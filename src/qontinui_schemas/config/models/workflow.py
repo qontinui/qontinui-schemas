@@ -23,7 +23,7 @@ class Connection(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class Connections(RootModel):
+class Connections(RootModel[dict[str, dict[str, list[list[Connection]]]]]):
     """
     Connections between actions in graph format.
 
@@ -129,7 +129,9 @@ class Workflow(BaseModel):
     variables: Variables | None = Field(
         None, description="Workflow variables (local, process, global)"
     )
-    settings: WorkflowSettings | None = Field(None, description="Workflow-level execution settings")
+    settings: WorkflowSettings | None = Field(
+        None, description="Workflow-level execution settings"
+    )
     metadata: WorkflowMetadata | None = Field(
         None, description="Workflow metadata (author, description, etc.)"
     )

@@ -9,10 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .code_actions import (
-    CodeBlockActionConfig,
-    CustomFunctionActionConfig,
-)
+from .code_actions import CodeBlockActionConfig, CustomFunctionActionConfig
 from .control_flow import (
     BreakActionConfig,
     ContinueActionConfig,
