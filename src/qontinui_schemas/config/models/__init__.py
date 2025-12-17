@@ -23,6 +23,37 @@ from .code_actions import (
     ErrorHandling,
 )
 
+# Root configuration models
+from .config_root import (
+    CheckMode,
+    ColorSpace,
+    CompatibleVersions,
+    ConfigMetadata,
+    ConfigSettings,
+    ExecutionRecord,
+    ExecutionSettings,
+    FailureStrategy,
+    FindActionSettings,
+    ImageAsset,
+    ImageFormat,
+    ImageSource,
+    KeyboardActionSettings,
+    LoggingSettings,
+)
+from .config_root import LogLevel as ConfigLogLevel
+from .config_root import (
+    MouseActionSettings,
+    PerformanceSettings,
+    QontinuiConfig,
+    RecognitionSettings,
+    Resolution,
+    Schedule,
+    ScheduleType,
+    SearchAlgorithm,
+    TriggerType,
+    WaitActionSettings,
+)
+
 # Control flow configs
 from .control_flow import (
     BreakActionConfig,
@@ -53,7 +84,8 @@ from .data_operations import (
 )
 
 # Execution control
-from .execution import BaseActionSettings, ExecutionSettings, RepetitionOptions
+from .execution import BaseActionSettings, RepetitionOptions
+from .execution import ExecutionSettings as ActionExecutionSettings
 
 # Find action configs
 from .find_actions import (
@@ -117,6 +149,28 @@ from .state_actions import (
     WorkflowRepetition,
 )
 
+# State machine models
+from .state_machine import (
+    BaseTransition,
+    IncomingTransition,
+    MultiPatternMode,
+    OutgoingTransition,
+    Pattern,
+    Position,
+    PositionName,
+    SearchMode,
+    SearchRegion,
+    State,
+    StateImage,
+    StateLocation,
+    StatePosition,
+    StateRegion,
+    StateString,
+    Transition,
+    TransitionCondition,
+    TransitionType,
+)
+
 # Target configurations
 from .targets import (
     AllResultsTarget,
@@ -127,6 +181,8 @@ from .targets import (
     RegionTarget,
     ResultByImageTarget,
     ResultIndexTarget,
+    StateLocationTarget,
+    StateRegionTarget,
     StateStringTarget,
     TargetConfig,
     TextTarget,
@@ -176,6 +232,8 @@ __all__ = [
     "RegionTarget",
     "ResultByImageTarget",
     "ResultIndexTarget",
+    "StateLocationTarget",
+    "StateRegionTarget",
     "StateStringTarget",
     "TargetConfig",
     "TextTarget",
@@ -251,4 +309,48 @@ __all__ = [
     "Workflow",
     "WorkflowMetadata",
     "WorkflowSettings",
+    # State machine models
+    "BaseTransition",
+    "IncomingTransition",
+    "MultiPatternMode",
+    "OutgoingTransition",
+    "Pattern",
+    "Position",
+    "PositionName",
+    "SearchMode",
+    "SearchRegion",
+    "State",
+    "StateImage",
+    "StateLocation",
+    "StatePosition",
+    "StateRegion",
+    "StateString",
+    "Transition",
+    "TransitionCondition",
+    "TransitionType",
+    # Root configuration models
+    "CheckMode",
+    "ColorSpace",
+    "CompatibleVersions",
+    "ConfigLogLevel",
+    "ConfigMetadata",
+    "ConfigSettings",
+    "ExecutionRecord",
+    "FailureStrategy",
+    "FindActionSettings",
+    "ImageAsset",
+    "ImageFormat",
+    "ImageSource",
+    "KeyboardActionSettings",
+    "LoggingSettings",
+    "MouseActionSettings",
+    "PerformanceSettings",
+    "QontinuiConfig",
+    "RecognitionSettings",
+    "Resolution",
+    "Schedule",
+    "ScheduleType",
+    "SearchAlgorithm",
+    "TriggerType",
+    "WaitActionSettings",
 ]
