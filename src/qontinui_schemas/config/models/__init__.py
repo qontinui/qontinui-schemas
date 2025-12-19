@@ -8,6 +8,16 @@ configuration, organized by domain for maintainability.
 # Base types and enums
 # Core action model
 from .action import ACTION_CONFIG_MAP, Action, get_typed_config
+
+# AI prompt action configs
+from .ai_prompts import (
+    AIPromptActionConfig,
+    AIPromptTemplate,
+    PromptParameter,
+    PromptSequence,
+    PromptSequenceStep,
+    RunPromptSequenceActionConfig,
+)
 from .base_types import (
     LogLevel,
     MouseButton,
@@ -84,8 +94,9 @@ from .data_operations import (
 )
 
 # Execution control
-from .execution import BaseActionSettings, RepetitionOptions
+from .execution import BaseActionSettings
 from .execution import ExecutionSettings as ActionExecutionSettings
+from .execution import RepetitionOptions
 
 # Find action configs
 from .find_actions import (
@@ -134,11 +145,7 @@ from .search import (
 )
 
 # Shell action configs
-from .shell_actions import (
-    ShellActionConfig,
-    ShellScriptActionConfig,
-    TriggerAiAnalysisActionConfig,
-)
+from .shell_actions import ShellActionConfig, ShellScriptActionConfig
 
 # State and workflow action configs
 from .state_actions import (
@@ -181,6 +188,7 @@ from .targets import (
     RegionTarget,
     ResultByImageTarget,
     ResultIndexTarget,
+    StateImageTarget,
     StateLocationTarget,
     StateRegionTarget,
     StateStringTarget,
@@ -232,6 +240,7 @@ __all__ = [
     "RegionTarget",
     "ResultByImageTarget",
     "ResultIndexTarget",
+    "StateImageTarget",
     "StateLocationTarget",
     "StateRegionTarget",
     "StateStringTarget",
@@ -291,7 +300,13 @@ __all__ = [
     # Shell actions
     "ShellActionConfig",
     "ShellScriptActionConfig",
-    "TriggerAiAnalysisActionConfig",
+    # AI prompt actions
+    "AIPromptActionConfig",
+    "AIPromptTemplate",
+    "PromptParameter",
+    "PromptSequence",
+    "PromptSequenceStep",
+    "RunPromptSequenceActionConfig",
     # State actions
     "GoToStateActionConfig",
     "RunWorkflowActionConfig",

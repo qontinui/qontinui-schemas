@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from .ai_prompts import AIPromptActionConfig, RunPromptSequenceActionConfig
 from .code_actions import CodeBlockActionConfig, CustomFunctionActionConfig
 from .control_flow import (
     BreakActionConfig,
@@ -52,11 +53,7 @@ from .mouse_actions import (
     MouseUpActionConfig,
     ScrollActionConfig,
 )
-from .shell_actions import (
-    ShellActionConfig,
-    ShellScriptActionConfig,
-    TriggerAiAnalysisActionConfig,
-)
+from .shell_actions import ShellActionConfig, ShellScriptActionConfig
 from .state_actions import (
     GoToStateActionConfig,
     RunWorkflowActionConfig,
@@ -129,7 +126,9 @@ ACTION_CONFIG_MAP = {
     # Shell actions
     "SHELL": ShellActionConfig,
     "SHELL_SCRIPT": ShellScriptActionConfig,
-    "TRIGGER_AI_ANALYSIS": TriggerAiAnalysisActionConfig,
+    # AI prompt actions
+    "AI_PROMPT": AIPromptActionConfig,
+    "RUN_PROMPT_SEQUENCE": RunPromptSequenceActionConfig,
 }
 
 
