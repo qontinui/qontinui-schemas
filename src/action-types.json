@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Qontinui Action Types",
+  "description": "Canonical definition of all action types in Qontinui",
+  "version": "1.0.0",
+
+  "categories": {
+    "find": {
+      "label": "Find",
+      "description": "Image matching and element detection",
+      "color": "#f59e0b"
+    },
+    "mouse": {
+      "label": "Mouse",
+      "description": "Mouse interactions and movements",
+      "color": "#10b981"
+    },
+    "keyboard": {
+      "label": "Keyboard",
+      "description": "Keyboard input and shortcuts",
+      "color": "#06b6d4"
+    },
+    "controlFlow": {
+      "label": "Control Flow",
+      "description": "Conditional logic and loops",
+      "color": "#3b82f6"
+    },
+    "data": {
+      "label": "Data",
+      "description": "Variables and data operations",
+      "color": "#f97316"
+    },
+    "state": {
+      "label": "State",
+      "description": "State management and workflow control",
+      "color": "#8b5cf6"
+    },
+    "code": {
+      "label": "Code",
+      "description": "Code execution, shell commands, and AI automation",
+      "color": "#6366f1"
+    }
+  },
+
+  "actions": {
+    "FIND": {
+      "displayName": "Find",
+      "description": "Find element on screen using image matching",
+      "category": "find",
+      "icon": "Search",
+      "keywords": ["find", "search", "locate", "image", "match", "detect"],
+      "targetTypes": ["image", "stateImages", "coordinates", "region"],
+      "strategies": ["FIRST", "EACH", "ALL", "BEST"],
+      "notes": "Use target.type='stateImages' to find any image from a state definition"
+    },
+    "VANISH": {
+      "displayName": "Vanish",
+      "description": "Wait for element to disappear from screen",
+      "category": "find",
+      "icon": "EyeOff",
+      "keywords": ["vanish", "disappear", "gone", "wait", "remove"]
+    },
+    "RAG_FIND": {
+      "displayName": "RAG Find",
+      "description": "Find element using AI embeddings (semantic search)",
+      "category": "find",
+      "icon": "Sparkles",
+      "keywords": ["rag", "ai", "embeddings", "semantic", "find", "search", "vector"]
+    },
+
+    "CLICK": {
+      "displayName": "Click",
+      "description": "Click on element (supports left/right/middle, single/double/triple)",
+      "category": "mouse",
+      "icon": "MousePointerClick",
+      "keywords": ["click", "mouse", "press", "select", "double", "right", "left", "middle"],
+      "config": {
+        "button": ["left", "right", "middle"],
+        "clickType": ["single", "double", "triple"],
+        "holdDuration": "number"
+      },
+      "notes": "Use clickType for double-click instead of separate DOUBLE_CLICK action"
+    },
+    "MOUSE_MOVE": {
+      "displayName": "Mouse Move",
+      "description": "Move mouse cursor to position",
+      "category": "mouse",
+      "icon": "Move",
+      "keywords": ["move", "mouse", "cursor", "position", "hover"]
+    },
+    "MOUSE_DOWN": {
+      "displayName": "Mouse Down",
+      "description": "Press mouse button down",
+      "category": "mouse",
+      "icon": "CornerDownRight",
+      "keywords": ["mouse", "down", "press", "hold", "button"]
+    },
+    "MOUSE_UP": {
+      "displayName": "Mouse Up",
+      "description": "Release mouse button",
+      "category": "mouse",
+      "icon": "CornerRightDown",
+      "keywords": ["mouse", "up", "release", "button"]
+    },
+    "DRAG": {
+      "displayName": "Drag",
+      "description": "Drag element from one position to another",
+      "category": "mouse",
+      "icon": "Move",
+      "keywords": ["drag", "drop", "move", "pull", "slide"],
+      "isComposite": true,
+      "composedOf": ["FIND", "FIND", "MOUSE_MOVE", "MOUSE_DOWN", "MOUSE_MOVE", "MOUSE_UP"]
+    },
+    "SCROLL": {
+      "displayName": "Scroll",
+      "description": "Scroll page or element",
+      "category": "mouse",
+      "icon": "RotateCw",
+      "keywords": ["scroll", "wheel", "page", "up", "down"]
+    },
+
+    "TYPE": {
+      "displayName": "Type",
+      "description": "Type text into an element",
+      "category": "keyboard",
+      "icon": "Type",
+      "keywords": ["type", "text", "input", "write", "enter"]
+    },
+    "KEY_PRESS": {
+      "displayName": "Key Press",
+      "description": "Press and release a single key",
+      "category": "keyboard",
+      "icon": "Command",
+      "keywords": ["key", "press", "keyboard", "button", "tap"]
+    },
+    "KEY_DOWN": {
+      "displayName": "Key Down",
+      "description": "Press key down (hold)",
+      "category": "keyboard",
+      "icon": "CornerDownRight",
+      "keywords": ["key", "down", "press", "hold", "modifier"]
+    },
+    "KEY_UP": {
+      "displayName": "Key Up",
+      "description": "Release key",
+      "category": "keyboard",
+      "icon": "CornerRightDown",
+      "keywords": ["key", "up", "release"]
+    },
+    "HOTKEY": {
+      "displayName": "Hotkey",
+      "description": "Execute keyboard shortcut combination",
+      "category": "keyboard",
+      "icon": "Command",
+      "keywords": ["hotkey", "shortcut", "combination", "ctrl", "alt", "cmd"]
+    },
+
+    "IF": {
+      "displayName": "If",
+      "description": "Conditional branching based on condition",
+      "category": "controlFlow",
+      "icon": "GitBranch",
+      "keywords": ["if", "condition", "branch", "decision", "choice"],
+      "multiOutput": true,
+      "outputCount": 2
+    },
+    "LOOP": {
+      "displayName": "Loop",
+      "description": "Repeat actions multiple times",
+      "category": "controlFlow",
+      "icon": "Repeat",
+      "keywords": ["loop", "repeat", "iterate", "cycle", "for", "while"]
+    },
+    "BREAK": {
+      "displayName": "Break",
+      "description": "Exit from loop early",
+      "category": "controlFlow",
+      "icon": "X",
+      "keywords": ["break", "exit", "stop", "terminate", "loop"]
+    },
+    "CONTINUE": {
+      "displayName": "Continue",
+      "description": "Skip to next loop iteration",
+      "category": "controlFlow",
+      "icon": "ArrowRight",
+      "keywords": ["continue", "skip", "next", "loop", "iteration"]
+    },
+    "SWITCH": {
+      "displayName": "Switch",
+      "description": "Multi-way branching based on value",
+      "category": "controlFlow",
+      "icon": "GitMerge",
+      "keywords": ["switch", "case", "branch", "select", "choice"],
+      "multiOutput": true
+    },
+    "TRY_CATCH": {
+      "displayName": "Try/Catch",
+      "description": "Error handling and recovery",
+      "category": "controlFlow",
+      "icon": "AlertTriangle",
+      "keywords": ["try", "catch", "error", "exception", "handle"],
+      "multiOutput": true,
+      "outputCount": 2
+    },
+
+    "SET_VARIABLE": {
+      "displayName": "Set Variable",
+      "description": "Store a value in a variable",
+      "category": "data",
+      "icon": "Variable",
+      "keywords": ["set", "variable", "store", "save", "assign"]
+    },
+    "GET_VARIABLE": {
+      "displayName": "Get Variable",
+      "description": "Retrieve a variable value",
+      "category": "data",
+      "icon": "Variable",
+      "keywords": ["get", "variable", "retrieve", "load", "read"]
+    },
+    "SORT": {
+      "displayName": "Sort",
+      "description": "Sort array or list of items",
+      "category": "data",
+      "icon": "SortAsc",
+      "keywords": ["sort", "order", "arrange", "organize", "array"]
+    },
+    "FILTER": {
+      "displayName": "Filter",
+      "description": "Filter array based on condition",
+      "category": "data",
+      "icon": "Filter",
+      "keywords": ["filter", "select", "condition", "array", "subset"]
+    },
+    "MAP": {
+      "displayName": "Map",
+      "description": "Transform each item in array",
+      "category": "data",
+      "icon": "MapPin",
+      "keywords": ["map", "transform", "convert", "array", "each"]
+    },
+    "REDUCE": {
+      "displayName": "Reduce",
+      "description": "Reduce array to single value",
+      "category": "data",
+      "icon": "Minus",
+      "keywords": ["reduce", "aggregate", "combine", "array", "accumulate"]
+    },
+    "STRING_OPERATION": {
+      "displayName": "String Operation",
+      "description": "Manipulate text strings",
+      "category": "data",
+      "icon": "Text",
+      "keywords": ["string", "text", "concat", "split", "replace", "substring"]
+    },
+    "MATH_OPERATION": {
+      "displayName": "Math Operation",
+      "description": "Perform mathematical calculations",
+      "category": "data",
+      "icon": "Calculator",
+      "keywords": ["math", "calculate", "add", "subtract", "multiply", "divide"]
+    },
+
+    "GO_TO_STATE": {
+      "displayName": "Go To State",
+      "description": "Navigate to a different workflow state",
+      "category": "state",
+      "icon": "Navigation",
+      "keywords": ["goto", "state", "navigate", "jump", "transition"],
+      "isExpandable": true,
+      "notes": "Expands to pathfinding transitions at runtime"
+    },
+    "RUN_WORKFLOW": {
+      "displayName": "Run Workflow",
+      "description": "Execute another workflow",
+      "category": "state",
+      "icon": "Play",
+      "keywords": ["run", "workflow", "execute", "call", "subprocess"],
+      "isExpandable": true
+    },
+    "SCREENSHOT": {
+      "displayName": "Screenshot",
+      "description": "Capture screen or region",
+      "category": "state",
+      "icon": "Camera",
+      "keywords": ["screenshot", "capture", "image", "screen", "snap"]
+    },
+
+    "CODE_BLOCK": {
+      "displayName": "Code Block",
+      "description": "Execute inline Python code with access to workflow context",
+      "category": "code",
+      "icon": "Code",
+      "keywords": ["code", "python", "script", "execute", "run", "inline", "custom"],
+      "subcategory": "python"
+    },
+    "CUSTOM_FUNCTION": {
+      "displayName": "Custom Function",
+      "description": "Execute pre-registered custom Python function",
+      "category": "code",
+      "icon": "FileCode",
+      "keywords": ["function", "custom", "python", "plugin", "module", "import"],
+      "subcategory": "python"
+    },
+    "SHELL": {
+      "displayName": "Run Command",
+      "description": "Execute a shell command and capture output",
+      "category": "code",
+      "icon": "Terminal",
+      "keywords": ["shell", "command", "bash", "powershell", "cmd", "terminal", "execute", "run", "cli"],
+      "subcategory": "shell"
+    },
+    "SHELL_SCRIPT": {
+      "displayName": "Run Script",
+      "description": "Execute a multi-line shell script",
+      "category": "code",
+      "icon": "FileTerminal",
+      "keywords": ["shell", "script", "bash", "powershell", "batch", "multiline", "execute", "run"],
+      "subcategory": "shell"
+    },
+    "AI_PROMPT": {
+      "displayName": "AI Prompt",
+      "description": "Execute an AI prompt with context isolation",
+      "category": "code",
+      "icon": "Sparkles",
+      "keywords": ["ai", "prompt", "claude", "assistant", "intelligent", "autonomous", "template"],
+      "subcategory": "ai"
+    },
+    "RUN_PROMPT_SEQUENCE": {
+      "displayName": "Prompt Sequence",
+      "description": "Execute a sequence of AI prompts with context isolation",
+      "category": "code",
+      "icon": "RotateCw",
+      "keywords": ["ai", "sequence", "multi-step", "pipeline", "workflow", "claude", "batch"],
+      "subcategory": "ai",
+      "isExpandable": true
+    },
+    "CHECKPOINT_WORKFLOW": {
+      "displayName": "Checkpoint Workflow",
+      "description": "Dynamic multi-session AI workflow with checkpoint-based progress tracking",
+      "category": "code",
+      "icon": "GitBranch",
+      "keywords": ["ai", "checkpoint", "multi-session", "dynamic", "workflow", "claude", "phase", "continuation", "long-running"],
+      "subcategory": "ai",
+      "isExpandable": true
+    }
+  },
+
+  "deprecated": {
+    "EXISTS": {
+      "replacedBy": "FIND",
+      "notes": "Use FIND with FIRST strategy and minimal timeout"
+    },
+    "WAIT": {
+      "replacedBy": null,
+      "notes": "Use pauseBeforeBegin/pauseAfterEnd for time delays, or FIND for waiting for images"
+    },
+    "FIND_STATE_IMAGE": {
+      "replacedBy": "FIND",
+      "notes": "Use FIND with target.type='stateImages'"
+    },
+    "DOUBLE_CLICK": {
+      "replacedBy": "CLICK",
+      "notes": "Use CLICK with clickType='double'"
+    },
+    "RIGHT_CLICK": {
+      "replacedBy": "CLICK",
+      "notes": "Use CLICK with button='right'"
+    }
+  }
+}

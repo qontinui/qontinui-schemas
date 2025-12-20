@@ -1,0 +1,20 @@
+{
+  "name": "qontinui-schemas",
+  "version": "1.0.0",
+  "description": "Canonical schema definitions for Qontinui action types and configurations",
+  "main": "generated/typescript/index.js",
+  "types": "generated/typescript/index.d.ts",
+  "scripts": {
+    "generate": "npm run generate:typescript && npm run generate:python",
+    "generate:typescript": "ts-node scripts/generate-typescript.ts",
+    "generate:python": "python scripts/generate-python.py",
+    "validate": "ts-node scripts/validate-schemas.ts"
+  },
+  "keywords": ["qontinui", "automation", "schemas", "actions"],
+  "author": "Joshua Spinak",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
