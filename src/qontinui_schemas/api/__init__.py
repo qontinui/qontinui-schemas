@@ -1,0 +1,246 @@
+"""API schemas for Qontinui services.
+
+This module contains request/response schemas for API endpoints
+shared between backend, frontend, and runner.
+"""
+
+from qontinui_schemas.api.execution import (
+    ActionExecutionBatch,
+    ActionExecutionBatchResponse,
+    ActionExecutionCreate,
+    ActionExecutionListResponse,
+    ActionExecutionResponse,
+    ActionReliabilityStats,
+    ActionStatus,
+    ActionType,
+    CoverageData,
+    ExecutionIssueBatch,
+    ExecutionIssueBatchResponse,
+    ExecutionIssueCreate,
+    ExecutionIssueDetail,
+    ExecutionIssueListResponse,
+    ExecutionIssueResponse,
+    ExecutionIssueUpdate,
+    ExecutionRunComplete,
+    ExecutionRunCompleteResponse,
+    ExecutionRunCreate,
+    ExecutionRunDetail,
+    ExecutionRunListResponse,
+    ExecutionRunResponse,
+    ExecutionScreenshotCreate,
+    ExecutionScreenshotResponse,
+    ExecutionStats,
+    ExecutionTrendDataPoint,
+    ExecutionTrendResponse,
+    HistoricalActionQuery,
+    HistoricalActionResult,
+    IssueSeverity,
+    IssueSource,
+    IssueStatus,
+    IssueType,
+)
+from qontinui_schemas.api.execution import Pagination as ExecutionPagination
+from qontinui_schemas.api.execution import (
+    PlaybackFrameRequest,
+    RunnerMetadata,
+    RunStatus,
+    RunType,
+)
+from qontinui_schemas.api.execution import (
+    ScreenshotType as ExecutionScreenshotType,  # Enums; Metadata; Execution Run; Action Execution; Screenshot; Issue; Analytics; Historical Playback; Pagination
+)
+from qontinui_schemas.api.execution import (
+    VisualComparisonResult,
+    WorkflowMetadata,
+)
+from qontinui_schemas.api.rag import (  # Enums; Embedding Sync (Runner → Backend); RAG Progress Events (Runner → UI); RAG Dashboard (Backend → Frontend); Semantic Search; State Filter
+    EmbeddingItem,
+    EmbeddingListResponse,
+    EmbeddingResultItem,
+    EmbeddingResultsRequest,
+    EmbeddingResultsResponse,
+    JobItem,
+    JobListResponse,
+    JobStatus,
+    JobSummary,
+    RagCompletionEvent,
+    RAGDashboardStats,
+    RagProcessingStatus,
+    RagProgressEvent,
+    SearchResultItem,
+    SemanticSearchRequest,
+    SemanticSearchResponse,
+    StateFilterItem,
+    StatesResponse,
+)
+from qontinui_schemas.api.testing import (  # Enums; Request schemas; Response schemas; Analytics; Historical Data (Config Testing)
+    ActionDataBatch,
+    ActionDataBatchResponse,
+    ActionDataCreate,
+    CoverageTrendDataPoint,
+    CoverageTrendResponse,
+    CoverageUpdate,
+    CoverageUpdateResponse,
+    DeficiencyBatchCreate,
+    DeficiencyBatchResponse,
+    DeficiencyCreate,
+    DeficiencyDetail,
+    DeficiencyListResponse,
+    DeficiencyResponse,
+    DeficiencySeverity,
+    DeficiencyStatus,
+    DeficiencyType,
+    DeficiencyUpdate,
+    HistoricalFrameResponse,
+    HistoricalResultRequest,
+    HistoricalResultResponse,
+    PaginatedResponse,
+    Pagination,
+    PlaybackRequest,
+    ReliabilityResponse,
+    ScreenshotMetadata,
+    ScreenshotType,
+    ScreenshotUploadResponse,
+    TestRunComplete,
+    TestRunCompleteResponse,
+    TestRunCreate,
+    TestRunDetail,
+    TestRunListResponse,
+    TestRunResponse,
+    TestRunStatus,
+    TransitionBatchCreate,
+    TransitionBatchResponse,
+    TransitionCreate,
+    TransitionReliabilityStats,
+    TransitionResponse,
+    TransitionStatus,
+    VisualComparisonSummary,
+)
+
+__all__ = [
+    # ==========================================================================
+    # Unified Execution API (NEW - replaces fragmented systems)
+    # ==========================================================================
+    # Execution Enums
+    "RunType",
+    "RunStatus",
+    "ActionType",
+    "ActionStatus",
+    "ExecutionScreenshotType",
+    "IssueSeverity",
+    "IssueStatus",
+    "IssueType",
+    "IssueSource",
+    # Metadata
+    "RunnerMetadata",
+    "WorkflowMetadata",
+    # Execution Run
+    "ExecutionRunCreate",
+    "ExecutionRunResponse",
+    "ExecutionRunDetail",
+    "ExecutionRunListResponse",
+    "ExecutionRunComplete",
+    "ExecutionRunCompleteResponse",
+    "ExecutionStats",
+    "CoverageData",
+    # Action Execution
+    "ActionExecutionCreate",
+    "ActionExecutionBatch",
+    "ActionExecutionResponse",
+    "ActionExecutionBatchResponse",
+    "ActionExecutionListResponse",
+    # Screenshot
+    "ExecutionScreenshotCreate",
+    "ExecutionScreenshotResponse",
+    "VisualComparisonResult",
+    # Issue
+    "ExecutionIssueCreate",
+    "ExecutionIssueBatch",
+    "ExecutionIssueResponse",
+    "ExecutionIssueDetail",
+    "ExecutionIssueListResponse",
+    "ExecutionIssueBatchResponse",
+    "ExecutionIssueUpdate",
+    # Analytics
+    "ActionReliabilityStats",
+    "ExecutionTrendDataPoint",
+    "ExecutionTrendResponse",
+    # Historical Playback
+    "HistoricalActionQuery",
+    "HistoricalActionResult",
+    "PlaybackFrameRequest",
+    "ExecutionPagination",
+    # ==========================================================================
+    # RAG API
+    # ==========================================================================
+    # RAG Enums
+    "JobStatus",
+    "RagProcessingStatus",
+    # RAG Embedding Sync (Runner → Backend)
+    "EmbeddingResultItem",
+    "EmbeddingResultsRequest",
+    "EmbeddingResultsResponse",
+    # RAG Progress Events (Runner → UI)
+    "RagProgressEvent",
+    "RagCompletionEvent",
+    # RAG Dashboard (Backend → Frontend)
+    "RAGDashboardStats",
+    "JobSummary",
+    "JobItem",
+    "JobListResponse",
+    "EmbeddingItem",
+    "EmbeddingListResponse",
+    # Semantic Search
+    "SemanticSearchRequest",
+    "SearchResultItem",
+    "SemanticSearchResponse",
+    # State Filter
+    "StateFilterItem",
+    "StatesResponse",
+    # Testing Enums
+    "TestRunStatus",
+    "TransitionStatus",
+    "DeficiencySeverity",
+    "DeficiencyStatus",
+    "DeficiencyType",
+    "ScreenshotType",
+    # Testing Request schemas
+    "TestRunCreate",
+    "TransitionCreate",
+    "TransitionBatchCreate",
+    "DeficiencyCreate",
+    "DeficiencyBatchCreate",
+    "DeficiencyUpdate",
+    "CoverageUpdate",
+    "TestRunComplete",
+    "ScreenshotMetadata",
+    # Testing Response schemas
+    "TestRunResponse",
+    "TestRunDetail",
+    "TestRunListResponse",
+    "TransitionResponse",
+    "TransitionBatchResponse",
+    "DeficiencyResponse",
+    "DeficiencyDetail",
+    "DeficiencyListResponse",
+    "DeficiencyBatchResponse",
+    "CoverageUpdateResponse",
+    "TestRunCompleteResponse",
+    "ScreenshotUploadResponse",
+    "VisualComparisonSummary",
+    "Pagination",
+    "PaginatedResponse",
+    # Analytics
+    "CoverageTrendDataPoint",
+    "CoverageTrendResponse",
+    "TransitionReliabilityStats",
+    "ReliabilityResponse",
+    # Historical Data (Config Testing)
+    "HistoricalResultRequest",
+    "HistoricalResultResponse",
+    "ActionDataCreate",
+    "ActionDataBatch",
+    "ActionDataBatchResponse",
+    "HistoricalFrameResponse",
+    "PlaybackRequest",
+]

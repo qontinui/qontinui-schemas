@@ -28,6 +28,10 @@ black = "^24.10"
 isort = "^7.0"
 ruff = "^0.14"
 mypy = "^1.14"
+pydantic-to-typescript = "^1.0.10"
+
+[tool.poetry.scripts]
+generate-ts = "scripts.generate_typescript:main"
 
 [build-system]
 requires = ["poetry-core"]

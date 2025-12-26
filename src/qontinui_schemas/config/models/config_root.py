@@ -79,6 +79,8 @@ class ImageAsset(BaseModel):
 
     Images are stored in base64 format within the configuration and
     referenced by ID from StateImages and Patterns.
+
+    Supports S3 storage with presigned URLs and versioning.
     """
 
     id: str = Field(..., description="Unique identifier for the image")
@@ -94,6 +96,39 @@ class ImageAsset(BaseModel):
     mask: str | None = Field(
         default=None,
         description="Optional base64 encoded mask image",
+    )
+
+    # S3 storage fields
+    s3_key: str | None = Field(
+        default=None,
+        alias="s3Key",
+        description="S3 object key for cloud storage",
+    )
+    url_expires_at: str | None = Field(
+        default=None,
+        alias="urlExpiresAt",
+        description="ISO 8601 timestamp when presigned URL expires",
+    )
+
+    # Versioning support
+    version: int | None = Field(
+        default=None,
+        description="Version number (default: 1)",
+    )
+    parent_image_id: str | None = Field(
+        default=None,
+        alias="parentImageId",
+        description="ID of the original image if this is a version",
+    )
+    versions: list[str] | None = Field(
+        default=None,
+        description="Array of version IDs (only on parent images)",
+    )
+
+    # Monitor assignment
+    monitors: list[int] | None = Field(
+        default=None,
+        description="Monitor indices where this image should be used (default: [0])",
     )
 
     model_config = {"populate_by_name": True}

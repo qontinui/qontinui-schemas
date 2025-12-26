@@ -1,0 +1,3616 @@
+{
+  "schemas": {
+    "TestRunCreate": {
+      "description": "Request schema for creating a new test run.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_name": {
+          "description": "Name of the test run",
+          "maxLength": 255,
+          "title": "Run Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional description",
+          "title": "Description"
+        },
+        "runner_metadata": {
+          "additionalProperties": true,
+          "description": "Metadata about the runner environment",
+          "title": "Runner Metadata",
+          "type": "object"
+        },
+        "workflow_metadata": {
+          "additionalProperties": true,
+          "description": "Metadata about the workflow being tested",
+          "title": "Workflow Metadata",
+          "type": "object"
+        },
+        "configuration_snapshot": {
+          "additionalProperties": true,
+          "description": "Snapshot of the test configuration",
+          "title": "Configuration Snapshot",
+          "type": "object"
+        }
+      },
+      "required": [
+        "project_id",
+        "run_name",
+        "runner_metadata",
+        "workflow_metadata",
+        "configuration_snapshot"
+      ],
+      "title": "TestRunCreate",
+      "type": "object"
+    },
+    "TransitionCreate": {
+      "$defs": {
+        "TransitionStatus": {
+          "description": "Status of a transition execution.",
+          "enum": [
+            "success",
+            "failed",
+            "timeout",
+            "skipped",
+            "error"
+          ],
+          "title": "TransitionStatus",
+          "type": "string"
+        }
+      },
+      "description": "Schema for a single transition report.",
+      "properties": {
+        "sequence_number": {
+          "description": "Order within test run",
+          "minimum": 1,
+          "title": "Sequence Number",
+          "type": "integer"
+        },
+        "from_state": {
+          "description": "Source state",
+          "maxLength": 255,
+          "title": "From State",
+          "type": "string"
+        },
+        "to_state": {
+          "description": "Destination state",
+          "maxLength": 255,
+          "title": "To State",
+          "type": "string"
+        },
+        "transition_name": {
+          "description": "Transition name",
+          "maxLength": 255,
+          "title": "Transition Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TransitionStatus",
+          "description": "Transition status"
+        },
+        "started_at": {
+          "description": "Transition start time",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "completed_at": {
+          "description": "Transition completion time",
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Duration in milliseconds",
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error type if failed",
+          "title": "Error Type"
+        },
+        "screenshot_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated screenshot ID",
+          "title": "Screenshot Id"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional transition metadata",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "sequence_number",
+        "from_state",
+        "to_state",
+        "transition_name",
+        "status",
+        "started_at",
+        "completed_at",
+        "duration_ms"
+      ],
+      "title": "TransitionCreate",
+      "type": "object"
+    },
+    "TransitionBatchCreate": {
+      "$defs": {
+        "TransitionCreate": {
+          "description": "Schema for a single transition report.",
+          "properties": {
+            "sequence_number": {
+              "description": "Order within test run",
+              "minimum": 1,
+              "title": "Sequence Number",
+              "type": "integer"
+            },
+            "from_state": {
+              "description": "Source state",
+              "maxLength": 255,
+              "title": "From State",
+              "type": "string"
+            },
+            "to_state": {
+              "description": "Destination state",
+              "maxLength": 255,
+              "title": "To State",
+              "type": "string"
+            },
+            "transition_name": {
+              "description": "Transition name",
+              "maxLength": 255,
+              "title": "Transition Name",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/TransitionStatus",
+              "description": "Transition status"
+            },
+            "started_at": {
+              "description": "Transition start time",
+              "format": "date-time",
+              "title": "Started At",
+              "type": "string"
+            },
+            "completed_at": {
+              "description": "Transition completion time",
+              "format": "date-time",
+              "title": "Completed At",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "error_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error type if failed",
+              "title": "Error Type"
+            },
+            "screenshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Associated screenshot ID",
+              "title": "Screenshot Id"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "description": "Additional transition metadata",
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "sequence_number",
+            "from_state",
+            "to_state",
+            "transition_name",
+            "status",
+            "started_at",
+            "completed_at",
+            "duration_ms"
+          ],
+          "title": "TransitionCreate",
+          "type": "object"
+        },
+        "TransitionStatus": {
+          "description": "Status of a transition execution.",
+          "enum": [
+            "success",
+            "failed",
+            "timeout",
+            "skipped",
+            "error"
+          ],
+          "title": "TransitionStatus",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for batch transition reporting.",
+      "properties": {
+        "transitions": {
+          "description": "List of transitions",
+          "items": {
+            "$ref": "#/$defs/TransitionCreate"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "transitions"
+      ],
+      "title": "TransitionBatchCreate",
+      "type": "object"
+    },
+    "DeficiencyCreate": {
+      "$defs": {
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyType": {
+          "description": "Type of deficiency.",
+          "enum": [
+            "functional_bug",
+            "ui_issue",
+            "performance",
+            "crash",
+            "security",
+            "accessibility",
+            "data",
+            "other"
+          ],
+          "title": "DeficiencyType",
+          "type": "string"
+        }
+      },
+      "description": "Schema for a single deficiency report.",
+      "properties": {
+        "title": {
+          "description": "Deficiency title",
+          "maxLength": 500,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "description": "Detailed description",
+          "title": "Description",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/DeficiencySeverity",
+          "description": "Severity level"
+        },
+        "deficiency_type": {
+          "$ref": "#/$defs/DeficiencyType",
+          "description": "Type of deficiency"
+        },
+        "transition_sequence_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Related transition sequence number",
+          "title": "Transition Sequence Number"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State where occurred",
+          "title": "State"
+        },
+        "screenshot_ids": {
+          "description": "Associated screenshot IDs",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Screenshot Ids",
+          "type": "array"
+        },
+        "reproduction_steps": {
+          "description": "Steps to reproduce",
+          "items": {
+            "type": "string"
+          },
+          "title": "Reproduction Steps",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "severity",
+        "deficiency_type"
+      ],
+      "title": "DeficiencyCreate",
+      "type": "object"
+    },
+    "DeficiencyBatchCreate": {
+      "$defs": {
+        "DeficiencyCreate": {
+          "description": "Schema for a single deficiency report.",
+          "properties": {
+            "title": {
+              "description": "Deficiency title",
+              "maxLength": 500,
+              "title": "Title",
+              "type": "string"
+            },
+            "description": {
+              "description": "Detailed description",
+              "title": "Description",
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "#/$defs/DeficiencySeverity",
+              "description": "Severity level"
+            },
+            "deficiency_type": {
+              "$ref": "#/$defs/DeficiencyType",
+              "description": "Type of deficiency"
+            },
+            "transition_sequence_number": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Related transition sequence number",
+              "title": "Transition Sequence Number"
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "State where occurred",
+              "title": "State"
+            },
+            "screenshot_ids": {
+              "description": "Associated screenshot IDs",
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "title": "Screenshot Ids",
+              "type": "array"
+            },
+            "reproduction_steps": {
+              "description": "Steps to reproduce",
+              "items": {
+                "type": "string"
+              },
+              "title": "Reproduction Steps",
+              "type": "array"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "description": "Additional metadata",
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "severity",
+            "deficiency_type"
+          ],
+          "title": "DeficiencyCreate",
+          "type": "object"
+        },
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyType": {
+          "description": "Type of deficiency.",
+          "enum": [
+            "functional_bug",
+            "ui_issue",
+            "performance",
+            "crash",
+            "security",
+            "accessibility",
+            "data",
+            "other"
+          ],
+          "title": "DeficiencyType",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for batch deficiency reporting.",
+      "properties": {
+        "deficiencies": {
+          "description": "List of deficiencies",
+          "items": {
+            "$ref": "#/$defs/DeficiencyCreate"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Deficiencies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "deficiencies"
+      ],
+      "title": "DeficiencyBatchCreate",
+      "type": "object"
+    },
+    "DeficiencyUpdate": {
+      "$defs": {
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyStatus": {
+          "description": "Status of a deficiency.",
+          "enum": [
+            "new",
+            "open",
+            "in_progress",
+            "resolved",
+            "closed",
+            "wont_fix"
+          ],
+          "title": "DeficiencyStatus",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for updating a deficiency.",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeficiencyStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New status"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeficiencySeverity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New severity"
+        },
+        "assigned_to_user_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Assign to user",
+          "title": "Assigned To User Id"
+        },
+        "resolution_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resolution notes",
+          "title": "Resolution Notes"
+        }
+      },
+      "title": "DeficiencyUpdate",
+      "type": "object"
+    },
+    "CoverageUpdate": {
+      "description": "Request schema for updating coverage metrics.",
+      "properties": {
+        "total_transitions_executed": {
+          "description": "Total executed",
+          "minimum": 0,
+          "title": "Total Transitions Executed",
+          "type": "integer"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique covered",
+          "minimum": 0,
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        },
+        "coverage_percentage": {
+          "description": "Coverage %",
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "transition_coverage_map": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Map of transition names to execution counts",
+          "title": "Transition Coverage Map",
+          "type": "object"
+        },
+        "state_coverage_map": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Map of state names to visit counts",
+          "title": "State Coverage Map",
+          "type": "object"
+        },
+        "uncovered_transitions": {
+          "description": "List of uncovered transitions",
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncovered Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_transitions_executed",
+        "unique_transitions_covered",
+        "coverage_percentage"
+      ],
+      "title": "CoverageUpdate",
+      "type": "object"
+    },
+    "TestRunComplete": {
+      "description": "Request schema for completing a test run.",
+      "properties": {
+        "status": {
+          "description": "Final status",
+          "title": "Status",
+          "type": "string"
+        },
+        "ended_at": {
+          "description": "End time",
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "final_metrics": {
+          "additionalProperties": true,
+          "description": "Final test metrics",
+          "title": "Final Metrics",
+          "type": "object"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional summary text",
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "status",
+        "ended_at",
+        "final_metrics"
+      ],
+      "title": "TestRunComplete",
+      "type": "object"
+    },
+    "ScreenshotMetadata": {
+      "$defs": {
+        "ScreenshotType": {
+          "description": "Type of screenshot.",
+          "enum": [
+            "error",
+            "success",
+            "manual",
+            "periodic",
+            "state_verification",
+            "action_result",
+            "before_action",
+            "after_action"
+          ],
+          "title": "ScreenshotType",
+          "type": "string"
+        }
+      },
+      "description": "Metadata for screenshot upload.",
+      "properties": {
+        "screenshot_id": {
+          "description": "Screenshot ID (client-generated)",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "sequence_number": {
+          "description": "Screenshot sequence number",
+          "minimum": 1,
+          "title": "Sequence Number",
+          "type": "integer"
+        },
+        "transition_sequence_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated transition sequence number",
+          "title": "Transition Sequence Number"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State when taken",
+          "title": "State"
+        },
+        "screenshot_type": {
+          "$ref": "#/$defs/ScreenshotType",
+          "description": "Screenshot type"
+        },
+        "timestamp": {
+          "description": "Screenshot timestamp",
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "width": {
+          "description": "Image width",
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Image height",
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "screenshot_id",
+        "sequence_number",
+        "screenshot_type",
+        "timestamp",
+        "width",
+        "height"
+      ],
+      "title": "ScreenshotMetadata",
+      "type": "object"
+    },
+    "Pagination": {
+      "description": "Pagination metadata.",
+      "properties": {
+        "total": {
+          "description": "Total number of items",
+          "title": "Total",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Number of items skipped",
+          "title": "Offset",
+          "type": "integer"
+        },
+        "has_more": {
+          "description": "Whether more items exist",
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "total",
+        "limit",
+        "offset",
+        "has_more"
+      ],
+      "title": "Pagination",
+      "type": "object"
+    },
+    "TestRunResponse": {
+      "$defs": {
+        "TestRunStatus": {
+          "description": "Status of a test run.",
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "TestRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for test run creation and retrieval.",
+      "properties": {
+        "run_id": {
+          "description": "Unique test run identifier",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_name": {
+          "description": "Name of the test run",
+          "title": "Run Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TestRunStatus",
+          "description": "Test run status"
+        },
+        "started_at": {
+          "description": "Test run start time",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Test run end time",
+          "title": "Ended At"
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration in seconds",
+          "title": "Duration Seconds"
+        },
+        "runner_metadata": {
+          "additionalProperties": true,
+          "description": "Runner metadata",
+          "title": "Runner Metadata",
+          "type": "object"
+        },
+        "created_at": {
+          "description": "Record creation time",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "project_id",
+        "run_name",
+        "status",
+        "started_at",
+        "runner_metadata",
+        "created_at"
+      ],
+      "title": "TestRunResponse",
+      "type": "object"
+    },
+    "TestRunDetail": {
+      "$defs": {
+        "TestRunStatus": {
+          "description": "Status of a test run.",
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "TestRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Detailed test run information.",
+      "properties": {
+        "run_id": {
+          "description": "Unique test run identifier",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_name": {
+          "description": "Name of the test run",
+          "title": "Run Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TestRunStatus",
+          "description": "Test run status"
+        },
+        "started_at": {
+          "description": "Test run start time",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Test run end time",
+          "title": "Ended At"
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration in seconds",
+          "title": "Duration Seconds"
+        },
+        "runner_metadata": {
+          "additionalProperties": true,
+          "description": "Runner metadata",
+          "title": "Runner Metadata",
+          "type": "object"
+        },
+        "created_at": {
+          "description": "Record creation time",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Test run description",
+          "title": "Description"
+        },
+        "workflow_metadata": {
+          "additionalProperties": true,
+          "description": "Workflow metadata",
+          "title": "Workflow Metadata",
+          "type": "object"
+        },
+        "configuration_snapshot": {
+          "additionalProperties": true,
+          "description": "Configuration snapshot",
+          "title": "Configuration Snapshot",
+          "type": "object"
+        },
+        "final_metrics": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Final metrics",
+          "title": "Final Metrics"
+        },
+        "coverage_data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coverage data",
+          "title": "Coverage Data"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last update time",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User who created",
+          "title": "Created By"
+        },
+        "transitions": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transitions",
+          "title": "Transitions"
+        },
+        "deficiencies": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deficiencies",
+          "title": "Deficiencies"
+        },
+        "screenshots": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Screenshots",
+          "title": "Screenshots"
+        }
+      },
+      "required": [
+        "run_id",
+        "project_id",
+        "run_name",
+        "status",
+        "started_at",
+        "runner_metadata",
+        "created_at",
+        "workflow_metadata",
+        "configuration_snapshot"
+      ],
+      "title": "TestRunDetail",
+      "type": "object"
+    },
+    "TestRunListResponse": {
+      "$defs": {
+        "Pagination": {
+          "description": "Pagination metadata.",
+          "properties": {
+            "total": {
+              "description": "Total number of items",
+              "title": "Total",
+              "type": "integer"
+            },
+            "limit": {
+              "description": "Items per page",
+              "title": "Limit",
+              "type": "integer"
+            },
+            "offset": {
+              "description": "Number of items skipped",
+              "title": "Offset",
+              "type": "integer"
+            },
+            "has_more": {
+              "description": "Whether more items exist",
+              "title": "Has More",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "total",
+            "limit",
+            "offset",
+            "has_more"
+          ],
+          "title": "Pagination",
+          "type": "object"
+        },
+        "TestRunResponse": {
+          "description": "Response schema for test run creation and retrieval.",
+          "properties": {
+            "run_id": {
+              "description": "Unique test run identifier",
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            },
+            "project_id": {
+              "description": "Project ID",
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            },
+            "run_name": {
+              "description": "Name of the test run",
+              "title": "Run Name",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/TestRunStatus",
+              "description": "Test run status"
+            },
+            "started_at": {
+              "description": "Test run start time",
+              "format": "date-time",
+              "title": "Started At",
+              "type": "string"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Test run end time",
+              "title": "Ended At"
+            },
+            "duration_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Duration in seconds",
+              "title": "Duration Seconds"
+            },
+            "runner_metadata": {
+              "additionalProperties": true,
+              "description": "Runner metadata",
+              "title": "Runner Metadata",
+              "type": "object"
+            },
+            "created_at": {
+              "description": "Record creation time",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id",
+            "project_id",
+            "run_name",
+            "status",
+            "started_at",
+            "runner_metadata",
+            "created_at"
+          ],
+          "title": "TestRunResponse",
+          "type": "object"
+        },
+        "TestRunStatus": {
+          "description": "Status of a test run.",
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "TestRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for paginated test run list.",
+      "properties": {
+        "runs": {
+          "description": "List of test runs",
+          "items": {
+            "$ref": "#/$defs/TestRunResponse"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "pagination": {
+          "$ref": "#/$defs/Pagination",
+          "description": "Pagination metadata"
+        }
+      },
+      "required": [
+        "runs",
+        "pagination"
+      ],
+      "title": "TestRunListResponse",
+      "type": "object"
+    },
+    "TransitionResponse": {
+      "$defs": {
+        "TransitionStatus": {
+          "description": "Status of a transition execution.",
+          "enum": [
+            "success",
+            "failed",
+            "timeout",
+            "skipped",
+            "error"
+          ],
+          "title": "TransitionStatus",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for a single transition.",
+      "properties": {
+        "transition_id": {
+          "description": "Transition ID",
+          "format": "uuid",
+          "title": "Transition Id",
+          "type": "string"
+        },
+        "sequence_number": {
+          "description": "Sequence number",
+          "title": "Sequence Number",
+          "type": "integer"
+        },
+        "from_state": {
+          "description": "Source state",
+          "title": "From State",
+          "type": "string"
+        },
+        "to_state": {
+          "description": "Destination state",
+          "title": "To State",
+          "type": "string"
+        },
+        "transition_name": {
+          "description": "Transition name",
+          "title": "Transition Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TransitionStatus",
+          "description": "Transition status"
+        },
+        "duration_ms": {
+          "description": "Duration in milliseconds",
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "started_at": {
+          "description": "Start time",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "completed_at": {
+          "description": "Completion time",
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message",
+          "title": "Error Message"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error type",
+          "title": "Error Type"
+        }
+      },
+      "required": [
+        "transition_id",
+        "sequence_number",
+        "from_state",
+        "to_state",
+        "transition_name",
+        "status",
+        "duration_ms",
+        "started_at",
+        "completed_at"
+      ],
+      "title": "TransitionResponse",
+      "type": "object"
+    },
+    "TransitionBatchResponse": {
+      "description": "Response schema for batch transition creation.",
+      "properties": {
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "transitions_recorded": {
+          "description": "Number recorded",
+          "title": "Transitions Recorded",
+          "type": "integer"
+        },
+        "transition_ids": {
+          "description": "IDs of created transitions",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Transition Ids",
+          "type": "array"
+        },
+        "coverage_updated": {
+          "additionalProperties": true,
+          "description": "Updated coverage",
+          "title": "Coverage Updated",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "transitions_recorded",
+        "transition_ids",
+        "coverage_updated"
+      ],
+      "title": "TransitionBatchResponse",
+      "type": "object"
+    },
+    "DeficiencyResponse": {
+      "$defs": {
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyStatus": {
+          "description": "Status of a deficiency.",
+          "enum": [
+            "new",
+            "open",
+            "in_progress",
+            "resolved",
+            "closed",
+            "wont_fix"
+          ],
+          "title": "DeficiencyStatus",
+          "type": "string"
+        },
+        "DeficiencyType": {
+          "description": "Type of deficiency.",
+          "enum": [
+            "functional_bug",
+            "ui_issue",
+            "performance",
+            "crash",
+            "security",
+            "accessibility",
+            "data",
+            "other"
+          ],
+          "title": "DeficiencyType",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for a single deficiency.",
+      "properties": {
+        "deficiency_id": {
+          "description": "Deficiency ID",
+          "format": "uuid",
+          "title": "Deficiency Id",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Deficiency title",
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "description": "Deficiency description",
+          "title": "Description",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/DeficiencySeverity",
+          "description": "Severity level"
+        },
+        "status": {
+          "$ref": "#/$defs/DeficiencyStatus",
+          "description": "Deficiency status"
+        },
+        "deficiency_type": {
+          "$ref": "#/$defs/DeficiencyType",
+          "description": "Deficiency type"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State where occurred",
+          "title": "State"
+        },
+        "transition_sequence_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Related transition",
+          "title": "Transition Sequence Number"
+        },
+        "screenshot_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of screenshots",
+          "title": "Screenshot Count"
+        },
+        "created_at": {
+          "description": "Creation time",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "description": "Last update time",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "run_info": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Related run info",
+          "title": "Run Info"
+        }
+      },
+      "required": [
+        "deficiency_id",
+        "run_id",
+        "title",
+        "description",
+        "severity",
+        "status",
+        "deficiency_type",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "DeficiencyResponse",
+      "type": "object"
+    },
+    "DeficiencyDetail": {
+      "$defs": {
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyStatus": {
+          "description": "Status of a deficiency.",
+          "enum": [
+            "new",
+            "open",
+            "in_progress",
+            "resolved",
+            "closed",
+            "wont_fix"
+          ],
+          "title": "DeficiencyStatus",
+          "type": "string"
+        },
+        "DeficiencyType": {
+          "description": "Type of deficiency.",
+          "enum": [
+            "functional_bug",
+            "ui_issue",
+            "performance",
+            "crash",
+            "security",
+            "accessibility",
+            "data",
+            "other"
+          ],
+          "title": "DeficiencyType",
+          "type": "string"
+        }
+      },
+      "description": "Detailed deficiency information.",
+      "properties": {
+        "deficiency_id": {
+          "description": "Deficiency ID",
+          "format": "uuid",
+          "title": "Deficiency Id",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Deficiency title",
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "description": "Deficiency description",
+          "title": "Description",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/DeficiencySeverity",
+          "description": "Severity level"
+        },
+        "status": {
+          "$ref": "#/$defs/DeficiencyStatus",
+          "description": "Deficiency status"
+        },
+        "deficiency_type": {
+          "$ref": "#/$defs/DeficiencyType",
+          "description": "Deficiency type"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State where occurred",
+          "title": "State"
+        },
+        "transition_sequence_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Related transition",
+          "title": "Transition Sequence Number"
+        },
+        "screenshot_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of screenshots",
+          "title": "Screenshot Count"
+        },
+        "created_at": {
+          "description": "Creation time",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "description": "Last update time",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "run_info": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Related run info",
+          "title": "Run Info"
+        },
+        "reproduction_steps": {
+          "description": "Reproduction steps",
+          "items": {
+            "type": "string"
+          },
+          "title": "Reproduction Steps",
+          "type": "array"
+        },
+        "screenshots": {
+          "description": "Associated screenshots",
+          "items": {},
+          "title": "Screenshots",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "title": "Metadata",
+          "type": "object"
+        },
+        "assigned_to": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Assigned user",
+          "title": "Assigned To"
+        },
+        "resolution_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resolution notes",
+          "title": "Resolution Notes"
+        },
+        "comments": {
+          "description": "Comments",
+          "items": {},
+          "title": "Comments",
+          "type": "array"
+        }
+      },
+      "required": [
+        "deficiency_id",
+        "run_id",
+        "title",
+        "description",
+        "severity",
+        "status",
+        "deficiency_type",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "DeficiencyDetail",
+      "type": "object"
+    },
+    "DeficiencyListResponse": {
+      "$defs": {
+        "DeficiencyResponse": {
+          "description": "Response schema for a single deficiency.",
+          "properties": {
+            "deficiency_id": {
+              "description": "Deficiency ID",
+              "format": "uuid",
+              "title": "Deficiency Id",
+              "type": "string"
+            },
+            "run_id": {
+              "description": "Test run ID",
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            },
+            "title": {
+              "description": "Deficiency title",
+              "title": "Title",
+              "type": "string"
+            },
+            "description": {
+              "description": "Deficiency description",
+              "title": "Description",
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "#/$defs/DeficiencySeverity",
+              "description": "Severity level"
+            },
+            "status": {
+              "$ref": "#/$defs/DeficiencyStatus",
+              "description": "Deficiency status"
+            },
+            "deficiency_type": {
+              "$ref": "#/$defs/DeficiencyType",
+              "description": "Deficiency type"
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "State where occurred",
+              "title": "State"
+            },
+            "transition_sequence_number": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Related transition",
+              "title": "Transition Sequence Number"
+            },
+            "screenshot_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of screenshots",
+              "title": "Screenshot Count"
+            },
+            "created_at": {
+              "description": "Creation time",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "Last update time",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            },
+            "run_info": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Related run info",
+              "title": "Run Info"
+            }
+          },
+          "required": [
+            "deficiency_id",
+            "run_id",
+            "title",
+            "description",
+            "severity",
+            "status",
+            "deficiency_type",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "DeficiencyResponse",
+          "type": "object"
+        },
+        "DeficiencySeverity": {
+          "description": "Severity level of a deficiency.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational"
+          ],
+          "title": "DeficiencySeverity",
+          "type": "string"
+        },
+        "DeficiencyStatus": {
+          "description": "Status of a deficiency.",
+          "enum": [
+            "new",
+            "open",
+            "in_progress",
+            "resolved",
+            "closed",
+            "wont_fix"
+          ],
+          "title": "DeficiencyStatus",
+          "type": "string"
+        },
+        "DeficiencyType": {
+          "description": "Type of deficiency.",
+          "enum": [
+            "functional_bug",
+            "ui_issue",
+            "performance",
+            "crash",
+            "security",
+            "accessibility",
+            "data",
+            "other"
+          ],
+          "title": "DeficiencyType",
+          "type": "string"
+        },
+        "Pagination": {
+          "description": "Pagination metadata.",
+          "properties": {
+            "total": {
+              "description": "Total number of items",
+              "title": "Total",
+              "type": "integer"
+            },
+            "limit": {
+              "description": "Items per page",
+              "title": "Limit",
+              "type": "integer"
+            },
+            "offset": {
+              "description": "Number of items skipped",
+              "title": "Offset",
+              "type": "integer"
+            },
+            "has_more": {
+              "description": "Whether more items exist",
+              "title": "Has More",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "total",
+            "limit",
+            "offset",
+            "has_more"
+          ],
+          "title": "Pagination",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for paginated deficiency list.",
+      "properties": {
+        "deficiencies": {
+          "description": "List of deficiencies",
+          "items": {
+            "$ref": "#/$defs/DeficiencyResponse"
+          },
+          "title": "Deficiencies",
+          "type": "array"
+        },
+        "pagination": {
+          "$ref": "#/$defs/Pagination",
+          "description": "Pagination metadata"
+        },
+        "summary": {
+          "additionalProperties": true,
+          "description": "Summary statistics",
+          "title": "Summary",
+          "type": "object"
+        }
+      },
+      "required": [
+        "deficiencies",
+        "pagination",
+        "summary"
+      ],
+      "title": "DeficiencyListResponse",
+      "type": "object"
+    },
+    "DeficiencyBatchResponse": {
+      "description": "Response schema for batch deficiency creation.",
+      "properties": {
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "deficiencies_recorded": {
+          "description": "Number recorded",
+          "title": "Deficiencies Recorded",
+          "type": "integer"
+        },
+        "deficiency_ids": {
+          "description": "IDs of created deficiencies",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Deficiency Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "deficiencies_recorded",
+        "deficiency_ids"
+      ],
+      "title": "DeficiencyBatchResponse",
+      "type": "object"
+    },
+    "CoverageUpdateResponse": {
+      "description": "Response schema for coverage update.",
+      "properties": {
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "coverage_updated": {
+          "description": "Whether update succeeded",
+          "title": "Coverage Updated",
+          "type": "boolean"
+        },
+        "coverage_percentage": {
+          "description": "Current coverage %",
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique transitions covered",
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "coverage_updated",
+        "coverage_percentage",
+        "unique_transitions_covered"
+      ],
+      "title": "CoverageUpdateResponse",
+      "type": "object"
+    },
+    "TestRunCompleteResponse": {
+      "$defs": {
+        "TestRunStatus": {
+          "description": "Status of a test run.",
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "TestRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for test run completion.",
+      "properties": {
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TestRunStatus",
+          "description": "Final status"
+        },
+        "started_at": {
+          "description": "Start time",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "description": "End time",
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "description": "Duration in seconds",
+          "title": "Duration Seconds",
+          "type": "integer"
+        },
+        "final_metrics": {
+          "additionalProperties": true,
+          "description": "Final metrics",
+          "title": "Final Metrics",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "status",
+        "started_at",
+        "ended_at",
+        "duration_seconds",
+        "final_metrics"
+      ],
+      "title": "TestRunCompleteResponse",
+      "type": "object"
+    },
+    "ScreenshotUploadResponse": {
+      "$defs": {
+        "VisualComparisonSummary": {
+          "description": "Summary of visual comparison result.",
+          "properties": {
+            "comparison_id": {
+              "description": "Visual comparison result ID",
+              "format": "uuid",
+              "title": "Comparison Id",
+              "type": "string"
+            },
+            "baseline_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Baseline ID compared against",
+              "title": "Baseline Id"
+            },
+            "similarity_score": {
+              "description": "Similarity score (0.0-1.0)",
+              "title": "Similarity Score",
+              "type": "number"
+            },
+            "threshold": {
+              "description": "Threshold used",
+              "title": "Threshold",
+              "type": "number"
+            },
+            "passed": {
+              "description": "Whether comparison passed",
+              "title": "Passed",
+              "type": "boolean"
+            },
+            "status": {
+              "description": "Comparison status",
+              "title": "Status",
+              "type": "string"
+            },
+            "diff_image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Diff image URL",
+              "title": "Diff Image Url"
+            },
+            "diff_region_count": {
+              "default": 0,
+              "description": "Number of diff regions",
+              "title": "Diff Region Count",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "comparison_id",
+            "similarity_score",
+            "threshold",
+            "passed",
+            "status"
+          ],
+          "title": "VisualComparisonSummary",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for screenshot upload.",
+      "properties": {
+        "screenshot_id": {
+          "description": "Screenshot ID",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "image_url": {
+          "description": "Full image URL",
+          "title": "Image Url",
+          "type": "string"
+        },
+        "thumbnail_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Thumbnail URL",
+          "title": "Thumbnail Url"
+        },
+        "uploaded_at": {
+          "description": "Upload time",
+          "format": "date-time",
+          "title": "Uploaded At",
+          "type": "string"
+        },
+        "file_size_bytes": {
+          "description": "File size in bytes",
+          "title": "File Size Bytes",
+          "type": "integer"
+        },
+        "state_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State name",
+          "title": "State Name"
+        },
+        "visual_comparison": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VisualComparisonSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Visual comparison result"
+        }
+      },
+      "required": [
+        "screenshot_id",
+        "run_id",
+        "image_url",
+        "uploaded_at",
+        "file_size_bytes"
+      ],
+      "title": "ScreenshotUploadResponse",
+      "type": "object"
+    },
+    "VisualComparisonSummary": {
+      "description": "Summary of visual comparison result.",
+      "properties": {
+        "comparison_id": {
+          "description": "Visual comparison result ID",
+          "format": "uuid",
+          "title": "Comparison Id",
+          "type": "string"
+        },
+        "baseline_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline ID compared against",
+          "title": "Baseline Id"
+        },
+        "similarity_score": {
+          "description": "Similarity score (0.0-1.0)",
+          "title": "Similarity Score",
+          "type": "number"
+        },
+        "threshold": {
+          "description": "Threshold used",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether comparison passed",
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "status": {
+          "description": "Comparison status",
+          "title": "Status",
+          "type": "string"
+        },
+        "diff_image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Diff image URL",
+          "title": "Diff Image Url"
+        },
+        "diff_region_count": {
+          "default": 0,
+          "description": "Number of diff regions",
+          "title": "Diff Region Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "comparison_id",
+        "similarity_score",
+        "threshold",
+        "passed",
+        "status"
+      ],
+      "title": "VisualComparisonSummary",
+      "type": "object"
+    },
+    "CoverageTrendDataPoint": {
+      "description": "Single data point in coverage trend.",
+      "properties": {
+        "date": {
+          "description": "Date (YYYY-MM-DD)",
+          "title": "Date",
+          "type": "string"
+        },
+        "runs_count": {
+          "description": "Number of runs on this date",
+          "title": "Runs Count",
+          "type": "integer"
+        },
+        "avg_coverage_percentage": {
+          "description": "Average coverage %",
+          "title": "Avg Coverage Percentage",
+          "type": "number"
+        },
+        "max_coverage_percentage": {
+          "description": "Maximum coverage %",
+          "title": "Max Coverage Percentage",
+          "type": "number"
+        },
+        "min_coverage_percentage": {
+          "description": "Minimum coverage %",
+          "title": "Min Coverage Percentage",
+          "type": "number"
+        },
+        "total_transitions_executed": {
+          "description": "Total transitions",
+          "title": "Total Transitions Executed",
+          "type": "integer"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique transitions",
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "runs_count",
+        "avg_coverage_percentage",
+        "max_coverage_percentage",
+        "min_coverage_percentage",
+        "total_transitions_executed",
+        "unique_transitions_covered"
+      ],
+      "title": "CoverageTrendDataPoint",
+      "type": "object"
+    },
+    "CoverageTrendResponse": {
+      "$defs": {
+        "CoverageTrendDataPoint": {
+          "description": "Single data point in coverage trend.",
+          "properties": {
+            "date": {
+              "description": "Date (YYYY-MM-DD)",
+              "title": "Date",
+              "type": "string"
+            },
+            "runs_count": {
+              "description": "Number of runs on this date",
+              "title": "Runs Count",
+              "type": "integer"
+            },
+            "avg_coverage_percentage": {
+              "description": "Average coverage %",
+              "title": "Avg Coverage Percentage",
+              "type": "number"
+            },
+            "max_coverage_percentage": {
+              "description": "Maximum coverage %",
+              "title": "Max Coverage Percentage",
+              "type": "number"
+            },
+            "min_coverage_percentage": {
+              "description": "Minimum coverage %",
+              "title": "Min Coverage Percentage",
+              "type": "number"
+            },
+            "total_transitions_executed": {
+              "description": "Total transitions",
+              "title": "Total Transitions Executed",
+              "type": "integer"
+            },
+            "unique_transitions_covered": {
+              "description": "Unique transitions",
+              "title": "Unique Transitions Covered",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "date",
+            "runs_count",
+            "avg_coverage_percentage",
+            "max_coverage_percentage",
+            "min_coverage_percentage",
+            "total_transitions_executed",
+            "unique_transitions_covered"
+          ],
+          "title": "CoverageTrendDataPoint",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for coverage trends.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "Start date",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "end_date": {
+          "description": "End date",
+          "title": "End Date",
+          "type": "string"
+        },
+        "granularity": {
+          "description": "Granularity",
+          "title": "Granularity",
+          "type": "string"
+        },
+        "data_points": {
+          "description": "Trend data",
+          "items": {
+            "$ref": "#/$defs/CoverageTrendDataPoint"
+          },
+          "title": "Data Points",
+          "type": "array"
+        },
+        "overall_stats": {
+          "additionalProperties": true,
+          "description": "Overall statistics",
+          "title": "Overall Stats",
+          "type": "object"
+        }
+      },
+      "required": [
+        "project_id",
+        "start_date",
+        "end_date",
+        "granularity",
+        "data_points",
+        "overall_stats"
+      ],
+      "title": "CoverageTrendResponse",
+      "type": "object"
+    },
+    "TransitionReliabilityStats": {
+      "description": "Statistics for a single transition.",
+      "properties": {
+        "transition_name": {
+          "description": "Transition name",
+          "title": "Transition Name",
+          "type": "string"
+        },
+        "from_state": {
+          "description": "Source state",
+          "title": "From State",
+          "type": "string"
+        },
+        "to_state": {
+          "description": "Destination state",
+          "title": "To State",
+          "type": "string"
+        },
+        "total_executions": {
+          "description": "Total executions",
+          "title": "Total Executions",
+          "type": "integer"
+        },
+        "successful_executions": {
+          "description": "Successful executions",
+          "title": "Successful Executions",
+          "type": "integer"
+        },
+        "failed_executions": {
+          "description": "Failed executions",
+          "title": "Failed Executions",
+          "type": "integer"
+        },
+        "success_rate": {
+          "description": "Success rate %",
+          "title": "Success Rate",
+          "type": "number"
+        },
+        "avg_duration_ms": {
+          "description": "Average duration ms",
+          "title": "Avg Duration Ms",
+          "type": "integer"
+        },
+        "median_duration_ms": {
+          "description": "Median duration ms",
+          "title": "Median Duration Ms",
+          "type": "integer"
+        },
+        "p95_duration_ms": {
+          "description": "95th percentile duration",
+          "title": "P95 Duration Ms",
+          "type": "integer"
+        },
+        "failure_modes": {
+          "description": "Failure mode breakdown",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Failure Modes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "transition_name",
+        "from_state",
+        "to_state",
+        "total_executions",
+        "successful_executions",
+        "failed_executions",
+        "success_rate",
+        "avg_duration_ms",
+        "median_duration_ms",
+        "p95_duration_ms"
+      ],
+      "title": "TransitionReliabilityStats",
+      "type": "object"
+    },
+    "ReliabilityResponse": {
+      "$defs": {
+        "TransitionReliabilityStats": {
+          "description": "Statistics for a single transition.",
+          "properties": {
+            "transition_name": {
+              "description": "Transition name",
+              "title": "Transition Name",
+              "type": "string"
+            },
+            "from_state": {
+              "description": "Source state",
+              "title": "From State",
+              "type": "string"
+            },
+            "to_state": {
+              "description": "Destination state",
+              "title": "To State",
+              "type": "string"
+            },
+            "total_executions": {
+              "description": "Total executions",
+              "title": "Total Executions",
+              "type": "integer"
+            },
+            "successful_executions": {
+              "description": "Successful executions",
+              "title": "Successful Executions",
+              "type": "integer"
+            },
+            "failed_executions": {
+              "description": "Failed executions",
+              "title": "Failed Executions",
+              "type": "integer"
+            },
+            "success_rate": {
+              "description": "Success rate %",
+              "title": "Success Rate",
+              "type": "number"
+            },
+            "avg_duration_ms": {
+              "description": "Average duration ms",
+              "title": "Avg Duration Ms",
+              "type": "integer"
+            },
+            "median_duration_ms": {
+              "description": "Median duration ms",
+              "title": "Median Duration Ms",
+              "type": "integer"
+            },
+            "p95_duration_ms": {
+              "description": "95th percentile duration",
+              "title": "P95 Duration Ms",
+              "type": "integer"
+            },
+            "failure_modes": {
+              "description": "Failure mode breakdown",
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Failure Modes",
+              "type": "array"
+            }
+          },
+          "required": [
+            "transition_name",
+            "from_state",
+            "to_state",
+            "total_executions",
+            "successful_executions",
+            "failed_executions",
+            "success_rate",
+            "avg_duration_ms",
+            "median_duration_ms",
+            "p95_duration_ms"
+          ],
+          "title": "TransitionReliabilityStats",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for transition reliability statistics.",
+      "properties": {
+        "workflow_id": {
+          "description": "Workflow ID",
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name",
+          "title": "Workflow Name"
+        },
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "date_range": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Date range",
+          "title": "Date Range",
+          "type": "object"
+        },
+        "transition_stats": {
+          "description": "Transition statistics",
+          "items": {
+            "$ref": "#/$defs/TransitionReliabilityStats"
+          },
+          "title": "Transition Stats",
+          "type": "array"
+        },
+        "overall_reliability": {
+          "additionalProperties": true,
+          "description": "Overall metrics",
+          "title": "Overall Reliability",
+          "type": "object"
+        }
+      },
+      "required": [
+        "workflow_id",
+        "project_id",
+        "date_range",
+        "transition_stats",
+        "overall_reliability"
+      ],
+      "title": "ReliabilityResponse",
+      "type": "object"
+    },
+    "HistoricalResultRequest": {
+      "description": "Request for random historical result (integration testing).",
+      "properties": {
+        "pattern_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by pattern ID",
+          "title": "Pattern Id"
+        },
+        "action_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by action type (FIND, CLICK, etc.)",
+          "title": "Action Type"
+        },
+        "active_states": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by active states (any match)",
+          "title": "Active States"
+        },
+        "success_only": {
+          "default": true,
+          "description": "Only return successful results",
+          "title": "Success Only",
+          "type": "boolean"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by workflow ID",
+          "title": "Workflow Id"
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by project ID",
+          "title": "Project Id"
+        }
+      },
+      "title": "HistoricalResultRequest",
+      "type": "object"
+    },
+    "HistoricalResultResponse": {
+      "description": "Response for a historical result.",
+      "properties": {
+        "id": {
+          "description": "Historical result ID",
+          "title": "Id",
+          "type": "integer"
+        },
+        "pattern_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern ID",
+          "title": "Pattern Id"
+        },
+        "pattern_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern name",
+          "title": "Pattern Name"
+        },
+        "action_type": {
+          "description": "Action type",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "active_states": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Active states",
+          "title": "Active States"
+        },
+        "success": {
+          "description": "Whether action succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "match_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of matches",
+          "title": "Match Count"
+        },
+        "best_match_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Best match score",
+          "title": "Best Match Score"
+        },
+        "match_x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match X coordinate",
+          "title": "Match X"
+        },
+        "match_y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match Y coordinate",
+          "title": "Match Y"
+        },
+        "match_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match width",
+          "title": "Match Width"
+        },
+        "match_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match height",
+          "title": "Match Height"
+        },
+        "frame_timestamp_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Frame timestamp",
+          "title": "Frame Timestamp Ms"
+        },
+        "has_frame": {
+          "default": false,
+          "description": "Whether frame is available",
+          "title": "Has Frame",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "action_type",
+        "success"
+      ],
+      "title": "HistoricalResultResponse",
+      "type": "object"
+    },
+    "ActionDataCreate": {
+      "description": "Action data submitted by runner for historical indexing.",
+      "properties": {
+        "action_id": {
+          "description": "Unique action ID",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "description": "Action type (FIND, CLICK, TYPE, etc.)",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether action succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "pattern_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern ID if applicable",
+          "title": "Pattern Id"
+        },
+        "pattern_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern name if applicable",
+          "title": "Pattern Name"
+        },
+        "active_states": {
+          "description": "Active states during action",
+          "items": {
+            "type": "string"
+          },
+          "title": "Active States",
+          "type": "array"
+        },
+        "match_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of matches found",
+          "title": "Match Count"
+        },
+        "best_match_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Best match confidence",
+          "title": "Best Match Score"
+        },
+        "match_x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match X coordinate",
+          "title": "Match X"
+        },
+        "match_y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match Y coordinate",
+          "title": "Match Y"
+        },
+        "match_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match width",
+          "title": "Match Width"
+        },
+        "match_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match height",
+          "title": "Match Height"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action duration in ms",
+          "title": "Duration Ms"
+        },
+        "result_data": {
+          "additionalProperties": true,
+          "description": "Additional result data",
+          "title": "Result Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_type",
+        "success"
+      ],
+      "title": "ActionDataCreate",
+      "type": "object"
+    },
+    "ActionDataBatch": {
+      "$defs": {
+        "ActionDataCreate": {
+          "description": "Action data submitted by runner for historical indexing.",
+          "properties": {
+            "action_id": {
+              "description": "Unique action ID",
+              "title": "Action Id",
+              "type": "string"
+            },
+            "action_type": {
+              "description": "Action type (FIND, CLICK, TYPE, etc.)",
+              "title": "Action Type",
+              "type": "string"
+            },
+            "success": {
+              "description": "Whether action succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "pattern_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pattern ID if applicable",
+              "title": "Pattern Id"
+            },
+            "pattern_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pattern name if applicable",
+              "title": "Pattern Name"
+            },
+            "active_states": {
+              "description": "Active states during action",
+              "items": {
+                "type": "string"
+              },
+              "title": "Active States",
+              "type": "array"
+            },
+            "match_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of matches found",
+              "title": "Match Count"
+            },
+            "best_match_score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Best match confidence",
+              "title": "Best Match Score"
+            },
+            "match_x": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match X coordinate",
+              "title": "Match X"
+            },
+            "match_y": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match Y coordinate",
+              "title": "Match Y"
+            },
+            "match_width": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match width",
+              "title": "Match Width"
+            },
+            "match_height": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match height",
+              "title": "Match Height"
+            },
+            "duration_ms": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Action duration in ms",
+              "title": "Duration Ms"
+            },
+            "result_data": {
+              "additionalProperties": true,
+              "description": "Additional result data",
+              "title": "Result Data",
+              "type": "object"
+            }
+          },
+          "required": [
+            "action_id",
+            "action_type",
+            "success"
+          ],
+          "title": "ActionDataCreate",
+          "type": "object"
+        }
+      },
+      "description": "Batch of action data from runner.",
+      "properties": {
+        "run_id": {
+          "description": "Test run or execution ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow ID if applicable",
+          "title": "Workflow Id"
+        },
+        "actions": {
+          "description": "List of action data",
+          "items": {
+            "$ref": "#/$defs/ActionDataCreate"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Actions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "project_id",
+        "actions"
+      ],
+      "title": "ActionDataBatch",
+      "type": "object"
+    },
+    "ActionDataBatchResponse": {
+      "description": "Response for batch action data submission.",
+      "properties": {
+        "indexed": {
+          "description": "Number of actions indexed",
+          "title": "Indexed",
+          "type": "integer"
+        },
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "indexed",
+        "run_id"
+      ],
+      "title": "ActionDataBatchResponse",
+      "type": "object"
+    },
+    "HistoricalFrameResponse": {
+      "description": "Response with frame data for playback.",
+      "properties": {
+        "historical_result_id": {
+          "description": "Historical result ID",
+          "title": "Historical Result Id",
+          "type": "integer"
+        },
+        "action_type": {
+          "description": "Action type",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "pattern_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern ID",
+          "title": "Pattern Id"
+        },
+        "pattern_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern name",
+          "title": "Pattern Name"
+        },
+        "success": {
+          "description": "Whether action succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "match_x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match X coordinate",
+          "title": "Match X"
+        },
+        "match_y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match Y coordinate",
+          "title": "Match Y"
+        },
+        "match_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match width",
+          "title": "Match Width"
+        },
+        "match_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Match height",
+          "title": "Match Height"
+        },
+        "timestamp_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp in ms",
+          "title": "Timestamp Ms"
+        },
+        "frame_base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base64 encoded JPEG frame",
+          "title": "Frame Base64"
+        },
+        "has_frame": {
+          "default": false,
+          "description": "Whether frame is available",
+          "title": "Has Frame",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "historical_result_id",
+        "action_type",
+        "success"
+      ],
+      "title": "HistoricalFrameResponse",
+      "type": "object"
+    },
+    "PlaybackRequest": {
+      "description": "Request for integration test playback frames.",
+      "properties": {
+        "historical_result_ids": {
+          "description": "List of historical result IDs in order",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Historical Result Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "historical_result_ids"
+      ],
+      "title": "PlaybackRequest",
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,2338 @@
+{
+  "schemas": {
+    "ComputeTextEmbeddingRequest": {
+      "description": "Request to compute CLIP text embedding for semantic search.",
+      "properties": {
+        "text": {
+          "description": "Text to encode into embedding space",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "ComputeTextEmbeddingRequest",
+      "type": "object"
+    },
+    "ComputeTextEmbeddingResponse": {
+      "description": "Response with computed CLIP text embedding.",
+      "properties": {
+        "success": {
+          "description": "Whether embedding computation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CLIP text embedding vector (512 dimensions)",
+          "title": "Embedding"
+        },
+        "embedding_dim": {
+          "default": 512,
+          "description": "Dimension of the embedding vector",
+          "title": "Embedding Dim",
+          "type": "integer"
+        },
+        "processing_time_ms": {
+          "default": 0.0,
+          "description": "Processing time in milliseconds",
+          "title": "Processing Time Ms",
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "title": "ComputeTextEmbeddingResponse",
+      "type": "object"
+    },
+    "ComputeEmbeddingRequest": {
+      "description": "Request to compute embedding for a single image.",
+      "properties": {
+        "image_data": {
+          "description": "Base64 encoded image data",
+          "title": "Image Data",
+          "type": "string"
+        },
+        "compute_text_embedding": {
+          "default": false,
+          "description": "Also compute text embedding from OCR",
+          "title": "Compute Text Embedding",
+          "type": "boolean"
+        },
+        "text_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional text description for text embedding",
+          "title": "Text Description"
+        }
+      },
+      "required": [
+        "image_data"
+      ],
+      "title": "ComputeEmbeddingRequest",
+      "type": "object"
+    },
+    "ComputeEmbeddingResponse": {
+      "description": "Response with computed embeddings for a single image.",
+      "properties": {
+        "success": {
+          "description": "Whether embedding computation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "image_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CLIP image embedding vector (512 dimensions)",
+          "title": "Image Embedding"
+        },
+        "text_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text embedding vector (384 dimensions)",
+          "title": "Text Embedding"
+        },
+        "text_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI-generated text description",
+          "title": "Text Description"
+        },
+        "ocr_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text extracted via OCR",
+          "title": "Ocr Text"
+        },
+        "ocr_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OCR confidence score (0-1)",
+          "title": "Ocr Confidence"
+        },
+        "processing_time_ms": {
+          "default": 0.0,
+          "description": "Processing time in milliseconds",
+          "title": "Processing Time Ms",
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "title": "ComputeEmbeddingResponse",
+      "type": "object"
+    },
+    "BatchComputeEmbeddingRequest": {
+      "description": "Request to compute embeddings for multiple images.",
+      "properties": {
+        "images": {
+          "description": "List of images with 'id', 'image_data' (base64), and optional 'text_description'",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Images",
+          "type": "array"
+        },
+        "compute_text_embeddings": {
+          "default": true,
+          "description": "Compute text embeddings for all images",
+          "title": "Compute Text Embeddings",
+          "type": "boolean"
+        },
+        "extract_ocr": {
+          "default": true,
+          "description": "Extract OCR text from images",
+          "title": "Extract Ocr",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "images"
+      ],
+      "title": "BatchComputeEmbeddingRequest",
+      "type": "object"
+    },
+    "BatchEmbeddingResult": {
+      "description": "Result for a single image in batch processing.",
+      "properties": {
+        "id": {
+          "description": "Image identifier from the request",
+          "title": "Id",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether embedding computation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "image_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CLIP image embedding vector (512 dimensions)",
+          "title": "Image Embedding"
+        },
+        "text_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text embedding vector (384 dimensions)",
+          "title": "Text Embedding"
+        },
+        "text_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI-generated text description",
+          "title": "Text Description"
+        },
+        "ocr_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text extracted via OCR",
+          "title": "Ocr Text"
+        },
+        "ocr_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OCR confidence score (0-1)",
+          "title": "Ocr Confidence"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "id",
+        "success"
+      ],
+      "title": "BatchEmbeddingResult",
+      "type": "object"
+    },
+    "BatchComputeEmbeddingResponse": {
+      "$defs": {
+        "BatchEmbeddingResult": {
+          "description": "Result for a single image in batch processing.",
+          "properties": {
+            "id": {
+              "description": "Image identifier from the request",
+              "title": "Id",
+              "type": "string"
+            },
+            "success": {
+              "description": "Whether embedding computation succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "image_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CLIP image embedding vector (512 dimensions)",
+              "title": "Image Embedding"
+            },
+            "text_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text embedding vector (384 dimensions)",
+              "title": "Text Embedding"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated text description",
+              "title": "Text Description"
+            },
+            "ocr_text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text extracted via OCR",
+              "title": "Ocr Text"
+            },
+            "ocr_confidence": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "OCR confidence score (0-1)",
+              "title": "Ocr Confidence"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            }
+          },
+          "required": [
+            "id",
+            "success"
+          ],
+          "title": "BatchEmbeddingResult",
+          "type": "object"
+        }
+      },
+      "description": "Response with batch computed embeddings.",
+      "properties": {
+        "success": {
+          "description": "Whether batch processing succeeded overall",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "results": {
+          "description": "Results for each image",
+          "items": {
+            "$ref": "#/$defs/BatchEmbeddingResult"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "total_processed": {
+          "description": "Total number of images processed",
+          "title": "Total Processed",
+          "type": "integer"
+        },
+        "successful": {
+          "description": "Number of successful embeddings",
+          "title": "Successful",
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of failed embeddings",
+          "title": "Failed",
+          "type": "integer"
+        },
+        "processing_time_ms": {
+          "default": 0.0,
+          "description": "Total processing time in milliseconds",
+          "title": "Processing Time Ms",
+          "type": "number"
+        }
+      },
+      "required": [
+        "success",
+        "results",
+        "total_processed",
+        "successful",
+        "failed"
+      ],
+      "title": "BatchComputeEmbeddingResponse",
+      "type": "object"
+    },
+    "EmbeddingResultItem": {
+      "description": "Single embedding result from runner.",
+      "properties": {
+        "state_image_id": {
+          "description": "ID of the state image that was processed",
+          "title": "State Image Id",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether embedding generation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "image_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CLIP image embedding vector (512 dimensions)",
+          "title": "Image Embedding"
+        },
+        "text_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text embedding vector (384 dimensions for all-MiniLM-L6-v2)",
+          "title": "Text Embedding"
+        },
+        "text_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI-generated text description of the element",
+          "title": "Text Description"
+        },
+        "ocr_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text extracted via OCR from the image",
+          "title": "Ocr Text"
+        },
+        "ocr_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Confidence score of OCR extraction (0-1)",
+          "title": "Ocr Confidence"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if processing failed",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "state_image_id",
+        "success"
+      ],
+      "title": "EmbeddingResultItem",
+      "type": "object"
+    },
+    "EmbeddingResultsRequest": {
+      "$defs": {
+        "EmbeddingResultItem": {
+          "description": "Single embedding result from runner.",
+          "properties": {
+            "state_image_id": {
+              "description": "ID of the state image that was processed",
+              "title": "State Image Id",
+              "type": "string"
+            },
+            "success": {
+              "description": "Whether embedding generation succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "image_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CLIP image embedding vector (512 dimensions)",
+              "title": "Image Embedding"
+            },
+            "text_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text embedding vector (384 dimensions for all-MiniLM-L6-v2)",
+              "title": "Text Embedding"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated text description of the element",
+              "title": "Text Description"
+            },
+            "ocr_text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text extracted via OCR from the image",
+              "title": "Ocr Text"
+            },
+            "ocr_confidence": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Confidence score of OCR extraction (0-1)",
+              "title": "Ocr Confidence"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if processing failed",
+              "title": "Error"
+            }
+          },
+          "required": [
+            "state_image_id",
+            "success"
+          ],
+          "title": "EmbeddingResultItem",
+          "type": "object"
+        }
+      },
+      "description": "Request containing embedding results from runner.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID the embeddings belong to",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "results": {
+          "description": "List of embedding results",
+          "items": {
+            "$ref": "#/$defs/EmbeddingResultItem"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "total_processed": {
+          "description": "Total number of elements processed",
+          "title": "Total Processed",
+          "type": "integer"
+        },
+        "successful": {
+          "description": "Number of successfully processed elements",
+          "title": "Successful",
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of failed elements",
+          "title": "Failed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_id",
+        "results",
+        "total_processed",
+        "successful",
+        "failed"
+      ],
+      "title": "EmbeddingResultsRequest",
+      "type": "object"
+    },
+    "EmbeddingResultsResponse": {
+      "description": "Response after applying embedding results.",
+      "properties": {
+        "success": {
+          "description": "Whether the sync operation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "Status message",
+          "title": "Message",
+          "type": "string"
+        },
+        "applied": {
+          "description": "Number of embeddings applied to config",
+          "title": "Applied",
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of embeddings that failed to apply",
+          "title": "Failed",
+          "type": "integer"
+        },
+        "not_found": {
+          "description": "Number of state images not found in config",
+          "title": "Not Found",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "success",
+        "message",
+        "applied",
+        "failed",
+        "not_found"
+      ],
+      "title": "EmbeddingResultsResponse",
+      "type": "object"
+    },
+    "RagProgressEvent": {
+      "$defs": {
+        "RagProcessingStatus": {
+          "description": "Status of RAG processing in the runner.",
+          "enum": [
+            "not_started",
+            "in_progress",
+            "completed",
+            "failed"
+          ],
+          "title": "RagProcessingStatus",
+          "type": "string"
+        }
+      },
+      "description": "Progress event emitted during RAG processing.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID being processed",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RagProcessingStatus",
+          "description": "Current processing status"
+        },
+        "message": {
+          "description": "Human-readable status message",
+          "title": "Message",
+          "type": "string"
+        },
+        "percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Progress percentage (0-100)",
+          "title": "Percent"
+        },
+        "elements_processed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of elements processed so far",
+          "title": "Elements Processed"
+        },
+        "total_elements": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Total number of elements to process",
+          "title": "Total Elements"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "project_id",
+        "status",
+        "message"
+      ],
+      "title": "RagProgressEvent",
+      "type": "object"
+    },
+    "RagCompletionEvent": {
+      "$defs": {
+        "EmbeddingResultItem": {
+          "description": "Single embedding result from runner.",
+          "properties": {
+            "state_image_id": {
+              "description": "ID of the state image that was processed",
+              "title": "State Image Id",
+              "type": "string"
+            },
+            "success": {
+              "description": "Whether embedding generation succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "image_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CLIP image embedding vector (512 dimensions)",
+              "title": "Image Embedding"
+            },
+            "text_embedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text embedding vector (384 dimensions for all-MiniLM-L6-v2)",
+              "title": "Text Embedding"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated text description of the element",
+              "title": "Text Description"
+            },
+            "ocr_text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text extracted via OCR from the image",
+              "title": "Ocr Text"
+            },
+            "ocr_confidence": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Confidence score of OCR extraction (0-1)",
+              "title": "Ocr Confidence"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if processing failed",
+              "title": "Error"
+            }
+          },
+          "required": [
+            "state_image_id",
+            "success"
+          ],
+          "title": "EmbeddingResultItem",
+          "type": "object"
+        }
+      },
+      "description": "Completion event emitted when RAG processing finishes.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID that was processed",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether processing completed successfully",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "results": {
+          "description": "Individual element results",
+          "items": {
+            "$ref": "#/$defs/EmbeddingResultItem"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "total_processed": {
+          "description": "Total elements processed",
+          "title": "Total Processed",
+          "type": "integer"
+        },
+        "successful": {
+          "description": "Number of successful elements",
+          "title": "Successful",
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of failed elements",
+          "title": "Failed",
+          "type": "integer"
+        },
+        "web_sync_success": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether sync to web backend succeeded",
+          "title": "Web Sync Success"
+        },
+        "web_sync_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if web sync failed",
+          "title": "Web Sync Error"
+        }
+      },
+      "required": [
+        "project_id",
+        "success",
+        "results",
+        "total_processed",
+        "successful",
+        "failed"
+      ],
+      "title": "RagCompletionEvent",
+      "type": "object"
+    },
+    "JobSummary": {
+      "$defs": {
+        "JobStatus": {
+          "description": "Status of an embedding generation job.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
+      "description": "Summary of an embedding generation job.",
+      "properties": {
+        "id": {
+          "description": "Job UUID",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus",
+          "description": "Current job status"
+        },
+        "progress_percent": {
+          "description": "Progress percentage (0-100)",
+          "title": "Progress Percent",
+          "type": "number"
+        },
+        "total_patterns": {
+          "description": "Total patterns to process",
+          "title": "Total Patterns",
+          "type": "integer"
+        },
+        "processed_patterns": {
+          "description": "Patterns processed so far",
+          "title": "Processed Patterns",
+          "type": "integer"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the job started",
+          "title": "Started At"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if job failed",
+          "title": "Error Message"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "progress_percent",
+        "total_patterns",
+        "processed_patterns"
+      ],
+      "title": "JobSummary",
+      "type": "object"
+    },
+    "RAGDashboardStats": {
+      "$defs": {
+        "JobStatus": {
+          "description": "Status of an embedding generation job.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "JobSummary": {
+          "description": "Summary of an embedding generation job.",
+          "properties": {
+            "id": {
+              "description": "Job UUID",
+              "title": "Id",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/JobStatus",
+              "description": "Current job status"
+            },
+            "progress_percent": {
+              "description": "Progress percentage (0-100)",
+              "title": "Progress Percent",
+              "type": "number"
+            },
+            "total_patterns": {
+              "description": "Total patterns to process",
+              "title": "Total Patterns",
+              "type": "integer"
+            },
+            "processed_patterns": {
+              "description": "Patterns processed so far",
+              "title": "Processed Patterns",
+              "type": "integer"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the job started",
+              "title": "Started At"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if job failed",
+              "title": "Error Message"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "progress_percent",
+            "total_patterns",
+            "processed_patterns"
+          ],
+          "title": "JobSummary",
+          "type": "object"
+        }
+      },
+      "description": "Summary statistics for RAG dashboard.",
+      "properties": {
+        "total_embeddings": {
+          "description": "Total number of indexed embeddings",
+          "title": "Total Embeddings",
+          "type": "integer"
+        },
+        "total_states": {
+          "description": "Number of unique states with embeddings",
+          "title": "Total States",
+          "type": "integer"
+        },
+        "total_patterns": {
+          "description": "Number of unique patterns",
+          "title": "Total Patterns",
+          "type": "integer"
+        },
+        "last_sync_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When runner last synced embeddings",
+          "title": "Last Sync At"
+        },
+        "active_job": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Currently running job if any"
+        }
+      },
+      "required": [
+        "total_embeddings",
+        "total_states",
+        "total_patterns"
+      ],
+      "title": "RAGDashboardStats",
+      "type": "object"
+    },
+    "EmbeddingItem": {
+      "description": "Single embedding record for display.",
+      "properties": {
+        "id": {
+          "description": "Embedding UUID",
+          "title": "Id",
+          "type": "string"
+        },
+        "pattern_id": {
+          "description": "Pattern identifier",
+          "title": "Pattern Id",
+          "type": "string"
+        },
+        "pattern_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable pattern name",
+          "title": "Pattern Name"
+        },
+        "state_id": {
+          "description": "State identifier",
+          "title": "State Id",
+          "type": "string"
+        },
+        "state_name": {
+          "description": "Human-readable state name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "image_id": {
+          "description": "Image identifier",
+          "title": "Image Id",
+          "type": "string"
+        },
+        "image_storage_path": {
+          "description": "Path to image in object storage",
+          "title": "Image Storage Path",
+          "type": "string"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Presigned URL for displaying the image",
+          "title": "Image Url"
+        },
+        "embedding_model": {
+          "description": "Model used for embedding (e.g., clip-vit-base-patch32)",
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "embedding_version": {
+          "description": "Version of the embedding model",
+          "title": "Embedding Version",
+          "type": "string"
+        },
+        "image_width": {
+          "description": "Image width in pixels",
+          "title": "Image Width",
+          "type": "integer"
+        },
+        "image_height": {
+          "description": "Image height in pixels",
+          "title": "Image Height",
+          "type": "integer"
+        },
+        "text_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI-generated or manual text description",
+          "title": "Text Description"
+        },
+        "has_text_embedding": {
+          "default": false,
+          "description": "Whether text embedding vector is available",
+          "title": "Has Text Embedding",
+          "type": "boolean"
+        },
+        "pattern_metadata": {
+          "additionalProperties": true,
+          "description": "Additional pattern metadata",
+          "title": "Pattern Metadata",
+          "type": "object"
+        },
+        "created_at": {
+          "description": "When the embedding was created",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "description": "When the embedding was last updated",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "pattern_id",
+        "state_id",
+        "state_name",
+        "image_id",
+        "image_storage_path",
+        "embedding_model",
+        "embedding_version",
+        "image_width",
+        "image_height",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "EmbeddingItem",
+      "type": "object"
+    },
+    "EmbeddingListResponse": {
+      "$defs": {
+        "EmbeddingItem": {
+          "description": "Single embedding record for display.",
+          "properties": {
+            "id": {
+              "description": "Embedding UUID",
+              "title": "Id",
+              "type": "string"
+            },
+            "pattern_id": {
+              "description": "Pattern identifier",
+              "title": "Pattern Id",
+              "type": "string"
+            },
+            "pattern_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Human-readable pattern name",
+              "title": "Pattern Name"
+            },
+            "state_id": {
+              "description": "State identifier",
+              "title": "State Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "Human-readable state name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "image_id": {
+              "description": "Image identifier",
+              "title": "Image Id",
+              "type": "string"
+            },
+            "image_storage_path": {
+              "description": "Path to image in object storage",
+              "title": "Image Storage Path",
+              "type": "string"
+            },
+            "image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Presigned URL for displaying the image",
+              "title": "Image Url"
+            },
+            "embedding_model": {
+              "description": "Model used for embedding (e.g., clip-vit-base-patch32)",
+              "title": "Embedding Model",
+              "type": "string"
+            },
+            "embedding_version": {
+              "description": "Version of the embedding model",
+              "title": "Embedding Version",
+              "type": "string"
+            },
+            "image_width": {
+              "description": "Image width in pixels",
+              "title": "Image Width",
+              "type": "integer"
+            },
+            "image_height": {
+              "description": "Image height in pixels",
+              "title": "Image Height",
+              "type": "integer"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated or manual text description",
+              "title": "Text Description"
+            },
+            "has_text_embedding": {
+              "default": false,
+              "description": "Whether text embedding vector is available",
+              "title": "Has Text Embedding",
+              "type": "boolean"
+            },
+            "pattern_metadata": {
+              "additionalProperties": true,
+              "description": "Additional pattern metadata",
+              "title": "Pattern Metadata",
+              "type": "object"
+            },
+            "created_at": {
+              "description": "When the embedding was created",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "When the embedding was last updated",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "pattern_id",
+            "state_id",
+            "state_name",
+            "image_id",
+            "image_storage_path",
+            "embedding_model",
+            "embedding_version",
+            "image_width",
+            "image_height",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "EmbeddingItem",
+          "type": "object"
+        }
+      },
+      "description": "Paginated list of embeddings.",
+      "properties": {
+        "items": {
+          "description": "List of embedding items",
+          "items": {
+            "$ref": "#/$defs/EmbeddingItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total number of embeddings matching filter",
+          "title": "Total",
+          "type": "integer"
+        },
+        "page": {
+          "description": "Current page number (1-indexed)",
+          "title": "Page",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        },
+        "has_more": {
+          "description": "Whether more pages exist",
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "limit",
+        "has_more"
+      ],
+      "title": "EmbeddingListResponse",
+      "type": "object"
+    },
+    "JobItem": {
+      "$defs": {
+        "JobStatus": {
+          "description": "Status of an embedding generation job.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
+      "description": "Single job record for display.",
+      "properties": {
+        "id": {
+          "description": "Job UUID",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus",
+          "description": "Current job status"
+        },
+        "total_patterns": {
+          "description": "Total patterns to process",
+          "title": "Total Patterns",
+          "type": "integer"
+        },
+        "processed_patterns": {
+          "description": "Patterns processed so far",
+          "title": "Processed Patterns",
+          "type": "integer"
+        },
+        "progress_percent": {
+          "description": "Progress percentage (0-100)",
+          "title": "Progress Percent",
+          "type": "number"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if job failed",
+          "title": "Error Message"
+        },
+        "retry_count": {
+          "description": "Number of retry attempts",
+          "title": "Retry Count",
+          "type": "integer"
+        },
+        "max_retries": {
+          "description": "Maximum retry attempts allowed",
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "job_metadata": {
+          "additionalProperties": true,
+          "description": "Additional job metadata",
+          "title": "Job Metadata",
+          "type": "object"
+        },
+        "created_at": {
+          "description": "When the job was created",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the job started",
+          "title": "Started At"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the job completed",
+          "title": "Completed At"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "total_patterns",
+        "processed_patterns",
+        "progress_percent",
+        "retry_count",
+        "max_retries",
+        "created_at"
+      ],
+      "title": "JobItem",
+      "type": "object"
+    },
+    "JobListResponse": {
+      "$defs": {
+        "JobItem": {
+          "description": "Single job record for display.",
+          "properties": {
+            "id": {
+              "description": "Job UUID",
+              "title": "Id",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/JobStatus",
+              "description": "Current job status"
+            },
+            "total_patterns": {
+              "description": "Total patterns to process",
+              "title": "Total Patterns",
+              "type": "integer"
+            },
+            "processed_patterns": {
+              "description": "Patterns processed so far",
+              "title": "Processed Patterns",
+              "type": "integer"
+            },
+            "progress_percent": {
+              "description": "Progress percentage (0-100)",
+              "title": "Progress Percent",
+              "type": "number"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if job failed",
+              "title": "Error Message"
+            },
+            "retry_count": {
+              "description": "Number of retry attempts",
+              "title": "Retry Count",
+              "type": "integer"
+            },
+            "max_retries": {
+              "description": "Maximum retry attempts allowed",
+              "title": "Max Retries",
+              "type": "integer"
+            },
+            "job_metadata": {
+              "additionalProperties": true,
+              "description": "Additional job metadata",
+              "title": "Job Metadata",
+              "type": "object"
+            },
+            "created_at": {
+              "description": "When the job was created",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the job started",
+              "title": "Started At"
+            },
+            "completed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the job completed",
+              "title": "Completed At"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "total_patterns",
+            "processed_patterns",
+            "progress_percent",
+            "retry_count",
+            "max_retries",
+            "created_at"
+          ],
+          "title": "JobItem",
+          "type": "object"
+        },
+        "JobStatus": {
+          "description": "Status of an embedding generation job.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
+      "description": "Paginated list of jobs.",
+      "properties": {
+        "items": {
+          "description": "List of job items",
+          "items": {
+            "$ref": "#/$defs/JobItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total number of jobs matching filter",
+          "title": "Total",
+          "type": "integer"
+        },
+        "page": {
+          "description": "Current page number (1-indexed)",
+          "title": "Page",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        },
+        "has_more": {
+          "description": "Whether more pages exist",
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "limit",
+        "has_more"
+      ],
+      "title": "JobListResponse",
+      "type": "object"
+    },
+    "SemanticSearchRequest": {
+      "description": "Request for semantic search.",
+      "properties": {
+        "query": {
+          "description": "Search query text",
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Max results to return",
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "min_similarity": {
+          "default": 0.5,
+          "description": "Minimum similarity threshold",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Min Similarity",
+          "type": "number"
+        },
+        "state_filter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by state ID",
+          "title": "State Filter"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "SemanticSearchRequest",
+      "type": "object"
+    },
+    "SearchResultItem": {
+      "$defs": {
+        "EmbeddingItem": {
+          "description": "Single embedding record for display.",
+          "properties": {
+            "id": {
+              "description": "Embedding UUID",
+              "title": "Id",
+              "type": "string"
+            },
+            "pattern_id": {
+              "description": "Pattern identifier",
+              "title": "Pattern Id",
+              "type": "string"
+            },
+            "pattern_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Human-readable pattern name",
+              "title": "Pattern Name"
+            },
+            "state_id": {
+              "description": "State identifier",
+              "title": "State Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "Human-readable state name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "image_id": {
+              "description": "Image identifier",
+              "title": "Image Id",
+              "type": "string"
+            },
+            "image_storage_path": {
+              "description": "Path to image in object storage",
+              "title": "Image Storage Path",
+              "type": "string"
+            },
+            "image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Presigned URL for displaying the image",
+              "title": "Image Url"
+            },
+            "embedding_model": {
+              "description": "Model used for embedding (e.g., clip-vit-base-patch32)",
+              "title": "Embedding Model",
+              "type": "string"
+            },
+            "embedding_version": {
+              "description": "Version of the embedding model",
+              "title": "Embedding Version",
+              "type": "string"
+            },
+            "image_width": {
+              "description": "Image width in pixels",
+              "title": "Image Width",
+              "type": "integer"
+            },
+            "image_height": {
+              "description": "Image height in pixels",
+              "title": "Image Height",
+              "type": "integer"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated or manual text description",
+              "title": "Text Description"
+            },
+            "has_text_embedding": {
+              "default": false,
+              "description": "Whether text embedding vector is available",
+              "title": "Has Text Embedding",
+              "type": "boolean"
+            },
+            "pattern_metadata": {
+              "additionalProperties": true,
+              "description": "Additional pattern metadata",
+              "title": "Pattern Metadata",
+              "type": "object"
+            },
+            "created_at": {
+              "description": "When the embedding was created",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "When the embedding was last updated",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "pattern_id",
+            "state_id",
+            "state_name",
+            "image_id",
+            "image_storage_path",
+            "embedding_model",
+            "embedding_version",
+            "image_width",
+            "image_height",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "EmbeddingItem",
+          "type": "object"
+        }
+      },
+      "description": "Single search result.",
+      "properties": {
+        "embedding": {
+          "$ref": "#/$defs/EmbeddingItem",
+          "description": "The matched embedding"
+        },
+        "similarity_score": {
+          "description": "Similarity score (0-1)",
+          "title": "Similarity Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "embedding",
+        "similarity_score"
+      ],
+      "title": "SearchResultItem",
+      "type": "object"
+    },
+    "SemanticSearchResponse": {
+      "$defs": {
+        "EmbeddingItem": {
+          "description": "Single embedding record for display.",
+          "properties": {
+            "id": {
+              "description": "Embedding UUID",
+              "title": "Id",
+              "type": "string"
+            },
+            "pattern_id": {
+              "description": "Pattern identifier",
+              "title": "Pattern Id",
+              "type": "string"
+            },
+            "pattern_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Human-readable pattern name",
+              "title": "Pattern Name"
+            },
+            "state_id": {
+              "description": "State identifier",
+              "title": "State Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "Human-readable state name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "image_id": {
+              "description": "Image identifier",
+              "title": "Image Id",
+              "type": "string"
+            },
+            "image_storage_path": {
+              "description": "Path to image in object storage",
+              "title": "Image Storage Path",
+              "type": "string"
+            },
+            "image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Presigned URL for displaying the image",
+              "title": "Image Url"
+            },
+            "embedding_model": {
+              "description": "Model used for embedding (e.g., clip-vit-base-patch32)",
+              "title": "Embedding Model",
+              "type": "string"
+            },
+            "embedding_version": {
+              "description": "Version of the embedding model",
+              "title": "Embedding Version",
+              "type": "string"
+            },
+            "image_width": {
+              "description": "Image width in pixels",
+              "title": "Image Width",
+              "type": "integer"
+            },
+            "image_height": {
+              "description": "Image height in pixels",
+              "title": "Image Height",
+              "type": "integer"
+            },
+            "text_description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated or manual text description",
+              "title": "Text Description"
+            },
+            "has_text_embedding": {
+              "default": false,
+              "description": "Whether text embedding vector is available",
+              "title": "Has Text Embedding",
+              "type": "boolean"
+            },
+            "pattern_metadata": {
+              "additionalProperties": true,
+              "description": "Additional pattern metadata",
+              "title": "Pattern Metadata",
+              "type": "object"
+            },
+            "created_at": {
+              "description": "When the embedding was created",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "When the embedding was last updated",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "pattern_id",
+            "state_id",
+            "state_name",
+            "image_id",
+            "image_storage_path",
+            "embedding_model",
+            "embedding_version",
+            "image_width",
+            "image_height",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "EmbeddingItem",
+          "type": "object"
+        },
+        "SearchResultItem": {
+          "description": "Single search result.",
+          "properties": {
+            "embedding": {
+              "$ref": "#/$defs/EmbeddingItem",
+              "description": "The matched embedding"
+            },
+            "similarity_score": {
+              "description": "Similarity score (0-1)",
+              "title": "Similarity Score",
+              "type": "number"
+            }
+          },
+          "required": [
+            "embedding",
+            "similarity_score"
+          ],
+          "title": "SearchResultItem",
+          "type": "object"
+        }
+      },
+      "description": "Response from semantic search.",
+      "properties": {
+        "results": {
+          "description": "List of search results",
+          "items": {
+            "$ref": "#/$defs/SearchResultItem"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "query": {
+          "description": "The original search query",
+          "title": "Query",
+          "type": "string"
+        },
+        "total_found": {
+          "description": "Total number of results found",
+          "title": "Total Found",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "results",
+        "query",
+        "total_found"
+      ],
+      "title": "SemanticSearchResponse",
+      "type": "object"
+    },
+    "StateFilterItem": {
+      "description": "State item for filter dropdown.",
+      "properties": {
+        "state_id": {
+          "description": "State identifier",
+          "title": "State Id",
+          "type": "string"
+        },
+        "state_name": {
+          "description": "Human-readable state name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "count": {
+          "description": "Number of embeddings in this state",
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state_id",
+        "state_name",
+        "count"
+      ],
+      "title": "StateFilterItem",
+      "type": "object"
+    },
+    "StatesResponse": {
+      "$defs": {
+        "StateFilterItem": {
+          "description": "State item for filter dropdown.",
+          "properties": {
+            "state_id": {
+              "description": "State identifier",
+              "title": "State Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "Human-readable state name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "count": {
+              "description": "Number of embeddings in this state",
+              "title": "Count",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state_id",
+            "state_name",
+            "count"
+          ],
+          "title": "StateFilterItem",
+          "type": "object"
+        }
+      },
+      "description": "Response with list of states for filtering.",
+      "properties": {
+        "states": {
+          "description": "List of states",
+          "items": {
+            "$ref": "#/$defs/StateFilterItem"
+          },
+          "title": "States",
+          "type": "array"
+        },
+        "count": {
+          "description": "Total number of states",
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "states",
+        "count"
+      ],
+      "title": "StatesResponse",
+      "type": "object"
+    }
+  }
+}

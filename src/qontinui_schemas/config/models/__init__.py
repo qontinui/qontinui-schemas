@@ -94,9 +94,42 @@ from .data_operations import (
 )
 
 # Execution control
-from .execution import BaseActionSettings
-from .execution import ExecutionSettings as ActionExecutionSettings
-from .execution import RepetitionOptions
+from .execution import (
+    ActiveStatesResult,
+    AvailableTransitionsResult,
+    BaseActionSettings,
+    NavigationResult,
+    RepetitionOptions,
+    TransitionExecutionResult,
+    TransitionInfo,
+)
+
+# Expectation and checkpoint configs
+from .expectations import (
+    ActionDefaults,
+    ActionExpectations,
+    AllActionsPassCriteria,
+    AssertionResult,
+    CheckpointDefinition,
+    CheckpointPassedCriteria,
+    CheckpointValidationResult,
+    ClaudeReviewResult,
+    CustomCriteria,
+    GlobalExpectations,
+    MaxFailuresCriteria,
+    MinMatchesCriteria,
+    NoDuplicateMatchesAssertion,
+    OcrAssertion,
+    RequiredStatesCriteria,
+    ScreenRegion,
+    SuccessCriteria,
+    TextAbsentAssertion,
+    TextCountAssertion,
+    TextInRegionAssertion,
+    TextPresentAssertion,
+    WorkflowExecutionResult,
+    WorkflowExpectations,
+)
 
 # Find action configs
 from .find_actions import (
@@ -133,6 +166,23 @@ from .mouse_actions import (
     MouseMoveActionConfig,
     MouseUpActionConfig,
     ScrollActionConfig,
+)
+
+# Scheduling models (runtime)
+from .scheduling import (
+    SchedulerStatistics,
+    StateCheckAction,
+    StateCheckResult,
+)
+
+# Screenshot models
+from .screenshots import (
+    Screenshot,
+    ScreenshotAnnotationType,
+    ScreenshotLocationAnnotation,
+    ScreenshotRegionAnnotation,
+    ScreenshotRegionBounds,
+    ScreenshotSource,
 )
 
 # Search and pattern matching
@@ -222,9 +272,14 @@ __all__ = [
     # Logging
     "LoggingOptions",
     # Execution
+    "ActiveStatesResult",
+    "AvailableTransitionsResult",
     "BaseActionSettings",
     "ExecutionSettings",
+    "NavigationResult",
     "RepetitionOptions",
+    "TransitionExecutionResult",
+    "TransitionInfo",
     # Search
     "MatchAdjustment",
     "PatternOptions",
@@ -293,6 +348,30 @@ __all__ = [
     "StringOperationActionConfig",
     "StringOperationParameters",
     "ValueSource",
+    # Expectations and checkpoints
+    "ActionDefaults",
+    "ActionExpectations",
+    "AllActionsPassCriteria",
+    "AssertionResult",
+    "CheckpointDefinition",
+    "CheckpointPassedCriteria",
+    "CheckpointValidationResult",
+    "ClaudeReviewResult",
+    "CustomCriteria",
+    "GlobalExpectations",
+    "MaxFailuresCriteria",
+    "MinMatchesCriteria",
+    "NoDuplicateMatchesAssertion",
+    "OcrAssertion",
+    "RequiredStatesCriteria",
+    "ScreenRegion",
+    "SuccessCriteria",
+    "TextAbsentAssertion",
+    "TextCountAssertion",
+    "TextInRegionAssertion",
+    "TextPresentAssertion",
+    "WorkflowExecutionResult",
+    "WorkflowExpectations",
     # Code execution
     "CodeBlockActionConfig",
     "CustomFunctionActionConfig",
@@ -368,4 +447,15 @@ __all__ = [
     "SearchAlgorithm",
     "TriggerType",
     "WaitActionSettings",
+    # Scheduling models (runtime)
+    "SchedulerStatistics",
+    "StateCheckAction",
+    "StateCheckResult",
+    # Screenshot models
+    "Screenshot",
+    "ScreenshotAnnotationType",
+    "ScreenshotLocationAnnotation",
+    "ScreenshotRegionAnnotation",
+    "ScreenshotRegionBounds",
+    "ScreenshotSource",
 ]
