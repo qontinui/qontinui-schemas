@@ -32,6 +32,7 @@ from qontinui_schemas.api.execution import (
     ExecutionStats,
     ExecutionTrendDataPoint,
     ExecutionTrendResponse,
+    ExecutionWorkflowMetadata,
     HistoricalActionQuery,
     HistoricalActionResult,
     IssueSeverity,
@@ -51,7 +52,6 @@ from qontinui_schemas.api.execution import (
 )
 from qontinui_schemas.api.execution import (
     VisualComparisonResult,
-    WorkflowMetadata,
 )
 from qontinui_schemas.api.rag import (  # Enums; Embedding Sync (Runner → Backend); RAG Progress Events (Runner → UI); RAG Dashboard (Backend → Frontend); Semantic Search; State Filter
     EmbeddingItem,
@@ -133,7 +133,7 @@ __all__ = [
     "IssueSource",
     # Metadata
     "RunnerMetadata",
-    "WorkflowMetadata",
+    "ExecutionWorkflowMetadata",
     # Execution Run
     "ExecutionRunCreate",
     "ExecutionRunResponse",

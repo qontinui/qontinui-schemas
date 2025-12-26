@@ -176,7 +176,7 @@ class RunnerMetadata(BaseModel):
     )
 
 
-class WorkflowMetadata(BaseModel):
+class ExecutionWorkflowMetadata(BaseModel):
     """Metadata about the workflow being executed."""
 
     workflow_id: str = Field(..., description="Workflow identifier")
@@ -200,7 +200,7 @@ class ExecutionRunCreate(BaseModel):
     run_name: str = Field(..., description="Name of the run", max_length=255)
     description: str | None = Field(None, description="Optional description")
     runner_metadata: RunnerMetadata = Field(..., description="Runner environment info")
-    workflow_metadata: WorkflowMetadata | None = Field(
+    workflow_metadata: ExecutionWorkflowMetadata | None = Field(
         None, description="Workflow info if applicable"
     )
     configuration: dict[str, Any] = Field(
@@ -223,7 +223,7 @@ class ExecutionRunResponse(BaseModel):
     ended_at: datetime | None = Field(None, description="End time")
     duration_seconds: int | None = Field(None, description="Duration in seconds")
     runner_metadata: RunnerMetadata = Field(..., description="Runner environment info")
-    workflow_metadata: WorkflowMetadata | None = Field(
+    workflow_metadata: ExecutionWorkflowMetadata | None = Field(
         None, description="Workflow info"
     )
     created_at: datetime = Field(..., description="Record creation time")

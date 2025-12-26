@@ -133,6 +133,7 @@ def generate_testing_types() -> bool:
     except Exception as e:
         print(f"Error generating testing types: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -202,6 +203,7 @@ def generate_rag_types() -> bool:
     except Exception as e:
         print(f"Error generating RAG types: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -249,12 +251,16 @@ def python_type_to_ts(python_type: str, field_info: dict | None = None) -> str:
         return " | ".join(python_type_to_ts(p.strip()) for p in parts)
 
     # Handle list types (only if it ends with ])
-    if (python_type.startswith("list[") or python_type.startswith("List[")) and python_type.endswith("]"):
+    if (
+        python_type.startswith("list[") or python_type.startswith("List[")
+    ) and python_type.endswith("]"):
         inner = python_type[5:-1]
         return f"{python_type_to_ts(inner)}[]"
 
     # Handle dict types
-    if (python_type.startswith("dict[") or python_type.startswith("Dict[")) and python_type.endswith("]"):
+    if (
+        python_type.startswith("dict[") or python_type.startswith("Dict[")
+    ) and python_type.endswith("]"):
         return "Record<string, any>"
 
     # Handle Optional types
@@ -311,6 +317,7 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
 
     # Handle typing.Any directly
     import typing
+
     if annotation is typing.Any:
         return "any"
 
