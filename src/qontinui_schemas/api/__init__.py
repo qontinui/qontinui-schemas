@@ -53,7 +53,14 @@ from qontinui_schemas.api.execution import (
 from qontinui_schemas.api.execution import (
     VisualComparisonResult,
 )
-from qontinui_schemas.api.rag import (  # Enums; Embedding Sync (Runner → Backend); RAG Progress Events (Runner → UI); RAG Dashboard (Backend → Frontend); Semantic Search; State Filter
+from qontinui_schemas.api.rag import (  # Enums; Embedding Computation; Embedding Sync (Runner → Backend); RAG Progress Events (Runner → UI); RAG Dashboard (Backend → Frontend); Semantic Search; State Filter
+    BatchComputeEmbeddingRequest,
+    BatchComputeEmbeddingResponse,
+    BatchEmbeddingResult,
+    ComputeEmbeddingRequest,
+    ComputeEmbeddingResponse,
+    ComputeTextEmbeddingRequest,
+    ComputeTextEmbeddingResponse,
     EmbeddingItem,
     EmbeddingListResponse,
     EmbeddingResultItem,
@@ -176,6 +183,14 @@ __all__ = [
     # RAG Enums
     "JobStatus",
     "RagProcessingStatus",
+    # RAG Embedding Computation (qontinui-api)
+    "ComputeTextEmbeddingRequest",
+    "ComputeTextEmbeddingResponse",
+    "ComputeEmbeddingRequest",
+    "ComputeEmbeddingResponse",
+    "BatchComputeEmbeddingRequest",
+    "BatchEmbeddingResult",
+    "BatchComputeEmbeddingResponse",
     # RAG Embedding Sync (Runner → Backend)
     "EmbeddingResultItem",
     "EmbeddingResultsRequest",

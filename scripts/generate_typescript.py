@@ -14,6 +14,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def get_project_root() -> Path:
@@ -113,7 +114,7 @@ def generate_testing_types() -> bool:
         ]
 
         # Generate combined JSON schema
-        schemas: dict[str, dict] = {}
+        schemas: dict[str, dict[str, object]] = {}
         for model in models:
             if hasattr(model, "model_json_schema"):
                 schemas[model.__name__] = model.model_json_schema()
@@ -183,7 +184,7 @@ def generate_rag_types() -> bool:
         ]
 
         # Generate combined JSON schema
-        schemas: dict[str, dict] = {}
+        schemas: dict[str, dict[str, object]] = {}
         for model in models:
             if hasattr(model, "model_json_schema"):
                 schemas[model.__name__] = model.model_json_schema()
@@ -218,7 +219,9 @@ def generate_from_json_schema() -> bool:
     return success
 
 
-def python_type_to_ts(python_type: str, field_info: dict | None = None) -> str:
+def python_type_to_ts(
+    python_type: str, field_info: dict[str, object] | None = None
+) -> str:
     """Convert Python type annotation to TypeScript type."""
     # Handle common types
     type_map = {
@@ -340,7 +343,7 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
     return python_type_to_ts(type_str)
 
 
-def generate_typescript_from_models(models: list) -> str:
+def generate_typescript_from_models(models: list[Any]) -> str:
     """Generate TypeScript interfaces from Pydantic models."""
     lines = [
         "/**",
