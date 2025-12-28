@@ -185,6 +185,10 @@ class ExecutionWorkflowMetadata(BaseModel):
     total_states: int = Field(0, description="Total states in workflow")
     total_transitions: int = Field(0, description="Total transitions in workflow")
     tags: list[str] = Field(default_factory=list, description="Workflow tags")
+    initial_state_ids: list[str] = Field(
+        default_factory=list,
+        description="Initial active states when workflow starts (resolved from config)",
+    )
 
 
 # =============================================================================

@@ -6231,6 +6231,14 @@
             }
           ],
           "title": "Duration Ms"
+        },
+        "initial_state_ids": {
+          "description": "Initial active states when workflow started",
+          "items": {
+            "type": "string"
+          },
+          "title": "Initial State Ids",
+          "type": "array"
         }
       },
       "required": [

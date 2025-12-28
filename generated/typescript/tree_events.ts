@@ -234,4 +234,6 @@ export interface ExecutionTreeResponse {
   workflow_name: string | null;
   status: NodeStatus;
   duration_ms: number | null;
+  /** Initial active states when workflow started */
+  initial_state_ids?: string[];
 }

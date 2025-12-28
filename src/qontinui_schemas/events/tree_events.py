@@ -405,3 +405,7 @@ class ExecutionTreeResponse(BaseModel):
     workflow_name: str | None
     status: NodeStatus
     duration_ms: float | None
+    initial_state_ids: list[str] = Field(
+        default_factory=list,
+        description="Initial active states when workflow started",
+    )
