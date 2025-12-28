@@ -247,13 +247,13 @@ export interface TestRunDetail {
   /** Configuration snapshot */
   configuration_snapshot: Record<string, any>;
   /** Final metrics */
-  final_metrics?: Record<string, any>;
+  final_metrics?: Record<string, any> | null;
   /** Coverage data */
-  coverage_data?: Record<string, any>;
+  coverage_data?: Record<string, any> | null;
   /** Last update time */
   updated_at?: string | null;
   /** User who created */
-  created_by?: Record<string, any>;
+  created_by?: Record<string, any> | null;
   /** Transitions */
   transitions?: Record<string, any>[] | null;
   /** Deficiencies */
@@ -331,7 +331,7 @@ export interface DeficiencyResponse {
   /** Last update time */
   updated_at: string;
   /** Related run info */
-  run_info?: Record<string, any>;
+  run_info?: Record<string, any> | null;
 }
 
 export interface DeficiencyDetail {
@@ -360,7 +360,7 @@ export interface DeficiencyDetail {
   /** Last update time */
   updated_at: string;
   /** Related run info */
-  run_info?: Record<string, any>;
+  run_info?: Record<string, any> | null;
   /** Reproduction steps */
   reproduction_steps?: string[];
   /** Associated screenshots */
@@ -368,7 +368,7 @@ export interface DeficiencyDetail {
   /** Additional metadata */
   metadata?: Record<string, any>;
   /** Assigned user */
-  assigned_to?: Record<string, any>;
+  assigned_to?: Record<string, any> | null;
   /** Resolution notes */
   resolution_notes?: string | null;
   /** Comments */

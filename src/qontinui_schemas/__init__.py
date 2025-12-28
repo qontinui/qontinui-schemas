@@ -11,6 +11,7 @@ __version__ = "0.1.0"
 from qontinui_schemas.api import *  # noqa: F401, F403
 from qontinui_schemas.config.models import *  # noqa: F401, F403
 from qontinui_schemas.config.property_groups import *  # noqa: F401, F403
+from qontinui_schemas.events import *  # noqa: F401, F403
 from qontinui_schemas.rag.models import *  # noqa: F401, F403
 
 __all__ = [

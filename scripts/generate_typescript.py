@@ -209,12 +209,76 @@ def generate_rag_types() -> bool:
         return False
 
 
+def generate_events_types() -> bool:
+    """Generate TypeScript types for Events (TreeEvents)."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.events import tree_events
+
+        models = [
+            # Enums
+            tree_events.NodeType,
+            tree_events.NodeStatus,
+            tree_events.TreeEventType,
+            tree_events.ActionType,
+            # Nested metadata models
+            tree_events.MatchLocation,
+            tree_events.TopMatch,
+            tree_events.RuntimeData,
+            tree_events.StateContext,
+            tree_events.TimingInfo,
+            tree_events.Outcome,
+            # Main tree event models
+            tree_events.NodeMetadata,
+            tree_events.TreeNode,
+            tree_events.PathElement,
+            tree_events.TreeEvent,
+            # Display models
+            tree_events.DisplayNode,
+            # API models
+            tree_events.TreeEventCreate,
+            tree_events.TreeEventResponse,
+            tree_events.TreeEventListResponse,
+            tree_events.ExecutionTreeResponse,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "tree_events.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models)
+        ts_file = output_dir / "tree_events.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating events types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
 def generate_from_json_schema() -> bool:
     """Generate TypeScript from JSON Schema as fallback."""
     success = True
     if not generate_testing_types():
         success = False
     if not generate_rag_types():
+        success = False
+    if not generate_events_types():
         success = False
     return success
 
@@ -238,8 +302,9 @@ def python_type_to_ts(
         "dict": "Record<string, any>",
     }
 
-    # Clean up fully qualified names
-    if "." in python_type:
+    # Clean up fully qualified names, but NOT if it's a generic type (contains [)
+    # e.g., "uuid.UUID" -> "UUID", but "list[module.Type]" should NOT be modified here
+    if "." in python_type and "[" not in python_type:
         # Get the last part (e.g., "uuid.UUID" -> "UUID")
         python_type = python_type.split(".")[-1]
 
@@ -258,6 +323,9 @@ def python_type_to_ts(
         python_type.startswith("list[") or python_type.startswith("List[")
     ) and python_type.endswith("]"):
         inner = python_type[5:-1]
+        # Clean up qualified names inside list brackets (e.g., "module.Type" -> "Type")
+        if "." in inner and "[" not in inner:
+            inner = inner.split(".")[-1]
         return f"{python_type_to_ts(inner)}[]"
 
     # Handle dict types
@@ -282,13 +350,24 @@ def python_type_to_ts(
 
 def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) -> str:
     """Convert a Python type annotation to TypeScript type."""
+    import types
+
     if annotation is None:
         return "any"
 
-    # Handle generic types (List, Dict, Optional, Union)
-    if hasattr(annotation, "__origin__"):
-        import types
+    # Handle Python 3.10+ union syntax (X | Y) - types.UnionType doesn't have __origin__
+    if isinstance(annotation, types.UnionType):
+        args = annotation.__args__
+        type_strs = []
+        for arg in args:
+            if arg is type(None):
+                type_strs.append("null")
+            else:
+                type_strs.append(get_ts_type_from_annotation(arg, known_enums))
+        return " | ".join(type_strs)
 
+    # Handle generic types (List, Dict, Optional, Union from typing module)
+    if hasattr(annotation, "__origin__"):
         origin = annotation.__origin__
         args = getattr(annotation, "__args__", ())
 
@@ -299,7 +378,7 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
             return "any[]"
         elif origin is dict:
             return "Record<string, any>"
-        elif origin is types.UnionType or str(origin) == "typing.Union":
+        elif str(origin) == "typing.Union":
             type_strs = []
             for arg in args:
                 if arg is type(None):
