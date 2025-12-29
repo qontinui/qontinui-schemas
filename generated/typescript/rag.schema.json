@@ -1885,8 +1885,8 @@
           "type": "integer"
         },
         "min_similarity": {
-          "default": 0.5,
-          "description": "Minimum similarity threshold",
+          "default": 0.2,
+          "description": "Minimum similarity threshold. CLIP text-to-image similarities typically range from 0.15-0.35, so 0.2 is a reasonable default.",
           "maximum": 1.0,
           "minimum": 0.0,
           "title": "Min Similarity",

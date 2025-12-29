@@ -6,15 +6,17 @@ used by:
 - qontinui-web frontend (TypeScript, via generated types)
 - qontinui-runner (test result submission)
 
-All datetime fields use ISO 8601 format strings for JSON serialization.
+All datetime fields use UTCDateTime for consistent UTC timezone handling
+and ISO 8601 format strings with 'Z' suffix for JSON serialization.
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
+
+from qontinui_schemas.common.time import UTCDateTime
 
 # =============================================================================
 # Enums
@@ -158,11 +160,11 @@ class TestRunResponse(BaseModel):
     project_id: UUID = Field(..., description="Project ID")
     run_name: str = Field(..., description="Name of the test run")
     status: TestRunStatus = Field(..., description="Test run status")
-    started_at: datetime = Field(..., description="Test run start time")
-    ended_at: datetime | None = Field(None, description="Test run end time")
+    started_at: UTCDateTime = Field(..., description="Test run start time (UTC)")
+    ended_at: UTCDateTime | None = Field(None, description="Test run end time (UTC)")
     duration_seconds: int | None = Field(None, description="Duration in seconds")
     runner_metadata: dict[str, Any] = Field(..., description="Runner metadata")
-    created_at: datetime = Field(..., description="Record creation time")
+    created_at: UTCDateTime = Field(..., description="Record creation time (UTC)")
 
 
 class TestRunDetail(TestRunResponse):
@@ -175,7 +177,7 @@ class TestRunDetail(TestRunResponse):
     )
     final_metrics: dict[str, Any] | None = Field(None, description="Final metrics")
     coverage_data: dict[str, Any] | None = Field(None, description="Coverage data")
-    updated_at: datetime | None = Field(None, description="Last update time")
+    updated_at: UTCDateTime | None = Field(None, description="Last update time (UTC)")
     created_by: dict[str, Any] | None = Field(None, description="User who created")
     transitions: list[dict[str, Any]] | None = Field(None, description="Transitions")
     deficiencies: list[dict[str, Any]] | None = Field(None, description="Deficiencies")
@@ -193,7 +195,7 @@ class TestRunComplete(BaseModel):
     """Request schema for completing a test run."""
 
     status: str = Field(..., description="Final status")
-    ended_at: datetime = Field(..., description="End time")
+    ended_at: UTCDateTime = Field(..., description="End time (UTC)")
     final_metrics: dict[str, Any] = Field(..., description="Final test metrics")
     summary: str | None = Field(None, description="Optional summary text")
 
@@ -211,8 +213,8 @@ class TestRunCompleteResponse(BaseModel):
 
     run_id: UUID = Field(..., description="Test run ID")
     status: TestRunStatus = Field(..., description="Final status")
-    started_at: datetime = Field(..., description="Start time")
-    ended_at: datetime = Field(..., description="End time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    ended_at: UTCDateTime = Field(..., description="End time (UTC)")
     duration_seconds: int = Field(..., description="Duration in seconds")
     final_metrics: dict[str, Any] = Field(..., description="Final metrics")
 
@@ -230,8 +232,10 @@ class TransitionCreate(BaseModel):
     to_state: str = Field(..., description="Destination state", max_length=255)
     transition_name: str = Field(..., description="Transition name", max_length=255)
     status: TransitionStatus = Field(..., description="Transition status")
-    started_at: datetime = Field(..., description="Transition start time")
-    completed_at: datetime = Field(..., description="Transition completion time")
+    started_at: UTCDateTime = Field(..., description="Transition start time (UTC)")
+    completed_at: UTCDateTime = Field(
+        ..., description="Transition completion time (UTC)"
+    )
     duration_ms: int = Field(..., description="Duration in milliseconds", ge=0)
     error_message: str | None = Field(None, description="Error message if failed")
     error_type: str | None = Field(None, description="Error type if failed")
@@ -260,8 +264,8 @@ class TransitionResponse(BaseModel):
     transition_name: str = Field(..., description="Transition name")
     status: TransitionStatus = Field(..., description="Transition status")
     duration_ms: int = Field(..., description="Duration in milliseconds")
-    started_at: datetime = Field(..., description="Start time")
-    completed_at: datetime = Field(..., description="Completion time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    completed_at: UTCDateTime = Field(..., description="Completion time (UTC)")
     error_message: str | None = Field(None, description="Error message")
     error_type: str | None = Field(None, description="Error type")
 
@@ -325,8 +329,8 @@ class DeficiencyResponse(BaseModel):
         None, description="Related transition"
     )
     screenshot_count: int | None = Field(None, description="Number of screenshots")
-    created_at: datetime = Field(..., description="Creation time")
-    updated_at: datetime = Field(..., description="Last update time")
+    created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
+    updated_at: UTCDateTime = Field(..., description="Last update time (UTC)")
     run_info: dict[str, Any] | None = Field(None, description="Related run info")
 
 
@@ -425,7 +429,7 @@ class ScreenshotMetadata(BaseModel):
     )
     state: str | None = Field(None, description="State when taken", max_length=255)
     screenshot_type: ScreenshotType = Field(..., description="Screenshot type")
-    timestamp: datetime = Field(..., description="Screenshot timestamp")
+    timestamp: UTCDateTime = Field(..., description="Screenshot timestamp (UTC)")
     width: int = Field(..., description="Image width", ge=1)
     height: int = Field(..., description="Image height", ge=1)
     metadata: dict[str, Any] = Field(
@@ -453,7 +457,7 @@ class ScreenshotUploadResponse(BaseModel):
     run_id: UUID = Field(..., description="Test run ID")
     image_url: str = Field(..., description="Full image URL")
     thumbnail_url: str | None = Field(None, description="Thumbnail URL")
-    uploaded_at: datetime = Field(..., description="Upload time")
+    uploaded_at: UTCDateTime = Field(..., description="Upload time (UTC)")
     file_size_bytes: int = Field(..., description="File size in bytes")
     state_name: str | None = Field(None, description="State name")
     visual_comparison: VisualComparisonSummary | None = Field(

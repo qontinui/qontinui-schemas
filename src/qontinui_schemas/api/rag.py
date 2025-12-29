@@ -4,13 +4,17 @@ These schemas are shared between:
 - qontinui-web backend (Python)
 - qontinui-web frontend (TypeScript)
 - qontinui-runner (TypeScript)
+
+All datetime fields use UTCDateTime for consistent UTC timezone handling
+and ISO 8601 format strings with 'Z' suffix for JSON serialization.
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from qontinui_schemas.common.time import UTCDateTime
 
 # ============================================================================
 # Enums
@@ -248,8 +252,8 @@ class JobSummary(BaseModel):
     progress_percent: float = Field(description="Progress percentage (0-100)")
     total_patterns: int = Field(description="Total patterns to process")
     processed_patterns: int = Field(description="Patterns processed so far")
-    started_at: datetime | None = Field(
-        default=None, description="When the job started"
+    started_at: UTCDateTime | None = Field(
+        default=None, description="When the job started (UTC)"
     )
     error_message: str | None = Field(
         default=None, description="Error message if job failed"
@@ -262,8 +266,8 @@ class RAGDashboardStats(BaseModel):
     total_embeddings: int = Field(description="Total number of indexed embeddings")
     total_states: int = Field(description="Number of unique states with embeddings")
     total_patterns: int = Field(description="Number of unique patterns")
-    last_sync_at: datetime | None = Field(
-        default=None, description="When runner last synced embeddings"
+    last_sync_at: UTCDateTime | None = Field(
+        default=None, description="When runner last synced embeddings (UTC)"
     )
     active_job: JobSummary | None = Field(
         default=None, description="Currently running job if any"
@@ -300,8 +304,10 @@ class EmbeddingItem(BaseModel):
     pattern_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional pattern metadata"
     )
-    created_at: datetime = Field(description="When the embedding was created")
-    updated_at: datetime = Field(description="When the embedding was last updated")
+    created_at: UTCDateTime = Field(description="When the embedding was created (UTC)")
+    updated_at: UTCDateTime = Field(
+        description="When the embedding was last updated (UTC)"
+    )
 
 
 class EmbeddingListResponse(BaseModel):
@@ -330,12 +336,12 @@ class JobItem(BaseModel):
     job_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional job metadata"
     )
-    created_at: datetime = Field(description="When the job was created")
-    started_at: datetime | None = Field(
-        default=None, description="When the job started"
+    created_at: UTCDateTime = Field(description="When the job was created (UTC)")
+    started_at: UTCDateTime | None = Field(
+        default=None, description="When the job started (UTC)"
     )
-    completed_at: datetime | None = Field(
-        default=None, description="When the job completed"
+    completed_at: UTCDateTime | None = Field(
+        default=None, description="When the job completed (UTC)"
     )
 
 
@@ -360,7 +366,11 @@ class SemanticSearchRequest(BaseModel):
     query: str = Field(min_length=1, description="Search query text")
     limit: int = Field(default=20, ge=1, le=100, description="Max results to return")
     min_similarity: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Minimum similarity threshold"
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity threshold. CLIP text-to-image similarities "
+        "typically range from 0.15-0.35, so 0.2 is a reasonable default.",
     )
     state_filter: str | None = Field(default=None, description="Filter by state ID")
 

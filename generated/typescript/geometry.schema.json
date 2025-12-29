@@ -1,0 +1,310 @@
+{
+  "schemas": {
+    "Coordinates": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        }
+      },
+      "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+      "properties": {
+        "x": {
+          "description": "X coordinate (horizontal position)",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate (vertical position)",
+          "title": "Y",
+          "type": "integer"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CoordinateSystem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+        },
+        "monitor_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+          "title": "Monitor Index"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Coordinates",
+      "type": "object"
+    },
+    "Region": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        }
+      },
+      "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+      "properties": {
+        "x": {
+          "description": "X coordinate of top-left corner",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate of top-left corner",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width of the region",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height of the region",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CoordinateSystem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+        },
+        "monitor_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+          "title": "Monitor Index"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "Region",
+      "type": "object"
+    },
+    "Monitor": {
+      "description": "Standardized monitor information.\n\nRepresents a physical display with its position in the virtual desktop\nand metadata for UI display.\n\nExamples\n--------\nPrimary monitor at origin:\n    >>> Monitor(\n    ...     index=0, x=0, y=0, width=1920, height=1080,\n    ...     position=\"center\", is_primary=True\n    ... )\n\nLeft monitor with negative coordinates:\n    >>> Monitor(\n    ...     index=1, x=-1920, y=0, width=1920, height=1080,\n    ...     position=\"left\", is_primary=False\n    ... )\n\nHigh-DPI monitor:\n    >>> Monitor(\n    ...     index=0, x=0, y=0, width=3840, height=2160,\n    ...     position=\"center\", is_primary=True, scale_factor=2.0\n    ... )",
+      "properties": {
+        "index": {
+          "description": "OS-assigned monitor index (hardware enumeration order)",
+          "title": "Index",
+          "type": "integer"
+        },
+        "x": {
+          "description": "X position in absolute screen coordinates (can be negative)",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y position in absolute screen coordinates (can be negative)",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Monitor width in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Monitor height in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "position": {
+          "description": "Spatial position based on X coordinate (for UI display)",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "Position",
+          "type": "string"
+        },
+        "is_primary": {
+          "default": false,
+          "description": "Whether this is the primary/main monitor",
+          "title": "Is Primary",
+          "type": "boolean"
+        },
+        "scale_factor": {
+          "default": 1.0,
+          "description": "DPI scale factor (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)",
+          "exclusiveMinimum": 0,
+          "title": "Scale Factor",
+          "type": "number"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Display name (e.g., 'DELL U2720Q')",
+          "title": "Name"
+        }
+      },
+      "required": [
+        "index",
+        "x",
+        "y",
+        "width",
+        "height",
+        "position"
+      ],
+      "title": "Monitor",
+      "type": "object"
+    },
+    "VirtualDesktop": {
+      "$defs": {
+        "Monitor": {
+          "description": "Standardized monitor information.\n\nRepresents a physical display with its position in the virtual desktop\nand metadata for UI display.\n\nExamples\n--------\nPrimary monitor at origin:\n    >>> Monitor(\n    ...     index=0, x=0, y=0, width=1920, height=1080,\n    ...     position=\"center\", is_primary=True\n    ... )\n\nLeft monitor with negative coordinates:\n    >>> Monitor(\n    ...     index=1, x=-1920, y=0, width=1920, height=1080,\n    ...     position=\"left\", is_primary=False\n    ... )\n\nHigh-DPI monitor:\n    >>> Monitor(\n    ...     index=0, x=0, y=0, width=3840, height=2160,\n    ...     position=\"center\", is_primary=True, scale_factor=2.0\n    ... )",
+          "properties": {
+            "index": {
+              "description": "OS-assigned monitor index (hardware enumeration order)",
+              "title": "Index",
+              "type": "integer"
+            },
+            "x": {
+              "description": "X position in absolute screen coordinates (can be negative)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y position in absolute screen coordinates (can be negative)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Monitor width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Monitor height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "position": {
+              "description": "Spatial position based on X coordinate (for UI display)",
+              "enum": [
+                "left",
+                "center",
+                "right"
+              ],
+              "title": "Position",
+              "type": "string"
+            },
+            "is_primary": {
+              "default": false,
+              "description": "Whether this is the primary/main monitor",
+              "title": "Is Primary",
+              "type": "boolean"
+            },
+            "scale_factor": {
+              "default": 1.0,
+              "description": "DPI scale factor (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)",
+              "exclusiveMinimum": 0,
+              "title": "Scale Factor",
+              "type": "number"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Display name (e.g., 'DELL U2720Q')",
+              "title": "Name"
+            }
+          },
+          "required": [
+            "index",
+            "x",
+            "y",
+            "width",
+            "height",
+            "position"
+          ],
+          "title": "Monitor",
+          "type": "object"
+        }
+      },
+      "description": "The combined coordinate space of all monitors.\n\nProvides utilities for working with multi-monitor coordinate systems\nand converting between them.\n\nExamples\n--------\nCreate from monitors:\n    >>> monitors = [\n    ...     Monitor(index=0, x=0, y=0, width=1920, height=1080, position=\"center\"),\n    ...     Monitor(index=1, x=-1920, y=0, width=1920, height=1080, position=\"left\"),\n    ... ]\n    >>> desktop = VirtualDesktop(monitors=monitors)\n    >>> desktop.min_x\n    -1920\n    >>> desktop.width\n    3840",
+      "properties": {
+        "monitors": {
+          "description": "List of all monitors in the virtual desktop",
+          "items": {
+            "$ref": "#/$defs/Monitor"
+          },
+          "title": "Monitors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "monitors"
+      ],
+      "title": "VirtualDesktop",
+      "type": "object"
+    }
+  }
+}

@@ -3,12 +3,16 @@ Screenshot models for Qontinui automation.
 
 This module provides models for screenshots and their annotations (regions and locations).
 Screenshots are used for state discovery and visual documentation of automation workflows.
+
+All datetime fields use UTCDateTime for consistent UTC timezone handling
+and ISO 8601 format strings with 'Z' suffix for JSON serialization.
 """
 
-from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from qontinui_schemas.common.time import UTCDateTime
 
 # =============================================================================
 # Enums
@@ -193,10 +197,10 @@ class Screenshot(BaseModel):
     name: str = Field(..., description="Human-readable name")
     url: str = Field(..., description="URL or path to the screenshot image")
     size: int = Field(..., gt=0, description="File size in bytes")
-    uploaded_at: datetime = Field(
+    uploaded_at: UTCDateTime = Field(
         ...,
         alias="uploadedAt",
-        description="When the screenshot was uploaded",
+        description="When the screenshot was uploaded (UTC)",
     )
     timestamp: int | None = Field(
         default=None,

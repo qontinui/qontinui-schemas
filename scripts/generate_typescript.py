@@ -271,6 +271,52 @@ def generate_events_types() -> bool:
         return False
 
 
+def generate_geometry_types() -> bool:
+    """Generate TypeScript types for Geometry and Monitor schemas."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.config.models import geometry, monitors
+
+        models = [
+            # Enums
+            geometry.CoordinateSystem,
+            # Geometry primitives
+            geometry.Coordinates,
+            geometry.Region,
+            # Monitor types
+            monitors.Monitor,
+            monitors.VirtualDesktop,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "geometry.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models)
+        ts_file = output_dir / "geometry.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating geometry types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
 def generate_from_json_schema() -> bool:
     """Generate TypeScript from JSON Schema as fallback."""
     success = True
@@ -279,6 +325,8 @@ def generate_from_json_schema() -> bool:
     if not generate_rag_types():
         success = False
     if not generate_events_types():
+        success = False
+    if not generate_geometry_types():
         success = False
     return success
 
@@ -351,6 +399,7 @@ def python_type_to_ts(
 def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) -> str:
     """Convert a Python type annotation to TypeScript type."""
     import types
+    import typing
 
     if annotation is None:
         return "any"
@@ -365,6 +414,12 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
             else:
                 type_strs.append(get_ts_type_from_annotation(arg, known_enums))
         return " | ".join(type_strs)
+
+    # Handle Literal types (e.g., Literal["left", "center", "right"])
+    if hasattr(annotation, "__origin__") and annotation.__origin__ is typing.Literal:
+        args = annotation.__args__
+        literals = [f'"{arg}"' if isinstance(arg, str) else str(arg) for arg in args]
+        return " | ".join(literals)
 
     # Handle generic types (List, Dict, Optional, Union from typing module)
     if hasattr(annotation, "__origin__"):

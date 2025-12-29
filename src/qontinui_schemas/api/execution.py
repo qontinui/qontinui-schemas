@@ -18,12 +18,13 @@ Used by:
 - qontinui-runner (execution reporting)
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from qontinui_schemas.common.time import UTCDateTime
 
 # =============================================================================
 # Enums
@@ -223,14 +224,14 @@ class ExecutionRunResponse(BaseModel):
     run_type: RunType = Field(..., description="Type of execution run")
     run_name: str = Field(..., description="Name of the run")
     status: RunStatus = Field(..., description="Current status")
-    started_at: datetime = Field(..., description="Start time")
-    ended_at: datetime | None = Field(None, description="End time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    ended_at: UTCDateTime | None = Field(None, description="End time (UTC)")
     duration_seconds: int | None = Field(None, description="Duration in seconds")
     runner_metadata: RunnerMetadata = Field(..., description="Runner environment info")
     workflow_metadata: ExecutionWorkflowMetadata | None = Field(
         None, description="Workflow info"
     )
-    created_at: datetime = Field(..., description="Record creation time")
+    created_at: UTCDateTime = Field(..., description="Record creation time (UTC)")
 
 
 class ExecutionRunDetail(ExecutionRunResponse):
@@ -242,7 +243,7 @@ class ExecutionRunDetail(ExecutionRunResponse):
     coverage: "CoverageData | None" = Field(
         None, description="Coverage data if applicable"
     )
-    updated_at: datetime | None = Field(None, description="Last update time")
+    updated_at: UTCDateTime | None = Field(None, description="Last update time (UTC)")
 
 
 class ExecutionStats(BaseModel):
@@ -282,7 +283,7 @@ class ExecutionRunComplete(BaseModel):
     """Request to complete an execution run."""
 
     status: RunStatus = Field(..., description="Final status")
-    ended_at: datetime = Field(..., description="End time")
+    ended_at: UTCDateTime = Field(..., description="End time (UTC)")
     stats: ExecutionStats = Field(..., description="Final statistics")
     coverage: CoverageData | None = Field(None, description="Final coverage data")
     summary: str | None = Field(None, description="Optional summary text")
@@ -294,8 +295,8 @@ class ExecutionRunCompleteResponse(BaseModel):
 
     id: UUID = Field(..., description="Execution run ID")
     status: RunStatus = Field(..., description="Final status")
-    started_at: datetime = Field(..., description="Start time")
-    ended_at: datetime = Field(..., description="End time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    ended_at: UTCDateTime = Field(..., description="End time (UTC)")
     duration_seconds: int = Field(..., description="Duration in seconds")
     stats: ExecutionStats = Field(..., description="Final statistics")
 
@@ -312,8 +313,8 @@ class ActionExecutionCreate(BaseModel):
     action_type: ActionType = Field(..., description="Type of action")
     action_name: str = Field(..., description="Action name/identifier", max_length=255)
     status: ActionStatus = Field(..., description="Execution status")
-    started_at: datetime = Field(..., description="Start time")
-    completed_at: datetime = Field(..., description="Completion time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    completed_at: UTCDateTime = Field(..., description="Completion time (UTC)")
     duration_ms: int = Field(..., description="Duration in milliseconds", ge=0)
     from_state: str | None = Field(None, description="Source state", max_length=255)
     to_state: str | None = Field(None, description="Target state", max_length=255)
@@ -349,8 +350,8 @@ class ActionExecutionResponse(BaseModel):
     action_type: ActionType = Field(..., description="Action type")
     action_name: str = Field(..., description="Action name")
     status: ActionStatus = Field(..., description="Status")
-    started_at: datetime = Field(..., description="Start time")
-    completed_at: datetime = Field(..., description="Completion time")
+    started_at: UTCDateTime = Field(..., description="Start time (UTC)")
+    completed_at: UTCDateTime = Field(..., description="Completion time (UTC)")
     duration_ms: int = Field(..., description="Duration in ms")
     from_state: str | None = Field(None, description="Source state")
     to_state: str | None = Field(None, description="Target state")
@@ -382,7 +383,7 @@ class ExecutionScreenshotCreate(BaseModel):
     state_name: str | None = Field(
         None, description="State when captured", max_length=255
     )
-    captured_at: datetime = Field(..., description="Capture timestamp")
+    captured_at: UTCDateTime = Field(..., description="Capture timestamp (UTC)")
     width: int = Field(..., description="Image width in pixels", ge=1)
     height: int = Field(..., description="Image height in pixels", ge=1)
     metadata: dict[str, Any] = Field(
@@ -412,7 +413,7 @@ class ExecutionScreenshotResponse(BaseModel):
     image_url: str = Field(..., description="Full image URL")
     thumbnail_url: str | None = Field(None, description="Thumbnail URL")
     state_name: str | None = Field(None, description="State name")
-    captured_at: datetime = Field(..., description="Capture time")
+    captured_at: UTCDateTime = Field(..., description="Capture time (UTC)")
     file_size_bytes: int = Field(..., description="File size in bytes")
     visual_comparison: VisualComparisonResult | None = Field(
         None, description="Visual comparison result if baseline exists"
@@ -471,8 +472,8 @@ class ExecutionIssueResponse(BaseModel):
     description: str = Field(..., description="Description")
     state_name: str | None = Field(None, description="State where occurred")
     screenshot_count: int = Field(0, description="Number of screenshots")
-    created_at: datetime = Field(..., description="Creation time")
-    updated_at: datetime = Field(..., description="Last update time")
+    created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
+    updated_at: UTCDateTime = Field(..., description="Last update time (UTC)")
 
 
 class ExecutionIssueDetail(ExecutionIssueResponse):

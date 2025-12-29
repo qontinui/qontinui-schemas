@@ -313,7 +313,7 @@ export interface SemanticSearchRequest {
   query: string;
   /** Max results to return */
   limit?: number;
-  /** Minimum similarity threshold */
+  /** Minimum similarity threshold. CLIP text-to-image similarities typically range from 0.15-0.35, so 0.2 is a reasonable default. */
   min_similarity?: number;
   /** Filter by state ID */
   state_filter?: string | null;

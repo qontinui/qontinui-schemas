@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from qontinui_schemas.common.time import from_iso, utc_now
+
 
 class ElementType(str, Enum):
     """Types of GUI elements that can be detected and stored."""
@@ -92,8 +94,8 @@ class GUIElementChunk:
     # Identity
     # ============================================================================
     id: str  # Unique identifier (UUID)
-    created_at: datetime = field(default_factory=datetime.now)
-    updated_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     # ============================================================================
     # Source Information
@@ -263,18 +265,22 @@ class GUIElementChunk:
         if data.get("bounding_box"):
             bbox = BoundingBox.from_dict(data["bounding_box"])
 
-        # Handle datetime fields
+        # Handle datetime fields (ensure UTC)
         created_at = data.get("created_at")
         if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at)
-        elif created_at is None:
-            created_at = datetime.now()
+            created_at = from_iso(created_at)
+        elif isinstance(created_at, datetime):
+            pass  # Keep as-is, assume UTC
+        else:
+            created_at = utc_now()
 
         updated_at = data.get("updated_at")
         if isinstance(updated_at, str):
-            updated_at = datetime.fromisoformat(updated_at)
-        elif updated_at is None:
-            updated_at = datetime.now()
+            updated_at = from_iso(updated_at)
+        elif isinstance(updated_at, datetime):
+            pass  # Keep as-is, assume UTC
+        else:
+            updated_at = utc_now()
 
         # Handle element type
         element_type_val = data.get("element_type", "unknown")
@@ -418,7 +424,7 @@ class EmbeddedElement:
     text_embedding: list[float] | None = None
     image_embedding: list[float] | None = None
     embedding_model: str = ""  # Model used for embedding
-    embedding_timestamp: datetime = field(default_factory=datetime.now)
+    embedding_timestamp: datetime = field(default_factory=utc_now)
 
 
 @dataclass
@@ -440,7 +446,7 @@ class SearchResult:
 
     # Metadata
     query_text: str = ""
-    query_timestamp: datetime = field(default_factory=datetime.now)
+    query_timestamp: datetime = field(default_factory=utc_now)
 
 
 @dataclass
@@ -457,6 +463,6 @@ class ExportResult:
     skipped_count: int = 0
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    export_timestamp: datetime = field(default_factory=datetime.now)
+    export_timestamp: datetime = field(default_factory=utc_now)
     export_path: str = ""
     format: str = "json"  # "json", "csv", "parquet", etc.

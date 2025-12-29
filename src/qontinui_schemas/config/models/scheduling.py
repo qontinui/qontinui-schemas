@@ -5,14 +5,15 @@ This module provides models for state check results and scheduler statistics.
 For base scheduling types (Schedule, ExecutionRecord, TriggerType, etc.),
 see config_root.py which defines the core scheduling models for export configs.
 
-Note: The models here use datetime objects for runtime use, while config_root
-uses ISO 8601 strings for serialization in exported configs.
+All datetime fields use UTCDateTime for consistent UTC timezone handling
+and ISO 8601 format strings with 'Z' suffix for JSON serialization.
 """
 
-from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from qontinui_schemas.common.time import UTCDateTime
 
 # =============================================================================
 # Enums
@@ -50,10 +51,10 @@ class StateCheckResult(BaseModel):
         alias="scheduleName",
         description="Name of the schedule being checked",
     )
-    check_time: datetime = Field(
+    check_time: UTCDateTime = Field(
         ...,
         alias="checkTime",
-        description="When the check was performed",
+        description="When the check was performed (UTC)",
     )
     all_states_present: bool = Field(
         ...,

@@ -409,3 +409,7 @@ class ExecutionTreeResponse(BaseModel):
         default_factory=list,
         description="Initial active states when workflow started",
     )
+    state_name_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of state IDs to display names",
+    )

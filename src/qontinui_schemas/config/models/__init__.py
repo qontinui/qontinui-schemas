@@ -141,8 +141,8 @@ from .find_actions import (
     WaitCondition,
 )
 
-# Geometry primitives
-from .geometry import Coordinates, Region
+# Geometry primitives and coordinate systems
+from .geometry import Coordinates, CoordinateSystem, Region
 
 # Keyboard action configs
 from .keyboard_actions import (
@@ -156,6 +156,9 @@ from .keyboard_actions import (
 
 # Logging configuration
 from .logging import LoggingOptions
+
+# Monitor definitions
+from .monitors import Monitor, VirtualDesktop
 
 # Mouse action configs
 from .mouse_actions import (
@@ -266,9 +269,13 @@ __all__ = [
     "SearchStrategy",
     "VerificationMode",
     "WorkflowVisibility",
-    # Geometry
+    # Geometry and coordinate systems
     "Coordinates",
+    "CoordinateSystem",
     "Region",
+    # Monitors
+    "Monitor",
+    "VirtualDesktop",
     # Logging
     "LoggingOptions",
     # Execution
