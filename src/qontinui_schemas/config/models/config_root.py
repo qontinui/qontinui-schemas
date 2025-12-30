@@ -7,8 +7,9 @@ QontinuiConfig that ties everything together.
 """
 
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .state_machine import State, Transition
 from .workflow import Workflow
@@ -66,6 +67,30 @@ class LogLevel(str, Enum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
+
+
+# =============================================================================
+# Category
+# =============================================================================
+
+
+class Category(BaseModel):
+    """
+    Workflow category for organization and automation control.
+
+    Categories organize workflows and control which are available for
+    automation in the runner. Only workflows in categories with
+    automationEnabled=True are shown in the runner's workflow list.
+    """
+
+    name: str = Field(..., description="Category name (e.g., 'Main', 'Testing')")
+    automation_enabled: bool = Field(
+        default=True,
+        alias="automationEnabled",
+        description="Whether workflows in this category are available for automation",
+    )
+
+    model_config = {"populate_by_name": True}
 
 
 # =============================================================================
@@ -608,9 +633,9 @@ class QontinuiConfig(BaseModel):
         default_factory=list,
         description="State transitions",
     )
-    categories: list[str] = Field(
+    categories: list[Category] = Field(
         default_factory=list,
-        description="Workflow categories",
+        description="Workflow categories with automation control",
     )
     settings: ConfigSettings | None = Field(
         default=None,
@@ -627,3 +652,40 @@ class QontinuiConfig(BaseModel):
     )
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("categories", mode="before")
+    @classmethod
+    def normalize_categories(cls, v: Any) -> list[dict[str, Any]]:
+        """Accept both string array and Category object array formats.
+
+        For backward compatibility, converts simple strings to Category objects:
+        - ["Main", "Testing"] -> [{"name": "Main", "automationEnabled": true}, ...]
+
+        The first category (typically "Main") gets automationEnabled=True by default.
+        """
+        if not isinstance(v, list):
+            return []
+
+        result = []
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                # Convert string to Category dict
+                # First category (usually "Main") defaults to enabled
+                result.append(
+                    {
+                        "name": item,
+                        "automationEnabled": i
+                        == 0,  # Only first category enabled by default
+                    }
+                )
+            elif isinstance(item, dict):
+                # Already a Category-like dict, pass through
+                result.append(item)
+            elif hasattr(item, "model_dump"):
+                # Already a Pydantic model
+                result.append(item.model_dump())
+            else:
+                # Unknown type, skip
+                continue
+
+        return result

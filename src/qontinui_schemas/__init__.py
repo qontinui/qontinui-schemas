@@ -22,6 +22,7 @@ from qontinui_schemas.common import (  # noqa: F401
 from qontinui_schemas.config.models import *  # noqa: F401, F403
 from qontinui_schemas.config.property_groups import *  # noqa: F401, F403
 from qontinui_schemas.events import *  # noqa: F401, F403
+from qontinui_schemas.extraction import *  # noqa: F401, F403
 from qontinui_schemas.rag.models import *  # noqa: F401, F403
 
 __all__ = [

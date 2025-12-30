@@ -6239,6 +6239,14 @@
           },
           "title": "Initial State Ids",
           "type": "array"
+        },
+        "state_name_map": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mapping of state IDs to display names",
+          "title": "State Name Map",
+          "type": "object"
         }
       },
       "required": [

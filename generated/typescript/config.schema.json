@@ -1,0 +1,1503 @@
+{
+  "schemas": {
+    "Category": {
+      "description": "Workflow category for organization and automation control.\n\nCategories organize workflows and control which are available for\nautomation in the runner. Only workflows in categories with\nautomationEnabled=True are shown in the runner's workflow list.",
+      "properties": {
+        "name": {
+          "description": "Category name (e.g., 'Main', 'Testing')",
+          "title": "Name",
+          "type": "string"
+        },
+        "automationEnabled": {
+          "default": true,
+          "description": "Whether workflows in this category are available for automation",
+          "title": "Automationenabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Category",
+      "type": "object"
+    },
+    "Resolution": {
+      "description": "Screen resolution.",
+      "properties": {
+        "width": {
+          "description": "Width in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Resolution",
+      "type": "object"
+    },
+    "ExecutionSettings": {
+      "$defs": {
+        "FailureStrategy": {
+          "description": "Strategy for handling action failures.",
+          "enum": [
+            "stop",
+            "continue",
+            "pause"
+          ],
+          "title": "FailureStrategy",
+          "type": "string"
+        },
+        "Resolution": {
+          "description": "Screen resolution.",
+          "properties": {
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "title": "Resolution",
+          "type": "object"
+        }
+      },
+      "description": "Execution control settings.",
+      "properties": {
+        "defaultTimeout": {
+          "default": 30000,
+          "description": "Default action timeout in milliseconds",
+          "title": "Defaulttimeout",
+          "type": "integer"
+        },
+        "defaultRetryCount": {
+          "default": 3,
+          "description": "Default number of retry attempts",
+          "title": "Defaultretrycount",
+          "type": "integer"
+        },
+        "actionDelay": {
+          "default": 100,
+          "description": "Delay between actions in milliseconds",
+          "title": "Actiondelay",
+          "type": "integer"
+        },
+        "failureStrategy": {
+          "$ref": "#/$defs/FailureStrategy",
+          "default": "stop",
+          "description": "How to handle action failures"
+        },
+        "headless": {
+          "default": false,
+          "description": "Run in headless mode",
+          "title": "Headless",
+          "type": "boolean"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Resolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target screen resolution"
+        }
+      },
+      "title": "ExecutionSettings",
+      "type": "object"
+    },
+    "RecognitionSettings": {
+      "$defs": {
+        "ColorSpace": {
+          "description": "Color space for image processing.",
+          "enum": [
+            "rgb",
+            "grayscale",
+            "hsv"
+          ],
+          "title": "ColorSpace",
+          "type": "string"
+        },
+        "SearchAlgorithm": {
+          "description": "Image search algorithm.",
+          "enum": [
+            "template_matching",
+            "feature_matching",
+            "ai"
+          ],
+          "title": "SearchAlgorithm",
+          "type": "string"
+        }
+      },
+      "description": "Image recognition settings.",
+      "properties": {
+        "defaultThreshold": {
+          "default": 0.8,
+          "description": "Default similarity threshold",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Defaultthreshold",
+          "type": "number"
+        },
+        "searchAlgorithm": {
+          "$ref": "#/$defs/SearchAlgorithm",
+          "default": "template_matching",
+          "description": "Image search algorithm"
+        },
+        "multiScaleSearch": {
+          "default": false,
+          "description": "Enable multi-scale search",
+          "title": "Multiscalesearch",
+          "type": "boolean"
+        },
+        "colorSpace": {
+          "$ref": "#/$defs/ColorSpace",
+          "default": "rgb",
+          "description": "Color space for matching"
+        },
+        "edgeDetection": {
+          "default": false,
+          "description": "Enable edge detection preprocessing",
+          "title": "Edgedetection",
+          "type": "boolean"
+        },
+        "ocrEnabled": {
+          "default": false,
+          "description": "Enable OCR text recognition",
+          "title": "Ocrenabled",
+          "type": "boolean"
+        },
+        "ocrLanguage": {
+          "default": "eng",
+          "description": "OCR language code",
+          "title": "Ocrlanguage",
+          "type": "string"
+        }
+      },
+      "title": "RecognitionSettings",
+      "type": "object"
+    },
+    "LoggingSettings": {
+      "$defs": {
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        }
+      },
+      "description": "Logging configuration.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "info",
+          "description": "Log level"
+        },
+        "screenshotOnError": {
+          "default": true,
+          "description": "Capture screenshot on errors",
+          "title": "Screenshotonerror",
+          "type": "boolean"
+        },
+        "logFile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Log file path",
+          "title": "Logfile"
+        },
+        "consoleOutput": {
+          "default": true,
+          "description": "Output logs to console",
+          "title": "Consoleoutput",
+          "type": "boolean"
+        },
+        "detailedMatching": {
+          "default": false,
+          "description": "Log detailed matching information",
+          "title": "Detailedmatching",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggingSettings",
+      "type": "object"
+    },
+    "PerformanceSettings": {
+      "description": "Performance tuning settings.",
+      "properties": {
+        "maxParallelActions": {
+          "default": 1,
+          "description": "Maximum parallel action execution",
+          "minimum": 1,
+          "title": "Maxparallelactions",
+          "type": "integer"
+        },
+        "cpuLimit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CPU usage limit percentage",
+          "title": "Cpulimit"
+        },
+        "memoryLimit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Memory limit in MB",
+          "title": "Memorylimit"
+        },
+        "cacheImages": {
+          "default": true,
+          "description": "Cache images in memory",
+          "title": "Cacheimages",
+          "type": "boolean"
+        },
+        "optimizeSearch": {
+          "default": true,
+          "description": "Enable search optimization",
+          "title": "Optimizesearch",
+          "type": "boolean"
+        }
+      },
+      "title": "PerformanceSettings",
+      "type": "object"
+    },
+    "MouseActionSettings": {
+      "description": "Mouse action timing settings.",
+      "properties": {
+        "click_hold_duration": {
+          "default": 0.05,
+          "description": "Duration to hold mouse button",
+          "title": "Click Hold Duration",
+          "type": "number"
+        },
+        "click_release_delay": {
+          "default": 0.05,
+          "description": "Delay after releasing mouse button",
+          "title": "Click Release Delay",
+          "type": "number"
+        },
+        "click_safety_release": {
+          "default": true,
+          "description": "Ensure mouse button is released",
+          "title": "Click Safety Release",
+          "type": "boolean"
+        },
+        "double_click_interval": {
+          "default": 0.1,
+          "description": "Interval between double-click clicks",
+          "title": "Double Click Interval",
+          "type": "number"
+        },
+        "drag_start_delay": {
+          "default": 0.1,
+          "description": "Delay before starting drag",
+          "title": "Drag Start Delay",
+          "type": "number"
+        },
+        "drag_end_delay": {
+          "default": 0.1,
+          "description": "Delay after ending drag",
+          "title": "Drag End Delay",
+          "type": "number"
+        },
+        "drag_default_duration": {
+          "default": 0.5,
+          "description": "Default drag duration",
+          "title": "Drag Default Duration",
+          "type": "number"
+        },
+        "move_default_duration": {
+          "default": 0.3,
+          "description": "Default move duration",
+          "title": "Move Default Duration",
+          "type": "number"
+        },
+        "safety_release_delay": {
+          "default": 0.1,
+          "description": "Safety release delay",
+          "title": "Safety Release Delay",
+          "type": "number"
+        }
+      },
+      "title": "MouseActionSettings",
+      "type": "object"
+    },
+    "KeyboardActionSettings": {
+      "description": "Keyboard action timing settings.",
+      "properties": {
+        "key_hold_duration": {
+          "default": 0.05,
+          "description": "Duration to hold key",
+          "title": "Key Hold Duration",
+          "type": "number"
+        },
+        "key_release_delay": {
+          "default": 0.05,
+          "description": "Delay after releasing key",
+          "title": "Key Release Delay",
+          "type": "number"
+        },
+        "typing_interval": {
+          "default": 0.05,
+          "description": "Interval between typed characters",
+          "title": "Typing Interval",
+          "type": "number"
+        },
+        "hotkey_hold_duration": {
+          "default": 0.1,
+          "description": "Duration to hold hotkey combination",
+          "title": "Hotkey Hold Duration",
+          "type": "number"
+        },
+        "hotkey_press_interval": {
+          "default": 0.05,
+          "description": "Interval between hotkey presses",
+          "title": "Hotkey Press Interval",
+          "type": "number"
+        }
+      },
+      "title": "KeyboardActionSettings",
+      "type": "object"
+    },
+    "FindActionSettings": {
+      "description": "Find action default settings.",
+      "properties": {
+        "default_timeout": {
+          "default": 10000,
+          "description": "Default find timeout in milliseconds",
+          "title": "Default Timeout",
+          "type": "integer"
+        },
+        "default_retry_count": {
+          "default": 3,
+          "description": "Default retry count",
+          "title": "Default Retry Count",
+          "type": "integer"
+        },
+        "search_interval": {
+          "default": 200,
+          "description": "Search polling interval in milliseconds",
+          "title": "Search Interval",
+          "type": "integer"
+        }
+      },
+      "title": "FindActionSettings",
+      "type": "object"
+    },
+    "WaitActionSettings": {
+      "description": "Wait action default settings.",
+      "properties": {
+        "pause_before_action": {
+          "default": 0.0,
+          "description": "Default pause before action",
+          "title": "Pause Before Action",
+          "type": "number"
+        },
+        "pause_after_action": {
+          "default": 0.0,
+          "description": "Default pause after action",
+          "title": "Pause After Action",
+          "type": "number"
+        }
+      },
+      "title": "WaitActionSettings",
+      "type": "object"
+    },
+    "ConfigSettings": {
+      "$defs": {
+        "ColorSpace": {
+          "description": "Color space for image processing.",
+          "enum": [
+            "rgb",
+            "grayscale",
+            "hsv"
+          ],
+          "title": "ColorSpace",
+          "type": "string"
+        },
+        "ExecutionSettings": {
+          "description": "Execution control settings.",
+          "properties": {
+            "defaultTimeout": {
+              "default": 30000,
+              "description": "Default action timeout in milliseconds",
+              "title": "Defaulttimeout",
+              "type": "integer"
+            },
+            "defaultRetryCount": {
+              "default": 3,
+              "description": "Default number of retry attempts",
+              "title": "Defaultretrycount",
+              "type": "integer"
+            },
+            "actionDelay": {
+              "default": 100,
+              "description": "Delay between actions in milliseconds",
+              "title": "Actiondelay",
+              "type": "integer"
+            },
+            "failureStrategy": {
+              "$ref": "#/$defs/FailureStrategy",
+              "default": "stop",
+              "description": "How to handle action failures"
+            },
+            "headless": {
+              "default": false,
+              "description": "Run in headless mode",
+              "title": "Headless",
+              "type": "boolean"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Resolution"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Target screen resolution"
+            }
+          },
+          "title": "ExecutionSettings",
+          "type": "object"
+        },
+        "FailureStrategy": {
+          "description": "Strategy for handling action failures.",
+          "enum": [
+            "stop",
+            "continue",
+            "pause"
+          ],
+          "title": "FailureStrategy",
+          "type": "string"
+        },
+        "FindActionSettings": {
+          "description": "Find action default settings.",
+          "properties": {
+            "default_timeout": {
+              "default": 10000,
+              "description": "Default find timeout in milliseconds",
+              "title": "Default Timeout",
+              "type": "integer"
+            },
+            "default_retry_count": {
+              "default": 3,
+              "description": "Default retry count",
+              "title": "Default Retry Count",
+              "type": "integer"
+            },
+            "search_interval": {
+              "default": 200,
+              "description": "Search polling interval in milliseconds",
+              "title": "Search Interval",
+              "type": "integer"
+            }
+          },
+          "title": "FindActionSettings",
+          "type": "object"
+        },
+        "KeyboardActionSettings": {
+          "description": "Keyboard action timing settings.",
+          "properties": {
+            "key_hold_duration": {
+              "default": 0.05,
+              "description": "Duration to hold key",
+              "title": "Key Hold Duration",
+              "type": "number"
+            },
+            "key_release_delay": {
+              "default": 0.05,
+              "description": "Delay after releasing key",
+              "title": "Key Release Delay",
+              "type": "number"
+            },
+            "typing_interval": {
+              "default": 0.05,
+              "description": "Interval between typed characters",
+              "title": "Typing Interval",
+              "type": "number"
+            },
+            "hotkey_hold_duration": {
+              "default": 0.1,
+              "description": "Duration to hold hotkey combination",
+              "title": "Hotkey Hold Duration",
+              "type": "number"
+            },
+            "hotkey_press_interval": {
+              "default": 0.05,
+              "description": "Interval between hotkey presses",
+              "title": "Hotkey Press Interval",
+              "type": "number"
+            }
+          },
+          "title": "KeyboardActionSettings",
+          "type": "object"
+        },
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        },
+        "LoggingSettings": {
+          "description": "Logging configuration.",
+          "properties": {
+            "level": {
+              "$ref": "#/$defs/LogLevel",
+              "default": "info",
+              "description": "Log level"
+            },
+            "screenshotOnError": {
+              "default": true,
+              "description": "Capture screenshot on errors",
+              "title": "Screenshotonerror",
+              "type": "boolean"
+            },
+            "logFile": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Log file path",
+              "title": "Logfile"
+            },
+            "consoleOutput": {
+              "default": true,
+              "description": "Output logs to console",
+              "title": "Consoleoutput",
+              "type": "boolean"
+            },
+            "detailedMatching": {
+              "default": false,
+              "description": "Log detailed matching information",
+              "title": "Detailedmatching",
+              "type": "boolean"
+            }
+          },
+          "title": "LoggingSettings",
+          "type": "object"
+        },
+        "MouseActionSettings": {
+          "description": "Mouse action timing settings.",
+          "properties": {
+            "click_hold_duration": {
+              "default": 0.05,
+              "description": "Duration to hold mouse button",
+              "title": "Click Hold Duration",
+              "type": "number"
+            },
+            "click_release_delay": {
+              "default": 0.05,
+              "description": "Delay after releasing mouse button",
+              "title": "Click Release Delay",
+              "type": "number"
+            },
+            "click_safety_release": {
+              "default": true,
+              "description": "Ensure mouse button is released",
+              "title": "Click Safety Release",
+              "type": "boolean"
+            },
+            "double_click_interval": {
+              "default": 0.1,
+              "description": "Interval between double-click clicks",
+              "title": "Double Click Interval",
+              "type": "number"
+            },
+            "drag_start_delay": {
+              "default": 0.1,
+              "description": "Delay before starting drag",
+              "title": "Drag Start Delay",
+              "type": "number"
+            },
+            "drag_end_delay": {
+              "default": 0.1,
+              "description": "Delay after ending drag",
+              "title": "Drag End Delay",
+              "type": "number"
+            },
+            "drag_default_duration": {
+              "default": 0.5,
+              "description": "Default drag duration",
+              "title": "Drag Default Duration",
+              "type": "number"
+            },
+            "move_default_duration": {
+              "default": 0.3,
+              "description": "Default move duration",
+              "title": "Move Default Duration",
+              "type": "number"
+            },
+            "safety_release_delay": {
+              "default": 0.1,
+              "description": "Safety release delay",
+              "title": "Safety Release Delay",
+              "type": "number"
+            }
+          },
+          "title": "MouseActionSettings",
+          "type": "object"
+        },
+        "PerformanceSettings": {
+          "description": "Performance tuning settings.",
+          "properties": {
+            "maxParallelActions": {
+              "default": 1,
+              "description": "Maximum parallel action execution",
+              "minimum": 1,
+              "title": "Maxparallelactions",
+              "type": "integer"
+            },
+            "cpuLimit": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CPU usage limit percentage",
+              "title": "Cpulimit"
+            },
+            "memoryLimit": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Memory limit in MB",
+              "title": "Memorylimit"
+            },
+            "cacheImages": {
+              "default": true,
+              "description": "Cache images in memory",
+              "title": "Cacheimages",
+              "type": "boolean"
+            },
+            "optimizeSearch": {
+              "default": true,
+              "description": "Enable search optimization",
+              "title": "Optimizesearch",
+              "type": "boolean"
+            }
+          },
+          "title": "PerformanceSettings",
+          "type": "object"
+        },
+        "RecognitionSettings": {
+          "description": "Image recognition settings.",
+          "properties": {
+            "defaultThreshold": {
+              "default": 0.8,
+              "description": "Default similarity threshold",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Defaultthreshold",
+              "type": "number"
+            },
+            "searchAlgorithm": {
+              "$ref": "#/$defs/SearchAlgorithm",
+              "default": "template_matching",
+              "description": "Image search algorithm"
+            },
+            "multiScaleSearch": {
+              "default": false,
+              "description": "Enable multi-scale search",
+              "title": "Multiscalesearch",
+              "type": "boolean"
+            },
+            "colorSpace": {
+              "$ref": "#/$defs/ColorSpace",
+              "default": "rgb",
+              "description": "Color space for matching"
+            },
+            "edgeDetection": {
+              "default": false,
+              "description": "Enable edge detection preprocessing",
+              "title": "Edgedetection",
+              "type": "boolean"
+            },
+            "ocrEnabled": {
+              "default": false,
+              "description": "Enable OCR text recognition",
+              "title": "Ocrenabled",
+              "type": "boolean"
+            },
+            "ocrLanguage": {
+              "default": "eng",
+              "description": "OCR language code",
+              "title": "Ocrlanguage",
+              "type": "string"
+            }
+          },
+          "title": "RecognitionSettings",
+          "type": "object"
+        },
+        "Resolution": {
+          "description": "Screen resolution.",
+          "properties": {
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "title": "Resolution",
+          "type": "object"
+        },
+        "SearchAlgorithm": {
+          "description": "Image search algorithm.",
+          "enum": [
+            "template_matching",
+            "feature_matching",
+            "ai"
+          ],
+          "title": "SearchAlgorithm",
+          "type": "string"
+        },
+        "WaitActionSettings": {
+          "description": "Wait action default settings.",
+          "properties": {
+            "pause_before_action": {
+              "default": 0.0,
+              "description": "Default pause before action",
+              "title": "Pause Before Action",
+              "type": "number"
+            },
+            "pause_after_action": {
+              "default": 0.0,
+              "description": "Default pause after action",
+              "title": "Pause After Action",
+              "type": "number"
+            }
+          },
+          "title": "WaitActionSettings",
+          "type": "object"
+        }
+      },
+      "description": "Complete settings configuration.",
+      "properties": {
+        "execution": {
+          "$ref": "#/$defs/ExecutionSettings",
+          "description": "Execution control settings"
+        },
+        "recognition": {
+          "$ref": "#/$defs/RecognitionSettings",
+          "description": "Image recognition settings"
+        },
+        "logging": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoggingSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Logging configuration"
+        },
+        "performance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PerformanceSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Performance tuning settings"
+        },
+        "mouse": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MouseActionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mouse action timing"
+        },
+        "keyboard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KeyboardActionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Keyboard action timing"
+        },
+        "find": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindActionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Find action defaults"
+        },
+        "wait": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaitActionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait action defaults"
+        }
+      },
+      "title": "ConfigSettings",
+      "type": "object"
+    },
+    "CompatibleVersions": {
+      "description": "Version compatibility information.",
+      "properties": {
+        "runner": {
+          "description": "Compatible runner version",
+          "title": "Runner",
+          "type": "string"
+        },
+        "website": {
+          "description": "Compatible website version",
+          "title": "Website",
+          "type": "string"
+        }
+      },
+      "required": [
+        "runner",
+        "website"
+      ],
+      "title": "CompatibleVersions",
+      "type": "object"
+    },
+    "ConfigMetadata": {
+      "$defs": {
+        "CompatibleVersions": {
+          "description": "Version compatibility information.",
+          "properties": {
+            "runner": {
+              "description": "Compatible runner version",
+              "title": "Runner",
+              "type": "string"
+            },
+            "website": {
+              "description": "Compatible website version",
+              "title": "Website",
+              "type": "string"
+            }
+          },
+          "required": [
+            "runner",
+            "website"
+          ],
+          "title": "CompatibleVersions",
+          "type": "object"
+        }
+      },
+      "description": "Metadata about the automation configuration.",
+      "properties": {
+        "name": {
+          "description": "Project/configuration name",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Description",
+          "title": "Description"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Author name",
+          "title": "Author"
+        },
+        "created": {
+          "description": "ISO 8601 creation timestamp",
+          "title": "Created",
+          "type": "string"
+        },
+        "modified": {
+          "description": "ISO 8601 last modified timestamp",
+          "title": "Modified",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags for categorization",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "targetApplication": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target application being automated",
+          "title": "Targetapplication"
+        },
+        "compatibleVersions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompatibleVersions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Version compatibility information"
+        }
+      },
+      "required": [
+        "name",
+        "created",
+        "modified"
+      ],
+      "title": "ConfigMetadata",
+      "type": "object"
+    },
+    "ImageAsset": {
+      "$defs": {
+        "ImageFormat": {
+          "description": "Supported image formats.",
+          "enum": [
+            "png",
+            "jpg",
+            "jpeg"
+          ],
+          "title": "ImageFormat",
+          "type": "string"
+        }
+      },
+      "description": "An image in the automation library.\n\nImages are stored in base64 format within the configuration and\nreferenced by ID from StateImages and Patterns.\n\nSupports S3 storage with presigned URLs and versioning.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the image",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "data": {
+          "description": "Base64 encoded image data",
+          "title": "Data",
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/$defs/ImageFormat",
+          "description": "Image format (png, jpg, jpeg)"
+        },
+        "width": {
+          "description": "Image width in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Image height in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SHA256 hash for integrity verification",
+          "title": "Hash"
+        },
+        "mask": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional base64 encoded mask image",
+          "title": "Mask"
+        },
+        "s3Key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "S3 object key for cloud storage",
+          "title": "S3Key"
+        },
+        "urlExpiresAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 8601 timestamp when presigned URL expires",
+          "title": "Urlexpiresat"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Version number (default: 1)",
+          "title": "Version"
+        },
+        "parentImageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of the original image if this is a version",
+          "title": "Parentimageid"
+        },
+        "versions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Array of version IDs (only on parent images)",
+          "title": "Versions"
+        },
+        "monitors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor indices where this image should be used (default: [0])",
+          "title": "Monitors"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "data",
+        "format",
+        "width",
+        "height"
+      ],
+      "title": "ImageAsset",
+      "type": "object"
+    },
+    "Schedule": {
+      "$defs": {
+        "CheckMode": {
+          "description": "State check modes.",
+          "enum": [
+            "CHECK_ALL",
+            "CHECK_INACTIVE_ONLY"
+          ],
+          "title": "CheckMode",
+          "type": "string"
+        },
+        "ScheduleType": {
+          "description": "Schedule timing types.",
+          "enum": [
+            "FIXED_RATE",
+            "FIXED_DELAY"
+          ],
+          "title": "ScheduleType",
+          "type": "string"
+        },
+        "TriggerType": {
+          "description": "Schedule trigger types.",
+          "enum": [
+            "TIME",
+            "INTERVAL",
+            "STATE",
+            "MANUAL"
+          ],
+          "title": "TriggerType",
+          "type": "string"
+        }
+      },
+      "description": "Automated workflow schedule.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Schedule name",
+          "title": "Name",
+          "type": "string"
+        },
+        "workflowId": {
+          "description": "Workflow to run",
+          "title": "Workflowid",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Description",
+          "title": "Description"
+        },
+        "triggerType": {
+          "$ref": "#/$defs/TriggerType",
+          "description": "Trigger type"
+        },
+        "checkMode": {
+          "$ref": "#/$defs/CheckMode",
+          "description": "State check mode"
+        },
+        "scheduleType": {
+          "$ref": "#/$defs/ScheduleType",
+          "description": "Schedule type"
+        },
+        "cronExpression": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Cron expression for TIME",
+          "title": "Cronexpression"
+        },
+        "intervalSeconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Interval in seconds",
+          "title": "Intervalseconds"
+        },
+        "triggerState": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State that triggers execution",
+          "title": "Triggerstate"
+        },
+        "maxIterations": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Max iterations",
+          "title": "Maxiterations"
+        },
+        "stateCheckDelaySeconds": {
+          "default": 5,
+          "description": "Delay between checks",
+          "title": "Statecheckdelayseconds",
+          "type": "integer"
+        },
+        "stateRebuildDelaySeconds": {
+          "default": 30,
+          "description": "Delay before rebuilding",
+          "title": "Staterebuilddelayseconds",
+          "type": "integer"
+        },
+        "failureThreshold": {
+          "default": 3,
+          "description": "Failures before action",
+          "title": "Failurethreshold",
+          "type": "integer"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Is schedule enabled",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Createdat"
+        },
+        "lastExecutedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last execution timestamp",
+          "title": "Lastexecutedat"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "workflowId",
+        "triggerType",
+        "checkMode",
+        "scheduleType"
+      ],
+      "title": "Schedule",
+      "type": "object"
+    },
+    "ExecutionRecord": {
+      "description": "Record of a schedule execution.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "scheduleId": {
+          "description": "Schedule ID",
+          "title": "Scheduleid",
+          "type": "string"
+        },
+        "workflowId": {
+          "description": "Workflow ID",
+          "title": "Workflowid",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Start timestamp",
+          "title": "Starttime",
+          "type": "string"
+        },
+        "endTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "End timestamp",
+          "title": "Endtime"
+        },
+        "success": {
+          "description": "Whether execution succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "iterationCount": {
+          "default": 0,
+          "description": "Number of iterations",
+          "title": "Iterationcount",
+          "type": "integer"
+        },
+        "errors": {
+          "description": "Error messages",
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "scheduleId",
+        "workflowId",
+        "startTime",
+        "success"
+      ],
+      "title": "ExecutionRecord",
+      "type": "object"
+    }
+  }
+}

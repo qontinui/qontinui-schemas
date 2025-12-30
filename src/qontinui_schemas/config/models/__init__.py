@@ -35,6 +35,7 @@ from .code_actions import (
 
 # Root configuration models
 from .config_root import (
+    Category,
     CheckMode,
     ColorSpace,
     CompatibleVersions,
@@ -430,6 +431,7 @@ __all__ = [
     "TransitionCondition",
     "TransitionType",
     # Root configuration models
+    "Category",
     "CheckMode",
     "ColorSpace",
     "CompatibleVersions",

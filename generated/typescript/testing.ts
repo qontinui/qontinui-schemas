@@ -84,9 +84,9 @@ export interface TransitionCreate {
   transition_name: string;
   /** Transition status */
   status: TransitionStatus;
-  /** Transition start time */
+  /** Transition start time (UTC) */
   started_at: string;
-  /** Transition completion time */
+  /** Transition completion time (UTC) */
   completed_at: string;
   /** Duration in milliseconds */
   duration_ms: number;
@@ -160,7 +160,7 @@ export interface CoverageUpdate {
 export interface TestRunComplete {
   /** Final status */
   status: string;
-  /** End time */
+  /** End time (UTC) */
   ended_at: string;
   /** Final test metrics */
   final_metrics: Record<string, any>;
@@ -179,7 +179,7 @@ export interface ScreenshotMetadata {
   state?: string | null;
   /** Screenshot type */
   screenshot_type: ScreenshotType;
-  /** Screenshot timestamp */
+  /** Screenshot timestamp (UTC) */
   timestamp: string;
   /** Image width */
   width: number;
@@ -209,15 +209,15 @@ export interface TestRunResponse {
   run_name: string;
   /** Test run status */
   status: TestRunStatus;
-  /** Test run start time */
+  /** Test run start time (UTC) */
   started_at: string;
-  /** Test run end time */
-  ended_at?: string | null;
+  /** Test run end time (UTC) */
+  ended_at?: any | null;
   /** Duration in seconds */
   duration_seconds?: number | null;
   /** Runner metadata */
   runner_metadata: Record<string, any>;
-  /** Record creation time */
+  /** Record creation time (UTC) */
   created_at: string;
 }
 
@@ -230,15 +230,15 @@ export interface TestRunDetail {
   run_name: string;
   /** Test run status */
   status: TestRunStatus;
-  /** Test run start time */
+  /** Test run start time (UTC) */
   started_at: string;
-  /** Test run end time */
-  ended_at?: string | null;
+  /** Test run end time (UTC) */
+  ended_at?: any | null;
   /** Duration in seconds */
   duration_seconds?: number | null;
   /** Runner metadata */
   runner_metadata: Record<string, any>;
-  /** Record creation time */
+  /** Record creation time (UTC) */
   created_at: string;
   /** Test run description */
   description?: string | null;
@@ -250,8 +250,8 @@ export interface TestRunDetail {
   final_metrics?: Record<string, any> | null;
   /** Coverage data */
   coverage_data?: Record<string, any> | null;
-  /** Last update time */
-  updated_at?: string | null;
+  /** Last update time (UTC) */
+  updated_at?: any | null;
   /** User who created */
   created_by?: Record<string, any> | null;
   /** Transitions */
@@ -284,9 +284,9 @@ export interface TransitionResponse {
   status: TransitionStatus;
   /** Duration in milliseconds */
   duration_ms: number;
-  /** Start time */
+  /** Start time (UTC) */
   started_at: string;
-  /** Completion time */
+  /** Completion time (UTC) */
   completed_at: string;
   /** Error message */
   error_message?: string | null;
@@ -326,9 +326,9 @@ export interface DeficiencyResponse {
   transition_sequence_number?: number | null;
   /** Number of screenshots */
   screenshot_count?: number | null;
-  /** Creation time */
+  /** Creation time (UTC) */
   created_at: string;
-  /** Last update time */
+  /** Last update time (UTC) */
   updated_at: string;
   /** Related run info */
   run_info?: Record<string, any> | null;
@@ -355,9 +355,9 @@ export interface DeficiencyDetail {
   transition_sequence_number?: number | null;
   /** Number of screenshots */
   screenshot_count?: number | null;
-  /** Creation time */
+  /** Creation time (UTC) */
   created_at: string;
-  /** Last update time */
+  /** Last update time (UTC) */
   updated_at: string;
   /** Related run info */
   run_info?: Record<string, any> | null;
@@ -409,9 +409,9 @@ export interface TestRunCompleteResponse {
   run_id: string;
   /** Final status */
   status: TestRunStatus;
-  /** Start time */
+  /** Start time (UTC) */
   started_at: string;
-  /** End time */
+  /** End time (UTC) */
   ended_at: string;
   /** Duration in seconds */
   duration_seconds: number;
@@ -428,7 +428,7 @@ export interface ScreenshotUploadResponse {
   image_url: string;
   /** Thumbnail URL */
   thumbnail_url?: string | null;
-  /** Upload time */
+  /** Upload time (UTC) */
   uploaded_at: string;
   /** File size in bytes */
   file_size_bytes: number;

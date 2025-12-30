@@ -1118,7 +1118,7 @@
             }
           ],
           "default": null,
-          "description": "When the job started",
+          "description": "When the job started (UTC)",
           "title": "Started At"
         },
         "error_message": {
@@ -1197,7 +1197,7 @@
                 }
               ],
               "default": null,
-              "description": "When the job started",
+              "description": "When the job started (UTC)",
               "title": "Started At"
             },
             "error_message": {
@@ -1253,7 +1253,7 @@
             }
           ],
           "default": null,
-          "description": "When runner last synced embeddings",
+          "description": "When runner last synced embeddings (UTC)",
           "title": "Last Sync At"
         },
         "active_job": {
@@ -1382,13 +1382,13 @@
           "type": "object"
         },
         "created_at": {
-          "description": "When the embedding was created",
+          "description": "When the embedding was created (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
         },
         "updated_at": {
-          "description": "When the embedding was last updated",
+          "description": "When the embedding was last updated (UTC)",
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
@@ -1518,13 +1518,13 @@
               "type": "object"
             },
             "created_at": {
-              "description": "When the embedding was created",
+              "description": "When the embedding was created (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
             },
             "updated_at": {
-              "description": "When the embedding was last updated",
+              "description": "When the embedding was last updated (UTC)",
               "format": "date-time",
               "title": "Updated At",
               "type": "string"
@@ -1660,7 +1660,7 @@
           "type": "object"
         },
         "created_at": {
-          "description": "When the job was created",
+          "description": "When the job was created (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
@@ -1676,7 +1676,7 @@
             }
           ],
           "default": null,
-          "description": "When the job started",
+          "description": "When the job started (UTC)",
           "title": "Started At"
         },
         "completed_at": {
@@ -1690,7 +1690,7 @@
             }
           ],
           "default": null,
-          "description": "When the job completed",
+          "description": "When the job completed (UTC)",
           "title": "Completed At"
         }
       },
@@ -1766,7 +1766,7 @@
               "type": "object"
             },
             "created_at": {
-              "description": "When the job was created",
+              "description": "When the job was created (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
@@ -1782,7 +1782,7 @@
                 }
               ],
               "default": null,
-              "description": "When the job started",
+              "description": "When the job started (UTC)",
               "title": "Started At"
             },
             "completed_at": {
@@ -1796,7 +1796,7 @@
                 }
               ],
               "default": null,
-              "description": "When the job completed",
+              "description": "When the job completed (UTC)",
               "title": "Completed At"
             }
           },
@@ -2019,13 +2019,13 @@
               "type": "object"
             },
             "created_at": {
-              "description": "When the embedding was created",
+              "description": "When the embedding was created (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
             },
             "updated_at": {
-              "description": "When the embedding was last updated",
+              "description": "When the embedding was last updated (UTC)",
               "format": "date-time",
               "title": "Updated At",
               "type": "string"
@@ -2175,13 +2175,13 @@
               "type": "object"
             },
             "created_at": {
-              "description": "When the embedding was created",
+              "description": "When the embedding was created (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
             },
             "updated_at": {
-              "description": "When the embedding was last updated",
+              "description": "When the embedding was last updated (UTC)",
               "format": "date-time",
               "title": "Updated At",
               "type": "string"

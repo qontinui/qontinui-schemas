@@ -236,4 +236,6 @@ export interface ExecutionTreeResponse {
   duration_ms: number | null;
   /** Initial active states when workflow started */
   initial_state_ids?: string[];
+  /** Mapping of state IDs to display names */
+  state_name_map?: Record<string, any>;
 }

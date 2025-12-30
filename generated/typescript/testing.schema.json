@@ -103,13 +103,13 @@
           "description": "Transition status"
         },
         "started_at": {
-          "description": "Transition start time",
+          "description": "Transition start time (UTC)",
           "format": "date-time",
           "title": "Started At",
           "type": "string"
         },
         "completed_at": {
-          "description": "Transition completion time",
+          "description": "Transition completion time (UTC)",
           "format": "date-time",
           "title": "Completed At",
           "type": "string"
@@ -214,13 +214,13 @@
               "description": "Transition status"
             },
             "started_at": {
-              "description": "Transition start time",
+              "description": "Transition start time (UTC)",
               "format": "date-time",
               "title": "Started At",
               "type": "string"
             },
             "completed_at": {
-              "description": "Transition completion time",
+              "description": "Transition completion time (UTC)",
               "format": "date-time",
               "title": "Completed At",
               "type": "string"
@@ -714,7 +714,7 @@
           "type": "string"
         },
         "ended_at": {
-          "description": "End time",
+          "description": "End time (UTC)",
           "format": "date-time",
           "title": "Ended At",
           "type": "string"
@@ -811,7 +811,7 @@
           "description": "Screenshot type"
         },
         "timestamp": {
-          "description": "Screenshot timestamp",
+          "description": "Screenshot timestamp (UTC)",
           "format": "date-time",
           "title": "Timestamp",
           "type": "string"
@@ -918,7 +918,7 @@
           "description": "Test run status"
         },
         "started_at": {
-          "description": "Test run start time",
+          "description": "Test run start time (UTC)",
           "format": "date-time",
           "title": "Started At",
           "type": "string"
@@ -934,7 +934,7 @@
             }
           ],
           "default": null,
-          "description": "Test run end time",
+          "description": "Test run end time (UTC)",
           "title": "Ended At"
         },
         "duration_seconds": {
@@ -957,7 +957,7 @@
           "type": "object"
         },
         "created_at": {
-          "description": "Record creation time",
+          "description": "Record creation time (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
@@ -1014,7 +1014,7 @@
           "description": "Test run status"
         },
         "started_at": {
-          "description": "Test run start time",
+          "description": "Test run start time (UTC)",
           "format": "date-time",
           "title": "Started At",
           "type": "string"
@@ -1030,7 +1030,7 @@
             }
           ],
           "default": null,
-          "description": "Test run end time",
+          "description": "Test run end time (UTC)",
           "title": "Ended At"
         },
         "duration_seconds": {
@@ -1053,7 +1053,7 @@
           "type": "object"
         },
         "created_at": {
-          "description": "Record creation time",
+          "description": "Record creation time (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
@@ -1122,7 +1122,7 @@
             }
           ],
           "default": null,
-          "description": "Last update time",
+          "description": "Last update time (UTC)",
           "title": "Updated At"
         },
         "created_by": {
@@ -1265,7 +1265,7 @@
               "description": "Test run status"
             },
             "started_at": {
-              "description": "Test run start time",
+              "description": "Test run start time (UTC)",
               "format": "date-time",
               "title": "Started At",
               "type": "string"
@@ -1281,7 +1281,7 @@
                 }
               ],
               "default": null,
-              "description": "Test run end time",
+              "description": "Test run end time (UTC)",
               "title": "Ended At"
             },
             "duration_seconds": {
@@ -1304,7 +1304,7 @@
               "type": "object"
             },
             "created_at": {
-              "description": "Record creation time",
+              "description": "Record creation time (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
@@ -1410,13 +1410,13 @@
           "type": "integer"
         },
         "started_at": {
-          "description": "Start time",
+          "description": "Start time (UTC)",
           "format": "date-time",
           "title": "Started At",
           "type": "string"
         },
         "completed_at": {
-          "description": "Completion time",
+          "description": "Completion time (UTC)",
           "format": "date-time",
           "title": "Completed At",
           "type": "string"
@@ -1620,13 +1620,13 @@
           "title": "Screenshot Count"
         },
         "created_at": {
-          "description": "Creation time",
+          "description": "Creation time (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
         },
         "updated_at": {
-          "description": "Last update time",
+          "description": "Last update time (UTC)",
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
@@ -1779,13 +1779,13 @@
           "title": "Screenshot Count"
         },
         "created_at": {
-          "description": "Creation time",
+          "description": "Creation time (UTC)",
           "format": "date-time",
           "title": "Created At",
           "type": "string"
         },
         "updated_at": {
-          "description": "Last update time",
+          "description": "Last update time (UTC)",
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
@@ -1951,13 +1951,13 @@
               "title": "Screenshot Count"
             },
             "created_at": {
-              "description": "Creation time",
+              "description": "Creation time (UTC)",
               "format": "date-time",
               "title": "Created At",
               "type": "string"
             },
             "updated_at": {
-              "description": "Last update time",
+              "description": "Last update time (UTC)",
               "format": "date-time",
               "title": "Updated At",
               "type": "string"
@@ -2188,13 +2188,13 @@
           "description": "Final status"
         },
         "started_at": {
-          "description": "Start time",
+          "description": "Start time (UTC)",
           "format": "date-time",
           "title": "Started At",
           "type": "string"
         },
         "ended_at": {
-          "description": "End time",
+          "description": "End time (UTC)",
           "format": "date-time",
           "title": "Ended At",
           "type": "string"
@@ -2331,7 +2331,7 @@
           "title": "Thumbnail Url"
         },
         "uploaded_at": {
-          "description": "Upload time",
+          "description": "Upload time (UTC)",
           "format": "date-time",
           "title": "Uploaded At",
           "type": "string"

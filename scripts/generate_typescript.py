@@ -317,6 +317,139 @@ def generate_geometry_types() -> bool:
         return False
 
 
+def generate_config_types() -> bool:
+    """Generate TypeScript types for Config schemas (Category, QontinuiConfig)."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.config.models import config_root
+
+        models = [
+            # Category - the main type needed by frontend
+            config_root.Category,
+            # Enums
+            config_root.ImageFormat,
+            config_root.ImageSource,
+            config_root.FailureStrategy,
+            config_root.SearchAlgorithm,
+            config_root.ColorSpace,
+            config_root.LogLevel,
+            config_root.TriggerType,
+            config_root.CheckMode,
+            config_root.ScheduleType,
+            # Settings models
+            config_root.Resolution,
+            config_root.ExecutionSettings,
+            config_root.RecognitionSettings,
+            config_root.LoggingSettings,
+            config_root.PerformanceSettings,
+            config_root.MouseActionSettings,
+            config_root.KeyboardActionSettings,
+            config_root.FindActionSettings,
+            config_root.WaitActionSettings,
+            config_root.ConfigSettings,
+            # Metadata
+            config_root.CompatibleVersions,
+            config_root.ConfigMetadata,
+            # Image
+            config_root.ImageAsset,
+            # Schedule
+            config_root.Schedule,
+            config_root.ExecutionRecord,
+            # NOTE: QontinuiConfig excluded - it references Workflow, State, Transition
+            # from other modules. Frontend maintains its own QontinuiConfig in export-schema.ts
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "config.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models)
+        ts_file = output_dir / "config.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating config types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_extraction_types() -> bool:
+    """Generate TypeScript types for Extraction schemas."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.extraction import models
+
+        model_list = [
+            # Enums
+            models.ExtractionStatus,
+            models.StateType,
+            models.TriggerType,
+            # Basic types
+            models.BoundingBox,
+            # Elements
+            models.ExtractedElement,
+            models.ElementAnnotation,
+            # States
+            models.StateAnnotation,
+            # Transitions
+            models.InferredTransition,
+            # Stats
+            models.ExtractionStats,
+            # Annotations
+            models.ExtractionAnnotation,
+            # Session
+            models.ExtractionSessionConfig,
+            models.ExtractionSession,
+            models.ExtractionSessionDetail,
+            # Import
+            models.StateImportRequest,
+            models.ImportResult,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in model_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "extraction.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(model_list)
+        ts_file = output_dir / "extraction.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating extraction types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
 def generate_from_json_schema() -> bool:
     """Generate TypeScript from JSON Schema as fallback."""
     success = True
@@ -327,6 +460,10 @@ def generate_from_json_schema() -> bool:
     if not generate_events_types():
         success = False
     if not generate_geometry_types():
+        success = False
+    if not generate_config_types():
+        success = False
+    if not generate_extraction_types():
         success = False
     return success
 
@@ -518,12 +655,16 @@ def generate_typescript_from_models(models: list[Any]) -> str:
             is_optional = not field_info.is_required()
             optional_marker = "?" if is_optional else ""
 
+            # Use alias if available (for camelCase field names), otherwise use field_name
+            # Pydantic stores alias in field_info.alias
+            output_name = field_info.alias if field_info.alias else field_name
+
             # Get description for JSDoc
             description = field_info.description or ""
             if description:
                 lines.append(f"  /** {description} */")
 
-            lines.append(f"  {field_name}{optional_marker}: {ts_type};")
+            lines.append(f"  {output_name}{optional_marker}: {ts_type};")
 
         lines.append("}")
         lines.append("")

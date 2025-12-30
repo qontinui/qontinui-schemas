@@ -1,0 +1,2058 @@
+{
+  "schemas": {
+    "BoundingBox": {
+      "description": "Bounding box for an element or state.",
+      "properties": {
+        "x": {
+          "description": "X coordinate of top-left corner",
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "description": "Y coordinate of top-left corner",
+          "title": "Y",
+          "type": "number"
+        },
+        "width": {
+          "description": "Width of the bounding box",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        },
+        "height": {
+          "description": "Height of the bounding box",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "BoundingBox",
+      "type": "object"
+    },
+    "ExtractedElement": {
+      "$defs": {
+        "BoundingBox": {
+          "description": "Bounding box for an element or state.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "number"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "number"
+            },
+            "width": {
+              "description": "Width of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "number"
+            },
+            "height": {
+              "description": "Height of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "BoundingBox",
+          "type": "object"
+        }
+      },
+      "description": "An interactive element discovered during extraction.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the element",
+          "title": "Id",
+          "type": "string"
+        },
+        "tagName": {
+          "description": "HTML tag name (e.g., 'button', 'a', 'input')",
+          "title": "Tagname",
+          "type": "string"
+        },
+        "elementType": {
+          "description": "Semantic type (e.g., 'button', 'link', 'input')",
+          "title": "Elementtype",
+          "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text content of the element",
+          "title": "Text"
+        },
+        "bbox": {
+          "$ref": "#/$defs/BoundingBox",
+          "description": "Bounding box of the element"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CSS selector for the element",
+          "title": "Selector"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "HTML attributes of the element",
+          "title": "Attributes",
+          "type": "object"
+        },
+        "isInteractive": {
+          "default": true,
+          "description": "Whether the element is interactive",
+          "title": "Isinteractive",
+          "type": "boolean"
+        },
+        "confidence": {
+          "default": 1.0,
+          "description": "Confidence score for element detection",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "tagName",
+        "elementType",
+        "bbox"
+      ],
+      "title": "ExtractedElement",
+      "type": "object"
+    },
+    "ElementAnnotation": {
+      "$defs": {
+        "BoundingBox": {
+          "description": "Bounding box for an element or state.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "number"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "number"
+            },
+            "width": {
+              "description": "Width of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "number"
+            },
+            "height": {
+              "description": "Height of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "BoundingBox",
+          "type": "object"
+        }
+      },
+      "description": "Element annotation for backend storage.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "elementType": {
+          "description": "Type of element",
+          "title": "Elementtype",
+          "type": "string"
+        },
+        "bbox": {
+          "$ref": "#/$defs/BoundingBox",
+          "description": "Bounding box"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text content",
+          "title": "Text"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CSS selector",
+          "title": "Selector"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "elementType",
+        "bbox"
+      ],
+      "title": "ElementAnnotation",
+      "type": "object"
+    },
+    "StateAnnotation": {
+      "$defs": {
+        "BoundingBox": {
+          "description": "Bounding box for an element or state.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "number"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "number"
+            },
+            "width": {
+              "description": "Width of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "number"
+            },
+            "height": {
+              "description": "Height of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "BoundingBox",
+          "type": "object"
+        },
+        "StateType": {
+          "description": "Type of extracted state (semantic region type).",
+          "enum": [
+            "page",
+            "navigation",
+            "header",
+            "footer",
+            "sidebar",
+            "main",
+            "modal",
+            "dialog",
+            "form",
+            "card",
+            "list",
+            "table",
+            "menu",
+            "toolbar",
+            "tab_panel",
+            "accordion",
+            "carousel",
+            "alert",
+            "toast",
+            "tooltip",
+            "popover",
+            "dropdown",
+            "unknown"
+          ],
+          "title": "StateType",
+          "type": "string"
+        }
+      },
+      "description": "A state discovered during extraction.\n\nStates represent distinct UI regions or views identified by their\nvisual and semantic properties.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the state",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name for the state",
+          "title": "Name",
+          "type": "string"
+        },
+        "bbox": {
+          "$ref": "#/$defs/BoundingBox",
+          "description": "Bounding box of the state region"
+        },
+        "stateType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StateType"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": "unknown",
+          "description": "Semantic type of the state",
+          "title": "Statetype"
+        },
+        "elementIds": {
+          "description": "IDs of elements contained in this state",
+          "items": {
+            "type": "string"
+          },
+          "title": "Elementids",
+          "type": "array"
+        },
+        "screenshotId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of the screenshot showing this state",
+          "title": "Screenshotid"
+        },
+        "sourceUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL where this state was discovered",
+          "title": "Sourceurl"
+        },
+        "detectionMethod": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How the state was detected (semantic, heuristic, etc.)",
+          "title": "Detectionmethod"
+        },
+        "confidence": {
+          "default": 1.0,
+          "description": "Confidence score for state detection",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata about the state",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "bbox"
+      ],
+      "title": "StateAnnotation",
+      "type": "object"
+    },
+    "InferredTransition": {
+      "$defs": {
+        "TriggerType": {
+          "description": "Type of trigger that causes a transition.",
+          "enum": [
+            "click",
+            "hover",
+            "focus",
+            "scroll",
+            "navigation",
+            "keyboard",
+            "state_change",
+            "unknown"
+          ],
+          "title": "TriggerType",
+          "type": "string"
+        }
+      },
+      "description": "A transition discovered during extraction.\n\nTransitions represent navigation or state changes between states,\ntriggered by user interactions (clicks, hovers, etc.).",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the transition",
+          "title": "Id",
+          "type": "string"
+        },
+        "fromStateId": {
+          "description": "ID of the source state",
+          "title": "Fromstateid",
+          "type": "string"
+        },
+        "toStateId": {
+          "description": "ID of the target state",
+          "title": "Tostateid",
+          "type": "string"
+        },
+        "triggerType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TriggerType"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": "click",
+          "description": "Type of trigger that causes the transition",
+          "title": "Triggertype"
+        },
+        "triggerSelector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CSS selector of the trigger element",
+          "title": "Triggerselector"
+        },
+        "triggerText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text of the trigger element (for non-image triggers)",
+          "title": "Triggertext"
+        },
+        "triggerImage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Image URL of the trigger element (for image triggers)",
+          "title": "Triggerimage"
+        },
+        "hasImage": {
+          "default": false,
+          "description": "Whether the trigger is an image link",
+          "title": "Hasimage",
+          "type": "boolean"
+        },
+        "sourceUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the source page",
+          "title": "Sourceurl"
+        },
+        "targetUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the target page",
+          "title": "Targeturl"
+        },
+        "confidence": {
+          "default": 1.0,
+          "description": "Confidence score for transition detection",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata about the transition",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "fromStateId",
+        "toStateId"
+      ],
+      "title": "InferredTransition",
+      "type": "object"
+    },
+    "ExtractionStats": {
+      "description": "Statistics from an extraction session.",
+      "properties": {
+        "pagesExtracted": {
+          "default": 0,
+          "description": "Number of pages crawled",
+          "title": "Pagesextracted",
+          "type": "integer"
+        },
+        "elementsFound": {
+          "default": 0,
+          "description": "Number of elements discovered",
+          "title": "Elementsfound",
+          "type": "integer"
+        },
+        "statesFound": {
+          "default": 0,
+          "description": "Number of states discovered",
+          "title": "Statesfound",
+          "type": "integer"
+        },
+        "transitionsFound": {
+          "default": 0,
+          "description": "Number of transitions discovered",
+          "title": "Transitionsfound",
+          "type": "integer"
+        },
+        "screenshotExtractionId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extraction ID where screenshots are stored",
+          "title": "Screenshotextractionid"
+        }
+      },
+      "title": "ExtractionStats",
+      "type": "object"
+    },
+    "ExtractionAnnotation": {
+      "$defs": {
+        "BoundingBox": {
+          "description": "Bounding box for an element or state.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "number"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "number"
+            },
+            "width": {
+              "description": "Width of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "number"
+            },
+            "height": {
+              "description": "Height of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "BoundingBox",
+          "type": "object"
+        },
+        "ElementAnnotation": {
+          "description": "Element annotation for backend storage.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier",
+              "title": "Id",
+              "type": "string"
+            },
+            "elementType": {
+              "description": "Type of element",
+              "title": "Elementtype",
+              "type": "string"
+            },
+            "bbox": {
+              "$ref": "#/$defs/BoundingBox",
+              "description": "Bounding box"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text content",
+              "title": "Text"
+            },
+            "selector": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CSS selector",
+              "title": "Selector"
+            },
+            "confidence": {
+              "default": 1.0,
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "elementType",
+            "bbox"
+          ],
+          "title": "ElementAnnotation",
+          "type": "object"
+        },
+        "StateAnnotation": {
+          "description": "A state discovered during extraction.\n\nStates represent distinct UI regions or views identified by their\nvisual and semantic properties.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the state",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name for the state",
+              "title": "Name",
+              "type": "string"
+            },
+            "bbox": {
+              "$ref": "#/$defs/BoundingBox",
+              "description": "Bounding box of the state region"
+            },
+            "stateType": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StateType"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "unknown",
+              "description": "Semantic type of the state",
+              "title": "Statetype"
+            },
+            "elementIds": {
+              "description": "IDs of elements contained in this state",
+              "items": {
+                "type": "string"
+              },
+              "title": "Elementids",
+              "type": "array"
+            },
+            "screenshotId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of the screenshot showing this state",
+              "title": "Screenshotid"
+            },
+            "sourceUrl": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL where this state was discovered",
+              "title": "Sourceurl"
+            },
+            "detectionMethod": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How the state was detected (semantic, heuristic, etc.)",
+              "title": "Detectionmethod"
+            },
+            "confidence": {
+              "default": 1.0,
+              "description": "Confidence score for state detection",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "description": "Additional metadata about the state",
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "bbox"
+          ],
+          "title": "StateAnnotation",
+          "type": "object"
+        },
+        "StateType": {
+          "description": "Type of extracted state (semantic region type).",
+          "enum": [
+            "page",
+            "navigation",
+            "header",
+            "footer",
+            "sidebar",
+            "main",
+            "modal",
+            "dialog",
+            "form",
+            "card",
+            "list",
+            "table",
+            "menu",
+            "toolbar",
+            "tab_panel",
+            "accordion",
+            "carousel",
+            "alert",
+            "toast",
+            "tooltip",
+            "popover",
+            "dropdown",
+            "unknown"
+          ],
+          "title": "StateType",
+          "type": "string"
+        }
+      },
+      "description": "Annotation for a single page/screenshot in an extraction.\n\nGroups states and elements discovered on a specific page at a specific viewport.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "ID of the parent extraction session",
+          "title": "Sessionid",
+          "type": "string"
+        },
+        "screenshotId": {
+          "description": "ID of the screenshot for this annotation",
+          "title": "Screenshotid",
+          "type": "string"
+        },
+        "sourceUrl": {
+          "description": "URL of the page",
+          "title": "Sourceurl",
+          "type": "string"
+        },
+        "viewportWidth": {
+          "description": "Viewport width when screenshot was taken",
+          "title": "Viewportwidth",
+          "type": "integer"
+        },
+        "viewportHeight": {
+          "description": "Viewport height when screenshot was taken",
+          "title": "Viewportheight",
+          "type": "integer"
+        },
+        "elements": {
+          "description": "Elements discovered on this page",
+          "items": {
+            "$ref": "#/$defs/ElementAnnotation"
+          },
+          "title": "Elements",
+          "type": "array"
+        },
+        "states": {
+          "description": "States discovered on this page",
+          "items": {
+            "$ref": "#/$defs/StateAnnotation"
+          },
+          "title": "States",
+          "type": "array"
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this annotation was created",
+          "title": "Createdat"
+        },
+        "updatedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this annotation was last updated",
+          "title": "Updatedat"
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "screenshotId",
+        "sourceUrl",
+        "viewportWidth",
+        "viewportHeight"
+      ],
+      "title": "ExtractionAnnotation",
+      "type": "object"
+    },
+    "ExtractionSessionConfig": {
+      "description": "Configuration for an extraction session.",
+      "properties": {
+        "viewports": {
+          "description": "Viewport sizes to use for extraction",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Viewports",
+          "type": "array"
+        },
+        "captureHoverStates": {
+          "default": true,
+          "description": "Whether to capture hover states",
+          "title": "Capturehoverstates",
+          "type": "boolean"
+        },
+        "captureFocusStates": {
+          "default": true,
+          "description": "Whether to capture focus states",
+          "title": "Capturefocusstates",
+          "type": "boolean"
+        },
+        "maxDepth": {
+          "default": 5,
+          "description": "Maximum crawl depth",
+          "title": "Maxdepth",
+          "type": "integer"
+        },
+        "maxPages": {
+          "default": 100,
+          "description": "Maximum number of pages to crawl",
+          "title": "Maxpages",
+          "type": "integer"
+        },
+        "authCookies": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Authentication cookies for the target site",
+          "title": "Authcookies"
+        }
+      },
+      "title": "ExtractionSessionConfig",
+      "type": "object"
+    },
+    "ExtractionSession": {
+      "$defs": {
+        "ExtractionSessionConfig": {
+          "description": "Configuration for an extraction session.",
+          "properties": {
+            "viewports": {
+              "description": "Viewport sizes to use for extraction",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              "title": "Viewports",
+              "type": "array"
+            },
+            "captureHoverStates": {
+              "default": true,
+              "description": "Whether to capture hover states",
+              "title": "Capturehoverstates",
+              "type": "boolean"
+            },
+            "captureFocusStates": {
+              "default": true,
+              "description": "Whether to capture focus states",
+              "title": "Capturefocusstates",
+              "type": "boolean"
+            },
+            "maxDepth": {
+              "default": 5,
+              "description": "Maximum crawl depth",
+              "title": "Maxdepth",
+              "type": "integer"
+            },
+            "maxPages": {
+              "default": 100,
+              "description": "Maximum number of pages to crawl",
+              "title": "Maxpages",
+              "type": "integer"
+            },
+            "authCookies": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Authentication cookies for the target site",
+              "title": "Authcookies"
+            }
+          },
+          "title": "ExtractionSessionConfig",
+          "type": "object"
+        },
+        "ExtractionStats": {
+          "description": "Statistics from an extraction session.",
+          "properties": {
+            "pagesExtracted": {
+              "default": 0,
+              "description": "Number of pages crawled",
+              "title": "Pagesextracted",
+              "type": "integer"
+            },
+            "elementsFound": {
+              "default": 0,
+              "description": "Number of elements discovered",
+              "title": "Elementsfound",
+              "type": "integer"
+            },
+            "statesFound": {
+              "default": 0,
+              "description": "Number of states discovered",
+              "title": "Statesfound",
+              "type": "integer"
+            },
+            "transitionsFound": {
+              "default": 0,
+              "description": "Number of transitions discovered",
+              "title": "Transitionsfound",
+              "type": "integer"
+            },
+            "screenshotExtractionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Extraction ID where screenshots are stored",
+              "title": "Screenshotextractionid"
+            }
+          },
+          "title": "ExtractionStats",
+          "type": "object"
+        },
+        "ExtractionStatus": {
+          "description": "Status of an extraction session.",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed"
+          ],
+          "title": "ExtractionStatus",
+          "type": "string"
+        }
+      },
+      "description": "An extraction session representing a web extraction job.\n\nSessions track the configuration, status, and results of extracting\nstates and transitions from web applications.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the session",
+          "title": "Id",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ID of the project this extraction belongs to",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "sourceUrls": {
+          "description": "URLs to extract from",
+          "items": {
+            "type": "string"
+          },
+          "title": "Sourceurls",
+          "type": "array"
+        },
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionSessionConfig"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          ],
+          "description": "Extraction configuration",
+          "title": "Config"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionStatus"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Current status of the extraction",
+          "title": "Status"
+        },
+        "stats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionStats"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          ],
+          "description": "Extraction statistics",
+          "title": "Stats"
+        },
+        "errorMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if extraction failed",
+          "title": "Errormessage"
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "When the session was created",
+          "title": "Createdat"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When extraction started",
+          "title": "Startedat"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When extraction completed",
+          "title": "Completedat"
+        },
+        "createdBy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User who created the session",
+          "title": "Createdby"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "sourceUrls",
+        "config",
+        "status",
+        "stats",
+        "createdAt"
+      ],
+      "title": "ExtractionSession",
+      "type": "object"
+    },
+    "ExtractionSessionDetail": {
+      "$defs": {
+        "BoundingBox": {
+          "description": "Bounding box for an element or state.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "number"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "number"
+            },
+            "width": {
+              "description": "Width of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "number"
+            },
+            "height": {
+              "description": "Height of the bounding box",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "BoundingBox",
+          "type": "object"
+        },
+        "ElementAnnotation": {
+          "description": "Element annotation for backend storage.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier",
+              "title": "Id",
+              "type": "string"
+            },
+            "elementType": {
+              "description": "Type of element",
+              "title": "Elementtype",
+              "type": "string"
+            },
+            "bbox": {
+              "$ref": "#/$defs/BoundingBox",
+              "description": "Bounding box"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text content",
+              "title": "Text"
+            },
+            "selector": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CSS selector",
+              "title": "Selector"
+            },
+            "confidence": {
+              "default": 1.0,
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "elementType",
+            "bbox"
+          ],
+          "title": "ElementAnnotation",
+          "type": "object"
+        },
+        "ExtractionAnnotation": {
+          "description": "Annotation for a single page/screenshot in an extraction.\n\nGroups states and elements discovered on a specific page at a specific viewport.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier",
+              "title": "Id",
+              "type": "string"
+            },
+            "sessionId": {
+              "description": "ID of the parent extraction session",
+              "title": "Sessionid",
+              "type": "string"
+            },
+            "screenshotId": {
+              "description": "ID of the screenshot for this annotation",
+              "title": "Screenshotid",
+              "type": "string"
+            },
+            "sourceUrl": {
+              "description": "URL of the page",
+              "title": "Sourceurl",
+              "type": "string"
+            },
+            "viewportWidth": {
+              "description": "Viewport width when screenshot was taken",
+              "title": "Viewportwidth",
+              "type": "integer"
+            },
+            "viewportHeight": {
+              "description": "Viewport height when screenshot was taken",
+              "title": "Viewportheight",
+              "type": "integer"
+            },
+            "elements": {
+              "description": "Elements discovered on this page",
+              "items": {
+                "$ref": "#/$defs/ElementAnnotation"
+              },
+              "title": "Elements",
+              "type": "array"
+            },
+            "states": {
+              "description": "States discovered on this page",
+              "items": {
+                "$ref": "#/$defs/StateAnnotation"
+              },
+              "title": "States",
+              "type": "array"
+            },
+            "createdAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this annotation was created",
+              "title": "Createdat"
+            },
+            "updatedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this annotation was last updated",
+              "title": "Updatedat"
+            }
+          },
+          "required": [
+            "id",
+            "sessionId",
+            "screenshotId",
+            "sourceUrl",
+            "viewportWidth",
+            "viewportHeight"
+          ],
+          "title": "ExtractionAnnotation",
+          "type": "object"
+        },
+        "ExtractionSessionConfig": {
+          "description": "Configuration for an extraction session.",
+          "properties": {
+            "viewports": {
+              "description": "Viewport sizes to use for extraction",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              "title": "Viewports",
+              "type": "array"
+            },
+            "captureHoverStates": {
+              "default": true,
+              "description": "Whether to capture hover states",
+              "title": "Capturehoverstates",
+              "type": "boolean"
+            },
+            "captureFocusStates": {
+              "default": true,
+              "description": "Whether to capture focus states",
+              "title": "Capturefocusstates",
+              "type": "boolean"
+            },
+            "maxDepth": {
+              "default": 5,
+              "description": "Maximum crawl depth",
+              "title": "Maxdepth",
+              "type": "integer"
+            },
+            "maxPages": {
+              "default": 100,
+              "description": "Maximum number of pages to crawl",
+              "title": "Maxpages",
+              "type": "integer"
+            },
+            "authCookies": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Authentication cookies for the target site",
+              "title": "Authcookies"
+            }
+          },
+          "title": "ExtractionSessionConfig",
+          "type": "object"
+        },
+        "ExtractionStats": {
+          "description": "Statistics from an extraction session.",
+          "properties": {
+            "pagesExtracted": {
+              "default": 0,
+              "description": "Number of pages crawled",
+              "title": "Pagesextracted",
+              "type": "integer"
+            },
+            "elementsFound": {
+              "default": 0,
+              "description": "Number of elements discovered",
+              "title": "Elementsfound",
+              "type": "integer"
+            },
+            "statesFound": {
+              "default": 0,
+              "description": "Number of states discovered",
+              "title": "Statesfound",
+              "type": "integer"
+            },
+            "transitionsFound": {
+              "default": 0,
+              "description": "Number of transitions discovered",
+              "title": "Transitionsfound",
+              "type": "integer"
+            },
+            "screenshotExtractionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Extraction ID where screenshots are stored",
+              "title": "Screenshotextractionid"
+            }
+          },
+          "title": "ExtractionStats",
+          "type": "object"
+        },
+        "ExtractionStatus": {
+          "description": "Status of an extraction session.",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed"
+          ],
+          "title": "ExtractionStatus",
+          "type": "string"
+        },
+        "InferredTransition": {
+          "description": "A transition discovered during extraction.\n\nTransitions represent navigation or state changes between states,\ntriggered by user interactions (clicks, hovers, etc.).",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the transition",
+              "title": "Id",
+              "type": "string"
+            },
+            "fromStateId": {
+              "description": "ID of the source state",
+              "title": "Fromstateid",
+              "type": "string"
+            },
+            "toStateId": {
+              "description": "ID of the target state",
+              "title": "Tostateid",
+              "type": "string"
+            },
+            "triggerType": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TriggerType"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "click",
+              "description": "Type of trigger that causes the transition",
+              "title": "Triggertype"
+            },
+            "triggerSelector": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CSS selector of the trigger element",
+              "title": "Triggerselector"
+            },
+            "triggerText": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Text of the trigger element (for non-image triggers)",
+              "title": "Triggertext"
+            },
+            "triggerImage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Image URL of the trigger element (for image triggers)",
+              "title": "Triggerimage"
+            },
+            "hasImage": {
+              "default": false,
+              "description": "Whether the trigger is an image link",
+              "title": "Hasimage",
+              "type": "boolean"
+            },
+            "sourceUrl": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL of the source page",
+              "title": "Sourceurl"
+            },
+            "targetUrl": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL of the target page",
+              "title": "Targeturl"
+            },
+            "confidence": {
+              "default": 1.0,
+              "description": "Confidence score for transition detection",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "description": "Additional metadata about the transition",
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "id",
+            "fromStateId",
+            "toStateId"
+          ],
+          "title": "InferredTransition",
+          "type": "object"
+        },
+        "StateAnnotation": {
+          "description": "A state discovered during extraction.\n\nStates represent distinct UI regions or views identified by their\nvisual and semantic properties.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the state",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name for the state",
+              "title": "Name",
+              "type": "string"
+            },
+            "bbox": {
+              "$ref": "#/$defs/BoundingBox",
+              "description": "Bounding box of the state region"
+            },
+            "stateType": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StateType"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "unknown",
+              "description": "Semantic type of the state",
+              "title": "Statetype"
+            },
+            "elementIds": {
+              "description": "IDs of elements contained in this state",
+              "items": {
+                "type": "string"
+              },
+              "title": "Elementids",
+              "type": "array"
+            },
+            "screenshotId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of the screenshot showing this state",
+              "title": "Screenshotid"
+            },
+            "sourceUrl": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL where this state was discovered",
+              "title": "Sourceurl"
+            },
+            "detectionMethod": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How the state was detected (semantic, heuristic, etc.)",
+              "title": "Detectionmethod"
+            },
+            "confidence": {
+              "default": 1.0,
+              "description": "Confidence score for state detection",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "description": "Additional metadata about the state",
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "bbox"
+          ],
+          "title": "StateAnnotation",
+          "type": "object"
+        },
+        "StateType": {
+          "description": "Type of extracted state (semantic region type).",
+          "enum": [
+            "page",
+            "navigation",
+            "header",
+            "footer",
+            "sidebar",
+            "main",
+            "modal",
+            "dialog",
+            "form",
+            "card",
+            "list",
+            "table",
+            "menu",
+            "toolbar",
+            "tab_panel",
+            "accordion",
+            "carousel",
+            "alert",
+            "toast",
+            "tooltip",
+            "popover",
+            "dropdown",
+            "unknown"
+          ],
+          "title": "StateType",
+          "type": "string"
+        },
+        "TriggerType": {
+          "description": "Type of trigger that causes a transition.",
+          "enum": [
+            "click",
+            "hover",
+            "focus",
+            "scroll",
+            "navigation",
+            "keyboard",
+            "state_change",
+            "unknown"
+          ],
+          "title": "TriggerType",
+          "type": "string"
+        }
+      },
+      "description": "Extraction session with full annotation details.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the session",
+          "title": "Id",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ID of the project this extraction belongs to",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "sourceUrls": {
+          "description": "URLs to extract from",
+          "items": {
+            "type": "string"
+          },
+          "title": "Sourceurls",
+          "type": "array"
+        },
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionSessionConfig"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          ],
+          "description": "Extraction configuration",
+          "title": "Config"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionStatus"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Current status of the extraction",
+          "title": "Status"
+        },
+        "stats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionStats"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          ],
+          "description": "Extraction statistics",
+          "title": "Stats"
+        },
+        "errorMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if extraction failed",
+          "title": "Errormessage"
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "When the session was created",
+          "title": "Createdat"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When extraction started",
+          "title": "Startedat"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When extraction completed",
+          "title": "Completedat"
+        },
+        "createdBy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User who created the session",
+          "title": "Createdby"
+        },
+        "annotations": {
+          "description": "Page annotations with states and elements",
+          "items": {
+            "$ref": "#/$defs/ExtractionAnnotation"
+          },
+          "title": "Annotations",
+          "type": "array"
+        },
+        "transitions": {
+          "description": "Transitions discovered during extraction",
+          "items": {
+            "$ref": "#/$defs/InferredTransition"
+          },
+          "title": "Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "sourceUrls",
+        "config",
+        "status",
+        "stats",
+        "createdAt"
+      ],
+      "title": "ExtractionSessionDetail",
+      "type": "object"
+    },
+    "StateImportRequest": {
+      "description": "Request to import extracted states into a project.",
+      "properties": {
+        "stateIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specific state IDs to import (None = all)",
+          "title": "Stateids"
+        },
+        "targetWorkflowId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow to add states to",
+          "title": "Targetworkflowid"
+        }
+      },
+      "title": "StateImportRequest",
+      "type": "object"
+    },
+    "ImportResult": {
+      "description": "Result of importing states into a project.",
+      "properties": {
+        "importedStates": {
+          "description": "Number of states imported",
+          "title": "Importedstates",
+          "type": "integer"
+        },
+        "importedTransitions": {
+          "description": "Number of transitions imported",
+          "title": "Importedtransitions",
+          "type": "integer"
+        },
+        "workflowId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of the workflow states were added to",
+          "title": "Workflowid"
+        }
+      },
+      "required": [
+        "importedStates",
+        "importedTransitions"
+      ],
+      "title": "ImportResult",
+      "type": "object"
+    }
+  }
+}

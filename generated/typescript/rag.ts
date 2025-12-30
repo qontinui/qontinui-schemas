@@ -199,8 +199,8 @@ export interface JobSummary {
   total_patterns: number;
   /** Patterns processed so far */
   processed_patterns: number;
-  /** When the job started */
-  started_at?: string | null;
+  /** When the job started (UTC) */
+  started_at?: any | null;
   /** Error message if job failed */
   error_message?: string | null;
 }
@@ -212,8 +212,8 @@ export interface RAGDashboardStats {
   total_states: number;
   /** Number of unique patterns */
   total_patterns: number;
-  /** When runner last synced embeddings */
-  last_sync_at?: string | null;
+  /** When runner last synced embeddings (UTC) */
+  last_sync_at?: any | null;
   /** Currently running job if any */
   active_job?: JobSummary | null;
 }
@@ -249,9 +249,9 @@ export interface EmbeddingItem {
   has_text_embedding?: boolean;
   /** Additional pattern metadata */
   pattern_metadata?: Record<string, any>;
-  /** When the embedding was created */
+  /** When the embedding was created (UTC) */
   created_at: string;
-  /** When the embedding was last updated */
+  /** When the embedding was last updated (UTC) */
   updated_at: string;
 }
 
@@ -287,12 +287,12 @@ export interface JobItem {
   max_retries: number;
   /** Additional job metadata */
   job_metadata?: Record<string, any>;
-  /** When the job was created */
+  /** When the job was created (UTC) */
   created_at: string;
-  /** When the job started */
-  started_at?: string | null;
-  /** When the job completed */
-  completed_at?: string | null;
+  /** When the job started (UTC) */
+  started_at?: any | null;
+  /** When the job completed (UTC) */
+  completed_at?: any | null;
 }
 
 export interface JobListResponse {
