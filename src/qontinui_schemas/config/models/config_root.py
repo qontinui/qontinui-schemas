@@ -7,9 +7,8 @@ QontinuiConfig that ties everything together.
 """
 
 from enum import Enum
-from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from .state_machine import State, Transition
 from .workflow import Workflow
@@ -652,40 +651,3 @@ class QontinuiConfig(BaseModel):
     )
 
     model_config = {"populate_by_name": True}
-
-    @field_validator("categories", mode="before")
-    @classmethod
-    def normalize_categories(cls, v: Any) -> list[dict[str, Any]]:
-        """Accept both string array and Category object array formats.
-
-        For backward compatibility, converts simple strings to Category objects:
-        - ["Main", "Testing"] -> [{"name": "Main", "automationEnabled": true}, ...]
-
-        The first category (typically "Main") gets automationEnabled=True by default.
-        """
-        if not isinstance(v, list):
-            return []
-
-        result = []
-        for i, item in enumerate(v):
-            if isinstance(item, str):
-                # Convert string to Category dict
-                # First category (usually "Main") defaults to enabled
-                result.append(
-                    {
-                        "name": item,
-                        "automationEnabled": i
-                        == 0,  # Only first category enabled by default
-                    }
-                )
-            elif isinstance(item, dict):
-                # Already a Category-like dict, pass through
-                result.append(item)
-            elif hasattr(item, "model_dump"):
-                # Already a Pydantic model
-                result.append(item.model_dump())
-            else:
-                # Unknown type, skip
-                continue
-
-        return result
