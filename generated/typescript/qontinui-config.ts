@@ -6,9 +6,56 @@
  * types from config.ts and workflow.ts
  */
 
-// Re-export all types from config and workflow for convenience
+// Re-export all types from config (canonical source for shared types like LogLevel, ExecutionSettings)
 export * from "./config";
-export * from "./workflow";
+
+// Re-export workflow types explicitly (excluding duplicates already in config.ts: LogLevel, ExecutionSettings)
+export type {
+  // Logging types
+  LoggingOptions,
+  // Execution types
+  RepetitionOptions,
+  BaseActionSettings,
+  // Position and region types
+  Position,
+  SearchRegion,
+  // Pattern and StateImage
+  Pattern,
+  StateImage,
+  // State components
+  StateRegion,
+  StateLocation,
+  StateString,
+  // State
+  StatePosition,
+  State,
+  // Transition types
+  TransitionCondition,
+  BaseTransition,
+  OutgoingTransition,
+  IncomingTransition,
+  Transition,
+  // Workflow types
+  Connection,
+  WorkflowMetadata,
+  Variables,
+  WorkflowSettings,
+  Workflow,
+  Connections,
+  ActionOutputs,
+  WorkflowConnections,
+  // Action
+  Action,
+} from "./workflow";
+
+// Re-export enums separately (they are values, not just types)
+export {
+  WorkflowVisibility,
+  PositionName,
+  TransitionType,
+  SearchMode,
+  MultiPatternMode,
+} from "./workflow";
 
 import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord } from "./config";
 import type { Workflow, State, Transition } from "./workflow";
