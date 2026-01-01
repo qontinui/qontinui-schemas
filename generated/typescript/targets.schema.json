@@ -1,0 +1,3212 @@
+{
+  "schemas": {
+    "PollingConfig": {
+      "description": "Polling configuration for search operations.",
+      "properties": {
+        "interval": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interval"
+        },
+        "maxAttempts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxattempts"
+        }
+      },
+      "title": "PollingConfig",
+      "type": "object"
+    },
+    "PatternOptions": {
+      "description": "Advanced pattern matching options.",
+      "properties": {
+        "matchMethod": {
+          "anyOf": [
+            {
+              "enum": [
+                "CORRELATION",
+                "CORRELATION_NORMED",
+                "SQUARED_DIFFERENCE",
+                "SQUARED_DIFFERENCE_NORMED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matchmethod"
+        },
+        "scaleInvariant": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scaleinvariant"
+        },
+        "rotationInvariant": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotationinvariant"
+        },
+        "minScale": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minscale"
+        },
+        "maxScale": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxscale"
+        },
+        "scaleStep": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scalestep"
+        },
+        "minRotation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minrotation"
+        },
+        "maxRotation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxrotation"
+        },
+        "rotationStep": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotationstep"
+        },
+        "useGrayscale": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usegrayscale"
+        },
+        "useColorReduction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usecolorreduction"
+        },
+        "colorTolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Colortolerance"
+        },
+        "useEdges": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Useedges"
+        },
+        "edgeThreshold1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edgethreshold1"
+        },
+        "edgeThreshold2": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edgethreshold2"
+        },
+        "nonMaxSuppression": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nonmaxsuppression"
+        },
+        "nmsThreshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nmsthreshold"
+        },
+        "minDistanceBetweenMatches": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mindistancebetweenmatches"
+        }
+      },
+      "title": "PatternOptions",
+      "type": "object"
+    },
+    "MatchAdjustment": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Coordinates": {
+          "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+          "properties": {
+            "x": {
+              "description": "X coordinate (horizontal position)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate (vertical position)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "Coordinates",
+          "type": "object"
+        }
+      },
+      "description": "Match adjustment - modify the matched region.",
+      "properties": {
+        "targetPosition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetposition"
+        },
+        "targetOffset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coordinates"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "addW": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Addw"
+        },
+        "addH": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Addh"
+        },
+        "absoluteW": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolutew"
+        },
+        "absoluteH": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absoluteh"
+        },
+        "addX": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Addx"
+        },
+        "addY": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Addy"
+        }
+      },
+      "title": "MatchAdjustment",
+      "type": "object"
+    },
+    "SearchOptions": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Coordinates": {
+          "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+          "properties": {
+            "x": {
+              "description": "X coordinate (horizontal position)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate (vertical position)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "Coordinates",
+          "type": "object"
+        },
+        "MatchAdjustment": {
+          "description": "Match adjustment - modify the matched region.",
+          "properties": {
+            "targetPosition": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Targetposition"
+            },
+            "targetOffset": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Coordinates"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "addW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addw"
+            },
+            "addH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addh"
+            },
+            "absoluteW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absolutew"
+            },
+            "absoluteH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absoluteh"
+            },
+            "addX": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addx"
+            },
+            "addY": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addy"
+            }
+          },
+          "title": "MatchAdjustment",
+          "type": "object"
+        },
+        "PatternOptions": {
+          "description": "Advanced pattern matching options.",
+          "properties": {
+            "matchMethod": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "CORRELATION",
+                    "CORRELATION_NORMED",
+                    "SQUARED_DIFFERENCE",
+                    "SQUARED_DIFFERENCE_NORMED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Matchmethod"
+            },
+            "scaleInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scaleinvariant"
+            },
+            "rotationInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationinvariant"
+            },
+            "minScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minscale"
+            },
+            "maxScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxscale"
+            },
+            "scaleStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scalestep"
+            },
+            "minRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minrotation"
+            },
+            "maxRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxrotation"
+            },
+            "rotationStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationstep"
+            },
+            "useGrayscale": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usegrayscale"
+            },
+            "useColorReduction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usecolorreduction"
+            },
+            "colorTolerance": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Colortolerance"
+            },
+            "useEdges": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Useedges"
+            },
+            "edgeThreshold1": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold1"
+            },
+            "edgeThreshold2": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold2"
+            },
+            "nonMaxSuppression": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nonmaxsuppression"
+            },
+            "nmsThreshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nmsthreshold"
+            },
+            "minDistanceBetweenMatches": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mindistancebetweenmatches"
+            }
+          },
+          "title": "PatternOptions",
+          "type": "object"
+        },
+        "PollingConfig": {
+          "description": "Polling configuration for search operations.",
+          "properties": {
+            "interval": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Interval"
+            },
+            "maxAttempts": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxattempts"
+            }
+          },
+          "title": "PollingConfig",
+          "type": "object"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        },
+        "SearchStrategy": {
+          "description": "Search strategy for finding targets.",
+          "enum": [
+            "FIRST",
+            "ALL",
+            "BEST",
+            "EACH"
+          ],
+          "title": "SearchStrategy",
+          "type": "string"
+        }
+      },
+      "description": "Search options for target finding.",
+      "properties": {
+        "similarity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Similarity"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "searchRegions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Region"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Searchregions"
+        },
+        "searchStrategy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "useDefinedRegion": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usedefinedregion"
+        },
+        "maxMatchesToActOn": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxmatchestoacton"
+        },
+        "minMatches": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minmatches"
+        },
+        "maxMatches": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxmatches"
+        },
+        "polling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PollingConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PatternOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "adjustment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MatchAdjustment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "captureImage": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Captureimage"
+        }
+      },
+      "title": "SearchOptions",
+      "type": "object"
+    },
+    "TextSearchOptions": {
+      "description": "Text search options for OCR-based finding.",
+      "properties": {
+        "ocrEngine": {
+          "anyOf": [
+            {
+              "enum": [
+                "TESSERACT",
+                "EASYOCR",
+                "PADDLEOCR",
+                "NATIVE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocrengine"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "whitelistChars": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Whitelistchars"
+        },
+        "blacklistChars": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blacklistchars"
+        },
+        "matchType": {
+          "anyOf": [
+            {
+              "enum": [
+                "EXACT",
+                "CONTAINS",
+                "STARTS_WITH",
+                "ENDS_WITH",
+                "REGEX",
+                "FUZZY"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matchtype"
+        },
+        "caseSensitive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Casesensitive"
+        },
+        "ignoreWhitespace": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignorewhitespace"
+        },
+        "normalizeUnicode": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalizeunicode"
+        },
+        "fuzzyThreshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fuzzythreshold"
+        },
+        "editDistance": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Editdistance"
+        },
+        "preprocessing": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preprocessing"
+        },
+        "scaleFactor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scalefactor"
+        },
+        "psmMode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Psmmode"
+        },
+        "oemMode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oemmode"
+        },
+        "confidenceThreshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidencethreshold"
+        }
+      },
+      "title": "TextSearchOptions",
+      "type": "object"
+    },
+    "ImageTarget": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Coordinates": {
+          "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+          "properties": {
+            "x": {
+              "description": "X coordinate (horizontal position)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate (vertical position)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "Coordinates",
+          "type": "object"
+        },
+        "MatchAdjustment": {
+          "description": "Match adjustment - modify the matched region.",
+          "properties": {
+            "targetPosition": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Targetposition"
+            },
+            "targetOffset": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Coordinates"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "addW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addw"
+            },
+            "addH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addh"
+            },
+            "absoluteW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absolutew"
+            },
+            "absoluteH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absoluteh"
+            },
+            "addX": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addx"
+            },
+            "addY": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addy"
+            }
+          },
+          "title": "MatchAdjustment",
+          "type": "object"
+        },
+        "PatternOptions": {
+          "description": "Advanced pattern matching options.",
+          "properties": {
+            "matchMethod": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "CORRELATION",
+                    "CORRELATION_NORMED",
+                    "SQUARED_DIFFERENCE",
+                    "SQUARED_DIFFERENCE_NORMED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Matchmethod"
+            },
+            "scaleInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scaleinvariant"
+            },
+            "rotationInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationinvariant"
+            },
+            "minScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minscale"
+            },
+            "maxScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxscale"
+            },
+            "scaleStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scalestep"
+            },
+            "minRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minrotation"
+            },
+            "maxRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxrotation"
+            },
+            "rotationStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationstep"
+            },
+            "useGrayscale": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usegrayscale"
+            },
+            "useColorReduction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usecolorreduction"
+            },
+            "colorTolerance": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Colortolerance"
+            },
+            "useEdges": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Useedges"
+            },
+            "edgeThreshold1": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold1"
+            },
+            "edgeThreshold2": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold2"
+            },
+            "nonMaxSuppression": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nonmaxsuppression"
+            },
+            "nmsThreshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nmsthreshold"
+            },
+            "minDistanceBetweenMatches": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mindistancebetweenmatches"
+            }
+          },
+          "title": "PatternOptions",
+          "type": "object"
+        },
+        "PollingConfig": {
+          "description": "Polling configuration for search operations.",
+          "properties": {
+            "interval": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Interval"
+            },
+            "maxAttempts": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxattempts"
+            }
+          },
+          "title": "PollingConfig",
+          "type": "object"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        },
+        "SearchOptions": {
+          "description": "Search options for target finding.",
+          "properties": {
+            "similarity": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Similarity"
+            },
+            "timeout": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout"
+            },
+            "searchRegions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/Region"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Searchregions"
+            },
+            "searchStrategy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SearchStrategy"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "useDefinedRegion": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usedefinedregion"
+            },
+            "maxMatchesToActOn": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxmatchestoacton"
+            },
+            "minMatches": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minmatches"
+            },
+            "maxMatches": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxmatches"
+            },
+            "polling": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PollingConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "pattern": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PatternOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "adjustment": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MatchAdjustment"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "captureImage": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Captureimage"
+            }
+          },
+          "title": "SearchOptions",
+          "type": "object"
+        },
+        "SearchStrategy": {
+          "description": "Search strategy for finding targets.",
+          "enum": [
+            "FIRST",
+            "ALL",
+            "BEST",
+            "EACH"
+          ],
+          "title": "SearchStrategy",
+          "type": "string"
+        }
+      },
+      "description": "Image target configuration supporting multiple images with search strategies.\n\nBreaking change: Changed from single image_id to multiple image_ids.\nUse image_ids with a single-element list for single image targeting.",
+      "properties": {
+        "type": {
+          "const": "image",
+          "default": "image",
+          "title": "Type",
+          "type": "string"
+        },
+        "imageIds": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Imageids",
+          "type": "array"
+        },
+        "searchOptions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "imageIds"
+      ],
+      "title": "ImageTarget",
+      "type": "object"
+    },
+    "RegionTarget": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        }
+      },
+      "description": "Region target configuration.",
+      "properties": {
+        "type": {
+          "const": "region",
+          "default": "region",
+          "title": "Type",
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/$defs/Region"
+        }
+      },
+      "required": [
+        "region"
+      ],
+      "title": "RegionTarget",
+      "type": "object"
+    },
+    "TextTarget": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Coordinates": {
+          "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+          "properties": {
+            "x": {
+              "description": "X coordinate (horizontal position)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate (vertical position)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "Coordinates",
+          "type": "object"
+        },
+        "MatchAdjustment": {
+          "description": "Match adjustment - modify the matched region.",
+          "properties": {
+            "targetPosition": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Targetposition"
+            },
+            "targetOffset": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Coordinates"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "addW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addw"
+            },
+            "addH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addh"
+            },
+            "absoluteW": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absolutew"
+            },
+            "absoluteH": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Absoluteh"
+            },
+            "addX": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addx"
+            },
+            "addY": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Addy"
+            }
+          },
+          "title": "MatchAdjustment",
+          "type": "object"
+        },
+        "PatternOptions": {
+          "description": "Advanced pattern matching options.",
+          "properties": {
+            "matchMethod": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "CORRELATION",
+                    "CORRELATION_NORMED",
+                    "SQUARED_DIFFERENCE",
+                    "SQUARED_DIFFERENCE_NORMED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Matchmethod"
+            },
+            "scaleInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scaleinvariant"
+            },
+            "rotationInvariant": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationinvariant"
+            },
+            "minScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minscale"
+            },
+            "maxScale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxscale"
+            },
+            "scaleStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scalestep"
+            },
+            "minRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minrotation"
+            },
+            "maxRotation": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxrotation"
+            },
+            "rotationStep": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rotationstep"
+            },
+            "useGrayscale": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usegrayscale"
+            },
+            "useColorReduction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usecolorreduction"
+            },
+            "colorTolerance": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Colortolerance"
+            },
+            "useEdges": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Useedges"
+            },
+            "edgeThreshold1": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold1"
+            },
+            "edgeThreshold2": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Edgethreshold2"
+            },
+            "nonMaxSuppression": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nonmaxsuppression"
+            },
+            "nmsThreshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nmsthreshold"
+            },
+            "minDistanceBetweenMatches": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mindistancebetweenmatches"
+            }
+          },
+          "title": "PatternOptions",
+          "type": "object"
+        },
+        "PollingConfig": {
+          "description": "Polling configuration for search operations.",
+          "properties": {
+            "interval": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Interval"
+            },
+            "maxAttempts": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxattempts"
+            }
+          },
+          "title": "PollingConfig",
+          "type": "object"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        },
+        "SearchOptions": {
+          "description": "Search options for target finding.",
+          "properties": {
+            "similarity": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Similarity"
+            },
+            "timeout": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout"
+            },
+            "searchRegions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/Region"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Searchregions"
+            },
+            "searchStrategy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SearchStrategy"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "useDefinedRegion": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Usedefinedregion"
+            },
+            "maxMatchesToActOn": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxmatchestoacton"
+            },
+            "minMatches": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minmatches"
+            },
+            "maxMatches": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxmatches"
+            },
+            "polling": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PollingConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "pattern": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PatternOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "adjustment": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MatchAdjustment"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "captureImage": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Captureimage"
+            }
+          },
+          "title": "SearchOptions",
+          "type": "object"
+        },
+        "SearchStrategy": {
+          "description": "Search strategy for finding targets.",
+          "enum": [
+            "FIRST",
+            "ALL",
+            "BEST",
+            "EACH"
+          ],
+          "title": "SearchStrategy",
+          "type": "string"
+        },
+        "TextSearchOptions": {
+          "description": "Text search options for OCR-based finding.",
+          "properties": {
+            "ocrEngine": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "TESSERACT",
+                    "EASYOCR",
+                    "PADDLEOCR",
+                    "NATIVE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ocrengine"
+            },
+            "language": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Language"
+            },
+            "whitelistChars": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Whitelistchars"
+            },
+            "blacklistChars": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Blacklistchars"
+            },
+            "matchType": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "EXACT",
+                    "CONTAINS",
+                    "STARTS_WITH",
+                    "ENDS_WITH",
+                    "REGEX",
+                    "FUZZY"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Matchtype"
+            },
+            "caseSensitive": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Casesensitive"
+            },
+            "ignoreWhitespace": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ignorewhitespace"
+            },
+            "normalizeUnicode": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Normalizeunicode"
+            },
+            "fuzzyThreshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Fuzzythreshold"
+            },
+            "editDistance": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Editdistance"
+            },
+            "preprocessing": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Preprocessing"
+            },
+            "scaleFactor": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scalefactor"
+            },
+            "psmMode": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Psmmode"
+            },
+            "oemMode": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Oemmode"
+            },
+            "confidenceThreshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Confidencethreshold"
+            }
+          },
+          "title": "TextSearchOptions",
+          "type": "object"
+        }
+      },
+      "description": "Text target configuration.",
+      "properties": {
+        "type": {
+          "const": "text",
+          "default": "text",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "searchOptions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "textOptions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextSearchOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextTarget",
+      "type": "object"
+    },
+    "CoordinatesTarget": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Coordinates": {
+          "description": "X,Y coordinates with optional coordinate system specification.\n\nFor backward compatibility, coordinates without a system specified\nare assumed to be SCREEN coordinates.\n\nExamples\n--------\nSimple screen coordinate:\n    >>> Coordinates(x=100, y=200)\n\nExplicit screen coordinate:\n    >>> Coordinates(x=-1920, y=0, system=CoordinateSystem.SCREEN)\n\nVirtual desktop coordinate:\n    >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)\n\nMonitor-relative coordinate:\n    >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)",
+          "properties": {
+            "x": {
+              "description": "X coordinate (horizontal position)",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate (vertical position)",
+              "title": "Y",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "Coordinates",
+          "type": "object"
+        }
+      },
+      "description": "Coordinates target configuration.",
+      "properties": {
+        "type": {
+          "const": "coordinates",
+          "default": "coordinates",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "$ref": "#/$defs/Coordinates"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "CoordinatesTarget",
+      "type": "object"
+    },
+    "StateStringTarget": {
+      "description": "State string target configuration.",
+      "properties": {
+        "type": {
+          "const": "stateString",
+          "default": "stateString",
+          "title": "Type",
+          "type": "string"
+        },
+        "stateId": {
+          "title": "Stateid",
+          "type": "string"
+        },
+        "stringIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stringids",
+          "type": "array"
+        },
+        "useAll": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Useall"
+        }
+      },
+      "required": [
+        "stateId",
+        "stringIds"
+      ],
+      "title": "StateStringTarget",
+      "type": "object"
+    },
+    "StateRegionTarget": {
+      "description": "Target a StateRegion by ID.\n\nThis target type references a StateRegion defined on a state, preserving\nthe monitor association. When executed, the action will use the region's\nconfigured monitors instead of a global default.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n    region_id: The ID of the StateRegion to target.\n\nExample:\n    {\n        \"type\": \"stateRegion\",\n        \"regionId\": \"region-123\"\n    }",
+      "properties": {
+        "type": {
+          "const": "stateRegion",
+          "default": "stateRegion",
+          "title": "Type",
+          "type": "string"
+        },
+        "regionId": {
+          "title": "Regionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "regionId"
+      ],
+      "title": "StateRegionTarget",
+      "type": "object"
+    },
+    "StateLocationTarget": {
+      "description": "Target a StateLocation by ID.\n\nThis target type references a StateLocation defined on a state, preserving\nthe monitor association. When executed, the action will use the location's\nconfigured monitors instead of a global default.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n    location_id: The ID of the StateLocation to target.\n\nExample:\n    {\n        \"type\": \"stateLocation\",\n        \"locationId\": \"location-456\"\n    }",
+      "properties": {
+        "type": {
+          "const": "stateLocation",
+          "default": "stateLocation",
+          "title": "Type",
+          "type": "string"
+        },
+        "locationId": {
+          "title": "Locationid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId"
+      ],
+      "title": "StateLocationTarget",
+      "type": "object"
+    },
+    "StateImageTarget": {
+      "description": "Target a StateImage by ID or by state reference.\n\nThis target type references a StateImage for FIND operations, allowing\nnavigation systems to verify state by finding images associated with\nthe target state. The StateImage's configured monitors are used.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n    state_id: The ID of the state containing the StateImages.\n    image_ids: List of StateImage IDs to search for.\n    state_name: Optional human-readable state name (for debugging).\n    image_names: Optional list of human-readable image names.\n\nExample:\n    {\n        \"type\": \"stateImage\",\n        \"stateId\": \"state-123\",\n        \"imageIds\": [\"stateimage-456\"]\n    }",
+      "properties": {
+        "type": {
+          "const": "stateImage",
+          "default": "stateImage",
+          "title": "Type",
+          "type": "string"
+        },
+        "stateId": {
+          "title": "Stateid",
+          "type": "string"
+        },
+        "imageIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Imageids",
+          "type": "array"
+        },
+        "stateName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Statename"
+        },
+        "imageNames": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imagenames"
+        }
+      },
+      "required": [
+        "stateId",
+        "imageIds"
+      ],
+      "title": "StateImageTarget",
+      "type": "object"
+    },
+    "CurrentPositionTarget": {
+      "description": "Current position target - clicks at current mouse position (pure action).",
+      "properties": {
+        "type": {
+          "const": "currentPosition",
+          "default": "currentPosition",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "CurrentPositionTarget",
+      "type": "object"
+    },
+    "LastFindResultTarget": {
+      "description": "Last find result target - uses location from most recent FIND action.\n\nThis target type allows actions to reference the result of a previous FIND\naction without knowing the exact coordinates at configuration time.",
+      "properties": {
+        "type": {
+          "const": "lastFindResult",
+          "default": "lastFindResult",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "LastFindResultTarget",
+      "type": "object"
+    },
+    "ResultIndexTarget": {
+      "description": "Target specific match from last action result by index.\n\nThis target type enables actions to reference a specific match from the\nActionResult of a previous FIND action. The index determines which match\nto use from the matches list.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n    index: Zero-based index into the matches list (0 = best/first match,\n           1 = second best, etc.). Defaults to 0 if not specified.\n\nExample:\n    To click on the second best match from a FIND action:\n    {\n        \"type\": \"resultIndex\",\n        \"index\": 1\n    }",
+      "properties": {
+        "type": {
+          "const": "resultIndex",
+          "default": "resultIndex",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "default": 0,
+          "title": "Index",
+          "type": "integer"
+        }
+      },
+      "title": "ResultIndexTarget",
+      "type": "object"
+    },
+    "AllResultsTarget": {
+      "description": "Target all matches from last action result.\n\nThis target type enables actions to operate on all matches from the\nActionResult of a previous FIND action. Useful for actions that can\nhandle multiple targets simultaneously, such as HIGHLIGHT which can\ndraw boxes around all found matches.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n\nExample:\n    To highlight all matches from a FIND action:\n    {\n        \"type\": \"allResults\"\n    }\n\nNote:\n    Not all action types support multiple targets. Actions that don't\n    support multiple targets (like CLICK) will typically use the first\n    match when receiving AllResultsTarget.",
+      "properties": {
+        "type": {
+          "const": "allResults",
+          "default": "allResults",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "AllResultsTarget",
+      "type": "object"
+    },
+    "ResultByImageTarget": {
+      "description": "Target match from specific image ID in multi-image FIND result.\n\nThis target type enables actions to reference the match that came from\na specific image in a multi-image FIND action. When using the EACH search\nstrategy with multiple images, each match is tagged with its source image.\nThis target type allows selecting the match from a particular image.\n\nAttributes:\n    type: Literal type discriminator for this target type.\n    image_id: The image ID whose match should be targeted. This should\n              correspond to one of the image_ids used in the ImageTarget\n              of the previous FIND action.\n\nExample:\n    To click on the match from the \"corn\" image in a multi-image FIND:\n    {\n        \"type\": \"resultByImage\",\n        \"imageId\": \"stateimage-corn\"\n    }\n\nNote:\n    Requires that the previous FIND action used the EACH search strategy\n    and that matches were tagged with source image IDs. If no match exists\n    for the specified image_id, the action will fail.",
+      "properties": {
+        "type": {
+          "const": "resultByImage",
+          "default": "resultByImage",
+          "title": "Type",
+          "type": "string"
+        },
+        "imageId": {
+          "title": "Imageid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "imageId"
+      ],
+      "title": "ResultByImageTarget",
+      "type": "object"
+    }
+  }
+}

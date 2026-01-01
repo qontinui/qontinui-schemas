@@ -1061,6 +1061,19 @@
           ],
           "default": null,
           "description": "Version compatibility information"
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Project ID from qontinui-web for test run reporting",
+          "title": "Projectid"
         }
       },
       "required": [

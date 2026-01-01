@@ -66,6 +66,11 @@ class WorkflowMetadata(BaseModel):
     author: str | None = None
     description: str | None = None
     version: str | None = None
+    view_mode: Literal["sequential", "graph"] | None = Field(
+        default=None,
+        alias="viewMode",
+        description="Preferred visualization mode for the workflow editor",
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -116,6 +121,14 @@ class Workflow(BaseModel):
 
     id: str = Field(..., description="Unique workflow identifier")
     name: str = Field(..., description="Human-readable workflow name")
+    description: str | None = Field(
+        default=None,
+        description="Human-readable description of what this workflow does",
+    )
+    category: str | None = Field(
+        default=None,
+        description="Category for organizing workflows (e.g., 'Main', 'Testing')",
+    )
     version: str = Field(..., description="Workflow version (e.g., '1.0.0')")
     format: Literal["graph"] = Field(
         default="graph", description="Workflow format (always 'graph')"

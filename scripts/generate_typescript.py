@@ -388,6 +388,120 @@ def generate_config_types() -> bool:
         return False
 
 
+def generate_target_types() -> bool:
+    """Generate TypeScript types for Target configuration schemas.
+
+    This generates the target types that are the source of truth for:
+    - qontinui-web frontend (action target configurations)
+    - qontinui-runner TypeScript layer
+    - config export/import schema
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.config.models import base_types, search, targets
+
+        models_list = [
+            # Enums
+            base_types.SearchStrategy,
+            # Search/Pattern options
+            search.PollingConfig,
+            search.PatternOptions,
+            search.MatchAdjustment,
+            search.SearchOptions,
+            search.TextSearchOptions,
+            # Target types (all with lowercase type discriminators)
+            targets.ImageTarget,
+            targets.RegionTarget,
+            targets.TextTarget,
+            targets.CoordinatesTarget,
+            targets.StateStringTarget,
+            targets.StateRegionTarget,
+            targets.StateLocationTarget,
+            targets.StateImageTarget,
+            targets.CurrentPositionTarget,
+            targets.LastFindResultTarget,
+            targets.ResultIndexTarget,
+            targets.AllResultsTarget,
+            targets.ResultByImageTarget,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "targets.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models_list)
+
+        # Add import for geometry types used by targets
+        import_line = "\nimport type { Region, Coordinates } from './geometry';\n"
+        header_end = ts_content.find("*/\n") + 3
+        ts_content = ts_content[:header_end] + import_line + ts_content[header_end:]
+
+        # Add the TargetType union type and TargetConfig union type
+        ts_content += """
+/**
+ * Valid target type discriminators.
+ * These are the literal string values used in target.type field.
+ * IMPORTANT: All use lowercase (e.g., "stateImage" not "StateImage")
+ */
+export type TargetType =
+  | "image"
+  | "stateImage"
+  | "region"
+  | "text"
+  | "coordinates"
+  | "stateString"
+  | "stateRegion"
+  | "stateLocation"
+  | "currentPosition"
+  | "lastFindResult"
+  | "resultIndex"
+  | "allResults"
+  | "resultByImage";
+
+/**
+ * Union of all valid target configurations.
+ * This is the canonical definition - all frontends should use this.
+ */
+export type TargetConfig =
+  | ImageTarget
+  | RegionTarget
+  | TextTarget
+  | CoordinatesTarget
+  | StateStringTarget
+  | StateRegionTarget
+  | StateLocationTarget
+  | StateImageTarget
+  | CurrentPositionTarget
+  | LastFindResultTarget
+  | ResultIndexTarget
+  | AllResultsTarget
+  | ResultByImageTarget;
+"""
+
+        ts_file = output_dir / "targets.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating target types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
 def generate_extraction_types() -> bool:
     """Generate TypeScript types for Extraction schemas."""
     project_root = get_project_root()
@@ -450,6 +564,198 @@ def generate_extraction_types() -> bool:
         return False
 
 
+def generate_workflow_types() -> bool:
+    """Generate TypeScript types for Workflow, State, Transition, and Action schemas.
+
+    This generates the complete export schema types that can be used by:
+    - qontinui-web frontend (instead of export-schema.ts)
+    - qontinui-runner TypeScript layer
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.config.models import (
+            action,
+            base_types,
+            execution,
+            logging,
+            state_machine,
+            workflow,
+        )
+
+        models_list = [
+            # Workflow enums
+            base_types.WorkflowVisibility,
+            base_types.LogLevel,  # Needed by LoggingOptions
+            # State machine enums
+            state_machine.PositionName,
+            state_machine.TransitionType,
+            state_machine.SearchMode,
+            state_machine.MultiPatternMode,
+            # Logging types (needed by execution)
+            logging.LoggingOptions,
+            # Execution types (needed by Action)
+            execution.RepetitionOptions,
+            execution.BaseActionSettings,
+            execution.ExecutionSettings,
+            # Position and region types
+            state_machine.Position,
+            state_machine.SearchRegion,
+            # Pattern and StateImage
+            state_machine.Pattern,
+            state_machine.StateImage,
+            # State components
+            state_machine.StateRegion,
+            state_machine.StateLocation,
+            state_machine.StateString,
+            # State
+            state_machine.StatePosition,
+            state_machine.State,
+            # Transition types
+            state_machine.TransitionCondition,
+            state_machine.BaseTransition,
+            state_machine.OutgoingTransition,
+            state_machine.IncomingTransition,
+            # Workflow types
+            workflow.Connection,
+            workflow.WorkflowMetadata,
+            workflow.Variables,
+            workflow.WorkflowSettings,
+            workflow.Workflow,
+            # Action (basic - config is dict[str, Any])
+            action.Action,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "workflow.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models_list)
+
+        # Add import for Region from geometry.ts (used by StateRegion.bounds)
+        # Insert after the header comment
+        import_line = "\nimport type { Region } from './geometry';\n"
+        header_end = ts_content.find("*/\n") + 3
+        ts_content = ts_content[:header_end] + import_line + ts_content[header_end:]
+
+        # Add the Transition type alias and Connections type
+        ts_content += """
+/** Union type for any transition */
+export type Transition = OutgoingTransition | IncomingTransition;
+
+/** Connections between actions in graph format */
+export type Connections = Record<string, Record<string, Connection[][]>>;
+
+/** Action outputs for graph connections */
+export interface ActionOutputs {
+  main?: Connection[][];
+  success?: Connection[][];
+  error?: Connection[][];
+  true?: Connection[][];
+  false?: Connection[][];
+  [key: string]: Connection[][] | undefined;
+}
+
+/** Workflow connections mapping */
+export type WorkflowConnections = Record<string, ActionOutputs>;
+"""
+
+        ts_file = output_dir / "workflow.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating workflow types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_qontinui_config_types() -> bool:
+    """Generate TypeScript types for the root QontinuiConfig.
+
+    This must be generated AFTER workflow types since it references them.
+    Imports workflow.ts types and generates the full QontinuiConfig.
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.config.models import config_root
+
+        # Only generate QontinuiConfig - other config types already in config.ts
+        models_list = [
+            config_root.QontinuiConfig,
+        ]
+
+        ts_content = """/**
+ * Auto-generated TypeScript types from qontinui-schemas
+ * DO NOT EDIT - regenerate with: poetry run python scripts/generate_typescript.py
+ *
+ * This file contains the root QontinuiConfig type that references
+ * types from config.ts and workflow.ts
+ */
+
+// Re-export all types from config and workflow for convenience
+export * from "./config";
+export * from "./workflow";
+
+import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord } from "./config";
+import type { Workflow, State, Transition } from "./workflow";
+
+"""
+        # Generate QontinuiConfig interface manually to use imported types
+        ts_content += """export interface QontinuiConfig {
+  /** Configuration schema version (semver) */
+  version: string;
+  /** Configuration metadata */
+  metadata: ConfigMetadata;
+  /** Image library */
+  images?: ImageAsset[];
+  /** Workflow definitions */
+  workflows?: Workflow[];
+  /** State machine states */
+  states?: State[];
+  /** State transitions */
+  transitions?: Transition[];
+  /** Workflow categories with automation control */
+  categories?: Category[];
+  /** Configuration settings */
+  settings?: ConfigSettings | null;
+  /** Automated schedules */
+  schedules?: Schedule[] | null;
+  /** Execution history */
+  executionRecords?: ExecutionRecord[] | null;
+}
+"""
+
+        ts_file = output_dir / "qontinui-config.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating qontinui-config types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
 def generate_from_json_schema() -> bool:
     """Generate TypeScript from JSON Schema as fallback."""
     success = True
@@ -464,6 +770,15 @@ def generate_from_json_schema() -> bool:
     if not generate_config_types():
         success = False
     if not generate_extraction_types():
+        success = False
+    # Generate target types (ImageTarget, StateImageTarget, etc.)
+    if not generate_target_types():
+        success = False
+    # Generate workflow types (State, Transition, Workflow, Action)
+    if not generate_workflow_types():
+        success = False
+    # Generate root QontinuiConfig (must be after workflow types)
+    if not generate_qontinui_config_types():
         success = False
     return success
 
@@ -554,8 +869,25 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
 
     # Handle Literal types (e.g., Literal["left", "center", "right"])
     if hasattr(annotation, "__origin__") and annotation.__origin__ is typing.Literal:
+        from enum import Enum
+
         args = annotation.__args__
-        literals = [f'"{arg}"' if isinstance(arg, str) else str(arg) for arg in args]
+        literals = []
+        for arg in args:
+            # Check for Enum FIRST because str-based enums (e.g., class Foo(str, Enum))
+            # are instances of both str and Enum, and we want to use .value not str()
+            if isinstance(arg, Enum):
+                # Enum member - use its value
+                literals.append(f'"{arg.value}"')
+            elif isinstance(arg, str):
+                literals.append(f'"{arg}"')
+            elif hasattr(arg, "value"):
+                # Object with value attribute (backup for enum-like objects)
+                literals.append(f'"{arg.value}"')
+            else:
+                # Fallback: convert to string
+                arg_str = str(arg)
+                literals.append(f'"{arg_str}"')
         return " | ".join(literals)
 
     # Handle generic types (List, Dict, Optional, Union from typing module)

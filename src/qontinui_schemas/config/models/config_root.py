@@ -191,6 +191,11 @@ class ConfigMetadata(BaseModel):
         alias="compatibleVersions",
         description="Version compatibility information",
     )
+    project_id: str | None = Field(
+        default=None,
+        alias="projectId",
+        description="Project ID from qontinui-web for test run reporting",
+    )
 
     model_config = {"populate_by_name": True}
 

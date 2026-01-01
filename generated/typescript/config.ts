@@ -223,6 +223,8 @@ export interface ConfigMetadata {
   targetApplication?: string | null;
   /** Version compatibility information */
   compatibleVersions?: CompatibleVersions | null;
+  /** Project ID from qontinui-web for test run reporting */
+  projectId?: string | null;
 }
 
 export interface ImageAsset {

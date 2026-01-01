@@ -1,0 +1,4858 @@
+{
+  "schemas": {
+    "LoggingOptions": {
+      "$defs": {
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        }
+      },
+      "description": "Logging configuration for actions.",
+      "properties": {
+        "beforeActionMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beforeactionmessage"
+        },
+        "afterActionMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Afteractionmessage"
+        },
+        "successMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Successmessage"
+        },
+        "failureMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failuremessage"
+        },
+        "logBeforeAction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logbeforeaction"
+        },
+        "logAfterAction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logafteraction"
+        },
+        "logOnSuccess": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logonsuccess"
+        },
+        "logOnFailure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logonfailure"
+        },
+        "beforeActionLevel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "afterActionLevel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "successLevel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "failureLevel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "logType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logtype"
+        }
+      },
+      "title": "LoggingOptions",
+      "type": "object"
+    },
+    "RepetitionOptions": {
+      "description": "Repetition configuration for actions.",
+      "properties": {
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "pauseBetween": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pausebetween"
+        },
+        "stopOnSuccess": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stoponsuccess"
+        },
+        "stopOnFailure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stoponfailure"
+        }
+      },
+      "title": "RepetitionOptions",
+      "type": "object"
+    },
+    "BaseActionSettings": {
+      "$defs": {
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        },
+        "LoggingOptions": {
+          "description": "Logging configuration for actions.",
+          "properties": {
+            "beforeActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Beforeactionmessage"
+            },
+            "afterActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Afteractionmessage"
+            },
+            "successMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Successmessage"
+            },
+            "failureMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Failuremessage"
+            },
+            "logBeforeAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logbeforeaction"
+            },
+            "logAfterAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logafteraction"
+            },
+            "logOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonsuccess"
+            },
+            "logOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonfailure"
+            },
+            "beforeActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "afterActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "successLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "failureLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "logType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logtype"
+            }
+          },
+          "title": "LoggingOptions",
+          "type": "object"
+        }
+      },
+      "description": "Base settings that apply to all actions.",
+      "properties": {
+        "pauseBeforeBegin": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pausebeforebegin"
+        },
+        "pauseAfterEnd": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pauseafterend"
+        },
+        "illustrate": {
+          "anyOf": [
+            {
+              "enum": [
+                "YES",
+                "NO",
+                "USE_GLOBAL"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Illustrate"
+        },
+        "loggingOptions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoggingOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "BaseActionSettings",
+      "type": "object"
+    },
+    "ExecutionSettings": {
+      "$defs": {
+        "RepetitionOptions": {
+          "description": "Repetition configuration for actions.",
+          "properties": {
+            "count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Count"
+            },
+            "pauseBetween": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pausebetween"
+            },
+            "stopOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponsuccess"
+            },
+            "stopOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponfailure"
+            }
+          },
+          "title": "RepetitionOptions",
+          "type": "object"
+        }
+      },
+      "description": "Execution control settings.\n\nNote: Model-based GUI automation is resilient by design - workflows always\ncontinue executing even if individual actions fail. There is no option to\nstop workflow execution on action failure.",
+      "properties": {
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "retryCount": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrycount"
+        },
+        "repetition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepetitionOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ExecutionSettings",
+      "type": "object"
+    },
+    "Position": {
+      "$defs": {
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        }
+      },
+      "description": "Position within a region using percentages (0.0-1.0).",
+      "properties": {
+        "percentW": {
+          "default": 0.5,
+          "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Percentw",
+          "type": "number"
+        },
+        "percentH": {
+          "default": 0.5,
+          "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Percenth",
+          "type": "number"
+        },
+        "positionName": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PositionName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional named position for convenience"
+        }
+      },
+      "title": "Position",
+      "type": "object"
+    },
+    "SearchRegion": {
+      "$defs": {
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        }
+      },
+      "description": "A region where to search for patterns.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the search region",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "x": {
+          "description": "X coordinate of top-left corner",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate of top-left corner",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width of the region",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height of the region",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "referenceImageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of StateImage for relative positioning",
+          "title": "Referenceimageid"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Position within referenced image region"
+        },
+        "offsetX": {
+          "default": 0,
+          "description": "X offset in pixels from reference position",
+          "title": "Offsetx",
+          "type": "integer"
+        },
+        "offsetY": {
+          "default": 0,
+          "description": "Y offset in pixels from reference position",
+          "title": "Offsety",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SearchRegion",
+      "type": "object"
+    },
+    "Pattern": {
+      "$defs": {
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        },
+        "SearchRegion": {
+          "description": "A region where to search for patterns.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the search region",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "referenceImageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of StateImage for relative positioning",
+              "title": "Referenceimageid"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position within referenced image region"
+            },
+            "offsetX": {
+              "default": 0,
+              "description": "X offset in pixels from reference position",
+              "title": "Offsetx",
+              "type": "integer"
+            },
+            "offsetY": {
+              "default": 0,
+              "description": "Y offset in pixels from reference position",
+              "title": "Offsety",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "SearchRegion",
+          "type": "object"
+        }
+      },
+      "description": "A single image variation with its search configuration.\n\nPatterns represent different visual appearances of the same UI element\n(e.g., normal, hover, clicked states). Images are referenced by ID\nfrom the Library - the Library is the source of truth for image data.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the pattern",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the pattern",
+          "title": "Name"
+        },
+        "imageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of ImageAsset in library (library is source of truth)",
+          "title": "Imageid"
+        },
+        "searchRegions": {
+          "description": "Pattern-level search regions (precedence level 2)",
+          "items": {
+            "$ref": "#/$defs/SearchRegion"
+          },
+          "title": "Searchregions",
+          "type": "array"
+        },
+        "fixed": {
+          "default": false,
+          "description": "If true, pattern position is fixed on screen",
+          "title": "Fixed",
+          "type": "boolean"
+        },
+        "similarity": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Similarity threshold (0.0-1.0)",
+          "title": "Similarity"
+        },
+        "targetPosition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Click position within pattern (default: center 0.5, 0.5)"
+        },
+        "offsetX": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pixel offset for click position X",
+          "title": "Offsetx"
+        },
+        "offsetY": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pixel offset for click position Y",
+          "title": "Offsety"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Pattern",
+      "type": "object"
+    },
+    "StateImage": {
+      "$defs": {
+        "MultiPatternMode": {
+          "description": "How to search when StateImage has multiple patterns.",
+          "enum": [
+            "all",
+            "combined"
+          ],
+          "title": "MultiPatternMode",
+          "type": "string"
+        },
+        "Pattern": {
+          "description": "A single image variation with its search configuration.\n\nPatterns represent different visual appearances of the same UI element\n(e.g., normal, hover, clicked states). Images are referenced by ID\nfrom the Library - the Library is the source of truth for image data.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the pattern",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional name for the pattern",
+              "title": "Name"
+            },
+            "imageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of ImageAsset in library (library is source of truth)",
+              "title": "Imageid"
+            },
+            "searchRegions": {
+              "description": "Pattern-level search regions (precedence level 2)",
+              "items": {
+                "$ref": "#/$defs/SearchRegion"
+              },
+              "title": "Searchregions",
+              "type": "array"
+            },
+            "fixed": {
+              "default": false,
+              "description": "If true, pattern position is fixed on screen",
+              "title": "Fixed",
+              "type": "boolean"
+            },
+            "similarity": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Similarity threshold (0.0-1.0)",
+              "title": "Similarity"
+            },
+            "targetPosition": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Click position within pattern (default: center 0.5, 0.5)"
+            },
+            "offsetX": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pixel offset for click position X",
+              "title": "Offsetx"
+            },
+            "offsetY": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pixel offset for click position Y",
+              "title": "Offsety"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "title": "Pattern",
+          "type": "object"
+        },
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        },
+        "SearchMode": {
+          "description": "Search mode for state images with multiple patterns.",
+          "enum": [
+            "default",
+            "rag",
+            "template"
+          ],
+          "title": "SearchMode",
+          "type": "string"
+        },
+        "SearchRegion": {
+          "description": "A region where to search for patterns.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the search region",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "referenceImageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of StateImage for relative positioning",
+              "title": "Referenceimageid"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position within referenced image region"
+            },
+            "offsetX": {
+              "default": 0,
+              "description": "X offset in pixels from reference position",
+              "title": "Offsetx",
+              "type": "integer"
+            },
+            "offsetY": {
+              "default": 0,
+              "description": "Y offset in pixels from reference position",
+              "title": "Offsety",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "SearchRegion",
+          "type": "object"
+        }
+      },
+      "description": "An image used to identify a state in visual automation.\n\nStateImages can have multiple patterns representing visual variations\n(e.g., button normal vs hover state). The image data itself is stored\nin the ImageAsset library and referenced by ID.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the state image",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "patterns": {
+          "description": "Multiple patterns for visual variations (e.g., normal, hover, clicked)",
+          "items": {
+            "$ref": "#/$defs/Pattern"
+          },
+          "title": "Patterns",
+          "type": "array"
+        },
+        "shared": {
+          "default": false,
+          "description": "If true, this image appears in multiple states",
+          "title": "Shared",
+          "type": "boolean"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How the image was created (upload, pattern-optimization, image-extraction)",
+          "title": "Source"
+        },
+        "probability": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mock testing: probability image appears (0.0-1.0)",
+          "title": "Probability"
+        },
+        "searchRegions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SearchRegion"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "StateImage-level search regions (precedence level 3)",
+          "title": "Searchregions"
+        },
+        "monitors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor indices where this image should be searched",
+          "title": "Monitors"
+        },
+        "ragMultiPatternMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MultiPatternMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How to search when StateImage has >1 pattern"
+        },
+        "searchMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Search mode for this image (default, rag, template)"
+        },
+        "imageEmbedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "RAG image embedding vector",
+          "title": "Imageembedding"
+        },
+        "textEmbedding": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "RAG text embedding vector",
+          "title": "Textembedding"
+        },
+        "ocrText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OCR extracted text from image",
+          "title": "Ocrtext"
+        },
+        "ocrConfidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Confidence score of OCR extraction",
+          "title": "Ocrconfidence"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "StateImage",
+      "type": "object"
+    },
+    "StateRegion": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        }
+      },
+      "description": "A region associated with a state.\n\nRegions can be used as search regions, interaction regions, or\ngeneral areas of interest within a state.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the region",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "x": {
+          "description": "X coordinate of top-left corner",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate of top-left corner",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width of the region",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height of the region",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Region"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Bounding box (alternative to x, y, width, height)"
+        },
+        "referenceImageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of StateImage for relative positioning",
+          "title": "Referenceimageid"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Position within referenced image region"
+        },
+        "offsetX": {
+          "default": 0,
+          "description": "X offset in pixels",
+          "title": "Offsetx",
+          "type": "integer"
+        },
+        "offsetY": {
+          "default": 0,
+          "description": "Y offset in pixels",
+          "title": "Offsety",
+          "type": "integer"
+        },
+        "isSearchRegion": {
+          "default": false,
+          "description": "If true, used as a search region for StateImages",
+          "title": "Issearchregion",
+          "type": "boolean"
+        },
+        "monitors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor indices where this region should be checked",
+          "title": "Monitors"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "StateRegion",
+      "type": "object"
+    },
+    "StateLocation": {
+      "$defs": {
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        }
+      },
+      "description": "A location (point) associated with a state.\n\nLocations can be used as click targets, anchor points, or\nreference positions within a state.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the location",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "x": {
+          "description": "X coordinate",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate",
+          "title": "Y",
+          "type": "integer"
+        },
+        "fixed": {
+          "default": false,
+          "description": "If true, location uses absolute coordinates",
+          "title": "Fixed",
+          "type": "boolean"
+        },
+        "anchor": {
+          "default": false,
+          "description": "If true, used as anchor point for relative positioning",
+          "title": "Anchor",
+          "type": "boolean"
+        },
+        "referenceImageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of StateImage for relative positioning",
+          "title": "Referenceimageid"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Position within referenced image region"
+        },
+        "offsetX": {
+          "default": 0,
+          "description": "X offset in pixels",
+          "title": "Offsetx",
+          "type": "integer"
+        },
+        "offsetY": {
+          "default": 0,
+          "description": "Y offset in pixels",
+          "title": "Offsety",
+          "type": "integer"
+        },
+        "percentW": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Width percentage (0.0-1.0)",
+          "title": "Percentw"
+        },
+        "percentH": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Height percentage (0.0-1.0)",
+          "title": "Percenth"
+        },
+        "anchorType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Position anchor type",
+          "title": "Anchortype"
+        },
+        "monitors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor indices where this location should be checked",
+          "title": "Monitors"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional metadata",
+          "title": "Metadata"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "x",
+        "y"
+      ],
+      "title": "StateLocation",
+      "type": "object"
+    },
+    "StateString": {
+      "description": "A string associated with a state for OCR, input, or verification.\n\nStrings can be used for OCR verification, text input, or\nexpected text validation.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the string",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "description": "The string value",
+          "title": "Value",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "description": "If true, used for OCR verification",
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "inputText": {
+          "default": true,
+          "description": "If true, used as text to be typed",
+          "title": "Inputtext",
+          "type": "boolean"
+        },
+        "expectedText": {
+          "default": false,
+          "description": "If true, used for validation/expected text",
+          "title": "Expectedtext",
+          "type": "boolean"
+        },
+        "regexPattern": {
+          "default": false,
+          "description": "If true, value is a regex pattern",
+          "title": "Regexpattern",
+          "type": "boolean"
+        },
+        "monitors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor indices where this string should be checked",
+          "title": "Monitors"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "value"
+      ],
+      "title": "StateString",
+      "type": "object"
+    },
+    "StatePosition": {
+      "description": "Position of a state node in the state machine graph.",
+      "properties": {
+        "x": {
+          "description": "X coordinate in graph",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate in graph",
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "StatePosition",
+      "type": "object"
+    },
+    "State": {
+      "$defs": {
+        "CoordinateSystem": {
+          "description": "Coordinate system identifier.\n\nAlways specify which coordinate system you're working with to avoid\nconfusion in multi-monitor setups.",
+          "enum": [
+            "screen",
+            "virtual",
+            "monitor_relative"
+          ],
+          "title": "CoordinateSystem",
+          "type": "string"
+        },
+        "MultiPatternMode": {
+          "description": "How to search when StateImage has multiple patterns.",
+          "enum": [
+            "all",
+            "combined"
+          ],
+          "title": "MultiPatternMode",
+          "type": "string"
+        },
+        "Pattern": {
+          "description": "A single image variation with its search configuration.\n\nPatterns represent different visual appearances of the same UI element\n(e.g., normal, hover, clicked states). Images are referenced by ID\nfrom the Library - the Library is the source of truth for image data.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the pattern",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional name for the pattern",
+              "title": "Name"
+            },
+            "imageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of ImageAsset in library (library is source of truth)",
+              "title": "Imageid"
+            },
+            "searchRegions": {
+              "description": "Pattern-level search regions (precedence level 2)",
+              "items": {
+                "$ref": "#/$defs/SearchRegion"
+              },
+              "title": "Searchregions",
+              "type": "array"
+            },
+            "fixed": {
+              "default": false,
+              "description": "If true, pattern position is fixed on screen",
+              "title": "Fixed",
+              "type": "boolean"
+            },
+            "similarity": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Similarity threshold (0.0-1.0)",
+              "title": "Similarity"
+            },
+            "targetPosition": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Click position within pattern (default: center 0.5, 0.5)"
+            },
+            "offsetX": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pixel offset for click position X",
+              "title": "Offsetx"
+            },
+            "offsetY": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pixel offset for click position Y",
+              "title": "Offsety"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "title": "Pattern",
+          "type": "object"
+        },
+        "Position": {
+          "description": "Position within a region using percentages (0.0-1.0).",
+          "properties": {
+            "percentW": {
+              "default": 0.5,
+              "description": "Horizontal position: 0.0 = left, 1.0 = right, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percentw",
+              "type": "number"
+            },
+            "percentH": {
+              "default": 0.5,
+              "description": "Vertical position: 0.0 = top, 1.0 = bottom, 0.5 = center",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Percenth",
+              "type": "number"
+            },
+            "positionName": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PositionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional named position for convenience"
+            }
+          },
+          "title": "Position",
+          "type": "object"
+        },
+        "PositionName": {
+          "description": "Named positions within a region (matches qontinui PositionName enum).",
+          "enum": [
+            "TOPLEFT",
+            "TOPMIDDLE",
+            "TOPRIGHT",
+            "MIDDLELEFT",
+            "MIDDLEMIDDLE",
+            "MIDDLERIGHT",
+            "BOTTOMLEFT",
+            "BOTTOMMIDDLE",
+            "BOTTOMRIGHT"
+          ],
+          "title": "PositionName",
+          "type": "string"
+        },
+        "Region": {
+          "description": "Rectangular region on screen.\n\nDefines a rectangular area with position and dimensions.\nLike Coordinates, can optionally specify the coordinate system.\n\nExamples\n--------\nSimple region:\n    >>> Region(x=100, y=100, width=200, height=150)\n\nMonitor-relative region:\n    >>> Region(\n    ...     x=0, y=0, width=1920, height=1080,\n    ...     system=CoordinateSystem.MONITOR_RELATIVE,\n    ...     monitor_index=0\n    ... )",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "system": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CoordinateSystem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Coordinate system. None defaults to SCREEN for backward compatibility."
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor index (required when system is MONITOR_RELATIVE)",
+              "title": "Monitor Index"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "Region",
+          "type": "object"
+        },
+        "SearchMode": {
+          "description": "Search mode for state images with multiple patterns.",
+          "enum": [
+            "default",
+            "rag",
+            "template"
+          ],
+          "title": "SearchMode",
+          "type": "string"
+        },
+        "SearchRegion": {
+          "description": "A region where to search for patterns.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the search region",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "referenceImageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of StateImage for relative positioning",
+              "title": "Referenceimageid"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position within referenced image region"
+            },
+            "offsetX": {
+              "default": 0,
+              "description": "X offset in pixels from reference position",
+              "title": "Offsetx",
+              "type": "integer"
+            },
+            "offsetY": {
+              "default": 0,
+              "description": "Y offset in pixels from reference position",
+              "title": "Offsety",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "SearchRegion",
+          "type": "object"
+        },
+        "StateImage": {
+          "description": "An image used to identify a state in visual automation.\n\nStateImages can have multiple patterns representing visual variations\n(e.g., button normal vs hover state). The image data itself is stored\nin the ImageAsset library and referenced by ID.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the state image",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "patterns": {
+              "description": "Multiple patterns for visual variations (e.g., normal, hover, clicked)",
+              "items": {
+                "$ref": "#/$defs/Pattern"
+              },
+              "title": "Patterns",
+              "type": "array"
+            },
+            "shared": {
+              "default": false,
+              "description": "If true, this image appears in multiple states",
+              "title": "Shared",
+              "type": "boolean"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How the image was created (upload, pattern-optimization, image-extraction)",
+              "title": "Source"
+            },
+            "probability": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Mock testing: probability image appears (0.0-1.0)",
+              "title": "Probability"
+            },
+            "searchRegions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/SearchRegion"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "StateImage-level search regions (precedence level 3)",
+              "title": "Searchregions"
+            },
+            "monitors": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor indices where this image should be searched",
+              "title": "Monitors"
+            },
+            "ragMultiPatternMode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MultiPatternMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How to search when StateImage has >1 pattern"
+            },
+            "searchMode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SearchMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Search mode for this image (default, rag, template)"
+            },
+            "imageEmbedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "RAG image embedding vector",
+              "title": "Imageembedding"
+            },
+            "textEmbedding": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "RAG text embedding vector",
+              "title": "Textembedding"
+            },
+            "ocrText": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "OCR extracted text from image",
+              "title": "Ocrtext"
+            },
+            "ocrConfidence": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Confidence score of OCR extraction",
+              "title": "Ocrconfidence"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "title": "StateImage",
+          "type": "object"
+        },
+        "StateLocation": {
+          "description": "A location (point) associated with a state.\n\nLocations can be used as click targets, anchor points, or\nreference positions within a state.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the location",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "x": {
+              "description": "X coordinate",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "title": "Y",
+              "type": "integer"
+            },
+            "fixed": {
+              "default": false,
+              "description": "If true, location uses absolute coordinates",
+              "title": "Fixed",
+              "type": "boolean"
+            },
+            "anchor": {
+              "default": false,
+              "description": "If true, used as anchor point for relative positioning",
+              "title": "Anchor",
+              "type": "boolean"
+            },
+            "referenceImageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of StateImage for relative positioning",
+              "title": "Referenceimageid"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position within referenced image region"
+            },
+            "offsetX": {
+              "default": 0,
+              "description": "X offset in pixels",
+              "title": "Offsetx",
+              "type": "integer"
+            },
+            "offsetY": {
+              "default": 0,
+              "description": "Y offset in pixels",
+              "title": "Offsety",
+              "type": "integer"
+            },
+            "percentW": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Width percentage (0.0-1.0)",
+              "title": "Percentw"
+            },
+            "percentH": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Height percentage (0.0-1.0)",
+              "title": "Percenth"
+            },
+            "anchorType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position anchor type",
+              "title": "Anchortype"
+            },
+            "monitors": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor indices where this location should be checked",
+              "title": "Monitors"
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional metadata",
+              "title": "Metadata"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "x",
+            "y"
+          ],
+          "title": "StateLocation",
+          "type": "object"
+        },
+        "StatePosition": {
+          "description": "Position of a state node in the state machine graph.",
+          "properties": {
+            "x": {
+              "description": "X coordinate in graph",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate in graph",
+              "title": "Y",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "title": "StatePosition",
+          "type": "object"
+        },
+        "StateRegion": {
+          "description": "A region associated with a state.\n\nRegions can be used as search regions, interaction regions, or\ngeneral areas of interest within a state.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the region",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width of the region",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height of the region",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "bounds": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Region"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Bounding box (alternative to x, y, width, height)"
+            },
+            "referenceImageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ID of StateImage for relative positioning",
+              "title": "Referenceimageid"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Position"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position within referenced image region"
+            },
+            "offsetX": {
+              "default": 0,
+              "description": "X offset in pixels",
+              "title": "Offsetx",
+              "type": "integer"
+            },
+            "offsetY": {
+              "default": 0,
+              "description": "Y offset in pixels",
+              "title": "Offsety",
+              "type": "integer"
+            },
+            "isSearchRegion": {
+              "default": false,
+              "description": "If true, used as a search region for StateImages",
+              "title": "Issearchregion",
+              "type": "boolean"
+            },
+            "monitors": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor indices where this region should be checked",
+              "title": "Monitors"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "StateRegion",
+          "type": "object"
+        },
+        "StateString": {
+          "description": "A string associated with a state for OCR, input, or verification.\n\nStrings can be used for OCR verification, text input, or\nexpected text validation.",
+          "properties": {
+            "id": {
+              "description": "Unique identifier for the string",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Human-readable name",
+              "title": "Name",
+              "type": "string"
+            },
+            "value": {
+              "description": "The string value",
+              "title": "Value",
+              "type": "string"
+            },
+            "identifier": {
+              "default": false,
+              "description": "If true, used for OCR verification",
+              "title": "Identifier",
+              "type": "boolean"
+            },
+            "inputText": {
+              "default": true,
+              "description": "If true, used as text to be typed",
+              "title": "Inputtext",
+              "type": "boolean"
+            },
+            "expectedText": {
+              "default": false,
+              "description": "If true, used for validation/expected text",
+              "title": "Expectedtext",
+              "type": "boolean"
+            },
+            "regexPattern": {
+              "default": false,
+              "description": "If true, value is a regex pattern",
+              "title": "Regexpattern",
+              "type": "boolean"
+            },
+            "monitors": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Monitor indices where this string should be checked",
+              "title": "Monitors"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "value"
+          ],
+          "title": "StateString",
+          "type": "object"
+        }
+      },
+      "description": "A state in the visual automation state machine.\n\nStates represent distinct UI screens or views that can be identified\nby their visual elements (StateImages) and contain associated data\n(regions, locations, strings).",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the state",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "Description of the state",
+          "title": "Description",
+          "type": "string"
+        },
+        "stateImages": {
+          "description": "Images that identify this state",
+          "items": {
+            "$ref": "#/$defs/StateImage"
+          },
+          "title": "Stateimages",
+          "type": "array"
+        },
+        "regions": {
+          "description": "Regions associated with this state",
+          "items": {
+            "$ref": "#/$defs/StateRegion"
+          },
+          "title": "Regions",
+          "type": "array"
+        },
+        "locations": {
+          "description": "Locations associated with this state",
+          "items": {
+            "$ref": "#/$defs/StateLocation"
+          },
+          "title": "Locations",
+          "type": "array"
+        },
+        "strings": {
+          "description": "Strings associated with this state",
+          "items": {
+            "$ref": "#/$defs/StateString"
+          },
+          "title": "Strings",
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/StatePosition",
+          "description": "Position in the state machine graph"
+        },
+        "isInitial": {
+          "default": false,
+          "description": "If true, this is an initial state",
+          "title": "Isinitial",
+          "type": "boolean"
+        },
+        "isFinal": {
+          "default": false,
+          "description": "If true, this is a final state",
+          "title": "Isfinal",
+          "type": "boolean"
+        },
+        "entryActions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow IDs to run on state entry",
+          "title": "Entryactions"
+        },
+        "exitActions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow IDs to run on state exit",
+          "title": "Exitactions"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timeout for state detection in milliseconds",
+          "title": "Timeout"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "position"
+      ],
+      "title": "State",
+      "type": "object"
+    },
+    "TransitionCondition": {
+      "description": "Condition that must be met for a transition to occur.",
+      "properties": {
+        "type": {
+          "default": "always",
+          "description": "Type of condition",
+          "enum": [
+            "always",
+            "image",
+            "time",
+            "custom"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "imageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Image ID for image-based conditions",
+          "title": "Imageid"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Similarity threshold for image matching",
+          "title": "Threshold"
+        },
+        "timeDelay": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time delay in milliseconds",
+          "title": "Timedelay"
+        },
+        "customScript": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom condition script",
+          "title": "Customscript"
+        }
+      },
+      "title": "TransitionCondition",
+      "type": "object"
+    },
+    "BaseTransition": {
+      "$defs": {
+        "TransitionType": {
+          "description": "Type of transition between states.",
+          "enum": [
+            "OutgoingTransition",
+            "IncomingTransition"
+          ],
+          "title": "TransitionType",
+          "type": "string"
+        }
+      },
+      "description": "Base class for transitions between states.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the transition",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/TransitionType",
+          "description": "Type of transition"
+        },
+        "workflows": {
+          "description": "Workflow IDs to execute during transition",
+          "items": {
+            "type": "string"
+          },
+          "title": "Workflows",
+          "type": "array"
+        },
+        "timeout": {
+          "default": 10000,
+          "description": "Transition timeout in milliseconds",
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "retryCount": {
+          "default": 3,
+          "description": "Number of retry attempts",
+          "title": "Retrycount",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name",
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional description",
+          "title": "Description"
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Priority for handling multiple valid transitions",
+          "title": "Priority"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "BaseTransition",
+      "type": "object"
+    },
+    "OutgoingTransition": {
+      "$defs": {
+        "TransitionCondition": {
+          "description": "Condition that must be met for a transition to occur.",
+          "properties": {
+            "type": {
+              "default": "always",
+              "description": "Type of condition",
+              "enum": [
+                "always",
+                "image",
+                "time",
+                "custom"
+              ],
+              "title": "Type",
+              "type": "string"
+            },
+            "imageId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Image ID for image-based conditions",
+              "title": "Imageid"
+            },
+            "threshold": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Similarity threshold for image matching",
+              "title": "Threshold"
+            },
+            "timeDelay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Time delay in milliseconds",
+              "title": "Timedelay"
+            },
+            "customScript": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Custom condition script",
+              "title": "Customscript"
+            }
+          },
+          "title": "TransitionCondition",
+          "type": "object"
+        }
+      },
+      "description": "Transition from one state to another.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the transition",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "OutgoingTransition",
+          "default": "OutgoingTransition",
+          "description": "Always 'OutgoingTransition'",
+          "title": "Type",
+          "type": "string"
+        },
+        "workflows": {
+          "description": "Workflow IDs to execute during transition",
+          "items": {
+            "type": "string"
+          },
+          "title": "Workflows",
+          "type": "array"
+        },
+        "timeout": {
+          "default": 10000,
+          "description": "Transition timeout in milliseconds",
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "retryCount": {
+          "default": 3,
+          "description": "Number of retry attempts",
+          "title": "Retrycount",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name",
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional description",
+          "title": "Description"
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Priority for handling multiple valid transitions",
+          "title": "Priority"
+        },
+        "fromState": {
+          "description": "Source state ID",
+          "title": "Fromstate",
+          "type": "string"
+        },
+        "toState": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target state ID",
+          "title": "Tostate"
+        },
+        "staysVisible": {
+          "default": false,
+          "description": "If true, source state remains visible after transition",
+          "title": "Staysvisible",
+          "type": "boolean"
+        },
+        "activateStates": {
+          "description": "State IDs to activate",
+          "items": {
+            "type": "string"
+          },
+          "title": "Activatestates",
+          "type": "array"
+        },
+        "deactivateStates": {
+          "description": "State IDs to deactivate",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deactivatestates",
+          "type": "array"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Condition for this transition"
+        }
+      },
+      "required": [
+        "id",
+        "fromState"
+      ],
+      "title": "OutgoingTransition",
+      "type": "object"
+    },
+    "IncomingTransition": {
+      "description": "Transition into a state (entry transition).",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the transition",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "IncomingTransition",
+          "default": "IncomingTransition",
+          "description": "Always 'IncomingTransition'",
+          "title": "Type",
+          "type": "string"
+        },
+        "workflows": {
+          "description": "Workflow IDs to execute during transition",
+          "items": {
+            "type": "string"
+          },
+          "title": "Workflows",
+          "type": "array"
+        },
+        "timeout": {
+          "default": 10000,
+          "description": "Transition timeout in milliseconds",
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "retryCount": {
+          "default": 3,
+          "description": "Number of retry attempts",
+          "title": "Retrycount",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name",
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional description",
+          "title": "Description"
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Priority for handling multiple valid transitions",
+          "title": "Priority"
+        },
+        "toState": {
+          "description": "Target state ID",
+          "title": "Tostate",
+          "type": "string"
+        },
+        "executeAfter": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OutgoingTransition IDs that trigger this",
+          "title": "Executeafter"
+        }
+      },
+      "required": [
+        "id",
+        "toState"
+      ],
+      "title": "IncomingTransition",
+      "type": "object"
+    },
+    "Connection": {
+      "description": "Connection from one action to another in graph format.",
+      "properties": {
+        "action": {
+          "description": "Target action ID",
+          "title": "Action",
+          "type": "string"
+        },
+        "type": {
+          "description": "Connection type (main, error, success)",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "description": "Input index on target action",
+          "title": "Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "type",
+        "index"
+      ],
+      "title": "Connection",
+      "type": "object"
+    },
+    "WorkflowMetadata": {
+      "description": "Metadata about the workflow.",
+      "properties": {
+        "created": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created"
+        },
+        "updated": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "viewMode": {
+          "anyOf": [
+            {
+              "enum": [
+                "sequential",
+                "graph"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Preferred visualization mode for the workflow editor",
+          "title": "Viewmode"
+        }
+      },
+      "title": "WorkflowMetadata",
+      "type": "object"
+    },
+    "Variables": {
+      "description": "Multi-scope variables for workflow execution.\n\nScopes:\n    - local: Scoped to current workflow execution\n    - process: Shared across process executions\n    - global_vars: Shared globally across all workflows",
+      "properties": {
+        "local": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        },
+        "process": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Process"
+        },
+        "global": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Global"
+        }
+      },
+      "title": "Variables",
+      "type": "object"
+    },
+    "WorkflowSettings": {
+      "description": "Workflow-level settings.\n\nThese settings apply to the entire workflow execution.\n\nNote: Model-based GUI automation is resilient by design - workflows always\ncontinue executing even if individual actions fail. There is no option to\nstop workflow execution on action failure.",
+      "properties": {
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "retryCount": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrycount"
+        },
+        "parallelExecution": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parallelexecution"
+        },
+        "maxParallelActions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxparallelactions"
+        }
+      },
+      "title": "WorkflowSettings",
+      "type": "object"
+    },
+    "Workflow": {
+      "$defs": {
+        "Action": {
+          "description": "Main action model - supports both graph and sequential formats.\n\nPosition is optional - required for graph format, not needed for sequential.\nConfig can be parsed into type-specific models using get_typed_config().",
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Name"
+            },
+            "config": {
+              "additionalProperties": true,
+              "title": "Config",
+              "type": "object"
+            },
+            "base": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BaseActionSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "execution": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ExecutionSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Position"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "config"
+          ],
+          "title": "Action",
+          "type": "object"
+        },
+        "BaseActionSettings": {
+          "description": "Base settings that apply to all actions.",
+          "properties": {
+            "pauseBeforeBegin": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pausebeforebegin"
+            },
+            "pauseAfterEnd": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pauseafterend"
+            },
+            "illustrate": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "YES",
+                    "NO",
+                    "USE_GLOBAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Illustrate"
+            },
+            "loggingOptions": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LoggingOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "BaseActionSettings",
+          "type": "object"
+        },
+        "Connection": {
+          "description": "Connection from one action to another in graph format.",
+          "properties": {
+            "action": {
+              "description": "Target action ID",
+              "title": "Action",
+              "type": "string"
+            },
+            "type": {
+              "description": "Connection type (main, error, success)",
+              "title": "Type",
+              "type": "string"
+            },
+            "index": {
+              "description": "Input index on target action",
+              "title": "Index",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "action",
+            "type",
+            "index"
+          ],
+          "title": "Connection",
+          "type": "object"
+        },
+        "Connections": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "items": {
+                "items": {
+                  "$ref": "#/$defs/Connection"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          "description": "Connections between actions in graph format.\n\nRoot structure: Dict[source_action_id, Dict[connection_type, List[List[Connection]]]]\n\nExample:\n    {\n        \"action1\": {\n            \"main\": [[{\"action\": \"action2\", \"type\": \"main\", \"index\": 0}]],\n            \"error\": [[{\"action\": \"action3\", \"type\": \"error\", \"index\": 0}]]\n        }\n    }\n\nConnection types:\n    - main: Normal execution flow\n    - error: Error handling flow\n    - success: Success-specific flow\n    - true/false: Conditional branches (IF action)\n    - case_N: Switch case branches",
+          "title": "Connections",
+          "type": "object"
+        },
+        "ExecutionSettings": {
+          "description": "Execution control settings.\n\nNote: Model-based GUI automation is resilient by design - workflows always\ncontinue executing even if individual actions fail. There is no option to\nstop workflow execution on action failure.",
+          "properties": {
+            "timeout": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout"
+            },
+            "retryCount": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retrycount"
+            },
+            "repetition": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RepetitionOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "ExecutionSettings",
+          "type": "object"
+        },
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        },
+        "LoggingOptions": {
+          "description": "Logging configuration for actions.",
+          "properties": {
+            "beforeActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Beforeactionmessage"
+            },
+            "afterActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Afteractionmessage"
+            },
+            "successMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Successmessage"
+            },
+            "failureMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Failuremessage"
+            },
+            "logBeforeAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logbeforeaction"
+            },
+            "logAfterAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logafteraction"
+            },
+            "logOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonsuccess"
+            },
+            "logOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonfailure"
+            },
+            "beforeActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "afterActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "successLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "failureLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "logType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logtype"
+            }
+          },
+          "title": "LoggingOptions",
+          "type": "object"
+        },
+        "RepetitionOptions": {
+          "description": "Repetition configuration for actions.",
+          "properties": {
+            "count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Count"
+            },
+            "pauseBetween": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pausebetween"
+            },
+            "stopOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponsuccess"
+            },
+            "stopOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponfailure"
+            }
+          },
+          "title": "RepetitionOptions",
+          "type": "object"
+        },
+        "Variables": {
+          "description": "Multi-scope variables for workflow execution.\n\nScopes:\n    - local: Scoped to current workflow execution\n    - process: Shared across process executions\n    - global_vars: Shared globally across all workflows",
+          "properties": {
+            "local": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Local"
+            },
+            "process": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Process"
+            },
+            "global": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Global"
+            }
+          },
+          "title": "Variables",
+          "type": "object"
+        },
+        "WorkflowMetadata": {
+          "description": "Metadata about the workflow.",
+          "properties": {
+            "created": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Created"
+            },
+            "updated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updated"
+            },
+            "author": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Author"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "version": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Version"
+            },
+            "viewMode": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "sequential",
+                    "graph"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Preferred visualization mode for the workflow editor",
+              "title": "Viewmode"
+            }
+          },
+          "title": "WorkflowMetadata",
+          "type": "object"
+        },
+        "WorkflowSettings": {
+          "description": "Workflow-level settings.\n\nThese settings apply to the entire workflow execution.\n\nNote: Model-based GUI automation is resilient by design - workflows always\ncontinue executing even if individual actions fail. There is no option to\nstop workflow execution on action failure.",
+          "properties": {
+            "timeout": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout"
+            },
+            "retryCount": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retrycount"
+            },
+            "parallelExecution": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parallelexecution"
+            },
+            "maxParallelActions": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maxparallelactions"
+            }
+          },
+          "title": "WorkflowSettings",
+          "type": "object"
+        },
+        "WorkflowVisibility": {
+          "description": "Workflow visibility levels for UI filtering.\n\n- PUBLIC: Normal workflows visible in UI dropdowns and lists\n- INTERNAL: Inline/helper workflows hidden from UI (but executable)\n- SYSTEM: Framework-generated workflows for internal use",
+          "enum": [
+            "public",
+            "internal",
+            "system"
+          ],
+          "title": "WorkflowVisibility",
+          "type": "string"
+        }
+      },
+      "description": "Complete workflow definition - graph format only.\n\nAll workflows use graph-based execution with connections and positioned actions.\nClean, modern structure without backward compatibility cruft.",
+      "properties": {
+        "id": {
+          "description": "Unique workflow identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable workflow name",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable description of what this workflow does",
+          "title": "Description"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Category for organizing workflows (e.g., 'Main', 'Testing')",
+          "title": "Category"
+        },
+        "version": {
+          "description": "Workflow version (e.g., '1.0.0')",
+          "title": "Version",
+          "type": "string"
+        },
+        "format": {
+          "const": "graph",
+          "default": "graph",
+          "description": "Workflow format (always 'graph')",
+          "title": "Format",
+          "type": "string"
+        },
+        "actions": {
+          "description": "List of actions in workflow",
+          "items": {
+            "$ref": "#/$defs/Action"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "connections": {
+          "$ref": "#/$defs/Connections",
+          "description": "Action connections (REQUIRED)"
+        },
+        "visibility": {
+          "$ref": "#/$defs/WorkflowVisibility",
+          "default": "public",
+          "description": "Workflow visibility level (public, internal, or system)"
+        },
+        "variables": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Variables"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow variables (local, process, global)"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow-level execution settings"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow metadata (author, description, etc.)"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tags for categorizing workflows",
+          "title": "Tags"
+        },
+        "initialStateIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Initial active states when workflow starts. Required for Main category workflows for model-based GUI automation.",
+          "title": "Initialstateids"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version",
+        "actions",
+        "connections"
+      ],
+      "title": "Workflow",
+      "type": "object"
+    },
+    "Action": {
+      "$defs": {
+        "BaseActionSettings": {
+          "description": "Base settings that apply to all actions.",
+          "properties": {
+            "pauseBeforeBegin": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pausebeforebegin"
+            },
+            "pauseAfterEnd": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pauseafterend"
+            },
+            "illustrate": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "YES",
+                    "NO",
+                    "USE_GLOBAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Illustrate"
+            },
+            "loggingOptions": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LoggingOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "BaseActionSettings",
+          "type": "object"
+        },
+        "ExecutionSettings": {
+          "description": "Execution control settings.\n\nNote: Model-based GUI automation is resilient by design - workflows always\ncontinue executing even if individual actions fail. There is no option to\nstop workflow execution on action failure.",
+          "properties": {
+            "timeout": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout"
+            },
+            "retryCount": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retrycount"
+            },
+            "repetition": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RepetitionOptions"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "ExecutionSettings",
+          "type": "object"
+        },
+        "LogLevel": {
+          "description": "Logging levels.",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "LogLevel",
+          "type": "string"
+        },
+        "LoggingOptions": {
+          "description": "Logging configuration for actions.",
+          "properties": {
+            "beforeActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Beforeactionmessage"
+            },
+            "afterActionMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Afteractionmessage"
+            },
+            "successMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Successmessage"
+            },
+            "failureMessage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Failuremessage"
+            },
+            "logBeforeAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logbeforeaction"
+            },
+            "logAfterAction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logafteraction"
+            },
+            "logOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonsuccess"
+            },
+            "logOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logonfailure"
+            },
+            "beforeActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "afterActionLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "successLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "failureLevel": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LogLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "logType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Logtype"
+            }
+          },
+          "title": "LoggingOptions",
+          "type": "object"
+        },
+        "RepetitionOptions": {
+          "description": "Repetition configuration for actions.",
+          "properties": {
+            "count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Count"
+            },
+            "pauseBetween": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pausebetween"
+            },
+            "stopOnSuccess": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponsuccess"
+            },
+            "stopOnFailure": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stoponfailure"
+            }
+          },
+          "title": "RepetitionOptions",
+          "type": "object"
+        }
+      },
+      "description": "Main action model - supports both graph and sequential formats.\n\nPosition is optional - required for graph format, not needed for sequential.\nConfig can be parsed into type-specific models using get_typed_config().",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseActionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "title": "Action",
+      "type": "object"
+    }
+  }
+}
