@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qontinui-schemas"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared Pydantic schemas for the Qontinui ecosystem"
 authors = ["Joshua Spinak <joshua.spinak@gmail.com>"]
 license = "MIT"

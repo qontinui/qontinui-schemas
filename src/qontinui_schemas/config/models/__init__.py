@@ -65,6 +65,9 @@ from .config_root import (
     WaitActionSettings,
 )
 
+# Context models for AI task guidance
+from .context import Context, ContextAutoInclude
+
 # Control flow configs
 from .control_flow import (
     BreakActionConfig,
@@ -384,6 +387,9 @@ __all__ = [
     "CodeBlockActionConfig",
     "CustomFunctionActionConfig",
     "ErrorHandling",
+    # Context models
+    "Context",
+    "ContextAutoInclude",
     # Shell actions
     "ShellActionConfig",
     "ShellScriptActionConfig",

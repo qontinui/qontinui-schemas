@@ -1,0 +1,2801 @@
+{
+  "schemas": {
+    "IgnoreRegion": {
+      "description": "A region to ignore during visual comparison.\n\nUsed to exclude dynamic areas (timestamps, ads, etc.).",
+      "properties": {
+        "x": {
+          "description": "X coordinate",
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate",
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height in pixels",
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional region name",
+          "title": "Name"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "IgnoreRegion",
+      "type": "object"
+    },
+    "ComparisonSettings": {
+      "$defs": {
+        "IgnoreRegion": {
+          "description": "A region to ignore during visual comparison.\n\nUsed to exclude dynamic areas (timestamps, ads, etc.).",
+          "properties": {
+            "x": {
+              "description": "X coordinate",
+              "minimum": 0,
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "minimum": 0,
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional region name",
+              "title": "Name"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "IgnoreRegion",
+          "type": "object"
+        }
+      },
+      "description": "Settings for visual comparison algorithm.\n\nControls how two images are compared for similarity.",
+      "properties": {
+        "algorithm": {
+          "default": "ssim",
+          "description": "Comparison algorithm: 'ssim', 'pixel_diff', 'perceptual_hash'",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "threshold": {
+          "default": 0.95,
+          "description": "Similarity threshold (0-1)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        },
+        "ignore_regions": {
+          "description": "Regions to ignore",
+          "items": {
+            "$ref": "#/$defs/IgnoreRegion"
+          },
+          "title": "Ignore Regions",
+          "type": "array"
+        }
+      },
+      "title": "ComparisonSettings",
+      "type": "object"
+    },
+    "VisualBaselineCreate": {
+      "$defs": {
+        "ComparisonSettings": {
+          "description": "Settings for visual comparison algorithm.\n\nControls how two images are compared for similarity.",
+          "properties": {
+            "algorithm": {
+              "default": "ssim",
+              "description": "Comparison algorithm: 'ssim', 'pixel_diff', 'perceptual_hash'",
+              "title": "Algorithm",
+              "type": "string"
+            },
+            "threshold": {
+              "default": 0.95,
+              "description": "Similarity threshold (0-1)",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Threshold",
+              "type": "number"
+            },
+            "ignore_regions": {
+              "description": "Regions to ignore",
+              "items": {
+                "$ref": "#/$defs/IgnoreRegion"
+              },
+              "title": "Ignore Regions",
+              "type": "array"
+            }
+          },
+          "title": "ComparisonSettings",
+          "type": "object"
+        },
+        "IgnoreRegion": {
+          "description": "A region to ignore during visual comparison.\n\nUsed to exclude dynamic areas (timestamps, ads, etc.).",
+          "properties": {
+            "x": {
+              "description": "X coordinate",
+              "minimum": 0,
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "minimum": 0,
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional region name",
+              "title": "Name"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "IgnoreRegion",
+          "type": "object"
+        }
+      },
+      "description": "Request schema for creating a visual baseline.\n\nBaselines are reference images used for comparison.",
+      "properties": {
+        "state_name": {
+          "description": "State this baseline is for",
+          "maxLength": 500,
+          "title": "State Name",
+          "type": "string"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional workflow ID",
+          "title": "Workflow Id"
+        },
+        "comparison_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComparisonSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Comparison settings (defaults to SSIM with 0.95 threshold)"
+        },
+        "approval_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Notes about this baseline",
+          "title": "Approval Notes"
+        }
+      },
+      "required": [
+        "state_name"
+      ],
+      "title": "VisualBaselineCreate",
+      "type": "object"
+    },
+    "VisualBaselineFromScreenshot": {
+      "$defs": {
+        "ComparisonSettings": {
+          "description": "Settings for visual comparison algorithm.\n\nControls how two images are compared for similarity.",
+          "properties": {
+            "algorithm": {
+              "default": "ssim",
+              "description": "Comparison algorithm: 'ssim', 'pixel_diff', 'perceptual_hash'",
+              "title": "Algorithm",
+              "type": "string"
+            },
+            "threshold": {
+              "default": 0.95,
+              "description": "Similarity threshold (0-1)",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Threshold",
+              "type": "number"
+            },
+            "ignore_regions": {
+              "description": "Regions to ignore",
+              "items": {
+                "$ref": "#/$defs/IgnoreRegion"
+              },
+              "title": "Ignore Regions",
+              "type": "array"
+            }
+          },
+          "title": "ComparisonSettings",
+          "type": "object"
+        },
+        "IgnoreRegion": {
+          "description": "A region to ignore during visual comparison.\n\nUsed to exclude dynamic areas (timestamps, ads, etc.).",
+          "properties": {
+            "x": {
+              "description": "X coordinate",
+              "minimum": 0,
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "minimum": 0,
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional region name",
+              "title": "Name"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "IgnoreRegion",
+          "type": "object"
+        }
+      },
+      "description": "Request to create baseline from existing screenshot.",
+      "properties": {
+        "screenshot_id": {
+          "description": "Source screenshot ID",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "state_name": {
+          "description": "State name",
+          "maxLength": 500,
+          "title": "State Name",
+          "type": "string"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow ID",
+          "title": "Workflow Id"
+        },
+        "comparison_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComparisonSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Comparison settings (defaults to SSIM with 0.95 threshold)"
+        },
+        "approval_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Approval notes",
+          "title": "Approval Notes"
+        }
+      },
+      "required": [
+        "screenshot_id",
+        "state_name"
+      ],
+      "title": "VisualBaselineFromScreenshot",
+      "type": "object"
+    },
+    "VisualBaselineUpdate": {
+      "$defs": {
+        "ComparisonSettings": {
+          "description": "Settings for visual comparison algorithm.\n\nControls how two images are compared for similarity.",
+          "properties": {
+            "algorithm": {
+              "default": "ssim",
+              "description": "Comparison algorithm: 'ssim', 'pixel_diff', 'perceptual_hash'",
+              "title": "Algorithm",
+              "type": "string"
+            },
+            "threshold": {
+              "default": 0.95,
+              "description": "Similarity threshold (0-1)",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Threshold",
+              "type": "number"
+            },
+            "ignore_regions": {
+              "description": "Regions to ignore",
+              "items": {
+                "$ref": "#/$defs/IgnoreRegion"
+              },
+              "title": "Ignore Regions",
+              "type": "array"
+            }
+          },
+          "title": "ComparisonSettings",
+          "type": "object"
+        },
+        "IgnoreRegion": {
+          "description": "A region to ignore during visual comparison.\n\nUsed to exclude dynamic areas (timestamps, ads, etc.).",
+          "properties": {
+            "x": {
+              "description": "X coordinate",
+              "minimum": 0,
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "minimum": 0,
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "exclusiveMinimum": 0,
+              "title": "Height",
+              "type": "integer"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional region name",
+              "title": "Name"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "IgnoreRegion",
+          "type": "object"
+        }
+      },
+      "description": "Request schema for updating a baseline.",
+      "properties": {
+        "comparison_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComparisonSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New comparison settings"
+        },
+        "approval_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New approval notes",
+          "title": "Approval Notes"
+        }
+      },
+      "title": "VisualBaselineUpdate",
+      "type": "object"
+    },
+    "VisualBaselineResponse": {
+      "description": "Response schema for a visual baseline.",
+      "properties": {
+        "id": {
+          "description": "Baseline ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "state_name": {
+          "description": "State name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow ID",
+          "title": "Workflow Id"
+        },
+        "width": {
+          "description": "Image width",
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Image height",
+          "title": "Height",
+          "type": "integer"
+        },
+        "file_size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File size",
+          "title": "File Size Bytes"
+        },
+        "perceptual_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Perceptual hash",
+          "title": "Perceptual Hash"
+        },
+        "version": {
+          "description": "Baseline version",
+          "title": "Version",
+          "type": "integer"
+        },
+        "is_active": {
+          "description": "Whether this is the active version",
+          "title": "Is Active",
+          "type": "boolean"
+        },
+        "approved_by_user_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Approved by user",
+          "title": "Approved By User Id"
+        },
+        "approved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Approval time (UTC)",
+          "title": "Approved At"
+        },
+        "approval_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Approval notes",
+          "title": "Approval Notes"
+        },
+        "comparison_settings": {
+          "additionalProperties": true,
+          "description": "Comparison settings",
+          "title": "Comparison Settings",
+          "type": "object"
+        },
+        "source_test_run_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source run ID",
+          "title": "Source Test Run Id"
+        },
+        "source_screenshot_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source screenshot ID",
+          "title": "Source Screenshot Id"
+        },
+        "created_at": {
+          "description": "Creation time (UTC)",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "description": "Last update time (UTC)",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Image URL",
+          "title": "Image Url"
+        },
+        "thumbnail_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Thumbnail URL",
+          "title": "Thumbnail Url"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "state_name",
+        "width",
+        "height",
+        "version",
+        "is_active",
+        "comparison_settings",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "VisualBaselineResponse",
+      "type": "object"
+    },
+    "VisualBaselineListResponse": {
+      "$defs": {
+        "VisualBaselineResponse": {
+          "description": "Response schema for a visual baseline.",
+          "properties": {
+            "id": {
+              "description": "Baseline ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "project_id": {
+              "description": "Project ID",
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "State name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "workflow_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Workflow ID",
+              "title": "Workflow Id"
+            },
+            "width": {
+              "description": "Image width",
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Image height",
+              "title": "Height",
+              "type": "integer"
+            },
+            "file_size_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "File size",
+              "title": "File Size Bytes"
+            },
+            "perceptual_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Perceptual hash",
+              "title": "Perceptual Hash"
+            },
+            "version": {
+              "description": "Baseline version",
+              "title": "Version",
+              "type": "integer"
+            },
+            "is_active": {
+              "description": "Whether this is the active version",
+              "title": "Is Active",
+              "type": "boolean"
+            },
+            "approved_by_user_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Approved by user",
+              "title": "Approved By User Id"
+            },
+            "approved_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Approval time (UTC)",
+              "title": "Approved At"
+            },
+            "approval_notes": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Approval notes",
+              "title": "Approval Notes"
+            },
+            "comparison_settings": {
+              "additionalProperties": true,
+              "description": "Comparison settings",
+              "title": "Comparison Settings",
+              "type": "object"
+            },
+            "source_test_run_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Source run ID",
+              "title": "Source Test Run Id"
+            },
+            "source_screenshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Source screenshot ID",
+              "title": "Source Screenshot Id"
+            },
+            "created_at": {
+              "description": "Creation time (UTC)",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "Last update time (UTC)",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            },
+            "image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Image URL",
+              "title": "Image Url"
+            },
+            "thumbnail_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Thumbnail URL",
+              "title": "Thumbnail Url"
+            }
+          },
+          "required": [
+            "id",
+            "project_id",
+            "state_name",
+            "width",
+            "height",
+            "version",
+            "is_active",
+            "comparison_settings",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "VisualBaselineResponse",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for paginated baseline list.",
+      "properties": {
+        "items": {
+          "description": "Baselines",
+          "items": {
+            "$ref": "#/$defs/VisualBaselineResponse"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total count",
+          "title": "Total",
+          "type": "integer"
+        },
+        "skip": {
+          "description": "Items skipped",
+          "title": "Skip",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "skip",
+        "limit"
+      ],
+      "title": "VisualBaselineListResponse",
+      "type": "object"
+    },
+    "DiffRegion": {
+      "description": "A region where images differ.",
+      "properties": {
+        "x": {
+          "description": "X coordinate",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width",
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height",
+          "title": "Height",
+          "type": "integer"
+        },
+        "change_percentage": {
+          "description": "Percentage of change in region",
+          "title": "Change Percentage",
+          "type": "number"
+        },
+        "pixel_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Changed pixel count",
+          "title": "Pixel Count"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "change_percentage"
+      ],
+      "title": "DiffRegion",
+      "type": "object"
+    },
+    "VisualComparisonCreate": {
+      "description": "Request schema for creating a visual comparison.",
+      "properties": {
+        "screenshot_id": {
+          "description": "Screenshot to compare",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "baseline_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline to compare against",
+          "title": "Baseline Id"
+        },
+        "algorithm": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override algorithm",
+          "title": "Algorithm"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override threshold",
+          "title": "Threshold"
+        }
+      },
+      "required": [
+        "screenshot_id"
+      ],
+      "title": "VisualComparisonCreate",
+      "type": "object"
+    },
+    "VisualComparisonResponse": {
+      "description": "Response schema for visual comparison result.",
+      "properties": {
+        "id": {
+          "description": "Comparison ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "test_run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Test Run Id",
+          "type": "string"
+        },
+        "baseline_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline ID",
+          "title": "Baseline Id"
+        },
+        "screenshot_id": {
+          "description": "Screenshot ID",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "transition_execution_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transition execution ID",
+          "title": "Transition Execution Id"
+        },
+        "state_name": {
+          "description": "State name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "comparison_algorithm": {
+          "description": "Algorithm used",
+          "title": "Comparison Algorithm",
+          "type": "string"
+        },
+        "similarity_score": {
+          "description": "Similarity score (0-1)",
+          "title": "Similarity Score",
+          "type": "number"
+        },
+        "threshold_used": {
+          "description": "Threshold used",
+          "title": "Threshold Used",
+          "type": "number"
+        },
+        "status": {
+          "description": "Comparison status: passed, failed, pending",
+          "title": "Status",
+          "type": "string"
+        },
+        "diff_region_count": {
+          "description": "Number of diff regions",
+          "title": "Diff Region Count",
+          "type": "integer"
+        },
+        "execution_time_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Execution time in ms",
+          "title": "Execution Time Ms"
+        },
+        "reviewed_by_user_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reviewer user ID",
+          "title": "Reviewed By User Id"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Review time (UTC)",
+          "title": "Reviewed At"
+        },
+        "review_decision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Decision: approved, rejected, new_baseline",
+          "title": "Review Decision"
+        },
+        "review_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Review notes",
+          "title": "Review Notes"
+        },
+        "deficiency_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Created deficiency ID",
+          "title": "Deficiency Id"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "created_at": {
+          "description": "Creation time (UTC)",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "diff_image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Diff image URL",
+          "title": "Diff Image Url"
+        },
+        "screenshot_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Screenshot URL",
+          "title": "Screenshot Url"
+        },
+        "baseline_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline URL",
+          "title": "Baseline Url"
+        }
+      },
+      "required": [
+        "id",
+        "test_run_id",
+        "screenshot_id",
+        "state_name",
+        "comparison_algorithm",
+        "similarity_score",
+        "threshold_used",
+        "status",
+        "diff_region_count",
+        "created_at"
+      ],
+      "title": "VisualComparisonResponse",
+      "type": "object"
+    },
+    "VisualComparisonDetail": {
+      "$defs": {
+        "DiffRegion": {
+          "description": "A region where images differ.",
+          "properties": {
+            "x": {
+              "description": "X coordinate",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width",
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height",
+              "title": "Height",
+              "type": "integer"
+            },
+            "change_percentage": {
+              "description": "Percentage of change in region",
+              "title": "Change Percentage",
+              "type": "number"
+            },
+            "pixel_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Changed pixel count",
+              "title": "Pixel Count"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height",
+            "change_percentage"
+          ],
+          "title": "DiffRegion",
+          "type": "object"
+        }
+      },
+      "description": "Detailed comparison with diff regions.",
+      "properties": {
+        "id": {
+          "description": "Comparison ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "test_run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Test Run Id",
+          "type": "string"
+        },
+        "baseline_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline ID",
+          "title": "Baseline Id"
+        },
+        "screenshot_id": {
+          "description": "Screenshot ID",
+          "format": "uuid",
+          "title": "Screenshot Id",
+          "type": "string"
+        },
+        "transition_execution_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transition execution ID",
+          "title": "Transition Execution Id"
+        },
+        "state_name": {
+          "description": "State name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "comparison_algorithm": {
+          "description": "Algorithm used",
+          "title": "Comparison Algorithm",
+          "type": "string"
+        },
+        "similarity_score": {
+          "description": "Similarity score (0-1)",
+          "title": "Similarity Score",
+          "type": "number"
+        },
+        "threshold_used": {
+          "description": "Threshold used",
+          "title": "Threshold Used",
+          "type": "number"
+        },
+        "status": {
+          "description": "Comparison status: passed, failed, pending",
+          "title": "Status",
+          "type": "string"
+        },
+        "diff_region_count": {
+          "description": "Number of diff regions",
+          "title": "Diff Region Count",
+          "type": "integer"
+        },
+        "execution_time_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Execution time in ms",
+          "title": "Execution Time Ms"
+        },
+        "reviewed_by_user_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reviewer user ID",
+          "title": "Reviewed By User Id"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Review time (UTC)",
+          "title": "Reviewed At"
+        },
+        "review_decision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Decision: approved, rejected, new_baseline",
+          "title": "Review Decision"
+        },
+        "review_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Review notes",
+          "title": "Review Notes"
+        },
+        "deficiency_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Created deficiency ID",
+          "title": "Deficiency Id"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "created_at": {
+          "description": "Creation time (UTC)",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "diff_image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Diff image URL",
+          "title": "Diff Image Url"
+        },
+        "screenshot_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Screenshot URL",
+          "title": "Screenshot Url"
+        },
+        "baseline_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline URL",
+          "title": "Baseline Url"
+        },
+        "diff_regions": {
+          "description": "Diff regions",
+          "items": {
+            "$ref": "#/$defs/DiffRegion"
+          },
+          "title": "Diff Regions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "test_run_id",
+        "screenshot_id",
+        "state_name",
+        "comparison_algorithm",
+        "similarity_score",
+        "threshold_used",
+        "status",
+        "diff_region_count",
+        "created_at"
+      ],
+      "title": "VisualComparisonDetail",
+      "type": "object"
+    },
+    "VisualComparisonListResponse": {
+      "$defs": {
+        "VisualComparisonResponse": {
+          "description": "Response schema for visual comparison result.",
+          "properties": {
+            "id": {
+              "description": "Comparison ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "test_run_id": {
+              "description": "Test run ID",
+              "format": "uuid",
+              "title": "Test Run Id",
+              "type": "string"
+            },
+            "baseline_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Baseline ID",
+              "title": "Baseline Id"
+            },
+            "screenshot_id": {
+              "description": "Screenshot ID",
+              "format": "uuid",
+              "title": "Screenshot Id",
+              "type": "string"
+            },
+            "transition_execution_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Transition execution ID",
+              "title": "Transition Execution Id"
+            },
+            "state_name": {
+              "description": "State name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "comparison_algorithm": {
+              "description": "Algorithm used",
+              "title": "Comparison Algorithm",
+              "type": "string"
+            },
+            "similarity_score": {
+              "description": "Similarity score (0-1)",
+              "title": "Similarity Score",
+              "type": "number"
+            },
+            "threshold_used": {
+              "description": "Threshold used",
+              "title": "Threshold Used",
+              "type": "number"
+            },
+            "status": {
+              "description": "Comparison status: passed, failed, pending",
+              "title": "Status",
+              "type": "string"
+            },
+            "diff_region_count": {
+              "description": "Number of diff regions",
+              "title": "Diff Region Count",
+              "type": "integer"
+            },
+            "execution_time_ms": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Execution time in ms",
+              "title": "Execution Time Ms"
+            },
+            "reviewed_by_user_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Reviewer user ID",
+              "title": "Reviewed By User Id"
+            },
+            "reviewed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Review time (UTC)",
+              "title": "Reviewed At"
+            },
+            "review_decision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Decision: approved, rejected, new_baseline",
+              "title": "Review Decision"
+            },
+            "review_notes": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Review notes",
+              "title": "Review Notes"
+            },
+            "deficiency_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Created deficiency ID",
+              "title": "Deficiency Id"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "created_at": {
+              "description": "Creation time (UTC)",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "diff_image_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Diff image URL",
+              "title": "Diff Image Url"
+            },
+            "screenshot_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Screenshot URL",
+              "title": "Screenshot Url"
+            },
+            "baseline_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Baseline URL",
+              "title": "Baseline Url"
+            }
+          },
+          "required": [
+            "id",
+            "test_run_id",
+            "screenshot_id",
+            "state_name",
+            "comparison_algorithm",
+            "similarity_score",
+            "threshold_used",
+            "status",
+            "diff_region_count",
+            "created_at"
+          ],
+          "title": "VisualComparisonResponse",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for paginated comparison list.",
+      "properties": {
+        "items": {
+          "description": "Comparisons",
+          "items": {
+            "$ref": "#/$defs/VisualComparisonResponse"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total count",
+          "title": "Total",
+          "type": "integer"
+        },
+        "skip": {
+          "description": "Items skipped",
+          "title": "Skip",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "skip",
+        "limit"
+      ],
+      "title": "VisualComparisonListResponse",
+      "type": "object"
+    },
+    "VisualComparisonSummary": {
+      "description": "Summary of visual comparison result.",
+      "properties": {
+        "comparison_id": {
+          "description": "Comparison ID",
+          "format": "uuid",
+          "title": "Comparison Id",
+          "type": "string"
+        },
+        "baseline_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Baseline ID",
+          "title": "Baseline Id"
+        },
+        "similarity_score": {
+          "description": "Similarity score",
+          "title": "Similarity Score",
+          "type": "number"
+        },
+        "threshold": {
+          "description": "Threshold used",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether comparison passed",
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "status": {
+          "description": "Status",
+          "title": "Status",
+          "type": "string"
+        },
+        "diff_image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Diff image URL",
+          "title": "Diff Image Url"
+        },
+        "diff_region_count": {
+          "default": 0,
+          "description": "Number of diff regions",
+          "title": "Diff Region Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "comparison_id",
+        "similarity_score",
+        "threshold",
+        "passed",
+        "status"
+      ],
+      "title": "VisualComparisonSummary",
+      "type": "object"
+    },
+    "ComparisonReview": {
+      "description": "Request schema for reviewing a comparison.",
+      "properties": {
+        "decision": {
+          "description": "Decision: 'approved', 'rejected', 'new_baseline'",
+          "title": "Decision",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Review notes",
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "title": "ComparisonReview",
+      "type": "object"
+    },
+    "ComparisonStats": {
+      "description": "Statistics for visual comparisons.",
+      "properties": {
+        "total": {
+          "description": "Total comparisons",
+          "title": "Total",
+          "type": "integer"
+        },
+        "passed": {
+          "description": "Passed comparisons",
+          "title": "Passed",
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Failed comparisons",
+          "title": "Failed",
+          "type": "integer"
+        },
+        "pending_review": {
+          "description": "Pending review",
+          "title": "Pending Review",
+          "type": "integer"
+        },
+        "approved_as_new": {
+          "description": "Approved as new baseline",
+          "title": "Approved As New",
+          "type": "integer"
+        },
+        "no_baseline": {
+          "description": "No baseline available",
+          "title": "No Baseline",
+          "type": "integer"
+        },
+        "pass_rate": {
+          "description": "Pass rate percentage",
+          "title": "Pass Rate",
+          "type": "number"
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "failed",
+        "pending_review",
+        "approved_as_new",
+        "no_baseline",
+        "pass_rate"
+      ],
+      "title": "ComparisonStats",
+      "type": "object"
+    },
+    "CoverageData": {
+      "description": "Coverage statistics for an execution run.\n\nTracks how much of the workflow's states and transitions\nwere exercised during the run.",
+      "properties": {
+        "coverage_percentage": {
+          "description": "Overall coverage percentage",
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "states_covered": {
+          "description": "Number of states visited",
+          "title": "States Covered",
+          "type": "integer"
+        },
+        "total_states": {
+          "description": "Total states in workflow",
+          "title": "Total States",
+          "type": "integer"
+        },
+        "transitions_covered": {
+          "description": "Number of transitions executed",
+          "title": "Transitions Covered",
+          "type": "integer"
+        },
+        "total_transitions": {
+          "description": "Total transitions in workflow",
+          "title": "Total Transitions",
+          "type": "integer"
+        },
+        "uncovered_states": {
+          "description": "List of unvisited state IDs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncovered States",
+          "type": "array"
+        },
+        "uncovered_transitions": {
+          "description": "List of unexecuted transition IDs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncovered Transitions",
+          "type": "array"
+        },
+        "state_visit_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Map of state ID to visit count",
+          "title": "State Visit Counts",
+          "type": "object"
+        },
+        "transition_execution_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Map of transition ID to execution count",
+          "title": "Transition Execution Counts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "coverage_percentage",
+        "states_covered",
+        "total_states",
+        "transitions_covered",
+        "total_transitions"
+      ],
+      "title": "CoverageData",
+      "type": "object"
+    },
+    "CoverageSnapshot": {
+      "description": "Point-in-time coverage snapshot.\n\nCaptured periodically during a test run to track coverage growth.",
+      "properties": {
+        "id": {
+          "description": "Snapshot ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "sequence_number": {
+          "description": "Snapshot sequence number",
+          "title": "Sequence Number",
+          "type": "integer"
+        },
+        "coverage_percentage": {
+          "description": "Coverage percentage",
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "states_covered": {
+          "description": "States covered",
+          "title": "States Covered",
+          "type": "integer"
+        },
+        "total_states": {
+          "description": "Total states",
+          "title": "Total States",
+          "type": "integer"
+        },
+        "transitions_covered": {
+          "description": "Transitions covered",
+          "title": "Transitions Covered",
+          "type": "integer"
+        },
+        "total_transitions": {
+          "description": "Total transitions",
+          "title": "Total Transitions",
+          "type": "integer"
+        },
+        "timestamp": {
+          "description": "Snapshot time (UTC)",
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "sequence_number",
+        "coverage_percentage",
+        "states_covered",
+        "total_states",
+        "transitions_covered",
+        "total_transitions",
+        "timestamp"
+      ],
+      "title": "CoverageSnapshot",
+      "type": "object"
+    },
+    "CoverageUpdate": {
+      "description": "Request schema for updating coverage metrics.\n\nSent by the runner when coverage changes.",
+      "properties": {
+        "total_transitions_executed": {
+          "description": "Total transitions executed",
+          "minimum": 0,
+          "title": "Total Transitions Executed",
+          "type": "integer"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique transitions covered",
+          "minimum": 0,
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        },
+        "coverage_percentage": {
+          "description": "Coverage percentage",
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "transition_coverage_map": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Transition to execution count",
+          "title": "Transition Coverage Map",
+          "type": "object"
+        },
+        "state_coverage_map": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "State to visit count",
+          "title": "State Coverage Map",
+          "type": "object"
+        },
+        "uncovered_transitions": {
+          "description": "Uncovered transition IDs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncovered Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_transitions_executed",
+        "unique_transitions_covered",
+        "coverage_percentage"
+      ],
+      "title": "CoverageUpdate",
+      "type": "object"
+    },
+    "CoverageUpdateResponse": {
+      "description": "Response schema for coverage update.",
+      "properties": {
+        "run_id": {
+          "description": "Test run ID",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "coverage_updated": {
+          "description": "Whether update succeeded",
+          "title": "Coverage Updated",
+          "type": "boolean"
+        },
+        "coverage_percentage": {
+          "description": "Current coverage",
+          "title": "Coverage Percentage",
+          "type": "number"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique transitions",
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "coverage_updated",
+        "coverage_percentage",
+        "unique_transitions_covered"
+      ],
+      "title": "CoverageUpdateResponse",
+      "type": "object"
+    },
+    "CoverageTrendDataPoint": {
+      "description": "Single data point in coverage trend.",
+      "properties": {
+        "date": {
+          "description": "Date (YYYY-MM-DD)",
+          "title": "Date",
+          "type": "string"
+        },
+        "runs_count": {
+          "description": "Number of runs",
+          "title": "Runs Count",
+          "type": "integer"
+        },
+        "avg_coverage_percentage": {
+          "description": "Average coverage",
+          "title": "Avg Coverage Percentage",
+          "type": "number"
+        },
+        "max_coverage_percentage": {
+          "description": "Maximum coverage",
+          "title": "Max Coverage Percentage",
+          "type": "number"
+        },
+        "min_coverage_percentage": {
+          "description": "Minimum coverage",
+          "title": "Min Coverage Percentage",
+          "type": "number"
+        },
+        "total_transitions_executed": {
+          "description": "Total transitions",
+          "title": "Total Transitions Executed",
+          "type": "integer"
+        },
+        "unique_transitions_covered": {
+          "description": "Unique transitions",
+          "title": "Unique Transitions Covered",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "runs_count",
+        "avg_coverage_percentage",
+        "max_coverage_percentage",
+        "min_coverage_percentage",
+        "total_transitions_executed",
+        "unique_transitions_covered"
+      ],
+      "title": "CoverageTrendDataPoint",
+      "type": "object"
+    },
+    "CoverageTrendResponse": {
+      "$defs": {
+        "CoverageTrendDataPoint": {
+          "description": "Single data point in coverage trend.",
+          "properties": {
+            "date": {
+              "description": "Date (YYYY-MM-DD)",
+              "title": "Date",
+              "type": "string"
+            },
+            "runs_count": {
+              "description": "Number of runs",
+              "title": "Runs Count",
+              "type": "integer"
+            },
+            "avg_coverage_percentage": {
+              "description": "Average coverage",
+              "title": "Avg Coverage Percentage",
+              "type": "number"
+            },
+            "max_coverage_percentage": {
+              "description": "Maximum coverage",
+              "title": "Max Coverage Percentage",
+              "type": "number"
+            },
+            "min_coverage_percentage": {
+              "description": "Minimum coverage",
+              "title": "Min Coverage Percentage",
+              "type": "number"
+            },
+            "total_transitions_executed": {
+              "description": "Total transitions",
+              "title": "Total Transitions Executed",
+              "type": "integer"
+            },
+            "unique_transitions_covered": {
+              "description": "Unique transitions",
+              "title": "Unique Transitions Covered",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "date",
+            "runs_count",
+            "avg_coverage_percentage",
+            "max_coverage_percentage",
+            "min_coverage_percentage",
+            "total_transitions_executed",
+            "unique_transitions_covered"
+          ],
+          "title": "CoverageTrendDataPoint",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for coverage trend analysis.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow ID if filtered",
+          "title": "Workflow Id"
+        },
+        "start_date": {
+          "description": "Start date",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "end_date": {
+          "description": "End date",
+          "title": "End Date",
+          "type": "string"
+        },
+        "granularity": {
+          "description": "Granularity: daily, weekly, monthly",
+          "title": "Granularity",
+          "type": "string"
+        },
+        "data_points": {
+          "description": "Trend data",
+          "items": {
+            "$ref": "#/$defs/CoverageTrendDataPoint"
+          },
+          "title": "Data Points",
+          "type": "array"
+        },
+        "overall_stats": {
+          "additionalProperties": true,
+          "description": "Overall statistics",
+          "title": "Overall Stats",
+          "type": "object"
+        }
+      },
+      "required": [
+        "project_id",
+        "start_date",
+        "end_date",
+        "granularity",
+        "data_points",
+        "overall_stats"
+      ],
+      "title": "CoverageTrendResponse",
+      "type": "object"
+    },
+    "CoverageGap": {
+      "description": "A gap in coverage (uncovered state or transition).",
+      "properties": {
+        "id": {
+          "description": "State or transition ID",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type: 'state' or 'transition'",
+          "title": "Type",
+          "type": "string"
+        },
+        "from_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source state (for transitions)",
+          "title": "From State"
+        },
+        "to_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target state (for transitions)",
+          "title": "To State"
+        },
+        "last_covered_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last time covered (UTC)",
+          "title": "Last Covered At"
+        },
+        "priority": {
+          "default": "medium",
+          "description": "Priority: 'critical', 'high', 'medium', 'low'",
+          "title": "Priority",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "title": "CoverageGap",
+      "type": "object"
+    },
+    "CoverageGapsResponse": {
+      "$defs": {
+        "CoverageGap": {
+          "description": "A gap in coverage (uncovered state or transition).",
+          "properties": {
+            "id": {
+              "description": "State or transition ID",
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "description": "Display name",
+              "title": "Name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Type: 'state' or 'transition'",
+              "title": "Type",
+              "type": "string"
+            },
+            "from_state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Source state (for transitions)",
+              "title": "From State"
+            },
+            "to_state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Target state (for transitions)",
+              "title": "To State"
+            },
+            "last_covered_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last time covered (UTC)",
+              "title": "Last Covered At"
+            },
+            "priority": {
+              "default": "medium",
+              "description": "Priority: 'critical', 'high', 'medium', 'low'",
+              "title": "Priority",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type"
+          ],
+          "title": "CoverageGap",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for coverage gaps analysis.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "description": "Workflow ID",
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "current_coverage": {
+          "description": "Current coverage percentage",
+          "title": "Current Coverage",
+          "type": "number"
+        },
+        "gaps": {
+          "description": "Coverage gaps",
+          "items": {
+            "$ref": "#/$defs/CoverageGap"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "total_gaps": {
+          "description": "Total gap count",
+          "title": "Total Gaps",
+          "type": "integer"
+        },
+        "critical_gaps": {
+          "description": "Critical gaps count",
+          "title": "Critical Gaps",
+          "type": "integer"
+        },
+        "recommended_next": {
+          "description": "Recommended transitions to cover",
+          "items": {
+            "type": "string"
+          },
+          "title": "Recommended Next",
+          "type": "array"
+        }
+      },
+      "required": [
+        "project_id",
+        "workflow_id",
+        "current_coverage",
+        "gaps",
+        "total_gaps",
+        "critical_gaps"
+      ],
+      "title": "CoverageGapsResponse",
+      "type": "object"
+    },
+    "CoverageHeatmapCell": {
+      "description": "Single cell in coverage heatmap.",
+      "properties": {
+        "state_id": {
+          "description": "State ID",
+          "title": "State Id",
+          "type": "string"
+        },
+        "state_name": {
+          "description": "State name",
+          "title": "State Name",
+          "type": "string"
+        },
+        "visit_count": {
+          "description": "Number of visits",
+          "title": "Visit Count",
+          "type": "integer"
+        },
+        "last_visited_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last visit time (UTC)",
+          "title": "Last Visited At"
+        },
+        "coverage_intensity": {
+          "description": "Coverage intensity (0-1)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Coverage Intensity",
+          "type": "number"
+        }
+      },
+      "required": [
+        "state_id",
+        "state_name",
+        "visit_count",
+        "coverage_intensity"
+      ],
+      "title": "CoverageHeatmapCell",
+      "type": "object"
+    },
+    "CoverageHeatmapResponse": {
+      "$defs": {
+        "CoverageHeatmapCell": {
+          "description": "Single cell in coverage heatmap.",
+          "properties": {
+            "state_id": {
+              "description": "State ID",
+              "title": "State Id",
+              "type": "string"
+            },
+            "state_name": {
+              "description": "State name",
+              "title": "State Name",
+              "type": "string"
+            },
+            "visit_count": {
+              "description": "Number of visits",
+              "title": "Visit Count",
+              "type": "integer"
+            },
+            "last_visited_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last visit time (UTC)",
+              "title": "Last Visited At"
+            },
+            "coverage_intensity": {
+              "description": "Coverage intensity (0-1)",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Coverage Intensity",
+              "type": "number"
+            }
+          },
+          "required": [
+            "state_id",
+            "state_name",
+            "visit_count",
+            "coverage_intensity"
+          ],
+          "title": "CoverageHeatmapCell",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for coverage heatmap.",
+      "properties": {
+        "project_id": {
+          "description": "Project ID",
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "description": "Workflow ID",
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run ID if single-run view",
+          "title": "Run Id"
+        },
+        "cells": {
+          "description": "Heatmap cells",
+          "items": {
+            "$ref": "#/$defs/CoverageHeatmapCell"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "max_visits": {
+          "description": "Maximum visit count",
+          "title": "Max Visits",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_id",
+        "workflow_id",
+        "cells",
+        "max_visits"
+      ],
+      "title": "CoverageHeatmapResponse",
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "schemas": {
+    "StateDescription": {
+      "description": "Rich description for a state in the state machine.\n\nProvides context for an AI verification agent to understand what a state\nrepresents and how to verify it matches expectations.",
+      "properties": {
+        "summary": {
+          "description": "Brief description of the state (1-2 sentences)",
+          "title": "Summary",
+          "type": "string"
+        },
+        "expected_elements": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "UI elements that should be visible in this state (e.g., 'Login button', 'Username field')",
+          "title": "Expected Elements"
+        },
+        "unexpected_elements": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "UI elements that should NOT be visible in this state - helps detect error dialogs or wrong states",
+          "title": "Unexpected Elements"
+        },
+        "user_goal": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Business context - what the user is trying to accomplish when in this state",
+          "title": "User Goal"
+        },
+        "verification_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom hints for AI verification - specific things to check or look for",
+          "title": "Verification Prompt"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "title": "StateDescription",
+      "type": "object"
+    },
+    "ActionDescription": {
+      "description": "Rich description for an action in a workflow.\n\nProvides context for an AI verification agent to understand what an action\nis supposed to accomplish and how to verify it succeeded.",
+      "properties": {
+        "intent": {
+          "description": "What this action is supposed to accomplish (e.g., 'Click the submit button to proceed')",
+          "title": "Intent",
+          "type": "string"
+        },
+        "preconditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditions that should be true before this action executes",
+          "title": "Preconditions"
+        },
+        "postconditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditions that should be true after this action completes successfully",
+          "title": "Postconditions"
+        },
+        "failure_modes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Known ways this action can fail (e.g., 'Button may be disabled', 'Network timeout')",
+          "title": "Failure Modes"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "title": "ActionDescription",
+      "type": "object"
+    },
+    "TransitionDescription": {
+      "description": "Rich description for a transition between states.\n\nProvides context for an AI verification agent to understand what a transition\naccomplishes and how to verify it completed successfully.",
+      "properties": {
+        "intent": {
+          "description": "What this transition accomplishes (e.g., 'Navigate from login to dashboard')",
+          "title": "Intent",
+          "type": "string"
+        },
+        "preconditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditions that must be true before this transition can occur",
+          "title": "Preconditions"
+        },
+        "postconditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditions that should be true after this transition completes",
+          "title": "Postconditions"
+        },
+        "failure_modes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Known ways this transition can fail (e.g., 'Authentication error', 'Server unavailable')",
+          "title": "Failure Modes"
+        },
+        "expected_duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Typical duration of this transition in milliseconds - helps detect performance issues",
+          "title": "Expected Duration Ms"
+        }
+      },
+      "required": [
+        "intent"
+      ],
+      "title": "TransitionDescription",
+      "type": "object"
+    },
+    "WorkflowDescription": {
+      "description": "Rich description for an entire workflow.\n\nProvides high-level context for an AI verification agent to understand\nthe overall purpose and success criteria of a workflow.",
+      "properties": {
+        "purpose": {
+          "description": "Overall goal of the workflow (e.g., 'Complete user registration process')",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "success_criteria": {
+          "description": "How to determine if the workflow succeeded (e.g., 'User sees welcome message')",
+          "title": "Success Criteria",
+          "type": "string"
+        },
+        "steps_summary": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable summary of the workflow steps for quick understanding",
+          "title": "Steps Summary"
+        },
+        "business_context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why this workflow exists and its importance in the application",
+          "title": "Business Context"
+        }
+      },
+      "required": [
+        "purpose",
+        "success_criteria"
+      ],
+      "title": "WorkflowDescription",
+      "type": "object"
+    }
+  }
+}

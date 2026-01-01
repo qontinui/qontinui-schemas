@@ -1,5 +1,223 @@
 {
   "schemas": {
+    "ContextAutoInclude": {
+      "description": "Rules for automatically including a context in AI tasks.\n\nWhen an AI task is created, the runner evaluates these rules to determine\nwhich contexts should be automatically included. Multiple rules are OR'd\ntogether (any match triggers inclusion).",
+      "properties": {
+        "taskMentions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Keywords in task prompt that trigger inclusion (case-insensitive)",
+          "title": "Taskmentions"
+        },
+        "actionTypes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action types in loaded config that trigger inclusion (e.g., 'CLICK', 'FIND')",
+          "title": "Actiontypes"
+        },
+        "errorPatterns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regex patterns in recent logs that trigger inclusion",
+          "title": "Errorpatterns"
+        },
+        "filePatterns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for files being worked on (e.g., '*.rs', 'src/api/**')",
+          "title": "Filepatterns"
+        }
+      },
+      "title": "ContextAutoInclude",
+      "type": "object"
+    },
+    "Context": {
+      "$defs": {
+        "ContextAutoInclude": {
+          "description": "Rules for automatically including a context in AI tasks.\n\nWhen an AI task is created, the runner evaluates these rules to determine\nwhich contexts should be automatically included. Multiple rules are OR'd\ntogether (any match triggers inclusion).",
+          "properties": {
+            "taskMentions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Keywords in task prompt that trigger inclusion (case-insensitive)",
+              "title": "Taskmentions"
+            },
+            "actionTypes": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Action types in loaded config that trigger inclusion (e.g., 'CLICK', 'FIND')",
+              "title": "Actiontypes"
+            },
+            "errorPatterns": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Regex patterns in recent logs that trigger inclusion",
+              "title": "Errorpatterns"
+            },
+            "filePatterns": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Glob patterns for files being worked on (e.g., '*.rs', 'src/api/**')",
+              "title": "Filepatterns"
+            }
+          },
+          "title": "ContextAutoInclude",
+          "type": "object"
+        }
+      },
+      "description": "AI context for providing domain knowledge to AI tasks.\n\nContexts are markdown documents that get injected into AI task prompts\nto provide relevant background knowledge, coding standards, architectural\nguidance, or debugging tips.\n\nExample:\n    {\n        \"id\": \"ctx-schema-flow\",\n        \"name\": \"Schema Architecture\",\n        \"content\": \"## Schema Source of Truth\\n\\nAll schemas are defined in...\",\n        \"category\": \"architecture\",\n        \"tags\": [\"schema\", \"validation\"],\n        \"autoInclude\": {\n            \"taskMentions\": [\"schema\", \"validation\", \"target type\"],\n            \"errorPatterns\": [\"validation.*error\", \"type.*mismatch\"]\n        }\n    }",
+      "properties": {
+        "id": {
+          "description": "Unique identifier (UUID v4 or prefixed like 'ctx-schema-flow')",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name for display",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "content": {
+          "description": "Markdown content injected into AI prompts",
+          "title": "Content",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Category for organization (e.g., 'architecture', 'debugging', 'philosophy')",
+          "title": "Category"
+        },
+        "tags": {
+          "description": "Tags for flexible grouping and search",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "autoInclude": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextAutoInclude"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Rules for automatic inclusion in AI tasks"
+        },
+        "createdAt": {
+          "description": "ISO 8601 creation timestamp",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "modifiedAt": {
+          "description": "ISO 8601 last modification timestamp",
+          "title": "Modifiedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "content",
+        "createdAt",
+        "modifiedAt"
+      ],
+      "title": "Context",
+      "type": "object"
+    },
     "Category": {
       "description": "Workflow category for organization and automation control.\n\nCategories organize workflows and control which are available for\nautomation in the runner. Only workflows in categories with\nautomationEnabled=True are shown in the runner's workflow list.",
       "properties": {

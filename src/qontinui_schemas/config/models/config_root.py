@@ -10,6 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from .context import Context
 from .state_machine import State, Transition
 from .workflow import Workflow
 
@@ -653,6 +654,10 @@ class QontinuiConfig(BaseModel):
         default=None,
         alias="executionRecords",
         description="Execution history",
+    )
+    contexts: list[Context] = Field(
+        default_factory=list,
+        description="AI contexts for providing domain knowledge to AI tasks",
     )
 
     model_config = {"populate_by_name": True}

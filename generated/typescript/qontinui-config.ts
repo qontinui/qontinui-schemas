@@ -6,50 +6,13 @@
  * types from config.ts and workflow.ts
  */
 
-// Re-export all types from config (canonical source for shared types like LogLevel, ExecutionSettings)
+// Re-export types from config - these are the primary config types
 export * from "./config";
 
-// Re-export workflow types explicitly (excluding duplicates already in config.ts: LogLevel, ExecutionSettings)
-export type {
-  // Logging types
-  LoggingOptions,
-  // Execution types
-  RepetitionOptions,
-  BaseActionSettings,
-  // Position and region types
-  Position,
-  SearchRegion,
-  // Pattern and StateImage
-  Pattern,
-  StateImage,
-  // State components
-  StateRegion,
-  StateLocation,
-  StateString,
-  // State
-  StatePosition,
-  State,
-  // Transition types
-  TransitionCondition,
-  BaseTransition,
-  OutgoingTransition,
-  IncomingTransition,
-  Transition,
-  // Workflow types
-  Connection,
-  WorkflowMetadata,
-  Variables,
-  WorkflowSettings,
-  Workflow,
-  Connections,
-  ActionOutputs,
-  WorkflowConnections,
-  // Action
-  Action,
-} from "./workflow";
-
-// Re-export enums separately (they are values, not just types)
+// Re-export workflow types, excluding duplicates that exist in config
+// (LogLevel and ExecutionSettings are defined in both, we use config's versions)
 export {
+  // Enums (runtime values)
   WorkflowVisibility,
   PositionName,
   TransitionType,
@@ -57,7 +20,40 @@ export {
   MultiPatternMode,
 } from "./workflow";
 
-import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord } from "./config";
+// Re-export type-only exports
+export type {
+  LoggingOptions,
+  RepetitionOptions,
+  BaseActionSettings,
+  Position,
+  SearchRegion,
+  Pattern,
+  StateImage,
+  StateRegion,
+  StateLocation,
+  StateString,
+  StatePosition,
+  State,
+  TransitionCondition,
+  BaseTransition,
+  OutgoingTransition,
+  IncomingTransition,
+  Connection,
+  WorkflowMetadata,
+  Variables,
+  WorkflowSettings,
+  Workflow,
+  Action,
+  Transition,
+  Connections,
+  ActionOutputs,
+  WorkflowConnections,
+} from "./workflow";
+
+// Re-export workflow's ExecutionSettings as ActionExecutionSettings to avoid conflict
+export type { ExecutionSettings as ActionExecutionSettings } from "./workflow";
+
+import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord, Context } from "./config";
 import type { Workflow, State, Transition } from "./workflow";
 
 export interface QontinuiConfig {
@@ -81,4 +77,6 @@ export interface QontinuiConfig {
   schedules?: Schedule[] | null;
   /** Execution history */
   executionRecords?: ExecutionRecord[] | null;
+  /** AI contexts for providing domain knowledge to AI tasks */
+  contexts?: Context[];
 }

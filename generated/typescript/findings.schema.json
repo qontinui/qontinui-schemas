@@ -1,0 +1,1367 @@
+{
+  "schemas": {
+    "FindingCodeContext": {
+      "description": "Code context for a finding.\n\nProvides location and snippet information for findings related to specific code.",
+      "properties": {
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path where the finding was detected",
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Line number where the finding was detected",
+          "title": "Line"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column number where the finding was detected",
+          "title": "Column"
+        },
+        "snippet": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Code snippet related to the finding (max 1000 chars)",
+          "title": "Snippet"
+        }
+      },
+      "title": "FindingCodeContext",
+      "type": "object"
+    },
+    "FindingUserInput": {
+      "description": "User input request for a finding.\n\nDefines the question and input format when a finding requires user decision.",
+      "properties": {
+        "question": {
+          "description": "Question to present to the user",
+          "title": "Question",
+          "type": "string"
+        },
+        "input_type": {
+          "default": "text",
+          "description": "Type of input expected: 'text' or 'choice'",
+          "title": "Input Type",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Options for choice-type input",
+          "title": "Options"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "FindingUserInput",
+      "type": "object"
+    },
+    "FindingCreate": {
+      "$defs": {
+        "FindingActionType": {
+          "description": "Type of action recommended for a finding.\n\nAUTO_FIX: Can be automatically fixed without user intervention.\nNEEDS_USER_INPUT: Requires user decision or input to resolve.\nINFORMATIONAL: No action needed, for awareness only.",
+          "enum": [
+            "auto_fix",
+            "needs_user_input",
+            "informational"
+          ],
+          "title": "FindingActionType",
+          "type": "string"
+        },
+        "FindingCategory": {
+          "description": "Category of a detected finding.\n\nDetermines the type of issue or observation detected during analysis.",
+          "enum": [
+            "code_bug",
+            "security",
+            "performance",
+            "todo",
+            "enhancement",
+            "config_issue",
+            "test_issue",
+            "documentation",
+            "runtime_issue",
+            "already_fixed",
+            "expected_behavior"
+          ],
+          "title": "FindingCategory",
+          "type": "string"
+        },
+        "FindingCodeContext": {
+          "description": "Code context for a finding.\n\nProvides location and snippet information for findings related to specific code.",
+          "properties": {
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "File path where the finding was detected",
+              "title": "File"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number where the finding was detected",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number where the finding was detected",
+              "title": "Column"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code snippet related to the finding (max 1000 chars)",
+              "title": "Snippet"
+            }
+          },
+          "title": "FindingCodeContext",
+          "type": "object"
+        },
+        "FindingSeverity": {
+          "description": "Severity level of a finding.\n\nCRITICAL: Blocks functionality, immediate attention required.\nHIGH: Major issue, should be fixed soon.\nMEDIUM: Moderate issue, should be fixed.\nLOW: Minor issue, fix when convenient.\nINFO: Informational, no action required.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "FindingSeverity",
+          "type": "string"
+        },
+        "FindingUserInput": {
+          "description": "User input request for a finding.\n\nDefines the question and input format when a finding requires user decision.",
+          "properties": {
+            "question": {
+              "description": "Question to present to the user",
+              "title": "Question",
+              "type": "string"
+            },
+            "input_type": {
+              "default": "text",
+              "description": "Type of input expected: 'text' or 'choice'",
+              "title": "Input Type",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Options for choice-type input",
+              "title": "Options"
+            }
+          },
+          "required": [
+            "question"
+          ],
+          "title": "FindingUserInput",
+          "type": "object"
+        }
+      },
+      "description": "Schema for creating a finding.\n\nSent by the runner when an AI analysis session detects issues or observations.\nRunner -> Backend.",
+      "properties": {
+        "task_run_id": {
+          "description": "Parent task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "session_num": {
+          "description": "Session number where the finding was detected",
+          "title": "Session Num",
+          "type": "integer"
+        },
+        "category": {
+          "$ref": "#/$defs/FindingCategory",
+          "description": "Category of the finding"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity",
+          "description": "Severity level of the finding"
+        },
+        "title": {
+          "description": "Brief title describing the finding (max 500 chars)",
+          "maxLength": 500,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "description": "Detailed description of the finding",
+          "title": "Description",
+          "type": "string"
+        },
+        "code_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingCodeContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Code context if the finding relates to specific code"
+        },
+        "signature_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash for deduplication across sessions",
+          "title": "Signature Hash"
+        },
+        "action_type": {
+          "$ref": "#/$defs/FindingActionType",
+          "description": "Type of action for this finding"
+        },
+        "user_input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingUserInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User input request if action_type requires user decision"
+        }
+      },
+      "required": [
+        "task_run_id",
+        "session_num",
+        "category",
+        "severity",
+        "title",
+        "description",
+        "action_type"
+      ],
+      "title": "FindingCreate",
+      "type": "object"
+    },
+    "FindingBatchCreate": {
+      "$defs": {
+        "FindingActionType": {
+          "description": "Type of action recommended for a finding.\n\nAUTO_FIX: Can be automatically fixed without user intervention.\nNEEDS_USER_INPUT: Requires user decision or input to resolve.\nINFORMATIONAL: No action needed, for awareness only.",
+          "enum": [
+            "auto_fix",
+            "needs_user_input",
+            "informational"
+          ],
+          "title": "FindingActionType",
+          "type": "string"
+        },
+        "FindingCategory": {
+          "description": "Category of a detected finding.\n\nDetermines the type of issue or observation detected during analysis.",
+          "enum": [
+            "code_bug",
+            "security",
+            "performance",
+            "todo",
+            "enhancement",
+            "config_issue",
+            "test_issue",
+            "documentation",
+            "runtime_issue",
+            "already_fixed",
+            "expected_behavior"
+          ],
+          "title": "FindingCategory",
+          "type": "string"
+        },
+        "FindingCodeContext": {
+          "description": "Code context for a finding.\n\nProvides location and snippet information for findings related to specific code.",
+          "properties": {
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "File path where the finding was detected",
+              "title": "File"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number where the finding was detected",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number where the finding was detected",
+              "title": "Column"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code snippet related to the finding (max 1000 chars)",
+              "title": "Snippet"
+            }
+          },
+          "title": "FindingCodeContext",
+          "type": "object"
+        },
+        "FindingCreate": {
+          "description": "Schema for creating a finding.\n\nSent by the runner when an AI analysis session detects issues or observations.\nRunner -> Backend.",
+          "properties": {
+            "task_run_id": {
+              "description": "Parent task run ID",
+              "title": "Task Run Id",
+              "type": "string"
+            },
+            "session_num": {
+              "description": "Session number where the finding was detected",
+              "title": "Session Num",
+              "type": "integer"
+            },
+            "category": {
+              "$ref": "#/$defs/FindingCategory",
+              "description": "Category of the finding"
+            },
+            "severity": {
+              "$ref": "#/$defs/FindingSeverity",
+              "description": "Severity level of the finding"
+            },
+            "title": {
+              "description": "Brief title describing the finding (max 500 chars)",
+              "maxLength": 500,
+              "title": "Title",
+              "type": "string"
+            },
+            "description": {
+              "description": "Detailed description of the finding",
+              "title": "Description",
+              "type": "string"
+            },
+            "code_context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FindingCodeContext"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code context if the finding relates to specific code"
+            },
+            "signature_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Hash for deduplication across sessions",
+              "title": "Signature Hash"
+            },
+            "action_type": {
+              "$ref": "#/$defs/FindingActionType",
+              "description": "Type of action for this finding"
+            },
+            "user_input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FindingUserInput"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "User input request if action_type requires user decision"
+            }
+          },
+          "required": [
+            "task_run_id",
+            "session_num",
+            "category",
+            "severity",
+            "title",
+            "description",
+            "action_type"
+          ],
+          "title": "FindingCreate",
+          "type": "object"
+        },
+        "FindingSeverity": {
+          "description": "Severity level of a finding.\n\nCRITICAL: Blocks functionality, immediate attention required.\nHIGH: Major issue, should be fixed soon.\nMEDIUM: Moderate issue, should be fixed.\nLOW: Minor issue, fix when convenient.\nINFO: Informational, no action required.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "FindingSeverity",
+          "type": "string"
+        },
+        "FindingUserInput": {
+          "description": "User input request for a finding.\n\nDefines the question and input format when a finding requires user decision.",
+          "properties": {
+            "question": {
+              "description": "Question to present to the user",
+              "title": "Question",
+              "type": "string"
+            },
+            "input_type": {
+              "default": "text",
+              "description": "Type of input expected: 'text' or 'choice'",
+              "title": "Input Type",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Options for choice-type input",
+              "title": "Options"
+            }
+          },
+          "required": [
+            "question"
+          ],
+          "title": "FindingUserInput",
+          "type": "object"
+        }
+      },
+      "description": "Request schema for batch finding creation.\n\nAllows creating multiple findings in a single request.",
+      "properties": {
+        "findings": {
+          "description": "List of findings to create (1-50 items)",
+          "items": {
+            "$ref": "#/$defs/FindingCreate"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "findings"
+      ],
+      "title": "FindingBatchCreate",
+      "type": "object"
+    },
+    "FindingUpdate": {
+      "$defs": {
+        "FindingStatus": {
+          "description": "Status of a finding.\n\nLifecycle: DETECTED -> IN_PROGRESS -> (RESOLVED | WONT_FIX | DEFERRED)\nNEEDS_INPUT is a special state requiring user decision.",
+          "enum": [
+            "detected",
+            "in_progress",
+            "needs_input",
+            "resolved",
+            "wont_fix",
+            "deferred"
+          ],
+          "title": "FindingStatus",
+          "type": "string"
+        }
+      },
+      "description": "Schema for updating a finding.\n\nUsed to update status, resolution, or provide user response.",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New status for the finding"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resolution description",
+          "title": "Resolution"
+        },
+        "resolved_in_session": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Session number where the finding was resolved",
+          "title": "Resolved In Session"
+        },
+        "user_response": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's response to a finding requiring input",
+          "title": "User Response"
+        }
+      },
+      "title": "FindingUpdate",
+      "type": "object"
+    },
+    "FindingDetail": {
+      "$defs": {
+        "FindingActionType": {
+          "description": "Type of action recommended for a finding.\n\nAUTO_FIX: Can be automatically fixed without user intervention.\nNEEDS_USER_INPUT: Requires user decision or input to resolve.\nINFORMATIONAL: No action needed, for awareness only.",
+          "enum": [
+            "auto_fix",
+            "needs_user_input",
+            "informational"
+          ],
+          "title": "FindingActionType",
+          "type": "string"
+        },
+        "FindingCategory": {
+          "description": "Category of a detected finding.\n\nDetermines the type of issue or observation detected during analysis.",
+          "enum": [
+            "code_bug",
+            "security",
+            "performance",
+            "todo",
+            "enhancement",
+            "config_issue",
+            "test_issue",
+            "documentation",
+            "runtime_issue",
+            "already_fixed",
+            "expected_behavior"
+          ],
+          "title": "FindingCategory",
+          "type": "string"
+        },
+        "FindingCodeContext": {
+          "description": "Code context for a finding.\n\nProvides location and snippet information for findings related to specific code.",
+          "properties": {
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "File path where the finding was detected",
+              "title": "File"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number where the finding was detected",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number where the finding was detected",
+              "title": "Column"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code snippet related to the finding (max 1000 chars)",
+              "title": "Snippet"
+            }
+          },
+          "title": "FindingCodeContext",
+          "type": "object"
+        },
+        "FindingSeverity": {
+          "description": "Severity level of a finding.\n\nCRITICAL: Blocks functionality, immediate attention required.\nHIGH: Major issue, should be fixed soon.\nMEDIUM: Moderate issue, should be fixed.\nLOW: Minor issue, fix when convenient.\nINFO: Informational, no action required.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "FindingSeverity",
+          "type": "string"
+        },
+        "FindingStatus": {
+          "description": "Status of a finding.\n\nLifecycle: DETECTED -> IN_PROGRESS -> (RESOLVED | WONT_FIX | DEFERRED)\nNEEDS_INPUT is a special state requiring user decision.",
+          "enum": [
+            "detected",
+            "in_progress",
+            "needs_input",
+            "resolved",
+            "wont_fix",
+            "deferred"
+          ],
+          "title": "FindingStatus",
+          "type": "string"
+        },
+        "FindingUserInput": {
+          "description": "User input request for a finding.\n\nDefines the question and input format when a finding requires user decision.",
+          "properties": {
+            "question": {
+              "description": "Question to present to the user",
+              "title": "Question",
+              "type": "string"
+            },
+            "input_type": {
+              "default": "text",
+              "description": "Type of input expected: 'text' or 'choice'",
+              "title": "Input Type",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Options for choice-type input",
+              "title": "Options"
+            }
+          },
+          "required": [
+            "question"
+          ],
+          "title": "FindingUserInput",
+          "type": "object"
+        }
+      },
+      "description": "Detailed finding information.\n\nUsed when retrieving individual finding details.\nBackend -> Frontend.",
+      "properties": {
+        "id": {
+          "description": "Finding ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "description": "Parent task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "session_num": {
+          "description": "Session number where the finding was detected",
+          "title": "Session Num",
+          "type": "integer"
+        },
+        "category": {
+          "$ref": "#/$defs/FindingCategory",
+          "description": "Category of the finding"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity",
+          "description": "Severity level of the finding"
+        },
+        "status": {
+          "$ref": "#/$defs/FindingStatus",
+          "description": "Current status of the finding"
+        },
+        "title": {
+          "description": "Brief title describing the finding",
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "description": "Detailed description of the finding",
+          "title": "Description",
+          "type": "string"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resolution description if resolved",
+          "title": "Resolution"
+        },
+        "code_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingCodeContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Code context if the finding relates to specific code"
+        },
+        "signature_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash for deduplication across sessions",
+          "title": "Signature Hash"
+        },
+        "action_type": {
+          "$ref": "#/$defs/FindingActionType",
+          "description": "Type of action for this finding"
+        },
+        "user_input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingUserInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User input request if action_type requires user decision"
+        },
+        "user_response": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's response if input was requested",
+          "title": "User Response"
+        },
+        "detected_at": {
+          "description": "When the finding was detected (UTC)",
+          "format": "date-time",
+          "title": "Detected At",
+          "type": "string"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the finding was resolved (UTC)",
+          "title": "Resolved At"
+        },
+        "resolved_in_session": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Session number where the finding was resolved",
+          "title": "Resolved In Session"
+        }
+      },
+      "required": [
+        "id",
+        "task_run_id",
+        "session_num",
+        "category",
+        "severity",
+        "status",
+        "title",
+        "description",
+        "action_type",
+        "detected_at"
+      ],
+      "title": "FindingDetail",
+      "type": "object"
+    },
+    "FindingListResponse": {
+      "$defs": {
+        "FindingActionType": {
+          "description": "Type of action recommended for a finding.\n\nAUTO_FIX: Can be automatically fixed without user intervention.\nNEEDS_USER_INPUT: Requires user decision or input to resolve.\nINFORMATIONAL: No action needed, for awareness only.",
+          "enum": [
+            "auto_fix",
+            "needs_user_input",
+            "informational"
+          ],
+          "title": "FindingActionType",
+          "type": "string"
+        },
+        "FindingCategory": {
+          "description": "Category of a detected finding.\n\nDetermines the type of issue or observation detected during analysis.",
+          "enum": [
+            "code_bug",
+            "security",
+            "performance",
+            "todo",
+            "enhancement",
+            "config_issue",
+            "test_issue",
+            "documentation",
+            "runtime_issue",
+            "already_fixed",
+            "expected_behavior"
+          ],
+          "title": "FindingCategory",
+          "type": "string"
+        },
+        "FindingCodeContext": {
+          "description": "Code context for a finding.\n\nProvides location and snippet information for findings related to specific code.",
+          "properties": {
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "File path where the finding was detected",
+              "title": "File"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number where the finding was detected",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number where the finding was detected",
+              "title": "Column"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code snippet related to the finding (max 1000 chars)",
+              "title": "Snippet"
+            }
+          },
+          "title": "FindingCodeContext",
+          "type": "object"
+        },
+        "FindingDetail": {
+          "description": "Detailed finding information.\n\nUsed when retrieving individual finding details.\nBackend -> Frontend.",
+          "properties": {
+            "id": {
+              "description": "Finding ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_run_id": {
+              "description": "Parent task run ID",
+              "title": "Task Run Id",
+              "type": "string"
+            },
+            "session_num": {
+              "description": "Session number where the finding was detected",
+              "title": "Session Num",
+              "type": "integer"
+            },
+            "category": {
+              "$ref": "#/$defs/FindingCategory",
+              "description": "Category of the finding"
+            },
+            "severity": {
+              "$ref": "#/$defs/FindingSeverity",
+              "description": "Severity level of the finding"
+            },
+            "status": {
+              "$ref": "#/$defs/FindingStatus",
+              "description": "Current status of the finding"
+            },
+            "title": {
+              "description": "Brief title describing the finding",
+              "title": "Title",
+              "type": "string"
+            },
+            "description": {
+              "description": "Detailed description of the finding",
+              "title": "Description",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Resolution description if resolved",
+              "title": "Resolution"
+            },
+            "code_context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FindingCodeContext"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Code context if the finding relates to specific code"
+            },
+            "signature_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Hash for deduplication across sessions",
+              "title": "Signature Hash"
+            },
+            "action_type": {
+              "$ref": "#/$defs/FindingActionType",
+              "description": "Type of action for this finding"
+            },
+            "user_input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FindingUserInput"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "User input request if action_type requires user decision"
+            },
+            "user_response": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "User's response if input was requested",
+              "title": "User Response"
+            },
+            "detected_at": {
+              "description": "When the finding was detected (UTC)",
+              "format": "date-time",
+              "title": "Detected At",
+              "type": "string"
+            },
+            "resolved_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the finding was resolved (UTC)",
+              "title": "Resolved At"
+            },
+            "resolved_in_session": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Session number where the finding was resolved",
+              "title": "Resolved In Session"
+            }
+          },
+          "required": [
+            "id",
+            "task_run_id",
+            "session_num",
+            "category",
+            "severity",
+            "status",
+            "title",
+            "description",
+            "action_type",
+            "detected_at"
+          ],
+          "title": "FindingDetail",
+          "type": "object"
+        },
+        "FindingSeverity": {
+          "description": "Severity level of a finding.\n\nCRITICAL: Blocks functionality, immediate attention required.\nHIGH: Major issue, should be fixed soon.\nMEDIUM: Moderate issue, should be fixed.\nLOW: Minor issue, fix when convenient.\nINFO: Informational, no action required.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "FindingSeverity",
+          "type": "string"
+        },
+        "FindingStatus": {
+          "description": "Status of a finding.\n\nLifecycle: DETECTED -> IN_PROGRESS -> (RESOLVED | WONT_FIX | DEFERRED)\nNEEDS_INPUT is a special state requiring user decision.",
+          "enum": [
+            "detected",
+            "in_progress",
+            "needs_input",
+            "resolved",
+            "wont_fix",
+            "deferred"
+          ],
+          "title": "FindingStatus",
+          "type": "string"
+        },
+        "FindingUserInput": {
+          "description": "User input request for a finding.\n\nDefines the question and input format when a finding requires user decision.",
+          "properties": {
+            "question": {
+              "description": "Question to present to the user",
+              "title": "Question",
+              "type": "string"
+            },
+            "input_type": {
+              "default": "text",
+              "description": "Type of input expected: 'text' or 'choice'",
+              "title": "Input Type",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Options for choice-type input",
+              "title": "Options"
+            }
+          },
+          "required": [
+            "question"
+          ],
+          "title": "FindingUserInput",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for paginated finding list.",
+      "properties": {
+        "findings": {
+          "description": "List of findings",
+          "items": {
+            "$ref": "#/$defs/FindingDetail"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total count of findings matching the query",
+          "title": "Total",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Maximum items per page",
+          "title": "Limit",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Number of items skipped",
+          "title": "Offset",
+          "type": "integer"
+        },
+        "has_more": {
+          "description": "Whether more items exist beyond this page",
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "findings",
+        "total",
+        "limit",
+        "offset",
+        "has_more"
+      ],
+      "title": "FindingListResponse",
+      "type": "object"
+    },
+    "FindingSummary": {
+      "description": "Summary statistics for findings in a task run.",
+      "properties": {
+        "task_run_id": {
+          "description": "Task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "total": {
+          "default": 0,
+          "description": "Total number of findings",
+          "title": "Total",
+          "type": "integer"
+        },
+        "by_category": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Count of findings by category",
+          "title": "By Category",
+          "type": "object"
+        },
+        "by_severity": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Count of findings by severity",
+          "title": "By Severity",
+          "type": "object"
+        },
+        "by_status": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Count of findings by status",
+          "title": "By Status",
+          "type": "object"
+        },
+        "needs_input_count": {
+          "default": 0,
+          "description": "Number of findings awaiting user input",
+          "title": "Needs Input Count",
+          "type": "integer"
+        },
+        "resolved_count": {
+          "default": 0,
+          "description": "Number of resolved findings",
+          "title": "Resolved Count",
+          "type": "integer"
+        },
+        "outstanding_count": {
+          "default": 0,
+          "description": "Number of unresolved findings",
+          "title": "Outstanding Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_run_id"
+      ],
+      "title": "FindingSummary",
+      "type": "object"
+    }
+  }
+}

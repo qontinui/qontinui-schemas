@@ -58,6 +58,36 @@ export enum ScheduleType {
   FIXED_DELAY = "FIXED_DELAY",
 }
 
+export interface ContextAutoInclude {
+  /** Keywords in task prompt that trigger inclusion (case-insensitive) */
+  taskMentions?: string[] | null;
+  /** Action types in loaded config that trigger inclusion (e.g., 'CLICK', 'FIND') */
+  actionTypes?: string[] | null;
+  /** Regex patterns in recent logs that trigger inclusion */
+  errorPatterns?: string[] | null;
+  /** Glob patterns for files being worked on (e.g., '*.rs', 'src/api/**') */
+  filePatterns?: string[] | null;
+}
+
+export interface Context {
+  /** Unique identifier (UUID v4 or prefixed like 'ctx-schema-flow') */
+  id: string;
+  /** Human-readable name for display */
+  name: string;
+  /** Markdown content injected into AI prompts */
+  content: string;
+  /** Category for organization (e.g., 'architecture', 'debugging', 'philosophy') */
+  category?: string | null;
+  /** Tags for flexible grouping and search */
+  tags?: string[];
+  /** Rules for automatic inclusion in AI tasks */
+  autoInclude?: ContextAutoInclude | null;
+  /** ISO 8601 creation timestamp */
+  createdAt: string;
+  /** ISO 8601 last modification timestamp */
+  modifiedAt: string;
+}
+
 export interface Category {
   /** Category name (e.g., 'Main', 'Testing') */
   name: string;

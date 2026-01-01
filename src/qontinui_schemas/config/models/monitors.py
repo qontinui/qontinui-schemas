@@ -101,13 +101,13 @@ class Monitor(BaseModel):
         default=None, description="Display name (e.g., 'DELL U2720Q')"
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def right(self) -> int:
         """X coordinate of the right edge."""
         return self.x + self.width
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def bottom(self) -> int:
         """Y coordinate of the bottom edge."""
@@ -153,7 +153,7 @@ class VirtualDesktop(BaseModel):
         description="List of all monitors in the virtual desktop"
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def min_x(self) -> int:
         """Minimum X coordinate across all monitors."""
@@ -161,7 +161,7 @@ class VirtualDesktop(BaseModel):
             return 0
         return min(m.x for m in self.monitors)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def min_y(self) -> int:
         """Minimum Y coordinate across all monitors."""
@@ -169,7 +169,7 @@ class VirtualDesktop(BaseModel):
             return 0
         return min(m.y for m in self.monitors)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def max_x(self) -> int:
         """Maximum X coordinate (right edge) across all monitors."""
@@ -177,7 +177,7 @@ class VirtualDesktop(BaseModel):
             return 1920
         return max(m.right for m in self.monitors)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def max_y(self) -> int:
         """Maximum Y coordinate (bottom edge) across all monitors."""
@@ -185,13 +185,13 @@ class VirtualDesktop(BaseModel):
             return 1080
         return max(m.bottom for m in self.monitors)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def width(self) -> int:
         """Total width of the virtual desktop."""
         return self.max_x - self.min_x
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def height(self) -> int:
         """Total height of the virtual desktop."""

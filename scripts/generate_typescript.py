@@ -324,9 +324,12 @@ def generate_config_types() -> bool:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        from qontinui_schemas.config.models import config_root
+        from qontinui_schemas.config.models import config_root, context
 
         models = [
+            # Context models for AI task guidance
+            context.ContextAutoInclude,
+            context.Context,
             # Category - the main type needed by frontend
             config_root.Category,
             # Enums
@@ -496,6 +499,288 @@ export type TargetConfig =
         return True
     except Exception as e:
         print(f"Error generating target types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_execution_types() -> bool:
+    """Generate TypeScript types for unified Execution schemas.
+
+    This generates the execution types that are the source of truth for:
+    - qontinui-runner TypeScript layer
+    - qontinui-web frontend execution tracking
+    - qontinui-web backend API
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import execution
+        from qontinui_schemas.common import metadata, stats
+
+        models_list = [
+            # Enums
+            execution.RunType,
+            execution.RunStatus,
+            execution.ActionType,
+            execution.ActionStatus,
+            execution.ErrorType,
+            execution.IssueSeverity,
+            execution.IssueType,
+            execution.IssueStatus,
+            execution.IssueSource,
+            execution.ScreenshotType,
+            execution.TreeNodeType,
+            execution.TreeEventType,
+            execution.TreeNodeStatus,
+            # Common metadata
+            metadata.RunnerMetadata,
+            metadata.WorkflowMetadata,
+            metadata.MatchLocation,
+            metadata.ScreenshotAnnotation,
+            # Common stats
+            stats.ExecutionStats,
+            stats.CoverageData,
+            stats.ReliabilityStats,
+            stats.TransitionReliability,
+            # Run schemas
+            execution.ExecutionRunCreate,
+            execution.ExecutionRunResponse,
+            execution.ExecutionRunDetail,
+            execution.ExecutionRunComplete,
+            execution.ExecutionRunCompleteResponse,
+            execution.ExecutionRunListResponse,
+            # Action schemas
+            execution.ActionExecutionCreate,
+            execution.ActionExecutionBatchCreate,
+            execution.ActionExecutionResponse,
+            execution.ActionExecutionDetail,
+            execution.ActionExecutionListResponse,
+            # Screenshot schemas
+            execution.ExecutionScreenshotCreate,
+            execution.ExecutionScreenshotResponse,
+            execution.ExecutionScreenshotDetail,
+            execution.ExecutionScreenshotListResponse,
+            # Issue schemas
+            execution.ExecutionIssueCreate,
+            execution.ExecutionIssueBatchCreate,
+            execution.ExecutionIssueResponse,
+            execution.ExecutionIssueDetail,
+            execution.ExecutionIssueUpdate,
+            execution.ExecutionIssueListResponse,
+            execution.ExecutionIssueSummary,
+            # Tree event schemas
+            execution.ExecutionTreeEventCreate,
+            execution.ExecutionTreeEventBatchCreate,
+            execution.ExecutionTreeEventResponse,
+            execution.ExecutionTreeEventListResponse,
+            execution.ExecutionTreeResponse,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "execution.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models_list)
+
+        # Add note about imports from tree_events for full tree structures
+        ts_content += """
+/**
+ * Re-export tree event core types from tree_events.ts for full structures.
+ * These are referenced by ExecutionTreeEventResponse and ExecutionTreeResponse.
+ */
+// import type { TreeNode, PathElement, DisplayNode, NodeMetadata } from './tree_events';
+"""
+
+        ts_file = output_dir / "execution.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating execution types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_visual_testing_types() -> bool:
+    """Generate TypeScript types for visual regression testing schemas."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import testing
+
+        models_list = [
+            # Visual regression
+            testing.IgnoreRegion,
+            testing.ComparisonSettings,
+            testing.VisualBaselineCreate,
+            testing.VisualBaselineFromScreenshot,
+            testing.VisualBaselineUpdate,
+            testing.VisualBaselineResponse,
+            testing.VisualBaselineListResponse,
+            testing.DiffRegion,
+            testing.VisualComparisonCreate,
+            testing.VisualComparisonResponse,
+            testing.VisualComparisonDetail,
+            testing.VisualComparisonListResponse,
+            testing.VisualComparisonSummary,
+            testing.ComparisonReview,
+            testing.ComparisonStats,
+            # Coverage
+            testing.CoverageData,
+            testing.CoverageSnapshot,
+            testing.CoverageUpdate,
+            testing.CoverageUpdateResponse,
+            testing.CoverageTrendDataPoint,
+            testing.CoverageTrendResponse,
+            testing.CoverageGap,
+            testing.CoverageGapsResponse,
+            testing.CoverageHeatmapCell,
+            testing.CoverageHeatmapResponse,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "visual-testing.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models_list)
+        ts_file = output_dir / "visual-testing.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating visual testing types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_findings_types() -> bool:
+    """Generate TypeScript types for Findings schemas.
+
+    This generates the findings types that are the source of truth for:
+    - qontinui-runner findings tracking system
+    - qontinui-web backend API
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import findings
+
+        models_list = [
+            # Enums
+            findings.FindingCategory,
+            findings.FindingSeverity,
+            findings.FindingStatus,
+            findings.FindingActionType,
+            # Models
+            findings.FindingCodeContext,
+            findings.FindingUserInput,
+            findings.FindingCreate,
+            findings.FindingBatchCreate,
+            findings.FindingUpdate,
+            findings.FindingDetail,
+            findings.FindingListResponse,
+            findings.FindingSummary,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "findings.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models_list)
+        ts_file = output_dir / "findings.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating findings types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_descriptions_types() -> bool:
+    """Generate TypeScript types for Descriptions schemas.
+
+    This generates the description types used by the AI verification agent:
+    - StateDescription - Rich description for a state
+    - ActionDescription - Rich description for an action
+    - TransitionDescription - Rich description for a transition
+    - WorkflowDescription - Rich description for a workflow
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas.descriptions import models
+
+        model_list = [
+            models.StateDescription,
+            models.ActionDescription,
+            models.TransitionDescription,
+            models.WorkflowDescription,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in model_list:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "descriptions.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(model_list)
+        ts_file = output_dir / "descriptions.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating descriptions types: {e}")
         import traceback
 
         traceback.print_exc()
@@ -694,13 +979,6 @@ def generate_qontinui_config_types() -> bool:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        from qontinui_schemas.config.models import config_root
-
-        # Only generate QontinuiConfig - other config types already in config.ts
-        models_list = [
-            config_root.QontinuiConfig,
-        ]
-
         ts_content = """/**
  * Auto-generated TypeScript types from qontinui-schemas
  * DO NOT EDIT - regenerate with: poetry run python scripts/generate_typescript.py
@@ -713,7 +991,7 @@ def generate_qontinui_config_types() -> bool:
 export * from "./config";
 export * from "./workflow";
 
-import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord } from "./config";
+import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord, Context } from "./config";
 import type { Workflow, State, Transition } from "./workflow";
 
 """
@@ -739,6 +1017,8 @@ import type { Workflow, State, Transition } from "./workflow";
   schedules?: Schedule[] | null;
   /** Execution history */
   executionRecords?: ExecutionRecord[] | null;
+  /** AI contexts for providing domain knowledge to AI tasks */
+  contexts?: Context[];
 }
 """
 
@@ -779,6 +1059,18 @@ def generate_from_json_schema() -> bool:
         success = False
     # Generate root QontinuiConfig (must be after workflow types)
     if not generate_qontinui_config_types():
+        success = False
+    # Generate unified execution types (runs, actions, screenshots, issues)
+    if not generate_execution_types():
+        success = False
+    # Generate visual testing types (baselines, comparisons, coverage)
+    if not generate_visual_testing_types():
+        success = False
+    # Generate findings types (findings tracking system)
+    if not generate_findings_types():
+        success = False
+    # Generate descriptions types (AI verification agent)
+    if not generate_descriptions_types():
         success = False
     return success
 
