@@ -1160,10 +1160,13 @@ def get_ts_type_from_annotation(annotation: type | None, known_enums: set[str]) 
         return " | ".join(type_strs)
 
     # Handle Literal types (e.g., Literal["left", "center", "right"])
-    if hasattr(annotation, "__origin__") and annotation.__origin__ is typing.Literal:
+    if (
+        hasattr(annotation, "__origin__")
+        and getattr(annotation, "__origin__", None) is typing.Literal
+    ):
         from enum import Enum
 
-        args = annotation.__args__
+        args = getattr(annotation, "__args__", ())
         literals = []
         for arg in args:
             # Check for Enum FIRST because str-based enums (e.g., class Foo(str, Enum))
