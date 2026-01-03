@@ -199,6 +199,10 @@ class ElementAnnotation(BaseModel):
     """Element annotation for backend storage."""
 
     id: str = Field(..., description="Unique identifier")
+    name: str | None = Field(
+        default=None,
+        description="Human-readable name for the element (OCR-based or derived)",
+    )
     element_type: str = Field(
         ...,
         alias="elementType",
