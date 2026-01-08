@@ -264,7 +264,7 @@ class VisionAssertion(BaseModel):
 
     # Common options
     options: AssertionOptions = Field(
-        default_factory=AssertionOptions, description="Assertion options"
+        default_factory=lambda: AssertionOptions(), description="Assertion options"
     )
 
     # Metadata
@@ -407,7 +407,7 @@ class VisionTest(BaseModel):
 
     # Configuration
     config: VisionTestConfig = Field(
-        default_factory=VisionTestConfig, description="Test configuration"
+        default_factory=lambda: VisionTestConfig(), description="Test configuration"
     )
 
     # Baselines

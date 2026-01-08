@@ -191,7 +191,7 @@ class ColorPalette(BaseModel):
         description="List of dominant colors (hex) from k-means clustering",
     )
     semantic_colors: SemanticColors = Field(
-        default_factory=SemanticColors, description="Semantically associated colors"
+        default_factory=lambda: SemanticColors(), description="Semantically associated colors"
     )
     theme_type: ThemeType = Field(
         ThemeType.DARK, description="Detected theme type based on luminance"
@@ -270,7 +270,7 @@ class Typography(BaseModel):
         default_factory=list, description="Font samples detected via OCR"
     )
     text_sizes: TextSizes = Field(
-        default_factory=TextSizes, description="Semantic text size mappings"
+        default_factory=lambda: TextSizes(), description="Semantic text size mappings"
     )
     languages_detected: list[str] = Field(
         default_factory=list, description="Detected languages (ISO 639-1 codes)"
@@ -324,7 +324,7 @@ class LayoutRegion(BaseModel):
     id: str = Field(..., description="Unique identifier for this region")
     bounds: BoundingBox = Field(..., description="Region bounds")
     characteristics: RegionCharacteristics = Field(
-        default_factory=RegionCharacteristics, description="Region characteristics"
+        default_factory=lambda: RegionCharacteristics(), description="Region characteristics"
     )
     semantic_label: SemanticRegionType = Field(
         SemanticRegionType.UNKNOWN, description="Inferred semantic type"
@@ -363,7 +363,7 @@ class Layout(BaseModel):
         default_factory=dict, description="Named layout regions"
     )
     grid: GridConfiguration = Field(
-        default_factory=GridConfiguration, description="Detected grid system"
+        default_factory=lambda: GridConfiguration(), description="Detected grid system"
     )
     alignment_guides: list[AlignmentGuide] = Field(
         default_factory=list, description="Detected alignment guides"
@@ -486,7 +486,7 @@ class ElementState(BaseModel):
     state_type: ElementStateType = Field(..., description="Type of state")
     observed_samples: int = Field(0, ge=0, description="Number of observations")
     visual_signature: VisualSignature = Field(
-        default_factory=VisualSignature, description="Visual characteristics"
+        default_factory=lambda: VisualSignature(), description="Visual characteristics"
     )
     confidence: float = Field(0.0, ge=0.0, le=1.0, description="Detection confidence")
 
@@ -641,25 +641,25 @@ class GUIEnvironment(BaseModel):
 
     # Discovered data
     colors: ColorPalette = Field(
-        default_factory=ColorPalette, description="Discovered color palette"
+        default_factory=lambda: ColorPalette(), description="Discovered color palette"
     )
     typography: Typography = Field(
-        default_factory=Typography, description="Discovered typography"
+        default_factory=lambda: Typography(), description="Discovered typography"
     )
-    layout: Layout = Field(default_factory=Layout, description="Discovered layout")
+    layout: Layout = Field(default_factory=lambda: Layout(), description="Discovered layout")
     dynamic_regions: DynamicRegions = Field(
-        default_factory=DynamicRegions, description="Discovered dynamic regions"
+        default_factory=lambda: DynamicRegions(), description="Discovered dynamic regions"
     )
     visual_states: VisualStates = Field(
-        default_factory=VisualStates, description="Learned visual states"
+        default_factory=lambda: VisualStates(), description="Learned visual states"
     )
     element_patterns: ElementPatterns = Field(
-        default_factory=ElementPatterns, description="Detected element patterns"
+        default_factory=lambda: ElementPatterns(), description="Detected element patterns"
     )
 
     # Quality metrics
     confidence_scores: ConfidenceScores = Field(
-        default_factory=ConfidenceScores, description="Per-component confidence scores"
+        default_factory=lambda: ConfidenceScores(), description="Per-component confidence scores"
     )
 
     # Continuous learning
