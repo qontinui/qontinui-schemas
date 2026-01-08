@@ -1,0 +1,1983 @@
+{
+  "schemas": {
+    "TaskRunCreate": {
+      "$defs": {
+        "TaskType": {
+          "description": "Type of task run.\n\nDetermines the nature and behavior of the task.",
+          "enum": [
+            "task",
+            "automation",
+            "scheduled"
+          ],
+          "title": "TaskType",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for creating a new task run.\n\nUsed by qontinui-runner when starting any type of task.",
+      "properties": {
+        "task_name": {
+          "description": "Human-readable name for this task",
+          "title": "Task Name",
+          "type": "string"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Task prompt (NULL for pure automation)",
+          "title": "Prompt"
+        },
+        "task_type": {
+          "$ref": "#/$defs/TaskType",
+          "default": "task",
+          "description": "Type of task: 'task', 'automation', or 'scheduled'"
+        },
+        "auto_continue": {
+          "default": true,
+          "description": "Whether to auto-continue on session completion",
+          "title": "Auto Continue",
+          "type": "boolean"
+        },
+        "max_sessions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of AI sessions allowed",
+          "title": "Max Sessions"
+        },
+        "execution_steps_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON-encoded execution steps to run before each AI session",
+          "title": "Execution Steps Json"
+        },
+        "log_sources_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON-encoded log sources to capture during execution",
+          "title": "Log Sources Json"
+        },
+        "config_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Config ID for automation-enabled tasks",
+          "title": "Config Id"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name being executed",
+          "title": "Workflow Name"
+        }
+      },
+      "required": [
+        "task_name"
+      ],
+      "title": "TaskRunCreate",
+      "type": "object"
+    },
+    "TaskRunResponse": {
+      "$defs": {
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        },
+        "TaskType": {
+          "description": "Type of task run.\n\nDetermines the nature and behavior of the task.",
+          "enum": [
+            "task",
+            "automation",
+            "scheduled"
+          ],
+          "title": "TaskType",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for task run creation and listing.\n\nContains essential fields for display in lists.",
+      "properties": {
+        "id": {
+          "description": "Unique task run identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_name": {
+          "description": "Task name",
+          "title": "Task Name",
+          "type": "string"
+        },
+        "task_type": {
+          "$ref": "#/$defs/TaskType",
+          "description": "Type of task"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskRunStatus",
+          "description": "Current status"
+        },
+        "sessions_count": {
+          "default": 0,
+          "description": "Number of AI sessions run",
+          "title": "Sessions Count",
+          "type": "integer"
+        },
+        "max_sessions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum sessions allowed",
+          "title": "Max Sessions"
+        },
+        "auto_continue": {
+          "default": true,
+          "description": "Auto-continue enabled",
+          "title": "Auto Continue",
+          "type": "boolean"
+        },
+        "config_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Config ID",
+          "title": "Config Id"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name",
+          "title": "Workflow Name"
+        },
+        "created_at": {
+          "description": "When the task was created (UTC)",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the task completed (UTC)",
+          "title": "Completed At"
+        }
+      },
+      "required": [
+        "id",
+        "task_name",
+        "task_type",
+        "status",
+        "created_at"
+      ],
+      "title": "TaskRunResponse",
+      "type": "object"
+    },
+    "TaskRunDetail": {
+      "$defs": {
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        },
+        "TaskType": {
+          "description": "Type of task run.\n\nDetermines the nature and behavior of the task.",
+          "enum": [
+            "task",
+            "automation",
+            "scheduled"
+          ],
+          "title": "TaskType",
+          "type": "string"
+        }
+      },
+      "description": "Detailed task run information.\n\nIncludes full output, summary, and all metadata.",
+      "properties": {
+        "id": {
+          "description": "Unique task run identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_name": {
+          "description": "Task name",
+          "title": "Task Name",
+          "type": "string"
+        },
+        "task_type": {
+          "$ref": "#/$defs/TaskType",
+          "description": "Type of task"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskRunStatus",
+          "description": "Current status"
+        },
+        "sessions_count": {
+          "default": 0,
+          "description": "Number of AI sessions run",
+          "title": "Sessions Count",
+          "type": "integer"
+        },
+        "max_sessions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum sessions allowed",
+          "title": "Max Sessions"
+        },
+        "auto_continue": {
+          "default": true,
+          "description": "Auto-continue enabled",
+          "title": "Auto Continue",
+          "type": "boolean"
+        },
+        "config_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Config ID",
+          "title": "Config Id"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name",
+          "title": "Workflow Name"
+        },
+        "created_at": {
+          "description": "When the task was created (UTC)",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the task completed (UTC)",
+          "title": "Completed At"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Task prompt",
+          "title": "Prompt"
+        },
+        "output_log": {
+          "default": "",
+          "description": "Full task output log",
+          "title": "Output Log",
+          "type": "string"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "execution_steps_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Execution steps JSON",
+          "title": "Execution Steps Json"
+        },
+        "log_sources_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Log sources JSON",
+          "title": "Log Sources Json"
+        },
+        "summary": {
+          "alias": "ai_summary",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI-generated paragraph summary of the task run",
+          "title": "Summary"
+        },
+        "goal_achieved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether the stated goal was achieved",
+          "title": "Goal Achieved"
+        },
+        "remaining_work": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What remains to be done if goal not achieved",
+          "title": "Remaining Work"
+        },
+        "summary_generated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the summary was generated",
+          "title": "Summary Generated At"
+        },
+        "updated_at": {
+          "description": "Last update time (UTC)",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "task_name",
+        "task_type",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "TaskRunDetail",
+      "type": "object"
+    },
+    "TaskRunUpdate": {
+      "$defs": {
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for updating a task run.",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskRunStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New status"
+        },
+        "output_log": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output to append",
+          "title": "Output Log"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message",
+          "title": "Error Message"
+        },
+        "sessions_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update session count",
+          "title": "Sessions Count"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AI summary",
+          "title": "Summary"
+        },
+        "goal_achieved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Goal achieved flag",
+          "title": "Goal Achieved"
+        },
+        "remaining_work": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Remaining work description",
+          "title": "Remaining Work"
+        }
+      },
+      "title": "TaskRunUpdate",
+      "type": "object"
+    },
+    "TaskRunComplete": {
+      "$defs": {
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for completing a task run.\n\nSent when task execution finishes (success or failure).",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/TaskRunStatus",
+          "description": "Final status (complete, failed, stopped)"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional execution summary",
+          "title": "Summary"
+        },
+        "goal_achieved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether goal was achieved",
+          "title": "Goal Achieved"
+        },
+        "remaining_work": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What remains if goal not achieved",
+          "title": "Remaining Work"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "TaskRunComplete",
+      "type": "object"
+    },
+    "TaskRunReopen": {
+      "description": "Request schema for reopening a finished task run.\n\nAllows continuing a task that didn't achieve its goal.",
+      "properties": {
+        "additional_sessions": {
+          "description": "Number of additional sessions to add",
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Additional Sessions",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "additional_sessions"
+      ],
+      "title": "TaskRunReopen",
+      "type": "object"
+    },
+    "TaskRunListResponse": {
+      "$defs": {
+        "TaskRunResponse": {
+          "description": "Response schema for task run creation and listing.\n\nContains essential fields for display in lists.",
+          "properties": {
+            "id": {
+              "description": "Unique task run identifier",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_name": {
+              "description": "Task name",
+              "title": "Task Name",
+              "type": "string"
+            },
+            "task_type": {
+              "$ref": "#/$defs/TaskType",
+              "description": "Type of task"
+            },
+            "status": {
+              "$ref": "#/$defs/TaskRunStatus",
+              "description": "Current status"
+            },
+            "sessions_count": {
+              "default": 0,
+              "description": "Number of AI sessions run",
+              "title": "Sessions Count",
+              "type": "integer"
+            },
+            "max_sessions": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum sessions allowed",
+              "title": "Max Sessions"
+            },
+            "auto_continue": {
+              "default": true,
+              "description": "Auto-continue enabled",
+              "title": "Auto Continue",
+              "type": "boolean"
+            },
+            "config_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Config ID",
+              "title": "Config Id"
+            },
+            "workflow_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Workflow name",
+              "title": "Workflow Name"
+            },
+            "created_at": {
+              "description": "When the task was created (UTC)",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "completed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the task completed (UTC)",
+              "title": "Completed At"
+            }
+          },
+          "required": [
+            "id",
+            "task_name",
+            "task_type",
+            "status",
+            "created_at"
+          ],
+          "title": "TaskRunResponse",
+          "type": "object"
+        },
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        },
+        "TaskType": {
+          "description": "Type of task run.\n\nDetermines the nature and behavior of the task.",
+          "enum": [
+            "task",
+            "automation",
+            "scheduled"
+          ],
+          "title": "TaskType",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for paginated task run list.",
+      "properties": {
+        "runs": {
+          "description": "List of task runs",
+          "items": {
+            "$ref": "#/$defs/TaskRunResponse"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total number of runs",
+          "title": "Total",
+          "type": "integer"
+        },
+        "limit": {
+          "description": "Items per page",
+          "title": "Limit",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Items skipped",
+          "title": "Offset",
+          "type": "integer"
+        },
+        "has_more": {
+          "description": "Whether more items exist",
+          "title": "Has More",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runs",
+        "total",
+        "limit",
+        "offset",
+        "has_more"
+      ],
+      "title": "TaskRunListResponse",
+      "type": "object"
+    },
+    "TaskRunAutomationCreate": {
+      "description": "Request schema for creating an automation record.",
+      "properties": {
+        "task_run_id": {
+          "description": "Parent task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow being executed",
+          "title": "Workflow Name"
+        },
+        "iteration_number": {
+          "default": 1,
+          "description": "Iteration number within the task",
+          "title": "Iteration Number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_run_id"
+      ],
+      "title": "TaskRunAutomationCreate",
+      "type": "object"
+    },
+    "TaskRunAutomationResponse": {
+      "$defs": {
+        "AutomationStatus": {
+          "description": "Status of an automation execution within a task run.\n\nUsed for task_run_automation child records.",
+          "enum": [
+            "running",
+            "success",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "AutomationStatus",
+          "type": "string"
+        }
+      },
+      "description": "Response schema for automation execution.",
+      "properties": {
+        "id": {
+          "description": "Unique automation record ID",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "description": "Parent task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name",
+          "title": "Workflow Name"
+        },
+        "automation_status": {
+          "$ref": "#/$defs/AutomationStatus",
+          "description": "Automation status"
+        },
+        "iteration_number": {
+          "default": 1,
+          "description": "Iteration number",
+          "title": "Iteration Number",
+          "type": "integer"
+        },
+        "started_at": {
+          "description": "When automation started (UTC)",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When automation ended (UTC)",
+          "title": "Ended At"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration in milliseconds",
+          "title": "Duration Ms"
+        }
+      },
+      "required": [
+        "id",
+        "task_run_id",
+        "automation_status",
+        "started_at"
+      ],
+      "title": "TaskRunAutomationResponse",
+      "type": "object"
+    },
+    "TaskRunAutomationDetail": {
+      "$defs": {
+        "AutomationStatus": {
+          "description": "Status of an automation execution within a task run.\n\nUsed for task_run_automation child records.",
+          "enum": [
+            "running",
+            "success",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "AutomationStatus",
+          "type": "string"
+        }
+      },
+      "description": "Detailed automation execution information.\n\nIncludes all metrics from the run.",
+      "properties": {
+        "id": {
+          "description": "Unique automation record ID",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "description": "Parent task run ID",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "workflow_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workflow name",
+          "title": "Workflow Name"
+        },
+        "automation_status": {
+          "$ref": "#/$defs/AutomationStatus",
+          "description": "Automation status"
+        },
+        "iteration_number": {
+          "default": 1,
+          "description": "Iteration number",
+          "title": "Iteration Number",
+          "type": "integer"
+        },
+        "started_at": {
+          "description": "When automation started (UTC)",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When automation ended (UTC)",
+          "title": "Ended At"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration in milliseconds",
+          "title": "Duration Ms"
+        },
+        "success": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether automation succeeded",
+          "title": "Success"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of error if failed",
+          "title": "Error Type"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "actions_summary": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Summary of actions executed",
+          "title": "Actions Summary"
+        },
+        "states_visited": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "States visited",
+          "title": "States Visited"
+        },
+        "transitions_executed": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transitions executed",
+          "title": "Transitions Executed"
+        },
+        "template_matches": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Template matching results",
+          "title": "Template Matches"
+        },
+        "anomalies": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Anomalies detected",
+          "title": "Anomalies"
+        }
+      },
+      "required": [
+        "id",
+        "task_run_id",
+        "automation_status",
+        "started_at"
+      ],
+      "title": "TaskRunAutomationDetail",
+      "type": "object"
+    },
+    "TaskRunAutomationComplete": {
+      "$defs": {
+        "AutomationStatus": {
+          "description": "Status of an automation execution within a task run.\n\nUsed for task_run_automation child records.",
+          "enum": [
+            "running",
+            "success",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "AutomationStatus",
+          "type": "string"
+        }
+      },
+      "description": "Request schema for completing an automation execution.",
+      "properties": {
+        "automation_status": {
+          "$ref": "#/$defs/AutomationStatus",
+          "description": "Final status"
+        },
+        "success": {
+          "description": "Whether automation succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error type if failed",
+          "title": "Error Type"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "actions_summary": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Actions summary",
+          "title": "Actions Summary"
+        },
+        "states_visited": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "States visited",
+          "title": "States Visited"
+        },
+        "transitions_executed": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transitions executed",
+          "title": "Transitions Executed"
+        },
+        "template_matches": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Template matches",
+          "title": "Template Matches"
+        },
+        "anomalies": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Anomalies",
+          "title": "Anomalies"
+        }
+      },
+      "required": [
+        "automation_status",
+        "success"
+      ],
+      "title": "TaskRunAutomationComplete",
+      "type": "object"
+    },
+    "TaskRunAutomationListResponse": {
+      "$defs": {
+        "AutomationStatus": {
+          "description": "Status of an automation execution within a task run.\n\nUsed for task_run_automation child records.",
+          "enum": [
+            "running",
+            "success",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "AutomationStatus",
+          "type": "string"
+        },
+        "TaskRunAutomationResponse": {
+          "description": "Response schema for automation execution.",
+          "properties": {
+            "id": {
+              "description": "Unique automation record ID",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_run_id": {
+              "description": "Parent task run ID",
+              "title": "Task Run Id",
+              "type": "string"
+            },
+            "workflow_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Workflow name",
+              "title": "Workflow Name"
+            },
+            "automation_status": {
+              "$ref": "#/$defs/AutomationStatus",
+              "description": "Automation status"
+            },
+            "iteration_number": {
+              "default": 1,
+              "description": "Iteration number",
+              "title": "Iteration Number",
+              "type": "integer"
+            },
+            "started_at": {
+              "description": "When automation started (UTC)",
+              "format": "date-time",
+              "title": "Started At",
+              "type": "string"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When automation ended (UTC)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Duration in milliseconds",
+              "title": "Duration Ms"
+            }
+          },
+          "required": [
+            "id",
+            "task_run_id",
+            "automation_status",
+            "started_at"
+          ],
+          "title": "TaskRunAutomationResponse",
+          "type": "object"
+        }
+      },
+      "description": "Response schema for automation list within a task run.",
+      "properties": {
+        "automations": {
+          "description": "List of automation executions",
+          "items": {
+            "$ref": "#/$defs/TaskRunAutomationResponse"
+          },
+          "title": "Automations",
+          "type": "array"
+        },
+        "total": {
+          "description": "Total count",
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "automations",
+        "total"
+      ],
+      "title": "TaskRunAutomationListResponse",
+      "type": "object"
+    },
+    "TaskRunSyncPayload": {
+      "$defs": {
+        "AutomationStatus": {
+          "description": "Status of an automation execution within a task run.\n\nUsed for task_run_automation child records.",
+          "enum": [
+            "running",
+            "success",
+            "failed",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "AutomationStatus",
+          "type": "string"
+        },
+        "TaskRunAutomationDetail": {
+          "description": "Detailed automation execution information.\n\nIncludes all metrics from the run.",
+          "properties": {
+            "id": {
+              "description": "Unique automation record ID",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_run_id": {
+              "description": "Parent task run ID",
+              "title": "Task Run Id",
+              "type": "string"
+            },
+            "workflow_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Workflow name",
+              "title": "Workflow Name"
+            },
+            "automation_status": {
+              "$ref": "#/$defs/AutomationStatus",
+              "description": "Automation status"
+            },
+            "iteration_number": {
+              "default": 1,
+              "description": "Iteration number",
+              "title": "Iteration Number",
+              "type": "integer"
+            },
+            "started_at": {
+              "description": "When automation started (UTC)",
+              "format": "date-time",
+              "title": "Started At",
+              "type": "string"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When automation ended (UTC)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Duration in milliseconds",
+              "title": "Duration Ms"
+            },
+            "success": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Whether automation succeeded",
+              "title": "Success"
+            },
+            "error_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Type of error if failed",
+              "title": "Error Type"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "actions_summary": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Summary of actions executed",
+              "title": "Actions Summary"
+            },
+            "states_visited": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "States visited",
+              "title": "States Visited"
+            },
+            "transitions_executed": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Transitions executed",
+              "title": "Transitions Executed"
+            },
+            "template_matches": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Template matching results",
+              "title": "Template Matches"
+            },
+            "anomalies": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Anomalies detected",
+              "title": "Anomalies"
+            }
+          },
+          "required": [
+            "id",
+            "task_run_id",
+            "automation_status",
+            "started_at"
+          ],
+          "title": "TaskRunAutomationDetail",
+          "type": "object"
+        },
+        "TaskRunDetail": {
+          "description": "Detailed task run information.\n\nIncludes full output, summary, and all metadata.",
+          "properties": {
+            "id": {
+              "description": "Unique task run identifier",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_name": {
+              "description": "Task name",
+              "title": "Task Name",
+              "type": "string"
+            },
+            "task_type": {
+              "$ref": "#/$defs/TaskType",
+              "description": "Type of task"
+            },
+            "status": {
+              "$ref": "#/$defs/TaskRunStatus",
+              "description": "Current status"
+            },
+            "sessions_count": {
+              "default": 0,
+              "description": "Number of AI sessions run",
+              "title": "Sessions Count",
+              "type": "integer"
+            },
+            "max_sessions": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum sessions allowed",
+              "title": "Max Sessions"
+            },
+            "auto_continue": {
+              "default": true,
+              "description": "Auto-continue enabled",
+              "title": "Auto Continue",
+              "type": "boolean"
+            },
+            "config_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Config ID",
+              "title": "Config Id"
+            },
+            "workflow_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Workflow name",
+              "title": "Workflow Name"
+            },
+            "created_at": {
+              "description": "When the task was created (UTC)",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "completed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the task completed (UTC)",
+              "title": "Completed At"
+            },
+            "prompt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Task prompt",
+              "title": "Prompt"
+            },
+            "output_log": {
+              "default": "",
+              "description": "Full task output log",
+              "title": "Output Log",
+              "type": "string"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "execution_steps_json": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Execution steps JSON",
+              "title": "Execution Steps Json"
+            },
+            "log_sources_json": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Log sources JSON",
+              "title": "Log Sources Json"
+            },
+            "summary": {
+              "alias": "ai_summary",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "AI-generated paragraph summary of the task run",
+              "title": "Summary"
+            },
+            "goal_achieved": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Whether the stated goal was achieved",
+              "title": "Goal Achieved"
+            },
+            "remaining_work": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "What remains to be done if goal not achieved",
+              "title": "Remaining Work"
+            },
+            "summary_generated_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the summary was generated",
+              "title": "Summary Generated At"
+            },
+            "updated_at": {
+              "description": "Last update time (UTC)",
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "task_name",
+            "task_type",
+            "status",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "TaskRunDetail",
+          "type": "object"
+        },
+        "TaskRunStatus": {
+          "description": "Status of a task run.\n\nLifecycle: running -> (complete | failed | stopped)",
+          "enum": [
+            "running",
+            "complete",
+            "failed",
+            "stopped"
+          ],
+          "title": "TaskRunStatus",
+          "type": "string"
+        },
+        "TaskType": {
+          "description": "Type of task run.\n\nDetermines the nature and behavior of the task.",
+          "enum": [
+            "task",
+            "automation",
+            "scheduled"
+          ],
+          "title": "TaskType",
+          "type": "string"
+        }
+      },
+      "description": "Unified payload for syncing task runs to qontinui-web.\n\nCombines task run data with automation records and findings.",
+      "properties": {
+        "task_run": {
+          "$ref": "#/$defs/TaskRunDetail",
+          "description": "Task run details"
+        },
+        "automations": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TaskRunAutomationDetail"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Automation execution records",
+          "title": "Automations"
+        },
+        "findings": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Code/automation findings",
+          "title": "Findings"
+        },
+        "discoveries": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Discoveries from automation",
+          "title": "Discoveries"
+        }
+      },
+      "required": [
+        "task_run"
+      ],
+      "title": "TaskRunSyncPayload",
+      "type": "object"
+    }
+  }
+}

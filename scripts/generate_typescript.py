@@ -593,14 +593,10 @@ def generate_execution_types() -> bool:
 
         ts_content = generate_typescript_from_models(models_list)
 
-        # Add note about imports from tree_events for full tree structures
-        ts_content += """
-/**
- * Re-export tree event core types from tree_events.ts for full structures.
- * These are referenced by ExecutionTreeEventResponse and ExecutionTreeResponse.
- */
-// import type { TreeNode, PathElement, DisplayNode, NodeMetadata } from './tree_events';
-"""
+        # Add import for tree_events types used by execution types
+        import_line = "\nimport type { TreeNode, PathElement, DisplayNode, NodeMetadata, NodeType, NodeStatus } from './tree_events';\n"
+        header_end = ts_content.find("*/\n") + 3
+        ts_content = ts_content[:header_end] + import_line + ts_content[header_end:]
 
         ts_file = output_dir / "execution.ts"
         with open(ts_file, "w") as f:
@@ -987,9 +983,43 @@ def generate_qontinui_config_types() -> bool:
  * types from config.ts and workflow.ts
  */
 
-// Re-export all types from config and workflow for convenience
+// Re-export all types from config (primary source for ExecutionSettings and LogLevel)
 export * from "./config";
-export * from "./workflow";
+// Re-export workflow types, excluding duplicates that are already in config
+// Using 'export type' for compatibility with isolatedModules
+export type {
+  WorkflowVisibility,
+  PositionName,
+  TransitionType,
+  SearchMode,
+  MultiPatternMode,
+  LoggingOptions,
+  RepetitionOptions,
+  BaseActionSettings,
+  Position,
+  SearchRegion,
+  Pattern,
+  StateImage,
+  StateRegion,
+  StateLocation,
+  StateString,
+  StatePosition,
+  State,
+  TransitionCondition,
+  BaseTransition,
+  OutgoingTransition,
+  IncomingTransition,
+  Connection,
+  WorkflowMetadata,
+  Variables,
+  WorkflowSettings,
+  Workflow,
+  Action,
+  Transition,
+  Connections,
+  ActionOutputs,
+  WorkflowConnections,
+} from "./workflow";
 
 import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord, Context } from "./config";
 import type { Workflow, State, Transition } from "./workflow";
@@ -1072,7 +1102,68 @@ def generate_from_json_schema() -> bool:
     # Generate descriptions types (AI verification agent)
     if not generate_descriptions_types():
         success = False
+    # Generate task_run types (unified task execution model)
+    if not generate_task_run_types():
+        success = False
     return success
+
+
+def generate_task_run_types() -> bool:
+    """Generate TypeScript types for TaskRun (unified task execution model)."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import task_run
+
+        models = [
+            # Enums
+            task_run.TaskType,
+            task_run.TaskRunStatus,
+            task_run.AutomationStatus,
+            # TaskRun models
+            task_run.TaskRunCreate,
+            task_run.TaskRunResponse,
+            task_run.TaskRunDetail,
+            task_run.TaskRunUpdate,
+            task_run.TaskRunComplete,
+            task_run.TaskRunReopen,
+            task_run.TaskRunListResponse,
+            # TaskRunAutomation models
+            task_run.TaskRunAutomationCreate,
+            task_run.TaskRunAutomationResponse,
+            task_run.TaskRunAutomationDetail,
+            task_run.TaskRunAutomationComplete,
+            task_run.TaskRunAutomationListResponse,
+            # Sync payload
+            task_run.TaskRunSyncPayload,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "task_run.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models)
+        ts_file = output_dir / "task_run.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating task_run types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
 
 
 def python_type_to_ts(

@@ -5,7 +5,8 @@ qontinui-runner, and other Qontinui services. It has minimal dependencies
 (pydantic only) to avoid pulling in heavy ML libraries.
 
 Modules:
-- execution: Unified execution tracking (runs, actions, screenshots, issues)
+- task_run: Unified task run model (AI tasks, automation, or both)
+- execution: Execution tracking (runs, actions, screenshots, issues)
 - testing: Visual regression and coverage tracking
 - api: External API request/response schemas (legacy, prefer execution module)
 - config: Workflow and action configuration models
@@ -14,12 +15,17 @@ Modules:
 - descriptions: Rich descriptions for AI verification agent
 
 Usage:
-    # Preferred - use the new unified execution module
+    # TaskRun - the unified task execution model
+    from qontinui_schemas.task_run import (
+        TaskType, TaskRunStatus, TaskRunCreate, TaskRunDetail,
+    )
+
+    # Execution tracking
     from qontinui_schemas.execution import (
         RunType, RunStatus, ExecutionRunCreate, ActionExecutionCreate,
     )
 
-    # Or use the testing module for visual regression
+    # Visual regression testing
     from qontinui_schemas.testing import (
         VisualBaselineCreate, CoverageUpdate,
     )
@@ -172,6 +178,26 @@ from qontinui_schemas.execution import (  # noqa: F401
     TreeNodeType,
 )
 
+# TaskRun module - unified task execution model
+from qontinui_schemas.task_run import (  # noqa: F401
+    AutomationStatus,
+    TaskRunAutomationComplete,
+    TaskRunAutomationCreate,
+    TaskRunAutomationDetail,
+    TaskRunAutomationListResponse,
+    TaskRunAutomationResponse,
+    TaskRunComplete,
+    TaskRunCreate,
+    TaskRunDetail,
+    TaskRunListResponse,
+    TaskRunReopen,
+    TaskRunResponse,
+    TaskRunStatus,
+    TaskRunSyncPayload,
+    TaskRunUpdate,
+    TaskType,
+)
+
 # Testing module - visual regression and coverage
 from qontinui_schemas.testing import (  # noqa: F401
     ComparisonReview,
@@ -303,4 +329,21 @@ __all__ = [
     "ActionDescription",
     "TransitionDescription",
     "WorkflowDescription",
+    # TaskRun - unified task execution model
+    "TaskType",
+    "TaskRunStatus",
+    "AutomationStatus",
+    "TaskRunCreate",
+    "TaskRunResponse",
+    "TaskRunDetail",
+    "TaskRunUpdate",
+    "TaskRunComplete",
+    "TaskRunReopen",
+    "TaskRunListResponse",
+    "TaskRunAutomationCreate",
+    "TaskRunAutomationResponse",
+    "TaskRunAutomationDetail",
+    "TaskRunAutomationComplete",
+    "TaskRunAutomationListResponse",
+    "TaskRunSyncPayload",
 ]

@@ -197,6 +197,19 @@
           "title": "Id",
           "type": "string"
         },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable name for the element (OCR-based or derived)",
+          "title": "Name"
+        },
         "elementType": {
           "description": "Type of element",
           "title": "Elementtype",
@@ -645,6 +658,19 @@
               "description": "Unique identifier",
               "title": "Id",
               "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Human-readable name for the element (OCR-based or derived)",
+              "title": "Name"
             },
             "elementType": {
               "description": "Type of element",
@@ -1292,6 +1318,19 @@
               "description": "Unique identifier",
               "title": "Id",
               "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Human-readable name for the element (OCR-based or derived)",
+              "title": "Name"
             },
             "elementType": {
               "description": "Type of element",

@@ -3,14 +3,7 @@
  * DO NOT EDIT - regenerate with: poetry run python scripts/generate_typescript.py
  */
 
-import type {
-  TreeNode,
-  PathElement,
-  NodeType,
-  NodeStatus,
-  NodeMetadata,
-  DisplayNode,
-} from "./tree_events";
+import type { TreeNode, PathElement, DisplayNode, NodeMetadata, NodeType, NodeStatus } from './tree_events';
 
 export enum RunType {
   QA_TEST = "qa_test",
@@ -834,9 +827,3 @@ export interface ExecutionTreeResponse {
   /** State ID to name mapping */
   state_name_map?: Record<string, any>;
 }
-
-/**
- * Re-export tree event core types from tree_events.ts for full structures.
- * These are referenced by ExecutionTreeEventResponse and ExecutionTreeResponse.
- */
-// import type { TreeNode, PathElement, DisplayNode, NodeMetadata } from './tree_events';
