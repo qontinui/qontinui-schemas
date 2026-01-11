@@ -75,8 +75,13 @@ from qontinui_schemas.config.models.monitors import (  # noqa: F401
     Monitor,
     VirtualDesktop,
 )
+from qontinui_schemas.config.models.config_root import (  # noqa: F401
+    ImageAsset,
+    QontinuiConfig,
+)
 from qontinui_schemas.config.models.state_machine import (  # noqa: F401
     Pattern,
+    SearchRegion,
     State,
     StateImage,
     StateLocation,
