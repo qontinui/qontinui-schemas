@@ -30,6 +30,8 @@ ruff = "^0.14"
 mypy = "^1.14"
 pydantic-to-typescript = "^1.0.10"
 bandit = "^1.9.2"
+pytest = "^8.0"
+pytest-asyncio = "^0.24"
 
 [tool.poetry.scripts]
 generate-ts = "scripts.generate_typescript:main"
@@ -62,3 +64,10 @@ plugins = ["pydantic.mypy"]
 init_forbid_extra = true
 init_typed = true
 warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"

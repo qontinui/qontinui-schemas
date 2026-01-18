@@ -5,6 +5,7 @@ qontinui-runner, and other Qontinui services. It has minimal dependencies
 (pydantic only) to avoid pulling in heavy ML libraries.
 
 Modules:
+- accessibility: Accessibility tree capture and interaction schemas
 - task_run: Unified task run model (AI tasks, automation, or both)
 - execution: Execution tracking (runs, actions, screenshots, issues)
 - testing: Visual regression and coverage tracking
@@ -32,6 +33,20 @@ Usage:
 """
 
 __version__ = "0.2.0"
+
+# Accessibility module - accessibility tree capture and interaction
+from qontinui_schemas.accessibility import (  # noqa: F401
+    AccessibilityActionResult,
+    AccessibilityBackend,
+    AccessibilityBounds,
+    AccessibilityCaptureOptions,
+    AccessibilityConfig,
+    AccessibilityNode,
+    AccessibilityRole,
+    AccessibilitySelector,
+    AccessibilitySnapshot,
+    AccessibilityState,
+)
 
 # Re-export common metadata and stats (unique names)
 from qontinui_schemas.common.metadata import (  # noqa: F401
@@ -66,6 +81,10 @@ from qontinui_schemas.config.models.base_types import (  # noqa: F401
     VerificationMode,
     WorkflowVisibility,
 )
+from qontinui_schemas.config.models.config_root import (  # noqa: F401
+    ImageAsset,
+    QontinuiConfig,
+)
 from qontinui_schemas.config.models.geometry import (  # noqa: F401
     Coordinates,
     CoordinateSystem,
@@ -74,10 +93,6 @@ from qontinui_schemas.config.models.geometry import (  # noqa: F401
 from qontinui_schemas.config.models.monitors import (  # noqa: F401
     Monitor,
     VirtualDesktop,
-)
-from qontinui_schemas.config.models.config_root import (  # noqa: F401
-    ImageAsset,
-    QontinuiConfig,
 )
 from qontinui_schemas.config.models.state_machine import (  # noqa: F401
     Pattern,
@@ -103,6 +118,21 @@ from qontinui_schemas.descriptions import (  # noqa: F401
     StateDescription,
     TransitionDescription,
     WorkflowDescription,
+)
+
+# Events module - healing events for self-healing metrics
+from qontinui_schemas.events.healing_events import (  # noqa: F401
+    CacheMetrics,
+    HealingAttemptInfo,
+    HealingEvent,
+    HealingEventCreate,
+    HealingEventData,
+    HealingEventType,
+    HealingMetrics,
+    HealingStatsResponse,
+    HealingStrategy,
+    ReliabilityInfo,
+    VisualValidationInfo,
 )
 
 # Events module - tree events for execution logging
@@ -241,6 +271,17 @@ __all__ = [
     "from_iso",
     "to_iso",
     "ensure_utc",
+    # Accessibility
+    "AccessibilityRole",
+    "AccessibilityBackend",
+    "AccessibilityState",
+    "AccessibilityBounds",
+    "AccessibilityNode",
+    "AccessibilitySnapshot",
+    "AccessibilitySelector",
+    "AccessibilityConfig",
+    "AccessibilityCaptureOptions",
+    "AccessibilityActionResult",
     # Common metadata
     "RunnerMetadata",
     "WorkflowMetadata",
@@ -351,4 +392,16 @@ __all__ = [
     "TaskRunAutomationComplete",
     "TaskRunAutomationListResponse",
     "TaskRunSyncPayload",
+    # Healing events - self-healing metrics
+    "HealingEventType",
+    "HealingStrategy",
+    "CacheMetrics",
+    "HealingAttemptInfo",
+    "HealingMetrics",
+    "ReliabilityInfo",
+    "VisualValidationInfo",
+    "HealingEvent",
+    "HealingEventData",
+    "HealingEventCreate",
+    "HealingStatsResponse",
 ]

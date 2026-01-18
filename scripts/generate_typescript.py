@@ -1105,6 +1105,9 @@ def generate_from_json_schema() -> bool:
     # Generate task_run types (unified task execution model)
     if not generate_task_run_types():
         success = False
+    # Generate accessibility types (accessibility tree capture and interaction)
+    if not generate_accessibility_types():
+        success = False
     return success
 
 
@@ -1160,6 +1163,57 @@ def generate_task_run_types() -> bool:
         return True
     except Exception as e:
         print(f"Error generating task_run types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_accessibility_types() -> bool:
+    """Generate TypeScript types for accessibility tree capture and interaction."""
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import accessibility
+
+        models = [
+            # Enums
+            accessibility.AccessibilityRole,
+            accessibility.AccessibilityBackend,
+            # Core models
+            accessibility.AccessibilityState,
+            accessibility.AccessibilityBounds,
+            accessibility.AccessibilityNode,
+            accessibility.AccessibilitySnapshot,
+            accessibility.AccessibilitySelector,
+            # Config
+            accessibility.AccessibilityConfig,
+            accessibility.AccessibilityCaptureOptions,
+            accessibility.AccessibilityActionResult,
+        ]
+
+        # Generate combined JSON schema
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "accessibility.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        ts_content = generate_typescript_from_models(models)
+        ts_file = output_dir / "accessibility.ts"
+        with open(ts_file, "w") as f:
+            f.write(ts_content)
+        print(f"Generated TypeScript: {ts_file}")
+
+        return True
+    except Exception as e:
+        print(f"Error generating accessibility types: {e}")
         import traceback
 
         traceback.print_exc()

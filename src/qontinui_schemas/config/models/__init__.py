@@ -237,6 +237,7 @@ from .state_machine import (
 
 # Target configurations
 from .targets import (
+    AccessibilityTarget,
     AllResultsTarget,
     CoordinatesTarget,
     CurrentPositionTarget,
@@ -298,6 +299,7 @@ __all__ = [
     "SearchOptions",
     "TextSearchOptions",
     # Targets
+    "AccessibilityTarget",
     "AllResultsTarget",
     "CoordinatesTarget",
     "CurrentPositionTarget",

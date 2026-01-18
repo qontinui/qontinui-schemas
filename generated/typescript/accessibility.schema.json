@@ -1,0 +1,1654 @@
+{
+  "schemas": {
+    "AccessibilityState": {
+      "description": "Accessibility state flags for a node.\n\nThese flags represent the current interactive state of an element.\nBoolean flags use tri-state logic: True, False, or None (not applicable).",
+      "properties": {
+        "is_focused": {
+          "default": false,
+          "description": "Element has keyboard focus",
+          "title": "Is Focused",
+          "type": "boolean"
+        },
+        "is_disabled": {
+          "default": false,
+          "description": "Element is disabled/non-interactive",
+          "title": "Is Disabled",
+          "type": "boolean"
+        },
+        "is_hidden": {
+          "default": false,
+          "description": "Element is hidden from accessibility tree",
+          "title": "Is Hidden",
+          "type": "boolean"
+        },
+        "is_expanded": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expandable element expansion state",
+          "title": "Is Expanded"
+        },
+        "is_selected": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Selectable element selection state",
+          "title": "Is Selected"
+        },
+        "is_checked": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Checkable element checked state",
+          "title": "Is Checked"
+        },
+        "is_pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pressable element pressed state",
+          "title": "Is Pressed"
+        },
+        "is_readonly": {
+          "default": false,
+          "description": "Element is read-only",
+          "title": "Is Readonly",
+          "type": "boolean"
+        },
+        "is_required": {
+          "default": false,
+          "description": "Element value is required",
+          "title": "Is Required",
+          "type": "boolean"
+        },
+        "is_multiselectable": {
+          "default": false,
+          "description": "Element allows multiple selections",
+          "title": "Is Multiselectable",
+          "type": "boolean"
+        },
+        "is_editable": {
+          "default": false,
+          "description": "Element content can be edited",
+          "title": "Is Editable",
+          "type": "boolean"
+        },
+        "is_focusable": {
+          "default": false,
+          "description": "Element can receive focus",
+          "title": "Is Focusable",
+          "type": "boolean"
+        },
+        "is_modal": {
+          "default": false,
+          "description": "Element is a modal dialog",
+          "title": "Is Modal",
+          "type": "boolean"
+        }
+      },
+      "title": "AccessibilityState",
+      "type": "object"
+    },
+    "AccessibilityBounds": {
+      "description": "Bounding rectangle for an accessibility node.\n\nCoordinates are in screen pixels, typically absolute screen coordinates.",
+      "properties": {
+        "x": {
+          "description": "X coordinate of top-left corner",
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Y coordinate of top-left corner",
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width in pixels",
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Height in pixels",
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "AccessibilityBounds",
+      "type": "object"
+    },
+    "AccessibilityNode": {
+      "$defs": {
+        "AccessibilityBounds": {
+          "description": "Bounding rectangle for an accessibility node.\n\nCoordinates are in screen pixels, typically absolute screen coordinates.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "title": "Height",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "AccessibilityBounds",
+          "type": "object"
+        },
+        "AccessibilityNode": {
+          "description": "A node in the accessibility tree.\n\nEach node represents an element in the accessibility hierarchy with\nits role, name, value, state, and bounds. The ref field provides a\nstable identifier for AI-driven automation (e.g., @e1, @e2).\n\nExample:\n    A button might have:\n    - ref: \"@e5\"\n    - role: AccessibilityRole.BUTTON\n    - name: \"Submit\"\n    - is_interactive: True",
+          "properties": {
+            "ref": {
+              "description": "Reference ID like @e1, @e2 for AI interaction",
+              "title": "Ref",
+              "type": "string"
+            },
+            "role": {
+              "$ref": "#/$defs/AccessibilityRole",
+              "description": "Accessibility role (button, textbox, etc.)"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Accessible name (label)",
+              "title": "Name"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Current value (for inputs)",
+              "title": "Value"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Accessible description (additional context)",
+              "title": "Description"
+            },
+            "bounds": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AccessibilityBounds"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Bounding rectangle in screen coordinates"
+            },
+            "state": {
+              "$ref": "#/$defs/AccessibilityState",
+              "description": "Current state flags"
+            },
+            "is_interactive": {
+              "default": false,
+              "description": "Whether element accepts user interaction",
+              "title": "Is Interactive",
+              "type": "boolean"
+            },
+            "level": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Hierarchical level (for headings, tree items)",
+              "title": "Level"
+            },
+            "automation_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Automation ID / test ID attribute",
+              "title": "Automation Id"
+            },
+            "class_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CSS class name or control class",
+              "title": "Class Name"
+            },
+            "html_tag": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "HTML tag name (for web elements)",
+              "title": "Html Tag"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL for link elements",
+              "title": "Url"
+            },
+            "children": {
+              "description": "Child nodes in the tree",
+              "items": {
+                "$ref": "#/$defs/AccessibilityNode"
+              },
+              "title": "Children",
+              "type": "array"
+            }
+          },
+          "required": [
+            "ref",
+            "role"
+          ],
+          "title": "AccessibilityNode",
+          "type": "object"
+        },
+        "AccessibilityRole": {
+          "description": "ARIA/UIA accessibility roles.\n\nBased on WAI-ARIA 1.2 roles with extensions for Windows UI Automation\nand other platform-specific accessibility APIs.",
+          "enum": [
+            "application",
+            "document",
+            "article",
+            "banner",
+            "complementary",
+            "contentinfo",
+            "form",
+            "main",
+            "navigation",
+            "region",
+            "search",
+            "button",
+            "checkbox",
+            "combobox",
+            "dialog",
+            "gridcell",
+            "link",
+            "listbox",
+            "menu",
+            "menubar",
+            "menuitem",
+            "menuitemcheckbox",
+            "menuitemradio",
+            "option",
+            "progressbar",
+            "radio",
+            "radiogroup",
+            "scrollbar",
+            "searchbox",
+            "slider",
+            "spinbutton",
+            "switch",
+            "tab",
+            "tablist",
+            "tabpanel",
+            "textbox",
+            "toolbar",
+            "tooltip",
+            "tree",
+            "treegrid",
+            "treeitem",
+            "alert",
+            "alertdialog",
+            "grid",
+            "heading",
+            "img",
+            "list",
+            "listitem",
+            "log",
+            "marquee",
+            "math",
+            "note",
+            "separator",
+            "status",
+            "table",
+            "cell",
+            "columnheader",
+            "row",
+            "rowgroup",
+            "rowheader",
+            "timer",
+            "definition",
+            "directory",
+            "figure",
+            "group",
+            "paragraph",
+            "term",
+            "generic",
+            "static_text",
+            "none",
+            "unknown",
+            "window",
+            "pane",
+            "titlebar",
+            "edit",
+            "custom",
+            "dataitem",
+            "datepicker",
+            "calendar",
+            "hyperlink",
+            "splitbutton"
+          ],
+          "title": "AccessibilityRole",
+          "type": "string"
+        },
+        "AccessibilityState": {
+          "description": "Accessibility state flags for a node.\n\nThese flags represent the current interactive state of an element.\nBoolean flags use tri-state logic: True, False, or None (not applicable).",
+          "properties": {
+            "is_focused": {
+              "default": false,
+              "description": "Element has keyboard focus",
+              "title": "Is Focused",
+              "type": "boolean"
+            },
+            "is_disabled": {
+              "default": false,
+              "description": "Element is disabled/non-interactive",
+              "title": "Is Disabled",
+              "type": "boolean"
+            },
+            "is_hidden": {
+              "default": false,
+              "description": "Element is hidden from accessibility tree",
+              "title": "Is Hidden",
+              "type": "boolean"
+            },
+            "is_expanded": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Expandable element expansion state",
+              "title": "Is Expanded"
+            },
+            "is_selected": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Selectable element selection state",
+              "title": "Is Selected"
+            },
+            "is_checked": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Checkable element checked state",
+              "title": "Is Checked"
+            },
+            "is_pressed": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pressable element pressed state",
+              "title": "Is Pressed"
+            },
+            "is_readonly": {
+              "default": false,
+              "description": "Element is read-only",
+              "title": "Is Readonly",
+              "type": "boolean"
+            },
+            "is_required": {
+              "default": false,
+              "description": "Element value is required",
+              "title": "Is Required",
+              "type": "boolean"
+            },
+            "is_multiselectable": {
+              "default": false,
+              "description": "Element allows multiple selections",
+              "title": "Is Multiselectable",
+              "type": "boolean"
+            },
+            "is_editable": {
+              "default": false,
+              "description": "Element content can be edited",
+              "title": "Is Editable",
+              "type": "boolean"
+            },
+            "is_focusable": {
+              "default": false,
+              "description": "Element can receive focus",
+              "title": "Is Focusable",
+              "type": "boolean"
+            },
+            "is_modal": {
+              "default": false,
+              "description": "Element is a modal dialog",
+              "title": "Is Modal",
+              "type": "boolean"
+            }
+          },
+          "title": "AccessibilityState",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/AccessibilityNode"
+    },
+    "AccessibilitySnapshot": {
+      "$defs": {
+        "AccessibilityBackend": {
+          "description": "Accessibility capture backend types.\n\nAUTO: Automatically detect the best available backend.\nCDP: Chrome DevTools Protocol (browsers, Electron, Tauri on Windows).\nUIA: Windows UI Automation (native Windows apps).\nATSPI: AT-SPI2 (Linux desktop accessibility).\nAX: macOS Accessibility API.\nNONE: No accessibility capture (disabled).",
+          "enum": [
+            "auto",
+            "cdp",
+            "uia",
+            "atspi",
+            "ax",
+            "none"
+          ],
+          "title": "AccessibilityBackend",
+          "type": "string"
+        },
+        "AccessibilityBounds": {
+          "description": "Bounding rectangle for an accessibility node.\n\nCoordinates are in screen pixels, typically absolute screen coordinates.",
+          "properties": {
+            "x": {
+              "description": "X coordinate of top-left corner",
+              "title": "X",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Y coordinate of top-left corner",
+              "title": "Y",
+              "type": "integer"
+            },
+            "width": {
+              "description": "Width in pixels",
+              "title": "Width",
+              "type": "integer"
+            },
+            "height": {
+              "description": "Height in pixels",
+              "title": "Height",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "title": "AccessibilityBounds",
+          "type": "object"
+        },
+        "AccessibilityNode": {
+          "description": "A node in the accessibility tree.\n\nEach node represents an element in the accessibility hierarchy with\nits role, name, value, state, and bounds. The ref field provides a\nstable identifier for AI-driven automation (e.g., @e1, @e2).\n\nExample:\n    A button might have:\n    - ref: \"@e5\"\n    - role: AccessibilityRole.BUTTON\n    - name: \"Submit\"\n    - is_interactive: True",
+          "properties": {
+            "ref": {
+              "description": "Reference ID like @e1, @e2 for AI interaction",
+              "title": "Ref",
+              "type": "string"
+            },
+            "role": {
+              "$ref": "#/$defs/AccessibilityRole",
+              "description": "Accessibility role (button, textbox, etc.)"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Accessible name (label)",
+              "title": "Name"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Current value (for inputs)",
+              "title": "Value"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Accessible description (additional context)",
+              "title": "Description"
+            },
+            "bounds": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AccessibilityBounds"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Bounding rectangle in screen coordinates"
+            },
+            "state": {
+              "$ref": "#/$defs/AccessibilityState",
+              "description": "Current state flags"
+            },
+            "is_interactive": {
+              "default": false,
+              "description": "Whether element accepts user interaction",
+              "title": "Is Interactive",
+              "type": "boolean"
+            },
+            "level": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Hierarchical level (for headings, tree items)",
+              "title": "Level"
+            },
+            "automation_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Automation ID / test ID attribute",
+              "title": "Automation Id"
+            },
+            "class_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "CSS class name or control class",
+              "title": "Class Name"
+            },
+            "html_tag": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "HTML tag name (for web elements)",
+              "title": "Html Tag"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "URL for link elements",
+              "title": "Url"
+            },
+            "children": {
+              "description": "Child nodes in the tree",
+              "items": {
+                "$ref": "#/$defs/AccessibilityNode"
+              },
+              "title": "Children",
+              "type": "array"
+            }
+          },
+          "required": [
+            "ref",
+            "role"
+          ],
+          "title": "AccessibilityNode",
+          "type": "object"
+        },
+        "AccessibilityRole": {
+          "description": "ARIA/UIA accessibility roles.\n\nBased on WAI-ARIA 1.2 roles with extensions for Windows UI Automation\nand other platform-specific accessibility APIs.",
+          "enum": [
+            "application",
+            "document",
+            "article",
+            "banner",
+            "complementary",
+            "contentinfo",
+            "form",
+            "main",
+            "navigation",
+            "region",
+            "search",
+            "button",
+            "checkbox",
+            "combobox",
+            "dialog",
+            "gridcell",
+            "link",
+            "listbox",
+            "menu",
+            "menubar",
+            "menuitem",
+            "menuitemcheckbox",
+            "menuitemradio",
+            "option",
+            "progressbar",
+            "radio",
+            "radiogroup",
+            "scrollbar",
+            "searchbox",
+            "slider",
+            "spinbutton",
+            "switch",
+            "tab",
+            "tablist",
+            "tabpanel",
+            "textbox",
+            "toolbar",
+            "tooltip",
+            "tree",
+            "treegrid",
+            "treeitem",
+            "alert",
+            "alertdialog",
+            "grid",
+            "heading",
+            "img",
+            "list",
+            "listitem",
+            "log",
+            "marquee",
+            "math",
+            "note",
+            "separator",
+            "status",
+            "table",
+            "cell",
+            "columnheader",
+            "row",
+            "rowgroup",
+            "rowheader",
+            "timer",
+            "definition",
+            "directory",
+            "figure",
+            "group",
+            "paragraph",
+            "term",
+            "generic",
+            "static_text",
+            "none",
+            "unknown",
+            "window",
+            "pane",
+            "titlebar",
+            "edit",
+            "custom",
+            "dataitem",
+            "datepicker",
+            "calendar",
+            "hyperlink",
+            "splitbutton"
+          ],
+          "title": "AccessibilityRole",
+          "type": "string"
+        },
+        "AccessibilityState": {
+          "description": "Accessibility state flags for a node.\n\nThese flags represent the current interactive state of an element.\nBoolean flags use tri-state logic: True, False, or None (not applicable).",
+          "properties": {
+            "is_focused": {
+              "default": false,
+              "description": "Element has keyboard focus",
+              "title": "Is Focused",
+              "type": "boolean"
+            },
+            "is_disabled": {
+              "default": false,
+              "description": "Element is disabled/non-interactive",
+              "title": "Is Disabled",
+              "type": "boolean"
+            },
+            "is_hidden": {
+              "default": false,
+              "description": "Element is hidden from accessibility tree",
+              "title": "Is Hidden",
+              "type": "boolean"
+            },
+            "is_expanded": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Expandable element expansion state",
+              "title": "Is Expanded"
+            },
+            "is_selected": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Selectable element selection state",
+              "title": "Is Selected"
+            },
+            "is_checked": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Checkable element checked state",
+              "title": "Is Checked"
+            },
+            "is_pressed": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pressable element pressed state",
+              "title": "Is Pressed"
+            },
+            "is_readonly": {
+              "default": false,
+              "description": "Element is read-only",
+              "title": "Is Readonly",
+              "type": "boolean"
+            },
+            "is_required": {
+              "default": false,
+              "description": "Element value is required",
+              "title": "Is Required",
+              "type": "boolean"
+            },
+            "is_multiselectable": {
+              "default": false,
+              "description": "Element allows multiple selections",
+              "title": "Is Multiselectable",
+              "type": "boolean"
+            },
+            "is_editable": {
+              "default": false,
+              "description": "Element content can be edited",
+              "title": "Is Editable",
+              "type": "boolean"
+            },
+            "is_focusable": {
+              "default": false,
+              "description": "Element can receive focus",
+              "title": "Is Focusable",
+              "type": "boolean"
+            },
+            "is_modal": {
+              "default": false,
+              "description": "Element is a modal dialog",
+              "title": "Is Modal",
+              "type": "boolean"
+            }
+          },
+          "title": "AccessibilityState",
+          "type": "object"
+        }
+      },
+      "description": "Complete accessibility tree snapshot.\n\nRepresents the full accessibility tree at a point in time, with\nmetadata about the capture source and statistics.\n\nExample AI context output:\n    ## Accessibility Tree\n    URL: https://example.com/login\n    Title: Login Page\n\n    ### Interactive Elements\n    - @e1: button \"Sign In\"\n    - @e2: textbox \"Email\"\n    - @e3: textbox \"Password\"",
+      "properties": {
+        "root": {
+          "$ref": "#/$defs/AccessibilityNode",
+          "description": "Root node of the accessibility tree"
+        },
+        "timestamp": {
+          "description": "Unix timestamp of capture",
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "backend": {
+          "$ref": "#/$defs/AccessibilityBackend",
+          "description": "Backend used for capture"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Page URL (for web targets)",
+          "title": "Url"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Page/window title",
+          "title": "Title"
+        },
+        "total_nodes": {
+          "default": 0,
+          "description": "Total number of nodes in tree",
+          "title": "Total Nodes",
+          "type": "integer"
+        },
+        "interactive_nodes": {
+          "default": 0,
+          "description": "Number of interactive nodes",
+          "title": "Interactive Nodes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "root",
+        "timestamp",
+        "backend"
+      ],
+      "title": "AccessibilitySnapshot",
+      "type": "object"
+    },
+    "AccessibilitySelector": {
+      "$defs": {
+        "AccessibilityRole": {
+          "description": "ARIA/UIA accessibility roles.\n\nBased on WAI-ARIA 1.2 roles with extensions for Windows UI Automation\nand other platform-specific accessibility APIs.",
+          "enum": [
+            "application",
+            "document",
+            "article",
+            "banner",
+            "complementary",
+            "contentinfo",
+            "form",
+            "main",
+            "navigation",
+            "region",
+            "search",
+            "button",
+            "checkbox",
+            "combobox",
+            "dialog",
+            "gridcell",
+            "link",
+            "listbox",
+            "menu",
+            "menubar",
+            "menuitem",
+            "menuitemcheckbox",
+            "menuitemradio",
+            "option",
+            "progressbar",
+            "radio",
+            "radiogroup",
+            "scrollbar",
+            "searchbox",
+            "slider",
+            "spinbutton",
+            "switch",
+            "tab",
+            "tablist",
+            "tabpanel",
+            "textbox",
+            "toolbar",
+            "tooltip",
+            "tree",
+            "treegrid",
+            "treeitem",
+            "alert",
+            "alertdialog",
+            "grid",
+            "heading",
+            "img",
+            "list",
+            "listitem",
+            "log",
+            "marquee",
+            "math",
+            "note",
+            "separator",
+            "status",
+            "table",
+            "cell",
+            "columnheader",
+            "row",
+            "rowgroup",
+            "rowheader",
+            "timer",
+            "definition",
+            "directory",
+            "figure",
+            "group",
+            "paragraph",
+            "term",
+            "generic",
+            "static_text",
+            "none",
+            "unknown",
+            "window",
+            "pane",
+            "titlebar",
+            "edit",
+            "custom",
+            "dataitem",
+            "datepicker",
+            "calendar",
+            "hyperlink",
+            "splitbutton"
+          ],
+          "title": "AccessibilityRole",
+          "type": "string"
+        },
+        "AccessibilitySelector": {
+          "description": "Selector for finding nodes in an accessibility tree.\n\nProvides flexible matching criteria for locating elements by role,\nname, automation ID, or other attributes. Multiple criteria are\ncombined with AND logic.\n\nExample:\n    # Find a button named \"Submit\"\n    selector = AccessibilitySelector(\n        role=AccessibilityRole.BUTTON,\n        name=\"Submit\"\n    )\n\n    # Find any textbox containing \"email\" (case-insensitive)\n    selector = AccessibilitySelector(\n        role=AccessibilityRole.TEXTBOX,\n        name_contains=\"email\",\n        case_sensitive=False\n    )",
+          "properties": {
+            "role": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AccessibilityRole"
+                },
+                {
+                  "items": {
+                    "$ref": "#/$defs/AccessibilityRole"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match by role (single or list)",
+              "title": "Role"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exact name match",
+              "title": "Name"
+            },
+            "name_contains": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Partial name match (contains)",
+              "title": "Name Contains"
+            },
+            "name_pattern": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Regex pattern for name matching",
+              "title": "Name Pattern"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exact value match",
+              "title": "Value"
+            },
+            "value_contains": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Partial value match (contains)",
+              "title": "Value Contains"
+            },
+            "automation_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match by automation/test ID",
+              "title": "Automation Id"
+            },
+            "class_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match by CSS/control class name",
+              "title": "Class Name"
+            },
+            "html_tag": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Match by HTML tag name",
+              "title": "Html Tag"
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AccessibilityState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Required state flags (partial match)"
+            },
+            "is_interactive": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter by interactivity",
+              "title": "Is Interactive"
+            },
+            "ancestor": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AccessibilitySelector"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Required ancestor selector"
+            },
+            "max_depth": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum tree depth to search",
+              "title": "Max Depth"
+            },
+            "case_sensitive": {
+              "default": true,
+              "description": "Whether string matching is case-sensitive",
+              "title": "Case Sensitive",
+              "type": "boolean"
+            }
+          },
+          "title": "AccessibilitySelector",
+          "type": "object"
+        },
+        "AccessibilityState": {
+          "description": "Accessibility state flags for a node.\n\nThese flags represent the current interactive state of an element.\nBoolean flags use tri-state logic: True, False, or None (not applicable).",
+          "properties": {
+            "is_focused": {
+              "default": false,
+              "description": "Element has keyboard focus",
+              "title": "Is Focused",
+              "type": "boolean"
+            },
+            "is_disabled": {
+              "default": false,
+              "description": "Element is disabled/non-interactive",
+              "title": "Is Disabled",
+              "type": "boolean"
+            },
+            "is_hidden": {
+              "default": false,
+              "description": "Element is hidden from accessibility tree",
+              "title": "Is Hidden",
+              "type": "boolean"
+            },
+            "is_expanded": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Expandable element expansion state",
+              "title": "Is Expanded"
+            },
+            "is_selected": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Selectable element selection state",
+              "title": "Is Selected"
+            },
+            "is_checked": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Checkable element checked state",
+              "title": "Is Checked"
+            },
+            "is_pressed": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Pressable element pressed state",
+              "title": "Is Pressed"
+            },
+            "is_readonly": {
+              "default": false,
+              "description": "Element is read-only",
+              "title": "Is Readonly",
+              "type": "boolean"
+            },
+            "is_required": {
+              "default": false,
+              "description": "Element value is required",
+              "title": "Is Required",
+              "type": "boolean"
+            },
+            "is_multiselectable": {
+              "default": false,
+              "description": "Element allows multiple selections",
+              "title": "Is Multiselectable",
+              "type": "boolean"
+            },
+            "is_editable": {
+              "default": false,
+              "description": "Element content can be edited",
+              "title": "Is Editable",
+              "type": "boolean"
+            },
+            "is_focusable": {
+              "default": false,
+              "description": "Element can receive focus",
+              "title": "Is Focusable",
+              "type": "boolean"
+            },
+            "is_modal": {
+              "default": false,
+              "description": "Element is a modal dialog",
+              "title": "Is Modal",
+              "type": "boolean"
+            }
+          },
+          "title": "AccessibilityState",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/AccessibilitySelector"
+    },
+    "AccessibilityConfig": {
+      "$defs": {
+        "AccessibilityBackend": {
+          "description": "Accessibility capture backend types.\n\nAUTO: Automatically detect the best available backend.\nCDP: Chrome DevTools Protocol (browsers, Electron, Tauri on Windows).\nUIA: Windows UI Automation (native Windows apps).\nATSPI: AT-SPI2 (Linux desktop accessibility).\nAX: macOS Accessibility API.\nNONE: No accessibility capture (disabled).",
+          "enum": [
+            "auto",
+            "cdp",
+            "uia",
+            "atspi",
+            "ax",
+            "none"
+          ],
+          "title": "AccessibilityBackend",
+          "type": "string"
+        }
+      },
+      "description": "Configuration for accessibility capture.\n\nControls how accessibility trees are captured, including which backend\nto use and filtering options.",
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/AccessibilityBackend",
+          "default": "auto",
+          "description": "Accessibility backend to use (auto, cdp, uia, etc.)"
+        },
+        "interactive_only": {
+          "default": false,
+          "description": "Only capture interactive elements (reduces tree size)",
+          "title": "Interactive Only",
+          "type": "boolean"
+        },
+        "include_hidden": {
+          "default": false,
+          "description": "Include hidden/offscreen elements in capture",
+          "title": "Include Hidden",
+          "type": "boolean"
+        },
+        "max_depth": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum tree depth to capture (None for unlimited)",
+          "title": "Max Depth"
+        },
+        "cdp_host": {
+          "default": "localhost",
+          "description": "CDP WebSocket host for browser connections",
+          "title": "Cdp Host",
+          "type": "string"
+        },
+        "cdp_port": {
+          "default": 9222,
+          "description": "CDP WebSocket port for browser connections",
+          "title": "Cdp Port",
+          "type": "integer"
+        },
+        "cdp_timeout": {
+          "default": 30.0,
+          "description": "Timeout in seconds for CDP operations",
+          "title": "Cdp Timeout",
+          "type": "number"
+        },
+        "include_bounds": {
+          "default": true,
+          "description": "Include bounding rectangles for each node",
+          "title": "Include Bounds",
+          "type": "boolean"
+        },
+        "include_value": {
+          "default": true,
+          "description": "Include current values for input elements",
+          "title": "Include Value",
+          "type": "boolean"
+        }
+      },
+      "title": "AccessibilityConfig",
+      "type": "object"
+    },
+    "AccessibilityCaptureOptions": {
+      "$defs": {
+        "AccessibilityBackend": {
+          "description": "Accessibility capture backend types.\n\nAUTO: Automatically detect the best available backend.\nCDP: Chrome DevTools Protocol (browsers, Electron, Tauri on Windows).\nUIA: Windows UI Automation (native Windows apps).\nATSPI: AT-SPI2 (Linux desktop accessibility).\nAX: macOS Accessibility API.\nNONE: No accessibility capture (disabled).",
+          "enum": [
+            "auto",
+            "cdp",
+            "uia",
+            "atspi",
+            "ax",
+            "none"
+          ],
+          "title": "AccessibilityBackend",
+          "type": "string"
+        },
+        "AccessibilityConfig": {
+          "description": "Configuration for accessibility capture.\n\nControls how accessibility trees are captured, including which backend\nto use and filtering options.",
+          "properties": {
+            "backend": {
+              "$ref": "#/$defs/AccessibilityBackend",
+              "default": "auto",
+              "description": "Accessibility backend to use (auto, cdp, uia, etc.)"
+            },
+            "interactive_only": {
+              "default": false,
+              "description": "Only capture interactive elements (reduces tree size)",
+              "title": "Interactive Only",
+              "type": "boolean"
+            },
+            "include_hidden": {
+              "default": false,
+              "description": "Include hidden/offscreen elements in capture",
+              "title": "Include Hidden",
+              "type": "boolean"
+            },
+            "max_depth": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum tree depth to capture (None for unlimited)",
+              "title": "Max Depth"
+            },
+            "cdp_host": {
+              "default": "localhost",
+              "description": "CDP WebSocket host for browser connections",
+              "title": "Cdp Host",
+              "type": "string"
+            },
+            "cdp_port": {
+              "default": 9222,
+              "description": "CDP WebSocket port for browser connections",
+              "title": "Cdp Port",
+              "type": "integer"
+            },
+            "cdp_timeout": {
+              "default": 30.0,
+              "description": "Timeout in seconds for CDP operations",
+              "title": "Cdp Timeout",
+              "type": "number"
+            },
+            "include_bounds": {
+              "default": true,
+              "description": "Include bounding rectangles for each node",
+              "title": "Include Bounds",
+              "type": "boolean"
+            },
+            "include_value": {
+              "default": true,
+              "description": "Include current values for input elements",
+              "title": "Include Value",
+              "type": "boolean"
+            }
+          },
+          "title": "AccessibilityConfig",
+          "type": "object"
+        }
+      },
+      "description": "Options for a single accessibility capture operation.\n\nUsed when invoking a capture to specify target and overrides.",
+      "properties": {
+        "target": {
+          "default": "auto",
+          "description": "Capture target: 'auto', 'web', 'native', 'tauri', or a window title/handle",
+          "title": "Target",
+          "type": "string"
+        },
+        "include_screenshot": {
+          "default": true,
+          "description": "Also capture a screenshot alongside the tree",
+          "title": "Include Screenshot",
+          "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/$defs/AccessibilityConfig",
+          "description": "Capture configuration overrides"
+        }
+      },
+      "title": "AccessibilityCaptureOptions",
+      "type": "object"
+    },
+    "AccessibilityActionResult": {
+      "description": "Result of an accessibility-based action.\n\nReturned when performing actions like click_by_ref or type_by_ref.",
+      "properties": {
+        "success": {
+          "description": "Whether the action succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "ref": {
+          "description": "The ref that was acted upon",
+          "title": "Ref",
+          "type": "string"
+        },
+        "action": {
+          "description": "The action performed (click, type, focus)",
+          "title": "Action",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if action failed",
+          "title": "Error"
+        },
+        "element_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the element acted upon",
+          "title": "Element Name"
+        },
+        "element_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Role of the element acted upon",
+          "title": "Element Role"
+        }
+      },
+      "required": [
+        "success",
+        "ref",
+        "action"
+      ],
+      "title": "AccessibilityActionResult",
+      "type": "object"
+    }
+  }
+}

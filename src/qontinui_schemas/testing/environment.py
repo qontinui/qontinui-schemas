@@ -191,7 +191,8 @@ class ColorPalette(BaseModel):
         description="List of dominant colors (hex) from k-means clustering",
     )
     semantic_colors: SemanticColors = Field(
-        default_factory=lambda: SemanticColors(), description="Semantically associated colors"
+        default_factory=lambda: SemanticColors(),
+        description="Semantically associated colors",
     )
     theme_type: ThemeType = Field(
         ThemeType.DARK, description="Detected theme type based on luminance"
@@ -324,7 +325,8 @@ class LayoutRegion(BaseModel):
     id: str = Field(..., description="Unique identifier for this region")
     bounds: BoundingBox = Field(..., description="Region bounds")
     characteristics: RegionCharacteristics = Field(
-        default_factory=lambda: RegionCharacteristics(), description="Region characteristics"
+        default_factory=lambda: RegionCharacteristics(),
+        description="Region characteristics",
     )
     semantic_label: SemanticRegionType = Field(
         SemanticRegionType.UNKNOWN, description="Inferred semantic type"
@@ -646,20 +648,25 @@ class GUIEnvironment(BaseModel):
     typography: Typography = Field(
         default_factory=lambda: Typography(), description="Discovered typography"
     )
-    layout: Layout = Field(default_factory=lambda: Layout(), description="Discovered layout")
+    layout: Layout = Field(
+        default_factory=lambda: Layout(), description="Discovered layout"
+    )
     dynamic_regions: DynamicRegions = Field(
-        default_factory=lambda: DynamicRegions(), description="Discovered dynamic regions"
+        default_factory=lambda: DynamicRegions(),
+        description="Discovered dynamic regions",
     )
     visual_states: VisualStates = Field(
         default_factory=lambda: VisualStates(), description="Learned visual states"
     )
     element_patterns: ElementPatterns = Field(
-        default_factory=lambda: ElementPatterns(), description="Detected element patterns"
+        default_factory=lambda: ElementPatterns(),
+        description="Detected element patterns",
     )
 
     # Quality metrics
     confidence_scores: ConfidenceScores = Field(
-        default_factory=lambda: ConfidenceScores(), description="Per-component confidence scores"
+        default_factory=lambda: ConfidenceScores(),
+        description="Per-component confidence scores",
     )
 
     # Continuous learning

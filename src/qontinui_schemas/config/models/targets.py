@@ -210,6 +210,63 @@ class AllResultsTarget(BaseModel):
     type: Literal["allResults"] = "allResults"
 
 
+class AccessibilityTarget(BaseModel):
+    """Target an element by accessibility ref or selector.
+
+    This target type enables actions to reference elements in the accessibility tree,
+    allowing AI-optimized element selection via refs (@e1, @e2, etc.) or role-based
+    selectors. Requires capturing an accessibility tree before use.
+
+    Attributes:
+        type: Literal type discriminator for this target type.
+        ref: Direct accessibility ref (e.g., "@e3") from a captured tree.
+        role: Accessibility role to match (e.g., "button", "textbox").
+        name: Accessible name to match (exact match).
+        name_contains: Partial name match.
+        is_interactive: If True, only match interactive elements.
+        capture_first: If True, capture accessibility tree before finding.
+        cdp_host: CDP host for browser accessibility capture.
+        cdp_port: CDP port for browser accessibility capture.
+
+    Example - by ref:
+        {
+            "type": "accessibility",
+            "ref": "@e3"
+        }
+
+    Example - by selector:
+        {
+            "type": "accessibility",
+            "role": "button",
+            "name": "Submit"
+        }
+    """
+
+    type: Literal["accessibility"] = "accessibility"
+    ref: str | None = Field(
+        None, description="Direct accessibility ref (@e1, @e2, etc.)"
+    )
+    role: str | list[str] | None = Field(
+        None, description="Accessibility role(s) to match"
+    )
+    name: str | None = Field(None, description="Exact accessible name to match")
+    name_contains: str | None = Field(
+        None, alias="nameContains", description="Partial name match"
+    )
+    is_interactive: bool | None = Field(
+        None, alias="isInteractive", description="Only match interactive elements"
+    )
+    capture_first: bool = Field(
+        True, alias="captureFirst", description="Capture tree before finding"
+    )
+    cdp_host: str = Field(
+        "localhost", alias="cdpHost", description="CDP host for capture"
+    )
+    cdp_port: int = Field(9222, alias="cdpPort", description="CDP port for capture")
+
+    model_config = {"populate_by_name": True}
+
+
 class ResultByImageTarget(BaseModel):
     """Target match from specific image ID in multi-image FIND result.
 
@@ -258,4 +315,5 @@ TargetConfig = (
     | ResultIndexTarget
     | AllResultsTarget
     | ResultByImageTarget
+    | AccessibilityTarget
 )
