@@ -54,9 +54,10 @@ class TestAccessibilityEnums:
         """Role enum is a string enum for JSON serialization."""
         role = AccessibilityRole.BUTTON
         assert isinstance(role.value, str)
+        # Access .value before the comparison to avoid MyPy type narrowing
+        assert role.value == "button"
         # String enums inherit from str, so they can be used directly as strings
         assert role == "button"
-        assert role.value == "button"
 
 
 class TestAccessibilityState:
