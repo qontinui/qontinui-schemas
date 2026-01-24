@@ -1,0 +1,8 @@
+/**
+ * @qontinui/shared-types
+ *
+ * Shared TypeScript types for the Qontinui ecosystem.
+ */
+
+// Render logging types
+export * from "./render-log";

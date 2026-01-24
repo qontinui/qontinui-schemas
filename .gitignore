@@ -56,3 +56,6 @@ Thumbs.db
 
 # Project specific
 poetry.lock
+
+# TypeScript
+ts/node_modules/
