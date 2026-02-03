@@ -6,6 +6,7 @@ qontinui-runner, and other Qontinui services. It has minimal dependencies
 
 Modules:
 - accessibility: Accessibility tree capture and interaction schemas
+- discovery: Unified state discovery results (from any source)
 - task_run: Unified task run model (AI tasks, automation, or both)
 - execution: Execution tracking (runs, actions, screenshots, issues)
 - testing: Visual regression and coverage tracking
@@ -118,6 +119,25 @@ from qontinui_schemas.descriptions import (  # noqa: F401
     StateDescription,
     TransitionDescription,
     WorkflowDescription,
+)
+
+# Discovery module - unified state discovery results
+from qontinui_schemas.discovery import (  # noqa: F401
+    SOURCE_TYPE_LABELS,
+    DiscoveredState,
+    DiscoveredStateImage,
+    DiscoveredTransition,
+    DiscoveryBoundingBox,
+    DiscoverySourceType,
+    DiscoveryTransitionTrigger,
+    StateDiscoveryResult,
+    StateDiscoveryResultCreate,
+    StateDiscoveryResultListResponse,
+    StateDiscoveryResultSummary,
+    StateDiscoveryResultUpdate,
+    StateMachineExport,
+    StateMachineImport,
+    TransitionTriggerType,
 )
 
 # Events module - healing events for self-healing metrics
@@ -233,6 +253,29 @@ from qontinui_schemas.task_run import (  # noqa: F401
     TaskType,
 )
 
+# Template Capture module - click-to-template system
+from qontinui_schemas.template_capture import (  # noqa: F401
+    ApplicationProfile,
+    ApplicationProfileCreate,
+    ApplicationProfileListResponse,
+    ApplicationProfileResponse,
+    ApplicationProfileUpdate,
+    CandidateBoundingBox,
+    CandidateStatus,
+    DetectionStrategyType,
+    ElementType,
+    TemplateCandidateBatchCreate,
+    TemplateCandidateCreate,
+    TemplateCandidateDetail,
+    TemplateCandidateListResponse,
+    TemplateCandidateResponse,
+    TemplateCandidateSummary,
+    TemplateCandidateUpdate,
+    TuningMetrics,
+    TuningRequest,
+    TuningResult,
+)
+
 # Testing module - visual regression and coverage
 from qontinui_schemas.testing import (  # noqa: F401
     ComparisonReview,
@@ -282,6 +325,22 @@ __all__ = [
     "AccessibilityConfig",
     "AccessibilityCaptureOptions",
     "AccessibilityActionResult",
+    # Discovery - unified state discovery results
+    "DiscoverySourceType",
+    "TransitionTriggerType",
+    "DiscoveryBoundingBox",
+    "DiscoveryTransitionTrigger",
+    "DiscoveredStateImage",
+    "DiscoveredState",
+    "DiscoveredTransition",
+    "StateDiscoveryResult",
+    "StateDiscoveryResultSummary",
+    "StateDiscoveryResultListResponse",
+    "StateDiscoveryResultCreate",
+    "StateDiscoveryResultUpdate",
+    "StateMachineExport",
+    "StateMachineImport",
+    "SOURCE_TYPE_LABELS",
     # Common metadata
     "RunnerMetadata",
     "WorkflowMetadata",
@@ -404,4 +463,24 @@ __all__ = [
     "HealingEventData",
     "HealingEventCreate",
     "HealingStatsResponse",
+    # Template Capture - click-to-template system
+    "ElementType",
+    "DetectionStrategyType",
+    "CandidateStatus",
+    "CandidateBoundingBox",
+    "TemplateCandidateCreate",
+    "TemplateCandidateBatchCreate",
+    "TemplateCandidateResponse",
+    "TemplateCandidateDetail",
+    "TemplateCandidateSummary",
+    "TemplateCandidateUpdate",
+    "TemplateCandidateListResponse",
+    "TuningMetrics",
+    "ApplicationProfileCreate",
+    "ApplicationProfileResponse",
+    "ApplicationProfileUpdate",
+    "ApplicationProfile",
+    "ApplicationProfileListResponse",
+    "TuningRequest",
+    "TuningResult",
 ]

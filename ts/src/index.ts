@@ -6,3 +6,6 @@
 
 // Render logging types
 export * from "./render-log";
+
+// State discovery types
+export * from "./discovery";
