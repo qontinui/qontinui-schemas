@@ -276,6 +276,25 @@ from qontinui_schemas.template_capture import (  # noqa: F401
     TuningResult,
 )
 
+# Test Specifications module - declarative test specs for web/runner exchange
+from qontinui_schemas.test_specifications import (  # noqa: F401
+    AssertionSource,
+    ElementIdTarget,
+    ExplorationMetadata,
+    FormIdTarget,
+    GeneratorType,
+    ModalIdTarget,
+    NonVisualState,
+    NonVisualTransition,
+    SnapshotMetadata,
+    TestAssertion,
+    TestCategory,
+    TestGeneratorOutput,
+    TestSeverity,
+    TestSpecification,
+    TriggerAction,
+)
+
 # Testing module - visual regression and coverage
 from qontinui_schemas.testing import (  # noqa: F401
     ComparisonReview,
@@ -483,4 +502,20 @@ __all__ = [
     "ApplicationProfileListResponse",
     "TuningRequest",
     "TuningResult",
+    # Test Specifications - declarative test specs
+    "TestCategory",
+    "TestSeverity",
+    "TriggerAction",
+    "AssertionSource",
+    "GeneratorType",
+    "ElementIdTarget",
+    "FormIdTarget",
+    "ModalIdTarget",
+    "TestAssertion",
+    "TestSpecification",
+    "NonVisualState",
+    "NonVisualTransition",
+    "SnapshotMetadata",
+    "ExplorationMetadata",
+    "TestGeneratorOutput",
 ]

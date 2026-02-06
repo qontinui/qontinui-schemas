@@ -9,3 +9,5 @@ export * from "./render-log";
 
 // State discovery types
 export * from "./discovery";
+
+// Test specification types — migrated to @qontinui/ui-bridge/specs
