@@ -578,6 +578,18 @@ def generate_execution_types() -> bool:
             execution.ExecutionTreeEventResponse,
             execution.ExecutionTreeEventListResponse,
             execution.ExecutionTreeResponse,
+            # Verification result schemas
+            execution.CheckIssueDetail,
+            execution.IndividualCheckResult,
+            execution.VerificationStepDetails,
+            execution.StepExecutionConfig,
+            execution.VerificationStepResult,
+            execution.GateEvaluationResult,
+            execution.VerificationPhaseResult,
+            execution.VerificationResultCreate,
+            execution.VerificationResultsBatchRequest,
+            execution.VerificationResultResponse,
+            execution.VerificationResultsListResponse,
         ]
 
         # Generate combined JSON schema

@@ -1,11 +1,17 @@
 {
   "schemas": {
     "ComputeTextEmbeddingRequest": {
-      "description": "Request to compute CLIP text embedding for semantic search.",
+      "description": "Request to compute text embedding for semantic search.",
       "properties": {
         "text": {
           "description": "Text to encode into embedding space",
           "title": "Text",
+          "type": "string"
+        },
+        "model": {
+          "default": "clip",
+          "description": "Embedding model: 'clip' (512-dim) or 'minilm' (384-dim)",
+          "title": "Model",
           "type": "string"
         }
       },
@@ -16,7 +22,7 @@
       "type": "object"
     },
     "ComputeTextEmbeddingResponse": {
-      "description": "Response with computed CLIP text embedding.",
+      "description": "Response with computed text embedding.",
       "properties": {
         "success": {
           "description": "Whether embedding computation succeeded",
@@ -36,7 +42,7 @@
             }
           ],
           "default": null,
-          "description": "CLIP text embedding vector (512 dimensions)",
+          "description": "Text embedding vector",
           "title": "Embedding"
         },
         "embedding_dim": {

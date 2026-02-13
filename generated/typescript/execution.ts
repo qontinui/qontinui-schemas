@@ -827,3 +827,197 @@ export interface ExecutionTreeResponse {
   /** State ID to name mapping */
   state_name_map?: Record<string, any>;
 }
+
+export interface CheckIssueDetail {
+  /** File path where the issue was found */
+  file: string;
+  /** Line number (1-based) */
+  line?: number | null;
+  /** Column number (1-based) */
+  column?: number | null;
+  /** Rule code (e.g., 'E501', 'no-unused-vars') */
+  code?: string | null;
+  /** Issue message */
+  message: string;
+  /** Severity level: error, warning, info */
+  severity: string;
+  /** Whether this issue is fixable */
+  fixable?: boolean;
+}
+
+export interface IndividualCheckResult {
+  /** Check name */
+  name: string;
+  /** Status: passed, failed, skipped */
+  status: string;
+  /** Duration in milliseconds */
+  duration_ms: number;
+  /** Number of issues found */
+  issues_found?: number;
+  /** Number of issues fixed */
+  issues_fixed?: number;
+  /** Number of files checked */
+  files_checked?: number;
+  /** Error message if failed */
+  error_message?: string | null;
+  /** Raw output from the check tool */
+  output?: string | null;
+  /** Individual issues found */
+  issues?: CheckIssueDetail[];
+}
+
+export interface VerificationStepDetails {
+  /** Step ID from the workflow */
+  step_id: string;
+  /** Phase this step belongs to */
+  phase: string;
+  /** Standard output from the step */
+  stdout?: string | null;
+  /** Standard error from the step */
+  stderr?: string | null;
+  /** Number of assertions passed */
+  assertions_passed?: number | null;
+  /** Total number of assertions */
+  assertions_total?: number | null;
+  /** Console output from browser/runtime */
+  console_output?: string | null;
+  /** Page snapshot (YAML accessibility tree) */
+  page_snapshot?: string | null;
+  /** Exit code from command execution */
+  exit_code?: number | null;
+  /** Individual check results for check_group steps */
+  check_results?: IndividualCheckResult[] | null;
+}
+
+export interface StepExecutionConfig {
+  action_type?: string | null;
+  target_image_id?: string | null;
+  target_image_name?: string | null;
+  monitor_index?: number | null;
+  screenshot_delay?: number | null;
+  timeout_seconds?: number | null;
+  playwright_script_id?: string | null;
+  initial_state_ids?: string[] | null;
+  check_type?: string | null;
+}
+
+export interface VerificationStepResult {
+  /** Step index (0-based) */
+  step_index: number;
+  /** Step type that was executed */
+  step_type: string;
+  /** Step name for display */
+  step_name: string;
+  /** Step ID from the workflow definition */
+  step_id?: string | null;
+  /** Whether the step succeeded */
+  success: boolean;
+  /** Error message if failed */
+  error?: string | null;
+  /** Path to screenshot if captured */
+  screenshot_path?: string | null;
+  /** When this step started (ISO) */
+  started_at?: string | null;
+  /** When this step ended (ISO) */
+  ended_at?: string | null;
+  /** Execution duration in ms */
+  duration_ms: number;
+  /** Step configuration */
+  config?: StepExecutionConfig;
+  /** Verification-specific fields */
+  verification_details?: VerificationStepDetails | null;
+  /** Additional output data from the step handler */
+  output_data?: Record<string, any> | null;
+}
+
+export interface GateEvaluationResult {
+  /** Gate step name */
+  gate_name: string;
+  /** Step IDs that the gate requires */
+  required_step_ids?: string[];
+  /** Step IDs that passed */
+  passed_step_ids?: string[];
+  /** Step IDs that failed */
+  failed_step_ids?: string[];
+  /** Step IDs not found in results */
+  missing_step_ids?: string[];
+  /** Whether the gate passed (all required steps passed) */
+  passed: boolean;
+}
+
+export interface VerificationPhaseResult {
+  /** Iteration number (1-indexed) */
+  iteration: number;
+  /** Whether all verification steps passed */
+  all_passed: boolean;
+  /** Total number of steps */
+  total_steps: number;
+  /** Number of steps that passed */
+  passed_steps: number;
+  /** Number of steps that failed */
+  failed_steps: number;
+  /** Number of steps skipped (gate stop_on_failure) */
+  skipped_steps?: number;
+  /** Total execution time in milliseconds */
+  total_duration_ms: number;
+  /** Individual step results */
+  step_results?: VerificationStepResult[];
+  /** Whether a critical gate failure occurred */
+  critical_failure?: boolean;
+  /** Gate evaluation results */
+  gate_results?: GateEvaluationResult[];
+  /** Whether evaluation was gate-based */
+  gate_based_evaluation?: boolean;
+}
+
+export interface VerificationResultCreate {
+  /** Iteration number */
+  iteration: number;
+  /** Full verification phase result */
+  result: VerificationPhaseResult;
+}
+
+export interface VerificationResultsBatchRequest {
+  /** Results to upsert */
+  results: VerificationResultCreate[];
+}
+
+export interface VerificationResultResponse {
+  /** Record ID */
+  id: string;
+  /** Task run ID */
+  task_run_id: string;
+  /** Iteration number */
+  iteration: number;
+  /** Whether all steps passed */
+  all_passed: boolean;
+  /** Total steps */
+  total_steps: number;
+  /** Steps that passed */
+  passed_steps: number;
+  /** Steps that failed */
+  failed_steps: number;
+  /** Steps that were skipped */
+  skipped_steps: number;
+  /** Total duration in ms */
+  total_duration_ms: number;
+  /** Whether critical failure occurred */
+  critical_failure: boolean;
+  /** Full result data */
+  result_json: VerificationPhaseResult;
+  /** When the record was created */
+  created_at: string;
+}
+
+export interface VerificationResultsListResponse {
+  /** Task run ID */
+  task_run_id: string;
+  /** Verification results ordered by iteration */
+  results: VerificationResultResponse[];
+  /** Total number of results */
+  count: number;
+  /** Number of iterations where all steps passed */
+  passed_iterations: number;
+  /** Number of iterations with failures */
+  failed_iterations: number;
+}

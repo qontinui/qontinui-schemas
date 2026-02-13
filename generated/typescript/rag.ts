@@ -21,12 +21,14 @@ export enum RagProcessingStatus {
 export interface ComputeTextEmbeddingRequest {
   /** Text to encode into embedding space */
   text: string;
+  /** Embedding model: 'clip' (512-dim) or 'minilm' (384-dim) */
+  model?: string;
 }
 
 export interface ComputeTextEmbeddingResponse {
   /** Whether embedding computation succeeded */
   success: boolean;
-  /** CLIP text embedding vector (512 dimensions) */
+  /** Text embedding vector */
   embedding?: number[] | null;
   /** Dimension of the embedding vector */
   embedding_dim?: number;

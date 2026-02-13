@@ -8503,6 +8503,4893 @@
       ],
       "title": "ExecutionTreeResponse",
       "type": "object"
+    },
+    "CheckIssueDetail": {
+      "description": "Details of an individual issue found by a check.",
+      "properties": {
+        "file": {
+          "description": "File path where the issue was found",
+          "title": "File",
+          "type": "string"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Line number (1-based)",
+          "title": "Line"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column number (1-based)",
+          "title": "Column"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+          "title": "Code"
+        },
+        "message": {
+          "description": "Issue message",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Severity level: error, warning, info",
+          "title": "Severity",
+          "type": "string"
+        },
+        "fixable": {
+          "default": false,
+          "description": "Whether this issue is fixable",
+          "title": "Fixable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file",
+        "message",
+        "severity"
+      ],
+      "title": "CheckIssueDetail",
+      "type": "object"
+    },
+    "IndividualCheckResult": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        }
+      },
+      "description": "Individual check result within a check group.",
+      "properties": {
+        "name": {
+          "description": "Check name",
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status: passed, failed, skipped",
+          "title": "Status",
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Duration in milliseconds",
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "issues_found": {
+          "default": 0,
+          "description": "Number of issues found",
+          "minimum": 0,
+          "title": "Issues Found",
+          "type": "integer"
+        },
+        "issues_fixed": {
+          "default": 0,
+          "description": "Number of issues fixed",
+          "minimum": 0,
+          "title": "Issues Fixed",
+          "type": "integer"
+        },
+        "files_checked": {
+          "default": 0,
+          "description": "Number of files checked",
+          "minimum": 0,
+          "title": "Files Checked",
+          "type": "integer"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error Message"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Raw output from the check tool",
+          "title": "Output"
+        },
+        "issues": {
+          "description": "Individual issues found",
+          "items": {
+            "$ref": "#/$defs/CheckIssueDetail"
+          },
+          "title": "Issues",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "duration_ms"
+      ],
+      "title": "IndividualCheckResult",
+      "type": "object"
+    },
+    "VerificationStepDetails": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        }
+      },
+      "description": "Verification-specific details for test and check steps.",
+      "properties": {
+        "step_id": {
+          "description": "Step ID from the workflow",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "phase": {
+          "description": "Phase this step belongs to",
+          "title": "Phase",
+          "type": "string"
+        },
+        "stdout": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Standard output from the step",
+          "title": "Stdout"
+        },
+        "stderr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Standard error from the step",
+          "title": "Stderr"
+        },
+        "assertions_passed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of assertions passed",
+          "title": "Assertions Passed"
+        },
+        "assertions_total": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Total number of assertions",
+          "title": "Assertions Total"
+        },
+        "console_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Console output from browser/runtime",
+          "title": "Console Output"
+        },
+        "page_snapshot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Page snapshot (YAML accessibility tree)",
+          "title": "Page Snapshot"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exit code from command execution",
+          "title": "Exit Code"
+        },
+        "check_results": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/IndividualCheckResult"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual check results for check_group steps",
+          "title": "Check Results"
+        }
+      },
+      "required": [
+        "step_id",
+        "phase"
+      ],
+      "title": "VerificationStepDetails",
+      "type": "object"
+    },
+    "StepExecutionConfig": {
+      "additionalProperties": true,
+      "description": "Step configuration captured for AI visibility.",
+      "properties": {
+        "action_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Type"
+        },
+        "target_image_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Image Id"
+        },
+        "target_image_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Image Name"
+        },
+        "monitor_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Monitor Index"
+        },
+        "screenshot_delay": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot Delay"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        },
+        "playwright_script_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Playwright Script Id"
+        },
+        "initial_state_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Initial State Ids"
+        },
+        "check_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Check Type"
+        }
+      },
+      "title": "StepExecutionConfig",
+      "type": "object"
+    },
+    "VerificationStepResult": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        }
+      },
+      "description": "Result of executing a single verification step.",
+      "properties": {
+        "step_index": {
+          "description": "Step index (0-based)",
+          "minimum": 0,
+          "title": "Step Index",
+          "type": "integer"
+        },
+        "step_type": {
+          "description": "Step type that was executed",
+          "title": "Step Type",
+          "type": "string"
+        },
+        "step_name": {
+          "description": "Step name for display",
+          "title": "Step Name",
+          "type": "string"
+        },
+        "step_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Step ID from the workflow definition",
+          "title": "Step Id"
+        },
+        "success": {
+          "description": "Whether the step succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        },
+        "screenshot_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to screenshot if captured",
+          "title": "Screenshot Path"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this step started (ISO)",
+          "title": "Started At"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this step ended (ISO)",
+          "title": "Ended At"
+        },
+        "duration_ms": {
+          "description": "Execution duration in ms",
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "config": {
+          "$ref": "#/$defs/StepExecutionConfig",
+          "description": "Step configuration"
+        },
+        "verification_details": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerificationStepDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Verification-specific fields"
+        },
+        "output_data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional output data from the step handler",
+          "title": "Output Data"
+        }
+      },
+      "required": [
+        "step_index",
+        "step_type",
+        "step_name",
+        "success",
+        "duration_ms"
+      ],
+      "title": "VerificationStepResult",
+      "type": "object"
+    },
+    "GateEvaluationResult": {
+      "description": "Result of evaluating a gate step.",
+      "properties": {
+        "gate_name": {
+          "description": "Gate step name",
+          "title": "Gate Name",
+          "type": "string"
+        },
+        "required_step_ids": {
+          "description": "Step IDs that the gate requires",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Step Ids",
+          "type": "array"
+        },
+        "passed_step_ids": {
+          "description": "Step IDs that passed",
+          "items": {
+            "type": "string"
+          },
+          "title": "Passed Step Ids",
+          "type": "array"
+        },
+        "failed_step_ids": {
+          "description": "Step IDs that failed",
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Step Ids",
+          "type": "array"
+        },
+        "missing_step_ids": {
+          "description": "Step IDs not found in results",
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Step Ids",
+          "type": "array"
+        },
+        "passed": {
+          "description": "Whether the gate passed (all required steps passed)",
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "gate_name",
+        "passed"
+      ],
+      "title": "GateEvaluationResult",
+      "type": "object"
+    },
+    "VerificationPhaseResult": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "GateEvaluationResult": {
+          "description": "Result of evaluating a gate step.",
+          "properties": {
+            "gate_name": {
+              "description": "Gate step name",
+              "title": "Gate Name",
+              "type": "string"
+            },
+            "required_step_ids": {
+              "description": "Step IDs that the gate requires",
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Step Ids",
+              "type": "array"
+            },
+            "passed_step_ids": {
+              "description": "Step IDs that passed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Passed Step Ids",
+              "type": "array"
+            },
+            "failed_step_ids": {
+              "description": "Step IDs that failed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Failed Step Ids",
+              "type": "array"
+            },
+            "missing_step_ids": {
+              "description": "Step IDs not found in results",
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing Step Ids",
+              "type": "array"
+            },
+            "passed": {
+              "description": "Whether the gate passed (all required steps passed)",
+              "title": "Passed",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "gate_name",
+            "passed"
+          ],
+          "title": "GateEvaluationResult",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        },
+        "VerificationStepResult": {
+          "description": "Result of executing a single verification step.",
+          "properties": {
+            "step_index": {
+              "description": "Step index (0-based)",
+              "minimum": 0,
+              "title": "Step Index",
+              "type": "integer"
+            },
+            "step_type": {
+              "description": "Step type that was executed",
+              "title": "Step Type",
+              "type": "string"
+            },
+            "step_name": {
+              "description": "Step name for display",
+              "title": "Step Name",
+              "type": "string"
+            },
+            "step_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Step ID from the workflow definition",
+              "title": "Step Id"
+            },
+            "success": {
+              "description": "Whether the step succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            },
+            "screenshot_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to screenshot if captured",
+              "title": "Screenshot Path"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step started (ISO)",
+              "title": "Started At"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step ended (ISO)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "description": "Execution duration in ms",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "config": {
+              "$ref": "#/$defs/StepExecutionConfig",
+              "description": "Step configuration"
+            },
+            "verification_details": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VerificationStepDetails"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Verification-specific fields"
+            },
+            "output_data": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional output data from the step handler",
+              "title": "Output Data"
+            }
+          },
+          "required": [
+            "step_index",
+            "step_type",
+            "step_name",
+            "success",
+            "duration_ms"
+          ],
+          "title": "VerificationStepResult",
+          "type": "object"
+        }
+      },
+      "description": "Result of running all verification steps in a unified workflow iteration.",
+      "properties": {
+        "iteration": {
+          "description": "Iteration number (1-indexed)",
+          "minimum": 1,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "all_passed": {
+          "description": "Whether all verification steps passed",
+          "title": "All Passed",
+          "type": "boolean"
+        },
+        "total_steps": {
+          "description": "Total number of steps",
+          "minimum": 0,
+          "title": "Total Steps",
+          "type": "integer"
+        },
+        "passed_steps": {
+          "description": "Number of steps that passed",
+          "minimum": 0,
+          "title": "Passed Steps",
+          "type": "integer"
+        },
+        "failed_steps": {
+          "description": "Number of steps that failed",
+          "minimum": 0,
+          "title": "Failed Steps",
+          "type": "integer"
+        },
+        "skipped_steps": {
+          "default": 0,
+          "description": "Number of steps skipped (gate stop_on_failure)",
+          "minimum": 0,
+          "title": "Skipped Steps",
+          "type": "integer"
+        },
+        "total_duration_ms": {
+          "description": "Total execution time in milliseconds",
+          "minimum": 0,
+          "title": "Total Duration Ms",
+          "type": "integer"
+        },
+        "step_results": {
+          "description": "Individual step results",
+          "items": {
+            "$ref": "#/$defs/VerificationStepResult"
+          },
+          "title": "Step Results",
+          "type": "array"
+        },
+        "critical_failure": {
+          "default": false,
+          "description": "Whether a critical gate failure occurred",
+          "title": "Critical Failure",
+          "type": "boolean"
+        },
+        "gate_results": {
+          "description": "Gate evaluation results",
+          "items": {
+            "$ref": "#/$defs/GateEvaluationResult"
+          },
+          "title": "Gate Results",
+          "type": "array"
+        },
+        "gate_based_evaluation": {
+          "default": false,
+          "description": "Whether evaluation was gate-based",
+          "title": "Gate Based Evaluation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "iteration",
+        "all_passed",
+        "total_steps",
+        "passed_steps",
+        "failed_steps",
+        "total_duration_ms"
+      ],
+      "title": "VerificationPhaseResult",
+      "type": "object"
+    },
+    "VerificationResultCreate": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "GateEvaluationResult": {
+          "description": "Result of evaluating a gate step.",
+          "properties": {
+            "gate_name": {
+              "description": "Gate step name",
+              "title": "Gate Name",
+              "type": "string"
+            },
+            "required_step_ids": {
+              "description": "Step IDs that the gate requires",
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Step Ids",
+              "type": "array"
+            },
+            "passed_step_ids": {
+              "description": "Step IDs that passed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Passed Step Ids",
+              "type": "array"
+            },
+            "failed_step_ids": {
+              "description": "Step IDs that failed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Failed Step Ids",
+              "type": "array"
+            },
+            "missing_step_ids": {
+              "description": "Step IDs not found in results",
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing Step Ids",
+              "type": "array"
+            },
+            "passed": {
+              "description": "Whether the gate passed (all required steps passed)",
+              "title": "Passed",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "gate_name",
+            "passed"
+          ],
+          "title": "GateEvaluationResult",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationPhaseResult": {
+          "description": "Result of running all verification steps in a unified workflow iteration.",
+          "properties": {
+            "iteration": {
+              "description": "Iteration number (1-indexed)",
+              "minimum": 1,
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "all_passed": {
+              "description": "Whether all verification steps passed",
+              "title": "All Passed",
+              "type": "boolean"
+            },
+            "total_steps": {
+              "description": "Total number of steps",
+              "minimum": 0,
+              "title": "Total Steps",
+              "type": "integer"
+            },
+            "passed_steps": {
+              "description": "Number of steps that passed",
+              "minimum": 0,
+              "title": "Passed Steps",
+              "type": "integer"
+            },
+            "failed_steps": {
+              "description": "Number of steps that failed",
+              "minimum": 0,
+              "title": "Failed Steps",
+              "type": "integer"
+            },
+            "skipped_steps": {
+              "default": 0,
+              "description": "Number of steps skipped (gate stop_on_failure)",
+              "minimum": 0,
+              "title": "Skipped Steps",
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "description": "Total execution time in milliseconds",
+              "minimum": 0,
+              "title": "Total Duration Ms",
+              "type": "integer"
+            },
+            "step_results": {
+              "description": "Individual step results",
+              "items": {
+                "$ref": "#/$defs/VerificationStepResult"
+              },
+              "title": "Step Results",
+              "type": "array"
+            },
+            "critical_failure": {
+              "default": false,
+              "description": "Whether a critical gate failure occurred",
+              "title": "Critical Failure",
+              "type": "boolean"
+            },
+            "gate_results": {
+              "description": "Gate evaluation results",
+              "items": {
+                "$ref": "#/$defs/GateEvaluationResult"
+              },
+              "title": "Gate Results",
+              "type": "array"
+            },
+            "gate_based_evaluation": {
+              "default": false,
+              "description": "Whether evaluation was gate-based",
+              "title": "Gate Based Evaluation",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "iteration",
+            "all_passed",
+            "total_steps",
+            "passed_steps",
+            "failed_steps",
+            "total_duration_ms"
+          ],
+          "title": "VerificationPhaseResult",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        },
+        "VerificationStepResult": {
+          "description": "Result of executing a single verification step.",
+          "properties": {
+            "step_index": {
+              "description": "Step index (0-based)",
+              "minimum": 0,
+              "title": "Step Index",
+              "type": "integer"
+            },
+            "step_type": {
+              "description": "Step type that was executed",
+              "title": "Step Type",
+              "type": "string"
+            },
+            "step_name": {
+              "description": "Step name for display",
+              "title": "Step Name",
+              "type": "string"
+            },
+            "step_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Step ID from the workflow definition",
+              "title": "Step Id"
+            },
+            "success": {
+              "description": "Whether the step succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            },
+            "screenshot_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to screenshot if captured",
+              "title": "Screenshot Path"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step started (ISO)",
+              "title": "Started At"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step ended (ISO)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "description": "Execution duration in ms",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "config": {
+              "$ref": "#/$defs/StepExecutionConfig",
+              "description": "Step configuration"
+            },
+            "verification_details": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VerificationStepDetails"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Verification-specific fields"
+            },
+            "output_data": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional output data from the step handler",
+              "title": "Output Data"
+            }
+          },
+          "required": [
+            "step_index",
+            "step_type",
+            "step_name",
+            "success",
+            "duration_ms"
+          ],
+          "title": "VerificationStepResult",
+          "type": "object"
+        }
+      },
+      "description": "Single verification result for upsert.",
+      "properties": {
+        "iteration": {
+          "description": "Iteration number",
+          "minimum": 1,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "result": {
+          "$ref": "#/$defs/VerificationPhaseResult",
+          "description": "Full verification phase result"
+        }
+      },
+      "required": [
+        "iteration",
+        "result"
+      ],
+      "title": "VerificationResultCreate",
+      "type": "object"
+    },
+    "VerificationResultsBatchRequest": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "GateEvaluationResult": {
+          "description": "Result of evaluating a gate step.",
+          "properties": {
+            "gate_name": {
+              "description": "Gate step name",
+              "title": "Gate Name",
+              "type": "string"
+            },
+            "required_step_ids": {
+              "description": "Step IDs that the gate requires",
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Step Ids",
+              "type": "array"
+            },
+            "passed_step_ids": {
+              "description": "Step IDs that passed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Passed Step Ids",
+              "type": "array"
+            },
+            "failed_step_ids": {
+              "description": "Step IDs that failed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Failed Step Ids",
+              "type": "array"
+            },
+            "missing_step_ids": {
+              "description": "Step IDs not found in results",
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing Step Ids",
+              "type": "array"
+            },
+            "passed": {
+              "description": "Whether the gate passed (all required steps passed)",
+              "title": "Passed",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "gate_name",
+            "passed"
+          ],
+          "title": "GateEvaluationResult",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationPhaseResult": {
+          "description": "Result of running all verification steps in a unified workflow iteration.",
+          "properties": {
+            "iteration": {
+              "description": "Iteration number (1-indexed)",
+              "minimum": 1,
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "all_passed": {
+              "description": "Whether all verification steps passed",
+              "title": "All Passed",
+              "type": "boolean"
+            },
+            "total_steps": {
+              "description": "Total number of steps",
+              "minimum": 0,
+              "title": "Total Steps",
+              "type": "integer"
+            },
+            "passed_steps": {
+              "description": "Number of steps that passed",
+              "minimum": 0,
+              "title": "Passed Steps",
+              "type": "integer"
+            },
+            "failed_steps": {
+              "description": "Number of steps that failed",
+              "minimum": 0,
+              "title": "Failed Steps",
+              "type": "integer"
+            },
+            "skipped_steps": {
+              "default": 0,
+              "description": "Number of steps skipped (gate stop_on_failure)",
+              "minimum": 0,
+              "title": "Skipped Steps",
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "description": "Total execution time in milliseconds",
+              "minimum": 0,
+              "title": "Total Duration Ms",
+              "type": "integer"
+            },
+            "step_results": {
+              "description": "Individual step results",
+              "items": {
+                "$ref": "#/$defs/VerificationStepResult"
+              },
+              "title": "Step Results",
+              "type": "array"
+            },
+            "critical_failure": {
+              "default": false,
+              "description": "Whether a critical gate failure occurred",
+              "title": "Critical Failure",
+              "type": "boolean"
+            },
+            "gate_results": {
+              "description": "Gate evaluation results",
+              "items": {
+                "$ref": "#/$defs/GateEvaluationResult"
+              },
+              "title": "Gate Results",
+              "type": "array"
+            },
+            "gate_based_evaluation": {
+              "default": false,
+              "description": "Whether evaluation was gate-based",
+              "title": "Gate Based Evaluation",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "iteration",
+            "all_passed",
+            "total_steps",
+            "passed_steps",
+            "failed_steps",
+            "total_duration_ms"
+          ],
+          "title": "VerificationPhaseResult",
+          "type": "object"
+        },
+        "VerificationResultCreate": {
+          "description": "Single verification result for upsert.",
+          "properties": {
+            "iteration": {
+              "description": "Iteration number",
+              "minimum": 1,
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "result": {
+              "$ref": "#/$defs/VerificationPhaseResult",
+              "description": "Full verification phase result"
+            }
+          },
+          "required": [
+            "iteration",
+            "result"
+          ],
+          "title": "VerificationResultCreate",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        },
+        "VerificationStepResult": {
+          "description": "Result of executing a single verification step.",
+          "properties": {
+            "step_index": {
+              "description": "Step index (0-based)",
+              "minimum": 0,
+              "title": "Step Index",
+              "type": "integer"
+            },
+            "step_type": {
+              "description": "Step type that was executed",
+              "title": "Step Type",
+              "type": "string"
+            },
+            "step_name": {
+              "description": "Step name for display",
+              "title": "Step Name",
+              "type": "string"
+            },
+            "step_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Step ID from the workflow definition",
+              "title": "Step Id"
+            },
+            "success": {
+              "description": "Whether the step succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            },
+            "screenshot_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to screenshot if captured",
+              "title": "Screenshot Path"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step started (ISO)",
+              "title": "Started At"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step ended (ISO)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "description": "Execution duration in ms",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "config": {
+              "$ref": "#/$defs/StepExecutionConfig",
+              "description": "Step configuration"
+            },
+            "verification_details": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VerificationStepDetails"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Verification-specific fields"
+            },
+            "output_data": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional output data from the step handler",
+              "title": "Output Data"
+            }
+          },
+          "required": [
+            "step_index",
+            "step_type",
+            "step_name",
+            "success",
+            "duration_ms"
+          ],
+          "title": "VerificationStepResult",
+          "type": "object"
+        }
+      },
+      "description": "Request to batch upsert verification results.",
+      "properties": {
+        "results": {
+          "description": "Results to upsert",
+          "items": {
+            "$ref": "#/$defs/VerificationResultCreate"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "title": "VerificationResultsBatchRequest",
+      "type": "object"
+    },
+    "VerificationResultResponse": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "GateEvaluationResult": {
+          "description": "Result of evaluating a gate step.",
+          "properties": {
+            "gate_name": {
+              "description": "Gate step name",
+              "title": "Gate Name",
+              "type": "string"
+            },
+            "required_step_ids": {
+              "description": "Step IDs that the gate requires",
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Step Ids",
+              "type": "array"
+            },
+            "passed_step_ids": {
+              "description": "Step IDs that passed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Passed Step Ids",
+              "type": "array"
+            },
+            "failed_step_ids": {
+              "description": "Step IDs that failed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Failed Step Ids",
+              "type": "array"
+            },
+            "missing_step_ids": {
+              "description": "Step IDs not found in results",
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing Step Ids",
+              "type": "array"
+            },
+            "passed": {
+              "description": "Whether the gate passed (all required steps passed)",
+              "title": "Passed",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "gate_name",
+            "passed"
+          ],
+          "title": "GateEvaluationResult",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationPhaseResult": {
+          "description": "Result of running all verification steps in a unified workflow iteration.",
+          "properties": {
+            "iteration": {
+              "description": "Iteration number (1-indexed)",
+              "minimum": 1,
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "all_passed": {
+              "description": "Whether all verification steps passed",
+              "title": "All Passed",
+              "type": "boolean"
+            },
+            "total_steps": {
+              "description": "Total number of steps",
+              "minimum": 0,
+              "title": "Total Steps",
+              "type": "integer"
+            },
+            "passed_steps": {
+              "description": "Number of steps that passed",
+              "minimum": 0,
+              "title": "Passed Steps",
+              "type": "integer"
+            },
+            "failed_steps": {
+              "description": "Number of steps that failed",
+              "minimum": 0,
+              "title": "Failed Steps",
+              "type": "integer"
+            },
+            "skipped_steps": {
+              "default": 0,
+              "description": "Number of steps skipped (gate stop_on_failure)",
+              "minimum": 0,
+              "title": "Skipped Steps",
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "description": "Total execution time in milliseconds",
+              "minimum": 0,
+              "title": "Total Duration Ms",
+              "type": "integer"
+            },
+            "step_results": {
+              "description": "Individual step results",
+              "items": {
+                "$ref": "#/$defs/VerificationStepResult"
+              },
+              "title": "Step Results",
+              "type": "array"
+            },
+            "critical_failure": {
+              "default": false,
+              "description": "Whether a critical gate failure occurred",
+              "title": "Critical Failure",
+              "type": "boolean"
+            },
+            "gate_results": {
+              "description": "Gate evaluation results",
+              "items": {
+                "$ref": "#/$defs/GateEvaluationResult"
+              },
+              "title": "Gate Results",
+              "type": "array"
+            },
+            "gate_based_evaluation": {
+              "default": false,
+              "description": "Whether evaluation was gate-based",
+              "title": "Gate Based Evaluation",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "iteration",
+            "all_passed",
+            "total_steps",
+            "passed_steps",
+            "failed_steps",
+            "total_duration_ms"
+          ],
+          "title": "VerificationPhaseResult",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        },
+        "VerificationStepResult": {
+          "description": "Result of executing a single verification step.",
+          "properties": {
+            "step_index": {
+              "description": "Step index (0-based)",
+              "minimum": 0,
+              "title": "Step Index",
+              "type": "integer"
+            },
+            "step_type": {
+              "description": "Step type that was executed",
+              "title": "Step Type",
+              "type": "string"
+            },
+            "step_name": {
+              "description": "Step name for display",
+              "title": "Step Name",
+              "type": "string"
+            },
+            "step_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Step ID from the workflow definition",
+              "title": "Step Id"
+            },
+            "success": {
+              "description": "Whether the step succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            },
+            "screenshot_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to screenshot if captured",
+              "title": "Screenshot Path"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step started (ISO)",
+              "title": "Started At"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step ended (ISO)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "description": "Execution duration in ms",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "config": {
+              "$ref": "#/$defs/StepExecutionConfig",
+              "description": "Step configuration"
+            },
+            "verification_details": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VerificationStepDetails"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Verification-specific fields"
+            },
+            "output_data": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional output data from the step handler",
+              "title": "Output Data"
+            }
+          },
+          "required": [
+            "step_index",
+            "step_type",
+            "step_name",
+            "success",
+            "duration_ms"
+          ],
+          "title": "VerificationStepResult",
+          "type": "object"
+        }
+      },
+      "description": "Response for a single stored verification result.",
+      "properties": {
+        "id": {
+          "description": "Record ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "description": "Task run ID",
+          "format": "uuid",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "iteration": {
+          "description": "Iteration number",
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "all_passed": {
+          "description": "Whether all steps passed",
+          "title": "All Passed",
+          "type": "boolean"
+        },
+        "total_steps": {
+          "description": "Total steps",
+          "title": "Total Steps",
+          "type": "integer"
+        },
+        "passed_steps": {
+          "description": "Steps that passed",
+          "title": "Passed Steps",
+          "type": "integer"
+        },
+        "failed_steps": {
+          "description": "Steps that failed",
+          "title": "Failed Steps",
+          "type": "integer"
+        },
+        "skipped_steps": {
+          "description": "Steps that were skipped",
+          "title": "Skipped Steps",
+          "type": "integer"
+        },
+        "total_duration_ms": {
+          "description": "Total duration in ms",
+          "title": "Total Duration Ms",
+          "type": "integer"
+        },
+        "critical_failure": {
+          "description": "Whether critical failure occurred",
+          "title": "Critical Failure",
+          "type": "boolean"
+        },
+        "result_json": {
+          "$ref": "#/$defs/VerificationPhaseResult",
+          "description": "Full result data"
+        },
+        "created_at": {
+          "description": "When the record was created",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "task_run_id",
+        "iteration",
+        "all_passed",
+        "total_steps",
+        "passed_steps",
+        "failed_steps",
+        "skipped_steps",
+        "total_duration_ms",
+        "critical_failure",
+        "result_json",
+        "created_at"
+      ],
+      "title": "VerificationResultResponse",
+      "type": "object"
+    },
+    "VerificationResultsListResponse": {
+      "$defs": {
+        "CheckIssueDetail": {
+          "description": "Details of an individual issue found by a check.",
+          "properties": {
+            "file": {
+              "description": "File path where the issue was found",
+              "title": "File",
+              "type": "string"
+            },
+            "line": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Line number (1-based)",
+              "title": "Line"
+            },
+            "column": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Column number (1-based)",
+              "title": "Column"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rule code (e.g., 'E501', 'no-unused-vars')",
+              "title": "Code"
+            },
+            "message": {
+              "description": "Issue message",
+              "title": "Message",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Severity level: error, warning, info",
+              "title": "Severity",
+              "type": "string"
+            },
+            "fixable": {
+              "default": false,
+              "description": "Whether this issue is fixable",
+              "title": "Fixable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "file",
+            "message",
+            "severity"
+          ],
+          "title": "CheckIssueDetail",
+          "type": "object"
+        },
+        "GateEvaluationResult": {
+          "description": "Result of evaluating a gate step.",
+          "properties": {
+            "gate_name": {
+              "description": "Gate step name",
+              "title": "Gate Name",
+              "type": "string"
+            },
+            "required_step_ids": {
+              "description": "Step IDs that the gate requires",
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Step Ids",
+              "type": "array"
+            },
+            "passed_step_ids": {
+              "description": "Step IDs that passed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Passed Step Ids",
+              "type": "array"
+            },
+            "failed_step_ids": {
+              "description": "Step IDs that failed",
+              "items": {
+                "type": "string"
+              },
+              "title": "Failed Step Ids",
+              "type": "array"
+            },
+            "missing_step_ids": {
+              "description": "Step IDs not found in results",
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing Step Ids",
+              "type": "array"
+            },
+            "passed": {
+              "description": "Whether the gate passed (all required steps passed)",
+              "title": "Passed",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "gate_name",
+            "passed"
+          ],
+          "title": "GateEvaluationResult",
+          "type": "object"
+        },
+        "IndividualCheckResult": {
+          "description": "Individual check result within a check group.",
+          "properties": {
+            "name": {
+              "description": "Check name",
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "description": "Status: passed, failed, skipped",
+              "title": "Status",
+              "type": "string"
+            },
+            "duration_ms": {
+              "description": "Duration in milliseconds",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "issues_found": {
+              "default": 0,
+              "description": "Number of issues found",
+              "minimum": 0,
+              "title": "Issues Found",
+              "type": "integer"
+            },
+            "issues_fixed": {
+              "default": 0,
+              "description": "Number of issues fixed",
+              "minimum": 0,
+              "title": "Issues Fixed",
+              "type": "integer"
+            },
+            "files_checked": {
+              "default": 0,
+              "description": "Number of files checked",
+              "minimum": 0,
+              "title": "Files Checked",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error Message"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Raw output from the check tool",
+              "title": "Output"
+            },
+            "issues": {
+              "description": "Individual issues found",
+              "items": {
+                "$ref": "#/$defs/CheckIssueDetail"
+              },
+              "title": "Issues",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "duration_ms"
+          ],
+          "title": "IndividualCheckResult",
+          "type": "object"
+        },
+        "StepExecutionConfig": {
+          "additionalProperties": true,
+          "description": "Step configuration captured for AI visibility.",
+          "properties": {
+            "action_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Action Type"
+            },
+            "target_image_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Id"
+            },
+            "target_image_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Image Name"
+            },
+            "monitor_index": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Monitor Index"
+            },
+            "screenshot_delay": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Delay"
+            },
+            "timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timeout Seconds"
+            },
+            "playwright_script_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Playwright Script Id"
+            },
+            "initial_state_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Initial State Ids"
+            },
+            "check_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Check Type"
+            }
+          },
+          "title": "StepExecutionConfig",
+          "type": "object"
+        },
+        "VerificationPhaseResult": {
+          "description": "Result of running all verification steps in a unified workflow iteration.",
+          "properties": {
+            "iteration": {
+              "description": "Iteration number (1-indexed)",
+              "minimum": 1,
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "all_passed": {
+              "description": "Whether all verification steps passed",
+              "title": "All Passed",
+              "type": "boolean"
+            },
+            "total_steps": {
+              "description": "Total number of steps",
+              "minimum": 0,
+              "title": "Total Steps",
+              "type": "integer"
+            },
+            "passed_steps": {
+              "description": "Number of steps that passed",
+              "minimum": 0,
+              "title": "Passed Steps",
+              "type": "integer"
+            },
+            "failed_steps": {
+              "description": "Number of steps that failed",
+              "minimum": 0,
+              "title": "Failed Steps",
+              "type": "integer"
+            },
+            "skipped_steps": {
+              "default": 0,
+              "description": "Number of steps skipped (gate stop_on_failure)",
+              "minimum": 0,
+              "title": "Skipped Steps",
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "description": "Total execution time in milliseconds",
+              "minimum": 0,
+              "title": "Total Duration Ms",
+              "type": "integer"
+            },
+            "step_results": {
+              "description": "Individual step results",
+              "items": {
+                "$ref": "#/$defs/VerificationStepResult"
+              },
+              "title": "Step Results",
+              "type": "array"
+            },
+            "critical_failure": {
+              "default": false,
+              "description": "Whether a critical gate failure occurred",
+              "title": "Critical Failure",
+              "type": "boolean"
+            },
+            "gate_results": {
+              "description": "Gate evaluation results",
+              "items": {
+                "$ref": "#/$defs/GateEvaluationResult"
+              },
+              "title": "Gate Results",
+              "type": "array"
+            },
+            "gate_based_evaluation": {
+              "default": false,
+              "description": "Whether evaluation was gate-based",
+              "title": "Gate Based Evaluation",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "iteration",
+            "all_passed",
+            "total_steps",
+            "passed_steps",
+            "failed_steps",
+            "total_duration_ms"
+          ],
+          "title": "VerificationPhaseResult",
+          "type": "object"
+        },
+        "VerificationResultResponse": {
+          "description": "Response for a single stored verification result.",
+          "properties": {
+            "id": {
+              "description": "Record ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "task_run_id": {
+              "description": "Task run ID",
+              "format": "uuid",
+              "title": "Task Run Id",
+              "type": "string"
+            },
+            "iteration": {
+              "description": "Iteration number",
+              "title": "Iteration",
+              "type": "integer"
+            },
+            "all_passed": {
+              "description": "Whether all steps passed",
+              "title": "All Passed",
+              "type": "boolean"
+            },
+            "total_steps": {
+              "description": "Total steps",
+              "title": "Total Steps",
+              "type": "integer"
+            },
+            "passed_steps": {
+              "description": "Steps that passed",
+              "title": "Passed Steps",
+              "type": "integer"
+            },
+            "failed_steps": {
+              "description": "Steps that failed",
+              "title": "Failed Steps",
+              "type": "integer"
+            },
+            "skipped_steps": {
+              "description": "Steps that were skipped",
+              "title": "Skipped Steps",
+              "type": "integer"
+            },
+            "total_duration_ms": {
+              "description": "Total duration in ms",
+              "title": "Total Duration Ms",
+              "type": "integer"
+            },
+            "critical_failure": {
+              "description": "Whether critical failure occurred",
+              "title": "Critical Failure",
+              "type": "boolean"
+            },
+            "result_json": {
+              "$ref": "#/$defs/VerificationPhaseResult",
+              "description": "Full result data"
+            },
+            "created_at": {
+              "description": "When the record was created",
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "task_run_id",
+            "iteration",
+            "all_passed",
+            "total_steps",
+            "passed_steps",
+            "failed_steps",
+            "skipped_steps",
+            "total_duration_ms",
+            "critical_failure",
+            "result_json",
+            "created_at"
+          ],
+          "title": "VerificationResultResponse",
+          "type": "object"
+        },
+        "VerificationStepDetails": {
+          "description": "Verification-specific details for test and check steps.",
+          "properties": {
+            "step_id": {
+              "description": "Step ID from the workflow",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "phase": {
+              "description": "Phase this step belongs to",
+              "title": "Phase",
+              "type": "string"
+            },
+            "stdout": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard output from the step",
+              "title": "Stdout"
+            },
+            "stderr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Standard error from the step",
+              "title": "Stderr"
+            },
+            "assertions_passed": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Number of assertions passed",
+              "title": "Assertions Passed"
+            },
+            "assertions_total": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total number of assertions",
+              "title": "Assertions Total"
+            },
+            "console_output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Console output from browser/runtime",
+              "title": "Console Output"
+            },
+            "page_snapshot": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Page snapshot (YAML accessibility tree)",
+              "title": "Page Snapshot"
+            },
+            "exit_code": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exit code from command execution",
+              "title": "Exit Code"
+            },
+            "check_results": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/IndividualCheckResult"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Individual check results for check_group steps",
+              "title": "Check Results"
+            }
+          },
+          "required": [
+            "step_id",
+            "phase"
+          ],
+          "title": "VerificationStepDetails",
+          "type": "object"
+        },
+        "VerificationStepResult": {
+          "description": "Result of executing a single verification step.",
+          "properties": {
+            "step_index": {
+              "description": "Step index (0-based)",
+              "minimum": 0,
+              "title": "Step Index",
+              "type": "integer"
+            },
+            "step_type": {
+              "description": "Step type that was executed",
+              "title": "Step Type",
+              "type": "string"
+            },
+            "step_name": {
+              "description": "Step name for display",
+              "title": "Step Name",
+              "type": "string"
+            },
+            "step_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Step ID from the workflow definition",
+              "title": "Step Id"
+            },
+            "success": {
+              "description": "Whether the step succeeded",
+              "title": "Success",
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Error message if failed",
+              "title": "Error"
+            },
+            "screenshot_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to screenshot if captured",
+              "title": "Screenshot Path"
+            },
+            "started_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step started (ISO)",
+              "title": "Started At"
+            },
+            "ended_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When this step ended (ISO)",
+              "title": "Ended At"
+            },
+            "duration_ms": {
+              "description": "Execution duration in ms",
+              "minimum": 0,
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "config": {
+              "$ref": "#/$defs/StepExecutionConfig",
+              "description": "Step configuration"
+            },
+            "verification_details": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VerificationStepDetails"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Verification-specific fields"
+            },
+            "output_data": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional output data from the step handler",
+              "title": "Output Data"
+            }
+          },
+          "required": [
+            "step_index",
+            "step_type",
+            "step_name",
+            "success",
+            "duration_ms"
+          ],
+          "title": "VerificationStepResult",
+          "type": "object"
+        }
+      },
+      "description": "Response for listing verification results for a task run.",
+      "properties": {
+        "task_run_id": {
+          "description": "Task run ID",
+          "format": "uuid",
+          "title": "Task Run Id",
+          "type": "string"
+        },
+        "results": {
+          "description": "Verification results ordered by iteration",
+          "items": {
+            "$ref": "#/$defs/VerificationResultResponse"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "count": {
+          "description": "Total number of results",
+          "title": "Count",
+          "type": "integer"
+        },
+        "passed_iterations": {
+          "description": "Number of iterations where all steps passed",
+          "title": "Passed Iterations",
+          "type": "integer"
+        },
+        "failed_iterations": {
+          "description": "Number of iterations with failures",
+          "title": "Failed Iterations",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_run_id",
+        "results",
+        "count",
+        "passed_iterations",
+        "failed_iterations"
+      ],
+      "title": "VerificationResultsListResponse",
+      "type": "object"
     }
   }
 }
