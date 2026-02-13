@@ -63,9 +63,7 @@ class VerificationStepDetails(BaseModel):
     assertions_passed: int | None = Field(
         None, description="Number of assertions passed"
     )
-    assertions_total: int | None = Field(
-        None, description="Total number of assertions"
-    )
+    assertions_total: int | None = Field(None, description="Total number of assertions")
     console_output: str | None = Field(
         None, description="Console output from browser/runtime"
     )
@@ -147,9 +145,7 @@ class VerificationPhaseResult(BaseModel):
     """Result of running all verification steps in a unified workflow iteration."""
 
     iteration: int = Field(..., ge=1, description="Iteration number (1-indexed)")
-    all_passed: bool = Field(
-        ..., description="Whether all verification steps passed"
-    )
+    all_passed: bool = Field(..., description="Whether all verification steps passed")
     total_steps: int = Field(..., ge=0, description="Total number of steps")
     passed_steps: int = Field(..., ge=0, description="Number of steps that passed")
     failed_steps: int = Field(..., ge=0, description="Number of steps that failed")
@@ -208,9 +204,7 @@ class VerificationResultResponse(BaseModel):
     skipped_steps: int = Field(..., description="Steps that were skipped")
     total_duration_ms: int = Field(..., description="Total duration in ms")
     critical_failure: bool = Field(..., description="Whether critical failure occurred")
-    result_json: VerificationPhaseResult = Field(
-        ..., description="Full result data"
-    )
+    result_json: VerificationPhaseResult = Field(..., description="Full result data")
     created_at: datetime = Field(..., description="When the record was created")
 
 
