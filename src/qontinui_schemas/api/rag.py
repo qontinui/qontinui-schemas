@@ -46,17 +46,21 @@ class RagProcessingStatus(str, Enum):
 
 
 class ComputeTextEmbeddingRequest(BaseModel):
-    """Request to compute CLIP text embedding for semantic search."""
+    """Request to compute text embedding for semantic search."""
 
     text: str = Field(description="Text to encode into embedding space")
+    model: str = Field(
+        default="clip",
+        description="Embedding model: 'clip' (512-dim) or 'minilm' (384-dim)",
+    )
 
 
 class ComputeTextEmbeddingResponse(BaseModel):
-    """Response with computed CLIP text embedding."""
+    """Response with computed text embedding."""
 
     success: bool = Field(description="Whether embedding computation succeeded")
     embedding: list[float] | None = Field(
-        default=None, description="CLIP text embedding vector (512 dimensions)"
+        default=None, description="Text embedding vector"
     )
     embedding_dim: int = Field(
         default=512, description="Dimension of the embedding vector"
