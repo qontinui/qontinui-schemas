@@ -29,7 +29,11 @@ export type WorkflowPhase = "setup" | "verification" | "agentic" | "completion";
 // Log Source Selection
 // =============================================================================
 
-export type LogSourceSelection = "default" | "ai" | "all" | { profile_id: string };
+export type LogSourceSelection =
+  | "default"
+  | "ai"
+  | "all"
+  | { profile_id: string };
 
 // =============================================================================
 // Health Check Configuration
@@ -77,7 +81,12 @@ export interface ApiVariableExtraction {
 }
 
 export interface ApiAssertion {
-  type: "status_code" | "json_path" | "header" | "body_contains" | "response_time";
+  type:
+    | "status_code"
+    | "json_path"
+    | "header"
+    | "body_contains"
+    | "response_time";
   expected: string | number;
   json_path?: string;
   header_name?: string;
@@ -203,12 +212,24 @@ export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow";
 // Unified Step Types
 // =============================================================================
 
-export type UnifiedStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
+export type UnifiedStep =
+  | CommandStep
+  | PromptStep
+  | UiBridgeStep
+  | WorkflowStep;
 
 export type SetupStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
-export type VerificationStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
+export type VerificationStep =
+  | CommandStep
+  | PromptStep
+  | UiBridgeStep
+  | WorkflowStep;
 export type AgenticStep = PromptStep;
-export type CompletionStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
+export type CompletionStep =
+  | CommandStep
+  | PromptStep
+  | UiBridgeStep
+  | WorkflowStep;
 
 // =============================================================================
 // Workflow Stages
@@ -288,4 +309,36 @@ export interface WorkflowImportResult {
   workflow: UnifiedWorkflow;
   overwritten: boolean;
   original_id: string | null;
+}
+
+// =============================================================================
+// Phase Normalization Helpers
+// =============================================================================
+
+/** Convert any workflow to its phases (stages) representation */
+export function normalizeToPhases(workflow: UnifiedWorkflow): WorkflowStage[] {
+  if (workflow.stages && workflow.stages.length > 0) {
+    return workflow.stages;
+  }
+  // Wrap top-level steps as a single phase
+  return [
+    {
+      id: workflow.id + "-phase-1",
+      name: workflow.name,
+      description: workflow.description,
+      setup_steps: workflow.setup_steps,
+      verification_steps: workflow.verification_steps,
+      agentic_steps: workflow.agentic_steps,
+      completion_steps: workflow.completion_steps ?? [],
+      max_iterations: workflow.max_iterations,
+      timeout_seconds: workflow.timeout_seconds,
+      provider: workflow.provider,
+      model: workflow.model,
+    },
+  ];
+}
+
+/** Get the number of phases in a workflow */
+export function getPhaseCount(workflow: UnifiedWorkflow): number {
+  return normalizeToPhases(workflow).length;
 }
