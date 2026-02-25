@@ -262,7 +262,8 @@ export interface CategoryStore {
 // Color Types (design-system colors)
 // ============================================================================
 
-export type SeverityLevel = "critical" | "high" | "medium" | "low" | "info";
+/** @deprecated Use FindingSeverity instead */
+export type SeverityLevel = FindingSeverity;
 
 export interface SeverityColorClasses {
   bg: string;

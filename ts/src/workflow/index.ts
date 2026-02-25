@@ -323,7 +323,7 @@ export interface StepTypeInfo {
   description: string;
   icon: string;
   color: string;
-  phase: WorkflowPhase | "setup" | "verification";
+  phase: WorkflowPhase;
 }
 
 // =============================================================================
