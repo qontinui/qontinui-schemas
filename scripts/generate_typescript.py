@@ -1120,6 +1120,9 @@ def generate_from_json_schema() -> bool:
     # Generate accessibility types (accessibility tree capture and interaction)
     if not generate_accessibility_types():
         success = False
+    # Generate unified workflow types (JSON Schema only, TS maintained manually)
+    if not generate_unified_workflow_types():
+        success = False
     return success
 
 
@@ -1232,9 +1235,62 @@ def generate_accessibility_types() -> bool:
         return False
 
 
-def python_type_to_ts(
-    python_type: str, field_info: dict[str, object] | None = None
-) -> str:
+def generate_unified_workflow_types() -> bool:
+    """Generate JSON Schema for Unified Workflow types.
+
+    Note: The TypeScript file (unified_workflow.ts) is manually maintained
+    to preserve TypeScript-native patterns (union types, extends, type aliases)
+    that cannot be auto-generated from Pydantic models. Only the JSON Schema
+    is auto-generated here.
+    """
+    project_root = get_project_root()
+    output_dir = project_root / "generated" / "typescript"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from qontinui_schemas import unified_workflow
+
+        models = [
+            unified_workflow.HealthCheckUrl,
+            unified_workflow.BaseStep,
+            unified_workflow.CommandStep,
+            unified_workflow.PromptStep,
+            unified_workflow.UiBridgeStep,
+            unified_workflow.ApiVariableExtraction,
+            unified_workflow.ApiAssertion,
+            unified_workflow.WorkflowStage,
+            unified_workflow.UnifiedWorkflow,
+        ]
+
+        # Generate combined JSON schema (for validation/documentation)
+        schemas: dict[str, dict[str, object]] = {}
+        for model in models:
+            if hasattr(model, "model_json_schema"):
+                schemas[model.__name__] = model.model_json_schema()
+
+        schema_file = output_dir / "unified_workflow.schema.json"
+        with open(schema_file, "w") as f:
+            json.dump({"schemas": schemas}, f, indent=2)
+        print(f"Generated JSON Schema: {schema_file}")
+
+        # Note: TypeScript file is manually maintained for proper TS patterns
+        ts_file = output_dir / "unified_workflow.ts"
+        if ts_file.exists():
+            print(f"TypeScript file exists (manually maintained): {ts_file}")
+        else:
+            print(f"Warning: TypeScript file not found: {ts_file}")
+            print("  Create it manually with proper TypeScript patterns.")
+
+        return True
+    except Exception as e:
+        print(f"Error generating unified_workflow types: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def python_type_to_ts(python_type: str, field_info: dict[str, object] | None = None) -> str:
     """Convert Python type annotation to TypeScript type."""
     # Handle common types
     type_map = {

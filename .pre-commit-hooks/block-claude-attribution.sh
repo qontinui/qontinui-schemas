@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Block Claude attribution in commit messages
 
 COMMIT_MSG_FILE=$1
