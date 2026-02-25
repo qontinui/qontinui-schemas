@@ -202,7 +202,7 @@ export const SOURCE_TYPE_COLORS: Record<DiscoverySourceType, string> = {
 // =============================================================================
 
 export function toStateDiscoveryResult(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): StateDiscoveryResult {
   return {
     id: data.id as string,
@@ -215,7 +215,7 @@ export function toStateDiscoveryResult(
     images: ((data.images as unknown[]) || []).map(toDiscoveredStateImage),
     states: ((data.states as unknown[]) || []).map(toDiscoveredState),
     transitions: ((data.transitions as unknown[]) || []).map(
-      toDiscoveredTransition
+      toDiscoveredTransition,
     ),
     element_to_renders:
       (data.element_to_renders as Record<string, string[]>) || {},
@@ -284,7 +284,7 @@ export function toDiscoveredTransition(data: unknown): DiscoveredTransition {
 }
 
 export function toStateDiscoveryResultSummary(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): StateDiscoveryResultSummary {
   return {
     id: data.id as string,

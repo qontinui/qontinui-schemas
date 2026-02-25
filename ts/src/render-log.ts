@@ -259,7 +259,9 @@ export interface DomSnapshotRenderLogEntry extends RenderLogEntryBase {
  * Any render log entry.
  * Use the `type` field to discriminate.
  */
-export type RenderLogEntry = ComponentRenderLogEntry | DomSnapshotRenderLogEntry;
+export type RenderLogEntry =
+  | ComponentRenderLogEntry
+  | DomSnapshotRenderLogEntry;
 
 // =============================================================================
 // API Types (for REST endpoints)
@@ -354,7 +356,7 @@ export interface RenderLogStats {
  * Check if a render log entry is a component log.
  */
 export function isComponentRenderLog(
-  entry: RenderLogEntry
+  entry: RenderLogEntry,
 ): entry is ComponentRenderLogEntry {
   return entry.type === "component";
 }
@@ -363,7 +365,7 @@ export function isComponentRenderLog(
  * Check if a render log entry is a DOM snapshot log.
  */
 export function isDomSnapshotRenderLog(
-  entry: RenderLogEntry
+  entry: RenderLogEntry,
 ): entry is DomSnapshotRenderLogEntry {
   return entry.type === "dom_snapshot";
 }

@@ -10,4 +10,17 @@ export * from "./render-log";
 // State discovery types
 export * from "./discovery";
 
-// Test specification types — migrated to @qontinui/ui-bridge/specs
+// Workflow types
+export * from "./workflow";
+
+// Task run types
+export * from "./task-run";
+
+// Execution types
+export * from "./execution";
+
+// Scheduler types
+export * from "./scheduler";
+
+// Library types
+export * from "./library";

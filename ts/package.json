@@ -1,17 +1,51 @@
 {
   "name": "@qontinui/shared-types",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared TypeScript types for the Qontinui ecosystem",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./workflow": {
+      "types": "./dist/workflow.d.ts",
+      "import": "./dist/workflow.js",
+      "require": "./dist/workflow.cjs"
+    },
+    "./task-run": {
+      "types": "./dist/task-run.d.ts",
+      "import": "./dist/task-run.js",
+      "require": "./dist/task-run.cjs"
+    },
+    "./execution": {
+      "types": "./dist/execution.d.ts",
+      "import": "./dist/execution.js",
+      "require": "./dist/execution.cjs"
+    },
+    "./scheduler": {
+      "types": "./dist/scheduler.d.ts",
+      "import": "./dist/scheduler.js",
+      "require": "./dist/scheduler.cjs"
+    },
+    "./library": {
+      "types": "./dist/library.d.ts",
+      "import": "./dist/library.js",
+      "require": "./dist/library.cjs"
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run build"
   },
@@ -23,6 +57,7 @@
   "author": "Joshua Spinak",
   "license": "MIT",
   "devDependencies": {
+    "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "rimraf": "^5.0.0"
   },
