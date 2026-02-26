@@ -23,7 +23,21 @@ export interface ScheduleInterval {
   value: number;
 }
 
-export type ScheduleExpression = ScheduleOnce | ScheduleCron | ScheduleInterval;
+export interface ScheduleState {
+  type: "State";
+  /** The state machine state ID that triggers this task */
+  state_id: string;
+  /** Delay in seconds after entering the state before triggering */
+  check_delay_seconds?: number;
+  /** Minimum seconds between re-triggers if state is re-entered */
+  rebuild_delay_seconds?: number;
+}
+
+export type ScheduleExpression =
+  | ScheduleOnce
+  | ScheduleCron
+  | ScheduleInterval
+  | ScheduleState;
 
 // ============================================================================
 // Schedule Conditions
