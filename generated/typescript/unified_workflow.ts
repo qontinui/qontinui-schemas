@@ -283,6 +283,7 @@ export interface UnifiedWorkflow {
   prompt_template?: string | null;
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
+  reflection_mode?: boolean;
   category: string;
   tags: string[];
   created_at: string;

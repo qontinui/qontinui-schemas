@@ -36,6 +36,11 @@
       "types": "./dist/library.d.ts",
       "import": "./dist/library.js",
       "require": "./dist/library.cjs"
+    },
+    "./chat": {
+      "types": "./dist/chat.d.ts",
+      "import": "./dist/chat.js",
+      "require": "./dist/chat.cjs"
     }
   },
   "files": [

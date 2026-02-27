@@ -8,6 +8,7 @@ export default defineConfig({
     execution: "src/execution/index.ts",
     scheduler: "src/scheduler/index.ts",
     library: "src/library/index.ts",
+    chat: "src/chat/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

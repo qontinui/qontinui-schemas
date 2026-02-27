@@ -24,3 +24,6 @@ export * from "./scheduler";
 
 // Library types
 export * from "./library";
+
+// Chat types
+export * from "./chat";
