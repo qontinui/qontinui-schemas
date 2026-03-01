@@ -1,0 +1,132 @@
+/**
+ * Canvas Types
+ *
+ * Type definitions for the A2UI (Agent-to-UI) Canvas system.
+ * Canvas panels allow the AI agent to render rich, structured visual content
+ * in the dashboard during workflow execution.
+ */
+
+/**
+ * Supported canvas component types.
+ * These are validated server-side against an allowlist.
+ */
+export type CanvasComponentType =
+  | "Markdown"
+  | "CodeDiff"
+  | "Table"
+  | "FileTree"
+  | "KeyValue"
+  | "Terminal"
+  | "Alert"
+  | "Timeline"
+  | "ProgressChart"
+  | "FindingList"
+  | "Checklist";
+
+/**
+ * A canvas panel rendered in the dashboard.
+ */
+export interface CanvasPanel {
+  panel_id: string;
+  component: CanvasComponentType;
+  title: string;
+  data: Record<string, unknown>;
+  priority?: number;
+  size?: "compact" | "normal" | "large";
+  task_run_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Event emitted when a canvas panel is created, updated, or deleted.
+ */
+export interface CanvasUpdateEvent {
+  action: "create" | "update" | "delete" | "clear";
+  panel_id: string;
+  panel?: CanvasPanel;
+  task_run_id?: string;
+}
+
+// ============================================================================
+// Component-specific data schemas
+// ============================================================================
+
+/** Data for Markdown component. */
+export interface MarkdownData {
+  content: string;
+}
+
+/** Data for Table component. */
+export interface TableData {
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+  sortable?: boolean;
+}
+
+/** Data for CodeDiff component. */
+export interface CodeDiffData {
+  file_path: string;
+  language?: string;
+  old_content?: string;
+  new_content?: string;
+  unified_diff?: string;
+}
+
+/** Data for KeyValue component. */
+export interface KeyValueData {
+  pairs: Array<{
+    key: string;
+    value: string | number | boolean;
+    style?: "default" | "success" | "warning" | "error";
+  }>;
+}
+
+/** Data for Alert component. */
+export interface AlertData {
+  severity: "info" | "success" | "warning" | "error";
+  message: string;
+  details?: string;
+}
+
+/** Data for Terminal component. */
+export interface TerminalData {
+  lines: string[];
+  max_lines?: number;
+}
+
+/** Data for Timeline component. */
+export interface TimelineData {
+  events: Array<{
+    timestamp?: string;
+    title: string;
+    description?: string;
+    status?: "pending" | "running" | "success" | "failed";
+  }>;
+}
+
+/** Data for FileTree component. */
+export interface FileTreeData {
+  root: string;
+  entries: Array<{
+    path: string;
+    type: "file" | "directory";
+    status?: "added" | "modified" | "deleted";
+  }>;
+}
+
+/** Data for ProgressChart component. */
+export interface ProgressChartData {
+  segments: Array<{ label: string; value: number; color?: string }>;
+  total?: number;
+}
+
+/** Data for Checklist component. */
+export interface ChecklistData {
+  items: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+    description?: string;
+  }>;
+}

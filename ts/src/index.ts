@@ -27,3 +27,6 @@ export * from "./library";
 
 // Chat types
 export * from "./chat";
+
+// Canvas types
+export * from "./canvas";

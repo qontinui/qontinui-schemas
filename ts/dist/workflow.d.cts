@@ -1,4 +1,65 @@
 /**
+ * Skill Types
+ *
+ * A skill is a named, parameterized template that produces pre-configured
+ * workflow step(s) when instantiated. Skills sit between raw step types
+ * and full workflows:
+ *
+ *   Raw Step Types  (command, prompt, ui_bridge, workflow)  ← execution primitives
+ *        ↑ instantiates
+ *   Skills          ("Lint Project", "API Health Check")    ← named capability templates
+ *        ↑ composes into
+ *   Workflows       (multi-phase verification-agentic loops) ← orchestration
+ *
+ * Skills are purely a configuration-time abstraction — they produce steps,
+ * they do NOT add new runtime behavior.
+ */
+
+type SkillCategory = "code-quality" | "testing" | "monitoring" | "ai-task" | "deployment" | "composition" | "custom";
+interface SkillParameterOption {
+    label: string;
+    value: string;
+}
+interface SkillParameter {
+    name: string;
+    type: "string" | "number" | "boolean" | "select";
+    label: string;
+    description: string;
+    required: boolean;
+    default?: unknown;
+    options?: SkillParameterOption[];
+    placeholder?: string;
+}
+interface SingleStepTemplate {
+    kind: "single_step";
+    step: Record<string, unknown>;
+}
+interface MultiStepTemplate {
+    kind: "multi_step";
+    steps: Record<string, unknown>[];
+}
+type SkillTemplate = SingleStepTemplate | MultiStepTemplate;
+interface SkillDefinition {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    category: SkillCategory;
+    tags: string[];
+    icon: string;
+    color: string;
+    allowed_phases: WorkflowPhase[];
+    parameters: SkillParameter[];
+    template: SkillTemplate;
+    source: "builtin" | "user";
+}
+interface SkillOrigin {
+    skill_id: string;
+    skill_slug: string;
+    parameter_values: Record<string, unknown>;
+}
+
+/**
  * Workflow Types
  *
  * Canonical type definitions for the unified Workflow Builder system.
@@ -26,6 +87,7 @@ interface HealthCheckUrl {
     timeout_seconds?: number;
     is_critical?: boolean;
 }
+
 interface BaseStep {
     id: string;
     name: string;
@@ -38,6 +100,7 @@ interface BaseStep {
         count: number;
         delay_ms: number;
     };
+    skill_origin?: SkillOrigin;
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type ApiContentType = "application/json" | "application/x-www-form-urlencoded" | "text/plain" | "none";
@@ -203,4 +266,4 @@ declare const PHASE_INFO: Record<WorkflowPhase, {
 }>;
 declare const DEFAULT_SUMMARY_PROMPT = "Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.";
 
-export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, DEFAULT_SUMMARY_PROMPT, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, STEP_TYPES, type SetupStep, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
+export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, DEFAULT_SUMMARY_PROMPT, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillCategory, type SkillDefinition, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillTemplate, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };

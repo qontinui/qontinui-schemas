@@ -1,4 +1,4 @@
-export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, DEFAULT_SUMMARY_PROMPT, HealthCheckUrl, HttpMethod, LogSourceSelection, PHASE_INFO, PlaywrightExecutionMode, PromptStep, STEP_TYPES, SetupStep, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.cjs';
+export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, DEFAULT_SUMMARY_PROMPT, HealthCheckUrl, HttpMethod, LogSourceSelection, MultiStepTemplate, PHASE_INFO, PlaywrightExecutionMode, PromptStep, STEP_TYPES, SetupStep, SingleStepTemplate, SkillCategory, SkillDefinition, SkillOrigin, SkillParameter, SkillParameterOption, SkillTemplate, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.cjs';
 export { CheckIssueDetail, CreateTaskRunRequest, FindingsSummary, GateEvaluationResult, IndividualCheckResult, Pagination, RunPromptRequest, RunPromptResponse, StepExecutionConfig, TaskRun, TaskRunBackend, TaskRunBackendDetail, TaskRunCreate, TaskRunFilters, TaskRunFinding, TaskRunFindingActionType, TaskRunFindingCategory, TaskRunFindingCreate, TaskRunFindingFilters, TaskRunFindingResponse, TaskRunFindingSeverity, TaskRunFindingStatus, TaskRunFindingSummary, TaskRunFindingUpdate, TaskRunFindingsListResponse, TaskRunListResponse, TaskRunSession, TaskRunStatus, TaskRunUpdate, TaskType, VerificationPhaseResult, VerificationResultResponse, VerificationResultsListResponse, VerificationStepDetails, VerificationStepResult } from './task-run.cjs';
 export { ActionExecutionCreate, ActionExecutionResponse, ActionStatus, ActionType, CompressionResult, CompressionStatus, CoverageData, ErrorType, ExecutionIssueCreate, ExecutionIssueResponse, ExecutionRunComplete, ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse, ExecutionScreenshotCreate, ExecutionScreenshotResponse, ExecutionStats, ExecutionStatus, HookDefinition, HookExecutionResult, HookStatus, HookTrigger, IssueSeverity, RawCompressionEvent, RawCompressionResultPayload, RawExecutionStatusEvent, RawExecutionStatusEventBase, RawHookExecutionEvent, RawHookExecutionPayload, RawHookStartedEvent, RawRetryAttemptEvent, RawRetryAttemptPayload, RawRetryStatePayload, RawRoutingDecisionEvent, RawRoutingDecisionPayload, RawStatusChangeEvent, RawSubStepCompleteEvent, RawSubStepStartedEvent, RawTokenCountPayload, RawTokenCountUpdateEvent, RetryAttempt, RetryState, RetryStatus, RoutingDecision, RoutingFactor, RoutingStatus, RunStatus, RunType, RunnerMetadata, ScreenshotType, SubStepInfo, SubStepStatus, SubStepStatusDisplay, TaskComplexity, TokenCount, WorkflowMetadata } from './execution.cjs';
 export { AutoFixTask, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, PromptTask, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleCron, ScheduleExpression, ScheduleInterval, ScheduleOnce, ScheduleState, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest, WorkflowTask } from './scheduler.cjs';
@@ -416,4 +416,113 @@ declare function toDiscoveredState(data: unknown): DiscoveredState;
 declare function toDiscoveredTransition(data: unknown): DiscoveredTransition;
 declare function toStateDiscoveryResultSummary(data: Record<string, unknown>): StateDiscoveryResultSummary;
 
-export { type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FormSnapshot, type ImageSnapshot, type LinkSnapshot, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type TransitionTriggerType, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+/**
+ * Canvas Types
+ *
+ * Type definitions for the A2UI (Agent-to-UI) Canvas system.
+ * Canvas panels allow the AI agent to render rich, structured visual content
+ * in the dashboard during workflow execution.
+ */
+/**
+ * Supported canvas component types.
+ * These are validated server-side against an allowlist.
+ */
+type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist";
+/**
+ * A canvas panel rendered in the dashboard.
+ */
+interface CanvasPanel {
+    panel_id: string;
+    component: CanvasComponentType;
+    title: string;
+    data: Record<string, unknown>;
+    priority?: number;
+    size?: "compact" | "normal" | "large";
+    task_run_id?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+/**
+ * Event emitted when a canvas panel is created, updated, or deleted.
+ */
+interface CanvasUpdateEvent {
+    action: "create" | "update" | "delete" | "clear";
+    panel_id: string;
+    panel?: CanvasPanel;
+    task_run_id?: string;
+}
+/** Data for Markdown component. */
+interface MarkdownData {
+    content: string;
+}
+/** Data for Table component. */
+interface TableData {
+    columns: string[];
+    rows: (string | number | boolean | null)[][];
+    sortable?: boolean;
+}
+/** Data for CodeDiff component. */
+interface CodeDiffData {
+    file_path: string;
+    language?: string;
+    old_content?: string;
+    new_content?: string;
+    unified_diff?: string;
+}
+/** Data for KeyValue component. */
+interface KeyValueData {
+    pairs: Array<{
+        key: string;
+        value: string | number | boolean;
+        style?: "default" | "success" | "warning" | "error";
+    }>;
+}
+/** Data for Alert component. */
+interface AlertData {
+    severity: "info" | "success" | "warning" | "error";
+    message: string;
+    details?: string;
+}
+/** Data for Terminal component. */
+interface TerminalData {
+    lines: string[];
+    max_lines?: number;
+}
+/** Data for Timeline component. */
+interface TimelineData {
+    events: Array<{
+        timestamp?: string;
+        title: string;
+        description?: string;
+        status?: "pending" | "running" | "success" | "failed";
+    }>;
+}
+/** Data for FileTree component. */
+interface FileTreeData {
+    root: string;
+    entries: Array<{
+        path: string;
+        type: "file" | "directory";
+        status?: "added" | "modified" | "deleted";
+    }>;
+}
+/** Data for ProgressChart component. */
+interface ProgressChartData {
+    segments: Array<{
+        label: string;
+        value: number;
+        color?: string;
+    }>;
+    total?: number;
+}
+/** Data for Checklist component. */
+interface ChecklistData {
+    items: Array<{
+        id: string;
+        label: string;
+        checked: boolean;
+        description?: string;
+    }>;
+}
+
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

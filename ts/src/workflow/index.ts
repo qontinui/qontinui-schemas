@@ -45,6 +45,21 @@ export interface HealthCheckUrl {
 }
 
 // =============================================================================
+// Skill Types (re-exported from ./skill)
+// =============================================================================
+
+export type {
+  SkillCategory,
+  SkillParameterOption,
+  SkillParameter,
+  SingleStepTemplate,
+  MultiStepTemplate,
+  SkillTemplate,
+  SkillDefinition,
+  SkillOrigin,
+} from "./skill";
+
+// =============================================================================
 // Step Types
 // =============================================================================
 
@@ -57,6 +72,7 @@ export interface BaseStep {
   depends_on?: string[];
   required?: boolean;
   retry?: { count: number; delay_ms: number };
+  skill_origin?: import("./skill").SkillOrigin;
 }
 
 // -----------------------------------------------------------------------------
