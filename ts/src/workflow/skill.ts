@@ -31,6 +31,16 @@ export type SkillCategory =
   | "custom";
 
 // =============================================================================
+// Skill Author
+// =============================================================================
+
+export interface SkillAuthor {
+  name: string;
+  email?: string;
+  url?: string;
+}
+
+// =============================================================================
 // Skill Parameters
 // =============================================================================
 
@@ -48,6 +58,10 @@ export interface SkillParameter {
   default?: unknown;
   options?: SkillParameterOption[];
   placeholder?: string;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  depends_on?: { param: string; value: unknown };
 }
 
 // =============================================================================
@@ -64,7 +78,17 @@ export interface MultiStepTemplate {
   steps: Record<string, unknown>[];
 }
 
-export type SkillTemplate = SingleStepTemplate | MultiStepTemplate;
+export interface CompositionTemplate {
+  kind: "composition";
+  skill_refs: SkillRef[];
+}
+
+export interface SkillRef {
+  skill_id: string;
+  parameter_overrides?: Record<string, unknown>;
+}
+
+export type SkillTemplate = SingleStepTemplate | MultiStepTemplate | CompositionTemplate;
 
 // =============================================================================
 // Skill Definition
@@ -82,7 +106,14 @@ export interface SkillDefinition {
   allowed_phases: WorkflowPhase[];
   parameters: SkillParameter[];
   template: SkillTemplate;
-  source: "builtin" | "user";
+  source: "builtin" | "user" | "community";
+  version?: string;
+  author?: SkillAuthor;
+  checksum?: string;
+  depends_on?: string[];
+  usage_count?: number;
+  approval_status?: "pending" | "approved" | "rejected";
+  forked_from?: string;
 }
 
 // =============================================================================
@@ -93,4 +124,29 @@ export interface SkillOrigin {
   skill_id: string;
   skill_slug: string;
   parameter_values: Record<string, unknown>;
+}
+
+// =============================================================================
+// Export / Import
+// =============================================================================
+
+export interface SkillExportManifest {
+  version: string;
+  exported_at: string;
+  app_version: string;
+  content_type: "skills";
+  skill_count: number;
+  checksum?: string;  // SHA-256 of all skill content
+}
+
+export interface SkillExport {
+  manifest: SkillExportManifest;
+  skills: SkillDefinition[];
+}
+
+export interface SkillImportResult {
+  imported: number;
+  skipped: number;
+  overwritten: number;
+  errors: string[];
 }

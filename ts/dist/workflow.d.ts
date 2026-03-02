@@ -16,6 +16,11 @@
  */
 
 type SkillCategory = "code-quality" | "testing" | "monitoring" | "ai-task" | "deployment" | "composition" | "custom";
+interface SkillAuthor {
+    name: string;
+    email?: string;
+    url?: string;
+}
 interface SkillParameterOption {
     label: string;
     value: string;
@@ -29,6 +34,13 @@ interface SkillParameter {
     default?: unknown;
     options?: SkillParameterOption[];
     placeholder?: string;
+    min?: number;
+    max?: number;
+    pattern?: string;
+    depends_on?: {
+        param: string;
+        value: unknown;
+    };
 }
 interface SingleStepTemplate {
     kind: "single_step";
@@ -38,7 +50,15 @@ interface MultiStepTemplate {
     kind: "multi_step";
     steps: Record<string, unknown>[];
 }
-type SkillTemplate = SingleStepTemplate | MultiStepTemplate;
+interface CompositionTemplate {
+    kind: "composition";
+    skill_refs: SkillRef[];
+}
+interface SkillRef {
+    skill_id: string;
+    parameter_overrides?: Record<string, unknown>;
+}
+type SkillTemplate = SingleStepTemplate | MultiStepTemplate | CompositionTemplate;
 interface SkillDefinition {
     id: string;
     name: string;
@@ -51,12 +71,37 @@ interface SkillDefinition {
     allowed_phases: WorkflowPhase[];
     parameters: SkillParameter[];
     template: SkillTemplate;
-    source: "builtin" | "user";
+    source: "builtin" | "user" | "community";
+    version?: string;
+    author?: SkillAuthor;
+    checksum?: string;
+    depends_on?: string[];
+    usage_count?: number;
+    approval_status?: "pending" | "approved" | "rejected";
+    forked_from?: string;
 }
 interface SkillOrigin {
     skill_id: string;
     skill_slug: string;
     parameter_values: Record<string, unknown>;
+}
+interface SkillExportManifest {
+    version: string;
+    exported_at: string;
+    app_version: string;
+    content_type: "skills";
+    skill_count: number;
+    checksum?: string;
+}
+interface SkillExport {
+    manifest: SkillExportManifest;
+    skills: SkillDefinition[];
+}
+interface SkillImportResult {
+    imported: number;
+    skipped: number;
+    overwritten: number;
+    errors: string[];
 }
 
 /**
@@ -184,6 +229,53 @@ type SetupStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type VerificationStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type AgenticStep = PromptStep;
 type CompletionStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
+/** A conditional routing rule that selects model/provider based on runtime context. */
+interface RoutingRule {
+    /** Condition expression, e.g. "verification_failures >= 2" */
+    condition: string;
+    model?: string;
+    provider?: string;
+    temperature?: number;
+    max_tokens?: number;
+}
+interface ModelOverrideConfig {
+    provider?: string;
+    model?: string;
+    /** Temperature override for this phase (0.0–1.0). */
+    temperature?: number;
+    /** Max output tokens override for this phase. */
+    max_tokens?: number;
+    /** Fallback provider if the primary fails with a retryable error. */
+    fallback_provider?: string;
+    /** Fallback model if the primary fails with a retryable error. */
+    fallback_model?: string;
+    /** Conditional routing rules evaluated at runtime. First matching rule wins. */
+    routing_rules?: RoutingRule[];
+}
+type ModelOverrides = {
+    setup?: ModelOverrideConfig;
+    agentic?: ModelOverrideConfig;
+    completion?: ModelOverrideConfig;
+    verification?: ModelOverrideConfig;
+    investigation?: ModelOverrideConfig;
+    summary?: ModelOverrideConfig;
+    generation?: ModelOverrideConfig;
+};
+/**
+ * Condition for conditional stage execution.
+ *
+ * When attached to a WorkflowStage, the stage is skipped if the condition
+ * evaluates to "should skip". All fields are optional and combine with AND
+ * semantics — all specified conditions must be met for the stage to run.
+ */
+interface StageCondition {
+    /** Run only if previous stage had this outcome: "passed", "failed", or "any" */
+    if_previous?: "passed" | "failed" | "any";
+    /** Run only after this many total iterations have occurred across all stages */
+    min_iteration?: number;
+    /** Run only if this many stages have failed verification so far */
+    min_failures?: number;
+}
 interface WorkflowStage {
     id: string;
     name: string;
@@ -196,6 +288,9 @@ interface WorkflowStage {
     timeout_seconds?: number | null;
     provider?: string;
     model?: string;
+    model_overrides?: ModelOverrides;
+    /** Optional condition for conditional stage execution */
+    condition?: StageCondition;
 }
 interface UnifiedWorkflow {
     id: string;
@@ -209,6 +304,7 @@ interface UnifiedWorkflow {
     timeout_seconds?: number | null;
     provider?: string;
     model?: string;
+    model_overrides?: ModelOverrides;
     log_source_selection?: LogSourceSelection;
     context_ids?: string[];
     disabled_context_ids?: string[];
@@ -266,4 +362,4 @@ declare const PHASE_INFO: Record<WorkflowPhase, {
 }>;
 declare const DEFAULT_SUMMARY_PROMPT = "Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.";
 
-export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, DEFAULT_SUMMARY_PROMPT, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillCategory, type SkillDefinition, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillTemplate, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
+export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, type CompositionTemplate, DEFAULT_SUMMARY_PROMPT, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };

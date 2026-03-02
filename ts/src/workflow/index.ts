@@ -50,13 +50,19 @@ export interface HealthCheckUrl {
 
 export type {
   SkillCategory,
+  SkillAuthor,
   SkillParameterOption,
   SkillParameter,
   SingleStepTemplate,
   MultiStepTemplate,
+  CompositionTemplate,
+  SkillRef,
   SkillTemplate,
   SkillDefinition,
   SkillOrigin,
+  SkillExportManifest,
+  SkillExport,
+  SkillImportResult,
 } from "./skill";
 
 // =============================================================================
@@ -243,8 +249,63 @@ export type CompletionStep =
   | WorkflowStep;
 
 // =============================================================================
+// Per-Phase Model Overrides
+// =============================================================================
+
+/** A conditional routing rule that selects model/provider based on runtime context. */
+export interface RoutingRule {
+  /** Condition expression, e.g. "verification_failures >= 2" */
+  condition: string;
+  model?: string;
+  provider?: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export interface ModelOverrideConfig {
+  provider?: string;
+  model?: string;
+  /** Temperature override for this phase (0.0–1.0). */
+  temperature?: number;
+  /** Max output tokens override for this phase. */
+  max_tokens?: number;
+  /** Fallback provider if the primary fails with a retryable error. */
+  fallback_provider?: string;
+  /** Fallback model if the primary fails with a retryable error. */
+  fallback_model?: string;
+  /** Conditional routing rules evaluated at runtime. First matching rule wins. */
+  routing_rules?: RoutingRule[];
+}
+
+export type ModelOverrides = {
+  setup?: ModelOverrideConfig;
+  agentic?: ModelOverrideConfig;
+  completion?: ModelOverrideConfig;
+  verification?: ModelOverrideConfig;
+  investigation?: ModelOverrideConfig;
+  summary?: ModelOverrideConfig;
+  generation?: ModelOverrideConfig;
+};
+
+// =============================================================================
 // Workflow Stages
 // =============================================================================
+
+/**
+ * Condition for conditional stage execution.
+ *
+ * When attached to a WorkflowStage, the stage is skipped if the condition
+ * evaluates to "should skip". All fields are optional and combine with AND
+ * semantics — all specified conditions must be met for the stage to run.
+ */
+export interface StageCondition {
+  /** Run only if previous stage had this outcome: "passed", "failed", or "any" */
+  if_previous?: "passed" | "failed" | "any";
+  /** Run only after this many total iterations have occurred across all stages */
+  min_iteration?: number;
+  /** Run only if this many stages have failed verification so far */
+  min_failures?: number;
+}
 
 export interface WorkflowStage {
   id: string;
@@ -258,6 +319,9 @@ export interface WorkflowStage {
   timeout_seconds?: number | null;
   provider?: string;
   model?: string;
+  model_overrides?: ModelOverrides;
+  /** Optional condition for conditional stage execution */
+  condition?: StageCondition;
 }
 
 // =============================================================================
@@ -276,6 +340,7 @@ export interface UnifiedWorkflow {
   timeout_seconds?: number | null;
   provider?: string;
   model?: string;
+  model_overrides?: ModelOverrides;
   log_source_selection?: LogSourceSelection;
   context_ids?: string[];
   disabled_context_ids?: string[];

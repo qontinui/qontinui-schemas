@@ -1,4 +1,4 @@
-export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, DEFAULT_SUMMARY_PROMPT, HealthCheckUrl, HttpMethod, LogSourceSelection, MultiStepTemplate, PHASE_INFO, PlaywrightExecutionMode, PromptStep, STEP_TYPES, SetupStep, SingleStepTemplate, SkillCategory, SkillDefinition, SkillOrigin, SkillParameter, SkillParameterOption, SkillTemplate, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.cjs';
+export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, CompositionTemplate, DEFAULT_SUMMARY_PROMPT, HealthCheckUrl, HttpMethod, LogSourceSelection, ModelOverrideConfig, ModelOverrides, MultiStepTemplate, PHASE_INFO, PlaywrightExecutionMode, PromptStep, RoutingRule, STEP_TYPES, SetupStep, SingleStepTemplate, SkillAuthor, SkillCategory, SkillDefinition, SkillExport, SkillExportManifest, SkillImportResult, SkillOrigin, SkillParameter, SkillParameterOption, SkillRef, SkillTemplate, StageCondition, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.cjs';
 export { CheckIssueDetail, CreateTaskRunRequest, FindingsSummary, GateEvaluationResult, IndividualCheckResult, Pagination, RunPromptRequest, RunPromptResponse, StepExecutionConfig, TaskRun, TaskRunBackend, TaskRunBackendDetail, TaskRunCreate, TaskRunFilters, TaskRunFinding, TaskRunFindingActionType, TaskRunFindingCategory, TaskRunFindingCreate, TaskRunFindingFilters, TaskRunFindingResponse, TaskRunFindingSeverity, TaskRunFindingStatus, TaskRunFindingSummary, TaskRunFindingUpdate, TaskRunFindingsListResponse, TaskRunListResponse, TaskRunSession, TaskRunStatus, TaskRunUpdate, TaskType, VerificationPhaseResult, VerificationResultResponse, VerificationResultsListResponse, VerificationStepDetails, VerificationStepResult } from './task-run.cjs';
 export { ActionExecutionCreate, ActionExecutionResponse, ActionStatus, ActionType, CompressionResult, CompressionStatus, CoverageData, ErrorType, ExecutionIssueCreate, ExecutionIssueResponse, ExecutionRunComplete, ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse, ExecutionScreenshotCreate, ExecutionScreenshotResponse, ExecutionStats, ExecutionStatus, HookDefinition, HookExecutionResult, HookStatus, HookTrigger, IssueSeverity, RawCompressionEvent, RawCompressionResultPayload, RawExecutionStatusEvent, RawExecutionStatusEventBase, RawHookExecutionEvent, RawHookExecutionPayload, RawHookStartedEvent, RawRetryAttemptEvent, RawRetryAttemptPayload, RawRetryStatePayload, RawRoutingDecisionEvent, RawRoutingDecisionPayload, RawStatusChangeEvent, RawSubStepCompleteEvent, RawSubStepStartedEvent, RawTokenCountPayload, RawTokenCountUpdateEvent, RetryAttempt, RetryState, RetryStatus, RoutingDecision, RoutingFactor, RoutingStatus, RunStatus, RunType, RunnerMetadata, ScreenshotType, SubStepInfo, SubStepStatus, SubStepStatusDisplay, TaskComplexity, TokenCount, WorkflowMetadata } from './execution.cjs';
 export { AutoFixTask, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, PromptTask, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleCron, ScheduleExpression, ScheduleInterval, ScheduleOnce, ScheduleState, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest, WorkflowTask } from './scheduler.cjs';
@@ -438,6 +438,7 @@ interface CanvasPanel {
     data: Record<string, unknown>;
     priority?: number;
     size?: "compact" | "normal" | "large";
+    group?: string;
     task_run_id?: string;
     created_at?: string;
     updated_at?: string;
@@ -515,6 +516,16 @@ interface ProgressChartData {
     }>;
     total?: number;
 }
+/** Data for FindingList component. */
+interface FindingListData {
+    findings: Array<{
+        id?: string;
+        title: string;
+        description?: string;
+        severity?: "info" | "low" | "medium" | "high" | "critical";
+        location?: string;
+    }>;
+}
 /** Data for Checklist component. */
 interface ChecklistData {
     items: Array<{
@@ -525,4 +536,4 @@ interface ChecklistData {
     }>;
 }
 
-export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

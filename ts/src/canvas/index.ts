@@ -33,6 +33,7 @@ export interface CanvasPanel {
   data: Record<string, unknown>;
   priority?: number;
   size?: "compact" | "normal" | "large";
+  group?: string;
   task_run_id?: string;
   created_at?: string;
   updated_at?: string;
@@ -119,6 +120,17 @@ export interface FileTreeData {
 export interface ProgressChartData {
   segments: Array<{ label: string; value: number; color?: string }>;
   total?: number;
+}
+
+/** Data for FindingList component. */
+export interface FindingListData {
+  findings: Array<{
+    id?: string;
+    title: string;
+    description?: string;
+    severity?: "info" | "low" | "medium" | "high" | "critical";
+    location?: string;
+  }>;
 }
 
 /** Data for Checklist component. */
