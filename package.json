@@ -1,0 +1,58 @@
+{
+  "name": "@qontinui/shared-types",
+  "version": "0.2.0",
+  "description": "Shared TypeScript types for the Qontinui ecosystem",
+  "type": "module",
+  "main": "./ts/dist/index.js",
+  "module": "./ts/dist/index.js",
+  "types": "./ts/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./ts/dist/index.d.ts",
+      "import": "./ts/dist/index.js",
+      "require": "./ts/dist/index.cjs"
+    },
+    "./workflow": {
+      "types": "./ts/dist/workflow.d.ts",
+      "import": "./ts/dist/workflow.js",
+      "require": "./ts/dist/workflow.cjs"
+    },
+    "./task-run": {
+      "types": "./ts/dist/task-run.d.ts",
+      "import": "./ts/dist/task-run.js",
+      "require": "./ts/dist/task-run.cjs"
+    },
+    "./execution": {
+      "types": "./ts/dist/execution.d.ts",
+      "import": "./ts/dist/execution.js",
+      "require": "./ts/dist/execution.cjs"
+    },
+    "./scheduler": {
+      "types": "./ts/dist/scheduler.d.ts",
+      "import": "./ts/dist/scheduler.js",
+      "require": "./ts/dist/scheduler.cjs"
+    },
+    "./library": {
+      "types": "./ts/dist/library.d.ts",
+      "import": "./ts/dist/library.js",
+      "require": "./ts/dist/library.cjs"
+    },
+    "./chat": {
+      "types": "./ts/dist/chat.d.ts",
+      "import": "./ts/dist/chat.js",
+      "require": "./ts/dist/chat.cjs"
+    }
+  },
+  "files": [
+    "ts/dist",
+    "ts/src"
+  ],
+  "scripts": {
+    "build": "cd ts && npm run build",
+    "dev": "cd ts && npm run dev",
+    "typecheck": "cd ts && npm run typecheck",
+    "clean": "cd ts && npm run clean"
+  },
+  "author": "Joshua Spinak",
+  "license": "MIT"
+}
