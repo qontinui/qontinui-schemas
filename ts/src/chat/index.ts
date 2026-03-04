@@ -1,9 +1,9 @@
 /**
- * Chat session types shared between web and runner frontends.
+ * AI session types shared between web and runner frontends.
  */
 
-/** State of a chat session. */
-export type ChatSessionState =
+/** State of an AI session. */
+export type AiSessionState =
   | "connecting"
   | "initializing"
   | "ready"
@@ -15,8 +15,8 @@ export type ChatSessionState =
   | "not_found"
   | "restoring";
 
-/** A single message in a chat conversation. */
-export interface ChatMessage {
+/** A single message in an AI conversation. */
+export interface AiMessage {
   role: "user" | "ai" | "system";
   content: string;
   timestamp?: string;

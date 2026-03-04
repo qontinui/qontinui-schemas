@@ -1,13 +1,13 @@
 /**
- * Chat session types shared between web and runner frontends.
+ * AI session types shared between web and runner frontends.
  */
-/** State of a chat session. */
-type ChatSessionState = "connecting" | "initializing" | "ready" | "processing" | "interrupting" | "closed" | "disconnected" | "error" | "not_found" | "restoring";
-/** A single message in a chat conversation. */
-interface ChatMessage {
+/** State of an AI session. */
+type AiSessionState = "connecting" | "initializing" | "ready" | "processing" | "interrupting" | "closed" | "disconnected" | "error" | "not_found" | "restoring";
+/** A single message in an AI conversation. */
+interface AiMessage {
     role: "user" | "ai" | "system";
     content: string;
     timestamp?: string;
 }
 
-export type { ChatMessage, ChatSessionState };
+export type { AiMessage, AiSessionState };
