@@ -216,6 +216,8 @@ interface UiBridgeStep extends BaseStep {
     comparison_mode?: "structural" | "visual" | "both";
     reference_snapshot_id?: string;
     severity_threshold?: "critical" | "major" | "minor" | "info";
+    /** Snapshot target: "control" (runner UI), "sdk" (connected app), or "proxy:PORT" */
+    ui_bridge_snapshot_target?: string;
 }
 interface WorkflowStep extends BaseStep {
     type: "workflow";
