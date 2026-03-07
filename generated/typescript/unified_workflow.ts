@@ -188,7 +188,7 @@ export interface PromptStep extends BaseStep {
 export interface UiBridgeStep extends BaseStep {
   type: "ui_bridge";
   phase: "setup" | "verification" | "completion";
-  action: "navigate" | "execute" | "assert" | "snapshot" | "compare";
+  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert";
   url?: string;
   instruction?: string;
   target?: string;
@@ -198,6 +198,8 @@ export interface UiBridgeStep extends BaseStep {
   comparison_mode?: "structural" | "visual" | "both";
   reference_snapshot_id?: string;
   severity_threshold?: "critical" | "major" | "minor" | "info";
+  /** Snapshot target: "control" (runner UI), "sdk" (connected app), or "proxy:PORT" */
+  ui_bridge_snapshot_target?: string;
 }
 
 // -----------------------------------------------------------------------------

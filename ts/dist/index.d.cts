@@ -427,7 +427,7 @@ declare function toStateDiscoveryResultSummary(data: Record<string, unknown>): S
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
  */
-type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist";
+type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart";
 /**
  * A canvas panel rendered in the dashboard.
  */
@@ -535,5 +535,52 @@ interface ChecklistData {
         description?: string;
     }>;
 }
+/** Data for SummaryStats component. */
+interface SummaryStatsData {
+    total: number;
+    passed: number;
+    failed: number;
+    skipped?: number;
+    label?: string;
+}
+/** Data for StateTimeline component. */
+interface StateTimelineData {
+    steps: Array<{
+        name: string;
+        iterations: Array<{
+            iteration: number;
+            status: "pass" | "fail" | "skip" | "pending";
+        }>;
+    }>;
+}
+/** Data for Waterfall component. */
+interface WaterfallData {
+    entries: Array<{
+        name: string;
+        start_ms: number;
+        duration_ms: number;
+        status?: "running" | "success" | "failed" | "skipped" | "pending";
+        phase?: string;
+    }>;
+    total_duration_ms: number;
+}
+/** Data for Sparkline component. */
+interface SparklineData {
+    series: Array<{
+        name: string;
+        values: Array<{
+            iteration: number;
+            outcome: "pass" | "fail";
+        }>;
+    }>;
+}
+/** Data for WaffleChart component. */
+interface WaffleChartData {
+    cells: Array<{
+        label: string;
+        status: "pass" | "fail" | "pending" | "running" | "skip";
+    }>;
+    columns?: number;
+}
 
-export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type SummaryStatsData, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

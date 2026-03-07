@@ -21,7 +21,12 @@ export type CanvasComponentType =
   | "Timeline"
   | "ProgressChart"
   | "FindingList"
-  | "Checklist";
+  | "Checklist"
+  | "SummaryStats"
+  | "StateTimeline"
+  | "Waterfall"
+  | "Sparkline"
+  | "WaffleChart";
 
 /**
  * A canvas panel rendered in the dashboard.
@@ -141,4 +146,56 @@ export interface ChecklistData {
     checked: boolean;
     description?: string;
   }>;
+}
+
+/** Data for SummaryStats component. */
+export interface SummaryStatsData {
+  total: number;
+  passed: number;
+  failed: number;
+  skipped?: number;
+  label?: string;
+}
+
+/** Data for StateTimeline component. */
+export interface StateTimelineData {
+  steps: Array<{
+    name: string;
+    iterations: Array<{
+      iteration: number;
+      status: "pass" | "fail" | "skip" | "pending";
+    }>;
+  }>;
+}
+
+/** Data for Waterfall component. */
+export interface WaterfallData {
+  entries: Array<{
+    name: string;
+    start_ms: number;
+    duration_ms: number;
+    status?: "running" | "success" | "failed" | "skipped" | "pending";
+    phase?: string;
+  }>;
+  total_duration_ms: number;
+}
+
+/** Data for Sparkline component. */
+export interface SparklineData {
+  series: Array<{
+    name: string;
+    values: Array<{
+      iteration: number;
+      outcome: "pass" | "fail";
+    }>;
+  }>;
+}
+
+/** Data for WaffleChart component. */
+export interface WaffleChartData {
+  cells: Array<{
+    label: string;
+    status: "pass" | "fail" | "pending" | "running" | "skip";
+  }>;
+  columns?: number;
 }

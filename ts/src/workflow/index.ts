@@ -196,7 +196,7 @@ export interface PromptStep extends BaseStep {
 export interface UiBridgeStep extends BaseStep {
   type: "ui_bridge";
   phase: "setup" | "verification" | "completion";
-  action: "navigate" | "execute" | "assert" | "snapshot" | "compare";
+  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert";
   url?: string;
   instruction?: string;
   target?: string;
