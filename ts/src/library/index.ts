@@ -315,6 +315,7 @@ export type AccentColor =
   | "blue"
   | "cyan"
   | "purple"
+  | "rose"
   | "slate";
 
 export interface AccentColorClasses {

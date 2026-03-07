@@ -127,11 +127,42 @@ function toStateDiscoveryResultSummary(data) {
     created_at: data.created_at
   };
 }
+
+// src/known-issues/index.ts
+var ISSUE_CATEGORIES = [
+  { value: "duplication", label: "Duplication" },
+  { value: "rendering", label: "Rendering" },
+  { value: "data_integrity", label: "Data Integrity" },
+  { value: "timing", label: "Timing" },
+  { value: "layout", label: "Layout" },
+  { value: "state", label: "State" },
+  { value: "performance", label: "Performance" },
+  { value: "encoding", label: "Encoding" },
+  { value: "navigation", label: "Navigation" },
+  { value: "authentication", label: "Authentication" },
+  { value: "other", label: "Other" }
+];
+var ISSUE_SEVERITIES = [
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" }
+];
+var DETECTION_METHODS = [
+  { value: "algorithmic", label: "Algorithmic (automatic)" },
+  { value: "ai_judgment", label: "AI Judgment" },
+  { value: "visual", label: "Visual (screenshot)" },
+  { value: "command", label: "Shell Command" },
+  { value: "ui_bridge", label: "UI Bridge" }
+];
 export {
   ActionStatus,
   ActionType,
   DEFAULT_SUMMARY_PROMPT,
+  DETECTION_METHODS,
   ErrorType,
+  ISSUE_CATEGORIES,
+  ISSUE_SEVERITIES,
   IssueSeverity,
   PHASE_INFO,
   RunStatus,

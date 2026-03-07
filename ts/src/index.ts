@@ -30,3 +30,6 @@ export * from "./chat";
 
 // Canvas types
 export * from "./canvas";
+
+// Known Issues types
+export * from "./known-issues";

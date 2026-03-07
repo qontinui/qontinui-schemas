@@ -427,7 +427,7 @@ declare function toStateDiscoveryResultSummary(data: Record<string, unknown>): S
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
  */
-type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart";
+type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart" | "PhaseTimeline" | "IterationComparison" | "StepDurationChart" | "PhaseDistribution";
 /**
  * A canvas panel rendered in the dashboard.
  */
@@ -582,5 +582,174 @@ interface WaffleChartData {
     }>;
     columns?: number;
 }
+/** Data for PhaseTimeline component. */
+interface PhaseTimelineData {
+    phases: Array<{
+        name: string;
+        duration_ms: number;
+        status: "completed" | "running" | "pending" | "failed";
+        step_count: number;
+    }>;
+    total_duration_ms: number;
+}
+/** Data for IterationComparison component. */
+interface IterationComparisonData {
+    iterations: Array<{
+        iteration: number;
+        passed: number;
+        failed: number;
+        total: number;
+    }>;
+}
+/** Data for StepDurationChart component. */
+interface StepDurationChartData {
+    steps: Array<{
+        name: string;
+        duration_ms: number;
+        status: "success" | "failed" | "running" | "skipped";
+        phase?: string;
+    }>;
+    max_duration_ms: number;
+}
+/** Data for PhaseDistribution component. */
+interface PhaseDistributionData {
+    segments: Array<{
+        phase: string;
+        duration_ms: number;
+        percentage: number;
+        color?: string;
+    }>;
+    total_duration_ms: number;
+}
 
-export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateRenderLogRequest, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, type ImageSnapshot, type KeyValueData, type LinkSnapshot, type MarkdownData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type SummaryStatsData, type TableData, type TerminalData, type TimelineData, type TransitionTriggerType, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+/**
+ * Known Issues Registry Types
+ *
+ * Persistent known issue tracking that survives across workflow runs.
+ * Issues are scoped to specs, URLs, components, or global.
+ */
+type IssueCategory = "duplication" | "rendering" | "data_integrity" | "timing" | "layout" | "state" | "performance" | "encoding" | "navigation" | "authentication" | "other";
+type ScopeType = "global" | "spec" | "url" | "component" | "feature";
+type DetectionMethod = "algorithmic" | "ai_judgment" | "visual" | "command" | "ui_bridge";
+type KnownIssueSeverity = "critical" | "high" | "medium" | "low";
+type IssueStatus = "active" | "resolved" | "monitoring" | "wont_fix";
+type IssueProvenance = "manual" | "auto_detected" | "reflection" | "imported";
+interface KnownIssue {
+    id: string;
+    title: string;
+    description: string;
+    category: IssueCategory;
+    scope_type: ScopeType;
+    scope_value: string | null;
+    scope_tags: string[];
+    detection_method: DetectionMethod;
+    detection_config: Record<string, unknown>;
+    pattern_template_id: string | null;
+    reproduction_context: string | null;
+    trigger_conditions: string[];
+    severity: KnownIssueSeverity;
+    status: IssueStatus;
+    confidence: number;
+    provenance: IssueProvenance;
+    source_finding_ids: string[];
+    source_task_run_id: string | null;
+    verification_hint: string | null;
+    verification_step_template: Record<string, unknown> | null;
+    times_detected: number;
+    times_checked: number;
+    last_detected_at: string | null;
+    last_checked_at: string | null;
+    resolved_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+interface CreateKnownIssueRequest {
+    title: string;
+    description: string;
+    category: IssueCategory;
+    scope_type: ScopeType;
+    scope_value?: string | null;
+    scope_tags?: string[];
+    detection_method: DetectionMethod;
+    detection_config?: Record<string, unknown>;
+    pattern_template_id?: string | null;
+    reproduction_context?: string | null;
+    trigger_conditions?: string[];
+    severity: KnownIssueSeverity;
+    provenance?: IssueProvenance;
+    source_finding_ids?: string[];
+    source_task_run_id?: string | null;
+    verification_hint?: string | null;
+    verification_step_template?: Record<string, unknown> | null;
+}
+interface UpdateKnownIssueRequest {
+    title?: string;
+    description?: string;
+    category?: IssueCategory;
+    scope_type?: ScopeType;
+    scope_value?: string | null;
+    scope_tags?: string[];
+    detection_method?: DetectionMethod;
+    detection_config?: Record<string, unknown>;
+    pattern_template_id?: string | null;
+    reproduction_context?: string | null;
+    trigger_conditions?: string[];
+    severity?: KnownIssueSeverity;
+    status?: IssueStatus;
+    confidence?: number;
+    verification_hint?: string | null;
+    verification_step_template?: Record<string, unknown> | null;
+}
+interface ListKnownIssuesQuery {
+    scope_type?: string;
+    scope_value?: string;
+    category?: string;
+    severity?: string;
+    status?: string;
+    spec_id?: string;
+}
+interface CreatePatternTemplateRequest {
+    name: string;
+    description: string;
+    category: string;
+    detection_type: string;
+    ai_prompt_template?: string | null;
+    parameters?: string | null;
+}
+interface TemplateParameter {
+    name: string;
+    type: string;
+    description: string;
+    default?: unknown;
+}
+interface IssuePatternTemplate {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    detection_type: string;
+    step_template: Record<string, unknown> | null;
+    ai_prompt_template: string | null;
+    parameters: TemplateParameter[];
+    built_in: boolean;
+    status: string;
+    created_at: string;
+    updated_at: string;
+}
+/** All issue categories with display labels */
+declare const ISSUE_CATEGORIES: {
+    value: IssueCategory;
+    label: string;
+}[];
+/** All severity levels with display labels */
+declare const ISSUE_SEVERITIES: {
+    value: KnownIssueSeverity;
+    label: string;
+}[];
+/** All detection methods with display labels */
+declare const DETECTION_METHODS: {
+    value: DetectionMethod;
+    label: string;
+}[];
+
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateKnownIssueRequest, type CreatePatternTemplateRequest, type CreateRenderLogRequest, DETECTION_METHODS, type DetectionMethod, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, ISSUE_CATEGORIES, ISSUE_SEVERITIES, type ImageSnapshot, type IssueCategory, type IssuePatternTemplate, type IssueProvenance, type IssueStatus, type IterationComparisonData, type KeyValueData, type KnownIssue, type KnownIssueSeverity, type LinkSnapshot, type ListKnownIssuesQuery, type MarkdownData, type PhaseDistributionData, type PhaseTimelineData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type ScopeType, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type StepDurationChartData, type SummaryStatsData, type TableData, type TemplateParameter, type TerminalData, type TimelineData, type TransitionTriggerType, type UpdateKnownIssueRequest, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

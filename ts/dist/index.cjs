@@ -23,7 +23,10 @@ __export(src_exports, {
   ActionStatus: () => ActionStatus,
   ActionType: () => ActionType,
   DEFAULT_SUMMARY_PROMPT: () => DEFAULT_SUMMARY_PROMPT,
+  DETECTION_METHODS: () => DETECTION_METHODS,
   ErrorType: () => ErrorType,
+  ISSUE_CATEGORIES: () => ISSUE_CATEGORIES,
+  ISSUE_SEVERITIES: () => ISSUE_SEVERITIES,
   IssueSeverity: () => IssueSeverity,
   PHASE_INFO: () => PHASE_INFO,
   RunStatus: () => RunStatus,
@@ -374,12 +377,43 @@ var ScreenshotType = /* @__PURE__ */ ((ScreenshotType2) => {
   ScreenshotType2["STATE_VERIFICATION"] = "state_verification";
   return ScreenshotType2;
 })(ScreenshotType || {});
+
+// src/known-issues/index.ts
+var ISSUE_CATEGORIES = [
+  { value: "duplication", label: "Duplication" },
+  { value: "rendering", label: "Rendering" },
+  { value: "data_integrity", label: "Data Integrity" },
+  { value: "timing", label: "Timing" },
+  { value: "layout", label: "Layout" },
+  { value: "state", label: "State" },
+  { value: "performance", label: "Performance" },
+  { value: "encoding", label: "Encoding" },
+  { value: "navigation", label: "Navigation" },
+  { value: "authentication", label: "Authentication" },
+  { value: "other", label: "Other" }
+];
+var ISSUE_SEVERITIES = [
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" }
+];
+var DETECTION_METHODS = [
+  { value: "algorithmic", label: "Algorithmic (automatic)" },
+  { value: "ai_judgment", label: "AI Judgment" },
+  { value: "visual", label: "Visual (screenshot)" },
+  { value: "command", label: "Shell Command" },
+  { value: "ui_bridge", label: "UI Bridge" }
+];
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ActionStatus,
   ActionType,
   DEFAULT_SUMMARY_PROMPT,
+  DETECTION_METHODS,
   ErrorType,
+  ISSUE_CATEGORIES,
+  ISSUE_SEVERITIES,
   IssueSeverity,
   PHASE_INFO,
   RunStatus,

@@ -26,7 +26,11 @@ export type CanvasComponentType =
   | "StateTimeline"
   | "Waterfall"
   | "Sparkline"
-  | "WaffleChart";
+  | "WaffleChart"
+  | "PhaseTimeline"
+  | "IterationComparison"
+  | "StepDurationChart"
+  | "PhaseDistribution";
 
 /**
  * A canvas panel rendered in the dashboard.
@@ -198,4 +202,47 @@ export interface WaffleChartData {
     status: "pass" | "fail" | "pending" | "running" | "skip";
   }>;
   columns?: number;
+}
+
+/** Data for PhaseTimeline component. */
+export interface PhaseTimelineData {
+  phases: Array<{
+    name: string;
+    duration_ms: number;
+    status: "completed" | "running" | "pending" | "failed";
+    step_count: number;
+  }>;
+  total_duration_ms: number;
+}
+
+/** Data for IterationComparison component. */
+export interface IterationComparisonData {
+  iterations: Array<{
+    iteration: number;
+    passed: number;
+    failed: number;
+    total: number;
+  }>;
+}
+
+/** Data for StepDurationChart component. */
+export interface StepDurationChartData {
+  steps: Array<{
+    name: string;
+    duration_ms: number;
+    status: "success" | "failed" | "running" | "skipped";
+    phase?: string;
+  }>;
+  max_duration_ms: number;
+}
+
+/** Data for PhaseDistribution component. */
+export interface PhaseDistributionData {
+  segments: Array<{
+    phase: string;
+    duration_ms: number;
+    percentage: number;
+    color?: string;
+  }>;
+  total_duration_ms: number;
 }

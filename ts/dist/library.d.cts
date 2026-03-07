@@ -194,7 +194,7 @@ interface ActionColorClasses {
     border: string;
     badge: string;
 }
-type AccentColor = "red" | "orange" | "amber" | "yellow" | "green" | "emerald" | "blue" | "cyan" | "purple" | "slate";
+type AccentColor = "red" | "orange" | "amber" | "yellow" | "green" | "emerald" | "blue" | "cyan" | "purple" | "rose" | "slate";
 interface AccentColorClasses {
     bg: string;
     bgSolid: string;
