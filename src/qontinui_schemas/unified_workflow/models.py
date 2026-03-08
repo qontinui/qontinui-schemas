@@ -445,6 +445,10 @@ class UnifiedWorkflow(BaseModel):
         None,
         description="Whether to stop the entire workflow if a stage fails",
     )
+    is_favorite: bool | None = Field(
+        None,
+        description="Whether this workflow is marked as a favorite for quick access",
+    )
 
     # Metadata
     category: str = Field(

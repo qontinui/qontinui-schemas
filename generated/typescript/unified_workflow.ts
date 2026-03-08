@@ -350,6 +350,7 @@ export interface UnifiedWorkflow {
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
   reflection_mode?: boolean;
+  is_favorite?: boolean;
   category: string;
   tags: string[];
   created_at: string;
