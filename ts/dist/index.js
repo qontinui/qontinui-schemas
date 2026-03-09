@@ -16,6 +16,7 @@ import {
 import "./chunk-JF3RFB7K.js";
 import "./chunk-DCVXHLBX.js";
 import "./chunk-4ZNI2G73.js";
+import "./chunk-S7M5FPLQ.js";
 
 // src/render-log.ts
 function isComponentRenderLog(entry) {

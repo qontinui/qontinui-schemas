@@ -41,6 +41,11 @@
       "types": "./dist/chat.d.ts",
       "import": "./dist/chat.js",
       "require": "./dist/chat.cjs"
+    },
+    "./state-machine": {
+      "types": "./dist/state-machine.d.ts",
+      "import": "./dist/state-machine.js",
+      "require": "./dist/state-machine.cjs"
     }
   },
   "files": [

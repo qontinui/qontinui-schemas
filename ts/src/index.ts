@@ -33,3 +33,6 @@ export * from "./canvas";
 
 // Known Issues types
 export * from "./known-issues";
+
+// State Machine types
+export * from "./state-machine";

@@ -9,6 +9,7 @@ export default defineConfig({
     scheduler: "src/scheduler/index.ts",
     library: "src/library/index.ts",
     chat: "src/chat/index.ts",
+    "state-machine": "src/state-machine/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
