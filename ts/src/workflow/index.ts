@@ -79,6 +79,10 @@ export interface BaseStep {
   required?: boolean;
   retry?: { count: number; delay_ms: number };
   skill_origin?: import("./skill").SkillOrigin;
+  /** Acceptance criterion IDs this step verifies (supports multiple) */
+  criterion_ids?: string[];
+  /** Verification depth category for this step */
+  verification_category?: VerificationCategory;
 }
 
 // -----------------------------------------------------------------------------
@@ -309,6 +313,31 @@ export interface StageCondition {
   min_failures?: number;
 }
 
+export interface RetryPolicy {
+  /** Number of retry attempts (0 = no retries) */
+  count: number;
+  /** Delay between retries in milliseconds */
+  delay_ms: number;
+  /** Whether to use exponential backoff */
+  backoff?: boolean;
+}
+
+export interface StageOutput {
+  /** Unique key for this output (e.g. "api_url", "auth_token") */
+  key: string;
+  /** Human-readable description */
+  description?: string;
+}
+
+export interface StageInput {
+  /** The key to bind (matches a StageOutput.key from a prior stage) */
+  key: string;
+  /** Which stage provides this input (stage id). If omitted, searches all prior stages. */
+  from_stage?: string;
+  /** Whether this input is required (default: true) */
+  required?: boolean;
+}
+
 export interface WorkflowStage {
   id: string;
   name: string;
@@ -324,6 +353,12 @@ export interface WorkflowStage {
   model_overrides?: ModelOverrides;
   /** Optional condition for conditional stage execution */
   condition?: StageCondition;
+  /** Retry policy for this stage (overrides per-step defaults) */
+  retry_policy?: RetryPolicy;
+  /** Declared outputs that this stage produces for downstream stages */
+  outputs?: StageOutput[];
+  /** Inputs required from prior stages */
+  inputs?: StageInput[];
 }
 
 // =============================================================================
@@ -355,10 +390,114 @@ export interface UnifiedWorkflow {
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
   reflection_mode?: boolean;
+  /** Dependency graph computed during generation */
+  dependency_graph?: DependencyGraph;
+  /** Cost annotations computed during generation */
+  cost_annotations?: CostAnnotations;
+  /** Quality report from the revision phase */
+  quality_report?: QualityReport;
   category: string;
   tags: string[];
   created_at: string;
   modified_at: string;
+}
+
+// =============================================================================
+// Verification Categories
+// =============================================================================
+
+export type VerificationCategory =
+  | "existence"
+  | "uniqueness"
+  | "referential_integrity"
+  | "semantic_correctness"
+  | "runtime_behavior";
+
+// =============================================================================
+// Dependency Graph
+// =============================================================================
+
+export interface DependencyNode {
+  id: string;
+  label: string;
+  type: string;
+  phase: WorkflowPhase;
+  is_referenced: boolean;
+  cost_category?: string;
+}
+
+export interface DependencyEdge {
+  source: string;
+  target: string;
+  label?: string;
+  edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
+}
+
+export interface DependencyGraph {
+  nodes: DependencyNode[];
+  edges: DependencyEdge[];
+}
+
+// =============================================================================
+// Cost Annotations
+// =============================================================================
+
+export type CostCategory =
+  | "network"
+  | "ai_call"
+  | "setup"
+  | "ui_interaction";
+
+export interface StepCost {
+  step_id: string;
+  name: string;
+  estimated_ms: number;
+  category: CostCategory;
+  has_side_effects: boolean;
+}
+
+export interface CostAnnotations {
+  steps: StepCost[];
+  total_estimated_ms: number;
+}
+
+// =============================================================================
+// Quality Report
+// =============================================================================
+
+export type QualityFindingSeverity = "critical" | "warning" | "info";
+
+export type QualityFindingCategory =
+  | "verification_gap"
+  | "missing_criterion"
+  | "unnecessary_step"
+  | "weak_retry"
+  | "required_flag_violation"
+  | "retry_inconsistency"
+  | "data_contract_violation"
+  | "false_positive_risk";
+
+export interface QualityFinding {
+  finding_id: string;
+  step_id?: string;
+  severity: QualityFindingSeverity;
+  category: QualityFindingCategory;
+  description: string;
+  suggested_fix?: string;
+}
+
+export interface CoverageMatrix {
+  criteria_to_steps: Record<string, string[]>;
+  steps_to_criteria: Record<string, string[]>;
+  uncovered_criteria: string[];
+  unlinked_steps: string[];
+}
+
+export interface QualityReport {
+  findings: QualityFinding[];
+  score: number;
+  pass: boolean;
+  coverage_matrix?: CoverageMatrix;
 }
 
 // =============================================================================

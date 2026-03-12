@@ -1,4 +1,4 @@
-export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, CompositionTemplate, DEFAULT_SUMMARY_PROMPT, HealthCheckUrl, HttpMethod, LogSourceSelection, ModelOverrideConfig, ModelOverrides, MultiStepTemplate, PHASE_INFO, PlaywrightExecutionMode, PromptStep, RoutingRule, STEP_TYPES, SetupStep, SingleStepTemplate, SkillAuthor, SkillCategory, SkillDefinition, SkillExport, SkillExportManifest, SkillImportResult, SkillOrigin, SkillParameter, SkillParameterOption, SkillRef, SkillTemplate, StageCondition, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.js';
+export { AgenticStep, ApiAssertion, ApiContentType, ApiVariableExtraction, BaseStep, CheckType, CommandStep, CompletionStep, CompositionTemplate, CostAnnotations, CostCategory, CoverageMatrix, DEFAULT_SUMMARY_PROMPT, DependencyEdge, DependencyGraph, DependencyNode, HealthCheckUrl, HttpMethod, LogSourceSelection, ModelOverrideConfig, ModelOverrides, MultiStepTemplate, PHASE_INFO, PlaywrightExecutionMode, PromptStep, QualityFinding, QualityFindingCategory, QualityFindingSeverity, QualityReport, RetryPolicy, RoutingRule, STEP_TYPES, SetupStep, SingleStepTemplate, SkillAuthor, SkillCategory, SkillDefinition, SkillExport, SkillExportManifest, SkillImportResult, SkillOrigin, SkillParameter, SkillParameterOption, SkillRef, SkillTemplate, StageCondition, StageInput, StageOutput, StepCost, StepTypeInfo, StepTypeName, TestType, UiBridgeStep, UnifiedStep, UnifiedWorkflow, VerificationCategory, VerificationStep, WorkflowExport, WorkflowExportManifest, WorkflowFeatures, WorkflowImportResult, WorkflowPhase, WorkflowStage, WorkflowStep } from './workflow.js';
 export { CheckIssueDetail, CreateTaskRunRequest, FindingsSummary, GateEvaluationResult, IndividualCheckResult, Pagination, RunPromptRequest, RunPromptResponse, StepExecutionConfig, TaskRun, TaskRunBackend, TaskRunBackendDetail, TaskRunCreate, TaskRunFilters, TaskRunFinding, TaskRunFindingActionType, TaskRunFindingCategory, TaskRunFindingCreate, TaskRunFindingFilters, TaskRunFindingResponse, TaskRunFindingSeverity, TaskRunFindingStatus, TaskRunFindingSummary, TaskRunFindingUpdate, TaskRunFindingsListResponse, TaskRunListResponse, TaskRunSession, TaskRunStatus, TaskRunUpdate, TaskType, VerificationPhaseResult, VerificationResultResponse, VerificationResultsListResponse, VerificationStepDetails, VerificationStepResult } from './task-run.js';
 export { ActionExecutionCreate, ActionExecutionResponse, ActionStatus, ActionType, CompressionResult, CompressionStatus, CoverageData, ErrorType, ExecutionIssueCreate, ExecutionIssueResponse, ExecutionRunComplete, ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse, ExecutionScreenshotCreate, ExecutionScreenshotResponse, ExecutionStats, ExecutionStatus, HookDefinition, HookExecutionResult, HookStatus, HookTrigger, IssueSeverity, RawCompressionEvent, RawCompressionResultPayload, RawExecutionStatusEvent, RawExecutionStatusEventBase, RawHookExecutionEvent, RawHookExecutionPayload, RawHookStartedEvent, RawRetryAttemptEvent, RawRetryAttemptPayload, RawRetryStatePayload, RawRoutingDecisionEvent, RawRoutingDecisionPayload, RawStatusChangeEvent, RawSubStepCompleteEvent, RawSubStepStartedEvent, RawTokenCountPayload, RawTokenCountUpdateEvent, RetryAttempt, RetryState, RetryStatus, RoutingDecision, RoutingFactor, RoutingStatus, RunStatus, RunType, RunnerMetadata, ScreenshotType, SubStepInfo, SubStepStatus, SubStepStatusDisplay, TaskComplexity, TokenCount, WorkflowMetadata } from './execution.js';
 export { AutoFixTask, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, PromptTask, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleCron, ScheduleExpression, ScheduleInterval, ScheduleOnce, ScheduleState, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest, WorkflowTask } from './scheduler.js';
@@ -428,7 +428,7 @@ declare function toStateDiscoveryResultSummary(data: Record<string, unknown>): S
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
  */
-type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart" | "PhaseTimeline" | "IterationComparison" | "StepDurationChart" | "PhaseDistribution";
+type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart" | "PhaseTimeline" | "IterationComparison" | "StepDurationChart" | "PhaseDistribution" | "DependencyGraph" | "CostBreakdown";
 /**
  * A canvas panel rendered in the dashboard.
  */
@@ -622,6 +622,33 @@ interface PhaseDistributionData {
     }>;
     total_duration_ms: number;
 }
+/** Data for DependencyGraph component. */
+interface DependencyGraphData {
+    nodes: Array<{
+        id: string;
+        label: string;
+        type: string;
+        phase: string;
+        is_referenced: boolean;
+        cost_category?: string;
+    }>;
+    edges: Array<{
+        source: string;
+        target: string;
+        label?: string;
+        edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
+    }>;
+}
+/** Data for CostBreakdown component. */
+interface CostBreakdownData {
+    steps: Array<{
+        name: string;
+        estimated_ms: number;
+        category: string;
+        has_side_effects: boolean;
+    }>;
+    total_estimated_ms: number;
+}
 
 /**
  * Known Issues Registry Types
@@ -753,4 +780,4 @@ declare const DETECTION_METHODS: {
     label: string;
 }[];
 
-export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CreateKnownIssueRequest, type CreatePatternTemplateRequest, type CreateRenderLogRequest, DETECTION_METHODS, type DetectionMethod, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, ISSUE_CATEGORIES, ISSUE_SEVERITIES, type ImageSnapshot, type IssueCategory, type IssuePatternTemplate, type IssueProvenance, type IssueStatus, type IterationComparisonData, type KeyValueData, type KnownIssue, type KnownIssueSeverity, type LinkSnapshot, type ListKnownIssuesQuery, type MarkdownData, type PhaseDistributionData, type PhaseTimelineData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type ScopeType, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type StepDurationChartData, type SummaryStatsData, type TableData, type TemplateParameter, type TerminalData, type TimelineData, type TransitionTriggerType, type UpdateKnownIssueRequest, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CostBreakdownData, type CreateKnownIssueRequest, type CreatePatternTemplateRequest, type CreateRenderLogRequest, DETECTION_METHODS, type DependencyGraphData, type DetectionMethod, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, ISSUE_CATEGORIES, ISSUE_SEVERITIES, type ImageSnapshot, type IssueCategory, type IssuePatternTemplate, type IssueProvenance, type IssueStatus, type IterationComparisonData, type KeyValueData, type KnownIssue, type KnownIssueSeverity, type LinkSnapshot, type ListKnownIssuesQuery, type MarkdownData, type PhaseDistributionData, type PhaseTimelineData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type ScopeType, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type StepDurationChartData, type SummaryStatsData, type TableData, type TemplateParameter, type TerminalData, type TimelineData, type TransitionTriggerType, type UpdateKnownIssueRequest, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

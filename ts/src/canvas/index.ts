@@ -30,7 +30,9 @@ export type CanvasComponentType =
   | "PhaseTimeline"
   | "IterationComparison"
   | "StepDurationChart"
-  | "PhaseDistribution";
+  | "PhaseDistribution"
+  | "DependencyGraph"
+  | "CostBreakdown";
 
 /**
  * A canvas panel rendered in the dashboard.
@@ -245,4 +247,33 @@ export interface PhaseDistributionData {
     color?: string;
   }>;
   total_duration_ms: number;
+}
+
+/** Data for DependencyGraph component. */
+export interface DependencyGraphData {
+  nodes: Array<{
+    id: string;
+    label: string;
+    type: string;
+    phase: string;
+    is_referenced: boolean;
+    cost_category?: string;
+  }>;
+  edges: Array<{
+    source: string;
+    target: string;
+    label?: string;
+    edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
+  }>;
+}
+
+/** Data for CostBreakdown component. */
+export interface CostBreakdownData {
+  steps: Array<{
+    name: string;
+    estimated_ms: number;
+    category: string;
+    has_side_effects: boolean;
+  }>;
+  total_estimated_ms: number;
 }

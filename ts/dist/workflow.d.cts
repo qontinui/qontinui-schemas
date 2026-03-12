@@ -146,6 +146,10 @@ interface BaseStep {
         delay_ms: number;
     };
     skill_origin?: SkillOrigin;
+    /** Acceptance criterion IDs this step verifies (supports multiple) */
+    criterion_ids?: string[];
+    /** Verification depth category for this step */
+    verification_category?: VerificationCategory;
 }
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type ApiContentType = "application/json" | "application/x-www-form-urlencoded" | "text/plain" | "none";
@@ -278,6 +282,28 @@ interface StageCondition {
     /** Run only if this many stages have failed verification so far */
     min_failures?: number;
 }
+interface RetryPolicy {
+    /** Number of retry attempts (0 = no retries) */
+    count: number;
+    /** Delay between retries in milliseconds */
+    delay_ms: number;
+    /** Whether to use exponential backoff */
+    backoff?: boolean;
+}
+interface StageOutput {
+    /** Unique key for this output (e.g. "api_url", "auth_token") */
+    key: string;
+    /** Human-readable description */
+    description?: string;
+}
+interface StageInput {
+    /** The key to bind (matches a StageOutput.key from a prior stage) */
+    key: string;
+    /** Which stage provides this input (stage id). If omitted, searches all prior stages. */
+    from_stage?: string;
+    /** Whether this input is required (default: true) */
+    required?: boolean;
+}
 interface WorkflowStage {
     id: string;
     name: string;
@@ -293,6 +319,12 @@ interface WorkflowStage {
     model_overrides?: ModelOverrides;
     /** Optional condition for conditional stage execution */
     condition?: StageCondition;
+    /** Retry policy for this stage (overrides per-step defaults) */
+    retry_policy?: RetryPolicy;
+    /** Declared outputs that this stage produces for downstream stages */
+    outputs?: StageOutput[];
+    /** Inputs required from prior stages */
+    inputs?: StageInput[];
 }
 interface UnifiedWorkflow {
     id: string;
@@ -319,10 +351,69 @@ interface UnifiedWorkflow {
     stages?: WorkflowStage[];
     stop_on_failure?: boolean;
     reflection_mode?: boolean;
+    /** Dependency graph computed during generation */
+    dependency_graph?: DependencyGraph;
+    /** Cost annotations computed during generation */
+    cost_annotations?: CostAnnotations;
+    /** Quality report from the revision phase */
+    quality_report?: QualityReport;
     category: string;
     tags: string[];
     created_at: string;
     modified_at: string;
+}
+type VerificationCategory = "existence" | "uniqueness" | "referential_integrity" | "semantic_correctness" | "runtime_behavior";
+interface DependencyNode {
+    id: string;
+    label: string;
+    type: string;
+    phase: WorkflowPhase;
+    is_referenced: boolean;
+    cost_category?: string;
+}
+interface DependencyEdge {
+    source: string;
+    target: string;
+    label?: string;
+    edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
+}
+interface DependencyGraph {
+    nodes: DependencyNode[];
+    edges: DependencyEdge[];
+}
+type CostCategory = "network" | "ai_call" | "setup" | "ui_interaction";
+interface StepCost {
+    step_id: string;
+    name: string;
+    estimated_ms: number;
+    category: CostCategory;
+    has_side_effects: boolean;
+}
+interface CostAnnotations {
+    steps: StepCost[];
+    total_estimated_ms: number;
+}
+type QualityFindingSeverity = "critical" | "warning" | "info";
+type QualityFindingCategory = "verification_gap" | "missing_criterion" | "unnecessary_step" | "weak_retry" | "required_flag_violation" | "retry_inconsistency" | "data_contract_violation" | "false_positive_risk";
+interface QualityFinding {
+    finding_id: string;
+    step_id?: string;
+    severity: QualityFindingSeverity;
+    category: QualityFindingCategory;
+    description: string;
+    suggested_fix?: string;
+}
+interface CoverageMatrix {
+    criteria_to_steps: Record<string, string[]>;
+    steps_to_criteria: Record<string, string[]>;
+    uncovered_criteria: string[];
+    unlinked_steps: string[];
+}
+interface QualityReport {
+    findings: QualityFinding[];
+    score: number;
+    pass: boolean;
+    coverage_matrix?: CoverageMatrix;
 }
 interface WorkflowExportManifest {
     version: string;
@@ -364,4 +455,4 @@ declare const PHASE_INFO: Record<WorkflowPhase, {
 }>;
 declare const DEFAULT_SUMMARY_PROMPT = "Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.";
 
-export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, type CompositionTemplate, DEFAULT_SUMMARY_PROMPT, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
+export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, type CompositionTemplate, type CostAnnotations, type CostCategory, type CoverageMatrix, DEFAULT_SUMMARY_PROMPT, type DependencyEdge, type DependencyGraph, type DependencyNode, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, type QualityFinding, type QualityFindingCategory, type QualityFindingSeverity, type QualityReport, type RetryPolicy, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StageInput, type StageOutput, type StepCost, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationCategory, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
