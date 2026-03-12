@@ -428,7 +428,7 @@ declare function toStateDiscoveryResultSummary(data: Record<string, unknown>): S
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
  */
-type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart" | "PhaseTimeline" | "IterationComparison" | "StepDurationChart" | "PhaseDistribution" | "DependencyGraph" | "CostBreakdown";
+type CanvasComponentType = "Markdown" | "CodeDiff" | "Table" | "FileTree" | "KeyValue" | "Terminal" | "Alert" | "Timeline" | "ProgressChart" | "FindingList" | "Checklist" | "SummaryStats" | "StateTimeline" | "Waterfall" | "Sparkline" | "WaffleChart" | "PhaseTimeline" | "IterationComparison" | "StepDurationChart" | "PhaseDistribution" | "DependencyGraph" | "CostBreakdown" | "MissionBrief";
 /**
  * A canvas panel rendered in the dashboard.
  */
@@ -639,6 +639,27 @@ interface DependencyGraphData {
         edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
     }>;
 }
+/** Data for MissionBrief component. */
+interface MissionBriefData {
+    workflow_name: string;
+    prompt: string;
+    model: string;
+    reflection: boolean;
+    approval_gate: boolean;
+    stages: Array<{
+        name: string;
+        index: number;
+        max_iterations: number;
+    }>;
+    total_stages: number;
+    max_iterations: number;
+    progress: {
+        current_stage_index: number | null;
+        current_iteration: number;
+        phase: string | null;
+        activity: string | null;
+    };
+}
 /** Data for CostBreakdown component. */
 interface CostBreakdownData {
     steps: Array<{
@@ -780,4 +801,4 @@ declare const DETECTION_METHODS: {
     label: string;
 }[];
 
-export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CostBreakdownData, type CreateKnownIssueRequest, type CreatePatternTemplateRequest, type CreateRenderLogRequest, DETECTION_METHODS, type DependencyGraphData, type DetectionMethod, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, ISSUE_CATEGORIES, ISSUE_SEVERITIES, type ImageSnapshot, type IssueCategory, type IssuePatternTemplate, type IssueProvenance, type IssueStatus, type IterationComparisonData, type KeyValueData, type KnownIssue, type KnownIssueSeverity, type LinkSnapshot, type ListKnownIssuesQuery, type MarkdownData, type PhaseDistributionData, type PhaseTimelineData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type ScopeType, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type StepDurationChartData, type SummaryStatsData, type TableData, type TemplateParameter, type TerminalData, type TimelineData, type TransitionTriggerType, type UpdateKnownIssueRequest, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };
+export { type AlertData, type CanvasComponentType, type CanvasPanel, type CanvasUpdateEvent, type ChecklistData, type CodeDiffData, type ComponentRenderLogEntry, type CostBreakdownData, type CreateKnownIssueRequest, type CreatePatternTemplateRequest, type CreateRenderLogRequest, DETECTION_METHODS, type DependencyGraphData, type DetectionMethod, type DiscoveredState, type DiscoveredStateImage, type DiscoveredTransition, type DiscoveryBoundingBox, type DiscoverySourceType, type DiscoveryTransitionTrigger, type DomElementSnapshot, type DomMutationType, type DomSnapshot, type DomSnapshotRenderLogEntry, type ElementRect, type FileTreeData, type FindingListData, type FormSnapshot, ISSUE_CATEGORIES, ISSUE_SEVERITIES, type ImageSnapshot, type IssueCategory, type IssuePatternTemplate, type IssueProvenance, type IssueStatus, type IterationComparisonData, type KeyValueData, type KnownIssue, type KnownIssueSeverity, type LinkSnapshot, type ListKnownIssuesQuery, type MarkdownData, type MissionBriefData, type PhaseDistributionData, type PhaseTimelineData, type ProgressChartData, type RenderLogEntry, type RenderLogEntryBase, type RenderLogList, type RenderLogResponse, type RenderLogStats, type RenderLogSummary, type RenderLogTrigger, SOURCE_TYPE_COLORS, SOURCE_TYPE_LABELS, type ScopeType, type SparklineData, type StateDiscoveryResult, type StateDiscoveryResultCreate, type StateDiscoveryResultListResponse, type StateDiscoveryResultSummary, type StateDiscoveryResultUpdate, type StateMachineExport, type StateMachineImport, type StateTimelineData, type StepDurationChartData, type SummaryStatsData, type TableData, type TemplateParameter, type TerminalData, type TimelineData, type TransitionTriggerType, type UpdateKnownIssueRequest, type WaffleChartData, type WaterfallData, isComponentRenderLog, isDomSnapshotRenderLog, toDiscoveredState, toDiscoveredStateImage, toDiscoveredTransition, toStateDiscoveryResult, toStateDiscoveryResultSummary };

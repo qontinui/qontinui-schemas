@@ -32,7 +32,8 @@ export type CanvasComponentType =
   | "StepDurationChart"
   | "PhaseDistribution"
   | "DependencyGraph"
-  | "CostBreakdown";
+  | "CostBreakdown"
+  | "MissionBrief";
 
 /**
  * A canvas panel rendered in the dashboard.
@@ -265,6 +266,28 @@ export interface DependencyGraphData {
     label?: string;
     edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
   }>;
+}
+
+/** Data for MissionBrief component. */
+export interface MissionBriefData {
+  workflow_name: string;
+  prompt: string;
+  model: string;
+  reflection: boolean;
+  approval_gate: boolean;
+  stages: Array<{
+    name: string;
+    index: number;
+    max_iterations: number;
+  }>;
+  total_stages: number;
+  max_iterations: number;
+  progress: {
+    current_stage_index: number | null;
+    current_iteration: number;
+    phase: string | null;
+    activity: string | null;
+  };
 }
 
 /** Data for CostBreakdown component. */
