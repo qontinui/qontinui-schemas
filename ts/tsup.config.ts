@@ -10,6 +10,7 @@ export default defineConfig({
     library: "src/library/index.ts",
     chat: "src/chat/index.ts",
     "state-machine": "src/state-machine/index.ts",
+    constraints: "src/constraints/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

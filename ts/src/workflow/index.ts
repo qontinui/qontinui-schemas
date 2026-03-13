@@ -390,6 +390,8 @@ export interface UnifiedWorkflow {
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
   reflection_mode?: boolean;
+  /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
+  constraint_overrides?: Record<string, boolean>;
   /** Dependency graph computed during generation */
   dependency_graph?: DependencyGraph;
   /** Cost annotations computed during generation */

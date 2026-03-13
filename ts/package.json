@@ -46,6 +46,11 @@
       "types": "./dist/state-machine.d.ts",
       "import": "./dist/state-machine.js",
       "require": "./dist/state-machine.cjs"
+    },
+    "./constraints": {
+      "types": "./dist/constraints.d.ts",
+      "import": "./dist/constraints.js",
+      "require": "./dist/constraints.cjs"
     }
   },
   "files": [

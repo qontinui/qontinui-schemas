@@ -36,3 +36,6 @@ export * from "./known-issues";
 
 // State Machine types
 export * from "./state-machine";
+
+// Constraint Engine types
+export * from "./constraints";
