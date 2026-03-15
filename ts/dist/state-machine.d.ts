@@ -301,6 +301,8 @@ interface StateNodeData {
     incomingCount?: number;
     isDropTarget?: boolean;
     onStartElementDrag?: (stateId: string, elementId: string) => void;
+    /** Optional map of element ID → base64 thumbnail image (data URL or raw base64 PNG). */
+    elementThumbnails?: Record<string, string>;
 }
 /**
  * Data passed to a transition edge in the ReactFlow graph editor.
