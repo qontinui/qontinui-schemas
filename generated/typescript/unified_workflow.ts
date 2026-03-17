@@ -1,5 +1,5 @@
 /**
- * Unified Workflow Types
+ * Workflow Types
  *
  * Canonical type definitions for the unified Workflow Builder system.
  * Shared across qontinui-runner and qontinui-web.
@@ -8,9 +8,6 @@
  *
  * Execution Order:
  *   Setup (once) -> [Verification <-> Agentic]* -> Completion (once)
- *
- * The Verification/Agentic loop continues until all required checks pass or max iterations.
- * Setup and Completion run exactly once - at the beginning and end respectively.
  *
  * Step Types (4 core types):
  *   command   - Shell commands, checks, check groups, tests
@@ -71,6 +68,10 @@ export interface BaseStep {
   required?: boolean;
   retry?: { count: number; delay_ms: number };
   skill_origin?: SkillOrigin;
+  /** Acceptance criterion IDs this step verifies (supports multiple) */
+  criterion_ids?: string[];
+  /** Verification depth category for this step */
+  verification_category?: VerificationCategory;
 }
 
 // -----------------------------------------------------------------------------
@@ -203,15 +204,13 @@ export interface UiBridgeStep extends BaseStep {
 }
 
 // -----------------------------------------------------------------------------
-// Workflow Steps (composition — run a saved workflow inline)
+// Workflow Steps (composition -- run a saved workflow inline)
 // -----------------------------------------------------------------------------
 
 export interface WorkflowStep extends BaseStep {
   type: "workflow";
   phase: "setup" | "verification" | "completion";
-  /** ID of the referenced workflow to execute */
   workflow_id: string;
-  /** Cached display name of the referenced workflow */
   workflow_name: string;
 }
 
@@ -250,6 +249,7 @@ export type CompletionStep =
 
 /** A conditional routing rule that selects model/provider based on runtime context. */
 export interface RoutingRule {
+  /** Condition expression, e.g. "verification_failures >= 2" */
   condition: string;
   model?: string;
   provider?: string;
@@ -260,10 +260,15 @@ export interface RoutingRule {
 export interface ModelOverrideConfig {
   provider?: string;
   model?: string;
+  /** Temperature override for this phase (0.0–1.0). */
   temperature?: number;
+  /** Max output tokens override for this phase. */
   max_tokens?: number;
+  /** Fallback provider if the primary fails with a retryable error. */
   fallback_provider?: string;
+  /** Fallback model if the primary fails with a retryable error. */
   fallback_model?: string;
+  /** Conditional routing rules evaluated at runtime. First matching rule wins. */
   routing_rules?: RoutingRule[];
 }
 
@@ -297,13 +302,31 @@ export interface StageCondition {
   min_failures?: number;
 }
 
-/**
- * A workflow stage — a self-contained unit of execution with its own
- * setup/verification/agentic/completion steps and verification-agentic loop.
- *
- * Multi-stage workflows execute stages sequentially. Each stage gets its own
- * verification-agentic loop, and later stages see full output from all prior stages.
- */
+export interface RetryPolicy {
+  /** Number of retry attempts (0 = no retries) */
+  count: number;
+  /** Delay between retries in milliseconds */
+  delay_ms: number;
+  /** Whether to use exponential backoff */
+  backoff?: boolean;
+}
+
+export interface StageOutput {
+  /** Unique key for this output (e.g. "api_url", "auth_token") */
+  key: string;
+  /** Human-readable description */
+  description?: string;
+}
+
+export interface StageInput {
+  /** The key to bind (matches a StageOutput.key from a prior stage) */
+  key: string;
+  /** Which stage provides this input (stage id). If omitted, searches all prior stages. */
+  from_stage?: string;
+  /** Whether this input is required (default: true) */
+  required?: boolean;
+}
+
 export interface WorkflowStage {
   id: string;
   name: string;
@@ -319,6 +342,12 @@ export interface WorkflowStage {
   model_overrides?: ModelOverrides;
   /** Optional condition for conditional stage execution */
   condition?: StageCondition;
+  /** Retry policy for this stage (overrides per-step defaults) */
+  retry_policy?: RetryPolicy;
+  /** Declared outputs that this stage produces for downstream stages */
+  outputs?: StageOutput[];
+  /** Inputs required from prior stages */
+  inputs?: StageInput[];
 }
 
 // =============================================================================
@@ -352,13 +381,116 @@ export interface UnifiedWorkflow {
   reflection_mode?: boolean;
   /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
   constraint_overrides?: Record<string, boolean>;
-  is_favorite?: boolean;
+  /** Dependency graph computed during generation */
+  dependency_graph?: DependencyGraph;
+  /** Cost annotations computed during generation */
+  cost_annotations?: CostAnnotations;
+  /** Quality report from the revision phase */
+  quality_report?: QualityReport;
   /** Acceptance criteria from the specification agent (JSON blob) */
   acceptance_criteria?: Record<string, unknown> | null;
   category: string;
   tags: string[];
   created_at: string;
   modified_at: string;
+}
+
+// =============================================================================
+// Verification Categories
+// =============================================================================
+
+export type VerificationCategory =
+  | "existence"
+  | "uniqueness"
+  | "referential_integrity"
+  | "semantic_correctness"
+  | "runtime_behavior";
+
+// =============================================================================
+// Dependency Graph
+// =============================================================================
+
+export interface DependencyNode {
+  id: string;
+  label: string;
+  type: string;
+  phase: WorkflowPhase;
+  is_referenced: boolean;
+  cost_category?: string;
+}
+
+export interface DependencyEdge {
+  source: string;
+  target: string;
+  label?: string;
+  edge_type: "explicit_depends_on" | "implicit_reference" | "setup_provides";
+}
+
+export interface DependencyGraph {
+  nodes: DependencyNode[];
+  edges: DependencyEdge[];
+}
+
+// =============================================================================
+// Cost Annotations
+// =============================================================================
+
+export type CostCategory =
+  | "network"
+  | "ai_call"
+  | "setup"
+  | "ui_interaction";
+
+export interface StepCost {
+  step_id: string;
+  name: string;
+  estimated_ms: number;
+  category: CostCategory;
+  has_side_effects: boolean;
+}
+
+export interface CostAnnotations {
+  steps: StepCost[];
+  total_estimated_ms: number;
+}
+
+// =============================================================================
+// Quality Report
+// =============================================================================
+
+export type QualityFindingSeverity = "critical" | "warning" | "info";
+
+export type QualityFindingCategory =
+  | "verification_gap"
+  | "missing_criterion"
+  | "unnecessary_step"
+  | "weak_retry"
+  | "required_flag_violation"
+  | "retry_inconsistency"
+  | "data_contract_violation"
+  | "false_positive_risk";
+
+export interface QualityFinding {
+  finding_id: string;
+  step_id?: string;
+  severity: QualityFindingSeverity;
+  category: QualityFindingCategory;
+  description: string;
+  suggested_fix?: string;
+}
+
+export interface CoverageMatrix {
+  criteria_to_steps: Record<string, string[]>;
+  steps_to_criteria: Record<string, string[]>;
+  uncovered_criteria: string[];
+  unlinked_steps: string[];
+}
+
+export interface QualityReport {
+  findings: QualityFinding[];
+  score: number;
+  pass: boolean;
+  coverage_matrix?: CoverageMatrix;
 }
 
 // =============================================================================
@@ -384,34 +516,183 @@ export interface WorkflowImportResult {
 }
 
 // =============================================================================
-// Phase Normalization Helpers
+// Feature Detection
 // =============================================================================
 
-/** Convert any workflow to its phases (stages) representation */
-export function normalizeToPhases(workflow: UnifiedWorkflow): WorkflowStage[] {
-  if (workflow.stages && workflow.stages.length > 0) {
-    return workflow.stages;
-  }
-  // Wrap top-level steps as a single phase
-  return [
-    {
-      id: workflow.id + "-phase-1",
-      name: workflow.name,
-      description: workflow.description,
-      setup_steps: workflow.setup_steps,
-      verification_steps: workflow.verification_steps,
-      agentic_steps: workflow.agentic_steps,
-      completion_steps: workflow.completion_steps ?? [],
-      max_iterations: workflow.max_iterations,
-      timeout_seconds: workflow.timeout_seconds,
-      provider: workflow.provider,
-      model: workflow.model,
-      model_overrides: workflow.model_overrides,
-    },
-  ];
+export interface WorkflowFeatures {
+  hasSetup: boolean;
+  hasVerification: boolean;
+  hasAgentic: boolean;
+  hasCompletion: boolean;
+  hasUiBridge: boolean;
+  showIterationSettings: boolean;
+  hasAiPrompts: boolean;
 }
 
-/** Get the number of phases in a workflow */
-export function getPhaseCount(workflow: UnifiedWorkflow): number {
-  return normalizeToPhases(workflow).length;
+// =============================================================================
+// Step Type Display Info
+// =============================================================================
+
+export interface StepTypeInfo {
+  type: string;
+  label: string;
+  description: string;
+  icon: string;
+  color: string;
+  phase: WorkflowPhase;
 }
+
+// =============================================================================
+// Step Type Constants
+// =============================================================================
+
+export const STEP_TYPES: Record<WorkflowPhase, StepTypeInfo[]> = {
+  setup: [
+    {
+      type: "command",
+      label: "Command",
+      description: "Run shell commands, checks, or tests",
+      icon: "Terminal",
+      color: "gray",
+      phase: "setup",
+    },
+    {
+      type: "ui_bridge",
+      label: "UI Bridge",
+      description: "Interact with UI via UI Bridge SDK",
+      icon: "Monitor",
+      color: "emerald",
+      phase: "setup",
+    },
+    {
+      type: "prompt",
+      label: "AI Task",
+      description: "AI-driven task",
+      icon: "Bot",
+      color: "violet",
+      phase: "setup",
+    },
+    {
+      type: "workflow",
+      label: "Workflow",
+      description: "Run a saved workflow",
+      icon: "Workflow",
+      color: "blue",
+      phase: "setup",
+    },
+  ],
+  verification: [
+    {
+      type: "command",
+      label: "Command",
+      description: "Run commands, checks, or tests for verification",
+      icon: "Terminal",
+      color: "gray",
+      phase: "verification",
+    },
+    {
+      type: "ui_bridge",
+      label: "UI Bridge",
+      description: "Verify UI state via UI Bridge",
+      icon: "Monitor",
+      color: "emerald",
+      phase: "verification",
+    },
+    {
+      type: "prompt",
+      label: "AI Verification",
+      description: "AI-evaluated criteria",
+      icon: "Bot",
+      color: "violet",
+      phase: "verification",
+    },
+    {
+      type: "workflow",
+      label: "Workflow",
+      description: "Run a saved workflow for verification",
+      icon: "Workflow",
+      color: "blue",
+      phase: "verification",
+    },
+  ],
+  agentic: [
+    {
+      type: "prompt",
+      label: "Prompt",
+      description: "AI task instructions",
+      icon: "MessageSquare",
+      color: "amber",
+      phase: "agentic",
+    },
+  ],
+  completion: [
+    {
+      type: "command",
+      label: "Command",
+      description: "Run cleanup commands or final tests",
+      icon: "Terminal",
+      color: "gray",
+      phase: "completion",
+    },
+    {
+      type: "ui_bridge",
+      label: "UI Bridge",
+      description: "Final UI interactions",
+      icon: "Monitor",
+      color: "emerald",
+      phase: "completion",
+    },
+    {
+      type: "prompt",
+      label: "AI Completion",
+      description: "Final AI actions",
+      icon: "Bot",
+      color: "violet",
+      phase: "completion",
+    },
+    {
+      type: "workflow",
+      label: "Workflow",
+      description: "Run a saved workflow as a completion step",
+      icon: "Workflow",
+      color: "blue",
+      phase: "completion",
+    },
+  ],
+};
+
+// =============================================================================
+// Phase Display Info
+// =============================================================================
+
+export const PHASE_INFO: Record<
+  WorkflowPhase,
+  { label: string; description: string; color: string }
+> = {
+  setup: {
+    label: "Setup",
+    description: "Runs once at the beginning",
+    color: "blue",
+  },
+  verification: {
+    label: "Verification",
+    description: "Checks success criteria, loops with agentic",
+    color: "green",
+  },
+  agentic: {
+    label: "Agentic",
+    description: "AI work, iterates until verification passes",
+    color: "amber",
+  },
+  completion: {
+    label: "Completion",
+    description: "Runs once after the loop exits",
+    color: "purple",
+  },
+};
+
+// =============================================================================
+// Summary Step Constants
+// =============================================================================
+
+export const DEFAULT_SUMMARY_PROMPT = `Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.`;
