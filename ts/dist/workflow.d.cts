@@ -361,6 +361,8 @@ interface UnifiedWorkflow {
     quality_report?: QualityReport;
     /** Acceptance criteria from the specification agent (JSON blob) */
     acceptance_criteria?: Record<string, unknown> | null;
+    /** Whether this workflow is marked as a favorite */
+    is_favorite?: boolean | null;
     category: string;
     tags: string[];
     created_at: string;
