@@ -353,6 +353,8 @@ export interface UnifiedWorkflow {
   /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
   constraint_overrides?: Record<string, boolean>;
   is_favorite?: boolean;
+  /** Acceptance criteria from the specification agent (JSON blob) */
+  acceptance_criteria?: Record<string, unknown> | null;
   category: string;
   tags: string[];
   created_at: string;

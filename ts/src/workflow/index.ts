@@ -398,6 +398,8 @@ export interface UnifiedWorkflow {
   cost_annotations?: CostAnnotations;
   /** Quality report from the revision phase */
   quality_report?: QualityReport;
+  /** Acceptance criteria from the specification agent (JSON blob) */
+  acceptance_criteria?: Record<string, unknown> | null;
   category: string;
   tags: string[];
   created_at: string;

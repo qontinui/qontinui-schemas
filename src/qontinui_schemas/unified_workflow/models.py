@@ -449,6 +449,10 @@ class UnifiedWorkflow(BaseModel):
         None,
         description="Whether this workflow is marked as a favorite for quick access",
     )
+    acceptance_criteria: dict[str, Any] | None = Field(
+        None,
+        description="Acceptance criteria from the specification agent (JSON blob)",
+    )
 
     # Metadata
     category: str = Field(

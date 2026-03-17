@@ -33,7 +33,8 @@ export type CanvasComponentType =
   | "PhaseDistribution"
   | "DependencyGraph"
   | "CostBreakdown"
-  | "MissionBrief";
+  | "MissionBrief"
+  | "AcceptanceCriteria";
 
 /**
  * A canvas panel rendered in the dashboard.
@@ -288,6 +289,22 @@ export interface MissionBriefData {
     phase: string | null;
     activity: string | null;
   };
+}
+
+/** Data for AcceptanceCriteria component. */
+export interface AcceptanceCriteriaData {
+  goal_summary: string;
+  criteria: Array<{
+    id: string;
+    description: string;
+    method: "command" | "ui_bridge" | "test" | "manual";
+    priority: "critical" | "important" | "optional";
+    verification_hint: string;
+    category: string;
+    status: "pending" | "running" | "passed" | "failed" | "skipped";
+    last_error?: string;
+  }>;
+  assumptions?: string[];
 }
 
 /** Data for CostBreakdown component. */
