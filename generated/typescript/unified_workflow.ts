@@ -379,6 +379,14 @@ export interface UnifiedWorkflow {
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
   reflection_mode?: boolean;
+  /** Create a new git branch and worktree for this run. Changes stay isolated until merged. */
+  use_worktree?: boolean;
+  /** Run in multi-agent mode, spawning parallel sub-agents for independent tasks. */
+  multi_agent_mode?: boolean;
+  /** Workflow execution architecture override. */
+  workflow_architecture?: "traditional" | "agentic_verification" | "multi_agent_pipeline";
+  /** Configuration for the multi-agent pipeline architecture. */
+  multi_agent_pipeline_config?: Record<string, unknown>;
   /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
   constraint_overrides?: Record<string, boolean>;
   /** Dependency graph computed during generation */
