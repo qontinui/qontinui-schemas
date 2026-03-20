@@ -52,6 +52,8 @@ interface WorkflowTask {
     workflow_name: string;
     config_path?: string;
     monitor_index?: number;
+    /** If set, run unified workflow by ID instead of legacy workflow by name */
+    workflow_id?: string;
 }
 interface PromptTask {
     task_type: "Prompt";
