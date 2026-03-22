@@ -83,7 +83,9 @@ class HealthCheckUrl(BaseModel):
     expected_status: int | None = Field(
         None, description="Expected HTTP status code (defaults to 200)"
     )
-    timeout_seconds: int | None = Field(None, description="Timeout for the health check request")
+    timeout_seconds: int | None = Field(
+        None, description="Timeout for the health check request"
+    )
     is_critical: bool | None = Field(
         None,
         description="Whether failure of this check should abort the workflow",
@@ -97,11 +99,15 @@ class ApiVariableExtraction(BaseModel):
     template syntax.
     """
 
-    variable_name: str = Field(..., description="Name of the variable to store the extracted value")
+    variable_name: str = Field(
+        ..., description="Name of the variable to store the extracted value"
+    )
     json_path: str = Field(
         ..., description="JSONPath expression to extract the value from the response"
     )
-    default_value: str | None = Field(None, description="Default value if extraction fails")
+    default_value: str | None = Field(
+        None, description="Default value if extraction fails"
+    )
 
 
 class ApiAssertion(BaseModel):
@@ -111,9 +117,9 @@ class ApiAssertion(BaseModel):
     whether the step passes or fails.
     """
 
-    type: Literal["status_code", "json_path", "header", "body_contains", "response_time"] = Field(
-        ..., description="Type of assertion to evaluate"
-    )
+    type: Literal[
+        "status_code", "json_path", "header", "body_contains", "response_time"
+    ] = Field(..., description="Type of assertion to evaluate")
     expected: str | int = Field(..., description="Expected value to compare against")
     json_path: str | None = Field(
         None, description="JSONPath expression (required for json_path assertions)"
@@ -121,9 +127,9 @@ class ApiAssertion(BaseModel):
     header_name: str | None = Field(
         None, description="Header name (required for header assertions)"
     )
-    operator: Literal["equals", "contains", "matches", "greater_than", "less_than"] | None = Field(
-        None, description="Comparison operator (defaults to equals)"
-    )
+    operator: (
+        Literal["equals", "contains", "matches", "greater_than", "less_than"] | None
+    ) = Field(None, description="Comparison operator (defaults to equals)")
 
 
 # =============================================================================
@@ -184,7 +190,9 @@ class CommandStep(BaseStep):
     working_directory: str | None = Field(
         None, description="Working directory for command execution"
     )
-    timeout_seconds: int | None = Field(None, description="Maximum execution time in seconds")
+    timeout_seconds: int | None = Field(
+        None, description="Maximum execution time in seconds"
+    )
     fail_on_error: bool | None = Field(
         None, description="Whether to fail the step on non-zero exit code"
     )
@@ -203,28 +211,44 @@ class CommandStep(BaseStep):
     )
     check_id: str | None = Field(None, description="Unique identifier for this check")
     config_path: str | None = Field(None, description="Path to tool configuration file")
-    auto_fix: bool | None = Field(None, description="Whether to attempt auto-fix on failure")
-    fail_on_warning: bool | None = Field(None, description="Whether to treat warnings as failures")
+    auto_fix: bool | None = Field(
+        None, description="Whether to attempt auto-fix on failure"
+    )
+    fail_on_warning: bool | None = Field(
+        None, description="Whether to treat warnings as failures"
+    )
 
     # CI/CD fields
     repository: str | None = Field(None, description="Repository for CI/CD integration")
-    workflow_name: str | None = Field(None, description="CI/CD workflow name to trigger or monitor")
+    workflow_name: str | None = Field(
+        None, description="CI/CD workflow name to trigger or monitor"
+    )
     branch: str | None = Field(None, description="Git branch for CI/CD operations")
     wait_for_completion: bool | None = Field(
         None, description="Whether to wait for CI/CD workflow completion"
     )
 
     # Check group fields
-    check_group_id: str | None = Field(None, description="Identifier for grouping related checks")
+    check_group_id: str | None = Field(
+        None, description="Identifier for grouping related checks"
+    )
 
     # Test mode fields
     test_type: TestType | None = Field(None, description="Type of test to execute")
     test_id: str | None = Field(None, description="Unique identifier for this test")
-    code: str | None = Field(None, description="Inline code to execute (for python/custom tests)")
-    script_id: str | None = Field(None, description="Reference ID for a pre-defined test script")
-    script_content: str | None = Field(None, description="Inline script content for test execution")
+    code: str | None = Field(
+        None, description="Inline code to execute (for python/custom tests)"
+    )
+    script_id: str | None = Field(
+        None, description="Reference ID for a pre-defined test script"
+    )
+    script_content: str | None = Field(
+        None, description="Inline script content for test execution"
+    )
     target_url: str | None = Field(None, description="URL target for Playwright tests")
-    fused_script_id: str | None = Field(None, description="ID of a fused (combined) test script")
+    fused_script_id: str | None = Field(
+        None, description="ID of a fused (combined) test script"
+    )
     execution_mode: PlaywrightExecutionMode | None = Field(
         None, description="Playwright execution mode (independent or chained)"
     )
@@ -249,7 +273,9 @@ class PromptStep(BaseStep):
         None,
         description="AI provider override (e.g., 'anthropic', 'openai')",
     )
-    model: str | None = Field(None, description="Model override (e.g., 'claude-sonnet-4-20250514')")
+    model: str | None = Field(
+        None, description="Model override (e.g., 'claude-sonnet-4-20250514')"
+    )
     is_summary_step: bool | None = Field(
         None, description="Whether this prompt generates a run summary"
     )
@@ -263,7 +289,9 @@ class UiBridgeStep(BaseStep):
     snapshots for visual regression detection.
     """
 
-    type: Literal["ui_bridge"] = Field("ui_bridge", description="Step type discriminator")
+    type: Literal["ui_bridge"] = Field(
+        "ui_bridge", description="Step type discriminator"
+    )
     phase: Literal["setup", "verification", "completion"] = Field(
         ..., description="Workflow phase this step belongs to"
     )
@@ -272,18 +300,26 @@ class UiBridgeStep(BaseStep):
     )
 
     # Navigate action fields
-    url: str | None = Field(None, description="URL to navigate to (for navigate action)")
+    url: str | None = Field(
+        None, description="URL to navigate to (for navigate action)"
+    )
 
     # Execute action fields
-    instruction: str | None = Field(None, description="Instruction to execute against the UI")
-    target: str | None = Field(None, description="Target element selector or identifier")
+    instruction: str | None = Field(
+        None, description="Instruction to execute against the UI"
+    )
+    target: str | None = Field(
+        None, description="Target element selector or identifier"
+    )
 
     # Assert action fields
-    assert_type: Literal["exists", "text_equals", "contains", "visible", "enabled"] | None = Field(
-        None, description="Type of assertion to evaluate"
-    )
+    assert_type: (
+        Literal["exists", "text_equals", "contains", "visible", "enabled"] | None
+    ) = Field(None, description="Type of assertion to evaluate")
     expected: str | None = Field(None, description="Expected value for the assertion")
-    timeout_ms: int | None = Field(None, description="Timeout for the action in milliseconds")
+    timeout_ms: int | None = Field(
+        None, description="Timeout for the action in milliseconds"
+    )
 
     # Compare action fields
     comparison_mode: Literal["structural", "visual", "both"] | None = Field(
@@ -310,8 +346,12 @@ class WorkflowStep(BaseStep):
     phase: Literal["setup", "verification", "completion"] = Field(
         ..., description="Workflow phase this step belongs to"
     )
-    workflow_id: str = Field(..., description="ID of the referenced workflow to execute")
-    workflow_name: str = Field(..., description="Cached display name of the referenced workflow")
+    workflow_id: str = Field(
+        ..., description="ID of the referenced workflow to execute"
+    )
+    workflow_name: str = Field(
+        ..., description="Cached display name of the referenced workflow"
+    )
 
 
 # =============================================================================
@@ -330,7 +370,9 @@ class WorkflowStage(BaseModel):
 
     id: str = Field(..., description="Unique identifier for this stage")
     name: str = Field(..., description="Human-readable name for this stage")
-    description: str | None = Field(None, description="Description of what this stage accomplishes")
+    description: str | None = Field(
+        None, description="Description of what this stage accomplishes"
+    )
     setup_steps: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Steps to run during the setup phase",
@@ -351,8 +393,12 @@ class WorkflowStage(BaseModel):
         None,
         description="Maximum verification-agentic loop iterations for this stage",
     )
-    timeout_seconds: int | None = Field(None, description="Maximum execution time for this stage")
-    provider: str | None = Field(None, description="AI provider override for this stage")
+    timeout_seconds: int | None = Field(
+        None, description="Maximum execution time for this stage"
+    )
+    provider: str | None = Field(
+        None, description="AI provider override for this stage"
+    )
     model: str | None = Field(None, description="AI model override for this stage")
 
 
@@ -398,9 +444,55 @@ class UnifiedWorkflow(BaseModel):
         None,
         description="Maximum verification-agentic loop iterations",
     )
-    timeout_seconds: int | None = Field(None, description="Maximum total execution time in seconds")
-    provider: str | None = Field(None, description="Default AI provider for prompt steps")
+    timeout_seconds: int | None = Field(
+        None, description="Maximum total execution time in seconds"
+    )
+    provider: str | None = Field(
+        None, description="Default AI provider for prompt steps"
+    )
     model: str | None = Field(None, description="Default AI model for prompt steps")
+    model_overrides: dict[str, Any] | None = Field(
+        None,
+        description="Per-phase model/provider overrides (keyed by phase name)",
+    )
+    reflection_mode: bool | None = Field(
+        None,
+        description="Whether to enable reflection mode during agentic iterations",
+    )
+    rollback_policy: Literal["none", "last_good", "clean"] | None = Field(
+        None,
+        description="Policy for automatic git rollback when the workflow fails",
+    )
+    enforce_token_budget: bool | None = Field(
+        None,
+        description="Whether to stop execution if accumulated token usage exceeds the budget",
+    )
+    strict_cwd: bool | None = Field(
+        None,
+        description="Whether to enforce strict working directory for all steps",
+    )
+    use_worktree: bool | None = Field(
+        None,
+        description="Whether to create a new git branch and worktree for this run",
+    )
+    workflow_architecture: (
+        Literal["traditional", "agentic_verification", "multi_agent_pipeline"] | None
+    ) = Field(
+        None,
+        description="Workflow execution architecture override",
+    )
+    multi_agent_mode: bool | None = Field(
+        None,
+        description="Whether to spawn parallel sub-agents for independent tasks",
+    )
+    multi_agent_pipeline_config: dict[str, Any] | None = Field(
+        None,
+        description="Configuration for the multi-agent pipeline architecture",
+    )
+    tool_tags: list[str] | None = Field(
+        None,
+        description="Tags for per-execution tool whitelisting",
+    )
 
     # Context and log configuration
     log_source_selection: str | dict[str, Any] | None = Field(
@@ -449,9 +541,31 @@ class UnifiedWorkflow(BaseModel):
         None,
         description="Whether this workflow is marked as a favorite for quick access",
     )
+
+    # Constraint and dependency metadata
+    constraint_overrides: dict[str, bool] | None = Field(
+        None,
+        description="Per-constraint overrides: map of constraint_id to enabled/disabled",
+    )
+    dependency_graph: dict[str, Any] | None = Field(
+        None,
+        description="Dependency graph computed during generation",
+    )
+    cost_annotations: dict[str, Any] | None = Field(
+        None,
+        description="Cost annotations computed during generation",
+    )
+    quality_report: dict[str, Any] | None = Field(
+        None,
+        description="Quality report from the revision phase",
+    )
     acceptance_criteria: dict[str, Any] | None = Field(
         None,
         description="Acceptance criteria from the specification agent (JSON blob)",
+    )
+    ai_reviewed: bool | None = Field(
+        None,
+        description="Whether the AI semantic review ran successfully during generation",
     )
 
     # Metadata

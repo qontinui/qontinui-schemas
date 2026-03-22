@@ -17,7 +17,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # =============================================================================
 # Core Result Types (matching runner's Rust structs)
 # =============================================================================
@@ -29,7 +28,9 @@ class CheckIssueDetail(BaseModel):
     file: str = Field(..., description="File path where the issue was found")
     line: int | None = Field(None, description="Line number (1-based)")
     column: int | None = Field(None, description="Column number (1-based)")
-    code: str | None = Field(None, description="Rule code (e.g., 'E501', 'no-unused-vars')")
+    code: str | None = Field(
+        None, description="Rule code (e.g., 'E501', 'no-unused-vars')"
+    )
     message: str = Field(..., description="Issue message")
     severity: str = Field(..., description="Severity level: error, warning, info")
     fixable: bool = Field(False, description="Whether this issue is fixable")
@@ -58,10 +59,16 @@ class VerificationStepDetails(BaseModel):
     phase: str = Field(..., description="Phase this step belongs to")
     stdout: str | None = Field(None, description="Standard output from the step")
     stderr: str | None = Field(None, description="Standard error from the step")
-    assertions_passed: int | None = Field(None, description="Number of assertions passed")
+    assertions_passed: int | None = Field(
+        None, description="Number of assertions passed"
+    )
     assertions_total: int | None = Field(None, description="Total number of assertions")
-    console_output: str | None = Field(None, description="Console output from browser/runtime")
-    page_snapshot: str | None = Field(None, description="Page snapshot (YAML accessibility tree)")
+    console_output: str | None = Field(
+        None, description="Console output from browser/runtime"
+    )
+    page_snapshot: str | None = Field(
+        None, description="Page snapshot (YAML accessibility tree)"
+    )
     exit_code: int | None = Field(None, description="Exit code from command execution")
     check_results: list[IndividualCheckResult] | None = Field(
         None, description="Individual check results for check_group steps"
@@ -90,10 +97,14 @@ class VerificationStepResult(BaseModel):
     step_index: int = Field(..., ge=0, description="Step index (0-based)")
     step_type: str = Field(..., description="Step type that was executed")
     step_name: str = Field(..., description="Step name for display")
-    step_id: str | None = Field(None, description="Step ID from the workflow definition")
+    step_id: str | None = Field(
+        None, description="Step ID from the workflow definition"
+    )
     success: bool = Field(..., description="Whether the step succeeded")
     error: str | None = Field(None, description="Error message if failed")
-    screenshot_path: str | None = Field(None, description="Path to screenshot if captured")
+    screenshot_path: str | None = Field(
+        None, description="Path to screenshot if captured"
+    )
     started_at: str | None = Field(None, description="When this step started (ISO)")
     ended_at: str | None = Field(None, description="When this step ended (ISO)")
     duration_ms: int = Field(..., ge=0, description="Execution duration in ms")
@@ -115,12 +126,18 @@ class GateEvaluationResult(BaseModel):
     required_step_ids: list[str] = Field(
         default_factory=list, description="Step IDs that the gate requires"
     )
-    passed_step_ids: list[str] = Field(default_factory=list, description="Step IDs that passed")
-    failed_step_ids: list[str] = Field(default_factory=list, description="Step IDs that failed")
+    passed_step_ids: list[str] = Field(
+        default_factory=list, description="Step IDs that passed"
+    )
+    failed_step_ids: list[str] = Field(
+        default_factory=list, description="Step IDs that failed"
+    )
     missing_step_ids: list[str] = Field(
         default_factory=list, description="Step IDs not found in results"
     )
-    passed: bool = Field(..., description="Whether the gate passed (all required steps passed)")
+    passed: bool = Field(
+        ..., description="Whether the gate passed (all required steps passed)"
+    )
 
 
 class VerificationPhaseResult(BaseModel):
@@ -134,15 +151,21 @@ class VerificationPhaseResult(BaseModel):
     skipped_steps: int = Field(
         0, ge=0, description="Number of steps skipped (gate stop_on_failure)"
     )
-    total_duration_ms: int = Field(..., ge=0, description="Total execution time in milliseconds")
+    total_duration_ms: int = Field(
+        ..., ge=0, description="Total execution time in milliseconds"
+    )
     step_results: list[VerificationStepResult] = Field(
         default_factory=list, description="Individual step results"
     )
-    critical_failure: bool = Field(False, description="Whether a critical gate failure occurred")
+    critical_failure: bool = Field(
+        False, description="Whether a critical gate failure occurred"
+    )
     gate_results: list[GateEvaluationResult] = Field(
         default_factory=list, description="Gate evaluation results"
     )
-    gate_based_evaluation: bool = Field(False, description="Whether evaluation was gate-based")
+    gate_based_evaluation: bool = Field(
+        False, description="Whether evaluation was gate-based"
+    )
 
 
 # =============================================================================
@@ -154,7 +177,9 @@ class VerificationResultCreate(BaseModel):
     """Single verification result for upsert."""
 
     iteration: int = Field(..., ge=1, description="Iteration number")
-    result: VerificationPhaseResult = Field(..., description="Full verification phase result")
+    result: VerificationPhaseResult = Field(
+        ..., description="Full verification phase result"
+    )
 
 
 class VerificationResultsBatchRequest(BaseModel):
@@ -190,8 +215,12 @@ class VerificationResultsListResponse(BaseModel):
         ..., description="Verification results ordered by iteration"
     )
     count: int = Field(..., description="Total number of results")
-    passed_iterations: int = Field(..., description="Number of iterations where all steps passed")
-    failed_iterations: int = Field(..., description="Number of iterations with failures")
+    passed_iterations: int = Field(
+        ..., description="Number of iterations where all steps passed"
+    )
+    failed_iterations: int = Field(
+        ..., description="Number of iterations with failures"
+    )
 
 
 __all__ = [

@@ -1290,7 +1290,9 @@ def generate_unified_workflow_types() -> bool:
         return False
 
 
-def python_type_to_ts(python_type: str, field_info: dict[str, object] | None = None) -> str:
+def python_type_to_ts(
+    python_type: str, field_info: dict[str, object] | None = None
+) -> str:
     """Convert Python type annotation to TypeScript type."""
     # Handle common types
     type_map = {

@@ -69,21 +69,6 @@ from qontinui_schemas.execution.screenshot import (
     ExecutionScreenshotResponse,
 )
 
-# Verification result schemas
-from qontinui_schemas.execution.verification_result import (
-    CheckIssueDetail,
-    GateEvaluationResult,
-    IndividualCheckResult,
-    StepExecutionConfig,
-    VerificationPhaseResult,
-    VerificationResultCreate,
-    VerificationResultResponse,
-    VerificationResultsBatchRequest,
-    VerificationResultsListResponse,
-    VerificationStepDetails,
-    VerificationStepResult,
-)
-
 # Tree event schemas
 from qontinui_schemas.execution.tree_event import (
     DisplayNode,
@@ -97,6 +82,21 @@ from qontinui_schemas.execution.tree_event import (
     NodeType,
     PathElement,
     TreeNode,
+)
+
+# Verification result schemas
+from qontinui_schemas.execution.verification_result import (
+    CheckIssueDetail,
+    GateEvaluationResult,
+    IndividualCheckResult,
+    StepExecutionConfig,
+    VerificationPhaseResult,
+    VerificationResultCreate,
+    VerificationResultResponse,
+    VerificationResultsBatchRequest,
+    VerificationResultsListResponse,
+    VerificationStepDetails,
+    VerificationStepResult,
 )
 
 __all__ = [
