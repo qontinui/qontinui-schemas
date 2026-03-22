@@ -387,6 +387,8 @@ export interface UnifiedWorkflow {
   workflow_architecture?: "traditional" | "agentic_verification" | "multi_agent_pipeline";
   /** Configuration for the multi-agent pipeline architecture. */
   multi_agent_pipeline_config?: Record<string, unknown>;
+  /** Policy for automatic git rollback when the workflow fails: "none" (default), "last_good", "clean". */
+  rollback_policy?: "none" | "last_good" | "clean";
   /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
   constraint_overrides?: Record<string, boolean>;
   /** Dependency graph computed during generation */
