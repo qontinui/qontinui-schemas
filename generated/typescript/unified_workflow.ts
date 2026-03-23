@@ -379,6 +379,10 @@ export interface UnifiedWorkflow {
   stages?: WorkflowStage[];
   stop_on_failure?: boolean;
   reflection_mode?: boolean;
+  /** Restrict working directory resolution to the workspace boundary. Steps cannot resolve paths outside the workspace root. */
+  strict_cwd?: boolean;
+  /** Tags for per-execution tool whitelisting. When non-empty, only skills matching at least one tag are included in AI prompt context. */
+  tool_tags?: string[];
   /** Create a new git branch and worktree for this run. Changes stay isolated until merged. */
   use_worktree?: boolean;
   /** Run in multi-agent mode, spawning parallel sub-agents for independent tasks. */

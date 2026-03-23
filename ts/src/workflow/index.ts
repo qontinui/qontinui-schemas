@@ -408,6 +408,8 @@ export interface UnifiedWorkflow {
   quality_report?: QualityReport;
   /** Acceptance criteria from the specification agent (JSON blob) */
   acceptance_criteria?: Record<string, unknown> | null;
+  /** When true, stop execution if accumulated tokens exceed max_context_tokens. */
+  enforce_token_budget?: boolean;
   /** Whether this workflow is marked as a favorite */
   is_favorite?: boolean | null;
   category: string;
