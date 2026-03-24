@@ -33,11 +33,21 @@ export interface ScheduleState {
   rebuild_delay_seconds?: number;
 }
 
+export interface ScheduleConditionOnly {
+  type: "Condition";
+  /** Condition config wrapped in `value` to match Rust's serde(tag, content) format */
+  value: {
+    /** Minutes to wait after execution before re-evaluating conditions (default: 60) */
+    rearm_delay_minutes?: number;
+  };
+}
+
 export type ScheduleExpression =
   | ScheduleOnce
   | ScheduleCron
   | ScheduleInterval
-  | ScheduleState;
+  | ScheduleState
+  | ScheduleConditionOnly;
 
 // ============================================================================
 // Schedule Conditions

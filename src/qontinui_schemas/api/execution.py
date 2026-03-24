@@ -160,6 +160,25 @@ class IssueSource(str, Enum):
 
 
 # =============================================================================
+# LLM Metrics
+# =============================================================================
+
+
+class LLMMetrics(BaseModel):
+    """Token and cost metrics for an LLM-powered action."""
+
+    model: str | None = Field(None, description="LLM model identifier")
+    provider: str | None = Field(None, description="Provider name (e.g. anthropic, openai)")
+    tokens_input: int | None = Field(None, description="Input/prompt token count")
+    tokens_output: int | None = Field(None, description="Completion token count")
+    tokens_total: int | None = Field(None, description="Computed total token count")
+    cost_usd: float | None = Field(None, description="Estimated cost in USD")
+    generation_params: dict[str, Any] | None = Field(
+        None, description="Generation parameters (temperature, max_tokens, etc.)"
+    )
+
+
+# =============================================================================
 # Runner Metadata
 # =============================================================================
 
@@ -258,6 +277,18 @@ class ExecutionStats(BaseModel):
     total_issues: int = Field(0, description="Issues detected")
     unique_states_visited: int = Field(0, description="Unique states visited")
     unique_actions_executed: int = Field(0, description="Unique action types executed")
+    total_tokens_input: int | None = Field(
+        None, description="Aggregate input tokens across all LLM actions"
+    )
+    total_tokens_output: int | None = Field(
+        None, description="Aggregate output tokens across all LLM actions"
+    )
+    total_cost_usd: float | None = Field(
+        None, description="Aggregate estimated cost in USD across all LLM actions"
+    )
+    llm_action_count: int | None = Field(
+        None, description="Number of actions that used an LLM"
+    )
 
 
 class CoverageData(BaseModel):
@@ -331,6 +362,9 @@ class ActionExecutionCreate(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
     )
+    llm_metrics: LLMMetrics | None = Field(
+        None, description="LLM token and cost metrics if action used an LLM"
+    )
 
 
 class ActionExecutionBatch(BaseModel):
@@ -356,6 +390,9 @@ class ActionExecutionResponse(BaseModel):
     from_state: str | None = Field(None, description="Source state")
     to_state: str | None = Field(None, description="Target state")
     error_message: str | None = Field(None, description="Error message")
+    llm_metrics: LLMMetrics | None = Field(
+        None, description="LLM token and cost metrics if action used an LLM"
+    )
 
 
 class ActionExecutionBatchResponse(BaseModel):
@@ -594,6 +631,52 @@ class ExecutionTrendResponse(BaseModel):
     granularity: str = Field(..., description="Granularity (daily/weekly/monthly)")
     data_points: list[ExecutionTrendDataPoint] = Field(..., description="Trend data")
     overall_stats: dict[str, Any] = Field(..., description="Overall statistics")
+
+
+class ModelCostBreakdown(BaseModel):
+    """Cost breakdown for a single LLM model."""
+
+    model: str = Field(..., description="LLM model identifier")
+    provider: str | None = Field(None, description="Provider name (e.g. anthropic, openai)")
+    tokens_input: int = Field(0, description="Total input tokens for this model")
+    tokens_output: int = Field(0, description="Total output tokens for this model")
+    cost_usd: float = Field(0.0, description="Total cost in USD for this model")
+    action_count: int = Field(0, description="Number of actions using this model")
+
+
+class LLMCostSummary(BaseModel):
+    """Aggregate LLM cost summary for an execution run."""
+
+    run_id: UUID = Field(..., description="Execution run ID")
+    total_tokens_input: int = Field(0, description="Total input tokens across all models")
+    total_tokens_output: int = Field(0, description="Total output tokens across all models")
+    total_cost_usd: float = Field(0.0, description="Total estimated cost in USD")
+    llm_action_count: int = Field(0, description="Number of actions that used an LLM")
+    per_model: list[ModelCostBreakdown] = Field(
+        default_factory=list, description="Cost breakdown by model"
+    )
+
+
+class CostTrendDataPoint(BaseModel):
+    """Single data point in cost trend."""
+
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    tokens_input: int = Field(0, description="Total input tokens for period")
+    tokens_output: int = Field(0, description="Total output tokens for period")
+    cost_usd: float = Field(0.0, description="Total cost in USD for period")
+    llm_action_count: int = Field(0, description="Number of LLM actions for period")
+    runs_count: int = Field(0, description="Number of runs for period")
+
+
+class CostTrendResponse(BaseModel):
+    """Response for LLM cost trends."""
+
+    project_id: UUID = Field(..., description="Project ID")
+    start_date: str = Field(..., description="Start date")
+    end_date: str = Field(..., description="End date")
+    granularity: str = Field(..., description="Granularity (daily/weekly/monthly)")
+    data_points: list[CostTrendDataPoint] = Field(..., description="Cost trend data")
+    overall_stats: dict[str, Any] = Field(..., description="Overall cost statistics")
 
 
 # =============================================================================

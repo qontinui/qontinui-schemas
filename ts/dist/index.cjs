@@ -347,6 +347,8 @@ var ActionType = /* @__PURE__ */ ((ActionType2) => {
   ActionType2["SCREENSHOT"] = "screenshot";
   ActionType2["LOG"] = "log";
   ActionType2["ASSERT"] = "assert";
+  ActionType2["AI_PROMPT"] = "ai_prompt";
+  ActionType2["RUN_PROMPT_SEQUENCE"] = "run_prompt_sequence";
   ActionType2["CUSTOM"] = "custom";
   return ActionType2;
 })(ActionType || {});

@@ -91,6 +91,14 @@ class AIPromptTemplate(BaseModel):
         description="Default working directory for execution",
     )
 
+    # Versioning (populated when loaded from versioned storage)
+    version: int | None = Field(None, description="Current version number of this template")
+    content_hash: str | None = Field(
+        None,
+        alias="contentHash",
+        description="SHA256 hash of the prompt content for deduplication",
+    )
+
     model_config = {"populate_by_name": True}
 
 

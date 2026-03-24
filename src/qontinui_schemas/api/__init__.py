@@ -13,6 +13,8 @@ from qontinui_schemas.api.execution import (
     ActionReliabilityStats,
     ActionStatus,
     ActionType,
+    CostTrendDataPoint,
+    CostTrendResponse,
     CoverageData,
     ExecutionIssueBatch,
     ExecutionIssueBatchResponse,
@@ -39,6 +41,9 @@ from qontinui_schemas.api.execution import (
     IssueSource,
     IssueStatus,
     IssueType,
+    LLMCostSummary,
+    LLMMetrics,
+    ModelCostBreakdown,
 )
 from qontinui_schemas.api.execution import Pagination as ExecutionPagination
 from qontinui_schemas.api.execution import (
@@ -79,6 +84,12 @@ from qontinui_schemas.api.rag import (  # Enums; Embedding Computation; Embeddin
     SemanticSearchResponse,
     StateFilterItem,
     StatesResponse,
+)
+from qontinui_schemas.api.prompt_versions import (  # Prompt Versioning
+    PromptVersionCreate,
+    PromptVersionDiff,
+    PromptVersionListResponse,
+    PromptVersionResponse,
 )
 from qontinui_schemas.api.testing import (  # Enums; Request schemas; Response schemas; Analytics; Historical Data (Config Testing)
     ActionDataBatch,
@@ -122,6 +133,28 @@ from qontinui_schemas.api.testing import (  # Enums; Request schemas; Response s
     TransitionResponse,
     TransitionStatus,
     VisualComparisonSummary,
+)
+from qontinui_schemas.api.evaluation import (
+    DatasetItemCreate,
+    DatasetItemListResponse,
+    DatasetItemResponse,
+    EvaluationDatasetCreate,
+    EvaluationDatasetListResponse,
+    EvaluationDatasetResponse,
+    EvaluationExperimentCreate,
+    EvaluationExperimentListResponse,
+    EvaluationExperimentResponse,
+    ExperimentResultCreate,
+    ExperimentResultListResponse,
+    ExperimentResultResponse,
+    ExperimentStatusUpdate,
+    ExperimentSummary,
+)
+from qontinui_schemas.api.feedback import (
+    FeedbackScoreCreate,
+    FeedbackScoreListResponse,
+    FeedbackScoreResponse,
+    FeedbackScoreSummary,
 )
 
 __all__ = [
@@ -168,10 +201,16 @@ __all__ = [
     "ExecutionIssueListResponse",
     "ExecutionIssueBatchResponse",
     "ExecutionIssueUpdate",
+    # LLM Metrics
+    "LLMMetrics",
+    "LLMCostSummary",
+    "ModelCostBreakdown",
     # Analytics
     "ActionReliabilityStats",
     "ExecutionTrendDataPoint",
     "ExecutionTrendResponse",
+    "CostTrendDataPoint",
+    "CostTrendResponse",
     # Historical Playback
     "HistoricalActionQuery",
     "HistoricalActionResult",
@@ -212,6 +251,13 @@ __all__ = [
     # State Filter
     "StateFilterItem",
     "StatesResponse",
+    # ==========================================================================
+    # Prompt Versioning API
+    # ==========================================================================
+    "PromptVersionCreate",
+    "PromptVersionResponse",
+    "PromptVersionListResponse",
+    "PromptVersionDiff",
     # Testing Enums
     "TestRunStatus",
     "TransitionStatus",
@@ -258,4 +304,30 @@ __all__ = [
     "ActionDataBatchResponse",
     "HistoricalFrameResponse",
     "PlaybackRequest",
+    # ==========================================================================
+    # Feedback Scores API (Opik integration)
+    # ==========================================================================
+    "FeedbackScoreCreate",
+    "FeedbackScoreResponse",
+    "FeedbackScoreSummary",
+    "FeedbackScoreListResponse",
+    # ==========================================================================
+    # Evaluation Datasets & Experiments API
+    # ==========================================================================
+    # Datasets
+    "EvaluationDatasetCreate",
+    "EvaluationDatasetResponse",
+    "EvaluationDatasetListResponse",
+    "DatasetItemCreate",
+    "DatasetItemResponse",
+    # Experiments
+    "EvaluationExperimentCreate",
+    "EvaluationExperimentResponse",
+    "EvaluationExperimentListResponse",
+    "ExperimentResultCreate",
+    "ExperimentResultResponse",
+    "DatasetItemListResponse",
+    "ExperimentResultListResponse",
+    "ExperimentStatusUpdate",
+    "ExperimentSummary",
 ]

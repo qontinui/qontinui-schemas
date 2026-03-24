@@ -71,6 +71,10 @@ export enum ActionType {
   LOG = "log",
   ASSERT = "assert",
 
+  // AI actions
+  AI_PROMPT = "ai_prompt",
+  RUN_PROMPT_SEQUENCE = "run_prompt_sequence",
+
   // Custom/plugin
   CUSTOM = "custom",
 }
@@ -135,6 +139,14 @@ export interface ExecutionStats {
   skipped_actions: number;
   total_duration_ms: number;
   avg_action_duration_ms?: number;
+  /** Aggregate input tokens across all LLM actions */
+  total_tokens_input?: number;
+  /** Aggregate output tokens across all LLM actions */
+  total_tokens_output?: number;
+  /** Aggregate estimated cost in USD across all LLM actions */
+  total_cost_usd?: number;
+  /** Number of actions that used an LLM */
+  llm_action_count?: number;
 }
 
 export interface CoverageData {
@@ -147,6 +159,28 @@ export interface CoverageData {
   uncovered_transitions?: string[];
   state_visit_counts?: Record<string, number>;
   transition_execution_counts?: Record<string, number>;
+}
+
+// ============================================================================
+// LLM Metrics
+// ============================================================================
+
+/** Token and cost metrics for an LLM-powered action. */
+export interface LLMMetrics {
+  /** LLM model identifier */
+  model?: string;
+  /** Provider name (e.g. anthropic, openai) */
+  provider?: string;
+  /** Input/prompt token count */
+  tokens_input?: number;
+  /** Completion token count */
+  tokens_output?: number;
+  /** Computed total token count */
+  tokens_total?: number;
+  /** Estimated cost in USD */
+  cost_usd?: number;
+  /** Generation parameters (temperature, max_tokens, etc.) */
+  generation_params?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -202,6 +236,14 @@ export interface ActionExecutionCreate {
   input_data?: Record<string, unknown>;
   output_data?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  /** LLM token and cost metrics if action used an LLM */
+  llm_metrics?: LLMMetrics;
+  /** Span type for tracing (e.g. "llm", "tool", "agent") */
+  span_type?: string;
+  /** Trace ID for correlating related actions */
+  trace_id?: string;
+  /** Parent action ID for child actions within a sequence */
+  parent_id?: string;
 }
 
 export interface ActionExecutionResponse {

@@ -24,7 +24,15 @@ interface ScheduleState {
     /** Minimum seconds between re-triggers if state is re-entered */
     rebuild_delay_seconds?: number;
 }
-type ScheduleExpression = ScheduleOnce | ScheduleCron | ScheduleInterval | ScheduleState;
+interface ScheduleConditionOnly {
+    type: "Condition";
+    /** Condition config wrapped in `value` to match Rust's serde(tag, content) format */
+    value: {
+        /** Minutes to wait after execution before re-evaluating conditions (default: 60) */
+        rearm_delay_minutes?: number;
+    };
+}
+type ScheduleExpression = ScheduleOnce | ScheduleCron | ScheduleInterval | ScheduleState | ScheduleConditionOnly;
 interface IdleCondition {
     enabled: boolean;
 }
@@ -134,4 +142,4 @@ interface UpdateScheduledTaskRequest {
     conditions?: ScheduleConditions | null;
 }
 
-export type { AutoFixTask, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, PromptTask, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleCron, ScheduleExpression, ScheduleInterval, ScheduleOnce, ScheduleState, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest, WorkflowTask };
+export type { AutoFixTask, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, PromptTask, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditionOnly, ScheduleConditions, ScheduleCron, ScheduleExpression, ScheduleInterval, ScheduleOnce, ScheduleState, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest, WorkflowTask };
