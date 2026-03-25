@@ -418,6 +418,10 @@ export interface UnifiedWorkflow {
   enforce_token_budget?: boolean;
   /** Whether this workflow is marked as a favorite */
   is_favorite?: boolean | null;
+  /** JSON-serialized flow control configuration (concurrency, throttle, rate limit, debounce) */
+  flow_control_json?: string | null;
+  /** JSON-serialized per-phase timeout configuration */
+  phase_timeouts_json?: string | null;
   category: string;
   tags: string[];
   created_at: string;

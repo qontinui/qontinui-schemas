@@ -75,6 +75,7 @@ from qontinui_schemas.api.execution import (
     VisualComparisonResult,
 )
 from qontinui_schemas.api.feedback import (
+    FeedbackScoreBatchResponse,
     FeedbackScoreCreate,
     FeedbackScoreListResponse,
     FeedbackScoreResponse,
@@ -307,6 +308,7 @@ __all__ = [
     # ==========================================================================
     # Feedback Scores API (Opik integration)
     # ==========================================================================
+    "FeedbackScoreBatchResponse",
     "FeedbackScoreCreate",
     "FeedbackScoreResponse",
     "FeedbackScoreSummary",

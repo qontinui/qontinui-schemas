@@ -56,6 +56,14 @@ class ActionExecutionCreate(BaseModel):
         None, description="Parent action ID (for nested actions)"
     )
 
+    # Tracing / span correlation
+    span_type: str | None = Field(
+        None, description='Span type for tracing (e.g. "llm_call", "tool", "agent")'
+    )
+    trace_id: str | None = Field(
+        None, description="Trace ID for correlating related actions"
+    )
+
     # Additional data
     input_data: dict[str, Any] = Field(
         default_factory=dict, description="Action input parameters"

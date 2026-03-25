@@ -36,7 +36,7 @@ class FeedbackScoreCreate(BaseModel):
     category_value: str | None = Field(
         None, description="Optional categorical label", max_length=255
     )
-    source: Literal["manual", "automated", "llm_judge"] = Field(
+    source: Literal["manual", "automated", "llm_judge", "runner_agentic_metrics"] = Field(
         "manual", description="Source of the feedback score"
     )
     reason: str | None = Field(None, description="Optional reason for the score")
@@ -69,6 +69,12 @@ class FeedbackScoreSummary(BaseModel):
     avg_value: float = Field(..., description="Average score value")
     min_value: float = Field(..., description="Minimum score value")
     max_value: float = Field(..., description="Maximum score value")
+
+
+class FeedbackScoreBatchResponse(BaseModel):
+    """Response for batch-creating feedback scores."""
+
+    created: int = Field(..., description="Number of scores successfully created")
 
 
 class FeedbackScoreListResponse(BaseModel):
