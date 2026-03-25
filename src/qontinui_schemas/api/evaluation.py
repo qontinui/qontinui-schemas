@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 
 from qontinui_schemas.common.time import UTCDateTime
 
-
 # =============================================================================
 # Evaluation Dataset Schemas
 # =============================================================================
@@ -26,12 +25,8 @@ from qontinui_schemas.common.time import UTCDateTime
 class EvaluationDatasetCreate(BaseModel):
     """Request to create a new evaluation dataset."""
 
-    name: str = Field(
-        ..., description="Dataset name", max_length=255
-    )
-    description: str | None = Field(
-        None, description="Optional dataset description"
-    )
+    name: str = Field(..., description="Dataset name", max_length=255)
+    description: str | None = Field(None, description="Optional dataset description")
 
 
 class EvaluationDatasetResponse(BaseModel):
@@ -46,9 +41,7 @@ class EvaluationDatasetResponse(BaseModel):
         None, description="Hash of dataset contents for change detection"
     )
     created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
-    updated_at: UTCDateTime | None = Field(
-        None, description="Last update time (UTC)"
-    )
+    updated_at: UTCDateTime | None = Field(None, description="Last update time (UTC)")
 
 
 class EvaluationDatasetListResponse(BaseModel):
@@ -68,15 +61,11 @@ class EvaluationDatasetListResponse(BaseModel):
 class DatasetItemCreate(BaseModel):
     """Request to create a new dataset item."""
 
-    input: dict[str, Any] = Field(
-        ..., description="Input data for the evaluation case"
-    )
+    input: dict[str, Any] = Field(..., description="Input data for the evaluation case")
     expected_output: dict[str, Any] | None = Field(
         None, description="Expected output for comparison"
     )
-    metadata: dict[str, Any] | None = Field(
-        None, description="Additional metadata"
-    )
+    metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
 
 
 class DatasetItemResponse(BaseModel):
@@ -85,13 +74,9 @@ class DatasetItemResponse(BaseModel):
     id: UUID = Field(..., description="Dataset item ID")
     dataset_id: UUID = Field(..., description="Parent dataset ID")
     input: dict[str, Any] = Field(..., description="Input data")
-    expected_output: dict[str, Any] | None = Field(
-        None, description="Expected output"
-    )
+    expected_output: dict[str, Any] | None = Field(None, description="Expected output")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
-    content_hash: str = Field(
-        ..., description="Hash of item content for deduplication"
-    )
+    content_hash: str = Field(..., description="Hash of item content for deduplication")
     created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
 
 
@@ -103,21 +88,15 @@ class DatasetItemResponse(BaseModel):
 class EvaluationExperimentCreate(BaseModel):
     """Request to create a new evaluation experiment."""
 
-    name: str = Field(
-        ..., description="Experiment name", max_length=255
-    )
-    dataset_id: UUID = Field(
-        ..., description="ID of the dataset to evaluate against"
-    )
+    name: str = Field(..., description="Experiment name", max_length=255)
+    dataset_id: UUID = Field(..., description="ID of the dataset to evaluate against")
     dataset_version: int | None = Field(
         None, description="Dataset version to pin (defaults to current)"
     )
     prompt_variant_id: str | None = Field(
         None, description="ID of the prompt variant being tested"
     )
-    description: str | None = Field(
-        None, description="Optional experiment description"
-    )
+    description: str | None = Field(None, description="Optional experiment description")
 
 
 class EvaluationExperimentResponse(BaseModel):
@@ -134,17 +113,11 @@ class EvaluationExperimentResponse(BaseModel):
     status: str = Field(
         ..., description="Experiment status: pending, running, completed, failed"
     )
-    metrics: dict[str, Any] | None = Field(
-        None, description="Aggregate result metrics"
-    )
+    metrics: dict[str, Any] | None = Field(None, description="Aggregate result metrics")
     item_count: int = Field(..., description="Total items in the experiment")
-    completed_count: int = Field(
-        ..., description="Number of completed items"
-    )
+    completed_count: int = Field(..., description="Number of completed items")
     created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
-    completed_at: UTCDateTime | None = Field(
-        None, description="Completion time (UTC)"
-    )
+    completed_at: UTCDateTime | None = Field(None, description="Completion time (UTC)")
 
 
 class EvaluationExperimentListResponse(BaseModel):
@@ -164,27 +137,17 @@ class EvaluationExperimentListResponse(BaseModel):
 class ExperimentResultCreate(BaseModel):
     """Request to create a new experiment result."""
 
-    experiment_id: UUID = Field(
-        ..., description="ID of the parent experiment"
-    )
-    dataset_item_id: UUID = Field(
-        ..., description="ID of the dataset item evaluated"
-    )
-    output: dict[str, Any] = Field(
-        ..., description="Actual output from evaluation"
-    )
+    experiment_id: UUID = Field(..., description="ID of the parent experiment")
+    dataset_item_id: UUID = Field(..., description="ID of the dataset item evaluated")
+    output: dict[str, Any] = Field(..., description="Actual output from evaluation")
     scores: dict[str, float] | None = Field(
         None, description="Score metrics (e.g. accuracy, similarity)"
     )
     duration_ms: float | None = Field(
         None, description="Evaluation duration in milliseconds"
     )
-    cost_usd: float | None = Field(
-        None, description="Cost of evaluation in USD"
-    )
-    tokens_total: int | None = Field(
-        None, description="Total tokens consumed"
-    )
+    cost_usd: float | None = Field(None, description="Cost of evaluation in USD")
+    tokens_total: int | None = Field(None, description="Total tokens consumed")
 
 
 class ExperimentResultResponse(BaseModel):
@@ -195,9 +158,7 @@ class ExperimentResultResponse(BaseModel):
     dataset_item_id: UUID = Field(..., description="Dataset item ID")
     output: dict[str, Any] = Field(..., description="Actual output")
     scores: dict[str, float] | None = Field(None, description="Score metrics")
-    duration_ms: float | None = Field(
-        None, description="Duration in milliseconds"
-    )
+    duration_ms: float | None = Field(None, description="Duration in milliseconds")
     cost_usd: float | None = Field(None, description="Cost in USD")
     tokens_total: int | None = Field(None, description="Total tokens consumed")
     created_at: UTCDateTime = Field(..., description="Creation time (UTC)")
@@ -206,9 +167,7 @@ class ExperimentResultResponse(BaseModel):
 class DatasetItemListResponse(BaseModel):
     """Response for listing dataset items."""
 
-    items: list[DatasetItemResponse] = Field(
-        ..., description="List of dataset items"
-    )
+    items: list[DatasetItemResponse] = Field(..., description="List of dataset items")
     total: int = Field(..., description="Total number of matching items")
 
 
@@ -239,12 +198,8 @@ class ExperimentSummary(BaseModel):
     avg_duration_ms: float | None = Field(
         None, description="Average duration in milliseconds"
     )
-    total_cost_usd: float | None = Field(
-        None, description="Total cost in USD"
-    )
-    total_tokens: int | None = Field(
-        None, description="Total tokens consumed"
-    )
+    total_cost_usd: float | None = Field(None, description="Total cost in USD")
+    total_tokens: int | None = Field(None, description="Total tokens consumed")
     avg_scores: dict[str, float] | None = Field(
         None, description="Average scores across all results"
     )

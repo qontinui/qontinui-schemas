@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 from qontinui_schemas.common.time import UTCDateTime
 
-
 # =============================================================================
 # Request Schemas
 # =============================================================================

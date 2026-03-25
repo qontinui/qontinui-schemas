@@ -92,7 +92,9 @@ class AIPromptTemplate(BaseModel):
     )
 
     # Versioning (populated when loaded from versioned storage)
-    version: int | None = Field(None, description="Current version number of this template")
+    version: int | None = Field(
+        None, description="Current version number of this template"
+    )
     content_hash: str | None = Field(
         None,
         alias="contentHash",

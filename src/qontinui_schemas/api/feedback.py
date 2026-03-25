@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 
 from qontinui_schemas.common.time import UTCDateTime
 
-
 # =============================================================================
 # Feedback Score Schemas
 # =============================================================================
@@ -29,9 +28,7 @@ class FeedbackScoreCreate(BaseModel):
     target_type: Literal["run", "action"] = Field(
         ..., description="Whether this score targets a run or an action"
     )
-    target_id: UUID = Field(
-        ..., description="ID of the target run or action execution"
-    )
+    target_id: UUID = Field(..., description="ID of the target run or action execution")
     name: str = Field(
         ..., description="Score name (e.g. 'accuracy', 'helpfulness')", max_length=255
     )
@@ -43,9 +40,7 @@ class FeedbackScoreCreate(BaseModel):
         "manual", description="Source of the feedback score"
     )
     reason: str | None = Field(None, description="Optional reason for the score")
-    metadata: dict[str, Any] | None = Field(
-        None, description="Additional metadata"
-    )
+    metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
 
 
 class FeedbackScoreResponse(BaseModel):
@@ -55,9 +50,7 @@ class FeedbackScoreResponse(BaseModel):
     target_type: Literal["run", "action"] = Field(
         ..., description="Whether this score targets a run or an action"
     )
-    target_id: UUID = Field(
-        ..., description="ID of the target run or action execution"
-    )
+    target_id: UUID = Field(..., description="ID of the target run or action execution")
     name: str = Field(..., description="Score name")
     value: float = Field(..., description="Numeric score value")
     category_value: str | None = Field(None, description="Categorical label")

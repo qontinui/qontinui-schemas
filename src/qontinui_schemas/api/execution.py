@@ -168,7 +168,9 @@ class LLMMetrics(BaseModel):
     """Token and cost metrics for an LLM-powered action."""
 
     model: str | None = Field(None, description="LLM model identifier")
-    provider: str | None = Field(None, description="Provider name (e.g. anthropic, openai)")
+    provider: str | None = Field(
+        None, description="Provider name (e.g. anthropic, openai)"
+    )
     tokens_input: int | None = Field(None, description="Input/prompt token count")
     tokens_output: int | None = Field(None, description="Completion token count")
     tokens_total: int | None = Field(None, description="Computed total token count")
@@ -637,7 +639,9 @@ class ModelCostBreakdown(BaseModel):
     """Cost breakdown for a single LLM model."""
 
     model: str = Field(..., description="LLM model identifier")
-    provider: str | None = Field(None, description="Provider name (e.g. anthropic, openai)")
+    provider: str | None = Field(
+        None, description="Provider name (e.g. anthropic, openai)"
+    )
     tokens_input: int = Field(0, description="Total input tokens for this model")
     tokens_output: int = Field(0, description="Total output tokens for this model")
     cost_usd: float = Field(0.0, description="Total cost in USD for this model")
@@ -648,8 +652,12 @@ class LLMCostSummary(BaseModel):
     """Aggregate LLM cost summary for an execution run."""
 
     run_id: UUID = Field(..., description="Execution run ID")
-    total_tokens_input: int = Field(0, description="Total input tokens across all models")
-    total_tokens_output: int = Field(0, description="Total output tokens across all models")
+    total_tokens_input: int = Field(
+        0, description="Total input tokens across all models"
+    )
+    total_tokens_output: int = Field(
+        0, description="Total output tokens across all models"
+    )
     total_cost_usd: float = Field(0.0, description="Total estimated cost in USD")
     llm_action_count: int = Field(0, description="Number of actions that used an LLM")
     per_model: list[ModelCostBreakdown] = Field(
