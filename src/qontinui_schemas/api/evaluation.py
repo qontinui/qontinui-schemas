@@ -10,7 +10,7 @@ Used by:
 - qontinui-runner (evaluation reporting)
 """
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -224,8 +224,8 @@ class ExperimentResultListResponse(BaseModel):
 class ExperimentStatusUpdate(BaseModel):
     """Request to update an experiment's status."""
 
-    status: str = Field(
-        ..., description="New status: pending, running, completed, failed"
+    status: Literal["pending", "running", "completed", "failed"] = Field(
+        ..., description="New experiment status"
     )
     metrics: dict[str, Any] | None = Field(
         None, description="Optional aggregate metrics to set"
