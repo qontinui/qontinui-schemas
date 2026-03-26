@@ -65,6 +65,16 @@ export type {
   SkillImportResult,
 } from "./skill";
 
+export type {
+  PlannedActionType,
+  ElementTarget,
+  PlannedAction,
+  ActionPlan,
+  PlannedActionResult,
+  ActionPlanResult,
+  ActionPlanExecuteRequest,
+} from "./action-plan";
+
 // =============================================================================
 // Step Types
 // =============================================================================
@@ -199,8 +209,8 @@ export interface PromptStep extends BaseStep {
 
 export interface UiBridgeStep extends BaseStep {
   type: "ui_bridge";
-  phase: "setup" | "verification" | "completion";
-  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert";
+  phase: "setup" | "verification" | "agentic" | "completion";
+  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert" | "action_plan";
   url?: string;
   instruction?: string;
   target?: string;
@@ -212,6 +222,8 @@ export interface UiBridgeStep extends BaseStep {
   severity_threshold?: "critical" | "major" | "minor" | "info";
   /** Snapshot target: "control" (runner UI), "sdk" (connected app), or "proxy:PORT" */
   ui_bridge_snapshot_target?: string;
+  /** Structured action plan for the "action_plan" action type */
+  action_plan?: import("./action-plan").ActionPlan;
 }
 
 // -----------------------------------------------------------------------------
