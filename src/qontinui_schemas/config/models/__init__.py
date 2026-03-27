@@ -50,9 +50,6 @@ from .config_root import (
     ImageSource,
     KeyboardActionSettings,
     LoggingSettings,
-)
-from .config_root import LogLevel as ConfigLogLevel
-from .config_root import (
     MouseActionSettings,
     PerformanceSettings,
     QontinuiConfig,
@@ -64,6 +61,7 @@ from .config_root import (
     TriggerType,
     WaitActionSettings,
 )
+from .config_root import LogLevel as ConfigLogLevel
 
 # Context models for AI task guidance
 from .context import Context, ContextAutoInclude

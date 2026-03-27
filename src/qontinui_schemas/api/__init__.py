@@ -60,19 +60,15 @@ from qontinui_schemas.api.execution import (
     LLMCostSummary,
     LLMMetrics,
     ModelCostBreakdown,
-)
-from qontinui_schemas.api.execution import Pagination as ExecutionPagination
-from qontinui_schemas.api.execution import (
     PlaybackFrameRequest,
     RunnerMetadata,
     RunStatus,
     RunType,
+    VisualComparisonResult,
 )
+from qontinui_schemas.api.execution import Pagination as ExecutionPagination
 from qontinui_schemas.api.execution import (
     ScreenshotType as ExecutionScreenshotType,  # Enums; Metadata; Execution Run; Action Execution; Screenshot; Issue; Analytics; Historical Playback; Pagination
-)
-from qontinui_schemas.api.execution import (
-    VisualComparisonResult,
 )
 from qontinui_schemas.api.feedback import (
     FeedbackScoreBatchResponse,
