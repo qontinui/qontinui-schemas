@@ -36,8 +36,8 @@ class FeedbackScoreCreate(BaseModel):
     category_value: str | None = Field(
         None, description="Optional categorical label", max_length=255
     )
-    source: Literal["manual", "automated", "llm_judge", "runner_agentic_metrics"] = Field(
-        "manual", description="Source of the feedback score"
+    source: Literal["manual", "automated", "llm_judge", "runner_agentic_metrics"] = (
+        Field("manual", description="Source of the feedback score")
     )
     reason: str | None = Field(None, description="Optional reason for the score")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
