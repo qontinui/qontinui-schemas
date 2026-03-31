@@ -229,7 +229,7 @@ interface WorkflowStep extends BaseStep {
     workflow_id: string;
     workflow_name: string;
 }
-type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow";
+type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow" | "native_accessibility";
 type UnifiedStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type SetupStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type VerificationStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;

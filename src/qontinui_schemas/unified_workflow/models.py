@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 WorkflowPhase = Literal["setup", "verification", "agentic", "completion"]
 """Phase of workflow execution."""
 
-StepTypeName = Literal["command", "ui_bridge", "prompt", "workflow"]
+StepTypeName = Literal["command", "ui_bridge", "prompt", "workflow", "native_accessibility"]
 """Discriminator for step types."""
 
 CheckType = Literal[

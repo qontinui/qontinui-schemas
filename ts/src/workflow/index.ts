@@ -241,7 +241,7 @@ export interface WorkflowStep extends BaseStep {
 // Step Type Names
 // =============================================================================
 
-export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow";
+export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow" | "native_accessibility";
 
 // =============================================================================
 // Unified Step Types
@@ -657,6 +657,14 @@ export const STEP_TYPES: Record<WorkflowPhase, StepTypeInfo[]> = {
       description: "Run a saved workflow for verification",
       icon: "Workflow",
       color: "blue",
+      phase: "verification",
+    },
+    {
+      type: "native_accessibility",
+      label: "Native Accessibility",
+      description: "Run a native accessibility audit using OS-level APIs",
+      icon: "Accessibility",
+      color: "teal",
       phase: "verification",
     },
   ],

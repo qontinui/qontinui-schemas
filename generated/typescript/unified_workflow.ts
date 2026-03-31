@@ -218,7 +218,7 @@ export interface WorkflowStep extends BaseStep {
 // Step Type Names
 // =============================================================================
 
-export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow";
+export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow" | "native_accessibility";
 
 // =============================================================================
 // Unified Step Types
