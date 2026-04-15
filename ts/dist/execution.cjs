@@ -29,6 +29,8 @@ __export(execution_exports, {
   ScreenshotType: () => ScreenshotType
 });
 module.exports = __toCommonJS(execution_exports);
+
+// src/execution/_api.ts
 var RunType = /* @__PURE__ */ ((RunType2) => {
   RunType2["QA_TEST"] = "qa_test";
   RunType2["INTEGRATION_TEST"] = "integration_test";

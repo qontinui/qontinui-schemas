@@ -10,23 +10,25 @@ export * from "./render-log";
 // State discovery types
 export * from "./discovery";
 
-// Workflow types
-export * from "./workflow";
+// Workflow types — import from _api directly (not the ./workflow entry) so
+// rollup's dts bundler doesn't see the same types in two entry graphs and
+// suffix collisions with $1/$2/$3. See tsup.config.ts for the entry list.
+export * from "./workflow/_api";
 
 // Task run types
-export * from "./task-run";
+export * from "./task-run/_api";
 
 // Execution types
-export * from "./execution";
+export * from "./execution/_api";
 
 // Scheduler types
-export * from "./scheduler";
+export * from "./scheduler/_api";
 
 // Library types
-export * from "./library";
+export * from "./library/_api";
 
 // Chat types
-export * from "./chat";
+export * from "./chat/_api";
 
 // Canvas types
 export * from "./canvas";
@@ -35,7 +37,7 @@ export * from "./canvas";
 export * from "./known-issues";
 
 // State Machine types
-export * from "./state-machine";
+export * from "./state-machine/_api";
 
 // Constraint Engine types
-export * from "./constraints";
+export * from "./constraints/_api";

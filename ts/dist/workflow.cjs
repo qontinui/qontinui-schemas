@@ -25,6 +25,8 @@ __export(workflow_exports, {
   STEP_TYPES: () => STEP_TYPES
 });
 module.exports = __toCommonJS(workflow_exports);
+
+// src/workflow/_api.ts
 var STEP_TYPES = {
   setup: [
     {

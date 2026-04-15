@@ -156,7 +156,7 @@ function toStateDiscoveryResultSummary(data) {
   };
 }
 
-// src/workflow/index.ts
+// src/workflow/_api.ts
 var STEP_TYPES = {
   setup: [
     {
@@ -303,7 +303,7 @@ var PHASE_INFO = {
 };
 var DEFAULT_SUMMARY_PROMPT = `Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.`;
 
-// src/execution/index.ts
+// src/execution/_api.ts
 var RunType = /* @__PURE__ */ ((RunType2) => {
   RunType2["QA_TEST"] = "qa_test";
   RunType2["INTEGRATION_TEST"] = "integration_test";

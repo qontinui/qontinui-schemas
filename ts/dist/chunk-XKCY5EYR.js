@@ -1,4 +1,4 @@
-// src/workflow/index.ts
+// src/workflow/_api.ts
 var STEP_TYPES = {
   setup: [
     {
@@ -150,4 +150,4 @@ export {
   PHASE_INFO,
   DEFAULT_SUMMARY_PROMPT
 };
-//# sourceMappingURL=chunk-RXIGJSWF.js.map
+//# sourceMappingURL=chunk-XKCY5EYR.js.map
