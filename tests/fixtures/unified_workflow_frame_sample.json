@@ -1,0 +1,90 @@
+{
+  "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "name": "Two-stage build-and-test",
+  "description": "Builds then tests the runner; demonstrates a multi-stage frame with overrides.",
+  "category": "ci",
+  "tags": ["build", "test", "example"],
+  "setup_steps": [],
+  "verification_steps": [],
+  "agentic_steps": [],
+  "completion_steps": [],
+  "max_iterations": 5,
+  "max_fix_attempts": 3,
+  "max_ci_auto_resumes": 10,
+  "provider": "anthropic",
+  "model": "claude-opus-4-6",
+  "model_overrides": {
+    "verification": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4",
+      "temperature": 0.2
+    }
+  },
+  "skip_ai_summary": false,
+  "log_source_selection": {
+    "profile_id": "runner-default-profile"
+  },
+  "auto_include_contexts": true,
+  "log_watch_enabled": true,
+  "health_check_enabled": true,
+  "health_check_urls": [
+    {
+      "name": "Backend API",
+      "url": "http://localhost:8000/health",
+      "expected_status": 200,
+      "timeout_seconds": 30,
+      "is_critical": true
+    }
+  ],
+  "preflight_check_enabled": true,
+  "enable_sweep": false,
+  "max_sweep_iterations": 5,
+  "stages": [
+    {
+      "id": "stage-build-0001",
+      "name": "Build",
+      "description": "Compile the runner workspace.",
+      "setup_steps": [],
+      "verification_steps": [],
+      "agentic_steps": [],
+      "completion_steps": [],
+      "max_iterations": 3,
+      "approval_gate": false,
+      "completion_prompts_first": false,
+      "outputs": [
+        { "key": "build_artifact_path", "description": "Path to the built artifact." }
+      ]
+    },
+    {
+      "id": "stage-test-0002",
+      "name": "Test",
+      "description": "Run the test suite against the build artifact.",
+      "setup_steps": [],
+      "verification_steps": [],
+      "agentic_steps": [],
+      "completion_steps": [],
+      "max_iterations": 5,
+      "approval_gate": false,
+      "condition": {
+        "if_previous": "passed"
+      },
+      "completion_prompts_first": false,
+      "inputs": [
+        { "key": "build_artifact_path", "from_stage": "stage-build-0001", "required": true }
+      ]
+    }
+  ],
+  "stop_on_failure": false,
+  "approval_gate": false,
+  "reflection_mode": true,
+  "completion_prompts_first": false,
+  "is_favorite": false,
+  "multi_agent_mode": true,
+  "enforce_token_budget": false,
+  "strict_cwd": false,
+  "use_worktree": false,
+  "workflow_architecture": "traditional",
+  "ai_reviewed": true,
+  "created_at": "2026-04-10T08:00:00Z",
+  "modified_at": "2026-04-14T09:00:00Z"
+}

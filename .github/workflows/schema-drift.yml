@@ -1,0 +1,63 @@
+name: schema-drift
+
+# Fails CI when the generated TypeScript or Python type bindings under
+# qontinui-schemas/ are out of sync with the Rust sources that drive them.
+#
+# Trigger scope: only runs when Rust schema sources, the runner-side
+# schema-export entry point, or the code generator script itself change.
+# This assumes the repository is the qontinui-root mono-repo; the workflow
+# expects to find both qontinui-runner/ and qontinui-schemas/ at the
+# checkout root.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "qontinui-schemas/rust/src/**"
+      - "qontinui-runner/src-tauri/src/schema_export.rs"
+      - "qontinui-runner/src-tauri/scripts/generate_types.sh"
+  pull_request:
+    branches: [main]
+    paths:
+      - "qontinui-schemas/rust/src/**"
+      - "qontinui-runner/src-tauri/src/schema_export.rs"
+      - "qontinui-runner/src-tauri/scripts/generate_types.sh"
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install json-schema-to-typescript
+        run: npm install -g json-schema-to-typescript
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install datamodel-code-generator
+        run: pip install datamodel-code-generator
+
+      - name: Regenerate types
+        run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code \
+              qontinui-schemas/ts/src/generated \
+              qontinui-schemas/src/qontinui_schemas/generated; then
+            echo "::error::Generated types are out of date."
+            echo "Run 'just generate-types' from the repo root and commit the updated files."
+            exit 1
+          fi

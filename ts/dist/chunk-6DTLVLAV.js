@@ -66,6 +66,14 @@ var STEP_TYPES = {
       icon: "Workflow",
       color: "blue",
       phase: "verification"
+    },
+    {
+      type: "native_accessibility",
+      label: "Native Accessibility",
+      description: "Run a native accessibility audit using OS-level APIs",
+      icon: "Accessibility",
+      color: "teal",
+      phase: "verification"
     }
   ],
   agentic: [
@@ -142,4 +150,4 @@ export {
   PHASE_INFO,
   DEFAULT_SUMMARY_PROMPT
 };
-//# sourceMappingURL=chunk-3LZ3M467.js.map
+//# sourceMappingURL=chunk-6DTLVLAV.js.map

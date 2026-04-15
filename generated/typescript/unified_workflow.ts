@@ -189,7 +189,7 @@ export interface PromptStep extends BaseStep {
 export interface UiBridgeStep extends BaseStep {
   type: "ui_bridge";
   phase: "setup" | "verification" | "completion";
-  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert";
+  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert" | "action_plan";
   url?: string;
   instruction?: string;
   target?: string;
@@ -335,7 +335,8 @@ export interface WorkflowStage {
   verification_steps: VerificationStep[];
   agentic_steps: AgenticStep[];
   completion_steps: CompletionStep[];
-  max_iterations?: number;
+  /** `null` (or omitted) means unlimited iterations. */
+  max_iterations?: number | null;
   timeout_seconds?: number | null;
   provider?: string;
   model?: string;
@@ -362,7 +363,8 @@ export interface UnifiedWorkflow {
   verification_steps: VerificationStep[];
   agentic_steps: AgenticStep[];
   completion_steps: CompletionStep[];
-  max_iterations?: number;
+  /** `null` (or omitted) means unlimited iterations. */
+  max_iterations?: number | null;
   timeout_seconds?: number | null;
   provider?: string;
   model?: string;

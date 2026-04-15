@@ -1,4 +1,149 @@
 /**
+ * Structured Action Plan Types
+ *
+ * Defines the schema for LLM-generated UI Bridge action plans.
+ * Instead of natural language instructions interpreted by a second LLM call,
+ * action plans let the agentic-phase LLM directly specify typed UI actions
+ * that map to UI Bridge's control API.
+ *
+ * Inspired by Skyvern's structured action protocol: each action carries
+ * reasoning, confidence, and typed parameters so that execution is
+ * deterministic and auditable.
+ */
+/**
+ * Action types that can appear in an action plan.
+ * Maps directly to UI Bridge's StandardAction type with additions
+ * for navigation and waiting.
+ */
+type PlannedActionType = "click" | "doubleClick" | "rightClick" | "type" | "clear" | "select" | "check" | "uncheck" | "toggle" | "hover" | "focus" | "scroll" | "scrollIntoView" | "setValue" | "drag" | "submit" | "sendKeys" | "autocomplete" | "navigate" | "wait";
+/**
+ * How to find the target element for an action.
+ * Supports multiple resolution strategies with fallback.
+ */
+interface ElementTarget {
+    /** Direct element ID from a prior snapshot (fastest resolution) */
+    elementId?: string;
+    /** data-testid attribute value */
+    testId?: string;
+    /** Natural language description for fuzzy search (fallback) */
+    searchText?: string;
+    /** Element type hint to narrow search (e.g., "button", "input") */
+    elementType?: string;
+    /** CSS selector */
+    selector?: string;
+}
+/**
+ * A single action in an action plan.
+ *
+ * The LLM produces an array of these, each mapping to one UI Bridge
+ * control action. The reasoning and confidence fields enable auditing
+ * and confidence-gated execution.
+ */
+interface PlannedAction {
+    /** Action type to execute */
+    action: PlannedActionType;
+    /** How to find the target element */
+    target: ElementTarget;
+    /** LLM's reasoning for this action (audit trail) */
+    reasoning?: string;
+    /** LLM's confidence that this is the right action (0.0–1.0) */
+    confidence: number;
+    /**
+     * Action-specific parameters.
+     * - type/setValue: { text: string }
+     * - select: { value: string } or { label: string }
+     * - scroll: { direction: "up"|"down"|"left"|"right" }
+     * - drag: { targetPosition: { x: number, y: number } }
+     * - sendKeys: { keys: string }
+     * - navigate: { url: string }
+     * - wait: { ms: number }
+     */
+    params?: Record<string, unknown>;
+    /**
+     * Separates the generic intent from specific data.
+     * Enables action plan caching: the query stays stable across runs,
+     * only the answer changes per user context.
+     *
+     * Example:
+     *   userDetailQuery: "What email should be entered?"
+     *   userDetailAnswer: "test@example.com"
+     */
+    userDetailQuery?: string;
+    userDetailAnswer?: string;
+}
+/**
+ * A complete action plan: an ordered sequence of UI actions
+ * produced by the agentic-phase LLM.
+ */
+interface ActionPlan {
+    /** Ordered list of actions to execute */
+    actions: PlannedAction[];
+    /** High-level goal this plan achieves */
+    goal: string;
+    /**
+     * Minimum confidence threshold. Actions below this confidence
+     * are skipped (or trigger verification) rather than executed.
+     * Default: 0.5
+     */
+    confidenceThreshold?: number;
+    /** Whether to stop on first action failure (default: true) */
+    stopOnFailure?: boolean;
+}
+/** Result of executing a single planned action */
+interface PlannedActionResult {
+    /** Index of the action in the plan */
+    index: number;
+    /** Whether the action succeeded */
+    success: boolean;
+    /** The action that was executed */
+    action: PlannedActionType;
+    /** Element ID that was resolved and acted upon */
+    resolvedElementId?: string;
+    /** Error message if the action failed */
+    error?: string;
+    /** Whether the action was skipped due to low confidence */
+    skippedLowConfidence?: boolean;
+    /** Duration in milliseconds */
+    durationMs: number;
+    /** Post-action element state (if available) */
+    elementState?: Record<string, unknown>;
+}
+/** Aggregated result of executing a full action plan */
+interface ActionPlanResult {
+    /** Whether all executed actions succeeded */
+    success: boolean;
+    /** The goal from the action plan */
+    goal?: string;
+    /** Per-action results */
+    results: PlannedActionResult[];
+    /** Count of actions executed (excludes skipped) */
+    executedCount: number;
+    /** Count of actions skipped due to low confidence */
+    skippedCount: number;
+    /** Count of actions that failed */
+    failedCount: number;
+    /** Total duration in milliseconds */
+    totalDurationMs: number;
+    /** Whether this plan was stored in the cache for future reuse */
+    cached?: boolean;
+}
+/**
+ * Extended action plan request with caching fields.
+ * Used when calling the endpoint directly (not via workflow steps).
+ */
+interface ActionPlanExecuteRequest extends ActionPlan {
+    /** Page URL for cache keying */
+    pageUrl?: string;
+    /** Element snapshot for cache fingerprinting (array of {id, type, role, label}) */
+    elementSnapshot?: Array<{
+        id?: string;
+        type?: string;
+        role?: string;
+        label?: string;
+    }>;
+}
+
+/**
  * Skill Types
  *
  * A skill is a named, parameterized template that produces pre-configured
@@ -210,7 +355,7 @@ interface PromptStep extends BaseStep {
 interface UiBridgeStep extends BaseStep {
     type: "ui_bridge";
     phase: "setup" | "verification" | "completion";
-    action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert";
+    action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert" | "action_plan";
     url?: string;
     instruction?: string;
     target?: string;
@@ -222,6 +367,8 @@ interface UiBridgeStep extends BaseStep {
     severity_threshold?: "critical" | "major" | "minor" | "info";
     /** Snapshot target: "control" (runner UI), "sdk" (connected app), or "proxy:PORT" */
     ui_bridge_snapshot_target?: string;
+    /** Structured action plan for the "action_plan" action type */
+    action_plan?: ActionPlan;
 }
 interface WorkflowStep extends BaseStep {
     type: "workflow";
@@ -312,7 +459,8 @@ interface WorkflowStage {
     verification_steps: VerificationStep[];
     agentic_steps: AgenticStep[];
     completion_steps: CompletionStep[];
-    max_iterations?: number;
+    /** `null` (or omitted) means unlimited iterations. */
+    max_iterations?: number | null;
     timeout_seconds?: number | null;
     provider?: string;
     model?: string;
@@ -334,7 +482,8 @@ interface UnifiedWorkflow {
     verification_steps: VerificationStep[];
     agentic_steps: AgenticStep[];
     completion_steps: CompletionStep[];
-    max_iterations?: number;
+    /** `null` (or omitted) means unlimited iterations. */
+    max_iterations?: number | null;
     timeout_seconds?: number | null;
     provider?: string;
     model?: string;
@@ -481,4 +630,4 @@ declare const PHASE_INFO: Record<WorkflowPhase, {
 }>;
 declare const DEFAULT_SUMMARY_PROMPT = "Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.";
 
-export { type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, type CompositionTemplate, type CostAnnotations, type CostCategory, type CoverageMatrix, DEFAULT_SUMMARY_PROMPT, type DependencyEdge, type DependencyGraph, type DependencyNode, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlaywrightExecutionMode, type PromptStep, type QualityFinding, type QualityFindingCategory, type QualityFindingSeverity, type QualityReport, type RetryPolicy, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StageInput, type StageOutput, type StepCost, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationCategory, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
+export { type ActionPlan, type ActionPlanExecuteRequest, type ActionPlanResult, type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CheckType, type CommandStep, type CompletionStep, type CompositionTemplate, type CostAnnotations, type CostCategory, type CoverageMatrix, DEFAULT_SUMMARY_PROMPT, type DependencyEdge, type DependencyGraph, type DependencyNode, type ElementTarget, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlannedAction, type PlannedActionResult, type PlannedActionType, type PlaywrightExecutionMode, type PromptStep, type QualityFinding, type QualityFindingCategory, type QualityFindingSeverity, type QualityReport, type RetryPolicy, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StageInput, type StageOutput, type StepCost, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationCategory, type VerificationStep, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };

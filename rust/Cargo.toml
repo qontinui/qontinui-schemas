@@ -1,0 +1,13 @@
+[package]
+name = "qontinui-types"
+version = "0.1.0"
+edition = "2021"
+description = "Canonical DTO types for Qontinui. Rust is the source of truth; TypeScript and Python are generated from JSON Schema emitted by schemars."
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }

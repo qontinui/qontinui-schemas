@@ -1,0 +1,45 @@
+{
+  "id": "7a1b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d",
+  "name": "Nightly auto-fix sweep",
+  "description": "Runs the auto-fix workflow every night at 3 AM when the runner is idle.",
+  "enabled": true,
+  "schedule": {
+    "type": "Cron",
+    "value": "0 3 * * *"
+  },
+  "task": {
+    "task_type": "AutoFix",
+    "check_findings": true,
+    "force_run": false
+  },
+  "skip_if_completed": false,
+  "auto_fix_on_failure": true,
+  "success_criteria": "All auto-fixable findings resolved; no new Critical findings introduced.",
+  "created_at": "2026-04-01T12:00:00Z",
+  "modified_at": "2026-04-14T09:30:00Z",
+  "last_run": {
+    "execution_id": "11111111-2222-4333-8444-555555555555",
+    "session_id": "sess-abc-123",
+    "started_at": "2026-04-13T03:00:01Z",
+    "ended_at": "2026-04-13T03:14:22Z",
+    "status": "completed",
+    "success": true,
+    "triggered_auto_fix": false
+  },
+  "next_run": "2026-04-15T03:00:00Z",
+  "conditions": {
+    "require_idle": {
+      "enabled": true
+    },
+    "require_repo_inactive": {
+      "enabled": true,
+      "repositories": [
+        {
+          "path": "D:/qontinui-root/qontinui-runner",
+          "inactive_minutes": 10
+        }
+      ]
+    },
+    "timeout_minutes": 60
+  }
+}

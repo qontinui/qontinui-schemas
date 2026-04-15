@@ -10,6 +10,20 @@ This package provides schema definitions used across multiple Qontinui services:
 - **qontinui-runner** - Desktop runner application
 - **qontinui** - Core automation library
 
+## CI schema drift check
+
+The generated TypeScript (`ts/src/generated/`) and Python (`src/qontinui_schemas/generated/`) bindings are produced from the Rust schema crate by `qontinui-runner/src-tauri/scripts/generate_types.sh`. A GitHub Actions workflow (`.github/workflows/schema-drift.yml`) re-runs the generator on every push and pull request to `main` that touches the Rust schema sources, the runner-side `schema_export.rs` entry point, or the generator script itself, then fails the build if the working tree has any uncommitted diff under those generated directories.
+
+If the drift check fails, regenerate the bindings locally and commit the result:
+
+```bash
+just generate-types
+git add qontinui-schemas/ts/src/generated qontinui-schemas/src/qontinui_schemas/generated
+git commit -m "chore: regenerate typed bindings"
+```
+
+The workflow assumes CI runs from the `qontinui-root` mono-repo checkout (so both `qontinui-runner/` and `qontinui-schemas/` are present side-by-side). If this package is later extracted to a standalone repository, the workflow will need to be adjusted to check out the runner as well (or the generator will need to be vendored into this repo).
+
 ## Why This Package Exists
 
 The schema definitions need to be shared across multiple services, but the main `qontinui` package has heavy dependencies (PyTorch, Transformers, OpenCV, etc.). This lightweight package extracts just the Pydantic schemas with minimal dependencies, allowing web services and APIs to use the same schema definitions without pulling in ML libraries.

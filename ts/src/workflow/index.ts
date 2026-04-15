@@ -17,32 +17,67 @@
  */
 
 // =============================================================================
+// Generated frame types — source of truth is qontinui-schemas/rust/src/workflow.rs
+// These are produced by the schemars -> JSON Schema -> json-schema-to-typescript
+// pipeline. Do NOT redeclare them here; re-export from ../generated/*.
+//
+// Step arrays on UnifiedWorkflow / WorkflowStage are typed as `unknown[]` by
+// the generator. Typed step arrays are part of the Wave 4 step migration and
+// remain hand-authored below (BaseStep, CommandStep, PromptStep, UiBridgeStep,
+// WorkflowStep, and the per-phase aliases).
+// =============================================================================
+
+export type { LogSourceSelection } from "../generated/LogSourceSelection";
+export type { HealthCheckUrl } from "../generated/HealthCheckUrl";
+export type { RoutingRule } from "../generated/RoutingRule";
+export type { ModelOverrideConfig } from "../generated/ModelOverrideConfig";
+export type { StageCondition } from "../generated/StageCondition";
+export type { RetryPolicy } from "../generated/RetryPolicy";
+export type { StageOutput } from "../generated/StageOutput";
+export type { StageInput } from "../generated/StageInput";
+export type { WorkflowStage } from "../generated/WorkflowStage";
+export type { UnifiedWorkflow } from "../generated/UnifiedWorkflow";
+export type { WorkflowArchitecture } from "../generated/WorkflowArchitecture";
+
+// Step DTOs (generated from qontinui-types::workflow_step)
+export type { CommandStep } from "../generated/CommandStep";
+export type { PromptStep } from "../generated/PromptStep";
+export type { UiBridgeStep } from "../generated/UiBridgeStep";
+export type { WorkflowStep } from "../generated/WorkflowStep";
+export type { UnifiedStep } from "../generated/UnifiedStep";
+export type { HttpMethod } from "../generated/HttpMethod";
+export type { ApiContentType } from "../generated/ApiContentType";
+export type { ApiAssertion } from "../generated/ApiAssertion";
+export type { ApiVariableExtraction } from "../generated/ApiVariableExtraction";
+export type { TestType } from "../generated/TestType";
+export type { PlaywrightExecutionMode } from "../generated/PlaywrightExecutionMode";
+export type { CheckType } from "../generated/CheckType";
+export type { CommandMode } from "../generated/CommandMode";
+export type { UiBridgeAction } from "../generated/UiBridgeAction";
+export type { VerificationCategoryKind } from "../generated/VerificationCategoryKind";
+
+// ModelOverrides is a hand-authored convenience alias: the generated
+// UnifiedWorkflow / WorkflowStage type `model_overrides` as an open
+// `{ [k: string]: ModelOverrideConfig }`, but downstream code prefers a
+// named type with known phase keys. Keep as a local alias over the generated
+// per-phase config.
+import type { ModelOverrideConfig as _ModelOverrideConfig } from "../generated/ModelOverrideConfig";
+
+export type ModelOverrides = {
+  setup?: _ModelOverrideConfig;
+  agentic?: _ModelOverrideConfig;
+  completion?: _ModelOverrideConfig;
+  verification?: _ModelOverrideConfig;
+  investigation?: _ModelOverrideConfig;
+  summary?: _ModelOverrideConfig;
+  generation?: _ModelOverrideConfig;
+};
+
+// =============================================================================
 // Phases
 // =============================================================================
 
 export type WorkflowPhase = "setup" | "verification" | "agentic" | "completion";
-
-// =============================================================================
-// Log Source Selection
-// =============================================================================
-
-export type LogSourceSelection =
-  | "default"
-  | "ai"
-  | "all"
-  | { profile_id: string };
-
-// =============================================================================
-// Health Check Configuration
-// =============================================================================
-
-export interface HealthCheckUrl {
-  name: string;
-  url: string;
-  expected_status?: number;
-  timeout_seconds?: number;
-  is_critical?: boolean;
-}
 
 // =============================================================================
 // Skill Types (re-exported from ./skill)
@@ -76,9 +111,32 @@ export type {
 } from "./action-plan";
 
 // =============================================================================
-// Step Types
+// Step Types — generated from qontinui-types::workflow_step
+//
+// The four canonical step variants (CommandStep, PromptStep, UiBridgeStep,
+// WorkflowStep) and their helper unions (HttpMethod, ApiContentType, …) are
+// re-exported at the top of this file from ../generated/*. The remaining
+// hand-authored types in this section are TS-only sugar: a `BaseStep` alias
+// for consumers that still want a name for the shared-fields subset, a
+// `StepTypeName` literal that includes non-canonical runner-side variants
+// (e.g. native_accessibility) for UI listings, and the phase-alias types.
+//
+// Phase narrowing is TS-only sugar — not a wire concern. The generator emits
+// a narrow `phase` field on each variant; these aliases just group the four
+// variants by the phase that can carry them.
 // =============================================================================
 
+import type { CommandStep as _CommandStep } from "../generated/CommandStep";
+import type { PromptStep as _PromptStep } from "../generated/PromptStep";
+import type { UiBridgeStep as _UiBridgeStep } from "../generated/UiBridgeStep";
+import type { WorkflowStep as _WorkflowStep } from "../generated/WorkflowStep";
+
+/**
+ * Shared-fields subset carried by every canonical step variant.
+ *
+ * Kept as a hand-authored alias so downstream code can still reference
+ * `BaseStep` by name. Fields mirror `qontinui-types::workflow_step::BaseStepFields`.
+ */
 export interface BaseStep {
   id: string;
   name: string;
@@ -95,350 +153,22 @@ export interface BaseStep {
   verification_category?: VerificationCategory;
 }
 
-// -----------------------------------------------------------------------------
-// API Request Builder Types
-// -----------------------------------------------------------------------------
-
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-
-export type ApiContentType =
-  | "application/json"
-  | "application/x-www-form-urlencoded"
-  | "text/plain"
-  | "none";
-
-export interface ApiVariableExtraction {
-  variable_name: string;
-  json_path: string;
-  default_value?: string;
-}
-
-export interface ApiAssertion {
-  type:
-    | "status_code"
-    | "json_path"
-    | "header"
-    | "body_contains"
-    | "response_time";
-  expected: string | number;
-  json_path?: string;
-  header_name?: string;
-  operator?: "equals" | "contains" | "matches" | "greater_than" | "less_than";
-}
-
-// -----------------------------------------------------------------------------
-// Test Types
-// -----------------------------------------------------------------------------
-
-export type TestType =
-  | "playwright"
-  | "qontinui_vision"
-  | "python"
-  | "repository"
-  | "custom_command";
-
-export type PlaywrightExecutionMode = "independent" | "chained";
-
-// -----------------------------------------------------------------------------
-// Check Types
-// -----------------------------------------------------------------------------
-
-export type CheckType =
-  | "lint"
-  | "format"
-  | "typecheck"
-  | "analyze"
-  | "security"
-  | "custom_command"
-  | "http_status"
-  | "ai_review"
-  | "ci_cd";
-
-// -----------------------------------------------------------------------------
-// Command Steps
-// -----------------------------------------------------------------------------
-
-export interface CommandStep extends BaseStep {
-  type: "command";
-  phase: "setup" | "verification" | "completion";
-  mode?: "shell" | "check" | "check_group" | "test";
-  command?: string;
-  working_directory?: string;
-  timeout_seconds?: number;
-  fail_on_error?: boolean;
-  run_on_subsequent_iterations?: boolean;
-  shell_command_id?: string;
-  check_type?: CheckType;
-  tool?: string;
-  check_id?: string;
-  config_path?: string;
-  auto_fix?: boolean;
-  fail_on_warning?: boolean;
-  repository?: string;
-  workflow_name?: string;
-  branch?: string;
-  wait_for_completion?: boolean;
-  check_group_id?: string;
-  test_type?: TestType;
-  test_id?: string;
-  code?: string;
-  script_id?: string;
-  script_content?: string;
-  target_url?: string;
-  fused_script_id?: string;
-  execution_mode?: PlaywrightExecutionMode;
-}
-
-// -----------------------------------------------------------------------------
-// Prompt Steps
-// -----------------------------------------------------------------------------
-
-export interface PromptStep extends BaseStep {
-  type: "prompt";
-  phase: "setup" | "verification" | "agentic" | "completion";
-  content: string;
-  prompt_id?: string;
-  provider?: string;
-  model?: string;
-  is_summary_step?: boolean;
-}
-
-// -----------------------------------------------------------------------------
-// UI Bridge Steps
-// -----------------------------------------------------------------------------
-
-export interface UiBridgeStep extends BaseStep {
-  type: "ui_bridge";
-  phase: "setup" | "verification" | "agentic" | "completion";
-  action: "navigate" | "execute" | "assert" | "snapshot" | "compare" | "snapshot_assert" | "action_plan";
-  url?: string;
-  instruction?: string;
-  target?: string;
-  assert_type?: "exists" | "text_equals" | "contains" | "visible" | "enabled";
-  expected?: string;
-  timeout_ms?: number;
-  comparison_mode?: "structural" | "visual" | "both";
-  reference_snapshot_id?: string;
-  severity_threshold?: "critical" | "major" | "minor" | "info";
-  /** Snapshot target: "control" (runner UI), "sdk" (connected app), or "proxy:PORT" */
-  ui_bridge_snapshot_target?: string;
-  /** Structured action plan for the "action_plan" action type */
-  action_plan?: import("./action-plan").ActionPlan;
-}
-
-// -----------------------------------------------------------------------------
-// Workflow Steps (composition -- run a saved workflow inline)
-// -----------------------------------------------------------------------------
-
-export interface WorkflowStep extends BaseStep {
-  type: "workflow";
-  phase: "setup" | "verification" | "completion";
-  workflow_id: string;
-  workflow_name: string;
-}
-
 // =============================================================================
 // Step Type Names
 // =============================================================================
 
+// Includes runner-side non-canonical variants (e.g. `native_accessibility`)
+// that appear in the UI listing but are not part of the `UnifiedStep` DTO.
 export type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow" | "native_accessibility";
 
 // =============================================================================
-// Unified Step Types
+// Phase-alias types (TS-only sugar over the generated UnifiedStep)
 // =============================================================================
 
-export type UnifiedStep =
-  | CommandStep
-  | PromptStep
-  | UiBridgeStep
-  | WorkflowStep;
-
-export type SetupStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
-export type VerificationStep =
-  | CommandStep
-  | PromptStep
-  | UiBridgeStep
-  | WorkflowStep;
-export type AgenticStep = PromptStep;
-export type CompletionStep =
-  | CommandStep
-  | PromptStep
-  | UiBridgeStep
-  | WorkflowStep;
-
-// =============================================================================
-// Per-Phase Model Overrides
-// =============================================================================
-
-/** A conditional routing rule that selects model/provider based on runtime context. */
-export interface RoutingRule {
-  /** Condition expression, e.g. "verification_failures >= 2" */
-  condition: string;
-  model?: string;
-  provider?: string;
-  temperature?: number;
-  max_tokens?: number;
-}
-
-export interface ModelOverrideConfig {
-  provider?: string;
-  model?: string;
-  /** Temperature override for this phase (0.0–1.0). */
-  temperature?: number;
-  /** Max output tokens override for this phase. */
-  max_tokens?: number;
-  /** Fallback provider if the primary fails with a retryable error. */
-  fallback_provider?: string;
-  /** Fallback model if the primary fails with a retryable error. */
-  fallback_model?: string;
-  /** Conditional routing rules evaluated at runtime. First matching rule wins. */
-  routing_rules?: RoutingRule[];
-}
-
-export type ModelOverrides = {
-  setup?: ModelOverrideConfig;
-  agentic?: ModelOverrideConfig;
-  completion?: ModelOverrideConfig;
-  verification?: ModelOverrideConfig;
-  investigation?: ModelOverrideConfig;
-  summary?: ModelOverrideConfig;
-  generation?: ModelOverrideConfig;
-};
-
-// =============================================================================
-// Workflow Stages
-// =============================================================================
-
-/**
- * Condition for conditional stage execution.
- *
- * When attached to a WorkflowStage, the stage is skipped if the condition
- * evaluates to "should skip". All fields are optional and combine with AND
- * semantics — all specified conditions must be met for the stage to run.
- */
-export interface StageCondition {
-  /** Run only if previous stage had this outcome: "passed", "failed", or "any" */
-  if_previous?: "passed" | "failed" | "any";
-  /** Run only after this many total iterations have occurred across all stages */
-  min_iteration?: number;
-  /** Run only if this many stages have failed verification so far */
-  min_failures?: number;
-}
-
-export interface RetryPolicy {
-  /** Number of retry attempts (0 = no retries) */
-  count: number;
-  /** Delay between retries in milliseconds */
-  delay_ms: number;
-  /** Whether to use exponential backoff */
-  backoff?: boolean;
-}
-
-export interface StageOutput {
-  /** Unique key for this output (e.g. "api_url", "auth_token") */
-  key: string;
-  /** Human-readable description */
-  description?: string;
-}
-
-export interface StageInput {
-  /** The key to bind (matches a StageOutput.key from a prior stage) */
-  key: string;
-  /** Which stage provides this input (stage id). If omitted, searches all prior stages. */
-  from_stage?: string;
-  /** Whether this input is required (default: true) */
-  required?: boolean;
-}
-
-export interface WorkflowStage {
-  id: string;
-  name: string;
-  description?: string;
-  setup_steps: SetupStep[];
-  verification_steps: VerificationStep[];
-  agentic_steps: AgenticStep[];
-  completion_steps: CompletionStep[];
-  max_iterations?: number;
-  timeout_seconds?: number | null;
-  provider?: string;
-  model?: string;
-  model_overrides?: ModelOverrides;
-  /** Optional condition for conditional stage execution */
-  condition?: StageCondition;
-  /** Retry policy for this stage (overrides per-step defaults) */
-  retry_policy?: RetryPolicy;
-  /** Declared outputs that this stage produces for downstream stages */
-  outputs?: StageOutput[];
-  /** Inputs required from prior stages */
-  inputs?: StageInput[];
-}
-
-// =============================================================================
-// Workflow
-// =============================================================================
-
-export interface UnifiedWorkflow {
-  id: string;
-  name: string;
-  description: string;
-  setup_steps: SetupStep[];
-  verification_steps: VerificationStep[];
-  agentic_steps: AgenticStep[];
-  completion_steps: CompletionStep[];
-  max_iterations?: number;
-  timeout_seconds?: number | null;
-  provider?: string;
-  model?: string;
-  model_overrides?: ModelOverrides;
-  log_source_selection?: LogSourceSelection;
-  context_ids?: string[];
-  disabled_context_ids?: string[];
-  auto_include_contexts?: boolean;
-  skip_ai_summary?: boolean;
-  log_watch_enabled?: boolean;
-  health_check_enabled?: boolean;
-  health_check_urls?: HealthCheckUrl[];
-  prompt_template?: string | null;
-  stages?: WorkflowStage[];
-  stop_on_failure?: boolean;
-  reflection_mode?: boolean;
-  /** Create a new git branch and worktree for this run. Changes stay isolated until merged. */
-  use_worktree?: boolean;
-  /** Run in multi-agent mode, spawning parallel sub-agents for independent tasks. */
-  multi_agent_mode?: boolean;
-  /** Workflow execution architecture override. */
-  workflow_architecture?: "traditional" | "agentic_verification" | "multi_agent_pipeline";
-  /** Configuration for the multi-agent pipeline architecture. */
-  multi_agent_pipeline_config?: Record<string, unknown>;
-  /** Restrict working directory resolution to the workspace boundary. Steps cannot resolve paths outside the workspace root. */
-  strict_cwd?: boolean;
-  /** Tags for per-execution tool whitelisting. When non-empty, only skills matching at least one tag are included in AI prompt context. */
-  tool_tags?: string[];
-  /** Policy for automatic git rollback when the workflow fails: "none" (default), "last_good", "clean". */
-  rollback_policy?: "none" | "last_good" | "clean";
-  /** Per-constraint overrides: map of constraint_id to enabled (true) / disabled (false) */
-  constraint_overrides?: Record<string, boolean>;
-  /** Dependency graph computed during generation */
-  dependency_graph?: DependencyGraph;
-  /** Cost annotations computed during generation */
-  cost_annotations?: CostAnnotations;
-  /** Quality report from the revision phase */
-  quality_report?: QualityReport;
-  /** Acceptance criteria from the specification agent (JSON blob) */
-  acceptance_criteria?: Record<string, unknown> | null;
-  /** When true, stop execution if accumulated tokens exceed max_context_tokens. */
-  enforce_token_budget?: boolean;
-  /** Whether this workflow is marked as a favorite */
-  is_favorite?: boolean | null;
-  /** JSON-serialized flow control configuration (concurrency, throttle, rate limit, debounce) */
-  flow_control_json?: string | null;
-  /** JSON-serialized per-phase timeout configuration */
-  phase_timeouts_json?: string | null;
-  category: string;
-  tags: string[];
-  created_at: string;
-  modified_at: string;
-}
+export type SetupStep = _CommandStep | _PromptStep | _UiBridgeStep | _WorkflowStep;
+export type VerificationStep = _CommandStep | _PromptStep | _UiBridgeStep | _WorkflowStep;
+export type AgenticStep = _PromptStep;
+export type CompletionStep = _CommandStep | _PromptStep | _UiBridgeStep | _WorkflowStep;
 
 // =============================================================================
 // Verification Categories
@@ -542,6 +272,8 @@ export interface QualityReport {
 // Export/Import Types
 // =============================================================================
 
+import type { UnifiedWorkflow as _UnifiedWorkflow } from "../generated/UnifiedWorkflow";
+
 export interface WorkflowExportManifest {
   version: string;
   exported_at: string;
@@ -551,11 +283,11 @@ export interface WorkflowExportManifest {
 
 export interface WorkflowExport {
   manifest: WorkflowExportManifest;
-  workflow: UnifiedWorkflow;
+  workflow: _UnifiedWorkflow;
 }
 
 export interface WorkflowImportResult {
-  workflow: UnifiedWorkflow;
+  workflow: _UnifiedWorkflow;
   overwritten: boolean;
   original_id: string | null;
 }

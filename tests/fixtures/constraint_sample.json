@@ -1,0 +1,12 @@
+{
+  "id": "project:no-secrets",
+  "name": "No hardcoded secrets",
+  "description": "Prevents accidental commits of API keys, tokens, or other secrets to source files.",
+  "check": {
+    "type": "grep_forbidden",
+    "pattern": "(AKIA[0-9A-Z]{16})|(sk-[A-Za-z0-9]{32,})",
+    "file_glob": "**/*.{rs,ts,py,toml}"
+  },
+  "severity": "block",
+  "enabled": true
+}

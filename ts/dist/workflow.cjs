@@ -92,6 +92,14 @@ var STEP_TYPES = {
       icon: "Workflow",
       color: "blue",
       phase: "verification"
+    },
+    {
+      type: "native_accessibility",
+      label: "Native Accessibility",
+      description: "Run a native accessibility audit using OS-level APIs",
+      icon: "Accessibility",
+      color: "teal",
+      phase: "verification"
     }
   ],
   agentic: [
