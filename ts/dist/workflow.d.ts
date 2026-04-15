@@ -1,109 +1,3 @@
-/**
- * Skill Types
- *
- * A skill is a named, parameterized template that produces pre-configured
- * workflow step(s) when instantiated. Skills sit between raw step types
- * and full workflows:
- *
- *   Raw Step Types  (command, prompt, ui_bridge, workflow)  ← execution primitives
- *        ↑ instantiates
- *   Skills          ("Lint Project", "API Health Check")    ← named capability templates
- *        ↑ composes into
- *   Workflows       (multi-phase verification-agentic loops) ← orchestration
- *
- * Skills are purely a configuration-time abstraction — they produce steps,
- * they do NOT add new runtime behavior.
- */
-
-type SkillCategory = "code-quality" | "testing" | "monitoring" | "ai-task" | "deployment" | "composition" | "custom";
-interface SkillAuthor {
-    name: string;
-    email?: string;
-    url?: string;
-}
-interface SkillParameterOption {
-    label: string;
-    value: string;
-}
-interface SkillParameter {
-    name: string;
-    type: "string" | "number" | "boolean" | "select";
-    label: string;
-    description: string;
-    required: boolean;
-    default?: unknown;
-    options?: SkillParameterOption[];
-    placeholder?: string;
-    min?: number;
-    max?: number;
-    pattern?: string;
-    depends_on?: {
-        param: string;
-        value: unknown;
-    };
-}
-interface SingleStepTemplate {
-    kind: "single_step";
-    step: Record<string, unknown>;
-}
-interface MultiStepTemplate {
-    kind: "multi_step";
-    steps: Record<string, unknown>[];
-}
-interface CompositionTemplate {
-    kind: "composition";
-    skill_refs: SkillRef[];
-}
-interface SkillRef {
-    skill_id: string;
-    parameter_overrides?: Record<string, unknown>;
-}
-type SkillTemplate = SingleStepTemplate | MultiStepTemplate | CompositionTemplate;
-interface SkillDefinition {
-    id: string;
-    name: string;
-    slug: string;
-    description: string;
-    category: SkillCategory;
-    tags: string[];
-    icon: string;
-    color: string;
-    allowed_phases: WorkflowPhase[];
-    parameters: SkillParameter[];
-    template: SkillTemplate;
-    source: "builtin" | "user" | "community";
-    version?: string;
-    author?: SkillAuthor;
-    checksum?: string;
-    depends_on?: string[];
-    usage_count?: number;
-    approval_status?: "pending" | "approved" | "rejected";
-    forked_from?: string;
-}
-interface SkillOrigin {
-    skill_id: string;
-    skill_slug: string;
-    parameter_values: Record<string, unknown>;
-}
-interface SkillExportManifest {
-    version: string;
-    exported_at: string;
-    app_version: string;
-    content_type: "skills";
-    skill_count: number;
-    checksum?: string;
-}
-interface SkillExport {
-    manifest: SkillExportManifest;
-    skills: SkillDefinition[];
-}
-interface SkillImportResult {
-    imported: number;
-    skipped: number;
-    overwritten: number;
-    errors: string[];
-}
-
 /* eslint-disable */
 /**
  * This file was automatically generated.
@@ -1600,6 +1494,79 @@ interface UnifiedWorkflow {
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+
+
+/**
+ * Shared fields common to every canonical step variant.
+ *
+ * Flattened into each step struct via `#[serde(flatten)]` so the wire shape
+ * stays flat (no nested `"base": { … }` envelope).
+ */
+interface BaseStepFields {
+  /**
+   * Acceptance criterion IDs verified by this step.
+   */
+  criterion_ids?: string[];
+  /**
+   * IDs of other steps that must complete first.
+   */
+  depends_on?: string[];
+  /**
+   * Extractions published to subsequent steps.
+   */
+  extract?: {
+    [k: string]: string;
+  };
+  /**
+   * If `Some(true)`, a console-error signal from the UI fails this step.
+   */
+  fail_on_console_errors?: boolean | null;
+  /**
+   * Unique identifier for the step.
+   */
+  id: string;
+  /**
+   * Named input bindings evaluated at step entry.
+   */
+  inputs?: {
+    [k: string]: string;
+  };
+  /**
+   * Display name for the step.
+   */
+  name: string;
+  /**
+   * Whether this step is required (default: `true` on consumer side).
+   */
+  required?: boolean | null;
+  /**
+   * Per-step retry configuration.
+   */
+  retry?: RetrySpec | null;
+  /**
+   * Provenance of this step when generated from a skill template.
+   *
+   * Typed as `serde_json::Value` here to avoid pulling the `skill`
+   * dependency chain into this module; the TS side re-imports the typed
+   * `SkillOrigin` after regeneration.
+   */
+  skill_origin?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Verification depth category.
+   */
+  verification_category?: VerificationCategoryKind | null;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
 /**
  * HTTP methods accepted by API-request command steps.
  *
@@ -1703,6 +1670,112 @@ interface ApiVariableExtraction {
    */
   variable_name: string;
   [k: string]: unknown;
+}
+
+/**
+ * Skill Types
+ *
+ * A skill is a named, parameterized template that produces pre-configured
+ * workflow step(s) when instantiated. Skills sit between raw step types
+ * and full workflows:
+ *
+ *   Raw Step Types  (command, prompt, ui_bridge, workflow)  ← execution primitives
+ *        ↑ instantiates
+ *   Skills          ("Lint Project", "API Health Check")    ← named capability templates
+ *        ↑ composes into
+ *   Workflows       (multi-phase verification-agentic loops) ← orchestration
+ *
+ * Skills are purely a configuration-time abstraction — they produce steps,
+ * they do NOT add new runtime behavior.
+ */
+
+type SkillCategory = "code-quality" | "testing" | "monitoring" | "ai-task" | "deployment" | "composition" | "custom";
+interface SkillAuthor {
+    name: string;
+    email?: string;
+    url?: string;
+}
+interface SkillParameterOption {
+    label: string;
+    value: string;
+}
+interface SkillParameter {
+    name: string;
+    type: "string" | "number" | "boolean" | "select";
+    label: string;
+    description: string;
+    required: boolean;
+    default?: unknown;
+    options?: SkillParameterOption[];
+    placeholder?: string;
+    min?: number;
+    max?: number;
+    pattern?: string;
+    depends_on?: {
+        param: string;
+        value: unknown;
+    };
+}
+interface SingleStepTemplate {
+    kind: "single_step";
+    step: Record<string, unknown>;
+}
+interface MultiStepTemplate {
+    kind: "multi_step";
+    steps: Record<string, unknown>[];
+}
+interface CompositionTemplate {
+    kind: "composition";
+    skill_refs: SkillRef[];
+}
+interface SkillRef {
+    skill_id: string;
+    parameter_overrides?: Record<string, unknown>;
+}
+type SkillTemplate = SingleStepTemplate | MultiStepTemplate | CompositionTemplate;
+interface SkillDefinition {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    category: SkillCategory;
+    tags: string[];
+    icon: string;
+    color: string;
+    allowed_phases: WorkflowPhase[];
+    parameters: SkillParameter[];
+    template: SkillTemplate;
+    source: "builtin" | "user" | "community";
+    version?: string;
+    author?: SkillAuthor;
+    checksum?: string;
+    depends_on?: string[];
+    usage_count?: number;
+    approval_status?: "pending" | "approved" | "rejected";
+    forked_from?: string;
+}
+interface SkillOrigin {
+    skill_id: string;
+    skill_slug: string;
+    parameter_values: Record<string, unknown>;
+}
+interface SkillExportManifest {
+    version: string;
+    exported_at: string;
+    app_version: string;
+    content_type: "skills";
+    skill_count: number;
+    checksum?: string;
+}
+interface SkillExport {
+    manifest: SkillExportManifest;
+    skills: SkillDefinition[];
+}
+interface SkillImportResult {
+    imported: number;
+    skipped: number;
+    overwritten: number;
+    errors: string[];
 }
 
 /**
@@ -1850,6 +1923,24 @@ interface ActionPlanExecuteRequest extends ActionPlan {
     }>;
 }
 
+/**
+ * Workflow Types
+ *
+ * Canonical type definitions for the unified Workflow Builder system.
+ * Shared across qontinui-runner and qontinui-web.
+ *
+ * All automation is organized into four phases: Setup, Verification, Agentic, Completion.
+ *
+ * Execution Order:
+ *   Setup (once) -> [Verification <-> Agentic]* -> Completion (once)
+ *
+ * Step Types (4 core types):
+ *   command   - Shell commands, checks, check groups, tests
+ *   ui_bridge - UI Bridge SDK interactions (navigate, execute, assert, snapshot)
+ *   prompt    - AI task instructions
+ *   workflow  - Run a saved workflow inline (composition)
+ */
+
 type ModelOverrides = {
     setup?: ModelOverrideConfig;
     agentic?: ModelOverrideConfig;
@@ -1861,36 +1952,14 @@ type ModelOverrides = {
 };
 type WorkflowPhase = "setup" | "verification" | "agentic" | "completion";
 
-/**
- * Shared-fields subset carried by every canonical step variant.
- *
- * Kept as a hand-authored alias so downstream code can still reference
- * `BaseStep` by name. Fields mirror `qontinui-types::workflow_step::BaseStepFields`.
- */
-interface BaseStep {
-    id: string;
-    name: string;
-    fail_on_console_errors?: boolean;
-    inputs?: Record<string, string>;
-    extract?: Record<string, string>;
-    depends_on?: string[];
-    required?: boolean;
-    retry?: {
-        count: number;
-        delay_ms: number;
-    };
-    skill_origin?: SkillOrigin;
-    /** Acceptance criterion IDs this step verifies (supports multiple) */
-    criterion_ids?: string[];
-    /** Verification depth category for this step */
-    verification_category?: VerificationCategory;
-}
+type BaseStep = BaseStepFields;
 type StepTypeName = "command" | "ui_bridge" | "prompt" | "workflow" | "native_accessibility";
 type SetupStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type VerificationStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
 type AgenticStep = PromptStep;
 type CompletionStep = CommandStep | PromptStep | UiBridgeStep | WorkflowStep;
-type VerificationCategory = "existence" | "uniqueness" | "referential_integrity" | "semantic_correctness" | "runtime_behavior";
+
+type VerificationCategory = VerificationCategoryKind;
 interface DependencyNode {
     id: string;
     label: string;
@@ -1984,4 +2053,4 @@ declare const PHASE_INFO: Record<WorkflowPhase, {
 }>;
 declare const DEFAULT_SUMMARY_PROMPT = "Write a one-paragraph summary of all the tasks completed in this workflow. Include what was accomplished, whether the stated goal was achieved, any issues encountered and how they were resolved, and remaining work if the goal was not fully achieved. Be concise but comprehensive.";
 
-export { type ActionPlan, type ActionPlanExecuteRequest, type ActionPlanResult, type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type CanonicalStep, type CheckType, type CommandMode, type CommandStep, type CompletionStep, type CompositionTemplate, type CostAnnotations, type CostCategory, type CoverageMatrix, DEFAULT_SUMMARY_PROMPT, type DependencyEdge, type DependencyGraph, type DependencyNode, type ElementTarget, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlannedAction, type PlannedActionResult, type PlannedActionType, type PlaywrightExecutionMode, type PromptStep, type QualityFinding, type QualityFindingCategory, type QualityFindingSeverity, type QualityReport, type RetryPolicy, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StageInput, type StageOutput, type StepCost, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeAction, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationCategory, type VerificationCategoryKind, type VerificationStep, type WorkflowArchitecture, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };
+export { type ActionPlan, type ActionPlanExecuteRequest, type ActionPlanResult, type AgenticStep, type ApiAssertion, type ApiContentType, type ApiVariableExtraction, type BaseStep, type BaseStepFields, type CanonicalStep, type CheckType, type CommandMode, type CommandStep, type CompletionStep, type CompositionTemplate, type CostAnnotations, type CostCategory, type CoverageMatrix, DEFAULT_SUMMARY_PROMPT, type DependencyEdge, type DependencyGraph, type DependencyNode, type ElementTarget, type HealthCheckUrl, type HttpMethod, type LogSourceSelection, type ModelOverrideConfig, type ModelOverrides, type MultiStepTemplate, PHASE_INFO, type PlannedAction, type PlannedActionResult, type PlannedActionType, type PlaywrightExecutionMode, type PromptStep, type QualityFinding, type QualityFindingCategory, type QualityFindingSeverity, type QualityReport, type RetryPolicy, type RetrySpec, type RoutingRule, STEP_TYPES, type SetupStep, type SingleStepTemplate, type SkillAuthor, type SkillCategory, type SkillDefinition, type SkillExport, type SkillExportManifest, type SkillImportResult, type SkillOrigin, type SkillParameter, type SkillParameterOption, type SkillRef, type SkillTemplate, type StageCondition, type StageInput, type StageOutput, type StepCost, type StepTypeInfo, type StepTypeName, type TestType, type UiBridgeAction, type UiBridgeStep, type UnifiedStep, type UnifiedWorkflow, type VerificationCategory, type VerificationCategoryKind, type VerificationStep, type WorkflowArchitecture, type WorkflowExport, type WorkflowExportManifest, type WorkflowFeatures, type WorkflowImportResult, type WorkflowPhase, type WorkflowStage, type WorkflowStep };

@@ -39,12 +39,16 @@ export type { WorkflowStage } from "../generated/WorkflowStage";
 export type { UnifiedWorkflow } from "../generated/UnifiedWorkflow";
 export type { WorkflowArchitecture } from "../generated/WorkflowArchitecture";
 
+export type { BaseStepFields } from "../generated/BaseStepFields";
+export type { RetrySpec } from "../generated/RetrySpec";
+
 // Step DTOs (generated from qontinui-types::workflow_step)
 export type { CommandStep } from "../generated/CommandStep";
 export type { PromptStep } from "../generated/PromptStep";
 export type { UiBridgeStep } from "../generated/UiBridgeStep";
 export type { WorkflowStep } from "../generated/WorkflowStep";
 export type { UnifiedStep } from "../generated/UnifiedStep";
+export type { CanonicalStep } from "../generated/CanonicalStep";
 export type { HttpMethod } from "../generated/HttpMethod";
 export type { ApiContentType } from "../generated/ApiContentType";
 export type { ApiAssertion } from "../generated/ApiAssertion";
@@ -134,24 +138,12 @@ import type { WorkflowStep as _WorkflowStep } from "../generated/WorkflowStep";
 /**
  * Shared-fields subset carried by every canonical step variant.
  *
- * Kept as a hand-authored alias so downstream code can still reference
- * `BaseStep` by name. Fields mirror `qontinui-types::workflow_step::BaseStepFields`.
+ * Alias for the generated `BaseStepFields` so downstream code can still
+ * reference `BaseStep` by name.  Source of truth:
+ * `qontinui-types::workflow_step::BaseStepFields`.
  */
-export interface BaseStep {
-  id: string;
-  name: string;
-  fail_on_console_errors?: boolean;
-  inputs?: Record<string, string>;
-  extract?: Record<string, string>;
-  depends_on?: string[];
-  required?: boolean;
-  retry?: { count: number; delay_ms: number };
-  skill_origin?: import("./skill").SkillOrigin;
-  /** Acceptance criterion IDs this step verifies (supports multiple) */
-  criterion_ids?: string[];
-  /** Verification depth category for this step */
-  verification_category?: VerificationCategory;
-}
+import type { BaseStepFields as _BaseStepFields } from "../generated/BaseStepFields";
+export type BaseStep = _BaseStepFields;
 
 // =============================================================================
 // Step Type Names
@@ -174,12 +166,11 @@ export type CompletionStep = _CommandStep | _PromptStep | _UiBridgeStep | _Workf
 // Verification Categories
 // =============================================================================
 
-export type VerificationCategory =
-  | "existence"
-  | "uniqueness"
-  | "referential_integrity"
-  | "semantic_correctness"
-  | "runtime_behavior";
+// Alias for the generated `VerificationCategoryKind` union.  Source of truth:
+// `qontinui-types::workflow_step::VerificationCategoryKind`.  `VerificationCategoryKind`
+// itself is re-exported earlier in this file.
+import type { VerificationCategoryKind as _VerificationCategoryKind } from "../generated/VerificationCategoryKind";
+export type VerificationCategory = _VerificationCategoryKind;
 
 // =============================================================================
 // Dependency Graph
