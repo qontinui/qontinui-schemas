@@ -6,6 +6,7 @@ export { AccentColor, AccentColorClasses, ActionColorClasses, ActionColorType, B
 export { AiMessage, AiSessionState } from './chat.cjs';
 export { ActiveStatesResult, AvailableTransitionsResult, DiscoveryStrategy, DomainKnowledge, InitialStatesSource, NavigationResult, PathfindingRequest, PathfindingResult, PathfindingStep, ResolvedInitialStates, ResolvedInitialStatesResult, StandardActionType, StateMachineConfig, StateMachineConfigCreate, StateMachineConfigFull, StateMachineConfigUpdate, StateMachineExportFormat, StateMachineState, StateMachineStateCreate, StateMachineStateUpdate, StateMachineTransition, StateMachineTransitionCreate, StateMachineTransitionUpdate, StateNodeData, TransitionAction, TransitionEdgeData, TransitionExecutionResult, TransitionInfo } from './state-machine.cjs';
 export { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse } from './constraints.cjs';
+export { CoordinateSystem, Coordinates, Monitor, MonitorPosition, Region, VirtualDesktop } from './geometry.cjs';
 
 /**
  * Shared Render Log Types

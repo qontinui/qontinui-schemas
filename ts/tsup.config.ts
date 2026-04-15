@@ -11,6 +11,8 @@ export default defineConfig({
     chat: "src/chat/index.ts",
     "state-machine": "src/state-machine/index.ts",
     constraints: "src/constraints/index.ts",
+    geometry: "src/geometry/index.ts",
+    "tree-events": "src/tree-events/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

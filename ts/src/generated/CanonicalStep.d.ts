@@ -41,6 +41,9 @@ import type { WorkflowStepPhase } from './WorkflowStepPhase';
  * `log_watch`, and others dispatched by the runner but absent from the
  * wire-contract surface) should use [`UnifiedStep`], which preserves
  * unknown payloads verbatim as `serde_json::Value`.
+ *
+ * Variant sizes are similar (~200–672 bytes each); the asymmetry reflects
+ * real differences in step-field cardinality and doesn't warrant boxing.
  */
 export type CanonicalStep =
   | (CommandStep & {

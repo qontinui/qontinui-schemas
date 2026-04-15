@@ -40,6 +40,15 @@ import type { WorkflowStepPhase } from './WorkflowStepPhase';
  * emit a `{"type":"gate", ...}` step and a consumer using [`UnifiedStep`]
  * will round-trip it losslessly even though `gate` is not in the canonical
  * set.
+ *
+ * ## Layout note (`#[allow(large_enum_variant)]`)
+ *
+ * `Canonical` carries a [`CanonicalStep`] (~672 bytes) while `Other` carries
+ * a [`serde_json::Value`] (~32 bytes). The size asymmetry is intentional and
+ * the enum is not held in bulk by any hot path today — `UnifiedWorkflow.*_steps`
+ * remains `Vec<serde_json::Value>`. Boxing `Canonical` would save stack space
+ * in hypothetical dense `Vec<UnifiedStep>` consumers at the cost of an extra
+ * heap allocation per step everywhere else and noisier pattern-matching.
  */
 export type UnifiedStep =
   | CanonicalStep

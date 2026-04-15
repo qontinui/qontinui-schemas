@@ -974,6 +974,9 @@ interface WorkflowStep {
  * `log_watch`, and others dispatched by the runner but absent from the
  * wire-contract surface) should use [`UnifiedStep`], which preserves
  * unknown payloads verbatim as `serde_json::Value`.
+ *
+ * Variant sizes are similar (~200–672 bytes each); the asymmetry reflects
+ * real differences in step-field cardinality and doesn't warrant boxing.
  */
 type CanonicalStep =
   | (CommandStep & {
@@ -1013,6 +1016,15 @@ type CanonicalStep =
  * emit a `{"type":"gate", ...}` step and a consumer using [`UnifiedStep`]
  * will round-trip it losslessly even though `gate` is not in the canonical
  * set.
+ *
+ * ## Layout note (`#[allow(large_enum_variant)]`)
+ *
+ * `Canonical` carries a [`CanonicalStep`] (~672 bytes) while `Other` carries
+ * a [`serde_json::Value`] (~32 bytes). The size asymmetry is intentional and
+ * the enum is not held in bulk by any hot path today — `UnifiedWorkflow.*_steps`
+ * remains `Vec<serde_json::Value>`. Boxing `Canonical` would save stack space
+ * in hypothetical dense `Vec<UnifiedStep>` consumers at the cost of an extra
+ * heap allocation per step everywhere else and noisier pattern-matching.
  */
 type UnifiedStep =
   | CanonicalStep

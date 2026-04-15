@@ -80,6 +80,12 @@ import type { WorkflowStepPhase } from './WorkflowStepPhase';
  * | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
  * | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
  * | `DagLoop` | `"dag_loop"` | `dag_nodes::DagLoopHandler` |
+ *
+ * Variant sizes range ~200–672 bytes depending on each step struct's field
+ * cardinality. `#[allow(large_enum_variant)]` because the sizes reflect real
+ * step shapes; boxing would add heap indirection on every deserialize and
+ * dispatch without meaningful savings — no hot path holds dense
+ * `Vec<FullRunnerStep>` in memory.
  */
 export type FullRunnerStep =
   | (CommandStep & {

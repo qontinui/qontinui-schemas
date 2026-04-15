@@ -41,3 +41,12 @@ export * from "./state-machine/_api";
 
 // Constraint Engine types
 export * from "./constraints/_api";
+
+// Geometry types (screen coordinates, regions, monitors) — see
+// `@qontinui/shared-types/geometry` subpath export.
+export * from "./geometry/_api";
+
+// Tree event types (execution logging) are NOT re-exported here because
+// `tree_events.ActionType` collides with `execution.ActionType` (different
+// enums, same name). Consumers should import from the subpath:
+//   import { TreeEvent, ActionType } from "@qontinui/shared-types/tree-events";

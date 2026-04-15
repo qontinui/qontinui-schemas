@@ -41,6 +41,16 @@
       "types": "./ts/dist/chat.d.ts",
       "import": "./ts/dist/chat.js",
       "require": "./ts/dist/chat.cjs"
+    },
+    "./geometry": {
+      "types": "./ts/dist/geometry.d.ts",
+      "import": "./ts/dist/geometry.js",
+      "require": "./ts/dist/geometry.cjs"
+    },
+    "./tree-events": {
+      "types": "./ts/dist/tree-events.d.ts",
+      "import": "./ts/dist/tree-events.js",
+      "require": "./ts/dist/tree-events.cjs"
     }
   },
   "files": [
