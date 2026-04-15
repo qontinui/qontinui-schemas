@@ -58,7 +58,7 @@ fn hashmap_is_empty<K, V>(m: &HashMap<K, V>) -> bool {
     m.is_empty()
 }
 
-fn vec_is_empty<T>(v: &Vec<T>) -> bool {
+fn vec_is_empty<T>(v: &[T]) -> bool {
     v.is_empty()
 }
 
@@ -272,69 +272,49 @@ pub struct BaseStepFields {
 // ============================================================================
 
 /// Phases in which a [`CommandStep`] may appear.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandStepPhase {
+    #[default]
     Setup,
     Verification,
     Completion,
 }
 
-impl Default for CommandStepPhase {
-    fn default() -> Self {
-        Self::Setup
-    }
-}
-
 /// Phases in which a [`PromptStep`] may appear.
 ///
 /// Prompt steps are the only variant that may appear in the agentic phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PromptStepPhase {
+    #[default]
     Setup,
     Verification,
     Agentic,
     Completion,
 }
 
-impl Default for PromptStepPhase {
-    fn default() -> Self {
-        Self::Setup
-    }
-}
-
 /// Phases in which a [`UiBridgeStep`] may appear.
 ///
 /// UI-bridge interactions only run in deterministic phases — never inside
 /// the agentic loop (where the AI drives steps directly via prompts).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UiBridgeStepPhase {
+    #[default]
     Setup,
     Verification,
     Completion,
-}
-
-impl Default for UiBridgeStepPhase {
-    fn default() -> Self {
-        Self::Setup
-    }
 }
 
 /// Phases in which a [`WorkflowStep`] may appear.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowStepPhase {
+    #[default]
     Setup,
     Verification,
     Completion,
-}
-
-impl Default for WorkflowStepPhase {
-    fn default() -> Self {
-        Self::Setup
-    }
 }
 
 // ============================================================================
@@ -473,9 +453,10 @@ pub struct PromptStep {
 // ============================================================================
 
 /// UI Bridge action kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UiBridgeAction {
+    #[default]
     Navigate,
     Execute,
     Assert,
@@ -483,12 +464,6 @@ pub enum UiBridgeAction {
     Compare,
     SnapshotAssert,
     ActionPlan,
-}
-
-impl Default for UiBridgeAction {
-    fn default() -> Self {
-        Self::Navigate
-    }
 }
 
 /// Kinds of assertion supported by `assert` actions.
@@ -606,8 +581,12 @@ pub struct WorkflowStep {
 /// `log_watch`, and others dispatched by the runner but absent from the
 /// wire-contract surface) should use [`UnifiedStep`], which preserves
 /// unknown payloads verbatim as `serde_json::Value`.
+///
+/// Variant sizes are similar (~200–672 bytes each); the asymmetry reflects
+/// real differences in step-field cardinality and doesn't warrant boxing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum CanonicalStep {
     Command(CommandStep),
     Prompt(PromptStep),
@@ -633,8 +612,18 @@ pub enum CanonicalStep {
 /// emit a `{"type":"gate", ...}` step and a consumer using [`UnifiedStep`]
 /// will round-trip it losslessly even though `gate` is not in the canonical
 /// set.
+///
+/// ## Layout note (`#[allow(large_enum_variant)]`)
+///
+/// `Canonical` carries a [`CanonicalStep`] (~672 bytes) while `Other` carries
+/// a [`serde_json::Value`] (~32 bytes). The size asymmetry is intentional and
+/// the enum is not held in bulk by any hot path today — `UnifiedWorkflow.*_steps`
+/// remains `Vec<serde_json::Value>`. Boxing `Canonical` would save stack space
+/// in hypothetical dense `Vec<UnifiedStep>` consumers at the cost of an extra
+/// heap allocation per step everywhere else and noisier pattern-matching.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum UnifiedStep {
     /// One of the four canonical step variants (command / prompt / ui_bridge / workflow).
     Canonical(CanonicalStep),
@@ -736,21 +725,16 @@ pub struct ExecutePlaybookStep {
 // ── NativeAccessibilityStep ──────────────────────────────────────────────────
 
 /// Accessibility action kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum A11yAction {
+    #[default]
     Capture,
     Click,
     Type,
     Focus,
     Query,
     AiContext,
-}
-
-impl Default for A11yAction {
-    fn default() -> Self {
-        Self::Capture
-    }
 }
 
 /// Interact with native UI elements via the accessibility layer (UIA/AT-SPI/AX).
@@ -841,18 +825,13 @@ pub struct SaveWorkflowArtifactStep {
 // ── WorkflowFixupStep ────────────────────────────────────────────────────────
 
 /// Fixup mode for [`WorkflowFixupStep`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowFixupMode {
+    #[default]
     Autofix,
     Harden,
     ValidateCriteria,
-}
-
-impl Default for WorkflowFixupMode {
-    fn default() -> Self {
-        Self::Autofix
-    }
 }
 
 /// Run deterministic Rust fixups on a workflow JSON file.
@@ -890,18 +869,13 @@ pub struct UiBridgeDesignAuditStep {
 // ── UiBridgeVisualAssertionStep ──────────────────────────────────────────────
 
 /// Visual assertion type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VisualAssertionType {
+    #[default]
     Text,
     Screenshot,
     Highlight,
-}
-
-impl Default for VisualAssertionType {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 /// Assert visual properties of UI elements via the UI Bridge.
@@ -1046,8 +1020,15 @@ pub struct DagLoopStep {
 /// | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
 /// | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
 /// | `DagLoop` | `"dag_loop"` | `dag_nodes::DagLoopHandler` |
+///
+/// Variant sizes range ~200–672 bytes depending on each step struct's field
+/// cardinality. `#[allow(large_enum_variant)]` because the sizes reflect real
+/// step shapes; boxing would add heap indirection on every deserialize and
+/// dispatch without meaningful savings — no hot path holds dense
+/// `Vec<FullRunnerStep>` in memory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum FullRunnerStep {
     // ── 4 canonical variants (field structs reused from CanonicalStep) ──
     Command(CommandStep),
