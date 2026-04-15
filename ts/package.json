@@ -72,9 +72,10 @@
   "author": "Joshua Spinak",
   "license": "MIT",
   "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4",
+    "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.3.0",
-    "rimraf": "^5.0.0"
+    "typescript": "^5.3.0"
   },
   "publishConfig": {
     "access": "public"

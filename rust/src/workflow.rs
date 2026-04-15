@@ -25,6 +25,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::workflow_step::UnifiedStep;
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -403,15 +405,19 @@ pub struct WorkflowStage {
     pub description: String,
     /// Setup phase steps for this stage (polymorphic; see module docs).
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub setup_steps: Vec<Value>,
     /// Verification phase steps for this stage.
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub verification_steps: Vec<Value>,
     /// Agentic phase steps for this stage.
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub agentic_steps: Vec<Value>,
     /// Completion phase steps for this stage.
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub completion_steps: Vec<Value>,
     /// Maximum iterations for this stage's verification-agentic loop.
     ///
@@ -484,16 +490,20 @@ pub struct UnifiedWorkflow {
 
     /// Setup phase steps (polymorphic JSON array; see module docs).
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub setup_steps: Vec<Value>,
     /// Verification phase steps (polymorphic JSON array).
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub verification_steps: Vec<Value>,
     /// Agentic phase steps (polymorphic JSON array).
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub agentic_steps: Vec<Value>,
     /// Completion phase steps (polymorphic JSON array) — runs once after the
     /// verification loop exits.
     #[serde(default)]
+    #[schemars(with = "Vec<UnifiedStep>")]
     pub completion_steps: Vec<Value>,
 
     /// Maximum iterations for the agentic phase.

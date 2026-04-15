@@ -54,5 +54,8 @@
     "clean": "cd ts && npm run clean"
   },
   "author": "Joshua Spinak",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0"
+  }
 }
