@@ -228,7 +228,7 @@ pub struct RetrySpec {
 ///
 /// Flattened into each step struct via `#[serde(flatten)]` so the wire shape
 /// stays flat (no nested `"base": { … }` envelope).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct BaseStepFields {
     /// Unique identifier for the step.
     pub id: String,
@@ -355,7 +355,7 @@ pub enum CommandMode {
 ///
 /// A single variant covers all command-like steps; the specific sub-kind is
 /// carried by [`CommandMode`] and the matching `*_id` / `*_type` fields.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CommandStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
@@ -446,7 +446,7 @@ pub struct CommandStep {
 // ============================================================================
 
 /// AI task instructions (prompt).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PromptStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
@@ -522,7 +522,7 @@ pub enum UiBridgeSeverity {
 }
 
 /// UI Bridge SDK interaction — navigate, execute, assert, snapshot, compare.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct UiBridgeStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
@@ -574,7 +574,7 @@ pub struct UiBridgeStep {
 // ============================================================================
 
 /// Run a saved workflow inline (composition).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct WorkflowStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
@@ -682,5 +682,801 @@ impl UnifiedStep {
             Self::Canonical(CanonicalStep::Workflow(_)) => Some("workflow"),
             Self::Other(v) => v.get("type").and_then(|t| t.as_str()),
         }
+    }
+}
+
+// ============================================================================
+// Additional runner-specific step variant structs
+// (not in the canonical 4, but registered in HandlerRegistry)
+// ============================================================================
+
+// ── CodeExecutionStep ────────────────────────────────────────────────────────
+
+/// Execute inline Python code or a Python file in an optional sandbox.
+///
+/// Wire tag: `"code_execution"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CodeExecutionStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Inline Python source code to execute.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// Path to a Python file to execute.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_file: Option<String>,
+    /// Sandbox mode: `"enforce"` (default) or `"warn"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox_mode: Option<String>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── ExecutePlaybookStep ──────────────────────────────────────────────────────
+
+/// Drive a state machine through recorded transitions from a playbook.
+///
+/// Wire tag: `"execute_playbook"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutePlaybookStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Playbook markdown content (inline).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Path to a playbook file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub playbook_path: Option<String>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── NativeAccessibilityStep ──────────────────────────────────────────────────
+
+/// Accessibility action kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum A11yAction {
+    Capture,
+    Click,
+    Type,
+    Focus,
+    Query,
+    AiContext,
+}
+
+impl Default for A11yAction {
+    fn default() -> Self {
+        Self::Capture
+    }
+}
+
+/// Interact with native UI elements via the accessibility layer (UIA/AT-SPI/AX).
+///
+/// Wire tag: `"native_accessibility"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct NativeAccessibilityStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Action to perform.
+    #[serde(default)]
+    pub action: A11yAction,
+    /// Connection target: `"Desktop"`, window title, or `"pid:1234"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// Element ref ID for click/type/focus (e.g. `"@e3"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_id: Option<String>,
+    /// Text to type (for `type` action).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// Whether to clear existing text before typing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clear_first: Option<bool>,
+    /// Role filter for `query` action (e.g. `"button"`, `"textbox"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_role: Option<String>,
+    /// Label filter for `query` action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_label: Option<String>,
+    /// Only include interactive elements (for `query` and `ai_context`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interactive_only: Option<bool>,
+    /// Maximum elements for `ai_context` action (default: 50).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_elements: Option<u32>,
+    /// Include hidden elements in `capture`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_hidden: Option<bool>,
+    /// Maximum tree depth for `capture`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_depth: Option<u32>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── RestartProcessStep ───────────────────────────────────────────────────────
+
+/// Restart a managed process by ID or name.
+///
+/// Wire tag: `"restart_process"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RestartProcessStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Process config ID to restart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart_process_id: Option<String>,
+    /// Process name to restart (resolved to ID at runtime).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart_process_name: Option<String>,
+    /// Whether to wait for health port after restart (default: `true`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart_wait_for_health: Option<bool>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── SaveWorkflowArtifactStep ─────────────────────────────────────────────────
+
+/// Read a generated workflow JSON file and save it to the database.
+///
+/// Wire tag: `"save_workflow_artifact"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SaveWorkflowArtifactStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Path to the workflow JSON file to save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_input_path: Option<String>,
+    /// When `true`, also creates a `PipelineArtifact` from the artifact directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_capture_prompts: Option<bool>,
+}
+
+// ── WorkflowFixupStep ────────────────────────────────────────────────────────
+
+/// Fixup mode for [`WorkflowFixupStep`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowFixupMode {
+    Autofix,
+    Harden,
+    ValidateCriteria,
+}
+
+impl Default for WorkflowFixupMode {
+    fn default() -> Self {
+        Self::Autofix
+    }
+}
+
+/// Run deterministic Rust fixups on a workflow JSON file.
+///
+/// Wire tag: `"workflow_fixup"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WorkflowFixupStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Path to the workflow JSON file to fix (supports `{{artifact_dir}}`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixup_input_path: Option<String>,
+    /// Fixup mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixup_mode: Option<WorkflowFixupMode>,
+    /// Path to criteria JSON file (for `validate_criteria` mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixup_criteria_path: Option<String>,
+}
+
+// ── UiBridgeDesignAuditStep ──────────────────────────────────────────────────
+
+/// Run a UI Bridge design-audit check (contrast, accessibility, select visibility).
+///
+/// Wire tag: `"ui_bridge_design_audit"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct UiBridgeDesignAuditStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── UiBridgeVisualAssertionStep ──────────────────────────────────────────────
+
+/// Visual assertion type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualAssertionType {
+    Text,
+    Screenshot,
+    Highlight,
+}
+
+impl Default for VisualAssertionType {
+    fn default() -> Self {
+        Self::Text
+    }
+}
+
+/// Assert visual properties of UI elements via the UI Bridge.
+///
+/// Wire tag: `"ui_bridge_visual_assertion"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct UiBridgeVisualAssertionStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_assertion_type: Option<VisualAssertionType>,
+    /// Element query JSON for text assertions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_assertion_query: Option<serde_json::Value>,
+    /// Expected text (for text assertion) or element ID (for screenshot/highlight).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_assertion_expected: Option<String>,
+    /// Options JSON for the assertion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_assertion_options: Option<serde_json::Value>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── WorkflowRefStep ──────────────────────────────────────────────────────────
+
+/// Run a saved workflow inline with input variable substitution.
+///
+/// Wire tag: `"workflow_ref"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WorkflowRefStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// ID of the saved workflow to run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_id: Option<String>,
+    /// Display name of the referenced workflow (denormalized for UI).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_workflow_name: Option<String>,
+    /// Input variables substituted into the child workflow's prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_workflow_inputs: Option<HashMap<String, String>>,
+    /// Whether to inherit model overrides from the parent context (default: `true`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_inherit_model_overrides: Option<bool>,
+    /// Timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── DagCancelStep ────────────────────────────────────────────────────────────
+
+/// DAG cancel node — terminates the workflow run with a cancellation reason.
+///
+/// Wire tag: `"dag_cancel"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct DagCancelStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Cancellation reason message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancel_reason: Option<String>,
+}
+
+// ── DagApprovalStep ──────────────────────────────────────────────────────────
+
+/// DAG approval gate — pauses and waits for human approval before continuing.
+///
+/// Wire tag: `"dag_approval"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct DagApprovalStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Prompt shown to the approver.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_prompt: Option<String>,
+    /// Timeout in seconds before auto-approving (to prevent permanent block).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+// ── DagLoopStep ──────────────────────────────────────────────────────────────
+
+/// DAG loop node — repeats a set of steps up to a maximum iteration count.
+///
+/// Wire tag: `"dag_loop"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct DagLoopStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Maximum number of loop iterations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_iterations: Option<u32>,
+    /// Condition to evaluate each iteration (JSON expression or step ID).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loop_condition: Option<String>,
+}
+
+// ============================================================================
+// FullRunnerStep — all 16 handler-registered step variants, internally tagged
+// ============================================================================
+
+/// Fully typed discriminated union over **all** step variants registered in
+/// the runner's `HandlerRegistry`.
+///
+/// ## Wire format
+///
+/// Internally tagged with `"type"`, matching existing JSON on the wire:
+/// ```json
+/// {"type": "command", "mode": "shell", "command": "cargo build", ...}
+/// {"type": "prompt", "phase": "agentic", "content": "..."}
+/// {"type": "ui_bridge", "action": "navigate", "url": "..."}
+/// {"type": "code_execution", "code": "print('hello')"}
+/// ```
+///
+/// ## Step arrays remain `Vec<serde_json::Value>`
+///
+/// `UnifiedWorkflow.setup_steps` / `.verification_steps` / `.agentic_steps` /
+/// `.completion_steps` stay as `Vec<serde_json::Value>` until the Session 2
+/// migration lands. `FullRunnerStep` is available for typed access but is not
+/// yet threaded into the workflow frame fields.
+///
+/// ## Variant coverage
+///
+/// | Variant | Wire tag | Handler |
+/// |---------|----------|---------|
+/// | `Command` | `"command"` | `CommandHandler` (sub-modes: shell/check/check_group/test) |
+/// | `Prompt` | `"prompt"` | `PromptStepHandler` |
+/// | `UiBridge` | `"ui_bridge"` | `UiBridgeHandler` (actions: navigate/execute/assert/snapshot/compare/snapshot_assert/action_plan) |
+/// | `Workflow` | `"workflow"` | `WorkflowStepHandler` |
+/// | `CodeExecution` | `"code_execution"` | `CodeExecutionHandler` |
+/// | `ExecutePlaybook` | `"execute_playbook"` | `ExecutePlaybookHandler` |
+/// | `NativeAccessibility` | `"native_accessibility"` | `NativeAccessibilityHandler` |
+/// | `RestartProcess` | `"restart_process"` | `RestartProcessHandler` |
+/// | `SaveWorkflowArtifact` | `"save_workflow_artifact"` | `SaveWorkflowArtifactHandler` |
+/// | `WorkflowFixup` | `"workflow_fixup"` | `WorkflowFixupHandler` |
+/// | `UiBridgeDesignAudit` | `"ui_bridge_design_audit"` | `UiBridgeDesignAuditHandler` |
+/// | `UiBridgeVisualAssertion` | `"ui_bridge_visual_assertion"` | `UiBridgeVisualAssertionHandler` |
+/// | `WorkflowRef` | `"workflow_ref"` | `WorkflowRefHandler` |
+/// | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
+/// | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
+/// | `DagLoop` | `"dag_loop"` | `dag_nodes::DagLoopHandler` |
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FullRunnerStep {
+    // ── 4 canonical variants (field structs reused from CanonicalStep) ──
+    Command(CommandStep),
+    Prompt(PromptStep),
+    UiBridge(UiBridgeStep),
+    Workflow(WorkflowStep),
+    // ── 12 runner-specific variants ──
+    CodeExecution(CodeExecutionStep),
+    ExecutePlaybook(ExecutePlaybookStep),
+    NativeAccessibility(NativeAccessibilityStep),
+    RestartProcess(RestartProcessStep),
+    SaveWorkflowArtifact(SaveWorkflowArtifactStep),
+    WorkflowFixup(WorkflowFixupStep),
+    UiBridgeDesignAudit(UiBridgeDesignAuditStep),
+    UiBridgeVisualAssertion(UiBridgeVisualAssertionStep),
+    WorkflowRef(WorkflowRefStep),
+    DagCancel(DagCancelStep),
+    DagApproval(DagApprovalStep),
+    DagLoop(DagLoopStep),
+}
+
+impl FullRunnerStep {
+    /// Return the wire `"type"` discriminator for this step variant.
+    pub fn step_type(&self) -> &'static str {
+        match self {
+            Self::Command(_) => "command",
+            Self::Prompt(_) => "prompt",
+            Self::UiBridge(_) => "ui_bridge",
+            Self::Workflow(_) => "workflow",
+            Self::CodeExecution(_) => "code_execution",
+            Self::ExecutePlaybook(_) => "execute_playbook",
+            Self::NativeAccessibility(_) => "native_accessibility",
+            Self::RestartProcess(_) => "restart_process",
+            Self::SaveWorkflowArtifact(_) => "save_workflow_artifact",
+            Self::WorkflowFixup(_) => "workflow_fixup",
+            Self::UiBridgeDesignAudit(_) => "ui_bridge_design_audit",
+            Self::UiBridgeVisualAssertion(_) => "ui_bridge_visual_assertion",
+            Self::WorkflowRef(_) => "workflow_ref",
+            Self::DagCancel(_) => "dag_cancel",
+            Self::DagApproval(_) => "dag_approval",
+            Self::DagLoop(_) => "dag_loop",
+        }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{json, Value};
+
+    // ─── helpers ─────────────────────────────────────────────────────────────
+
+    fn base(id: &str, name: &str) -> BaseStepFields {
+        BaseStepFields {
+            id: id.to_string(),
+            name: name.to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn roundtrip<T>(value: &T) -> T
+    where
+        T: Serialize + for<'de> Deserialize<'de>,
+    {
+        let json = serde_json::to_string(value).expect("serialize");
+        serde_json::from_str(&json).expect("deserialize")
+    }
+
+    fn assert_type_tag(json: &Value, expected: &str) {
+        assert_eq!(
+            json.get("type").and_then(|t| t.as_str()),
+            Some(expected),
+            "expected type tag {:?}, got: {}",
+            expected,
+            json
+        );
+    }
+
+    // ─── FullRunnerStep round-trips ───────────────────────────────────────────
+
+    #[test]
+    fn command_step_round_trip() {
+        let step = FullRunnerStep::Command(CommandStep {
+            base: base("s1", "Build"),
+            phase: CommandStepPhase::Setup,
+            mode: Some(CommandMode::Shell),
+            command: Some("cargo build".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "command");
+        assert_eq!(json["mode"], "shell");
+        assert_eq!(json["command"], "cargo build");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn prompt_step_round_trip() {
+        let step = FullRunnerStep::Prompt(PromptStep {
+            base: base("p1", "Agentic Task"),
+            phase: PromptStepPhase::Agentic,
+            content: "Fix the failing tests.".into(),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "prompt");
+        assert_eq!(json["phase"], "agentic");
+        assert_eq!(json["content"], "Fix the failing tests.");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn ui_bridge_step_round_trip() {
+        let step = FullRunnerStep::UiBridge(UiBridgeStep {
+            base: base("u1", "Navigate"),
+            phase: UiBridgeStepPhase::Setup,
+            action: UiBridgeAction::Navigate,
+            url: Some("http://localhost:3000".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "ui_bridge");
+        assert_eq!(json["action"], "navigate");
+        assert_eq!(json["url"], "http://localhost:3000");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn workflow_step_round_trip() {
+        let step = FullRunnerStep::Workflow(WorkflowStep {
+            base: base("w1", "Inner Workflow"),
+            phase: WorkflowStepPhase::Setup,
+            workflow_id: "wf-uuid-123".into(),
+            workflow_name: "My Workflow".into(),
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "workflow");
+        assert_eq!(json["workflow_id"], "wf-uuid-123");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn code_execution_step_round_trip() {
+        let step = FullRunnerStep::CodeExecution(CodeExecutionStep {
+            base: base("ce1", "Run Script"),
+            code: Some("print('hello')".into()),
+            sandbox_mode: Some("enforce".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "code_execution");
+        assert_eq!(json["code"], "print('hello')");
+        assert_eq!(json["sandbox_mode"], "enforce");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn execute_playbook_step_round_trip() {
+        let step = FullRunnerStep::ExecutePlaybook(ExecutePlaybookStep {
+            base: base("ep1", "Drive State Machine"),
+            playbook_path: Some("/artifacts/playbook.md".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "execute_playbook");
+        assert_eq!(json["playbook_path"], "/artifacts/playbook.md");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn native_accessibility_step_round_trip() {
+        let step = FullRunnerStep::NativeAccessibility(NativeAccessibilityStep {
+            base: base("na1", "Click Button"),
+            action: A11yAction::Click,
+            target: Some("Desktop".into()),
+            ref_id: Some("@e5".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "native_accessibility");
+        assert_eq!(json["action"], "click");
+        assert_eq!(json["ref_id"], "@e5");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn restart_process_step_round_trip() {
+        let step = FullRunnerStep::RestartProcess(RestartProcessStep {
+            base: base("rp1", "Restart Backend"),
+            restart_process_name: Some("backend".into()),
+            restart_wait_for_health: Some(true),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "restart_process");
+        assert_eq!(json["restart_process_name"], "backend");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn save_workflow_artifact_step_round_trip() {
+        let step = FullRunnerStep::SaveWorkflowArtifact(SaveWorkflowArtifactStep {
+            base: base("swa1", "Save Generated Workflow"),
+            artifact_input_path: Some("{{artifact_dir}}/workflow.json".into()),
+            artifact_capture_prompts: Some(true),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "save_workflow_artifact");
+        assert_eq!(json["artifact_input_path"], "{{artifact_dir}}/workflow.json");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn workflow_fixup_step_round_trip() {
+        let step = FullRunnerStep::WorkflowFixup(WorkflowFixupStep {
+            base: base("wf1", "Auto-fix Workflow"),
+            fixup_input_path: Some("{{artifact_dir}}/workflow.json".into()),
+            fixup_mode: Some(WorkflowFixupMode::Harden),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "workflow_fixup");
+        assert_eq!(json["fixup_mode"], "harden");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn ui_bridge_design_audit_step_round_trip() {
+        let step = FullRunnerStep::UiBridgeDesignAudit(UiBridgeDesignAuditStep {
+            base: base("da1", "Design Audit"),
+            timeout_seconds: Some(30),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "ui_bridge_design_audit");
+        assert_eq!(json["timeout_seconds"], 30);
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn ui_bridge_visual_assertion_step_round_trip() {
+        let step = FullRunnerStep::UiBridgeVisualAssertion(UiBridgeVisualAssertionStep {
+            base: base("va1", "Assert Button Text"),
+            visual_assertion_type: Some(VisualAssertionType::Text),
+            visual_assertion_expected: Some("Submit".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "ui_bridge_visual_assertion");
+        assert_eq!(json["visual_assertion_type"], "text");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn workflow_ref_step_round_trip() {
+        let step = FullRunnerStep::WorkflowRef(WorkflowRefStep {
+            base: base("wr1", "Call Sub-Workflow"),
+            workflow_id: Some("child-wf-uuid".into()),
+            ref_inherit_model_overrides: Some(true),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "workflow_ref");
+        assert_eq!(json["workflow_id"], "child-wf-uuid");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn dag_cancel_step_round_trip() {
+        let step = FullRunnerStep::DagCancel(DagCancelStep {
+            base: base("dc1", "Cancel on Failure"),
+            cancel_reason: Some("Build failed".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "dag_cancel");
+        assert_eq!(json["cancel_reason"], "Build failed");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn dag_approval_step_round_trip() {
+        let step = FullRunnerStep::DagApproval(DagApprovalStep {
+            base: base("da1", "Approval Gate"),
+            approval_prompt: Some("Approve deployment?".into()),
+            timeout_seconds: Some(3600),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "dag_approval");
+        assert_eq!(json["approval_prompt"], "Approve deployment?");
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn dag_loop_step_round_trip() {
+        let step = FullRunnerStep::DagLoop(DagLoopStep {
+            base: base("dl1", "Retry Loop"),
+            max_iterations: Some(5),
+            loop_condition: Some("not_passing".into()),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "dag_loop");
+        assert_eq!(json["max_iterations"], 5);
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    // ─── Value-bridge tests: real-wire-format JSON → FullRunnerStep ───────────
+
+    #[test]
+    fn value_bridge_command_shell() {
+        let raw = json!({
+            "type": "command",
+            "id": "abc",
+            "name": "Build",
+            "phase": "setup",
+            "mode": "shell",
+            "command": "npm install"
+        });
+        let step: FullRunnerStep = serde_json::from_value(raw.clone()).expect("deserialize");
+        assert_eq!(step.step_type(), "command");
+        let back = serde_json::to_value(&step).unwrap();
+        assert_eq!(back["type"], "command");
+        assert_eq!(back["command"], "npm install");
+    }
+
+    #[test]
+    fn value_bridge_prompt_agentic() {
+        let raw = json!({
+            "type": "prompt",
+            "id": "p1",
+            "name": "Fix Tests",
+            "phase": "agentic",
+            "content": "Please fix the failing tests."
+        });
+        let step: FullRunnerStep = serde_json::from_value(raw).expect("deserialize");
+        assert_eq!(step.step_type(), "prompt");
+    }
+
+    #[test]
+    fn value_bridge_ui_bridge_navigate() {
+        let raw = json!({
+            "type": "ui_bridge",
+            "id": "u1",
+            "name": "Open Dashboard",
+            "phase": "setup",
+            "action": "navigate",
+            "url": "http://localhost:3000/dashboard"
+        });
+        let step: FullRunnerStep = serde_json::from_value(raw).expect("deserialize");
+        assert_eq!(step.step_type(), "ui_bridge");
+    }
+
+    #[test]
+    fn value_bridge_code_execution() {
+        let raw = json!({
+            "type": "code_execution",
+            "id": "ce1",
+            "name": "Setup Data",
+            "code": "import os; print(os.getcwd())"
+        });
+        let step: FullRunnerStep = serde_json::from_value(raw).expect("deserialize");
+        assert_eq!(step.step_type(), "code_execution");
+    }
+
+    #[test]
+    fn value_bridge_dag_approval() {
+        let raw = json!({
+            "type": "dag_approval",
+            "id": "appr1",
+            "name": "Deploy Approval",
+            "approval_prompt": "Ready to deploy to production?"
+        });
+        let step: FullRunnerStep = serde_json::from_value(raw).expect("deserialize");
+        assert_eq!(step.step_type(), "dag_approval");
+    }
+
+    // ─── Negative test: unknown type tag returns an error ─────────────────────
+
+    #[test]
+    fn unknown_type_tag_returns_error() {
+        let raw = json!({
+            "type": "totally_unknown_step_xyz",
+            "id": "x1",
+            "name": "Mystery Step"
+        });
+        let result: Result<FullRunnerStep, _> = serde_json::from_value(raw);
+        assert!(
+            result.is_err(),
+            "Expected error for unknown type tag, got: {:?}",
+            result
+        );
+    }
+
+    // ─── CanonicalStep / UnifiedStep still work (non-regression) ─────────────
+
+    #[test]
+    fn canonical_step_non_regression() {
+        let step = CanonicalStep::Command(CommandStep {
+            base: base("c1", "Check"),
+            phase: CommandStepPhase::Verification,
+            mode: Some(CommandMode::Check),
+            check_type: Some(CheckType::Lint),
+            ..Default::default()
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "command");
+        assert_eq!(json["mode"], "check");
+    }
+
+    #[test]
+    fn unified_step_other_round_trips_verbatim() {
+        let raw = json!({
+            "type": "log_watch",
+            "id": "lw1",
+            "name": "Watch Logs",
+            "custom_field": 42
+        });
+        let step: UnifiedStep = serde_json::from_value(raw.clone()).expect("deserialize");
+        // Should fall through to Other
+        assert!(matches!(&step, UnifiedStep::Other(_)));
+        assert_eq!(step.step_type(), Some("log_watch"));
+        let back = serde_json::to_value(&step).unwrap();
+        assert_eq!(back, raw);
     }
 }
