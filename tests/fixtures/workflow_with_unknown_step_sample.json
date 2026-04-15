@@ -1,0 +1,66 @@
+{
+  "id": "cccccccc-dddd-4eee-8fff-000000000000",
+  "name": "Workflow with unknown step types",
+  "description": "Mixes canonical steps with runner-internal and forward-compatible step types — exercises UnifiedStep::Other fallback.",
+  "category": "general",
+  "tags": [],
+  "setup_steps": [
+    {
+      "type": "command",
+      "id": "setup-build-0001",
+      "name": "Cargo build",
+      "phase": "setup",
+      "mode": "shell",
+      "command": "cargo build --release",
+      "working_directory": "/workspace/runner/src-tauri"
+    },
+    {
+      "type": "state",
+      "id": "setup-state-0002",
+      "name": "Enter idle state",
+      "state_id": "idle",
+      "transition": "initial"
+    }
+  ],
+  "verification_steps": [
+    {
+      "type": "log_watch",
+      "id": "verify-log-0101",
+      "name": "Watch runner stdout for errors",
+      "source": "runner.stdout",
+      "pattern": "ERROR",
+      "max_matches": 0
+    }
+  ],
+  "agentic_steps": [],
+  "completion_steps": [
+    {
+      "type": "future_step_xyz",
+      "id": "complete-future-0301",
+      "name": "Hypothetical future step",
+      "future_param": "experimental",
+      "future_count": 7
+    }
+  ],
+  "max_fix_attempts": 3,
+  "max_ci_auto_resumes": 10,
+  "skip_ai_summary": false,
+  "auto_include_contexts": true,
+  "log_watch_enabled": true,
+  "health_check_enabled": true,
+  "preflight_check_enabled": true,
+  "enable_sweep": false,
+  "max_sweep_iterations": 5,
+  "stop_on_failure": false,
+  "approval_gate": false,
+  "reflection_mode": true,
+  "completion_prompts_first": false,
+  "is_favorite": false,
+  "multi_agent_mode": true,
+  "enforce_token_budget": false,
+  "strict_cwd": false,
+  "use_worktree": false,
+  "ai_reviewed": true,
+  "created_at": "2026-04-12T08:00:00Z",
+  "modified_at": "2026-04-14T09:30:00Z"
+}

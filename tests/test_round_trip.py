@@ -76,3 +76,20 @@ def test_scheduled_task_validates_status_enum() -> None:
     payload["last_run"]["status"] = "NOT_A_REAL_STATUS"
     with pytest.raises(ValidationError):
         ScheduledTask.model_validate(payload)
+
+
+# ── DB round-trip validation ──
+#
+# These mirror the Rust integration tests in `rust/tests/round_trip.rs`. They
+# stand in for DB-persisted workflow rows: the full fixture exercises every
+# FullRunnerStep variant; the unknown-step fixture exercises the `list[Any]`
+# fallback that lets the generated Pydantic model preserve runner-specific and
+# forward-compatible step types verbatim.
+
+
+def test_unified_workflow_full_fixture_roundtrips() -> None:
+    _roundtrip(UnifiedWorkflow, "unified_workflow_full_sample.json")
+
+
+def test_unified_workflow_unknown_step_fixture_roundtrips() -> None:
+    _roundtrip(UnifiedWorkflow, "workflow_with_unknown_step_sample.json")
