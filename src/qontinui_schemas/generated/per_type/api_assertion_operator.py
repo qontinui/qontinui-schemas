@@ -12,8 +12,8 @@ class ApiAssertionOperator(StrEnum):
     Comparison operators supported by API assertions.
     """
 
-    equals = 'equals'
-    contains = 'contains'
-    matches = 'matches'
-    greater_than = 'greater_than'
-    less_than = 'less_than'
+    equals = "equals"
+    contains = "contains"
+    matches = "matches"
+    greater_than = "greater_than"
+    less_than = "less_than"

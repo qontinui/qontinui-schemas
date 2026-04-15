@@ -12,7 +12,7 @@ class UiBridgeSeverity(StrEnum):
     Severity threshold for `compare` / `snapshot_assert` actions.
     """
 
-    critical = 'critical'
-    major = 'major'
-    minor = 'minor'
-    info = 'info'
+    critical = "critical"
+    major = "major"
+    minor = "minor"
+    info = "info"

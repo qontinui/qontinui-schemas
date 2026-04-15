@@ -17,6 +17,6 @@ class ConstraintSeverity(StrEnum):
     - `Log`: Record only, don't affect execution.
     """
 
-    block = 'block'
-    warn = 'warn'
-    log = 'log'
+    block = "block"
+    warn = "warn"
+    log = "log"

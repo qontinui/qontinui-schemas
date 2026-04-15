@@ -12,6 +12,6 @@ class StructuredOverride(BaseModel):
     A criterion override with justification.
     """
 
-    criterion: str = Field(..., description='The criterion being overridden.')
-    justification: str = Field(..., description='Justification for the override.')
-    status: str = Field(..., description='The new status.')
+    criterion: str = Field(..., description="The criterion being overridden.")
+    justification: str = Field(..., description="Justification for the override.")
+    status: str = Field(..., description="The new status.")

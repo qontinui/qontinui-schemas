@@ -18,10 +18,10 @@ class ConstraintCheck1(BaseModel):
 
     file_glob: str | None = Field(
         None,
-        description='Optional glob to limit which modified files are checked.\nDefault: all modified files.',
+        description="Optional glob to limit which modified files are checked.\nDefault: all modified files.",
     )
-    pattern: str = Field(..., description='Regex pattern to search for.')
-    type: Literal['grep_forbidden']
+    pattern: str = Field(..., description="Regex pattern to search for.")
+    type: Literal["grep_forbidden"]
 
 
 class ConstraintCheck2(BaseModel):
@@ -31,10 +31,10 @@ class ConstraintCheck2(BaseModel):
     """
 
     file_glob: str | None = Field(
-        None, description='Optional glob to limit which modified files are checked.'
+        None, description="Optional glob to limit which modified files are checked."
     )
-    pattern: str = Field(..., description='Regex pattern that must be present.')
-    type: Literal['grep_required']
+    pattern: str = Field(..., description="Regex pattern that must be present.")
+    type: Literal["grep_required"]
 
 
 class ConstraintCheck3(BaseModel):
@@ -47,7 +47,7 @@ class ConstraintCheck3(BaseModel):
         [],
         description='Allowed directory prefixes (relative to project root).\ne.g., `["src/", "tests/", "config/"]`.',
     )
-    type: Literal['file_scope']
+    type: Literal["file_scope"]
 
 
 class ConstraintCheck4(BaseModel):
@@ -56,15 +56,15 @@ class ConstraintCheck4(BaseModel):
     Useful for quick compilation checks, linting, etc.
     """
 
-    cmd: str = Field(..., description='The command to run.')
+    cmd: str = Field(..., description="The command to run.")
     cwd: str | None = Field(
         None,
-        description='Working directory (relative to project root). Default: project root.',
+        description="Working directory (relative to project root). Default: project root.",
     )
     timeout_secs: conint(ge=0) | None = Field(
-        30, description='Timeout in seconds. Default: 30.'
+        30, description="Timeout in seconds. Default: 30."
     )
-    type: Literal['command']
+    type: Literal["command"]
 
 
 class ConstraintCheck(
@@ -88,9 +88,9 @@ class ConstraintSeverity(StrEnum):
     - `Log`: Record only, don't affect execution.
     """
 
-    block = 'block'
-    warn = 'warn'
-    log = 'log'
+    block = "block"
+    warn = "warn"
+    log = "log"
 
 
 class Constraint(BaseModel):
@@ -98,19 +98,19 @@ class Constraint(BaseModel):
     A constraint definition.
     """
 
-    check: ConstraintCheck = Field(..., description='What to check.')
+    check: ConstraintCheck = Field(..., description="What to check.")
     description: str = Field(
-        ..., description='Why this constraint exists (shown to the AI on violation).'
+        ..., description="Why this constraint exists (shown to the AI on violation)."
     )
     enabled: bool | None = Field(
-        True, description='Whether this constraint is enabled. Default: true.'
+        True, description="Whether this constraint is enabled. Default: true."
     )
     id: str = Field(
         ...,
         description='Unique identifier (e.g., `"builtin:no-secrets"`, `"project:no-todos"`).',
     )
-    name: str = Field(..., description='Human-readable name.')
-    severity: ConstraintSeverity = Field(..., description='How severe a violation is.')
+    name: str = Field(..., description="Human-readable name.")
+    severity: ConstraintSeverity = Field(..., description="How severe a violation is.")
 
 
 class ValidateConfigResponse(BaseModel):
@@ -120,14 +120,14 @@ class ValidateConfigResponse(BaseModel):
 
     constraints: list[Constraint] | None = Field(
         [],
-        description='Successfully parsed constraints (may be partial if some were skipped).',
+        description="Successfully parsed constraints (may be partial if some were skipped).",
         validate_default=True,
     )
     errors: list[str] | None = Field(
         [],
-        description='Parse errors or non-fatal warnings (e.g., constraints skipped due to bad regex).',
+        description="Parse errors or non-fatal warnings (e.g., constraints skipped due to bad regex).",
     )
     valid: bool = Field(
         ...,
-        description='Whether the config is fully valid (parseable with no errors or warnings).',
+        description="Whether the config is fully valid (parseable with no errors or warnings).",
     )

@@ -19,16 +19,16 @@ class HealthCheckUrl(BaseModel):
     """
 
     expected_status: conint(ge=0, le=65535) | None = Field(
-        200, description='Expected HTTP status code (default: `200`).'
+        200, description="Expected HTTP status code (default: `200`)."
     )
     is_critical: bool | None = Field(
-        True, description='Whether failure should stop the workflow (default: `true`).'
+        True, description="Whether failure should stop the workflow (default: `true`)."
     )
     name: str = Field(
         ..., description='Display name for the health check (e.g., `"Backend Server"`).'
     )
     timeout_seconds: conint(ge=0) | None = Field(
-        30, description='Timeout in seconds (default: `30`).'
+        30, description="Timeout in seconds (default: `30`)."
     )
     url: str = Field(
         ..., description='URL to check (e.g., `"http://localhost:8000/health"`).'
@@ -42,9 +42,9 @@ class LogSourceMode(StrEnum):
     Serialized as a bare lowercase string: `"default"`, `"ai"`, or `"all"`.
     """
 
-    default = 'default'
-    ai = 'ai'
-    all = 'all'
+    default = "default"
+    ai = "ai"
+    all = "all"
 
 
 class LogSourceSelection1(BaseModel):
@@ -52,7 +52,7 @@ class LogSourceSelection1(BaseModel):
     Specific profile selection.
     """
 
-    profile_id: str = Field(..., description='ID of the log-source profile to use.')
+    profile_id: str = Field(..., description="ID of the log-source profile to use.")
 
 
 class LogSourceSelection(RootModel[LogSourceMode | LogSourceSelection1]):
@@ -68,13 +68,13 @@ class RetryPolicy(BaseModel):
     """
 
     backoff: bool | None = Field(
-        False, description='Whether to use exponential backoff.'
+        False, description="Whether to use exponential backoff."
     )
     count: conint(ge=0) | None = Field(
-        0, description='Number of retry attempts (`0` = no retries).'
+        0, description="Number of retry attempts (`0` = no retries)."
     )
     delay_ms: conint(ge=0) | None = Field(
-        2000, description='Delay between retries in milliseconds.'
+        2000, description="Delay between retries in milliseconds."
     )
 
 
@@ -93,14 +93,14 @@ class RoutingRule(BaseModel):
         ..., description='Condition expression, e.g. `"verification_failures >= 2"`.'
     )
     max_tokens: conint(ge=0) | None = Field(
-        None, description='Max tokens override when this rule matches.'
+        None, description="Max tokens override when this rule matches."
     )
-    model: str | None = Field(None, description='Model to use when this rule matches.')
+    model: str | None = Field(None, description="Model to use when this rule matches.")
     provider: str | None = Field(
-        None, description='Provider to use when this rule matches.'
+        None, description="Provider to use when this rule matches."
     )
     temperature: float | None = Field(
-        None, description='Temperature override when this rule matches.'
+        None, description="Temperature override when this rule matches."
     )
 
 
@@ -135,15 +135,15 @@ class StageInput(BaseModel):
 
     from_stage: str | None = Field(
         None,
-        description='Which stage provides this input (stage id). If omitted, searches all\nprior stages.',
+        description="Which stage provides this input (stage id). If omitted, searches all\nprior stages.",
     )
     key: str = Field(
         ...,
-        description='The key to bind this input to (matches a [`StageOutput::key`] from a\nprior stage).',
+        description="The key to bind this input to (matches a [`StageOutput::key`] from a\nprior stage).",
     )
     required: bool | None = Field(
         True,
-        description='Whether this input is required (default: `true`). Missing required\ninputs are Critical findings.',
+        description="Whether this input is required (default: `true`). Missing required\ninputs are Critical findings.",
     )
 
 
@@ -152,7 +152,7 @@ class StageOutput(BaseModel):
     An output declared by a stage, available to subsequent stages.
     """
 
-    description: str | None = Field('', description='Human-readable description.')
+    description: str | None = Field("", description="Human-readable description.")
     key: str = Field(
         ...,
         description='Unique key for this output (e.g. `"api_url"`, `"auth_token"`).',
@@ -169,9 +169,9 @@ class WorkflowArchitecture(StrEnum):
     `crate::agentic_verification`.
     """
 
-    traditional = 'traditional'
-    agentic_verification = 'agentic_verification'
-    multi_agent_pipeline = 'multi_agent_pipeline'
+    traditional = "traditional"
+    agentic_verification = "agentic_verification"
+    multi_agent_pipeline = "multi_agent_pipeline"
 
 
 class ModelOverrideConfig(BaseModel):
@@ -184,23 +184,23 @@ class ModelOverrideConfig(BaseModel):
     """
 
     fallback_model: str | None = Field(
-        None, description='Fallback model if the primary fails with a retryable error.'
+        None, description="Fallback model if the primary fails with a retryable error."
     )
     fallback_provider: str | None = Field(
         None,
-        description='Fallback provider if the primary fails with a retryable error.',
+        description="Fallback provider if the primary fails with a retryable error.",
     )
     max_tokens: conint(ge=0) | None = Field(
-        None, description='Max output tokens override for this phase.'
+        None, description="Max output tokens override for this phase."
     )
-    model: str | None = Field(None, description='Model override for this phase.')
-    provider: str | None = Field(None, description='Provider override for this phase.')
+    model: str | None = Field(None, description="Model override for this phase.")
+    provider: str | None = Field(None, description="Provider override for this phase.")
     routing_rules: list[RoutingRule] | None = Field(
         None,
         description="Conditional routing rules evaluated at runtime. First matching rule\nwins; unmatched falls back to this config's static fields.",
     )
     temperature: float | None = Field(
-        None, description='Temperature override for this phase (`0.0`–`1.0`).'
+        None, description="Temperature override for this phase (`0.0`–`1.0`)."
     )
 
 
@@ -217,59 +217,59 @@ class WorkflowStage(BaseModel):
     """
 
     agentic_steps: list[Any] | None = Field(
-        [], description='Agentic phase steps for this stage.'
+        [], description="Agentic phase steps for this stage."
     )
     approval_gate: bool | None = Field(
         False,
-        description='Whether to pause for human approval after each agentic phase.',
+        description="Whether to pause for human approval after each agentic phase.",
     )
     completion_prompts_first: bool | None = Field(
         False,
-        description='When true, run completion prompt steps BEFORE automation steps.\nDefault (`false`) runs automation first, then prompts.',
+        description="When true, run completion prompt steps BEFORE automation steps.\nDefault (`false`) runs automation first, then prompts.",
     )
     completion_steps: list[Any] | None = Field(
-        [], description='Completion phase steps for this stage.'
+        [], description="Completion phase steps for this stage."
     )
     condition: StageCondition | None = Field(
         None,
-        description='Optional condition for stage execution. When set, the stage is\nevaluated against this condition before running. If the condition is\nnot met, the stage is skipped.',
+        description="Optional condition for stage execution. When set, the stage is\nevaluated against this condition before running. If the condition is\nnot met, the stage is skipped.",
     )
     description: str | None = Field(
-        '', description='Description of what this stage does.'
+        "", description="Description of what this stage does."
     )
-    id: str | None = Field('', description='Unique identifier (UUID v4).')
+    id: str | None = Field("", description="Unique identifier (UUID v4).")
     inputs: list[StageInput] | None = Field(
-        None, description='Inputs required from prior stages.'
+        None, description="Inputs required from prior stages."
     )
     max_iterations: conint(ge=0) | None = Field(
         None,
         description="Maximum iterations for this stage's verification-agentic loop.\n\n`None` (omitted in JSON) means no iteration cap — the loop terminates\non success, explicit stop, or fix-attempt exhaustion.",
     )
-    model: str | None = Field(None, description='Model override for this stage.')
+    model: str | None = Field(None, description="Model override for this stage.")
     model_overrides: dict[str, ModelOverrideConfig] | None = Field(
-        None, description='Per-phase model overrides for this stage.'
+        None, description="Per-phase model overrides for this stage."
     )
-    name: str = Field(..., description='Display name for this stage.')
+    name: str = Field(..., description="Display name for this stage.")
     outputs: list[StageOutput] | None = Field(
         None,
-        description='Declared outputs that this stage produces for downstream stages.',
+        description="Declared outputs that this stage produces for downstream stages.",
     )
     provider: str | None = Field(
-        None, description='AI provider override for this stage.'
+        None, description="AI provider override for this stage."
     )
     retry_policy: RetryPolicy | None = Field(
-        None, description='Retry policy for this stage (overrides per-step defaults).'
+        None, description="Retry policy for this stage (overrides per-step defaults)."
     )
     setup_steps: list[Any] | None = Field(
         [],
-        description='Setup phase steps for this stage (polymorphic; see module docs).',
+        description="Setup phase steps for this stage (polymorphic; see module docs).",
     )
     timeout_seconds: conint(ge=0) | None = Field(
         None,
         description="Optional inactivity timeout in seconds for this stage's AI sessions.",
     )
     verification_steps: list[Any] | None = Field(
-        [], description='Verification phase steps for this stage.'
+        [], description="Verification phase steps for this stage."
     )
 
 
@@ -286,82 +286,82 @@ class UnifiedWorkflow(BaseModel):
 
     acceptance_criteria: Any | None = Field(
         None,
-        description='Acceptance criteria from the specification agent (opaque JSON blob).\n\nUsed by the canvas panel manager to show a live requirements tracker.',
+        description="Acceptance criteria from the specification agent (opaque JSON blob).\n\nUsed by the canvas panel manager to show a live requirements tracker.",
     )
     agentic_steps: list[Any] | None = Field(
-        [], description='Agentic phase steps (polymorphic JSON array).'
+        [], description="Agentic phase steps (polymorphic JSON array)."
     )
     ai_reviewed: bool | None = Field(
         True,
-        description='Whether the AI semantic review actually ran successfully during\ngeneration.\n\nWhen `false`, the workflow passed through the pipeline without AI\nverification (e.g., all verification iterations failed at\ninfrastructure level).',
+        description="Whether the AI semantic review actually ran successfully during\ngeneration.\n\nWhen `false`, the workflow passed through the pipeline without AI\nverification (e.g., all verification iterations failed at\ninfrastructure level).",
     )
     approval_gate: bool | None = Field(
         False,
-        description='Whether to pause for human approval after each agentic phase.',
+        description="Whether to pause for human approval after each agentic phase.",
     )
     auto_include_contexts: bool | None = Field(
         True,
-        description='Whether to auto-include contexts based on task mentions (default:\n`true`).',
+        description="Whether to auto-include contexts based on task mentions (default:\n`true`).",
     )
-    category: str | None = Field('general', description='Category for organization.')
+    category: str | None = Field("general", description="Category for organization.")
     completion_prompts_first: bool | None = Field(
         False,
-        description='When `true`, run completion prompt steps BEFORE automation steps.\n\nUsed by meta-workflows so the AI hardener runs before\n`save_workflow_artifact`. Default (`false`) runs automation first,\nthen prompts.',
+        description="When `true`, run completion prompt steps BEFORE automation steps.\n\nUsed by meta-workflows so the AI hardener runs before\n`save_workflow_artifact`. Default (`false`) runs automation first,\nthen prompts.",
     )
     completion_steps: list[Any] | None = Field(
         [],
-        description='Completion phase steps (polymorphic JSON array) — runs once after the\nverification loop exits.',
+        description="Completion phase steps (polymorphic JSON array) — runs once after the\nverification loop exits.",
     )
     constraint_overrides: dict[str, bool] | None = Field(
         None,
-        description='Per-constraint overrides: map of `constraint_id` to enabled (`true`) /\ndisabled (`false`).\n\nApplied to the constraint engine at execution time, after loading\nbuiltins and config.',
+        description="Per-constraint overrides: map of `constraint_id` to enabled (`true`) /\ndisabled (`false`).\n\nApplied to the constraint engine at execution time, after loading\nbuiltins and config.",
     )
     context_ids: list[str] | None = Field(
-        None, description='Manually added context IDs.'
+        None, description="Manually added context IDs."
     )
     cost_annotations: Any | None = Field(
         None,
-        description='Cost annotations computed during generation (opaque JSON blob).',
+        description="Cost annotations computed during generation (opaque JSON blob).",
     )
-    created_at: str | None = Field('', description='ISO 8601 timestamp of creation.')
+    created_at: str | None = Field("", description="ISO 8601 timestamp of creation.")
     dependency_graph: Any | None = Field(
         None,
-        description='Dependency graph computed during generation (opaque JSON blob).',
+        description="Dependency graph computed during generation (opaque JSON blob).",
     )
     description: str | None = Field(
-        '', description='Description of what this workflow does.'
+        "", description="Description of what this workflow does."
     )
     disabled_context_ids: list[str] | None = Field(
-        None, description='Disabled context IDs (excluded from auto-include).'
+        None, description="Disabled context IDs (excluded from auto-include)."
     )
     enable_sweep: bool | None = Field(
         False,
-        description='Whether to run a completion sweep after verification passes.\n\nThe sweep reviews all completed work for gaps before proceeding to\ncompletion.',
+        description="Whether to run a completion sweep after verification passes.\n\nThe sweep reviews all completed work for gaps before proceeding to\ncompletion.",
     )
     enforce_token_budget: bool | None = Field(
         False,
-        description='When `true`, the pipeline will stop execution if accumulated token\nusage exceeds the token budget. Disabled by default — only logs\nwarnings.',
+        description="When `true`, the pipeline will stop execution if accumulated token\nusage exceeds the token budget. Disabled by default — only logs\nwarnings.",
     )
     flow_control_json: str | None = Field(
         None,
-        description='Flow control configuration as a JSON string (e.g., concurrency limits,\nqueue behavior).',
+        description="Flow control configuration as a JSON string (e.g., concurrency limits,\nqueue behavior).",
     )
     generated_by_task_run_id: str | None = Field(
         None,
-        description='Task run ID that generated this workflow (for meta-workflow tracking).',
+        description="Task run ID that generated this workflow (for meta-workflow tracking).",
     )
     health_check_enabled: bool | None = Field(
         True,
-        description='Whether to automatically include health check steps before\nverification.\n\nWhen enabled and `health_check_urls` is non-empty, health check steps\nare prepended to verification steps to verify configured servers are\nrunning.',
+        description="Whether to automatically include health check steps before\nverification.\n\nWhen enabled and `health_check_urls` is non-empty, health check steps\nare prepended to verification steps to verify configured servers are\nrunning.",
     )
     health_check_urls: list[HealthCheckUrl] | None = Field(
         None,
-        description='URLs to health check before verification (user-configurable).\n\nEach entry specifies a URL to check, expected status, and timeout.\nIf empty, no health checks are performed even if `health_check_enabled`\nis true.',
+        description="URLs to health check before verification (user-configurable).\n\nEach entry specifies a URL to check, expected status, and timeout.\nIf empty, no health checks are performed even if `health_check_enabled`\nis true.",
     )
-    id: str | None = Field('', description='Unique identifier (UUID v4).')
+    id: str | None = Field("", description="Unique identifier (UUID v4).")
     is_favorite: bool | None = Field(
         False,
-        description='Whether this workflow is marked as a favorite for quick access.',
+        description="Whether this workflow is marked as a favorite for quick access.",
     )
     log_source_selection: LogSourceSelection | None = Field(
         None,
@@ -369,54 +369,54 @@ class UnifiedWorkflow(BaseModel):
     )
     log_watch_enabled: bool | None = Field(
         True,
-        description='Whether to automatically include a `log_watch` step before verification.\n\nWhen enabled (default), a `log_watch` step is prepended to\nverification steps to detect runtime errors in backend/frontend logs.',
+        description="Whether to automatically include a `log_watch` step before verification.\n\nWhen enabled (default), a `log_watch` step is prepended to\nverification steps to detect runtime errors in backend/frontend logs.",
     )
     max_ci_auto_resumes: conint(ge=0) | None = Field(
         10,
-        description='Maximum number of CI-triggered auto-resumes before requiring human\nintervention. Used by the PR watcher integration. `0` = disabled.\nDefault: `10`.',
+        description="Maximum number of CI-triggered auto-resumes before requiring human\nintervention. Used by the PR watcher integration. `0` = disabled.\nDefault: `10`.",
     )
     max_fix_attempts: conint(ge=0) | None = Field(
         3,
-        description='Maximum consecutive non-improving fix attempts before escalating.\n\nWhen the verification check count does not improve across this many\niterations, the loop exits with `fix_attempts_exhausted`. `0` =\ndisabled. Default: `3`.',
+        description="Maximum consecutive non-improving fix attempts before escalating.\n\nWhen the verification check count does not improve across this many\niterations, the loop exits with `fix_attempts_exhausted`. `0` =\ndisabled. Default: `3`.",
     )
     max_iterations: conint(ge=0) | None = Field(
         None,
-        description='Maximum iterations for the agentic phase.\n\n`None` means no iteration cap — the loop terminates on success,\nexplicit stop, or fix-attempt exhaustion.',
+        description="Maximum iterations for the agentic phase.\n\n`None` means no iteration cap — the loop terminates on success,\nexplicit stop, or fix-attempt exhaustion.",
     )
     max_sweep_iterations: conint(ge=0) | None = Field(
-        5, description='Maximum number of sweep iterations (default: `5`).'
+        5, description="Maximum number of sweep iterations (default: `5`)."
     )
-    model: str | None = Field(None, description='Model override.')
+    model: str | None = Field(None, description="Model override.")
     model_overrides: dict[str, ModelOverrideConfig] | None = Field(
-        None, description='Per-phase model overrides.'
+        None, description="Per-phase model overrides."
     )
     modified_at: str | None = Field(
-        '',
+        "",
         description='ISO 8601 timestamp of last modification (serialized as `"modified_at"`\nto match the frontend).',
     )
     multi_agent_mode: bool | None = Field(
         True,
-        description='Enable multi-agent fixer mode for the agentic phase.\n\nWhen `true`, verification failures are triaged and fixed by\nspecialized agents (quick-fix for lint/compilation, feature-fix for\nmissing functionality). Default: `true`.',
+        description="Enable multi-agent fixer mode for the agentic phase.\n\nWhen `true`, verification failures are triaged and fixed by\nspecialized agents (quick-fix for lint/compilation, feature-fix for\nmissing functionality). Default: `true`.",
     )
-    name: str = Field(..., description='Display name.')
+    name: str = Field(..., description="Display name.")
     phase_timeouts_json: str | None = Field(
-        None, description='Per-phase timeout configuration as a JSON string.'
+        None, description="Per-phase timeout configuration as a JSON string."
     )
     preflight_check_enabled: bool | None = Field(
         True,
-        description='Whether to automatically include a pre-flight environment check at the\nstart of setup.\n\nWhen enabled (default), a shell command step runs to verify disk\nspace, Node.js/npm, Python/Poetry, Rust/Cargo, and Git availability.\nUses the global setting from Settings if not explicitly set per\nworkflow.',
+        description="Whether to automatically include a pre-flight environment check at the\nstart of setup.\n\nWhen enabled (default), a shell command step runs to verify disk\nspace, Node.js/npm, Python/Poetry, Rust/Cargo, and Git availability.\nUses the global setting from Settings if not explicitly set per\nworkflow.",
     )
     prompt_template: str | None = Field(
         None,
-        description='Custom developer prompt template for this workflow.\n\nWhen set, this template is used instead of the global default when\nrunning the workflow. Supports variables: `{{SESSION_ID}}`,\n`{{ITERATION}}`, `{{MAX_ITERATIONS}}`, `{{GOAL}}`,\n`{{EXECUTION_STEPS}}`, `{{WORKSPACE_ESCAPED}}`.',
+        description="Custom developer prompt template for this workflow.\n\nWhen set, this template is used instead of the global default when\nrunning the workflow. Supports variables: `{{SESSION_ID}}`,\n`{{ITERATION}}`, `{{MAX_ITERATIONS}}`, `{{GOAL}}`,\n`{{EXECUTION_STEPS}}`, `{{WORKSPACE_ESCAPED}}`.",
     )
-    provider: str | None = Field(None, description='AI provider override.')
+    provider: str | None = Field(None, description="AI provider override.")
     quality_report: Any | None = Field(
-        None, description='Quality report from the revision phase (opaque JSON blob).'
+        None, description="Quality report from the revision phase (opaque JSON blob)."
     )
     reflection_mode: bool | None = Field(
         True,
-        description='Whether to enable reflection mode during agentic iterations.\n\nWhen `true`, the AI investigates root causes before fixing failures.\nDefault: `true` for user-created workflows.',
+        description="Whether to enable reflection mode during agentic iterations.\n\nWhen `true`, the AI investigates root causes before fixing failures.\nDefault: `true` for user-created workflows.",
     )
     rollback_policy: str | None = Field(
         None,
@@ -427,45 +427,45 @@ class UnifiedWorkflow(BaseModel):
         description='Per-workflow security profile override.\n\nWhen set, overrides the default security profile from settings for\nthis workflow. Values: `"permissive"`, `"standard"`, `"strict"`,\nor `"custom"`. If `None`, uses the default from Settings > Security.',
     )
     setup_steps: list[Any] | None = Field(
-        [], description='Setup phase steps (polymorphic JSON array; see module docs).'
+        [], description="Setup phase steps (polymorphic JSON array; see module docs)."
     )
     skip_ai_summary: bool | None = Field(
         False,
-        description='Skip AI summary generation at the end (default: `false`, meaning the\nAI summary is generated).',
+        description="Skip AI summary generation at the end (default: `false`, meaning the\nAI summary is generated).",
     )
     stages: list[WorkflowStage] | None = Field(
         None,
-        description='Optional stages for multi-stage workflows.\n\nWhen non-empty, the workflow executes stages sequentially instead of\nusing top-level steps. Each stage has its own\nsetup / verification / agentic / completion steps and loop.',
+        description="Optional stages for multi-stage workflows.\n\nWhen non-empty, the workflow executes stages sequentially instead of\nusing top-level steps. Each stage has its own\nsetup / verification / agentic / completion steps and loop.",
     )
     stop_on_failure: bool | None = Field(
         False,
-        description='Whether to stop execution if a stage fails verification.\n\nDefault: `false` (autonomous mode — continue to the next stage even\nif the previous failed).',
+        description="Whether to stop execution if a stage fails verification.\n\nDefault: `false` (autonomous mode — continue to the next stage even\nif the previous failed).",
     )
     strict_cwd: bool | None = Field(
         False,
-        description='Restrict working directory resolution to the workspace boundary.\n\nWhen `true`, steps cannot resolve paths outside the workspace root.\nDefault: `false` (permissive, current behavior).',
+        description="Restrict working directory resolution to the workspace boundary.\n\nWhen `true`, steps cannot resolve paths outside the workspace root.\nDefault: `false` (permissive, current behavior).",
     )
-    tags: list[str] | None = Field([], description='Tags for filtering.')
+    tags: list[str] | None = Field([], description="Tags for filtering.")
     targeted_error_ids: list[int] | None = Field(
         None,
-        description='Error IDs targeted by this workflow (for auto-resolution on success).\n\nWhen the workflow completes successfully, these errors will be marked\nas resolved. Used by error-fix workflows generated from the Error\nMonitor.',
+        description="Error IDs targeted by this workflow (for auto-resolution on success).\n\nWhen the workflow completes successfully, these errors will be marked\nas resolved. Used by error-fix workflows generated from the Error\nMonitor.",
     )
     timeout_seconds: conint(ge=0) | None = Field(
         None,
-        description='Optional inactivity timeout in seconds for AI sessions.\n\n- `None` (default): no timeout, runs until completion or manual stop.\n- `Some(N)`: kill AI session after `N` seconds of no output.\n\nTakes precedence over the global AI settings timeout.',
+        description="Optional inactivity timeout in seconds for AI sessions.\n\n- `None` (default): no timeout, runs until completion or manual stop.\n- `Some(N)`: kill AI session after `N` seconds of no output.\n\nTakes precedence over the global AI settings timeout.",
     )
     tool_tags: list[str] | None = Field(
         None,
-        description='Tags for per-execution tool whitelisting.\n\nWhen non-empty, only skills matching at least one tag are included in\nthe AI prompt context, reducing prompt bloat.',
+        description="Tags for per-execution tool whitelisting.\n\nWhen non-empty, only skills matching at least one tag are included in\nthe AI prompt context, reducing prompt bloat.",
     )
     use_worktree: bool | None = Field(
         False,
-        description='Run the workflow in an isolated git worktree.\n\nWhen `true`, a new branch and worktree are created before execution.\nChanges stay on the worktree branch and can be merged back after\nreview. Default: `false`.',
+        description="Run the workflow in an isolated git worktree.\n\nWhen `true`, a new branch and worktree are created before execution.\nChanges stay on the worktree branch and can be merged back after\nreview. Default: `false`.",
     )
     verification_steps: list[Any] | None = Field(
-        [], description='Verification phase steps (polymorphic JSON array).'
+        [], description="Verification phase steps (polymorphic JSON array)."
     )
     workflow_architecture: WorkflowArchitecture | None = Field(
         None,
-        description='Workflow execution architecture override.\n\nWhen set, forces the workflow to use a specific execution architecture\ninstead of the default Traditional loop. When `None`, the system\ninfers the best architecture based on workflow complexity.',
+        description="Workflow execution architecture override.\n\nWhen set, forces the workflow to use a specific execution architecture\ninstead of the default Traditional loop. When `None`, the system\ninfers the best architecture based on workflow complexity.",
     )

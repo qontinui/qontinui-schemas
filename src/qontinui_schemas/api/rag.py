@@ -110,7 +110,10 @@ class BatchComputeEmbeddingRequest(BaseModel):
     """Request to compute embeddings for multiple images."""
 
     images: list[dict[str, Any]] = Field(
-        description="List of images with 'id', 'image_data' (base64), and optional 'text_description'"
+        description=(
+            "List of images with 'id', 'image_data' (base64),"
+            " and optional 'text_description'"
+        )
     )
     compute_text_embeddings: bool = Field(
         default=True, description="Compute text embeddings for all images"

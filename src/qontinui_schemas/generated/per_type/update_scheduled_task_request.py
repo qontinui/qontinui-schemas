@@ -16,7 +16,7 @@ class ConditionScheduleConfig(BaseModel):
 
     rearm_delay_minutes: conint(ge=0) | None = Field(
         60,
-        description='Minutes to wait after an execution completes before re-evaluating\nconditions for another run.',
+        description="Minutes to wait after an execution completes before re-evaluating\nconditions for another run.",
     )
 
 
@@ -26,7 +26,7 @@ class IdleCondition(BaseModel):
     AI tasks) before the task may run.
     """
 
-    enabled: bool = Field(..., description='Whether this condition is active.')
+    enabled: bool = Field(..., description="Whether this condition is active.")
 
 
 class RepositoryWatch(BaseModel):
@@ -36,9 +36,9 @@ class RepositoryWatch(BaseModel):
 
     inactive_minutes: conint(ge=0) = Field(
         ...,
-        description='Minutes of inactivity required before the watch is considered met.',
+        description="Minutes of inactivity required before the watch is considered met.",
     )
-    path: str = Field(..., description='Path to the repository directory.')
+    path: str = Field(..., description="Path to the repository directory.")
 
 
 class ScheduleExpression1(BaseModel):
@@ -46,7 +46,7 @@ class ScheduleExpression1(BaseModel):
     Run once at a specific datetime (ISO 8601).
     """
 
-    type: Literal['Once']
+    type: Literal["Once"]
     value: str
 
 
@@ -56,7 +56,7 @@ class ScheduleExpression2(BaseModel):
     accepts both 5-field and 6/7-field cron forms and normalizes internally.
     """
 
-    type: Literal['Cron']
+    type: Literal["Cron"]
     value: str
 
 
@@ -65,7 +65,7 @@ class ScheduleExpression3(BaseModel):
     Interval in seconds between runs (for testing/debugging).
     """
 
-    type: Literal['Interval']
+    type: Literal["Interval"]
     value: conint(ge=0)
 
 
@@ -75,7 +75,7 @@ class ScheduleExpression4(BaseModel):
     [`ScheduleConditions`] on the task are met.
     """
 
-    type: Literal['Condition']
+    type: Literal["Condition"]
     value: ConditionScheduleConfig
 
 
@@ -105,18 +105,18 @@ class ScheduledTaskType1(BaseModel):
     """
 
     config_path: str | None = Field(
-        None, description='Optional path to a workflow config file.'
+        None, description="Optional path to a workflow config file."
     )
     monitor_index: int | None = Field(
-        None, description='Optional monitor index to target.'
+        None, description="Optional monitor index to target."
     )
-    task_type: Literal['Workflow']
+    task_type: Literal["Workflow"]
     workflow_id: str | None = Field(
         None,
-        description='If set, run a unified workflow by ID instead of a legacy workflow\nby name.',
+        description="If set, run a unified workflow by ID instead of a legacy workflow\nby name.",
     )
     workflow_name: str = Field(
-        ..., description='Display name (also used to look up legacy workflows).'
+        ..., description="Display name (also used to look up legacy workflows)."
     )
 
 
@@ -129,8 +129,8 @@ class ScheduledTaskType2(BaseModel):
         None,
         description="Optional override for `max_sessions`. `None` uses the prompt's own\nsetting.",
     )
-    prompt_id: str = Field(..., description='ID of the prompt to run.')
-    task_type: Literal['Prompt']
+    prompt_id: str = Field(..., description="ID of the prompt to run.")
+    task_type: Literal["Prompt"]
 
 
 class ScheduledTaskType3(BaseModel):
@@ -139,12 +139,12 @@ class ScheduledTaskType3(BaseModel):
     """
 
     check_findings: bool | None = Field(
-        True, description='Whether to check the findings queue before running.'
+        True, description="Whether to check the findings queue before running."
     )
     force_run: bool | None = Field(
-        False, description='Force a run even if no findings are present.'
+        False, description="Force a run even if no findings are present."
     )
-    task_type: Literal['AutoFix']
+    task_type: Literal["AutoFix"]
 
 
 class ScheduledTaskType4(BaseModel):
@@ -153,9 +153,9 @@ class ScheduledTaskType4(BaseModel):
     activity timeline, reasons with AI, and triggers an action.
     """
 
-    task_type: Literal['Watcher']
+    task_type: Literal["Watcher"]
     watcher_id: str = Field(
-        ..., description='ID of the watcher definition in PostgreSQL.'
+        ..., description="ID of the watcher definition in PostgreSQL."
     )
 
 
@@ -166,15 +166,15 @@ class ScheduledTaskType5(BaseModel):
     """
 
     capture_interval_secs: conint(ge=0) | None = Field(
-        30, description='Seconds between successive captures.'
+        30, description="Seconds between successive captures."
     )
     capture_on_focus_change: bool | None = Field(
-        True, description='Whether to also trigger a capture on window focus change.'
+        True, description="Whether to also trigger a capture on window focus change."
     )
     monitor_index: int | None = Field(
-        None, description='Optional monitor index to capture.'
+        None, description="Optional monitor index to capture."
     )
-    task_type: Literal['BackgroundCapture']
+    task_type: Literal["BackgroundCapture"]
 
 
 class ScheduledTaskType(
@@ -194,7 +194,7 @@ class ScheduledTaskType(
         | ScheduledTaskType5
     ) = Field(
         ...,
-        description='Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.',
+        description="Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.",
     )
 
 
@@ -205,10 +205,10 @@ class RepositoryInactiveCondition(BaseModel):
     condition to be met.
     """
 
-    enabled: bool = Field(..., description='Whether this condition is active.')
+    enabled: bool = Field(..., description="Whether this condition is active.")
     repositories: list[RepositoryWatch] | None = Field(
         [],
-        description='List of repositories to watch. ALL must be inactive simultaneously.',
+        description="List of repositories to watch. ALL must be inactive simultaneously.",
         validate_default=True,
     )
 
@@ -219,14 +219,14 @@ class ScheduleConditions(BaseModel):
     """
 
     require_idle: IdleCondition | None = Field(
-        None, description='Require the runner to be idle.'
+        None, description="Require the runner to be idle."
     )
     require_repo_inactive: RepositoryInactiveCondition | None = Field(
-        None, description='Require repository file inactivity across one or more paths.'
+        None, description="Require repository file inactivity across one or more paths."
     )
     timeout_minutes: conint(ge=0) | None = Field(
         None,
-        description='Maximum time to wait for conditions (minutes). `None` = wait\nindefinitely.',
+        description="Maximum time to wait for conditions (minutes). `None` = wait\nindefinitely.",
     )
 
 
@@ -237,25 +237,25 @@ class UpdateScheduledTaskRequest(BaseModel):
     """
 
     auto_fix_on_failure: bool | None = Field(
-        None, description='Update `auto_fix_on_failure`.'
+        None, description="Update `auto_fix_on_failure`."
     )
     conditions: ScheduleConditions | None = Field(
-        None, description='Replace the conditions block (pass `null` to clear).'
+        None, description="Replace the conditions block (pass `null` to clear)."
     )
     description: str | None = Field(
-        None, description='New description (pass `null` to clear).'
+        None, description="New description (pass `null` to clear)."
     )
-    enabled: bool | None = Field(None, description='Enable/disable the task.')
-    name: str | None = Field(None, description='New display name.')
+    enabled: bool | None = Field(None, description="Enable/disable the task.")
+    name: str | None = Field(None, description="New display name.")
     schedule: ScheduleExpression | None = Field(
-        None, description='Replace the schedule expression.'
+        None, description="Replace the schedule expression."
     )
     skip_if_completed: bool | None = Field(
-        None, description='Update `skip_if_completed`.'
+        None, description="Update `skip_if_completed`."
     )
     success_criteria: str | None = Field(
-        None, description='Update the success criteria (pass `null` to clear).'
+        None, description="Update the success criteria (pass `null` to clear)."
     )
     task: ScheduledTaskType | None = Field(
-        None, description='Replace the task definition.'
+        None, description="Replace the task definition."
     )

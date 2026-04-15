@@ -12,7 +12,7 @@ class StageOutput(BaseModel):
     An output declared by a stage, available to subsequent stages.
     """
 
-    description: str | None = Field('', description='Human-readable description.')
+    description: str | None = Field("", description="Human-readable description.")
     key: str = Field(
         ...,
         description='Unique key for this output (e.g. `"api_url"`, `"auth_token"`).',

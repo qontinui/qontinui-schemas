@@ -15,8 +15,8 @@ class VerificationCategoryKind(StrEnum):
     module because it is only referenced from [`BaseStepFields`].
     """
 
-    existence = 'existence'
-    uniqueness = 'uniqueness'
-    referential_integrity = 'referential_integrity'
-    semantic_correctness = 'semantic_correctness'
-    runtime_behavior = 'runtime_behavior'
+    existence = "existence"
+    uniqueness = "uniqueness"
+    referential_integrity = "referential_integrity"
+    semantic_correctness = "semantic_correctness"
+    runtime_behavior = "runtime_behavior"

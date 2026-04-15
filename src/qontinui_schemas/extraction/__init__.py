@@ -8,7 +8,9 @@ This module provides shared data structures for:
 - Import/export operations
 """
 
-from .models import (  # Enums; Basic types; Elements; States; Transitions; Stats; Annotations; Session; Import
+from .models import (
+    # Enums; Basic types; Elements; States; Transitions;
+    # Stats; Annotations; Session; Import
     BoundingBox,
     ElementAnnotation,
     ExtractedElement,

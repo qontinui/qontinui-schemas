@@ -16,16 +16,16 @@ class HealthCheckUrl(BaseModel):
     """
 
     expected_status: conint(ge=0, le=65535) | None = Field(
-        200, description='Expected HTTP status code (default: `200`).'
+        200, description="Expected HTTP status code (default: `200`)."
     )
     is_critical: bool | None = Field(
-        True, description='Whether failure should stop the workflow (default: `true`).'
+        True, description="Whether failure should stop the workflow (default: `true`)."
     )
     name: str = Field(
         ..., description='Display name for the health check (e.g., `"Backend Server"`).'
     )
     timeout_seconds: conint(ge=0) | None = Field(
-        30, description='Timeout in seconds (default: `30`).'
+        30, description="Timeout in seconds (default: `30`)."
     )
     url: str = Field(
         ..., description='URL to check (e.g., `"http://localhost:8000/health"`).'

@@ -14,9 +14,9 @@ class RepositoryWatch(BaseModel):
 
     inactive_minutes: conint(ge=0) = Field(
         ...,
-        description='Minutes of inactivity required before the watch is considered met.',
+        description="Minutes of inactivity required before the watch is considered met.",
     )
-    path: str = Field(..., description='Path to the repository directory.')
+    path: str = Field(..., description="Path to the repository directory.")
 
 
 class RepositoryInactiveCondition(BaseModel):
@@ -26,9 +26,9 @@ class RepositoryInactiveCondition(BaseModel):
     condition to be met.
     """
 
-    enabled: bool = Field(..., description='Whether this condition is active.')
+    enabled: bool = Field(..., description="Whether this condition is active.")
     repositories: list[RepositoryWatch] | None = Field(
         [],
-        description='List of repositories to watch. ALL must be inactive simultaneously.',
+        description="List of repositories to watch. ALL must be inactive simultaneously.",
         validate_default=True,
     )

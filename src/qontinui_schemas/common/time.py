@@ -108,7 +108,8 @@ def ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         raise ValueError(
             f"Naive datetime '{dt}' cannot be safely converted to UTC. "
-            "Use to_utc() if you want to assume UTC, or provide a timezone-aware datetime."
+            "Use to_utc() if you want to assume UTC, "
+            "or provide a timezone-aware datetime."
         )
     return dt.astimezone(UTC)
 

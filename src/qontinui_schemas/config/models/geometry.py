@@ -88,14 +88,21 @@ class Coordinates(BaseModel):
         >>> Coordinates(x=0, y=0, system=CoordinateSystem.VIRTUAL)
 
     Monitor-relative coordinate:
-        >>> Coordinates(x=100, y=100, system=CoordinateSystem.MONITOR_RELATIVE, monitor_index=1)
+        >>> Coordinates(
+        ...     x=100, y=100,
+        ...     system=CoordinateSystem.MONITOR_RELATIVE,
+        ...     monitor_index=1,
+        ... )
     """
 
     x: int = Field(description="X coordinate (horizontal position)")
     y: int = Field(description="Y coordinate (vertical position)")
     system: Optional[CoordinateSystem] = Field(
         default=None,
-        description="Coordinate system. None defaults to SCREEN for backward compatibility.",
+        description=(
+            "Coordinate system. None defaults to SCREEN"
+            " for backward compatibility."
+        ),
     )
     monitor_index: Optional[int] = Field(
         default=None,
@@ -146,7 +153,10 @@ class Region(BaseModel):
     height: int = Field(description="Height of the region", gt=0)
     system: Optional[CoordinateSystem] = Field(
         default=None,
-        description="Coordinate system. None defaults to SCREEN for backward compatibility.",
+        description=(
+            "Coordinate system. None defaults to SCREEN"
+            " for backward compatibility."
+        ),
     )
     monitor_index: Optional[int] = Field(
         default=None,

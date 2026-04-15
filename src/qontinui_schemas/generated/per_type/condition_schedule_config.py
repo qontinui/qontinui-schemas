@@ -14,5 +14,5 @@ class ConditionScheduleConfig(BaseModel):
 
     rearm_delay_minutes: conint(ge=0) | None = Field(
         60,
-        description='Minutes to wait after an execution completes before re-evaluating\nconditions for another run.',
+        description="Minutes to wait after an execution completes before re-evaluating\nconditions for another run.",
     )

@@ -1,8 +1,9 @@
 """
 Screenshot models for Qontinui automation.
 
-This module provides models for screenshots and their annotations (regions and locations).
-Screenshots are used for state discovery and visual documentation of automation workflows.
+This module provides models for screenshots and their annotations
+(regions and locations). Screenshots are used for state discovery
+and visual documentation of automation workflows.
 
 All datetime fields use UTCDateTime for consistent UTC timezone handling
 and ISO 8601 format strings with 'Z' suffix for JSON serialization.
@@ -234,7 +235,10 @@ class Screenshot(BaseModel):
     )
     monitors: list[int] = Field(
         default_factory=lambda: [0],
-        description="Monitor indices this screenshot is from/for (default: [0] for primary)",
+        description=(
+            "Monitor indices this screenshot is from/for"
+            " (default: [0] for primary)"
+        ),
     )
     source: ScreenshotSource | None = Field(
         default=None,

@@ -17,7 +17,7 @@ class FlowEvent1(BaseModel):
     flow_id: str
     flow_name: str
     instance_id: str
-    type: Literal['flow_started']
+    type: Literal["flow_started"]
 
 
 class FlowEvent2(BaseModel):
@@ -29,7 +29,7 @@ class FlowEvent2(BaseModel):
     step_id: str
     step_name: str
     step_type: str
-    type: Literal['step_started']
+    type: Literal["step_started"]
 
 
 class FlowEvent3(BaseModel):
@@ -43,7 +43,7 @@ class FlowEvent3(BaseModel):
     outputs: dict[str, Any]
     step_id: str
     success: bool
-    type: Literal['step_completed']
+    type: Literal["step_completed"]
 
 
 class FlowEvent4(BaseModel):
@@ -57,7 +57,7 @@ class FlowEvent4(BaseModel):
     instance_id: str
     success: bool
     total_steps: conint(ge=0)
-    type: Literal['flow_completed']
+    type: Literal["flow_completed"]
 
 
 class FlowEvent5(BaseModel):
@@ -69,7 +69,7 @@ class FlowEvent5(BaseModel):
     options: list[str]
     prompt: str
     step_id: str
-    type: Literal['waiting_for_input']
+    type: Literal["waiting_for_input"]
 
 
 class FlowEvent6(BaseModel):
@@ -81,7 +81,7 @@ class FlowEvent6(BaseModel):
     instance_id: str
     step_id: str
     total: conint(ge=0)
-    type: Literal['parallel_progress']
+    type: Literal["parallel_progress"]
 
 
 class FlowEvent(
@@ -93,6 +93,6 @@ class FlowEvent(
         FlowEvent1 | FlowEvent2 | FlowEvent3 | FlowEvent4 | FlowEvent5 | FlowEvent6
     ) = Field(
         ...,
-        description='Events emitted during flow execution for UI updates.',
-        title='FlowEvent',
+        description="Events emitted during flow execution for UI updates.",
+        title="FlowEvent",
     )

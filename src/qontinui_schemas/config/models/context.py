@@ -32,7 +32,10 @@ class ContextAutoInclude(BaseModel):
     action_types: list[str] | None = Field(
         default=None,
         alias="actionTypes",
-        description="Action types in loaded config that trigger inclusion (e.g., 'CLICK', 'FIND')",
+        description=(
+            "Action types in loaded config that trigger"
+            " inclusion (e.g., 'CLICK', 'FIND')"
+        ),
     )
     error_patterns: list[str] | None = Field(
         default=None,
@@ -42,7 +45,10 @@ class ContextAutoInclude(BaseModel):
     file_patterns: list[str] | None = Field(
         default=None,
         alias="filePatterns",
-        description="Glob patterns for files being worked on (e.g., '*.rs', 'src/api/**')",
+        description=(
+            "Glob patterns for files being worked on"
+            " (e.g., '*.rs', 'src/api/**')"
+        ),
     )
 
     model_config = {"populate_by_name": True}
@@ -86,7 +92,10 @@ class Context(BaseModel):
     )
     category: str | None = Field(
         default=None,
-        description="Category for organization (e.g., 'architecture', 'debugging', 'philosophy')",
+        description=(
+            "Category for organization"
+            " (e.g., 'architecture', 'debugging', 'philosophy')"
+        ),
     )
     tags: list[str] = Field(
         default_factory=list,

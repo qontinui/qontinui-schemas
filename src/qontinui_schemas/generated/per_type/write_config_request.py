@@ -14,6 +14,6 @@ class WriteConfigRequest(BaseModel):
 
     project_path: str | None = Field(
         None,
-        description='Project path for the `constraints.toml`. Defaults to workspace root.',
+        description="Project path for the `constraints.toml`. Defaults to workspace root.",
     )
-    toml: str = Field(..., description='Raw TOML content to validate and write.')
+    toml: str = Field(..., description="Raw TOML content to validate and write.")

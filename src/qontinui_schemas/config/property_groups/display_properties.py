@@ -71,7 +71,10 @@ class MonitorConfig(BaseModel):
     default_screen_index: int = Field(
         default=-1,
         ge=-1,
-        description="Monitor index to use for automation (0=primary, 1=secondary, -1=primary)",
+        description=(
+            "Monitor index to use for automation"
+            " (0=primary, 1=secondary, -1=primary)"
+        ),
     )
     multi_monitor_enabled: bool = Field(
         default=False, description="Enable multi-monitor support"

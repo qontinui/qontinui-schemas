@@ -12,8 +12,8 @@ class ApiAssertionType(StrEnum):
     Assertion kinds supported on API responses.
     """
 
-    status_code = 'status_code'
-    json_path = 'json_path'
-    header = 'header'
-    body_contains = 'body_contains'
-    response_time = 'response_time'
+    status_code = "status_code"
+    json_path = "json_path"
+    header = "header"
+    body_contains = "body_contains"
+    response_time = "response_time"

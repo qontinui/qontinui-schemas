@@ -17,6 +17,6 @@ class WorkflowArchitecture(StrEnum):
     `crate::agentic_verification`.
     """
 
-    traditional = 'traditional'
-    agentic_verification = 'agentic_verification'
-    multi_agent_pipeline = 'multi_agent_pipeline'
+    traditional = "traditional"
+    agentic_verification = "agentic_verification"
+    multi_agent_pipeline = "multi_agent_pipeline"

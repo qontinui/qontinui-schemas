@@ -17,8 +17,8 @@ class RetrySpec(BaseModel):
     """
 
     count: conint(ge=0) = Field(
-        ..., description='Number of retry attempts (`0` = no retries).'
+        ..., description="Number of retry attempts (`0` = no retries)."
     )
     delay_ms: conint(ge=0) = Field(
-        ..., description='Delay between retries in milliseconds.'
+        ..., description="Delay between retries in milliseconds."
     )

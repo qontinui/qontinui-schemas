@@ -14,13 +14,13 @@ class StageInput(BaseModel):
 
     from_stage: str | None = Field(
         None,
-        description='Which stage provides this input (stage id). If omitted, searches all\nprior stages.',
+        description="Which stage provides this input (stage id). If omitted, searches all\nprior stages.",
     )
     key: str = Field(
         ...,
-        description='The key to bind this input to (matches a [`StageOutput::key`] from a\nprior stage).',
+        description="The key to bind this input to (matches a [`StageOutput::key`] from a\nprior stage).",
     )
     required: bool | None = Field(
         True,
-        description='Whether this input is required (default: `true`). Missing required\ninputs are Critical findings.',
+        description="Whether this input is required (default: `true`). Missing required\ninputs are Critical findings.",
     )

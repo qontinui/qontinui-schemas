@@ -13,10 +13,10 @@ class WriteConfigResponse(BaseModel):
     """
 
     errors: list[str] | None = Field(
-        [], description='Parse errors or non-fatal warnings.'
+        [], description="Parse errors or non-fatal warnings."
     )
-    path: str = Field(..., description='The file path that was written to.')
+    path: str = Field(..., description="The file path that was written to.")
     valid: bool = Field(
         ...,
-        description='Whether the config is fully valid (parseable with no errors or warnings).',
+        description="Whether the config is fully valid (parseable with no errors or warnings).",
     )

@@ -12,6 +12,6 @@ class WorkflowStepPhase(StrEnum):
     Phases in which a [`WorkflowStep`] may appear.
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    completion = "completion"

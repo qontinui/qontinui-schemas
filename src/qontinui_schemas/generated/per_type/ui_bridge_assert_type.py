@@ -12,8 +12,8 @@ class UiBridgeAssertType(StrEnum):
     Kinds of assertion supported by `assert` actions.
     """
 
-    exists = 'exists'
-    text_equals = 'text_equals'
-    contains = 'contains'
-    visible = 'visible'
-    enabled = 'enabled'
+    exists = "exists"
+    text_equals = "text_equals"
+    contains = "contains"
+    visible = "visible"
+    enabled = "enabled"

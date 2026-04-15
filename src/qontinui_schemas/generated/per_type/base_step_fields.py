@@ -20,10 +20,10 @@ class RetrySpec(BaseModel):
     """
 
     count: conint(ge=0) = Field(
-        ..., description='Number of retry attempts (`0` = no retries).'
+        ..., description="Number of retry attempts (`0` = no retries)."
     )
     delay_ms: conint(ge=0) = Field(
-        ..., description='Delay between retries in milliseconds.'
+        ..., description="Delay between retries in milliseconds."
     )
 
 
@@ -35,11 +35,11 @@ class VerificationCategoryKind(StrEnum):
     module because it is only referenced from [`BaseStepFields`].
     """
 
-    existence = 'existence'
-    uniqueness = 'uniqueness'
-    referential_integrity = 'referential_integrity'
-    semantic_correctness = 'semantic_correctness'
-    runtime_behavior = 'runtime_behavior'
+    existence = "existence"
+    uniqueness = "uniqueness"
+    referential_integrity = "referential_integrity"
+    semantic_correctness = "semantic_correctness"
+    runtime_behavior = "runtime_behavior"
 
 
 class BaseStepFields(BaseModel):
@@ -51,32 +51,32 @@ class BaseStepFields(BaseModel):
     """
 
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
-    name: str = Field(..., description='Display name for the step.')
+    name: str = Field(..., description="Display name for the step.")
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )

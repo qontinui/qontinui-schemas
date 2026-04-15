@@ -12,9 +12,9 @@ class ScheduledTaskStatus(StrEnum):
     Status of a scheduled task execution.
     """
 
-    pending = 'pending'
-    running = 'running'
-    completed = 'completed'
-    failed = 'failed'
-    skipped = 'skipped'
-    cancelled = 'cancelled'
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    skipped = "skipped"
+    cancelled = "cancelled"

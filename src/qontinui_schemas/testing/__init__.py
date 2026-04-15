@@ -17,7 +17,9 @@ Usage:
 """
 
 # Vision Verification Assertion schemas
-from qontinui_schemas.testing.assertions import (  # Enums; Locator models; Assertion configs; Assertion definition; Results; Test definition
+from qontinui_schemas.testing.assertions import (
+    # Enums; Locator models; Assertion configs;
+    # Assertion definition; Results; Test definition
     AnimationAssertionConfig,
     AssertableState,
     AssertionOptions,
@@ -56,7 +58,10 @@ from qontinui_schemas.testing.coverage import (
 )
 
 # GUI Environment Discovery schemas
-from qontinui_schemas.testing.environment import (  # Enums; Color models; Typography models; Layout models; Dynamic region models; Visual state models; Element pattern models; Main model; API models
+from qontinui_schemas.testing.environment import (
+    # Enums; Color models; Typography models; Layout models;
+    # Dynamic region models; Visual state models;
+    # Element pattern models; Main model; API models
     AlignmentGuide,
     AnimationRegion,
     AnimationType,

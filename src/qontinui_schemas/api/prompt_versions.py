@@ -58,7 +58,10 @@ class PromptVersionResponse(BaseModel):
     created_by: str | None = Field(None, description="User who created this version")
     performance_metrics: dict[str, Any] | None = Field(
         None,
-        description="Aggregated performance metrics (success_rate, avg_cost, avg_latency)",
+        description=(
+            "Aggregated performance metrics"
+            " (success_rate, avg_cost, avg_latency)"
+        ),
     )
     created_at: UTCDateTime = Field(..., description="Creation timestamp (UTC)")
 

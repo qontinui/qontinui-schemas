@@ -63,7 +63,10 @@ class AIPromptTemplate(BaseModel):
     description: str | None = Field(None, description="What this template does")
     category: str | None = Field(
         None,
-        description="Category for organization (e.g., 'code-quality', 'security', 'testing')",
+        description=(
+            "Category for organization"
+            " (e.g., 'code-quality', 'security', 'testing')"
+        ),
     )
     tags: list[str] = Field(default_factory=list, description="Tags for filtering")
 

@@ -12,7 +12,7 @@ class CommandMode(StrEnum):
     Execution mode for a [`CommandStep`].
     """
 
-    shell = 'shell'
-    check = 'check'
-    check_group = 'check_group'
-    test = 'test'
+    shell = "shell"
+    check = "check"
+    check_group = "check_group"
+    test = "test"

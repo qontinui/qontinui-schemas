@@ -12,4 +12,4 @@ class ValidateConfigRequest(BaseModel):
     Request body for `POST /constraints/validate`.
     """
 
-    toml: str = Field(..., description='Raw TOML content to validate.')
+    toml: str = Field(..., description="Raw TOML content to validate.")

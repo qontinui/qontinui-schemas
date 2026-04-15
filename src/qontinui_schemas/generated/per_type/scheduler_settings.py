@@ -14,15 +14,15 @@ class SchedulerSettings(BaseModel):
 
     default_auto_fix_on_failure: bool | None = Field(
         False,
-        description='Default `auto_fix_on_failure` value for newly created tasks.',
+        description="Default `auto_fix_on_failure` value for newly created tasks.",
     )
     enabled: bool | None = Field(
-        True, description='Whether the scheduler is enabled globally.'
+        True, description="Whether the scheduler is enabled globally."
     )
     max_concurrent: conint(ge=0) | None = Field(
-        1, description='Maximum number of scheduled tasks allowed to run concurrently.'
+        1, description="Maximum number of scheduled tasks allowed to run concurrently."
     )
     timezone: str | None = Field(
         None,
-        description='Timezone for schedule interpretation (IANA name). `None` = local time.',
+        description="Timezone for schedule interpretation (IANA name). `None` = local time.",
     )

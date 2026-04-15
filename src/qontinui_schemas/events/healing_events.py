@@ -12,7 +12,7 @@ The schema follows the pattern established by tree_events.py for consistency.
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # =============================================================================
 # Enums
@@ -235,9 +235,7 @@ class HealingEventData(BaseModel):
         default_factory=dict, description="Additional event-specific data"
     )
 
-    class Config:
-        extra = "allow"
-        populate_by_name = True
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
 
 class HealingEvent(BaseModel):
@@ -252,8 +250,7 @@ class HealingEvent(BaseModel):
     type: str = Field(default="healing_event", description="Event type identifier")
     data: HealingEventData = Field(description="Event data payload")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # =============================================================================

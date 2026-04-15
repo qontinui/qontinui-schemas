@@ -2,7 +2,8 @@
 
 The Unified Workflow is the primary orchestration format for Qontinui task execution.
 It defines a multi-phase workflow with setup, verification, agentic, and completion
-steps that the runner executes iteratively until verification passes or limits are reached.
+steps that the runner executes iteratively until verification passes
+or limits are reached.
 
 These models are the canonical Python representation of the Unified Workflow schema.
 The TypeScript definitions in qontinui-web/frontend are the primary source for the
@@ -26,7 +27,9 @@ from pydantic import BaseModel, Field
 WorkflowPhase = Literal["setup", "verification", "agentic", "completion"]
 """Phase of workflow execution."""
 
-StepTypeName = Literal["command", "ui_bridge", "prompt", "workflow", "native_accessibility"]
+StepTypeName = Literal[
+    "command", "ui_bridge", "prompt", "workflow", "native_accessibility"
+]
 """Discriminator for step types."""
 
 CheckType = Literal[
@@ -155,7 +158,10 @@ class BaseStep(BaseModel):
     )
     extract: dict[str, str] | None = Field(
         None,
-        description="Output variable extractions (variable_name -> extraction expression)",
+        description=(
+            "Output variable extractions"
+            " (variable_name -> extraction expression)"
+        ),
     )
     depends_on: list[str] | None = Field(
         None, description="Step IDs that must complete before this step runs"
@@ -465,7 +471,10 @@ class UnifiedWorkflow(BaseModel):
     )
     enforce_token_budget: bool | None = Field(
         None,
-        description="Whether to stop execution if accumulated token usage exceeds the budget",
+        description=(
+            "Whether to stop execution if accumulated"
+            " token usage exceeds the budget"
+        ),
     )
     strict_cwd: bool | None = Field(
         None,
@@ -527,7 +536,10 @@ class UnifiedWorkflow(BaseModel):
     # Template and staging
     prompt_template: str | None = Field(
         None,
-        description="Template for constructing the agentic prompt from verification results",
+        description=(
+            "Template for constructing the agentic prompt"
+            " from verification results"
+        ),
     )
     stages: list[WorkflowStage] | None = Field(
         None,
@@ -545,7 +557,10 @@ class UnifiedWorkflow(BaseModel):
     # Constraint and dependency metadata
     constraint_overrides: dict[str, bool] | None = Field(
         None,
-        description="Per-constraint overrides: map of constraint_id to enabled/disabled",
+        description=(
+            "Per-constraint overrides:"
+            " map of constraint_id to enabled/disabled"
+        ),
     )
     dependency_graph: dict[str, Any] | None = Field(
         None,
@@ -571,7 +586,10 @@ class UnifiedWorkflow(BaseModel):
     # Metadata
     category: str = Field(
         ...,
-        description="Category for organizing workflows (e.g., 'development', 'testing')",
+        description=(
+            "Category for organizing workflows"
+            " (e.g., 'development', 'testing')"
+        ),
     )
     tags: list[str] = Field(
         default_factory=list,

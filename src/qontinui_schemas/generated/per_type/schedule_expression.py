@@ -14,7 +14,7 @@ class ScheduleExpression1(BaseModel):
     Run once at a specific datetime (ISO 8601).
     """
 
-    type: Literal['Once']
+    type: Literal["Once"]
     value: str
 
 
@@ -24,7 +24,7 @@ class ScheduleExpression2(BaseModel):
     accepts both 5-field and 6/7-field cron forms and normalizes internally.
     """
 
-    type: Literal['Cron']
+    type: Literal["Cron"]
     value: str
 
 
@@ -33,7 +33,7 @@ class ScheduleExpression3(BaseModel):
     Interval in seconds between runs (for testing/debugging).
     """
 
-    type: Literal['Interval']
+    type: Literal["Interval"]
     value: conint(ge=0)
 
 
@@ -44,7 +44,7 @@ class ConditionScheduleConfig(BaseModel):
 
     rearm_delay_minutes: conint(ge=0) | None = Field(
         60,
-        description='Minutes to wait after an execution completes before re-evaluating\nconditions for another run.',
+        description="Minutes to wait after an execution completes before re-evaluating\nconditions for another run.",
     )
 
 
@@ -54,7 +54,7 @@ class ScheduleExpression4(BaseModel):
     [`ScheduleConditions`] on the task are met.
     """
 
-    type: Literal['Condition']
+    type: Literal["Condition"]
     value: ConditionScheduleConfig
 
 
@@ -74,5 +74,5 @@ class ScheduleExpression(
     ) = Field(
         ...,
         description='How a task should be scheduled.\n\nSerialized with the external tag `type` and payload under `value` so that\n`Once("...")`, `Cron("...")`, and `Interval(60)` round-trip as\n`{ "type": "Once", "value": "..." }` etc. The `Condition` variant wraps a\n[`ConditionScheduleConfig`] rather than a scalar, but uses the same\n`{ type, value }` envelope.',
-        title='ScheduleExpression',
+        title="ScheduleExpression",
     )

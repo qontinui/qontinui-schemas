@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # =============================================================================
 # Enums
@@ -120,8 +120,7 @@ class MatchLocation(BaseModel):
     w: int | None = Field(default=None, description="Width of matched region")
     h: int | None = Field(default=None, description="Height of matched region")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TopMatch(BaseModel):
@@ -171,8 +170,7 @@ class RuntimeData(BaseModel):
     workflow_name: str | None = None
     workflow_status: str | None = None
 
-    class Config:
-        extra = "allow"  # Allow additional runtime fields
+    model_config = ConfigDict(extra="allow")  # Allow additional runtime fields
 
 
 class StateContext(BaseModel):
@@ -243,9 +241,7 @@ class NodeMetadata(BaseModel):
     screenshot_reference: str | None = None
     visual_debug_reference: str | None = None
 
-    class Config:
-        extra = "allow"  # Allow additional metadata fields
-        populate_by_name = True
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
 
 class TreeNode(BaseModel):
@@ -279,8 +275,7 @@ class TreeNode(BaseModel):
     metadata: NodeMetadata = Field(default_factory=NodeMetadata)
     error: str | None = Field(default=None, description="Error message if failed")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class PathElement(BaseModel):
@@ -290,8 +285,7 @@ class PathElement(BaseModel):
     name: str = Field(description="Display name of this element")
     node_type: NodeType = Field(description="Type of this element")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TreeEvent(BaseModel):
@@ -313,8 +307,7 @@ class TreeEvent(BaseModel):
     timestamp: float = Field(description="When this event was emitted (Unix epoch)")
     sequence: int = Field(default=0, description="Sequence number for ordering")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # =============================================================================
@@ -344,8 +337,7 @@ class DisplayNode(BaseModel):
     is_expanded: bool = Field(default=True)
     level: int = Field(default=0, description="Nesting level (0 for root)")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # Rebuild model for forward reference

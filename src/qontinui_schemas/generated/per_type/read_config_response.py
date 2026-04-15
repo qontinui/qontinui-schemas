@@ -13,9 +13,9 @@ class ReadConfigResponse(BaseModel):
     """
 
     path: str | None = Field(
-        None, description='Resolved file path, if a config file was found.'
+        None, description="Resolved file path, if a config file was found."
     )
     toml: str = Field(
         ...,
-        description='Raw TOML content of the `constraints.toml` file (empty string if not found).',
+        description="Raw TOML content of the `constraints.toml` file (empty string if not found).",
     )

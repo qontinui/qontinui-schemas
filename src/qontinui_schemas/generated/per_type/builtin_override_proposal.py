@@ -19,7 +19,7 @@ class BuiltinOverrideProposal(BaseModel):
         ...,
         description='Builtin suffix (e.g., `"no-secrets"`, `"no-debug-statements"`).',
     )
-    enabled: bool = Field(..., description='Whether the builtin should be enabled.')
+    enabled: bool = Field(..., description="Whether the builtin should be enabled.")
     reason: str = Field(
-        ..., description='Human-readable justification for the override.'
+        ..., description="Human-readable justification for the override."
     )

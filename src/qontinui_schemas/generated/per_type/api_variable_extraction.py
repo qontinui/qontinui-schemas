@@ -13,11 +13,11 @@ class ApiVariableExtraction(BaseModel):
     """
 
     default_value: str | None = Field(
-        None, description='Default value if the path does not resolve.'
+        None, description="Default value if the path does not resolve."
     )
     json_path: str = Field(
-        ..., description='JSONPath expression used to extract the value.'
+        ..., description="JSONPath expression used to extract the value."
     )
     variable_name: str = Field(
-        ..., description='Variable name to bind the extracted value to.'
+        ..., description="Variable name to bind the extracted value to."
     )

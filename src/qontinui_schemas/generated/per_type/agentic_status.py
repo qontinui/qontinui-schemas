@@ -12,7 +12,7 @@ class AgenticStatus(StrEnum):
     Status of the agentic phase execution.
     """
 
-    success = 'success'
-    partial_success = 'partial_success'
-    failed = 'failed'
-    unfixable = 'unfixable'
+    success = "success"
+    partial_success = "partial_success"
+    failed = "failed"
+    unfixable = "unfixable"

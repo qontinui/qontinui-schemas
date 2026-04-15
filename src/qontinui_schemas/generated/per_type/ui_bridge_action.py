@@ -12,10 +12,10 @@ class UiBridgeAction(StrEnum):
     UI Bridge action kind.
     """
 
-    navigate = 'navigate'
-    execute = 'execute'
-    assert_ = 'assert'
-    snapshot = 'snapshot'
-    compare = 'compare'
-    snapshot_assert = 'snapshot_assert'
-    action_plan = 'action_plan'
+    navigate = "navigate"
+    execute = "execute"
+    assert_ = "assert"
+    snapshot = "snapshot"
+    compare = "compare"
+    snapshot_assert = "snapshot_assert"
+    action_plan = "action_plan"

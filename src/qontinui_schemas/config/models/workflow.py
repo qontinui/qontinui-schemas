@@ -27,7 +27,8 @@ class Connections(RootModel[dict[str, dict[str, list[list[Connection]]]]]):
     """
     Connections between actions in graph format.
 
-    Root structure: Dict[source_action_id, Dict[connection_type, List[List[Connection]]]]
+    Root structure:
+    Dict[source_action_id, Dict[connection_type, List[List[Connection]]]]
 
     Example:
         {
@@ -152,7 +153,11 @@ class Workflow(BaseModel):
     initial_state_ids: list[str] | None = Field(
         None,
         alias="initialStateIds",
-        description="Initial active states when workflow starts. Required for Main category workflows for model-based GUI automation.",
+        description=(
+            "Initial active states when workflow starts."
+            " Required for Main category workflows"
+            " for model-based GUI automation."
+        ),
     )
 
     model_config = {"populate_by_name": True}

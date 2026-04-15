@@ -14,7 +14,7 @@ class PromptStepPhase(StrEnum):
     Prompt steps are the only variant that may appear in the agentic phase.
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    agentic = 'agentic'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    agentic = "agentic"
+    completion = "completion"

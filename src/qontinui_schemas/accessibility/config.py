@@ -62,7 +62,10 @@ class AccessibilityCaptureOptions(BaseModel):
 
     target: str = Field(
         default="auto",
-        description="Capture target: 'auto', 'web', 'native', 'tauri', or a window title/handle",
+        description=(
+            "Capture target: 'auto', 'web', 'native',"
+            " 'tauri', or a window title/handle"
+        ),
     )
     include_screenshot: bool = Field(
         default=True,

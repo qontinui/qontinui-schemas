@@ -153,7 +153,8 @@ class IssueType(str, Enum):
 class IssueStatus(str, Enum):
     """Status of an execution issue.
 
-    Lifecycle: OPEN -> IN_PROGRESS -> (RESOLVED | WONT_FIX | DUPLICATE | CANNOT_REPRODUCE)
+    Lifecycle: OPEN -> IN_PROGRESS ->
+    (RESOLVED | WONT_FIX | DUPLICATE | CANNOT_REPRODUCE)
     """
 
     OPEN = "open"

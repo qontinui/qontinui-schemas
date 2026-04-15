@@ -12,5 +12,5 @@ class PlaywrightExecutionMode(StrEnum):
     Whether a Playwright test executes independently or as part of a chain.
     """
 
-    independent = 'independent'
-    chained = 'chained'
+    independent = "independent"
+    chained = "chained"

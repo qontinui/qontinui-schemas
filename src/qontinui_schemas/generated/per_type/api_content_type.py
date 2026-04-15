@@ -12,7 +12,7 @@ class ApiContentType(StrEnum):
     Content-Type values for an API request body.
     """
 
-    application_json = 'application/json'
-    application_x_www_form_urlencoded = 'application/x-www-form-urlencoded'
-    text_plain = 'text/plain'
-    none = 'none'
+    application_json = "application/json"
+    application_x_www_form_urlencoded = "application/x-www-form-urlencoded"
+    text_plain = "text/plain"
+    none = "none"

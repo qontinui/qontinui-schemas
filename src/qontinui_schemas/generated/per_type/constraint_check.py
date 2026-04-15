@@ -17,10 +17,10 @@ class ConstraintCheck1(BaseModel):
 
     file_glob: str | None = Field(
         None,
-        description='Optional glob to limit which modified files are checked.\nDefault: all modified files.',
+        description="Optional glob to limit which modified files are checked.\nDefault: all modified files.",
     )
-    pattern: str = Field(..., description='Regex pattern to search for.')
-    type: Literal['grep_forbidden']
+    pattern: str = Field(..., description="Regex pattern to search for.")
+    type: Literal["grep_forbidden"]
 
 
 class ConstraintCheck2(BaseModel):
@@ -30,10 +30,10 @@ class ConstraintCheck2(BaseModel):
     """
 
     file_glob: str | None = Field(
-        None, description='Optional glob to limit which modified files are checked.'
+        None, description="Optional glob to limit which modified files are checked."
     )
-    pattern: str = Field(..., description='Regex pattern that must be present.')
-    type: Literal['grep_required']
+    pattern: str = Field(..., description="Regex pattern that must be present.")
+    type: Literal["grep_required"]
 
 
 class ConstraintCheck3(BaseModel):
@@ -46,7 +46,7 @@ class ConstraintCheck3(BaseModel):
         [],
         description='Allowed directory prefixes (relative to project root).\ne.g., `["src/", "tests/", "config/"]`.',
     )
-    type: Literal['file_scope']
+    type: Literal["file_scope"]
 
 
 class ConstraintCheck4(BaseModel):
@@ -55,15 +55,15 @@ class ConstraintCheck4(BaseModel):
     Useful for quick compilation checks, linting, etc.
     """
 
-    cmd: str = Field(..., description='The command to run.')
+    cmd: str = Field(..., description="The command to run.")
     cwd: str | None = Field(
         None,
-        description='Working directory (relative to project root). Default: project root.',
+        description="Working directory (relative to project root). Default: project root.",
     )
     timeout_secs: conint(ge=0) | None = Field(
-        30, description='Timeout in seconds. Default: 30.'
+        30, description="Timeout in seconds. Default: 30."
     )
-    type: Literal['command']
+    type: Literal["command"]
 
 
 class ConstraintCheck(
@@ -73,6 +73,6 @@ class ConstraintCheck(
         Field(
             ...,
             description="What to check and how.\n\nInternally tagged by the `type` field. Variants correspond to the four\ncheck kinds implemented by the runner's constraint engine.",
-            title='ConstraintCheck',
+            title="ConstraintCheck",
         )
     )

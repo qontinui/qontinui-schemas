@@ -14,12 +14,12 @@ class ScheduledTaskStatus(StrEnum):
     Status of a scheduled task execution.
     """
 
-    pending = 'pending'
-    running = 'running'
-    completed = 'completed'
-    failed = 'failed'
-    skipped = 'skipped'
-    cancelled = 'cancelled'
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    skipped = "skipped"
+    cancelled = "cancelled"
 
 
 class TaskExecutionRecord(BaseModel):
@@ -28,31 +28,31 @@ class TaskExecutionRecord(BaseModel):
     """
 
     auto_fix_session_id: str | None = Field(
-        None, description='Session ID of the auto-fix session, if one was triggered.'
+        None, description="Session ID of the auto-fix session, if one was triggered."
     )
     ended_at: str | None = Field(
-        None, description='ISO 8601 timestamp when execution ended.'
+        None, description="ISO 8601 timestamp when execution ended."
     )
     error_message: str | None = Field(
-        None, description='Error message if the execution failed.'
+        None, description="Error message if the execution failed."
     )
     execution_id: str = Field(
-        ..., description='Unique ID for this execution (UUID v4 string).'
+        ..., description="Unique ID for this execution (UUID v4 string)."
     )
     session_id: str | None = Field(
         None,
-        description='Session ID if this execution triggered an AI session, used for\ndownstream success tracking.',
+        description="Session ID if this execution triggered an AI session, used for\ndownstream success tracking.",
     )
     started_at: str = Field(
-        ..., description='ISO 8601 timestamp when execution started.'
+        ..., description="ISO 8601 timestamp when execution started."
     )
     status: ScheduledTaskStatus = Field(
-        ..., description='Current status of this execution.'
+        ..., description="Current status of this execution."
     )
     success: bool | None = Field(
         False,
-        description='Whether the task succeeded, read from the session checkpoint.',
+        description="Whether the task succeeded, read from the session checkpoint.",
     )
     triggered_auto_fix: bool | None = Field(
-        False, description='Whether auto-fix was triggered after this execution.'
+        False, description="Whether auto-fix was triggered after this execution."
     )

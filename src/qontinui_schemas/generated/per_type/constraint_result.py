@@ -19,9 +19,9 @@ class ConstraintSeverity(StrEnum):
     - `Log`: Record only, don't affect execution.
     """
 
-    block = 'block'
-    warn = 'warn'
-    log = 'log'
+    block = "block"
+    warn = "warn"
+    log = "log"
 
 
 class ConstraintViolation(BaseModel):
@@ -29,11 +29,11 @@ class ConstraintViolation(BaseModel):
     A specific violation found during constraint evaluation.
     """
 
-    detail: str = Field(..., description='What was found / what went wrong.')
+    detail: str = Field(..., description="What was found / what went wrong.")
     file: str | None = Field(
-        None, description='File where the violation was found (if applicable).'
+        None, description="File where the violation was found (if applicable)."
     )
-    line: conint(ge=0) | None = Field(None, description='Line number (if applicable).')
+    line: conint(ge=0) | None = Field(None, description="Line number (if applicable).")
 
 
 class ConstraintResult(BaseModel):
@@ -42,17 +42,17 @@ class ConstraintResult(BaseModel):
     """
 
     constraint_id: str = Field(
-        ..., description='The id of the constraint that was evaluated.'
+        ..., description="The id of the constraint that was evaluated."
     )
     constraint_name: str = Field(
-        ..., description='The human-readable name of the constraint that was evaluated.'
+        ..., description="The human-readable name of the constraint that was evaluated."
     )
-    passed: bool = Field(..., description='Whether the constraint passed.')
+    passed: bool = Field(..., description="Whether the constraint passed.")
     severity: ConstraintSeverity = Field(
-        ..., description='Severity of the constraint (for quick filtering).'
+        ..., description="Severity of the constraint (for quick filtering)."
     )
     violations: list[ConstraintViolation] | None = Field(
         [],
-        description='Details about the violation (empty if passed).',
+        description="Details about the violation (empty if passed).",
         validate_default=True,
     )

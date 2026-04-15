@@ -12,6 +12,6 @@ class UiBridgeComparisonMode(StrEnum):
     Comparison mode for `compare` / `snapshot_assert` actions.
     """
 
-    structural = 'structural'
-    visual = 'visual'
-    both = 'both'
+    structural = "structural"
+    visual = "visual"
+    both = "both"

@@ -16,18 +16,18 @@ class ScheduledTaskType1(BaseModel):
     """
 
     config_path: str | None = Field(
-        None, description='Optional path to a workflow config file.'
+        None, description="Optional path to a workflow config file."
     )
     monitor_index: int | None = Field(
-        None, description='Optional monitor index to target.'
+        None, description="Optional monitor index to target."
     )
-    task_type: Literal['Workflow']
+    task_type: Literal["Workflow"]
     workflow_id: str | None = Field(
         None,
-        description='If set, run a unified workflow by ID instead of a legacy workflow\nby name.',
+        description="If set, run a unified workflow by ID instead of a legacy workflow\nby name.",
     )
     workflow_name: str = Field(
-        ..., description='Display name (also used to look up legacy workflows).'
+        ..., description="Display name (also used to look up legacy workflows)."
     )
 
 
@@ -40,8 +40,8 @@ class ScheduledTaskType2(BaseModel):
         None,
         description="Optional override for `max_sessions`. `None` uses the prompt's own\nsetting.",
     )
-    prompt_id: str = Field(..., description='ID of the prompt to run.')
-    task_type: Literal['Prompt']
+    prompt_id: str = Field(..., description="ID of the prompt to run.")
+    task_type: Literal["Prompt"]
 
 
 class ScheduledTaskType3(BaseModel):
@@ -50,12 +50,12 @@ class ScheduledTaskType3(BaseModel):
     """
 
     check_findings: bool | None = Field(
-        True, description='Whether to check the findings queue before running.'
+        True, description="Whether to check the findings queue before running."
     )
     force_run: bool | None = Field(
-        False, description='Force a run even if no findings are present.'
+        False, description="Force a run even if no findings are present."
     )
-    task_type: Literal['AutoFix']
+    task_type: Literal["AutoFix"]
 
 
 class ScheduledTaskType4(BaseModel):
@@ -64,9 +64,9 @@ class ScheduledTaskType4(BaseModel):
     activity timeline, reasons with AI, and triggers an action.
     """
 
-    task_type: Literal['Watcher']
+    task_type: Literal["Watcher"]
     watcher_id: str = Field(
-        ..., description='ID of the watcher definition in PostgreSQL.'
+        ..., description="ID of the watcher definition in PostgreSQL."
     )
 
 
@@ -77,15 +77,15 @@ class ScheduledTaskType5(BaseModel):
     """
 
     capture_interval_secs: conint(ge=0) | None = Field(
-        30, description='Seconds between successive captures.'
+        30, description="Seconds between successive captures."
     )
     capture_on_focus_change: bool | None = Field(
-        True, description='Whether to also trigger a capture on window focus change.'
+        True, description="Whether to also trigger a capture on window focus change."
     )
     monitor_index: int | None = Field(
-        None, description='Optional monitor index to capture.'
+        None, description="Optional monitor index to capture."
     )
-    task_type: Literal['BackgroundCapture']
+    task_type: Literal["BackgroundCapture"]
 
 
 class ScheduledTaskType(
@@ -105,6 +105,6 @@ class ScheduledTaskType(
         | ScheduledTaskType5
     ) = Field(
         ...,
-        description='Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.',
-        title='ScheduledTaskType',
+        description="Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.",
+        title="ScheduledTaskType",
     )

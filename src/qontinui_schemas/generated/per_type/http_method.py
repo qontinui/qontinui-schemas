@@ -14,8 +14,8 @@ class HttpMethod(StrEnum):
     Serialized uppercase (`GET`, `POST`, …) to match HTTP convention.
     """
 
-    GET = 'GET'
-    POST = 'POST'
-    PUT = 'PUT'
-    PATCH = 'PATCH'
-    DELETE = 'DELETE'
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    PATCH = "PATCH"
+    DELETE = "DELETE"

@@ -139,8 +139,14 @@ class VirtualDesktop(BaseModel):
     --------
     Create from monitors:
         >>> monitors = [
-        ...     Monitor(index=0, x=0, y=0, width=1920, height=1080, position="center"),
-        ...     Monitor(index=1, x=-1920, y=0, width=1920, height=1080, position="left"),
+        ...     Monitor(
+        ...         index=0, x=0, y=0,
+        ...         width=1920, height=1080, position="center",
+        ...     ),
+        ...     Monitor(
+        ...         index=1, x=-1920, y=0,
+        ...         width=1920, height=1080, position="left",
+        ...     ),
         ... ]
         >>> desktop = VirtualDesktop(monitors=monitors)
         >>> desktop.min_x

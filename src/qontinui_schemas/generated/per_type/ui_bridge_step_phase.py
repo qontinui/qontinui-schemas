@@ -15,6 +15,6 @@ class UiBridgeStepPhase(StrEnum):
     the agentic loop (where the AI drives steps directly via prompts).
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    completion = "completion"

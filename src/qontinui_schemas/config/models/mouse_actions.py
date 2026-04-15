@@ -76,7 +76,8 @@ class MouseDownActionConfig(BaseModel):
 class MouseUpActionConfig(BaseModel):
     """MOUSE_UP action configuration.
 
-    Target supports LastFindResultTarget to release at location from previous FIND action.
+    Target supports LastFindResultTarget to release at location
+    from previous FIND action.
     """
 
     target: TargetConfig | None = None
@@ -107,7 +108,8 @@ class DragActionConfig(BaseModel):
 class ScrollActionConfig(BaseModel):
     """SCROLL action configuration.
 
-    Target supports LastFindResultTarget to scroll at location from previous FIND action.
+    Target supports LastFindResultTarget to scroll at location
+    from previous FIND action.
     """
 
     direction: Literal["up", "down", "left", "right"]

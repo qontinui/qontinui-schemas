@@ -13,4 +13,4 @@ class IdleCondition(BaseModel):
     AI tasks) before the task may run.
     """
 
-    enabled: bool = Field(..., description='Whether this condition is active.')
+    enabled: bool = Field(..., description="Whether this condition is active.")

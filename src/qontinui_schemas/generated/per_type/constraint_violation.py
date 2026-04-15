@@ -12,8 +12,8 @@ class ConstraintViolation(BaseModel):
     A specific violation found during constraint evaluation.
     """
 
-    detail: str = Field(..., description='What was found / what went wrong.')
+    detail: str = Field(..., description="What was found / what went wrong.")
     file: str | None = Field(
-        None, description='File where the violation was found (if applicable).'
+        None, description="File where the violation was found (if applicable)."
     )
-    line: conint(ge=0) | None = Field(None, description='Line number (if applicable).')
+    line: conint(ge=0) | None = Field(None, description="Line number (if applicable).")

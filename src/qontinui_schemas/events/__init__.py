@@ -4,7 +4,8 @@ This module contains event schemas used for real-time execution logging
 and historical playback across the Qontinui ecosystem.
 """
 
-from qontinui_schemas.events.healing_events import (  # Enums; Nested models; Main models; API models
+from qontinui_schemas.events.healing_events import (
+    # Enums; Nested models; Main models; API models
     CacheMetrics,
     HealingAttemptInfo,
     HealingEvent,
@@ -17,7 +18,8 @@ from qontinui_schemas.events.healing_events import (  # Enums; Nested models; Ma
     ReliabilityInfo,
     VisualValidationInfo,
 )
-from qontinui_schemas.events.tree_events import (  # Enums; Nested models; Main models; API models
+from qontinui_schemas.events.tree_events import (
+    # Enums; Nested models; Main models; API models
     ActionType,
     DisplayNode,
     ExecutionTreeResponse,

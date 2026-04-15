@@ -14,16 +14,16 @@ class ConditionStatus(BaseModel):
 
     idle_met: bool | None = Field(
         None,
-        description='Current idle-condition result. `None` if not yet checked,\n`Some(true)` if idle, `Some(false)` if busy.',
+        description="Current idle-condition result. `None` if not yet checked,\n`Some(true)` if idle, `Some(false)` if busy.",
     )
     repo_inactive_met: list[tuple[str, bool]] | None = Field(
         None,
-        description='Current repository-inactive status per repository: `(path, is_inactive)`.',
+        description="Current repository-inactive status per repository: `(path, is_inactive)`.",
     )
     timed_out: bool | None = Field(
         False,
-        description='Whether the overall condition-wait timeout has been exceeded.',
+        description="Whether the overall condition-wait timeout has been exceeded.",
     )
     waiting_since: str = Field(
-        ..., description='ISO 8601 timestamp when conditions began being evaluated.'
+        ..., description="ISO 8601 timestamp when conditions began being evaluated."
     )

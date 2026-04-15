@@ -15,9 +15,9 @@ class StructuredFinding(BaseModel):
     category: str = Field(
         ..., description='Finding category (e.g., "bug", "security", "performance").'
     )
-    description: str | None = Field('', description='Detailed description.')
+    description: str | None = Field("", description="Detailed description.")
     needs_input: bool | None = Field(
-        False, description='Whether this finding requires human input.'
+        False, description="Whether this finding requires human input."
     )
-    severity: str = Field(..., description='Severity level.')
-    title: str = Field(..., description='Short title describing the finding.')
+    severity: str = Field(..., description="Severity level.")
+    title: str = Field(..., description="Short title describing the finding.")

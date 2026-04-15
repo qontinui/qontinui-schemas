@@ -14,9 +14,9 @@ class ConfidenceLevel(StrEnum):
     Confidence level enum.
     """
 
-    high = 'high'
-    medium = 'medium'
-    low = 'low'
+    high = "high"
+    medium = "medium"
+    low = "low"
 
 
 class StructuredFinding(BaseModel):
@@ -27,12 +27,12 @@ class StructuredFinding(BaseModel):
     category: str = Field(
         ..., description='Finding category (e.g., "bug", "security", "performance").'
     )
-    description: str | None = Field('', description='Detailed description.')
+    description: str | None = Field("", description="Detailed description.")
     needs_input: bool | None = Field(
-        False, description='Whether this finding requires human input.'
+        False, description="Whether this finding requires human input."
     )
-    severity: str = Field(..., description='Severity level.')
-    title: str = Field(..., description='Short title describing the finding.')
+    severity: str = Field(..., description="Severity level.")
+    title: str = Field(..., description="Short title describing the finding.")
 
 
 class StructuredOverride(BaseModel):
@@ -40,9 +40,9 @@ class StructuredOverride(BaseModel):
     A criterion override with justification.
     """
 
-    criterion: str = Field(..., description='The criterion being overridden.')
-    justification: str = Field(..., description='Justification for the override.')
-    status: str = Field(..., description='The new status.')
+    criterion: str = Field(..., description="The criterion being overridden.")
+    justification: str = Field(..., description="Justification for the override.")
+    status: str = Field(..., description="The new status.")
 
 
 class StructuredSignal(BaseModel):
@@ -51,7 +51,7 @@ class StructuredSignal(BaseModel):
     """
 
     message: str | None = Field(
-        None, description='Optional message providing context for the signal.'
+        None, description="Optional message providing context for the signal."
     )
     signal_type: str = Field(
         ..., description='Signal type (e.g., "complete", "blocked", "needs_input").'
@@ -64,31 +64,31 @@ class WorkerOutput(BaseModel):
     """
 
     confidence: ConfidenceLevel | None = Field(
-        'medium', description='Confidence level in the work quality.'
+        "medium", description="Confidence level in the work quality."
     )
     criterion_overrides: list[StructuredOverride] | None = Field(
         [],
-        description='Criterion overrides with justifications.',
+        description="Criterion overrides with justifications.",
         validate_default=True,
     )
     files_modified: list[str] | None = Field(
-        [], description='Files that were modified in this iteration.'
+        [], description="Files that were modified in this iteration."
     )
     findings: list[StructuredFinding] | None = Field(
-        [], description='Findings discovered during work.', validate_default=True
+        [], description="Findings discovered during work.", validate_default=True
     )
     next_action_suggestion: str | None = Field(
-        None, description='Optional suggestion for next action if work continues.'
+        None, description="Optional suggestion for next action if work continues."
     )
     notes: str | None = Field(
-        None, description='Optional notes for debugging or context.'
+        None, description="Optional notes for debugging or context."
     )
     progress_estimate: float | None = Field(
-        None, description='Optional progress estimate (0.0 to 1.0).'
+        None, description="Optional progress estimate (0.0 to 1.0)."
     )
     signals: list[StructuredSignal] | None = Field(
-        [], description='Signals for orchestrator control flow.', validate_default=True
+        [], description="Signals for orchestrator control flow.", validate_default=True
     )
     work_summary: str = Field(
-        ..., description='Summary of work performed in this iteration.'
+        ..., description="Summary of work performed in this iteration."
     )

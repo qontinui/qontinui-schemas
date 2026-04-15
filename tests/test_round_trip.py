@@ -27,9 +27,7 @@ def _roundtrip(model_cls, fixture_name: str) -> None:
     parsed = model_cls.model_validate_json(raw)
     re_raw = parsed.model_dump_json(exclude_none=True, by_alias=True)
     # Compare as dicts so field ordering doesn't matter.
-    assert json.loads(re_raw) == json.loads(raw), (
-        f"{fixture_name}: round-trip diverged"
-    )
+    assert json.loads(re_raw) == json.loads(raw), f"{fixture_name}: round-trip diverged"
 
 
 def test_constraint_fixture_roundtrips() -> None:

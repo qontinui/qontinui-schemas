@@ -13,7 +13,7 @@ class StructuredSignal(BaseModel):
     """
 
     message: str | None = Field(
-        None, description='Optional message providing context for the signal.'
+        None, description="Optional message providing context for the signal."
     )
     signal_type: str = Field(
         ..., description='Signal type (e.g., "complete", "blocked", "needs_input").'

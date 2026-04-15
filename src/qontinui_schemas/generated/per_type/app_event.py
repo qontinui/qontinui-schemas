@@ -22,7 +22,7 @@ class AppEvent1(BaseModel):
     """
 
     data: Data
-    event_type: Literal['ExecutorEvent']
+    event_type: Literal["ExecutorEvent"]
 
 
 class Data1(BaseModel):
@@ -39,7 +39,7 @@ class AppEvent2(BaseModel):
     """
 
     data: Data1
-    event_type: Literal['ExecutorTreeEvent']
+    event_type: Literal["ExecutorTreeEvent"]
 
 
 class Data2(BaseModel):
@@ -53,7 +53,7 @@ class AppEvent3(BaseModel):
     """
 
     data: Data2
-    event_type: Literal['ExecutorError']
+    event_type: Literal["ExecutorError"]
 
 
 class Data3(BaseModel):
@@ -69,7 +69,7 @@ class AppEvent4(BaseModel):
     """
 
     data: Data3
-    event_type: Literal['ExecutorResponse']
+    event_type: Literal["ExecutorResponse"]
 
 
 class Data4(BaseModel):
@@ -82,7 +82,7 @@ class AppEvent5(BaseModel):
     """
 
     data: Data4
-    event_type: Literal['ImageRecognition']
+    event_type: Literal["ImageRecognition"]
 
 
 class Data5(BaseModel):
@@ -98,7 +98,7 @@ class AppEvent6(BaseModel):
     """
 
     data: Data5
-    event_type: Literal['ExtractionEvent']
+    event_type: Literal["ExtractionEvent"]
 
 
 class Data6(BaseModel):
@@ -112,7 +112,7 @@ class AppEvent7(BaseModel):
     """
 
     data: Data6
-    event_type: Literal['ExtractionError']
+    event_type: Literal["ExtractionError"]
 
 
 class Data7(BaseModel):
@@ -128,7 +128,7 @@ class AppEvent8(BaseModel):
     """
 
     data: Data7
-    event_type: Literal['ExtractionResponse']
+    event_type: Literal["ExtractionResponse"]
 
 
 class Data8(BaseModel):
@@ -147,7 +147,7 @@ class AppEvent9(BaseModel):
     """
 
     data: Data8
-    event_type: Literal['RagProgress']
+    event_type: Literal["RagProgress"]
 
 
 class Data9(BaseModel):
@@ -166,7 +166,7 @@ class AppEvent10(BaseModel):
     """
 
     data: Data9
-    event_type: Literal['RagCompletion']
+    event_type: Literal["RagCompletion"]
 
 
 class Data10(BaseModel):
@@ -181,7 +181,7 @@ class AppEvent12(BaseModel):
     """
 
     data: Data10
-    event_type: Literal['AiOutput']
+    event_type: Literal["AiOutput"]
 
 
 class Data11(BaseModel):
@@ -194,7 +194,7 @@ class AppEvent13(BaseModel):
     """
 
     data: Data11
-    event_type: Literal['FindingDetected']
+    event_type: Literal["FindingDetected"]
 
 
 class AppEvent14(BaseModel):
@@ -203,7 +203,7 @@ class AppEvent14(BaseModel):
     """
 
     data: Data11
-    event_type: Literal['FindingResolved']
+    event_type: Literal["FindingResolved"]
 
 
 class Data13(BaseModel):
@@ -216,7 +216,7 @@ class AppEvent15(BaseModel):
     """
 
     data: Data13
-    event_type: Literal['TestNavigation']
+    event_type: Literal["TestNavigation"]
 
 
 class AppEvent16(BaseModel):
@@ -225,7 +225,7 @@ class AppEvent16(BaseModel):
     """
 
     data: Data13
-    event_type: Literal['UiBridgeRequest']
+    event_type: Literal["UiBridgeRequest"]
 
 
 class Data15(BaseModel):
@@ -242,7 +242,7 @@ class AppEvent17(BaseModel):
     """
 
     data: Data15
-    event_type: Literal['OrchestratorStateChange']
+    event_type: Literal["OrchestratorStateChange"]
 
 
 class Data16(BaseModel):
@@ -260,7 +260,7 @@ class AppEvent18(BaseModel):
     """
 
     data: Data16
-    event_type: Literal['StepProgress']
+    event_type: Literal["StepProgress"]
 
 
 class Data17(BaseModel):
@@ -277,7 +277,7 @@ class AppEvent19(BaseModel):
     """
 
     data: Data17
-    event_type: Literal['TaskRunUpdate']
+    event_type: Literal["TaskRunUpdate"]
 
 
 class Data18(BaseModel):
@@ -293,7 +293,7 @@ class AppEvent20(BaseModel):
     """
 
     data: Data18
-    event_type: Literal['ApprovalRequired']
+    event_type: Literal["ApprovalRequired"]
 
 
 class Data19(BaseModel):
@@ -309,7 +309,7 @@ class AppEvent21(BaseModel):
     """
 
     data: Data19
-    event_type: Literal['ApprovalResolved']
+    event_type: Literal["ApprovalResolved"]
 
 
 class Data20(BaseModel):
@@ -327,7 +327,7 @@ class AppEvent22(BaseModel):
     """
 
     data: Data20
-    event_type: Literal['DeferredQuestionCreated']
+    event_type: Literal["DeferredQuestionCreated"]
 
 
 class Data21(BaseModel):
@@ -343,7 +343,7 @@ class AppEvent23(BaseModel):
     """
 
     data: Data21
-    event_type: Literal['DeferredQuestionReviewed']
+    event_type: Literal["DeferredQuestionReviewed"]
 
 
 class Data22(BaseModel):
@@ -359,7 +359,7 @@ class AppEvent24(BaseModel):
     """
 
     data: Data22
-    event_type: Literal['CanvasUpdate']
+    event_type: Literal["CanvasUpdate"]
 
 
 class Data23(BaseModel):
@@ -374,7 +374,7 @@ class AppEvent25(BaseModel):
     """
 
     data: Data23
-    event_type: Literal['AiOutputChunk']
+    event_type: Literal["AiOutputChunk"]
 
 
 class Data24(BaseModel):
@@ -394,7 +394,7 @@ class AppEvent26(BaseModel):
     """
 
     data: Data24
-    event_type: Literal['IterationMetrics']
+    event_type: Literal["IterationMetrics"]
 
 
 class Data25(BaseModel):
@@ -412,7 +412,7 @@ class AppEvent27(BaseModel):
     """
 
     data: Data25
-    event_type: Literal['BlameAttribution']
+    event_type: Literal["BlameAttribution"]
 
 
 class Data26(BaseModel):
@@ -429,7 +429,7 @@ class AppEvent28(BaseModel):
     """
 
     data: Data26
-    event_type: Literal['ConstraintResults']
+    event_type: Literal["ConstraintResults"]
 
 
 class Data27(BaseModel):
@@ -444,7 +444,7 @@ class AppEvent29(BaseModel):
     """
 
     data: Data27
-    event_type: Literal['WorkflowQueued']
+    event_type: Literal["WorkflowQueued"]
 
 
 class Data28(BaseModel):
@@ -459,7 +459,7 @@ class AppEvent30(BaseModel):
     """
 
     data: Data28
-    event_type: Literal['WorkflowDequeued']
+    event_type: Literal["WorkflowDequeued"]
 
 
 class Data29(BaseModel):
@@ -473,7 +473,7 @@ class AppEvent31(BaseModel):
     """
 
     data: Data29
-    event_type: Literal['Error']
+    event_type: Literal["Error"]
 
 
 class FlowEvent1(BaseModel):
@@ -484,7 +484,7 @@ class FlowEvent1(BaseModel):
     flow_id: str
     flow_name: str
     instance_id: str
-    type: Literal['flow_started']
+    type: Literal["flow_started"]
 
 
 class FlowEvent2(BaseModel):
@@ -496,7 +496,7 @@ class FlowEvent2(BaseModel):
     step_id: str
     step_name: str
     step_type: str
-    type: Literal['step_started']
+    type: Literal["step_started"]
 
 
 class FlowEvent3(BaseModel):
@@ -510,7 +510,7 @@ class FlowEvent3(BaseModel):
     outputs: dict[str, Any]
     step_id: str
     success: bool
-    type: Literal['step_completed']
+    type: Literal["step_completed"]
 
 
 class FlowEvent4(BaseModel):
@@ -524,7 +524,7 @@ class FlowEvent4(BaseModel):
     instance_id: str
     success: bool
     total_steps: conint(ge=0)
-    type: Literal['flow_completed']
+    type: Literal["flow_completed"]
 
 
 class FlowEvent5(BaseModel):
@@ -536,7 +536,7 @@ class FlowEvent5(BaseModel):
     options: list[str]
     prompt: str
     step_id: str
-    type: Literal['waiting_for_input']
+    type: Literal["waiting_for_input"]
 
 
 class FlowEvent6(BaseModel):
@@ -548,7 +548,7 @@ class FlowEvent6(BaseModel):
     instance_id: str
     step_id: str
     total: conint(ge=0)
-    type: Literal['parallel_progress']
+    type: Literal["parallel_progress"]
 
 
 class FlowEvent(
@@ -558,7 +558,7 @@ class FlowEvent(
 ):
     root: (
         FlowEvent1 | FlowEvent2 | FlowEvent3 | FlowEvent4 | FlowEvent5 | FlowEvent6
-    ) = Field(..., description='Events emitted during flow execution for UI updates.')
+    ) = Field(..., description="Events emitted during flow execution for UI updates.")
 
 
 class AppEvent11(BaseModel):
@@ -567,7 +567,7 @@ class AppEvent11(BaseModel):
     """
 
     data: FlowEvent
-    event_type: Literal['FlowEvent']
+    event_type: Literal["FlowEvent"]
 
 
 class AppEvent(
@@ -639,6 +639,6 @@ class AppEvent(
         | AppEvent31
     ) = Field(
         ...,
-        description='Unified application events for frontend communication.',
-        title='AppEvent',
+        description="Unified application events for frontend communication.",
+        title="AppEvent",
     )

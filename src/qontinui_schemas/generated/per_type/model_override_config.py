@@ -22,14 +22,14 @@ class RoutingRule(BaseModel):
         ..., description='Condition expression, e.g. `"verification_failures >= 2"`.'
     )
     max_tokens: conint(ge=0) | None = Field(
-        None, description='Max tokens override when this rule matches.'
+        None, description="Max tokens override when this rule matches."
     )
-    model: str | None = Field(None, description='Model to use when this rule matches.')
+    model: str | None = Field(None, description="Model to use when this rule matches.")
     provider: str | None = Field(
-        None, description='Provider to use when this rule matches.'
+        None, description="Provider to use when this rule matches."
     )
     temperature: float | None = Field(
-        None, description='Temperature override when this rule matches.'
+        None, description="Temperature override when this rule matches."
     )
 
 
@@ -43,21 +43,21 @@ class ModelOverrideConfig(BaseModel):
     """
 
     fallback_model: str | None = Field(
-        None, description='Fallback model if the primary fails with a retryable error.'
+        None, description="Fallback model if the primary fails with a retryable error."
     )
     fallback_provider: str | None = Field(
         None,
-        description='Fallback provider if the primary fails with a retryable error.',
+        description="Fallback provider if the primary fails with a retryable error.",
     )
     max_tokens: conint(ge=0) | None = Field(
-        None, description='Max output tokens override for this phase.'
+        None, description="Max output tokens override for this phase."
     )
-    model: str | None = Field(None, description='Model override for this phase.')
-    provider: str | None = Field(None, description='Provider override for this phase.')
+    model: str | None = Field(None, description="Model override for this phase.")
+    provider: str | None = Field(None, description="Provider override for this phase.")
     routing_rules: list[RoutingRule] | None = Field(
         None,
         description="Conditional routing rules evaluated at runtime. First matching rule\nwins; unmatched falls back to this config's static fields.",
     )
     temperature: float | None = Field(
-        None, description='Temperature override for this phase (`0.0`–`1.0`).'
+        None, description="Temperature override for this phase (`0.0`–`1.0`)."
     )

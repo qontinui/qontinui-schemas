@@ -13,11 +13,11 @@ class RetryPolicy(BaseModel):
     """
 
     backoff: bool | None = Field(
-        False, description='Whether to use exponential backoff.'
+        False, description="Whether to use exponential backoff."
     )
     count: conint(ge=0) | None = Field(
-        0, description='Number of retry attempts (`0` = no retries).'
+        0, description="Number of retry attempts (`0` = no retries)."
     )
     delay_ms: conint(ge=0) | None = Field(
-        2000, description='Delay between retries in milliseconds.'
+        2000, description="Delay between retries in milliseconds."
     )

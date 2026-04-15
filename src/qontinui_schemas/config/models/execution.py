@@ -67,7 +67,10 @@ class TransitionInfo(BaseModel):
     to_state: str | None = Field(
         ...,
         alias="toState",
-        description="ID of the destination state (may be null for transitions without a fixed destination)",
+        description=(
+            "ID of the destination state"
+            " (may be null for transitions without a fixed destination)"
+        ),
     )
     workflows: list[str] = Field(
         ..., description="List of workflow IDs that can trigger this transition"
@@ -96,7 +99,10 @@ class TransitionExecutionResult(BaseModel):
     )
     error: str | None = Field(
         None,
-        description="Error message if the transition failed (undefined if success is true)",
+        description=(
+            "Error message if the transition failed"
+            " (undefined if success is true)"
+        ),
     )
 
     model_config = {"populate_by_name": True}
@@ -113,7 +119,10 @@ class NavigationResult(BaseModel):
     )
     path: list[str] = Field(
         ...,
-        description="The path of states traversed during navigation (empty if navigation failed or no path was needed)",
+        description=(
+            "The path of states traversed during navigation"
+            " (empty if navigation failed or no path was needed)"
+        ),
     )
     active_states: list[str] = Field(
         ...,
@@ -123,11 +132,17 @@ class NavigationResult(BaseModel):
     target_state: str | None = Field(
         None,
         alias="targetState",
-        description="ID of the target state (single state navigation, undefined for multi-state)",
+        description=(
+            "ID of the target state"
+            " (single state navigation, undefined for multi-state)"
+        ),
     )
     results: list["NavigationResult"] | None = Field(
         None,
-        description="Detailed results for each state in multi-state navigation (undefined for single state)",
+        description=(
+            "Detailed results for each state in multi-state"
+            " navigation (undefined for single state)"
+        ),
     )
     error: str | None = Field(
         None,
@@ -150,7 +165,10 @@ class ActiveStatesResult(BaseModel):
     current_state: str | None = Field(
         None,
         alias="currentState",
-        description="The primary current state (if single-state mode, may be null if no state is active)",
+        description=(
+            "The primary current state"
+            " (if single-state mode, may be null if no state is active)"
+        ),
     )
     state_history: list[str] | None = Field(
         None,
@@ -174,12 +192,18 @@ class AvailableTransitionsResult(BaseModel):
     success: bool = Field(..., description="Whether the query executed successfully")
     transitions: list[TransitionInfo] = Field(
         ...,
-        description="List of available transitions (empty if no transitions are available or query failed)",
+        description=(
+            "List of available transitions"
+            " (empty if no transitions are available or query failed)"
+        ),
     )
     current_state: str | None = Field(
         None,
         alias="currentState",
-        description="The current state these transitions are available from (may be undefined if no current state)",
+        description=(
+            "The current state these transitions are available from"
+            " (may be undefined if no current state)"
+        ),
     )
     message: str | None = Field(
         None, description='Informational message (e.g., "No current state")'

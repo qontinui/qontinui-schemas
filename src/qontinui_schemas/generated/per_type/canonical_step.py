@@ -16,15 +16,15 @@ class CheckType(StrEnum):
     `mode = "check"` or `mode = "check_group"`.
     """
 
-    lint = 'lint'
-    format = 'format'
-    typecheck = 'typecheck'
-    analyze = 'analyze'
-    security = 'security'
-    custom_command = 'custom_command'
-    http_status = 'http_status'
-    ai_review = 'ai_review'
-    ci_cd = 'ci_cd'
+    lint = "lint"
+    format = "format"
+    typecheck = "typecheck"
+    analyze = "analyze"
+    security = "security"
+    custom_command = "custom_command"
+    http_status = "http_status"
+    ai_review = "ai_review"
+    ci_cd = "ci_cd"
 
 
 class CommandMode(StrEnum):
@@ -32,10 +32,10 @@ class CommandMode(StrEnum):
     Execution mode for a [`CommandStep`].
     """
 
-    shell = 'shell'
-    check = 'check'
-    check_group = 'check_group'
-    test = 'test'
+    shell = "shell"
+    check = "check"
+    check_group = "check_group"
+    test = "test"
 
 
 class CommandStepPhase(StrEnum):
@@ -43,9 +43,9 @@ class CommandStepPhase(StrEnum):
     Phases in which a [`CommandStep`] may appear.
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    completion = "completion"
 
 
 class PlaywrightExecutionMode(StrEnum):
@@ -53,8 +53,8 @@ class PlaywrightExecutionMode(StrEnum):
     Whether a Playwright test executes independently or as part of a chain.
     """
 
-    independent = 'independent'
-    chained = 'chained'
+    independent = "independent"
+    chained = "chained"
 
 
 class PromptStepPhase(StrEnum):
@@ -64,10 +64,10 @@ class PromptStepPhase(StrEnum):
     Prompt steps are the only variant that may appear in the agentic phase.
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    agentic = 'agentic'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    agentic = "agentic"
+    completion = "completion"
 
 
 class RetrySpec(BaseModel):
@@ -80,10 +80,10 @@ class RetrySpec(BaseModel):
     """
 
     count: conint(ge=0) = Field(
-        ..., description='Number of retry attempts (`0` = no retries).'
+        ..., description="Number of retry attempts (`0` = no retries)."
     )
     delay_ms: conint(ge=0) = Field(
-        ..., description='Delay between retries in milliseconds.'
+        ..., description="Delay between retries in milliseconds."
     )
 
 
@@ -92,11 +92,11 @@ class TestType(StrEnum):
     Test-runner kinds surfaced by `CommandStep` when `mode = "test"`.
     """
 
-    playwright = 'playwright'
-    qontinui_vision = 'qontinui_vision'
-    python = 'python'
-    repository = 'repository'
-    custom_command = 'custom_command'
+    playwright = "playwright"
+    qontinui_vision = "qontinui_vision"
+    python = "python"
+    repository = "repository"
+    custom_command = "custom_command"
 
 
 class UiBridgeAction(StrEnum):
@@ -104,13 +104,13 @@ class UiBridgeAction(StrEnum):
     UI Bridge action kind.
     """
 
-    navigate = 'navigate'
-    execute = 'execute'
-    assert_ = 'assert'
-    snapshot = 'snapshot'
-    compare = 'compare'
-    snapshot_assert = 'snapshot_assert'
-    action_plan = 'action_plan'
+    navigate = "navigate"
+    execute = "execute"
+    assert_ = "assert"
+    snapshot = "snapshot"
+    compare = "compare"
+    snapshot_assert = "snapshot_assert"
+    action_plan = "action_plan"
 
 
 class UiBridgeAssertType(StrEnum):
@@ -118,11 +118,11 @@ class UiBridgeAssertType(StrEnum):
     Kinds of assertion supported by `assert` actions.
     """
 
-    exists = 'exists'
-    text_equals = 'text_equals'
-    contains = 'contains'
-    visible = 'visible'
-    enabled = 'enabled'
+    exists = "exists"
+    text_equals = "text_equals"
+    contains = "contains"
+    visible = "visible"
+    enabled = "enabled"
 
 
 class UiBridgeComparisonMode(StrEnum):
@@ -130,9 +130,9 @@ class UiBridgeComparisonMode(StrEnum):
     Comparison mode for `compare` / `snapshot_assert` actions.
     """
 
-    structural = 'structural'
-    visual = 'visual'
-    both = 'both'
+    structural = "structural"
+    visual = "visual"
+    both = "both"
 
 
 class UiBridgeSeverity(StrEnum):
@@ -140,10 +140,10 @@ class UiBridgeSeverity(StrEnum):
     Severity threshold for `compare` / `snapshot_assert` actions.
     """
 
-    critical = 'critical'
-    major = 'major'
-    minor = 'minor'
-    info = 'info'
+    critical = "critical"
+    major = "major"
+    minor = "minor"
+    info = "info"
 
 
 class UiBridgeStepPhase(StrEnum):
@@ -154,9 +154,9 @@ class UiBridgeStepPhase(StrEnum):
     the agentic loop (where the AI drives steps directly via prompts).
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    completion = "completion"
 
 
 class VerificationCategoryKind(StrEnum):
@@ -167,11 +167,11 @@ class VerificationCategoryKind(StrEnum):
     module because it is only referenced from [`BaseStepFields`].
     """
 
-    existence = 'existence'
-    uniqueness = 'uniqueness'
-    referential_integrity = 'referential_integrity'
-    semantic_correctness = 'semantic_correctness'
-    runtime_behavior = 'runtime_behavior'
+    existence = "existence"
+    uniqueness = "uniqueness"
+    referential_integrity = "referential_integrity"
+    semantic_correctness = "semantic_correctness"
+    runtime_behavior = "runtime_behavior"
 
 
 class WorkflowStepPhase(StrEnum):
@@ -179,9 +179,9 @@ class WorkflowStepPhase(StrEnum):
     Phases in which a [`WorkflowStep`] may appear.
     """
 
-    setup = 'setup'
-    verification = 'verification'
-    completion = 'completion'
+    setup = "setup"
+    verification = "verification"
+    completion = "completion"
 
 
 class CanonicalStep1(BaseModel):
@@ -193,100 +193,100 @@ class CanonicalStep1(BaseModel):
     """
 
     auto_fix: bool | None = Field(
-        None, description='Whether to auto-fix during the check.'
+        None, description="Whether to auto-fix during the check."
     )
     branch: str | None = Field(
-        None, description='Branch selector for repository-targeted steps.'
+        None, description="Branch selector for repository-targeted steps."
     )
-    check_group_id: str | None = Field(None, description='Saved check-group ID.')
-    check_id: str | None = Field(None, description='Saved check definition ID.')
+    check_group_id: str | None = Field(None, description="Saved check-group ID.")
+    check_id: str | None = Field(None, description="Saved check definition ID.")
     check_type: CheckType | None = Field(
         None,
-        description='Kind of deterministic check (for `check` / `check_group` modes).',
+        description="Kind of deterministic check (for `check` / `check_group` modes).",
     )
     code: str | None = Field(
-        None, description='Inline code body (e.g., Python snippet).'
+        None, description="Inline code body (e.g., Python snippet)."
     )
     command: str | None = Field(
-        None, description='Shell command line (for `shell` mode).'
+        None, description="Shell command line (for `shell` mode)."
     )
     config_path: str | None = Field(
         None, description="Path to the check's config file."
     )
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     execution_mode: PlaywrightExecutionMode | None = Field(
-        None, description='Execution mode for Playwright tests.'
+        None, description="Execution mode for Playwright tests."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
     fail_on_error: bool | None = Field(
-        None, description='Whether non-zero exit status fails the step.'
+        None, description="Whether non-zero exit status fails the step."
     )
     fail_on_warning: bool | None = Field(
-        None, description='Fail the step on warnings in addition to errors.'
+        None, description="Fail the step on warnings in addition to errors."
     )
-    fused_script_id: str | None = Field(None, description='Saved fused-script ID.')
-    id: str = Field(..., description='Unique identifier for the step.')
+    fused_script_id: str | None = Field(None, description="Saved fused-script ID.")
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     mode: CommandMode | None = Field(
-        None, description='Execution mode — which sub-kind of command step this is.'
+        None, description="Execution mode — which sub-kind of command step this is."
     )
-    name: str = Field(..., description='Display name for the step.')
-    phase: CommandStepPhase = Field(..., description='Phase in which the step appears.')
+    name: str = Field(..., description="Display name for the step.")
+    phase: CommandStepPhase = Field(..., description="Phase in which the step appears.")
     repository: str | None = Field(
-        None, description='Repository selector for repository-targeted steps.'
+        None, description="Repository selector for repository-targeted steps."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     run_on_subsequent_iterations: bool | None = Field(
-        None, description='Re-run this step on every verification-agentic iteration.'
+        None, description="Re-run this step on every verification-agentic iteration."
     )
-    script_content: str | None = Field(None, description='Inline script contents.')
-    script_id: str | None = Field(None, description='Saved script ID.')
+    script_content: str | None = Field(None, description="Inline script contents.")
+    script_id: str | None = Field(None, description="Saved script ID.")
     shell_command_id: str | None = Field(
-        None, description='Saved shell command template ID.'
+        None, description="Saved shell command template ID."
     )
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     target_url: str | None = Field(
-        None, description='Target URL for navigation-style tests.'
+        None, description="Target URL for navigation-style tests."
     )
-    test_id: str | None = Field(None, description='Saved test ID.')
-    test_type: TestType | None = Field(None, description='Test runner kind.')
+    test_id: str | None = Field(None, description="Saved test ID.")
+    test_type: TestType | None = Field(None, description="Test runner kind.")
     timeout_seconds: conint(ge=0) | None = Field(
-        None, description='Timeout in seconds.'
+        None, description="Timeout in seconds."
     )
     tool: str | None = Field(
-        None, description='Tool identifier (e.g., `eslint`, `ruff`).'
+        None, description="Tool identifier (e.g., `eslint`, `ruff`)."
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
     wait_for_completion: bool | None = Field(
-        None, description='Whether the caller waits for the workflow to complete.'
+        None, description="Whether the caller waits for the workflow to complete."
     )
-    workflow_name: str | None = Field(None, description='Name of a workflow to invoke.')
+    workflow_name: str | None = Field(None, description="Name of a workflow to invoke.")
     working_directory: str | None = Field(
-        None, description='Working directory for the command.'
+        None, description="Working directory for the command."
     )
-    type: Literal['command']
+    type: Literal["command"]
 
 
 class CanonicalStep2(BaseModel):
@@ -294,48 +294,48 @@ class CanonicalStep2(BaseModel):
     AI task instructions (prompt).
     """
 
-    content: str = Field(..., description='Prompt body.')
+    content: str = Field(..., description="Prompt body.")
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     is_summary_step: bool | None = Field(
         None,
-        description='Marks this prompt as the summary step at the end of completion.',
+        description="Marks this prompt as the summary step at the end of completion.",
     )
-    model: str | None = Field(None, description='Model override.')
-    name: str = Field(..., description='Display name for the step.')
-    phase: PromptStepPhase = Field(..., description='Phase in which the step appears.')
+    model: str | None = Field(None, description="Model override.")
+    name: str = Field(..., description="Display name for the step.")
+    phase: PromptStepPhase = Field(..., description="Phase in which the step appears.")
     prompt_id: str | None = Field(
-        None, description='Saved prompt ID (when the body is a reference).'
+        None, description="Saved prompt ID (when the body is a reference)."
     )
-    provider: str | None = Field(None, description='AI provider override.')
+    provider: str | None = Field(None, description="AI provider override.")
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
-    type: Literal['prompt']
+    type: Literal["prompt"]
 
 
 class CanonicalStep3(BaseModel):
@@ -343,69 +343,69 @@ class CanonicalStep3(BaseModel):
     UI Bridge SDK interaction — navigate, execute, assert, snapshot, compare.
     """
 
-    action: UiBridgeAction = Field(..., description='Action kind.')
+    action: UiBridgeAction = Field(..., description="Action kind.")
     action_plan: Any | None = Field(
         None,
-        description='Structured action plan (for `action_plan`).\n\nTyped as `serde_json::Value` here to avoid pulling the `action-plan`\nmodule into this crate; the TS side re-imports the typed `ActionPlan`\nafter regeneration.',
+        description="Structured action plan (for `action_plan`).\n\nTyped as `serde_json::Value` here to avoid pulling the `action-plan`\nmodule into this crate; the TS side re-imports the typed `ActionPlan`\nafter regeneration.",
     )
     assert_type: UiBridgeAssertType | None = Field(
-        None, description='Assertion kind (for `assert`).'
+        None, description="Assertion kind (for `assert`)."
     )
     comparison_mode: UiBridgeComparisonMode | None = Field(
-        None, description='Comparison mode (for `compare` / `snapshot_assert`).'
+        None, description="Comparison mode (for `compare` / `snapshot_assert`)."
     )
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
-    expected: str | None = Field(None, description='Expected value for assertions.')
+    expected: str | None = Field(None, description="Expected value for assertions.")
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     instruction: str | None = Field(
-        None, description='Free-form instruction text (for `execute`).'
+        None, description="Free-form instruction text (for `execute`)."
     )
-    name: str = Field(..., description='Display name for the step.')
+    name: str = Field(..., description="Display name for the step.")
     phase: UiBridgeStepPhase = Field(
-        ..., description='Phase in which the step appears.'
+        ..., description="Phase in which the step appears."
     )
     reference_snapshot_id: str | None = Field(
-        None, description='Reference snapshot ID (for `compare` / `snapshot_assert`).'
+        None, description="Reference snapshot ID (for `compare` / `snapshot_assert`)."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     severity_threshold: UiBridgeSeverity | None = Field(
-        None, description='Severity threshold (for `compare` / `snapshot_assert`).'
+        None, description="Severity threshold (for `compare` / `snapshot_assert`)."
     )
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
-    target: str | None = Field(None, description='Target selector or element ID.')
+    target: str | None = Field(None, description="Target selector or element ID.")
     timeout_ms: conint(ge=0) | None = Field(
-        None, description='Timeout in milliseconds.'
+        None, description="Timeout in milliseconds."
     )
     ui_bridge_snapshot_target: str | None = Field(
         None, description='Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.'
     )
-    url: str | None = Field(None, description='Navigation URL (for `navigate`).')
+    url: str | None = Field(None, description="Navigation URL (for `navigate`).")
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
-    type: Literal['ui_bridge']
+    type: Literal["ui_bridge"]
 
 
 class CanonicalStep4(BaseModel):
@@ -414,43 +414,43 @@ class CanonicalStep4(BaseModel):
     """
 
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
-    name: str = Field(..., description='Display name for the step.')
+    name: str = Field(..., description="Display name for the step.")
     phase: WorkflowStepPhase = Field(
-        ..., description='Phase in which the step appears.'
+        ..., description="Phase in which the step appears."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
-    workflow_id: str = Field(..., description='ID of the saved workflow to run.')
+    workflow_id: str = Field(..., description="ID of the saved workflow to run.")
     workflow_name: str = Field(
-        ..., description='Display name of the saved workflow (denormalized for UI).'
+        ..., description="Display name of the saved workflow (denormalized for UI)."
     )
-    type: Literal['workflow']
+    type: Literal["workflow"]
 
 
 class CanonicalStep(
@@ -459,7 +459,7 @@ class CanonicalStep(
     root: CanonicalStep1 | CanonicalStep2 | CanonicalStep3 | CanonicalStep4 = Field(
         ...,
         description='Discriminated union over the four canonical step variants.\n\nWire format is a flat object with a `"type"` discriminator — serde\'s\ninternal tagging merges the inner struct\'s fields (including the flattened\n[`BaseStepFields`]) up into the top-level object. Example:\n\n```text\n{"type":"command","id":"s1","name":"build","phase":"setup","mode":"shell","command":"cargo build"}\n```\n\nConsumers that want a strict 4-variant typed view should use\n[`CanonicalStep`]. Consumers that need to tolerate runner-specific step\ntypes (e.g. `gate`, `screenshot`, `playwright`, `state`, `action`,\n`log_watch`, and others dispatched by the runner but absent from the\nwire-contract surface) should use [`UnifiedStep`], which preserves\nunknown payloads verbatim as `serde_json::Value`.',
-        title='CanonicalStep',
+        title="CanonicalStep",
     )
 
 
@@ -472,98 +472,98 @@ class CommandStep(BaseModel):
     """
 
     auto_fix: bool | None = Field(
-        None, description='Whether to auto-fix during the check.'
+        None, description="Whether to auto-fix during the check."
     )
     branch: str | None = Field(
-        None, description='Branch selector for repository-targeted steps.'
+        None, description="Branch selector for repository-targeted steps."
     )
-    check_group_id: str | None = Field(None, description='Saved check-group ID.')
-    check_id: str | None = Field(None, description='Saved check definition ID.')
+    check_group_id: str | None = Field(None, description="Saved check-group ID.")
+    check_id: str | None = Field(None, description="Saved check definition ID.")
     check_type: CheckType | None = Field(
         None,
-        description='Kind of deterministic check (for `check` / `check_group` modes).',
+        description="Kind of deterministic check (for `check` / `check_group` modes).",
     )
     code: str | None = Field(
-        None, description='Inline code body (e.g., Python snippet).'
+        None, description="Inline code body (e.g., Python snippet)."
     )
     command: str | None = Field(
-        None, description='Shell command line (for `shell` mode).'
+        None, description="Shell command line (for `shell` mode)."
     )
     config_path: str | None = Field(
         None, description="Path to the check's config file."
     )
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     execution_mode: PlaywrightExecutionMode | None = Field(
-        None, description='Execution mode for Playwright tests.'
+        None, description="Execution mode for Playwright tests."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
     fail_on_error: bool | None = Field(
-        None, description='Whether non-zero exit status fails the step.'
+        None, description="Whether non-zero exit status fails the step."
     )
     fail_on_warning: bool | None = Field(
-        None, description='Fail the step on warnings in addition to errors.'
+        None, description="Fail the step on warnings in addition to errors."
     )
-    fused_script_id: str | None = Field(None, description='Saved fused-script ID.')
-    id: str = Field(..., description='Unique identifier for the step.')
+    fused_script_id: str | None = Field(None, description="Saved fused-script ID.")
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     mode: CommandMode | None = Field(
-        None, description='Execution mode — which sub-kind of command step this is.'
+        None, description="Execution mode — which sub-kind of command step this is."
     )
-    name: str = Field(..., description='Display name for the step.')
-    phase: CommandStepPhase = Field(..., description='Phase in which the step appears.')
+    name: str = Field(..., description="Display name for the step.")
+    phase: CommandStepPhase = Field(..., description="Phase in which the step appears.")
     repository: str | None = Field(
-        None, description='Repository selector for repository-targeted steps.'
+        None, description="Repository selector for repository-targeted steps."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     run_on_subsequent_iterations: bool | None = Field(
-        None, description='Re-run this step on every verification-agentic iteration.'
+        None, description="Re-run this step on every verification-agentic iteration."
     )
-    script_content: str | None = Field(None, description='Inline script contents.')
-    script_id: str | None = Field(None, description='Saved script ID.')
+    script_content: str | None = Field(None, description="Inline script contents.")
+    script_id: str | None = Field(None, description="Saved script ID.")
     shell_command_id: str | None = Field(
-        None, description='Saved shell command template ID.'
+        None, description="Saved shell command template ID."
     )
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     target_url: str | None = Field(
-        None, description='Target URL for navigation-style tests.'
+        None, description="Target URL for navigation-style tests."
     )
-    test_id: str | None = Field(None, description='Saved test ID.')
-    test_type: TestType | None = Field(None, description='Test runner kind.')
+    test_id: str | None = Field(None, description="Saved test ID.")
+    test_type: TestType | None = Field(None, description="Test runner kind.")
     timeout_seconds: conint(ge=0) | None = Field(
-        None, description='Timeout in seconds.'
+        None, description="Timeout in seconds."
     )
     tool: str | None = Field(
-        None, description='Tool identifier (e.g., `eslint`, `ruff`).'
+        None, description="Tool identifier (e.g., `eslint`, `ruff`)."
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
     wait_for_completion: bool | None = Field(
-        None, description='Whether the caller waits for the workflow to complete.'
+        None, description="Whether the caller waits for the workflow to complete."
     )
-    workflow_name: str | None = Field(None, description='Name of a workflow to invoke.')
+    workflow_name: str | None = Field(None, description="Name of a workflow to invoke.")
     working_directory: str | None = Field(
-        None, description='Working directory for the command.'
+        None, description="Working directory for the command."
     )
 
 
@@ -572,46 +572,46 @@ class PromptStep(BaseModel):
     AI task instructions (prompt).
     """
 
-    content: str = Field(..., description='Prompt body.')
+    content: str = Field(..., description="Prompt body.")
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     is_summary_step: bool | None = Field(
         None,
-        description='Marks this prompt as the summary step at the end of completion.',
+        description="Marks this prompt as the summary step at the end of completion.",
     )
-    model: str | None = Field(None, description='Model override.')
-    name: str = Field(..., description='Display name for the step.')
-    phase: PromptStepPhase = Field(..., description='Phase in which the step appears.')
+    model: str | None = Field(None, description="Model override.")
+    name: str = Field(..., description="Display name for the step.")
+    phase: PromptStepPhase = Field(..., description="Phase in which the step appears.")
     prompt_id: str | None = Field(
-        None, description='Saved prompt ID (when the body is a reference).'
+        None, description="Saved prompt ID (when the body is a reference)."
     )
-    provider: str | None = Field(None, description='AI provider override.')
+    provider: str | None = Field(None, description="AI provider override.")
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
 
 
@@ -620,67 +620,67 @@ class UiBridgeStep(BaseModel):
     UI Bridge SDK interaction — navigate, execute, assert, snapshot, compare.
     """
 
-    action: UiBridgeAction = Field(..., description='Action kind.')
+    action: UiBridgeAction = Field(..., description="Action kind.")
     action_plan: Any | None = Field(
         None,
-        description='Structured action plan (for `action_plan`).\n\nTyped as `serde_json::Value` here to avoid pulling the `action-plan`\nmodule into this crate; the TS side re-imports the typed `ActionPlan`\nafter regeneration.',
+        description="Structured action plan (for `action_plan`).\n\nTyped as `serde_json::Value` here to avoid pulling the `action-plan`\nmodule into this crate; the TS side re-imports the typed `ActionPlan`\nafter regeneration.",
     )
     assert_type: UiBridgeAssertType | None = Field(
-        None, description='Assertion kind (for `assert`).'
+        None, description="Assertion kind (for `assert`)."
     )
     comparison_mode: UiBridgeComparisonMode | None = Field(
-        None, description='Comparison mode (for `compare` / `snapshot_assert`).'
+        None, description="Comparison mode (for `compare` / `snapshot_assert`)."
     )
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
-    expected: str | None = Field(None, description='Expected value for assertions.')
+    expected: str | None = Field(None, description="Expected value for assertions.")
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
     instruction: str | None = Field(
-        None, description='Free-form instruction text (for `execute`).'
+        None, description="Free-form instruction text (for `execute`)."
     )
-    name: str = Field(..., description='Display name for the step.')
+    name: str = Field(..., description="Display name for the step.")
     phase: UiBridgeStepPhase = Field(
-        ..., description='Phase in which the step appears.'
+        ..., description="Phase in which the step appears."
     )
     reference_snapshot_id: str | None = Field(
-        None, description='Reference snapshot ID (for `compare` / `snapshot_assert`).'
+        None, description="Reference snapshot ID (for `compare` / `snapshot_assert`)."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     severity_threshold: UiBridgeSeverity | None = Field(
-        None, description='Severity threshold (for `compare` / `snapshot_assert`).'
+        None, description="Severity threshold (for `compare` / `snapshot_assert`)."
     )
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
-    target: str | None = Field(None, description='Target selector or element ID.')
+    target: str | None = Field(None, description="Target selector or element ID.")
     timeout_ms: conint(ge=0) | None = Field(
-        None, description='Timeout in milliseconds.'
+        None, description="Timeout in milliseconds."
     )
     ui_bridge_snapshot_target: str | None = Field(
         None, description='Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.'
     )
-    url: str | None = Field(None, description='Navigation URL (for `navigate`).')
+    url: str | None = Field(None, description="Navigation URL (for `navigate`).")
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
 
 
@@ -690,39 +690,39 @@ class WorkflowStep(BaseModel):
     """
 
     criterion_ids: list[str] | None = Field(
-        None, description='Acceptance criterion IDs verified by this step.'
+        None, description="Acceptance criterion IDs verified by this step."
     )
     depends_on: list[str] | None = Field(
-        None, description='IDs of other steps that must complete first.'
+        None, description="IDs of other steps that must complete first."
     )
     extract: dict[str, str] | None = Field(
-        None, description='Extractions published to subsequent steps.'
+        None, description="Extractions published to subsequent steps."
     )
     fail_on_console_errors: bool | None = Field(
         None,
-        description='If `Some(true)`, a console-error signal from the UI fails this step.',
+        description="If `Some(true)`, a console-error signal from the UI fails this step.",
     )
-    id: str = Field(..., description='Unique identifier for the step.')
+    id: str = Field(..., description="Unique identifier for the step.")
     inputs: dict[str, str] | None = Field(
-        None, description='Named input bindings evaluated at step entry.'
+        None, description="Named input bindings evaluated at step entry."
     )
-    name: str = Field(..., description='Display name for the step.')
+    name: str = Field(..., description="Display name for the step.")
     phase: WorkflowStepPhase = Field(
-        ..., description='Phase in which the step appears.'
+        ..., description="Phase in which the step appears."
     )
     required: bool | None = Field(
         None,
-        description='Whether this step is required (default: `true` on consumer side).',
+        description="Whether this step is required (default: `true` on consumer side).",
     )
-    retry: RetrySpec | None = Field(None, description='Per-step retry configuration.')
+    retry: RetrySpec | None = Field(None, description="Per-step retry configuration.")
     skill_origin: Any | None = Field(
         None,
-        description='Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.',
+        description="Provenance of this step when generated from a skill template.\n\nTyped as `serde_json::Value` here to avoid pulling the `skill`\ndependency chain into this module; the TS side re-imports the typed\n`SkillOrigin` after regeneration.",
     )
     verification_category: VerificationCategoryKind | None = Field(
-        None, description='Verification depth category.'
+        None, description="Verification depth category."
     )
-    workflow_id: str = Field(..., description='ID of the saved workflow to run.')
+    workflow_id: str = Field(..., description="ID of the saved workflow to run.")
     workflow_name: str = Field(
-        ..., description='Display name of the saved workflow (denormalized for UI).'
+        ..., description="Display name of the saved workflow (denormalized for UI)."
     )

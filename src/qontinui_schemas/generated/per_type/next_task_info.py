@@ -12,8 +12,8 @@ class NextTaskInfo(BaseModel):
     Minimal description of the next task due to run.
     """
 
-    id: str = Field(..., description='Task ID.')
-    name: str = Field(..., description='Task display name.')
+    id: str = Field(..., description="Task ID.")
+    name: str = Field(..., description="Task display name.")
     next_run: str = Field(
-        ..., description='ISO 8601 timestamp of the next scheduled run.'
+        ..., description="ISO 8601 timestamp of the next scheduled run."
     )

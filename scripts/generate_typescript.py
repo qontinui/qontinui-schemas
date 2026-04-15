@@ -361,8 +361,9 @@ def generate_config_types() -> bool:
             # Schedule
             config_root.Schedule,
             config_root.ExecutionRecord,
-            # NOTE: QontinuiConfig excluded - it references Workflow, State, Transition
-            # from other modules. Frontend maintains its own QontinuiConfig in export-schema.ts
+            # NOTE: QontinuiConfig excluded - it references Workflow,
+            # State, Transition from other modules. Frontend maintains
+            # its own QontinuiConfig in export-schema.ts
         ]
 
         # Generate combined JSON schema
@@ -606,7 +607,11 @@ def generate_execution_types() -> bool:
         ts_content = generate_typescript_from_models(models_list)
 
         # Add import for tree_events types used by execution types
-        import_line = "\nimport type { TreeNode, PathElement, DisplayNode, NodeMetadata, NodeType, NodeStatus } from './tree_events';\n"
+        import_line = (
+            "\nimport type { TreeNode, PathElement, DisplayNode,"
+            " NodeMetadata, NodeType, NodeStatus }"
+            " from './tree_events';\n"
+        )
         header_end = ts_content.find("*/\n") + 3
         ts_content = ts_content[:header_end] + import_line + ts_content[header_end:]
 
@@ -1033,7 +1038,8 @@ export type {
   WorkflowConnections,
 } from "./workflow";
 
-import type { Category, ConfigMetadata, ImageAsset, ConfigSettings, Schedule, ExecutionRecord, Context } from "./config";
+import type { Category, ConfigMetadata, ImageAsset, ConfigSettings,
+  Schedule, ExecutionRecord, Context } from "./config";
 import type { Workflow, State, Transition } from "./workflow";
 
 """
@@ -1461,7 +1467,8 @@ def generate_typescript_from_models(models: list[Any]) -> str:
     lines = [
         "/**",
         " * Auto-generated TypeScript types from qontinui-schemas",
-        " * DO NOT EDIT - regenerate with: poetry run python scripts/generate_typescript.py",
+        " * DO NOT EDIT - regenerate with:"
+        " poetry run python scripts/generate_typescript.py",
         " */",
         "",
     ]
@@ -1497,7 +1504,8 @@ def generate_typescript_from_models(models: list[Any]) -> str:
             is_optional = not field_info.is_required()
             optional_marker = "?" if is_optional else ""
 
-            # Use alias if available (for camelCase field names), otherwise use field_name
+            # Use alias if available (for camelCase field names),
+            # otherwise use field_name
             # Pydantic stores alias in field_info.alias
             output_name = field_info.alias if field_info.alias else field_name
 

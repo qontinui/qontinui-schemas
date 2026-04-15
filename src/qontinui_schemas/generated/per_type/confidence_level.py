@@ -12,6 +12,6 @@ class ConfidenceLevel(StrEnum):
     Confidence level enum.
     """
 
-    high = 'high'
-    medium = 'medium'
-    low = 'low'
+    high = "high"
+    medium = "medium"
+    low = "low"

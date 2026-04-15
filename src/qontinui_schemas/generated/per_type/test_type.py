@@ -12,8 +12,8 @@ class TestType(StrEnum):
     Test-runner kinds surfaced by `CommandStep` when `mode = "test"`.
     """
 
-    playwright = 'playwright'
-    qontinui_vision = 'qontinui_vision'
-    python = 'python'
-    repository = 'repository'
-    custom_command = 'custom_command'
+    playwright = "playwright"
+    qontinui_vision = "qontinui_vision"
+    python = "python"
+    repository = "repository"
+    custom_command = "custom_command"

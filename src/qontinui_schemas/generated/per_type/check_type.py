@@ -13,12 +13,12 @@ class CheckType(StrEnum):
     `mode = "check"` or `mode = "check_group"`.
     """
 
-    lint = 'lint'
-    format = 'format'
-    typecheck = 'typecheck'
-    analyze = 'analyze'
-    security = 'security'
-    custom_command = 'custom_command'
-    http_status = 'http_status'
-    ai_review = 'ai_review'
-    ci_cd = 'ci_cd'
+    lint = "lint"
+    format = "format"
+    typecheck = "typecheck"
+    analyze = "analyze"
+    security = "security"
+    custom_command = "custom_command"
+    http_status = "http_status"
+    ai_review = "ai_review"
+    ci_cd = "ci_cd"

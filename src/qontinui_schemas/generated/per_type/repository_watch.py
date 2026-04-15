@@ -14,6 +14,6 @@ class RepositoryWatch(BaseModel):
 
     inactive_minutes: conint(ge=0) = Field(
         ...,
-        description='Minutes of inactivity required before the watch is considered met.',
+        description="Minutes of inactivity required before the watch is considered met.",
     )
-    path: str = Field(..., description='Path to the repository directory.')
+    path: str = Field(..., description="Path to the repository directory.")

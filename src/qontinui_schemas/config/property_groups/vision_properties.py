@@ -84,7 +84,10 @@ class ImageDebugConfig(BaseModel):
     # Debug data emission
     emit_match_details: bool = Field(
         default=True,
-        description="When True, emit detailed match info including top N matches and debug data",
+        description=(
+            "When True, emit detailed match info"
+            " including top N matches and debug data"
+        ),
     )
 
 

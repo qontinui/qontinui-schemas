@@ -13,7 +13,7 @@ class FindingOutput(BaseModel):
     """
 
     category: str
-    description: str | None = ''
+    description: str | None = ""
     needs_input: bool | None = False
     resolved: bool | None = False
     severity: str
