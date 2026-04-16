@@ -60,5 +60,7 @@ poetry.lock
 rust/target/
 
 # TypeScript
+node_modules/
 ts/node_modules/
+package-lock.json
 .worktrees/
