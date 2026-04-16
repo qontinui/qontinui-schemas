@@ -10,6 +10,7 @@
 //! contract and the Rust types.
 
 use qontinui_types::constraints::*;
+use qontinui_types::orchestration_config::*;
 use qontinui_types::process_management::*;
 use qontinui_types::scheduler::*;
 use qontinui_types::workflow::*;
@@ -6206,5 +6207,1349 @@ fn ticket_provider_config_empty_labels_skipped() {
         v.get("actionable_labels").is_none(),
         "empty actionable_labels must be skipped"
     );
+}
+
+// ============================================================================
+// orchestration_config ──────────────────────────────────────────────────────
+// ============================================================================
+
+#[test]
+fn exit_strategy_roundtrips_tagged_snake_case() {
+    let cases = [
+        (ExitStrategy::Reflection, r#"{"type":"reflection"}"#),
+        (
+            ExitStrategy::WorkflowVerification,
+            r#"{"type":"workflow_verification"}"#,
+        ),
+        (
+            ExitStrategy::FixedIterations,
+            r#"{"type":"fixed_iterations"}"#,
+        ),
+        (
+            ExitStrategy::DiagnosticEvaluation,
+            r#"{"type":"diagnostic_evaluation"}"#,
+        ),
+    ];
+    for (e, expected) in cases {
+        let json = serde_json::to_string(&e).unwrap();
+        assert_eq!(json, expected, "ExitStrategy tag mismatch");
+        let back: ExitStrategy = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, e);
+    }
+    // Default is Reflection.
+    assert_eq!(ExitStrategy::default(), ExitStrategy::Reflection);
+}
+
+#[test]
+fn between_iterations_roundtrips_with_payload() {
+    let cases = [
+        (
+            BetweenIterations::None,
+            r#"{"type":"none"}"#,
+        ),
+        (
+            BetweenIterations::WaitHealthy,
+            r#"{"type":"wait_healthy"}"#,
+        ),
+        (
+            BetweenIterations::RestartRunner { rebuild: true },
+            r#"{"type":"restart_runner","rebuild":true}"#,
+        ),
+        (
+            BetweenIterations::RestartOnSignal { rebuild: false },
+            r#"{"type":"restart_on_signal","rebuild":false}"#,
+        ),
+    ];
+    for (b, expected) in cases {
+        let json = serde_json::to_string(&b).unwrap();
+        assert_eq!(json, expected, "BetweenIterations mismatch");
+        let back: BetweenIterations = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, b);
+    }
+    assert_eq!(BetweenIterations::default(), BetweenIterations::None);
+}
+
+#[test]
+fn loop_phase_roundtrips_snake_case() {
+    let json = serde_json::to_string(&LoopPhase::ImplementingFixes).unwrap();
+    assert_eq!(json, "\"implementing_fixes\"");
+    let back: LoopPhase = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, LoopPhase::ImplementingFixes);
+    assert_eq!(LoopPhase::default(), LoopPhase::Idle);
+}
+
+#[test]
+fn root_cause_category_roundtrips_snake_case() {
+    let cases = [
+        (RootCauseCategory::BadUiRendering, "\"bad_ui_rendering\""),
+        (
+            RootCauseCategory::BadUiBridgeEvaluation,
+            "\"bad_ui_bridge_evaluation\"",
+        ),
+        (
+            RootCauseCategory::BadVerificationSteps,
+            "\"bad_verification_steps\"",
+        ),
+        (
+            RootCauseCategory::BadGenerationPrompt,
+            "\"bad_generation_prompt\"",
+        ),
+        (
+            RootCauseCategory::BadStateMachineLogic,
+            "\"bad_state_machine_logic\"",
+        ),
+        (
+            RootCauseCategory::InfrastructureIssue,
+            "\"infrastructure_issue\"",
+        ),
+        (RootCauseCategory::Unknown, "\"unknown\""),
+    ];
+    for (rc, expected) in cases {
+        let json = serde_json::to_string(&rc).unwrap();
+        assert_eq!(json, expected);
+        let back: RootCauseCategory = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, rc);
+    }
+}
+
+#[test]
+fn stall_detector_config_has_expected_defaults() {
+    let cfg = StallDetectorConfig::default();
+    assert_eq!(cfg.max_repeated_actions, 5);
+    assert_eq!(cfg.max_total_steps, 100);
+    assert_eq!(cfg.stall_timeout_secs, 300);
+    assert_eq!(cfg.oscillation_window, 10);
+}
+
+#[test]
+fn summarization_config_has_expected_defaults() {
+    let cfg = SummarizationConfig::default();
+    assert!(cfg.enabled);
+    assert!((cfg.token_threshold_pct - 0.75).abs() < f32::EPSILON);
+    assert_eq!(cfg.max_tokens_budget, 80000);
+    assert_eq!(cfg.preserve_last_n_iterations, 2);
+    assert_eq!(cfg.summary_max_tokens, 2000);
+}
+
+#[test]
+fn decomposer_config_has_expected_defaults() {
+    let cfg = DecomposerConfig::default();
+    assert!(cfg.enabled);
+    assert_eq!(cfg.min_subtasks, 3);
+    assert_eq!(cfg.max_subtasks, 7);
+    assert_eq!(cfg.model_override, None);
+}
+
+#[test]
+fn orchestration_loop_config_minimal_roundtrips() {
+    // Minimal config — only workflow_id required, everything else defaults.
+    let json = r#"{
+        "workflow_id": "wf-42"
+    }"#;
+    let cfg: OrchestrationLoopConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(cfg.workflow_id, "wf-42");
+    assert_eq!(cfg.supervisor_port, 9875, "default supervisor_port");
+    assert!(cfg.wait_for_fixer, "default wait_for_fixer");
+    assert!(!cfg.retry_on_failure);
+    assert_eq!(cfg.max_iterations, None);
+    assert!(cfg.pipeline.is_none());
+    assert_eq!(cfg.exit_strategy, ExitStrategy::Reflection);
+    assert_eq!(cfg.between_iterations, BetweenIterations::None);
+}
+
+#[test]
+fn orchestration_loop_config_optional_fields_skipped_when_none() {
+    let cfg = OrchestrationLoopConfig {
+        target_runner_port: None,
+        target_runner_id: None,
+        supervisor_port: 9875,
+        workflow_id: "wf-x".to_string(),
+        max_iterations: None,
+        exit_strategy: ExitStrategy::default(),
+        between_iterations: BetweenIterations::default(),
+        retry_on_failure: false,
+        wait_for_fixer: true,
+        pipeline: None,
+        stall_detection: None,
+        summarization: None,
+        decomposition: None,
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("target_runner_port").is_none());
+    assert!(v.get("target_runner_id").is_none());
+    assert!(v.get("max_iterations").is_none());
+    assert!(v.get("pipeline").is_none());
+    assert!(v.get("stall_detection").is_none());
+    assert!(v.get("summarization").is_none());
+    assert!(v.get("decomposition").is_none());
+}
+
+#[test]
+fn ol_config_roundtrips() {
+    let cfg = OlConfig {
+        id: "abc".to_string(),
+        name: "Nightly".to_string(),
+        description: Some("A preset".to_string()),
+        is_favorite: true,
+        config_json: json!({"workflow_id": "wf-42"}),
+        created_at: "2026-04-16T00:00:00Z".to_string(),
+        updated_at: "2026-04-16T00:00:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&cfg).unwrap();
+    let back: OlConfig = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+}
+
+#[test]
+fn create_ol_config_request_omits_optional_description() {
+    let req = CreateOlConfigRequest {
+        name: "n".to_string(),
+        description: None,
+        config_json: json!({}),
+    };
+    let json = serde_json::to_string(&req).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("description").is_none(), "description must be skipped");
+}
+
+#[test]
+fn update_ol_config_request_all_none_serializes_empty() {
+    let req = UpdateOlConfigRequest {
+        name: None,
+        description: None,
+        is_favorite: None,
+        config_json: None,
+    };
+    let json = serde_json::to_string(&req).unwrap();
+    assert_eq!(json, "{}");
+}
+
+#[test]
+fn diagnose_phase_config_defaults_applied() {
+    let json = "{}";
+    let cfg: DiagnosePhaseConfig = serde_json::from_str(json).unwrap();
+    assert!(cfg.assertions.is_empty());
+    assert!(cfg.capture_snapshot, "capture_snapshot defaults to true");
+    assert_eq!(cfg.snapshot_max_chars, 8000);
+    assert_eq!(cfg.model_override, None);
+}
+
+#[test]
+fn iteration_result_optional_fields_skipped() {
+    let ir = IterationResult {
+        iteration: 1,
+        started_at: "2026-04-16T00:00:00Z".to_string(),
+        completed_at: "2026-04-16T00:01:00Z".to_string(),
+        task_run_id: "tr-1".to_string(),
+        reflection_task_run_id: None,
+        fix_count: None,
+        exit_check: ExitCheckResult {
+            should_exit: false,
+            reason: "continue".to_string(),
+        },
+        generated_workflow_id: None,
+        fixes_implemented: None,
+        rebuild_triggered: None,
+        stall_detected: None,
+        context_summarized: None,
+        diagnostic_result: None,
+    };
+    let json = serde_json::to_string(&ir).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("reflection_task_run_id").is_none());
+    assert!(v.get("diagnostic_result").is_none());
+    assert!(v.get("rebuild_triggered").is_none());
+}
+
+#[test]
+fn multi_loop_config_roundtrips() {
+    let cfg = MultiLoopConfig {
+        loops: vec![MultiLoopEntry {
+            loop_id: "l1".to_string(),
+            label: Some("Pages 1-10".to_string()),
+            config: serde_json::from_str(r#"{"workflow_id":"wf-a"}"#).unwrap(),
+        }],
+        stop_all_on_error: true,
+    };
+    let json1 = serde_json::to_string(&cfg).unwrap();
+    let back: MultiLoopConfig = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    assert_eq!(back.loops.len(), 1);
+    assert_eq!(back.loops[0].loop_id, "l1");
+}
+
+// ============================================================================
+// ── discovery ────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::discovery::{
+    DiscoveredState, DiscoveredStateImage, DiscoveredTransition, DiscoveryBoundingBox,
+    DiscoverySourceType, DiscoveryTransitionTrigger, StateDiscoveryResult,
+    StateDiscoveryResultCreate, StateDiscoveryResultListResponse,
+    StateDiscoveryResultSummary, StateDiscoveryResultUpdate, StateMachineExport,
+    StateMachineImport, TransitionTriggerType,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn discovery_source_type_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (DiscoverySourceType::Playwright, "playwright"),
+        (DiscoverySourceType::UiBridge, "ui_bridge"),
+        (DiscoverySourceType::Recording, "recording"),
+        (DiscoverySourceType::Vision, "vision"),
+        (DiscoverySourceType::Manual, "manual"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: DiscoverySourceType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn transition_trigger_type_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (TransitionTriggerType::Click, "click"),
+        (TransitionTriggerType::Type, "type"),
+        (TransitionTriggerType::Scroll, "scroll"),
+        (TransitionTriggerType::Hover, "hover"),
+        (TransitionTriggerType::Custom, "custom"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: TransitionTriggerType =
+            serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn transition_trigger_type_default_is_click() {
+    // Mirrors Python `default=TransitionTriggerType.CLICK` on
+    // `DiscoveryTransitionTrigger.type`.
+    assert_eq!(TransitionTriggerType::default(), TransitionTriggerType::Click);
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn discovery_bounding_box_fully_populated_roundtrips() {
+    let b = DiscoveryBoundingBox {
+        x: 10.5,
+        y: 20.0,
+        width: 100.25,
+        height: 50.0,
+    };
+    let json1 = serde_json::to_string(&b).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["x"], 10.5);
+    assert_eq!(v["y"], 20.0);
+    assert_eq!(v["width"], 100.25);
+    assert_eq!(v["height"], 50.0);
+    let back: DiscoveryBoundingBox = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn discovery_transition_trigger_fully_populated_roundtrips() {
+    let t = DiscoveryTransitionTrigger {
+        r#type: TransitionTriggerType::Type,
+        image_id: Some("img-1".to_string()),
+        element_id: Some("el-42".to_string()),
+        selector: Some("#login-button".to_string()),
+        value: Some("hello".to_string()),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "type");
+    assert_eq!(v["imageId"], "img-1");
+    assert_eq!(v["elementId"], "el-42");
+    assert_eq!(v["selector"], "#login-button");
+    assert_eq!(v["value"], "hello");
+    let back: DiscoveryTransitionTrigger =
+        serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn discovery_transition_trigger_defaults_and_skip_none() {
+    let t = DiscoveryTransitionTrigger::default();
+    let json = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json).expect("parse");
+    // type has #[serde(default)] (no skip) so it should be present as "click".
+    assert_eq!(v["type"], "click");
+    // None Options must be skipped.
+    assert!(v.get("imageId").is_none());
+    assert!(v.get("elementId").is_none());
+    assert!(v.get("selector").is_none());
+    assert!(v.get("value").is_none());
+}
+
+#[test]
+fn discovered_state_image_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("tag".to_string(), Value::String("primary".to_string()));
+    let img = DiscoveredStateImage {
+        id: "img-1".to_string(),
+        screenshot_id: Some("scr-1".to_string()),
+        screenshot_url: Some("https://ex.com/s.png".to_string()),
+        bbox: DiscoveryBoundingBox {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 50.0,
+        },
+        pixel_hash: Some("deadbeef".to_string()),
+        state_id: Some("st-1".to_string()),
+        element_type: Some("button".to_string()),
+        label: Some("Login".to_string()),
+        confidence: 0.9,
+        metadata: Some(meta),
+    };
+    let json1 = serde_json::to_string(&img).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["id"], "img-1");
+    assert_eq!(v["screenshotId"], "scr-1");
+    assert_eq!(v["screenshotUrl"], "https://ex.com/s.png");
+    assert_eq!(v["bbox"]["width"], 100.0);
+    assert_eq!(v["pixelHash"], "deadbeef");
+    assert_eq!(v["stateId"], "st-1");
+    assert_eq!(v["elementType"], "button");
+    assert_eq!(v["label"], "Login");
+    assert_eq!(v["confidence"], 0.9);
+    assert_eq!(v["metadata"]["tag"], "primary");
+    let back: DiscoveredStateImage = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn discovered_state_image_confidence_defaults_to_one() {
+    // Omitting confidence on the wire should hydrate to 1.0 (Python default).
+    let json = r#"{
+        "id":"img-x",
+        "bbox":{"x":0.0,"y":0.0,"width":1.0,"height":1.0}
+    }"#;
+    let img: DiscoveredStateImage = serde_json::from_str(json).expect("deserialize");
+    assert_eq!(img.confidence, 1.0);
+    assert!(img.metadata.is_none());
+    assert!(img.screenshot_id.is_none());
+}
+
+#[test]
+fn discovered_state_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("source".to_string(), Value::String("playwright".to_string()));
+    let s = DiscoveredState {
+        id: "st-1".to_string(),
+        name: "Login page".to_string(),
+        image_ids: vec!["img-1".to_string(), "img-2".to_string()],
+        render_ids: vec!["r-1".to_string()],
+        element_ids: vec!["el-1".to_string(), "el-2".to_string()],
+        confidence: 0.85,
+        description: Some("The login screen".to_string()),
+        metadata: Some(meta),
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["id"], "st-1");
+    assert_eq!(v["name"], "Login page");
+    assert_eq!(v["imageIds"].as_array().unwrap().len(), 2);
+    assert_eq!(v["renderIds"][0], "r-1");
+    assert_eq!(v["elementIds"][1], "el-2");
+    assert_eq!(v["confidence"], 0.85);
+    assert_eq!(v["description"], "The login screen");
+    assert_eq!(v["metadata"]["source"], "playwright");
+    let back: DiscoveredState = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn discovered_state_empty_lists_are_skipped() {
+    let s = DiscoveredState {
+        id: "st-empty".to_string(),
+        name: "Empty".to_string(),
+        image_ids: vec![],
+        render_ids: vec![],
+        element_ids: vec![],
+        confidence: 1.0,
+        description: None,
+        metadata: None,
+    };
+    let json = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json).expect("parse");
+    assert!(v.get("imageIds").is_none());
+    assert!(v.get("renderIds").is_none());
+    assert!(v.get("elementIds").is_none());
+    assert!(v.get("description").is_none());
+    assert!(v.get("metadata").is_none());
+}
+
+#[test]
+fn discovered_transition_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("score".to_string(), Value::from(0.42));
+    let t = DiscoveredTransition {
+        id: "tr-1".to_string(),
+        from_state_id: "st-1".to_string(),
+        to_state_id: "st-2".to_string(),
+        trigger: Some(DiscoveryTransitionTrigger {
+            r#type: TransitionTriggerType::Click,
+            image_id: Some("img-1".to_string()),
+            element_id: None,
+            selector: Some("button#submit".to_string()),
+            value: None,
+        }),
+        confidence: 0.95,
+        metadata: Some(meta),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["id"], "tr-1");
+    assert_eq!(v["fromStateId"], "st-1");
+    assert_eq!(v["toStateId"], "st-2");
+    assert_eq!(v["trigger"]["type"], "click");
+    assert_eq!(v["trigger"]["imageId"], "img-1");
+    assert_eq!(v["trigger"]["selector"], "button#submit");
+    assert_eq!(v["confidence"], 0.95);
+    let back: DiscoveredTransition = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_fully_populated_roundtrips() {
+    let mut disco_meta = HashMap::new();
+    disco_meta.insert("engine".to_string(), Value::String("v2".to_string()));
+    let mut e2r: HashMap<String, Vec<String>> = HashMap::new();
+    e2r.insert(
+        "el-1".to_string(),
+        vec!["r-1".to_string(), "r-2".to_string()],
+    );
+
+    let img = DiscoveredStateImage {
+        id: "img-1".to_string(),
+        screenshot_id: None,
+        screenshot_url: None,
+        bbox: DiscoveryBoundingBox {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        },
+        pixel_hash: None,
+        state_id: Some("st-1".to_string()),
+        element_type: None,
+        label: None,
+        confidence: 1.0,
+        metadata: None,
+    };
+    let state = DiscoveredState {
+        id: "st-1".to_string(),
+        name: "Home".to_string(),
+        image_ids: vec!["img-1".to_string()],
+        render_ids: vec![],
+        element_ids: vec!["el-1".to_string()],
+        confidence: 1.0,
+        description: None,
+        metadata: None,
+    };
+    let tr = DiscoveredTransition {
+        id: "tr-1".to_string(),
+        from_state_id: "st-1".to_string(),
+        to_state_id: "st-2".to_string(),
+        trigger: None,
+        confidence: 0.8,
+        metadata: None,
+    };
+
+    let result = StateDiscoveryResult {
+        id: "res-1".to_string(),
+        project_id: "proj-xyz".to_string(),
+        name: "Nightly discovery".to_string(),
+        description: Some("Playwright run over /app".to_string()),
+        source_type: DiscoverySourceType::Playwright,
+        source_session_id: Some("sess-99".to_string()),
+        discovery_strategy: Some("auto".to_string()),
+        images: vec![img],
+        states: vec![state],
+        transitions: vec![tr],
+        element_to_renders: e2r,
+        image_count: 1,
+        state_count: 1,
+        transition_count: 1,
+        render_count: 5,
+        unique_element_count: 3,
+        confidence: 0.9,
+        discovery_metadata: disco_meta,
+        created_at: "2026-04-16T00:00:00Z".to_string(),
+        updated_at: "2026-04-16T01:00:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&result).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["id"], "res-1");
+    assert_eq!(v["projectId"], "proj-xyz");
+    assert_eq!(v["sourceType"], "playwright");
+    assert_eq!(v["sourceSessionId"], "sess-99");
+    assert_eq!(v["discoveryStrategy"], "auto");
+    assert_eq!(v["elementToRenders"]["el-1"][1], "r-2");
+    assert_eq!(v["imageCount"], 1);
+    assert_eq!(v["stateCount"], 1);
+    assert_eq!(v["transitionCount"], 1);
+    assert_eq!(v["renderCount"], 5);
+    assert_eq!(v["uniqueElementCount"], 3);
+    assert_eq!(v["discoveryMetadata"]["engine"], "v2");
+    assert_eq!(v["createdAt"], "2026-04-16T00:00:00Z");
+    assert_eq!(v["updatedAt"], "2026-04-16T01:00:00Z");
+    let back: StateDiscoveryResult = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_summary_roundtrips() {
+    let s = StateDiscoveryResultSummary {
+        id: "res-1".to_string(),
+        project_id: "proj-1".to_string(),
+        name: "Summary".to_string(),
+        description: Some("brief".to_string()),
+        source_type: DiscoverySourceType::UiBridge,
+        discovery_strategy: Some("fingerprint".to_string()),
+        image_count: 10,
+        state_count: 3,
+        transition_count: 4,
+        confidence: 0.77,
+        created_at: "2026-04-16T00:00:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["sourceType"], "ui_bridge");
+    assert_eq!(v["discoveryStrategy"], "fingerprint");
+    assert_eq!(v["imageCount"], 10);
+    assert_eq!(v["stateCount"], 3);
+    assert_eq!(v["transitionCount"], 4);
+    assert_eq!(v["createdAt"], "2026-04-16T00:00:00Z");
+    let back: StateDiscoveryResultSummary =
+        serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_list_response_roundtrips() {
+    let r = StateDiscoveryResultListResponse {
+        items: vec![StateDiscoveryResultSummary {
+            id: "res-1".to_string(),
+            project_id: "p-1".to_string(),
+            name: "N".to_string(),
+            description: None,
+            source_type: DiscoverySourceType::Manual,
+            discovery_strategy: None,
+            image_count: 0,
+            state_count: 0,
+            transition_count: 0,
+            confidence: 0.0,
+            created_at: "2026-04-16T00:00:00Z".to_string(),
+        }],
+        total: 1,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["items"][0]["sourceType"], "manual");
+    let back: StateDiscoveryResultListResponse =
+        serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_create_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("note".to_string(), Value::String("seed".to_string()));
+    let mut e2r: HashMap<String, Vec<String>> = HashMap::new();
+    e2r.insert("el-x".to_string(), vec!["r-1".to_string()]);
+    let c = StateDiscoveryResultCreate {
+        name: "Create".to_string(),
+        description: Some("desc".to_string()),
+        source_type: DiscoverySourceType::Recording,
+        source_session_id: Some("sess-1".to_string()),
+        discovery_strategy: Some("legacy".to_string()),
+        images: vec![],
+        states: vec![],
+        transitions: vec![],
+        element_to_renders: e2r,
+        confidence: 0.5,
+        discovery_metadata: meta,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["sourceType"], "recording");
+    assert_eq!(v["sourceSessionId"], "sess-1");
+    assert_eq!(v["discoveryStrategy"], "legacy");
+    assert_eq!(v["elementToRenders"]["el-x"][0], "r-1");
+    assert_eq!(v["discoveryMetadata"]["note"], "seed");
+    // Empty arrays must be skipped.
+    assert!(v.get("images").is_none());
+    assert!(v.get("states").is_none());
+    assert!(v.get("transitions").is_none());
+    let back: StateDiscoveryResultCreate =
+        serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_update_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("v".to_string(), Value::from(2));
+    let u = StateDiscoveryResultUpdate {
+        name: Some("new name".to_string()),
+        description: Some("new desc".to_string()),
+        images: Some(vec![]),
+        states: Some(vec![]),
+        transitions: Some(vec![]),
+        discovery_metadata: Some(meta),
+    };
+    let json1 = serde_json::to_string(&u).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["name"], "new name");
+    assert_eq!(v["description"], "new desc");
+    // `images` is Option<Vec<…>> → Some(vec![]) serializes as []
+    assert!(v["images"].is_array());
+    assert_eq!(v["images"].as_array().unwrap().len(), 0);
+    assert_eq!(v["discoveryMetadata"]["v"], 2);
+    let back: StateDiscoveryResultUpdate =
+        serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_discovery_result_update_all_none_serializes_empty() {
+    let u = StateDiscoveryResultUpdate::default();
+    let json = serde_json::to_string(&u).expect("serialize");
+    assert_eq!(json, "{}");
+}
+
+#[test]
+fn state_machine_export_fully_populated_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert(
+        "originalId".to_string(),
+        Value::String("res-1".to_string()),
+    );
+    let mut e2r: HashMap<String, Vec<String>> = HashMap::new();
+    e2r.insert("el-a".to_string(), vec!["r-a".to_string()]);
+    let e = StateMachineExport {
+        version: "1.0.0".to_string(),
+        name: "Export".to_string(),
+        description: Some("portable".to_string()),
+        source_type: "playwright".to_string(),
+        images: vec![],
+        states: vec![],
+        transitions: vec![],
+        element_to_renders: e2r,
+        metadata: meta,
+    };
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["version"], "1.0.0");
+    assert_eq!(v["name"], "Export");
+    assert_eq!(v["sourceType"], "playwright");
+    assert_eq!(v["elementToRenders"]["el-a"][0], "r-a");
+    assert_eq!(v["metadata"]["originalId"], "res-1");
+    let back: StateMachineExport = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_machine_export_version_defaults_when_omitted() {
+    // Python default for `version` is "1.0.0". Omitting it on the wire must
+    // hydrate via the #[serde(default = "…")] helper.
+    let json = r#"{
+        "name": "E",
+        "sourceType": "manual"
+    }"#;
+    let e: StateMachineExport = serde_json::from_str(json).expect("deserialize");
+    assert_eq!(e.version, "1.0.0");
+    assert_eq!(e.source_type, "manual");
+    assert!(e.description.is_none());
+    assert!(e.images.is_empty());
+    assert!(e.metadata.is_empty());
+}
+
+#[test]
+fn state_machine_import_fully_populated_roundtrips() {
+    let export = StateMachineExport {
+        version: "1.0.0".to_string(),
+        name: "E".to_string(),
+        description: None,
+        source_type: "manual".to_string(),
+        images: vec![],
+        states: vec![],
+        transitions: vec![],
+        element_to_renders: HashMap::new(),
+        metadata: HashMap::new(),
+    };
+    let i = StateMachineImport {
+        state_machine: export,
+        name: Some("override".to_string()),
+    };
+    let json1 = serde_json::to_string(&i).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["stateMachine"]["name"], "E");
+    assert_eq!(v["stateMachine"]["sourceType"], "manual");
+    assert_eq!(v["name"], "override");
+    let back: StateMachineImport = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_machine_import_name_optional() {
+    let export = StateMachineExport {
+        version: "1.0.0".to_string(),
+        name: "E".to_string(),
+        description: None,
+        source_type: "manual".to_string(),
+        images: vec![],
+        states: vec![],
+        transitions: vec![],
+        element_to_renders: HashMap::new(),
+        metadata: HashMap::new(),
+    };
+    let i = StateMachineImport {
+        state_machine: export,
+        name: None,
+    };
+    let json = serde_json::to_string(&i).expect("serialize");
+    let v: Value = serde_json::from_str(&json).expect("parse");
+    assert!(v.get("name").is_none(), "None override name must be skipped");
+}
+
+// ============================================================================
+// ── verification ───
+// Wire contract: planning-agent outputs consumed by the verification loop +
+// persisted to DB + returned from the task-run API.
+// ============================================================================
+
+use qontinui_types::verification::{
+    Confidence, CriterionOverride, CriterionType, DomainAssignment, DomainVerificationResult,
+    ExtendIterationsRequest, Finding as VerificationFinding, IterationVerificationResults,
+    OverrideCollection, StageTransition, SuccessCriterion, TaskCompletionResult,
+    VerificationAgentContext, VerificationMethod as VerifMethod,
+    VerificationPlan as VerifPlan, VerificationResult as VerifResult,
+    WorkerCoordinationMessage, WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
+};
+
+#[test]
+fn criterion_type_roundtrips_snake_case() {
+    let v = CriterionType::AiEvaluated;
+    let json = serde_json::to_string(&v).unwrap();
+    assert_eq!(json, r#""ai_evaluated""#);
+    let back: CriterionType = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, CriterionType::AiEvaluated);
+
+    let v2 = CriterionType::Deterministic;
+    let json2 = serde_json::to_string(&v2).unwrap();
+    assert_eq!(json2, r#""deterministic""#);
+}
+
+#[test]
+fn verification_method_roundtrips_snake_case() {
+    let cases = [
+        (VerifMethod::BuildSuccess, "build_success"),
+        (VerifMethod::UnitTest, "unit_test"),
+        (VerifMethod::IntegrationTest, "integration_test"),
+        (VerifMethod::Playwright, "playwright"),
+        (VerifMethod::LogPattern, "log_pattern"),
+        (VerifMethod::GuiAutomation, "gui_automation"),
+        (VerifMethod::TypeCheck, "type_check"),
+        (VerifMethod::LintCheck, "lint_check"),
+        (VerifMethod::CustomCommand, "custom_command"),
+    ];
+    for (v, s) in cases {
+        let json = serde_json::to_string(&v).unwrap();
+        assert_eq!(json, format!("\"{}\"", s));
+        let back: VerifMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, v);
+    }
+}
+
+#[test]
+fn success_criterion_minimal_roundtrips() {
+    // `type` is the wire-renamed discriminator. `required` / `is_critical`
+    // default to true and should hydrate from serde defaults when omitted.
+    let json = r#"{
+        "id": "c1",
+        "description": "Type check passes",
+        "type": "deterministic"
+    }"#;
+    let c: SuccessCriterion = serde_json::from_str(json).unwrap();
+    assert_eq!(c.id, "c1");
+    assert_eq!(c.criterion_type, CriterionType::Deterministic);
+    assert!(c.required);
+    assert!(c.is_critical);
+    assert!(c.verification_method.is_none());
+    assert!(c.weight.is_none());
+    assert!(c.domain.is_none());
+
+    let json2 = serde_json::to_string(&c).unwrap();
+    let back: SuccessCriterion = serde_json::from_str(&json2).unwrap();
+    assert_eq!(json2, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn success_criterion_full_roundtrips() {
+    let c = SuccessCriterion {
+        id: "c2".to_string(),
+        description: "Playwright script passes".to_string(),
+        criterion_type: CriterionType::Deterministic,
+        verification_method: Some(VerifMethod::Playwright),
+        verification_config: Some(serde_json::json!({"script": "tests/login.spec.ts"})),
+        evaluation_prompt: None,
+        required: true,
+        is_critical: false,
+        weight: Some(0.5),
+        domain: Some("frontend".to_string()),
+    };
+    let json = serde_json::to_string(&c).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // Confirm the wire-side rename: `criterion_type` → `type`.
+    assert_eq!(v["type"], "deterministic");
+    assert_eq!(v["verification_method"], "playwright");
+    assert_eq!(v["weight"], 0.5);
+    assert_eq!(v["domain"], "frontend");
+    let back: SuccessCriterion = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn verification_plan_minimal_roundtrips() {
+    // `execution_steps` / `worker_domains` absent; `suggested_worker_count`
+    // and `version` default to 1.
+    let json = r#"{
+        "goal_summary": "Make tests pass",
+        "success_criteria": []
+    }"#;
+    let p: VerifPlan = serde_json::from_str(json).unwrap();
+    assert_eq!(p.goal_summary, "Make tests pass");
+    assert!(p.success_criteria.is_empty());
+    assert!(p.execution_steps.is_empty());
+    assert_eq!(p.suggested_worker_count, 1);
+    assert_eq!(p.version, 1);
+    assert!(p.worker_domains.is_none());
+
+    let json2 = serde_json::to_string(&p).unwrap();
+    let back: VerifPlan = serde_json::from_str(&json2).unwrap();
+    assert_eq!(json2, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn verification_plan_full_roundtrips() {
+    let p = VerifPlan {
+        goal_summary: "Add login flow".to_string(),
+        success_criteria: vec![SuccessCriterion {
+            id: "c1".to_string(),
+            description: "Login succeeds".to_string(),
+            criterion_type: CriterionType::AiEvaluated,
+            verification_method: None,
+            verification_config: None,
+            evaluation_prompt: Some("Check screenshot shows dashboard".to_string()),
+            required: true,
+            is_critical: true,
+            weight: None,
+            domain: Some("frontend".to_string()),
+        }],
+        execution_steps: vec![serde_json::json!({"type": "gui_automation", "action": "click"})],
+        suggested_worker_count: 2,
+        worker_domains: Some(vec![WorkerDomain {
+            worker_id: "w1".to_string(),
+            specialization: Some("frontend".to_string()),
+            file_patterns: vec!["src/**/*.tsx".to_string()],
+            system_prompt_additions: None,
+        }]),
+        version: 3,
+    };
+    let json = serde_json::to_string(&p).unwrap();
+    let back: VerifPlan = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn domain_assignment_roundtrips() {
+    let d = DomainAssignment {
+        domain_id: "frontend".to_string(),
+        name: "Frontend".to_string(),
+        description: "UI layer".to_string(),
+        file_patterns: vec!["src/ui/**/*.ts".to_string()],
+        keywords: vec!["react".to_string(), "tsx".to_string()],
+        assigned_workers: vec!["w1".to_string()],
+        domain_criteria: vec!["c1".to_string()],
+        system_prompt_context: Some("Frontend specialist".to_string()),
+    };
+    let json = serde_json::to_string(&d).unwrap();
+    let back: DomainAssignment = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn worker_status_roundtrips_snake_case() {
+    let cases = [
+        (WorkerStatus::Idle, "idle"),
+        (WorkerStatus::Active, "active"),
+        (WorkerStatus::AwaitingVerification, "awaiting_verification"),
+        (WorkerStatus::Paused, "paused"),
+        (WorkerStatus::Completed, "completed"),
+        (WorkerStatus::Error, "error"),
+    ];
+    for (v, s) in cases {
+        let json = serde_json::to_string(&v).unwrap();
+        assert_eq!(json, format!("\"{}\"", s));
+        let back: WorkerStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, v);
+    }
+}
+
+#[test]
+fn worker_instance_minimal_roundtrips() {
+    let w = WorkerInstance {
+        worker_id: "w1".to_string(),
+        name: "Worker One".to_string(),
+        status: WorkerStatus::Idle,
+        domain: None,
+        iteration: 0,
+        max_iterations: 10,
+        last_signal: None,
+        findings: vec![],
+        touched_files: vec![],
+        started_at: None,
+        completed_at: None,
+        error_message: None,
+    };
+    let json = serde_json::to_string(&w).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // Empty Vecs / None options are skipped.
+    assert!(v.get("findings").is_none());
+    assert!(v.get("touched_files").is_none());
+    assert!(v.get("started_at").is_none());
+    let back: WorkerInstance = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn worker_coordination_message_files_modified_roundtrips() {
+    // Externally tagged as { "type": ..., "data": { ... } }.
+    let m = WorkerCoordinationMessage::FilesModified {
+        worker_id: "w1".to_string(),
+        files: vec!["src/a.rs".to_string()],
+    };
+    let json = serde_json::to_string(&m).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "files_modified");
+    assert_eq!(v["data"]["worker_id"], "w1");
+    assert_eq!(v["data"]["files"][0], "src/a.rs");
+    let back: WorkerCoordinationMessage = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn worker_coordination_message_all_variants_roundtrip() {
+    let finding = VerificationFinding {
+        id: "f1".to_string(),
+        finding_type: "bug".to_string(),
+        description: "crash".to_string(),
+        evidence: None,
+        confidence: Confidence::High,
+        related_files: vec![],
+    };
+    let variants = vec![
+        WorkerCoordinationMessage::SharedFinding {
+            worker_id: "w1".to_string(),
+            finding,
+        },
+        WorkerCoordinationMessage::Blocked {
+            worker_id: "w1".to_string(),
+            waiting_for: "w2".to_string(),
+            reason: "schema update".to_string(),
+        },
+        WorkerCoordinationMessage::ReadyForVerification {
+            worker_id: "w1".to_string(),
+            domain: Some("frontend".to_string()),
+        },
+        WorkerCoordinationMessage::SyncPoint {
+            worker_ids: vec!["w1".to_string(), "w2".to_string()],
+            reason: "merge".to_string(),
+        },
+    ];
+    for v in variants {
+        let json = serde_json::to_string(&v).unwrap();
+        let back: WorkerCoordinationMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(json, serde_json::to_string(&back).unwrap());
+    }
+}
+
+#[test]
+fn worker_signal_roundtrips_all_variants() {
+    // Tagged with `signal` (not `type`) to match pre-extraction wire.
+    let wc = WorkerSignal::WorkComplete {
+        reason: Some("done".to_string()),
+    };
+    let json = serde_json::to_string(&wc).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["signal"], "work_complete");
+    assert_eq!(v["data"]["reason"], "done");
+    let back: WorkerSignal = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+
+    let rp = WorkerSignal::NeedReplan {
+        reason: "plan wrong".to_string(),
+    };
+    let json2 = serde_json::to_string(&rp).unwrap();
+    let v2: Value = serde_json::from_str(&json2).unwrap();
+    assert_eq!(v2["signal"], "need_replan");
+    let back2: WorkerSignal = serde_json::from_str(&json2).unwrap();
+    assert_eq!(json2, serde_json::to_string(&back2).unwrap());
+
+    let cont = WorkerSignal::Continue;
+    let json3 = serde_json::to_string(&cont).unwrap();
+    let v3: Value = serde_json::from_str(&json3).unwrap();
+    assert_eq!(v3["signal"], "continue");
+
+    let f = WorkerSignal::Finding(VerificationFinding {
+        id: "f1".to_string(),
+        finding_type: "bug".to_string(),
+        description: "crash".to_string(),
+        evidence: None,
+        confidence: Confidence::Medium,
+        related_files: vec![],
+    });
+    let json4 = serde_json::to_string(&f).unwrap();
+    let v4: Value = serde_json::from_str(&json4).unwrap();
+    assert_eq!(v4["signal"], "finding");
+    let back4: WorkerSignal = serde_json::from_str(&json4).unwrap();
+    assert_eq!(json4, serde_json::to_string(&back4).unwrap());
+}
+
+#[test]
+fn finding_minimal_roundtrips() {
+    let f = VerificationFinding {
+        id: "f1".to_string(),
+        finding_type: "observation".to_string(),
+        description: "Slow DB query".to_string(),
+        evidence: None,
+        confidence: Confidence::Low,
+        related_files: vec![],
+    };
+    let json = serde_json::to_string(&f).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("evidence").is_none());
+    assert!(v.get("related_files").is_none());
+    let back: VerificationFinding = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn confidence_roundtrips_lowercase() {
+    for (c, s) in [
+        (Confidence::High, "high"),
+        (Confidence::Medium, "medium"),
+        (Confidence::Low, "low"),
+    ] {
+        let json = serde_json::to_string(&c).unwrap();
+        assert_eq!(json, format!("\"{}\"", s));
+        let back: Confidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, c);
+    }
+}
+
+#[test]
+fn verification_result_roundtrips() {
+    let r = VerifResult {
+        criterion_id: "c1".to_string(),
+        passed: false,
+        criterion_type: CriterionType::Deterministic,
+        confidence: Some(Confidence::High),
+        observations: vec!["Type error in main.rs:42".to_string()],
+        issues: vec!["E0308 mismatched types".to_string()],
+        suggestions: vec!["Convert u32 to i32".to_string()],
+        raw_output: Some("error[E0308]".to_string()),
+    };
+    let json = serde_json::to_string(&r).unwrap();
+    let back: VerifResult = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn iteration_verification_results_roundtrips() {
+    let r = IterationVerificationResults {
+        iteration: 3,
+        deterministic_results: vec![],
+        ai_results: vec![],
+        deterministic_passed: true,
+        ai_passed: true,
+        all_passed: true,
+        failure_summary: None,
+        applied_overrides: vec![],
+        overridden_criteria: vec![],
+    };
+    let json = serde_json::to_string(&r).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // Empty collection fields should be skipped on the wire.
+    assert!(v.get("applied_overrides").is_none());
+    assert!(v.get("overridden_criteria").is_none());
+    assert!(v.get("failure_summary").is_none());
+    let back: IterationVerificationResults = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn criterion_override_roundtrips() {
+    let o = CriterionOverride {
+        criterion_id: "c1".to_string(),
+        item: "FatClass".to_string(),
+        justification: "Pre-existing; out of scope".to_string(),
+        iteration: 2,
+        worker_id: Some("w1".to_string()),
+        recorded_at: "2026-04-16T12:00:00Z".to_string(),
+    };
+    let json = serde_json::to_string(&o).unwrap();
+    let back: CriterionOverride = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn override_collection_default_roundtrips() {
+    let c = OverrideCollection::default();
+    let json = serde_json::to_string(&c).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // Empty overrides skipped on the wire.
+    assert!(v.get("overrides").is_none());
+    let back: OverrideCollection = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn task_completion_result_success_roundtrips() {
+    // Internally tagged by `status`.
+    let r = TaskCompletionResult::Success {
+        iterations: 5,
+        findings: vec![],
+        verification_results: IterationVerificationResults {
+            iteration: 5,
+            deterministic_results: vec![],
+            ai_results: vec![],
+            deterministic_passed: true,
+            ai_passed: true,
+            all_passed: true,
+            failure_summary: None,
+            applied_overrides: vec![],
+            overridden_criteria: vec![],
+        },
+    };
+    let json = serde_json::to_string(&r).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["status"], "success");
+    assert_eq!(v["iterations"], 5);
+    let back: TaskCompletionResult = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn task_completion_result_all_variants_roundtrip() {
+    let variants = vec![
+        TaskCompletionResult::Failed {
+            reason: "max iterations".to_string(),
+            iterations: 10,
+            last_results: None,
+            findings: vec![],
+        },
+        TaskCompletionResult::Stopped {
+            at_iteration: 3,
+            findings: vec![],
+            can_resume: true,
+        },
+        TaskCompletionResult::Paused {
+            at_iteration: 10,
+            max_iterations: 10,
+            last_results: None,
+            findings: vec![],
+        },
+    ];
+    for v in variants {
+        let json = serde_json::to_string(&v).unwrap();
+        let back: TaskCompletionResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(json, serde_json::to_string(&back).unwrap());
+    }
+}
+
+#[test]
+fn stage_transition_roundtrips() {
+    let s = StageTransition {
+        from: "planning".to_string(),
+        to: "execution".to_string(),
+        timestamp: "2026-04-16T12:00:00Z".to_string(),
+        iteration: 1,
+    };
+    let json = serde_json::to_string(&s).unwrap();
+    let back: StageTransition = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn verification_agent_context_roundtrips() {
+    let c = VerificationAgentContext {
+        screenshot_base64: "iVBORw0KGgo=".to_string(),
+        evaluation_prompt: "Does the dashboard show?".to_string(),
+        goal_context: "Add login flow".to_string(),
+    };
+    let json = serde_json::to_string(&c).unwrap();
+    let back: VerificationAgentContext = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn extend_iterations_request_roundtrips() {
+    let r = ExtendIterationsRequest {
+        additional_iterations: 5,
+        guidance: Some("focus on tests".to_string()),
+    };
+    let json = serde_json::to_string(&r).unwrap();
+    let back: ExtendIterationsRequest = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+
+    let r2 = ExtendIterationsRequest {
+        additional_iterations: 2,
+        guidance: None,
+    };
+    let json2 = serde_json::to_string(&r2).unwrap();
+    let v2: Value = serde_json::from_str(&json2).unwrap();
+    assert!(v2.get("guidance").is_none(), "None guidance must be skipped");
+}
+
+#[test]
+fn domain_verification_result_roundtrips() {
+    let d = DomainVerificationResult {
+        domain_id: "frontend".to_string(),
+        worker_ids: vec!["w1".to_string()],
+        results: vec![],
+        all_passed: true,
+        failure_summary: None,
+    };
+    let json = serde_json::to_string(&d).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("failure_summary").is_none());
+    let back: DomainVerificationResult = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 

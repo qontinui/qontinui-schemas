@@ -23,9 +23,11 @@
 pub mod accessibility;
 pub mod config;
 pub mod constraints;
+pub mod discovery;
 pub mod execution;
 pub mod findings;
 pub mod geometry;
+pub mod orchestration_config;
 pub mod process_management;
 pub mod rag;
 pub mod scheduler;
@@ -34,5 +36,6 @@ pub mod targets;
 pub mod task_run;
 pub mod ticket_system;
 pub mod tree_events;
+pub mod verification;
 pub mod workflow;
 pub mod workflow_step;

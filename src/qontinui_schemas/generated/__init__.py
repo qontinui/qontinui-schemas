@@ -32,6 +32,8 @@ from .per_type.base_step_fields import BaseStepFields
 from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingRequest
 from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
 from .per_type.batch_embedding_result import BatchEmbeddingResult
+from .per_type.between_iterations import BetweenIterations
+from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.canonical_step import CanonicalStep
 from .per_type.category import Category
@@ -47,6 +49,7 @@ from .per_type.compute_text_embedding_request import ComputeTextEmbeddingRequest
 from .per_type.compute_text_embedding_response import ComputeTextEmbeddingResponse
 from .per_type.condition_schedule_config import ConditionScheduleConfig
 from .per_type.condition_status import ConditionStatus
+from .per_type.confidence import Confidence
 from .per_type.confidence_level import ConfidenceLevel
 from .per_type.constraint import Constraint
 from .per_type.constraint_check import ConstraintCheck
@@ -61,14 +64,28 @@ from .per_type.coordinates import Coordinates
 from .per_type.cost_trend_data_point import CostTrendDataPoint
 from .per_type.cost_trend_response import CostTrendResponse
 from .per_type.coverage_data import CoverageData
+from .per_type.create_ol_config_request import CreateOlConfigRequest
 from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
+from .per_type.criterion_override import CriterionOverride
+from .per_type.criterion_type import CriterionType
 from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
+from .per_type.decomposer_config import DecomposerConfig
+from .per_type.diagnose_phase_config import DiagnosePhaseConfig
+from .per_type.diagnostic_result import DiagnosticResult
+from .per_type.discovered_state import DiscoveredState
+from .per_type.discovered_state_image import DiscoveredStateImage
+from .per_type.discovered_transition import DiscoveredTransition
+from .per_type.discovery_bounding_box import DiscoveryBoundingBox
+from .per_type.discovery_source_type import DiscoverySourceType
 from .per_type.discovery_strategy import DiscoveryStrategy
+from .per_type.discovery_transition_trigger import DiscoveryTransitionTrigger
 from .per_type.display_node import DisplayNode
+from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
+from .per_type.domain_verification_result import DomainVerificationResult
 from .per_type.embedding_item import EmbeddingItem
 from .per_type.embedding_list_response import EmbeddingListResponse
 from .per_type.embedding_result_item import EmbeddingResultItem
@@ -97,7 +114,11 @@ from .per_type.execution_stats import ExecutionStats
 from .per_type.execution_tree_response import ExecutionTreeResponse
 from .per_type.execution_trend_data_point import ExecutionTrendDataPoint
 from .per_type.execution_trend_response import ExecutionTrendResponse
+from .per_type.exit_check_result import ExitCheckResult
+from .per_type.exit_strategy import ExitStrategy
+from .per_type.extend_iterations_request import ExtendIterationsRequest
 from .per_type.file_change import FileChange
+from .per_type.finding import Finding
 from .per_type.finding_action_type import FindingActionType
 from .per_type.finding_batch_create import FindingBatchCreate
 from .per_type.finding_category import FindingCategory
@@ -120,6 +141,7 @@ from .per_type.historical_action_query import HistoricalActionQuery
 from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
+from .per_type.implement_fixes_config import ImplementFixesConfig
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
@@ -127,6 +149,8 @@ from .per_type.issue_severity import IssueSeverity
 from .per_type.issue_source import IssueSource
 from .per_type.issue_status import IssueStatus
 from .per_type.issue_type import IssueType
+from .per_type.iteration_result import IterationResult
+from .per_type.iteration_verification_results import IterationVerificationResults
 from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
@@ -134,6 +158,8 @@ from .per_type.job_summary import JobSummary
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.log_source_selection import LogSourceSelection
+from .per_type.loop_instance_status import LoopInstanceStatus
+from .per_type.loop_phase import LoopPhase
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
@@ -142,6 +168,9 @@ from .per_type.model_override_config import ModelOverrideConfig
 from .per_type.monitor import Monitor
 from .per_type.monitor_position import MonitorPosition
 from .per_type.mouse_button import MouseButton
+from .per_type.multi_loop_config import MultiLoopConfig
+from .per_type.multi_loop_entry import MultiLoopEntry
+from .per_type.multi_loop_status import MultiLoopStatus
 from .per_type.native_accessibility_step import NativeAccessibilityStep
 from .per_type.navigation_result import NavigationResult
 from .per_type.new_constraint_proposal import NewConstraintProposal
@@ -150,9 +179,13 @@ from .per_type.node_metadata import NodeMetadata
 from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
 from .per_type.ocr_engine import OcrEngine
+from .per_type.ol_config import OlConfig
+from .per_type.orchestration_loop_config import OrchestrationLoopConfig
+from .per_type.orchestration_loop_status import OrchestrationLoopStatus
 from .per_type.outcome import Outcome
 from .per_type.output_line import OutputLine
 from .per_type.output_stream import OutputStream
+from .per_type.override_collection import OverrideCollection
 from .per_type.pagination import Pagination
 from .per_type.parser_type import ParserType
 from .per_type.path_element import PathElement
@@ -160,6 +193,7 @@ from .per_type.pathfinding_request import PathfindingRequest
 from .per_type.pathfinding_result import PathfindingResult
 from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
+from .per_type.pipeline_config import PipelineConfig
 from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
@@ -185,6 +219,7 @@ from .per_type.restart_process_step import RestartProcessStep
 from .per_type.retry_policy import RetryPolicy
 from .per_type.retry_spec import RetrySpec
 from .per_type.role_criterion import RoleCriterion
+from .per_type.root_cause_category import RootCauseCategory
 from .per_type.routing_rule import RoutingRule
 from .per_type.run_prompt_request import RunPromptRequest
 from .per_type.run_prompt_response import RunPromptResponse
@@ -213,14 +248,23 @@ from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.stage_condition import StageCondition
 from .per_type.stage_input import StageInput
 from .per_type.stage_output import StageOutput
+from .per_type.stage_transition import StageTransition
+from .per_type.stall_detector_config import StallDetectorConfig
 from .per_type.standard_action_type import StandardActionType
 from .per_type.state_context import StateContext
+from .per_type.state_discovery_result import StateDiscoveryResult
+from .per_type.state_discovery_result_create import StateDiscoveryResultCreate
+from .per_type.state_discovery_result_list_response import StateDiscoveryResultListResponse
+from .per_type.state_discovery_result_summary import StateDiscoveryResultSummary
+from .per_type.state_discovery_result_update import StateDiscoveryResultUpdate
 from .per_type.state_filter_item import StateFilterItem
 from .per_type.state_machine_config import StateMachineConfig
 from .per_type.state_machine_config_create import StateMachineConfigCreate
 from .per_type.state_machine_config_full import StateMachineConfigFull
 from .per_type.state_machine_config_update import StateMachineConfigUpdate
+from .per_type.state_machine_export import StateMachineExport
 from .per_type.state_machine_export_format import StateMachineExportFormat
+from .per_type.state_machine_import import StateMachineImport
 from .per_type.state_machine_state import StateMachineState
 from .per_type.state_machine_state_create import StateMachineStateCreate
 from .per_type.state_machine_state_update import StateMachineStateUpdate
@@ -233,7 +277,10 @@ from .per_type.step_execution_config import StepExecutionConfig
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
 from .per_type.structured_signal import StructuredSignal
+from .per_type.success_criterion import SuccessCriterion
+from .per_type.summarization_config import SummarizationConfig
 from .per_type.target_config import TargetConfig
+from .per_type.task_completion_result import TaskCompletionResult
 from .per_type.task_execution_record import TaskExecutionRecord
 from .per_type.task_run import TaskRun
 from .per_type.task_run_backend import TaskRunBackend
@@ -270,6 +317,7 @@ from .per_type.transition_action_value import TransitionActionValue
 from .per_type.transition_edge_data import TransitionEdgeData
 from .per_type.transition_execution_result import TransitionExecutionResult
 from .per_type.transition_info import TransitionInfo
+from .per_type.transition_trigger_type import TransitionTriggerType
 from .per_type.tree_event import TreeEvent
 from .per_type.tree_event_create import TreeEventCreate
 from .per_type.tree_event_list_response import TreeEventListResponse
@@ -286,11 +334,16 @@ from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
 from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionStep
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
+from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
 from .per_type.validate_config_request import ValidateConfigRequest
 from .per_type.validate_config_response import ValidateConfigResponse
+from .per_type.verification_agent_context import VerificationAgentContext
 from .per_type.verification_category_kind import VerificationCategoryKind
+from .per_type.verification_method import VerificationMethod
 from .per_type.verification_phase_result import VerificationPhaseResult
+from .per_type.verification_plan import VerificationPlan
+from .per_type.verification_result import VerificationResult
 from .per_type.verification_result_response import VerificationResultResponse
 from .per_type.verification_results_list_response import VerificationResultsListResponse
 from .per_type.verification_step_details import VerificationStepDetails
@@ -298,7 +351,12 @@ from .per_type.verification_step_result import VerificationStepResult
 from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
 from .per_type.visual_comparison_result import VisualComparisonResult
+from .per_type.worker_coordination_message import WorkerCoordinationMessage
+from .per_type.worker_domain import WorkerDomain
+from .per_type.worker_instance import WorkerInstance
 from .per_type.worker_output import WorkerOutput
+from .per_type.worker_signal import WorkerSignal
+from .per_type.worker_status import WorkerStatus
 from .per_type.workflow_architecture import WorkflowArchitecture
 from .per_type.workflow_fixup_mode import WorkflowFixupMode
 from .per_type.workflow_fixup_step import WorkflowFixupStep
@@ -342,6 +400,8 @@ __all__ = [
     "BatchComputeEmbeddingRequest",
     "BatchComputeEmbeddingResponse",
     "BatchEmbeddingResult",
+    "BetweenIterations",
+    "BuildPhaseConfig",
     "BuiltinOverrideProposal",
     "CanonicalStep",
     "Category",
@@ -357,6 +417,7 @@ __all__ = [
     "ComputeTextEmbeddingResponse",
     "ConditionScheduleConfig",
     "ConditionStatus",
+    "Confidence",
     "ConfidenceLevel",
     "Constraint",
     "ConstraintCheck",
@@ -371,14 +432,28 @@ __all__ = [
     "CostTrendDataPoint",
     "CostTrendResponse",
     "CoverageData",
+    "CreateOlConfigRequest",
     "CreateScheduledTaskRequest",
     "CreateTaskRunRequest",
+    "CriterionOverride",
+    "CriterionType",
     "DagApprovalStep",
     "DagCancelStep",
     "DagLoopStep",
+    "DecomposerConfig",
+    "DiagnosePhaseConfig",
+    "DiagnosticResult",
+    "DiscoveredState",
+    "DiscoveredStateImage",
+    "DiscoveredTransition",
+    "DiscoveryBoundingBox",
+    "DiscoverySourceType",
     "DiscoveryStrategy",
+    "DiscoveryTransitionTrigger",
     "DisplayNode",
+    "DomainAssignment",
     "DomainKnowledge",
+    "DomainVerificationResult",
     "EmbeddingItem",
     "EmbeddingListResponse",
     "EmbeddingResultItem",
@@ -407,7 +482,11 @@ __all__ = [
     "ExecutionTreeResponse",
     "ExecutionTrendDataPoint",
     "ExecutionTrendResponse",
+    "ExitCheckResult",
+    "ExitStrategy",
+    "ExtendIterationsRequest",
     "FileChange",
+    "Finding",
     "FindingActionType",
     "FindingBatchCreate",
     "FindingCategory",
@@ -430,6 +509,7 @@ __all__ = [
     "HistoricalActionResult",
     "HttpMethod",
     "IdleCondition",
+    "ImplementFixesConfig",
     "IndividualCheckResult",
     "InitialStateRef",
     "InitialStatesSource",
@@ -437,6 +517,8 @@ __all__ = [
     "IssueSource",
     "IssueStatus",
     "IssueType",
+    "IterationResult",
+    "IterationVerificationResults",
     "JobItem",
     "JobListResponse",
     "JobStatus",
@@ -444,6 +526,8 @@ __all__ = [
     "LLMCostSummary",
     "LLMMetrics",
     "LogSourceSelection",
+    "LoopInstanceStatus",
+    "LoopPhase",
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
@@ -452,6 +536,9 @@ __all__ = [
     "Monitor",
     "MonitorPosition",
     "MouseButton",
+    "MultiLoopConfig",
+    "MultiLoopEntry",
+    "MultiLoopStatus",
     "NativeAccessibilityStep",
     "NavigationResult",
     "NewConstraintProposal",
@@ -460,9 +547,13 @@ __all__ = [
     "NodeStatus",
     "NodeType",
     "OcrEngine",
+    "OlConfig",
+    "OrchestrationLoopConfig",
+    "OrchestrationLoopStatus",
     "Outcome",
     "OutputLine",
     "OutputStream",
+    "OverrideCollection",
     "Pagination",
     "ParserType",
     "PathElement",
@@ -470,6 +561,7 @@ __all__ = [
     "PathfindingResult",
     "PathfindingStep",
     "PatternOptions",
+    "PipelineConfig",
     "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
     "Point",
@@ -495,6 +587,7 @@ __all__ = [
     "RetryPolicy",
     "RetrySpec",
     "RoleCriterion",
+    "RootCauseCategory",
     "RoutingRule",
     "RunPromptRequest",
     "RunPromptResponse",
@@ -523,14 +616,23 @@ __all__ = [
     "StageCondition",
     "StageInput",
     "StageOutput",
+    "StageTransition",
+    "StallDetectorConfig",
     "StandardActionType",
     "StateContext",
+    "StateDiscoveryResult",
+    "StateDiscoveryResultCreate",
+    "StateDiscoveryResultListResponse",
+    "StateDiscoveryResultSummary",
+    "StateDiscoveryResultUpdate",
     "StateFilterItem",
     "StateMachineConfig",
     "StateMachineConfigCreate",
     "StateMachineConfigFull",
     "StateMachineConfigUpdate",
+    "StateMachineExport",
     "StateMachineExportFormat",
+    "StateMachineImport",
     "StateMachineState",
     "StateMachineStateCreate",
     "StateMachineStateUpdate",
@@ -543,7 +645,10 @@ __all__ = [
     "StructuredFinding",
     "StructuredOverride",
     "StructuredSignal",
+    "SuccessCriterion",
+    "SummarizationConfig",
     "TargetConfig",
+    "TaskCompletionResult",
     "TaskExecutionRecord",
     "TaskRun",
     "TaskRunBackend",
@@ -580,6 +685,7 @@ __all__ = [
     "TransitionEdgeData",
     "TransitionExecutionResult",
     "TransitionInfo",
+    "TransitionTriggerType",
     "TreeEvent",
     "TreeEventCreate",
     "TreeEventListResponse",
@@ -596,11 +702,16 @@ __all__ = [
     "UiBridgeVisualAssertionStep",
     "UnifiedStep",
     "UnifiedWorkflow",
+    "UpdateOlConfigRequest",
     "UpdateScheduledTaskRequest",
     "ValidateConfigRequest",
     "ValidateConfigResponse",
+    "VerificationAgentContext",
     "VerificationCategoryKind",
+    "VerificationMethod",
     "VerificationPhaseResult",
+    "VerificationPlan",
+    "VerificationResult",
     "VerificationResultResponse",
     "VerificationResultsListResponse",
     "VerificationStepDetails",
@@ -608,7 +719,12 @@ __all__ = [
     "VirtualDesktop",
     "VisualAssertionType",
     "VisualComparisonResult",
+    "WorkerCoordinationMessage",
+    "WorkerDomain",
+    "WorkerInstance",
     "WorkerOutput",
+    "WorkerSignal",
+    "WorkerStatus",
     "WorkflowArchitecture",
     "WorkflowFixupMode",
     "WorkflowFixupStep",
