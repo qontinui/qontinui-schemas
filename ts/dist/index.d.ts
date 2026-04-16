@@ -7,6 +7,7 @@ export { AiMessage, AiSessionState } from './chat.js';
 export { ActiveStatesResult, AvailableTransitionsResult, DiscoveryStrategy, DomainKnowledge, InitialStateRef, InitialStatesSource, MouseButton, NavigationResult, PathfindingRequest, PathfindingResult, PathfindingStep, Point, ResolvedInitialStates, ResolvedInitialStatesResult, ScrollDirection, StandardActionType, StateMachineConfig, StateMachineConfigCreate, StateMachineConfigFull, StateMachineConfigUpdate, StateMachineExportFormat, StateMachineState, StateMachineStateCreate, StateMachineStateUpdate, StateMachineTransition, StateMachineTransitionCreate, StateMachineTransitionUpdate, StateNodeData, TransitionAction, TransitionActionValue, TransitionEdgeData, TransitionExecutionResult, TransitionInfo } from './state-machine.js';
 export { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse } from './constraints.js';
 export { CoordinateSystem, Coordinates, Monitor, MonitorPosition, Region, VirtualDesktop } from './geometry.js';
+export { AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole, AccessibilitySelector, AccessibilitySnapshot, AccessibilityState } from './accessibility.js';
 
 /**
  * Shared Render Log Types

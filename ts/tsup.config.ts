@@ -13,6 +13,8 @@ export default defineConfig({
     constraints: "src/constraints/index.ts",
     geometry: "src/geometry/index.ts",
     "tree-events": "src/tree-events/index.ts",
+    accessibility: "src/accessibility/index.ts",
+    config: "src/config/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

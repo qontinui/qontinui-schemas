@@ -50,3 +50,11 @@ export * from "./geometry/_api";
 // `tree_events.ActionType` collides with `execution.ActionType` (different
 // enums, same name). Consumers should import from the subpath:
 //   import { TreeEvent, ActionType } from "@qontinui/shared-types/tree-events";
+
+// Accessibility tree types (CDP / UIA / AT-SPI / AX capture + selectors).
+export * from "./accessibility/_api";
+
+// Config types (AI context + workflow category) are NOT re-exported here
+// because `config.Context` (AI-task context) collides with `library.Context`
+// (library item with richer shape). Consumers use the subpath:
+//   import { Context, Category } from "@qontinui/shared-types/config";

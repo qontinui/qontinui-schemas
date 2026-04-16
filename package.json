@@ -51,6 +51,16 @@
       "types": "./ts/dist/tree-events.d.ts",
       "import": "./ts/dist/tree-events.js",
       "require": "./ts/dist/tree-events.cjs"
+    },
+    "./accessibility": {
+      "types": "./ts/dist/accessibility.d.ts",
+      "import": "./ts/dist/accessibility.js",
+      "require": "./ts/dist/accessibility.cjs"
+    },
+    "./config": {
+      "types": "./ts/dist/config.d.ts",
+      "import": "./ts/dist/config.js",
+      "require": "./ts/dist/config.cjs"
     }
   },
   "files": [

@@ -20,6 +20,8 @@
 //!   `{ "type": "array", "items": {} }` → `unknown[]` in TS, `list[Any]` in
 //!   Python. Typed step discriminated unions are a future migration (Wave 4).
 
+pub mod accessibility;
+pub mod config;
 pub mod constraints;
 pub mod execution;
 pub mod geometry;
