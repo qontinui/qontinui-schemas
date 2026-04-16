@@ -21,6 +21,7 @@
 //!   Python. Typed step discriminated unions are a future migration (Wave 4).
 
 pub mod constraints;
+pub mod execution;
 pub mod geometry;
 pub mod scheduler;
 pub mod state_machine;

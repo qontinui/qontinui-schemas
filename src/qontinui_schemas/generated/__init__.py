@@ -2,6 +2,11 @@
 # Re-exports the top-level type from each per-type module.
 
 from .per_type.a11y_action import A11yAction
+from .per_type.action_execution_create import ActionExecutionCreate
+from .per_type.action_execution_response import ActionExecutionResponse
+from .per_type.action_status import ActionStatus
+from .per_type.action_type import ActionType
+from .per_type.active_states_result import ActiveStatesResult
 from .per_type.agentic_phase_output import AgenticPhaseOutput
 from .per_type.agentic_status import AgenticStatus
 from .per_type.api_assertion import ApiAssertion
@@ -10,9 +15,11 @@ from .per_type.api_assertion_type import ApiAssertionType
 from .per_type.api_content_type import ApiContentType
 from .per_type.api_variable_extraction import ApiVariableExtraction
 from .per_type.app_event import AppEvent
+from .per_type.available_transitions_result import AvailableTransitionsResult
 from .per_type.base_step_fields import BaseStepFields
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.canonical_step import CanonicalStep
+from .per_type.check_issue_detail import CheckIssueDetail
 from .per_type.check_type import CheckType
 from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
@@ -27,35 +34,87 @@ from .per_type.constraint_proposal import ConstraintProposal
 from .per_type.constraint_result import ConstraintResult
 from .per_type.constraint_severity import ConstraintSeverity
 from .per_type.constraint_violation import ConstraintViolation
+from .per_type.coordinate_system import CoordinateSystem
+from .per_type.coordinates import Coordinates
+from .per_type.coverage_data import CoverageData
 from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
+from .per_type.create_task_run_request import CreateTaskRunRequest
 from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
+from .per_type.discovery_strategy import DiscoveryStrategy
+from .per_type.display_node import DisplayNode
+from .per_type.domain_knowledge import DomainKnowledge
+from .per_type.error_type import ErrorType
 from .per_type.execute_playbook_step import ExecutePlaybookStep
+from .per_type.execution_action_type import ExecutionActionType
+from .per_type.execution_issue_create import ExecutionIssueCreate
+from .per_type.execution_issue_response import ExecutionIssueResponse
+from .per_type.execution_match_location import ExecutionMatchLocation
+from .per_type.execution_run_complete import ExecutionRunComplete
+from .per_type.execution_run_complete_response import ExecutionRunCompleteResponse
+from .per_type.execution_run_create import ExecutionRunCreate
+from .per_type.execution_run_response import ExecutionRunResponse
+from .per_type.execution_screenshot_create import ExecutionScreenshotCreate
+from .per_type.execution_screenshot_response import ExecutionScreenshotResponse
+from .per_type.execution_stats import ExecutionStats
+from .per_type.execution_tree_response import ExecutionTreeResponse
 from .per_type.file_change import FileChange
 from .per_type.finding_output import FindingOutput
+from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
 from .per_type.full_runner_step import FullRunnerStep
+from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.health_check_url import HealthCheckUrl
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
+from .per_type.individual_check_result import IndividualCheckResult
+from .per_type.initial_state_ref import InitialStateRef
+from .per_type.initial_states_source import InitialStatesSource
+from .per_type.issue_severity import IssueSeverity
+from .per_type.llm_metrics import LLMMetrics
 from .per_type.log_source_selection import LogSourceSelection
+from .per_type.match_location import MatchLocation
 from .per_type.model_override_config import ModelOverrideConfig
+from .per_type.monitor import Monitor
+from .per_type.monitor_position import MonitorPosition
+from .per_type.mouse_button import MouseButton
 from .per_type.native_accessibility_step import NativeAccessibilityStep
+from .per_type.navigation_result import NavigationResult
 from .per_type.new_constraint_proposal import NewConstraintProposal
 from .per_type.next_task_info import NextTaskInfo
+from .per_type.node_metadata import NodeMetadata
+from .per_type.node_status import NodeStatus
+from .per_type.node_type import NodeType
+from .per_type.outcome import Outcome
+from .per_type.pagination import Pagination
+from .per_type.path_element import PathElement
+from .per_type.pathfinding_request import PathfindingRequest
+from .per_type.pathfinding_result import PathfindingResult
+from .per_type.pathfinding_step import PathfindingStep
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
+from .per_type.point import Point
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.reflection_fix_output import ReflectionFixOutput
+from .per_type.region import Region
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
 from .per_type.repository_watch import RepositoryWatch
+from .per_type.resolved_initial_states import ResolvedInitialStates
+from .per_type.resolved_initial_states_result import ResolvedInitialStatesResult
 from .per_type.resource_limits import ResourceLimits
 from .per_type.restart_process_step import RestartProcessStep
 from .per_type.retry_policy import RetryPolicy
 from .per_type.retry_spec import RetrySpec
 from .per_type.routing_rule import RoutingRule
+from .per_type.run_prompt_request import RunPromptRequest
+from .per_type.run_prompt_response import RunPromptResponse
+from .per_type.run_prompt_response_data import RunPromptResponseData
+from .per_type.run_status import RunStatus
+from .per_type.run_type import RunType
+from .per_type.runner_metadata import RunnerMetadata
+from .per_type.runtime_data import RuntimeData
 from .per_type.save_workflow_artifact_step import SaveWorkflowArtifactStep
 from .per_type.schedule_conditions import ScheduleConditions
 from .per_type.schedule_expression import ScheduleExpression
@@ -64,14 +123,66 @@ from .per_type.scheduled_task_status import ScheduledTaskStatus
 from .per_type.scheduled_task_type import ScheduledTaskType
 from .per_type.scheduler_settings import SchedulerSettings
 from .per_type.scheduler_status import SchedulerStatus
+from .per_type.screenshot_annotation import ScreenshotAnnotation
+from .per_type.screenshot_annotation_shape import ScreenshotAnnotationShape
+from .per_type.screenshot_type import ScreenshotType
+from .per_type.scroll_direction import ScrollDirection
 from .per_type.stage_condition import StageCondition
 from .per_type.stage_input import StageInput
 from .per_type.stage_output import StageOutput
+from .per_type.standard_action_type import StandardActionType
+from .per_type.state_context import StateContext
+from .per_type.state_machine_config import StateMachineConfig
+from .per_type.state_machine_config_create import StateMachineConfigCreate
+from .per_type.state_machine_config_full import StateMachineConfigFull
+from .per_type.state_machine_config_update import StateMachineConfigUpdate
+from .per_type.state_machine_export_format import StateMachineExportFormat
+from .per_type.state_machine_state import StateMachineState
+from .per_type.state_machine_state_create import StateMachineStateCreate
+from .per_type.state_machine_state_update import StateMachineStateUpdate
+from .per_type.state_machine_transition import StateMachineTransition
+from .per_type.state_machine_transition_create import StateMachineTransitionCreate
+from .per_type.state_machine_transition_update import StateMachineTransitionUpdate
+from .per_type.state_node_data import StateNodeData
+from .per_type.step_execution_config import StepExecutionConfig
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
 from .per_type.structured_signal import StructuredSignal
 from .per_type.task_execution_record import TaskExecutionRecord
+from .per_type.task_run import TaskRun
+from .per_type.task_run_backend import TaskRunBackend
+from .per_type.task_run_backend_detail import TaskRunBackendDetail
+from .per_type.task_run_create import TaskRunCreate
+from .per_type.task_run_filters import TaskRunFilters
+from .per_type.task_run_finding import TaskRunFinding
+from .per_type.task_run_finding_action_type import TaskRunFindingActionType
+from .per_type.task_run_finding_category import TaskRunFindingCategory
+from .per_type.task_run_finding_create import TaskRunFindingCreate
+from .per_type.task_run_finding_filters import TaskRunFindingFilters
+from .per_type.task_run_finding_severity import TaskRunFindingSeverity
+from .per_type.task_run_finding_status import TaskRunFindingStatus
+from .per_type.task_run_finding_summary import TaskRunFindingSummary
+from .per_type.task_run_finding_update import TaskRunFindingUpdate
+from .per_type.task_run_findings_list_response import TaskRunFindingsListResponse
+from .per_type.task_run_list_response import TaskRunListResponse
+from .per_type.task_run_session import TaskRunSession
+from .per_type.task_run_status import TaskRunStatus
+from .per_type.task_run_update import TaskRunUpdate
+from .per_type.task_type import TaskType
 from .per_type.test_type import TestType
+from .per_type.timing_info import TimingInfo
+from .per_type.top_match import TopMatch
+from .per_type.transition_action import TransitionAction
+from .per_type.transition_action_value import TransitionActionValue
+from .per_type.transition_edge_data import TransitionEdgeData
+from .per_type.transition_execution_result import TransitionExecutionResult
+from .per_type.transition_info import TransitionInfo
+from .per_type.tree_event import TreeEvent
+from .per_type.tree_event_create import TreeEventCreate
+from .per_type.tree_event_list_response import TreeEventListResponse
+from .per_type.tree_event_response import TreeEventResponse
+from .per_type.tree_event_type import TreeEventType
+from .per_type.tree_node import TreeNode
 from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
@@ -86,11 +197,18 @@ from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
 from .per_type.validate_config_request import ValidateConfigRequest
 from .per_type.validate_config_response import ValidateConfigResponse
 from .per_type.verification_category_kind import VerificationCategoryKind
+from .per_type.verification_phase_result import VerificationPhaseResult
+from .per_type.verification_result_response import VerificationResultResponse
+from .per_type.verification_results_list_response import VerificationResultsListResponse
+from .per_type.verification_step_details import VerificationStepDetails
+from .per_type.verification_step_result import VerificationStepResult
+from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
 from .per_type.worker_output import WorkerOutput
 from .per_type.workflow_architecture import WorkflowArchitecture
 from .per_type.workflow_fixup_mode import WorkflowFixupMode
 from .per_type.workflow_fixup_step import WorkflowFixupStep
+from .per_type.workflow_metadata import WorkflowMetadata
 from .per_type.workflow_ref_step import WorkflowRefStep
 from .per_type.workflow_stage import WorkflowStage
 from .per_type.workflow_step import WorkflowStep
@@ -100,6 +218,11 @@ from .per_type.write_config_response import WriteConfigResponse
 
 __all__ = [
     "A11yAction",
+    "ActionExecutionCreate",
+    "ActionExecutionResponse",
+    "ActionStatus",
+    "ActionType",
+    "ActiveStatesResult",
     "AgenticPhaseOutput",
     "AgenticStatus",
     "ApiAssertion",
@@ -108,9 +231,11 @@ __all__ = [
     "ApiContentType",
     "ApiVariableExtraction",
     "AppEvent",
+    "AvailableTransitionsResult",
     "BaseStepFields",
     "BuiltinOverrideProposal",
     "CanonicalStep",
+    "CheckIssueDetail",
     "CheckType",
     "CodeExecutionStep",
     "CommandMode",
@@ -125,35 +250,87 @@ __all__ = [
     "ConstraintResult",
     "ConstraintSeverity",
     "ConstraintViolation",
+    "CoordinateSystem",
+    "Coordinates",
+    "CoverageData",
     "CreateScheduledTaskRequest",
+    "CreateTaskRunRequest",
     "DagApprovalStep",
     "DagCancelStep",
     "DagLoopStep",
+    "DiscoveryStrategy",
+    "DisplayNode",
+    "DomainKnowledge",
+    "ErrorType",
     "ExecutePlaybookStep",
+    "ExecutionActionType",
+    "ExecutionIssueCreate",
+    "ExecutionIssueResponse",
+    "ExecutionMatchLocation",
+    "ExecutionRunComplete",
+    "ExecutionRunCompleteResponse",
+    "ExecutionRunCreate",
+    "ExecutionRunResponse",
+    "ExecutionScreenshotCreate",
+    "ExecutionScreenshotResponse",
+    "ExecutionStats",
+    "ExecutionTreeResponse",
     "FileChange",
     "FindingOutput",
+    "FindingsSummary",
     "FlowEvent",
     "FullRunnerStep",
+    "GateEvaluationResult",
     "HealthCheckUrl",
     "HttpMethod",
     "IdleCondition",
+    "IndividualCheckResult",
+    "InitialStateRef",
+    "InitialStatesSource",
+    "IssueSeverity",
+    "LLMMetrics",
     "LogSourceSelection",
+    "MatchLocation",
     "ModelOverrideConfig",
+    "Monitor",
+    "MonitorPosition",
+    "MouseButton",
     "NativeAccessibilityStep",
+    "NavigationResult",
     "NewConstraintProposal",
     "NextTaskInfo",
+    "NodeMetadata",
+    "NodeStatus",
+    "NodeType",
+    "Outcome",
+    "Pagination",
+    "PathElement",
+    "PathfindingRequest",
+    "PathfindingResult",
+    "PathfindingStep",
     "PlaywrightExecutionMode",
+    "Point",
     "PromptStep",
     "PromptStepPhase",
     "ReadConfigResponse",
     "ReflectionFixOutput",
+    "Region",
     "RepositoryInactiveCondition",
     "RepositoryWatch",
+    "ResolvedInitialStates",
+    "ResolvedInitialStatesResult",
     "ResourceLimits",
     "RestartProcessStep",
     "RetryPolicy",
     "RetrySpec",
     "RoutingRule",
+    "RunPromptRequest",
+    "RunPromptResponse",
+    "RunPromptResponseData",
+    "RunStatus",
+    "RunType",
+    "RunnerMetadata",
+    "RuntimeData",
     "SaveWorkflowArtifactStep",
     "ScheduleConditions",
     "ScheduleExpression",
@@ -162,14 +339,66 @@ __all__ = [
     "ScheduledTaskType",
     "SchedulerSettings",
     "SchedulerStatus",
+    "ScreenshotAnnotation",
+    "ScreenshotAnnotationShape",
+    "ScreenshotType",
+    "ScrollDirection",
     "StageCondition",
     "StageInput",
     "StageOutput",
+    "StandardActionType",
+    "StateContext",
+    "StateMachineConfig",
+    "StateMachineConfigCreate",
+    "StateMachineConfigFull",
+    "StateMachineConfigUpdate",
+    "StateMachineExportFormat",
+    "StateMachineState",
+    "StateMachineStateCreate",
+    "StateMachineStateUpdate",
+    "StateMachineTransition",
+    "StateMachineTransitionCreate",
+    "StateMachineTransitionUpdate",
+    "StateNodeData",
+    "StepExecutionConfig",
     "StructuredFinding",
     "StructuredOverride",
     "StructuredSignal",
     "TaskExecutionRecord",
+    "TaskRun",
+    "TaskRunBackend",
+    "TaskRunBackendDetail",
+    "TaskRunCreate",
+    "TaskRunFilters",
+    "TaskRunFinding",
+    "TaskRunFindingActionType",
+    "TaskRunFindingCategory",
+    "TaskRunFindingCreate",
+    "TaskRunFindingFilters",
+    "TaskRunFindingSeverity",
+    "TaskRunFindingStatus",
+    "TaskRunFindingSummary",
+    "TaskRunFindingUpdate",
+    "TaskRunFindingsListResponse",
+    "TaskRunListResponse",
+    "TaskRunSession",
+    "TaskRunStatus",
+    "TaskRunUpdate",
+    "TaskType",
     "TestType",
+    "TimingInfo",
+    "TopMatch",
+    "TransitionAction",
+    "TransitionActionValue",
+    "TransitionEdgeData",
+    "TransitionExecutionResult",
+    "TransitionInfo",
+    "TreeEvent",
+    "TreeEventCreate",
+    "TreeEventListResponse",
+    "TreeEventResponse",
+    "TreeEventType",
+    "TreeNode",
     "UiBridgeAction",
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
@@ -184,11 +413,18 @@ __all__ = [
     "ValidateConfigRequest",
     "ValidateConfigResponse",
     "VerificationCategoryKind",
+    "VerificationPhaseResult",
+    "VerificationResultResponse",
+    "VerificationResultsListResponse",
+    "VerificationStepDetails",
+    "VerificationStepResult",
+    "VirtualDesktop",
     "VisualAssertionType",
     "WorkerOutput",
     "WorkflowArchitecture",
     "WorkflowFixupMode",
     "WorkflowFixupStep",
+    "WorkflowMetadata",
     "WorkflowRefStep",
     "WorkflowStage",
     "WorkflowStep",

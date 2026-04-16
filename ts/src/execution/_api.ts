@@ -4,326 +4,181 @@
  * Type definitions for the unified execution reporting API that supports
  * multiple run types: QA testing, integration testing, live automation,
  * recording sessions, and debug runs.
+ *
+ * Tier 1 (enums) and Tier 2 (request/response DTOs) are generated from Rust
+ * (source of truth: qontinui-schemas/rust/src/execution.rs). Do not edit
+ * those sections by hand — regenerate via `just generate-types` (or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`).
+ *
+ * Tier 3 (UI display / live-status-stream types) remains hand-authored below.
  */
 
 // ============================================================================
-// Enums
+// Enums (Tier 1, generated)
 // ============================================================================
+//
+// For enums that had named-constant call-site syntax in the old hand-authored
+// TS (e.g. `RunType.QA_TEST`), we import the generated literal union under an
+// alias, re-export it as the type name, and declare a companion `const` object
+// with the same name so `RunType.QA_TEST` still resolves as a value. TS merges
+// the type alias and const value into one declaration usable in both
+// positions.
 
-export enum RunType {
-  QA_TEST = "qa_test",
-  INTEGRATION_TEST = "integration_test",
-  LIVE_AUTOMATION = "live_automation",
-  RECORDING = "recording",
-  DEBUG = "debug",
-}
+import type { RunType as _RunType } from "../generated/RunType";
+export type RunType = _RunType;
+export const RunType = {
+  QA_TEST: "qa_test",
+  INTEGRATION_TEST: "integration_test",
+  LIVE_AUTOMATION: "live_automation",
+  RECORDING: "recording",
+  DEBUG: "debug",
+} as const;
 
-export enum RunStatus {
-  PENDING = "pending",
-  RUNNING = "running",
-  COMPLETED = "completed",
-  FAILED = "failed",
-  TIMEOUT = "timeout",
-  CANCELLED = "cancelled",
-  PAUSED = "paused",
-}
+import type { RunStatus as _RunStatus } from "../generated/RunStatus";
+export type RunStatus = _RunStatus;
+export const RunStatus = {
+  PENDING: "pending",
+  RUNNING: "running",
+  COMPLETED: "completed",
+  FAILED: "failed",
+  TIMEOUT: "timeout",
+  CANCELLED: "cancelled",
+  PAUSED: "paused",
+} as const;
 
-export enum ActionStatus {
-  SUCCESS = "success",
-  FAILED = "failed",
-  TIMEOUT = "timeout",
-  SKIPPED = "skipped",
-  ERROR = "error",
-  PENDING = "pending",
-}
+import type { ActionStatus as _ActionStatus } from "../generated/ActionStatus";
+export type ActionStatus = _ActionStatus;
+export const ActionStatus = {
+  SUCCESS: "success",
+  FAILED: "failed",
+  TIMEOUT: "timeout",
+  SKIPPED: "skipped",
+  ERROR: "error",
+  PENDING: "pending",
+} as const;
 
-export enum ActionType {
+// `ActionType` collides with `tree_events::ActionType` on the Rust side, so
+// the generated symbol is `ExecutionActionType`. We preserve the local name
+// `ActionType` for backward compatibility.
+import type { ExecutionActionType as _ActionType } from "../generated/ExecutionActionType";
+export type ActionType = _ActionType;
+export const ActionType = {
   // Vision actions
-  FIND = "find",
-  FIND_ALL = "find_all",
-  WAIT_FOR = "wait_for",
-  WAIT_UNTIL_GONE = "wait_until_gone",
+  FIND: "find",
+  FIND_ALL: "find_all",
+  WAIT_FOR: "wait_for",
+  WAIT_UNTIL_GONE: "wait_until_gone",
 
   // Input actions
-  CLICK = "click",
-  DOUBLE_CLICK = "double_click",
-  RIGHT_CLICK = "right_click",
-  TYPE = "type",
-  PRESS_KEY = "press_key",
-  HOTKEY = "hotkey",
-  SCROLL = "scroll",
-  DRAG = "drag",
+  CLICK: "click",
+  DOUBLE_CLICK: "double_click",
+  RIGHT_CLICK: "right_click",
+  TYPE: "type",
+  PRESS_KEY: "press_key",
+  HOTKEY: "hotkey",
+  SCROLL: "scroll",
+  DRAG: "drag",
 
   // State machine actions
-  GO_TO_STATE = "go_to_state",
-  TRANSITION = "transition",
-  VERIFY_STATE = "verify_state",
+  GO_TO_STATE: "go_to_state",
+  TRANSITION: "transition",
+  VERIFY_STATE: "verify_state",
 
   // Control flow
-  CONDITIONAL = "conditional",
-  LOOP = "loop",
-  PARALLEL = "parallel",
-  SEQUENCE = "sequence",
+  CONDITIONAL: "conditional",
+  LOOP: "loop",
+  PARALLEL: "parallel",
+  SEQUENCE: "sequence",
 
   // Utility
-  WAIT = "wait",
-  SCREENSHOT = "screenshot",
-  LOG = "log",
-  ASSERT = "assert",
+  WAIT: "wait",
+  SCREENSHOT: "screenshot",
+  LOG: "log",
+  ASSERT: "assert",
 
   // AI actions
-  AI_PROMPT = "ai_prompt",
-  RUN_PROMPT_SEQUENCE = "run_prompt_sequence",
+  AI_PROMPT: "ai_prompt",
+  RUN_PROMPT_SEQUENCE: "run_prompt_sequence",
 
   // Custom/plugin
-  CUSTOM = "custom",
-}
+  CUSTOM: "custom",
+} as const;
 
-export enum ErrorType {
-  ELEMENT_NOT_FOUND = "element_not_found",
-  TIMEOUT = "timeout",
-  ASSERTION_FAILED = "assertion_failed",
-  CRASH = "crash",
-  NETWORK_ERROR = "network_error",
-  VALIDATION_ERROR = "validation_error",
-  OTHER = "other",
-}
+import type { ErrorType as _ErrorType } from "../generated/ErrorType";
+export type ErrorType = _ErrorType;
+export const ErrorType = {
+  ELEMENT_NOT_FOUND: "element_not_found",
+  TIMEOUT: "timeout",
+  ASSERTION_FAILED: "assertion_failed",
+  CRASH: "crash",
+  NETWORK_ERROR: "network_error",
+  VALIDATION_ERROR: "validation_error",
+  OTHER: "other",
+} as const;
 
-export enum IssueSeverity {
-  CRITICAL = "critical",
-  HIGH = "high",
-  MEDIUM = "medium",
-  LOW = "low",
-  INFORMATIONAL = "informational",
-}
+import type { IssueSeverity as _IssueSeverity } from "../generated/IssueSeverity";
+export type IssueSeverity = _IssueSeverity;
+export const IssueSeverity = {
+  CRITICAL: "critical",
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low",
+  INFORMATIONAL: "informational",
+} as const;
 
-export enum ScreenshotType {
-  ERROR = "error",
-  SUCCESS = "success",
-  MANUAL = "manual",
-  PERIODIC = "periodic",
-  ACTION_RESULT = "action_result",
-  STATE_VERIFICATION = "state_verification",
-}
+import type { ScreenshotType as _ScreenshotType } from "../generated/ScreenshotType";
+export type ScreenshotType = _ScreenshotType;
+export const ScreenshotType = {
+  ERROR: "error",
+  SUCCESS: "success",
+  MANUAL: "manual",
+  PERIODIC: "periodic",
+  ACTION_RESULT: "action_result",
+  STATE_VERIFICATION: "state_verification",
+} as const;
 
-// ============================================================================
-// Metadata Types
-// ============================================================================
-
-export interface RunnerMetadata {
-  runner_version: string;
-  os: string;
-  hostname: string;
-  screen_resolution?: string;
-  cpu_info?: string;
-  memory_mb?: number;
-  extra?: Record<string, unknown>;
-}
-
-export interface WorkflowMetadata {
-  workflow_id: string;
-  workflow_name: string;
-  workflow_version?: string;
-  total_states?: number;
-  total_transitions?: number;
-  tags?: string[];
-  description?: string;
-  initial_state_ids?: string[];
-}
-
-export interface ExecutionStats {
-  total_actions: number;
-  successful_actions: number;
-  failed_actions: number;
-  timeout_actions: number;
-  skipped_actions: number;
-  total_duration_ms: number;
-  avg_action_duration_ms?: number;
-  /** Aggregate input tokens across all LLM actions */
-  total_tokens_input?: number;
-  /** Aggregate output tokens across all LLM actions */
-  total_tokens_output?: number;
-  /** Aggregate estimated cost in USD across all LLM actions */
-  total_cost_usd?: number;
-  /** Number of actions that used an LLM */
-  llm_action_count?: number;
-}
-
-export interface CoverageData {
-  coverage_percentage: number;
-  states_covered: number;
-  total_states: number;
-  transitions_covered: number;
-  total_transitions: number;
-  uncovered_states?: string[];
-  uncovered_transitions?: string[];
-  state_visit_counts?: Record<string, number>;
-  transition_execution_counts?: Record<string, number>;
-}
+// Shape of annotation overlay on a screenshot. Was inline on
+// `ExecutionScreenshotCreate.annotations[].type` previously. No call sites
+// used a named-constant syntax, so a plain re-export suffices.
+export type { ScreenshotAnnotationShape } from "../generated/ScreenshotAnnotationShape";
 
 // ============================================================================
-// LLM Metrics
+// Metadata & DTO Types (Tier 2, generated)
 // ============================================================================
 
-/** Token and cost metrics for an LLM-powered action. */
-export interface LLMMetrics {
-  /** LLM model identifier */
-  model?: string;
-  /** Provider name (e.g. anthropic, openai) */
-  provider?: string;
-  /** Input/prompt token count */
-  tokens_input?: number;
-  /** Completion token count */
-  tokens_output?: number;
-  /** Computed total token count */
-  tokens_total?: number;
-  /** Estimated cost in USD */
-  cost_usd?: number;
-  /** Generation parameters (temperature, max_tokens, etc.) */
-  generation_params?: Record<string, unknown>;
-}
+export type { RunnerMetadata } from "../generated/RunnerMetadata";
+export type { WorkflowMetadata } from "../generated/WorkflowMetadata";
+export type { ExecutionStats } from "../generated/ExecutionStats";
+export type { CoverageData } from "../generated/CoverageData";
+export type { LLMMetrics } from "../generated/LLMMetrics";
 
 // ============================================================================
-// Request/Create Types
+// Request/Create + Response Types (Tier 2, generated)
 // ============================================================================
 
-export interface ExecutionRunCreate {
-  project_id: string;
-  run_type: RunType;
-  run_name: string;
-  description?: string;
-  runner_metadata: RunnerMetadata;
-  workflow_metadata?: WorkflowMetadata;
-  configuration?: Record<string, unknown>;
-}
+export type { ExecutionRunCreate } from "../generated/ExecutionRunCreate";
+export type { ExecutionRunResponse } from "../generated/ExecutionRunResponse";
 
-export interface ExecutionRunResponse {
-  run_id: string;
-  project_id: string;
-  run_type: RunType;
-  run_name: string;
-  status: RunStatus;
-  started_at: string;
-  ended_at?: string;
-  duration_seconds?: number;
-}
+// `MatchLocation` collides with `tree_events::MatchLocation` on the Rust
+// side, so the generated symbol is `ExecutionMatchLocation`. Preserve the
+// local name via a re-export alias.
+export type { ExecutionMatchLocation as MatchLocation } from "../generated/ExecutionMatchLocation";
 
-export interface ActionExecutionCreate {
-  sequence_number: number;
-  action_type: ActionType;
-  action_name: string;
-  status: ActionStatus;
-  started_at: string;
-  completed_at: string;
-  duration_ms: number;
-  from_state?: string;
-  to_state?: string;
-  active_states?: string[];
-  pattern_id?: string;
-  pattern_name?: string;
-  confidence_score?: number;
-  match_location?: {
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-  };
-  error_message?: string;
-  error_type?: ErrorType;
-  error_stack?: string;
-  screenshot_id?: string;
-  parent_action_id?: string;
-  input_data?: Record<string, unknown>;
-  output_data?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-  /** LLM token and cost metrics if action used an LLM */
-  llm_metrics?: LLMMetrics;
-  /** Span type for tracing (e.g. "llm", "tool", "agent") */
-  span_type?: string;
-  /** Trace ID for correlating related actions */
-  trace_id?: string;
-  /** Parent action ID for child actions within a sequence */
-  parent_id?: string;
-}
+export type { ActionExecutionCreate } from "../generated/ActionExecutionCreate";
+export type { ActionExecutionResponse } from "../generated/ActionExecutionResponse";
 
-export interface ActionExecutionResponse {
-  recorded: number;
-  run_id: string;
-  action_ids?: string[];
-}
+export type { ScreenshotAnnotation } from "../generated/ScreenshotAnnotation";
+export type { ExecutionScreenshotCreate } from "../generated/ExecutionScreenshotCreate";
+export type { ExecutionScreenshotResponse } from "../generated/ExecutionScreenshotResponse";
 
-export interface ExecutionScreenshotCreate {
-  screenshot_id: string;
-  sequence_number: number;
-  screenshot_type: ScreenshotType;
-  timestamp: string;
-  width: number;
-  height: number;
-  action_sequence_number?: number;
-  state?: string;
-  active_states?: string[];
-  annotations?: Array<{
-    type: "box" | "circle" | "arrow" | "text";
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    label?: string;
-    color?: string;
-  }>;
-  metadata?: Record<string, unknown>;
-}
+export type { ExecutionIssueCreate } from "../generated/ExecutionIssueCreate";
+export type { ExecutionIssueResponse } from "../generated/ExecutionIssueResponse";
 
-export interface ExecutionScreenshotResponse {
-  screenshot_id: string;
-  run_id: string;
-  image_url: string;
-  thumbnail_url?: string;
-  uploaded_at: string;
-  file_size_bytes: number;
-}
-
-export interface ExecutionIssueCreate {
-  title: string;
-  description: string;
-  severity: IssueSeverity;
-  issue_type: string;
-  action_sequence_number?: number;
-  state?: string;
-  screenshot_ids?: string[];
-  reproduction_steps?: string[];
-  expected_behavior?: string;
-  actual_behavior?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface ExecutionIssueResponse {
-  recorded: number;
-  run_id: string;
-  issue_ids?: string[];
-}
-
-export interface ExecutionRunComplete {
-  status: RunStatus;
-  ended_at: string;
-  stats: ExecutionStats;
-  coverage?: CoverageData;
-  summary?: string;
-  error_message?: string;
-}
-
-export interface ExecutionRunCompleteResponse {
-  run_id: string;
-  status: RunStatus;
-  started_at: string;
-  ended_at: string;
-  duration_seconds: number;
-  stats: ExecutionStats;
-  coverage?: CoverageData;
-}
+export type { ExecutionRunComplete } from "../generated/ExecutionRunComplete";
+export type { ExecutionRunCompleteResponse } from "../generated/ExecutionRunCompleteResponse";
 
 // ============================================================================
-// Execution Status Types (real-time display)
+// Execution Status Types (real-time display) — Tier 3, hand-authored
 // ============================================================================
 
 export type TaskComplexity = "simple" | "medium" | "complex";
@@ -487,7 +342,7 @@ export interface ExecutionStatus {
 }
 
 // ============================================================================
-// Raw Event Types (snake_case from backend)
+// Raw Event Types (snake_case from backend) — Tier 3, hand-authored
 // ============================================================================
 
 export interface RawExecutionStatusEventBase {

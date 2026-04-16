@@ -14,223 +14,54 @@
  * Runtime navigation (pathfinding through states) is handled by the qontinui
  * Python library using multistate. The TypeScript pathfinding types here are
  * for the graph editor's path preview only.
+ *
+ * Most wire types in this module are generated from Rust (source of truth:
+ * qontinui-schemas/rust/src/state_machine.rs). Do not edit those by hand —
+ * regenerate via `just generate-types` (or the runner's generate_types.sh).
+ * A small number of UI-only sugar types remain hand-authored below.
  */
 
 // =============================================================================
 // Action Types
 // =============================================================================
 
-/**
- * All UI Bridge SDK standard actions + workflow-level actions (wait, navigate).
- *
- * Parameterized actions: click, doubleClick, rightClick, type, select, scroll, drag
- * No-param actions: clear, focus, blur, hover, check, uncheck, toggle, setValue, submit, reset
- * Workflow-level actions: wait, navigate
- */
-export type StandardActionType =
-  | "click"
-  | "doubleClick"
-  | "rightClick"
-  | "type"
-  | "clear"
-  | "select"
-  | "focus"
-  | "blur"
-  | "hover"
-  | "scroll"
-  | "check"
-  | "uncheck"
-  | "toggle"
-  | "setValue"
-  | "drag"
-  | "submit"
-  | "reset"
-  | "wait"
-  | "navigate";
-
-/**
- * A single action within a transition.
- * Each action targets an element and performs an interaction.
- */
-export interface TransitionAction {
-  type: StandardActionType;
-  /** Target element ID (used by most element actions) */
-  target?: string;
-  /** Text to type (type action) */
-  text?: string;
-  /** Clear before typing (type action) */
-  clear_first?: boolean;
-  /** Keystroke delay in ms (type action) */
-  type_delay?: number;
-  /** Value to select or set (select / setValue actions) */
-  value?: string | string[];
-  /** Select by label instead of value (select action) */
-  select_by_label?: boolean;
-  /** URL to navigate to (navigate action) */
-  url?: string;
-  /** Delay in milliseconds (wait action) */
-  delay_ms?: number;
-  /** Scroll direction (scroll action) */
-  scroll_direction?: "up" | "down" | "left" | "right";
-  /** Scroll amount in pixels (scroll action) */
-  scroll_amount?: number;
-  /** Drag target element ID or selector (drag action) */
-  drag_target?: string;
-  /** Drag target position {x, y} or named position (drag action) */
-  drag_target_position?: string;
-  /** Number of intermediate mousemove steps (drag action) */
-  drag_steps?: number;
-  /** Hold delay before first move in ms (drag action) */
-  drag_hold_delay?: number;
-  /** Dispatch HTML5 drag events alongside mouse events (drag action) */
-  drag_html5?: boolean;
-  /** Mouse button: left, right, middle (click / doubleClick / rightClick) */
-  button?: "left" | "right" | "middle";
-  /** Click position relative to element (click / doubleClick / rightClick) */
-  position?: { x: number; y: number };
-}
+export type { StandardActionType } from "../generated/StandardActionType";
+export type { Point } from "../generated/Point";
+export type { ScrollDirection } from "../generated/ScrollDirection";
+export type { MouseButton } from "../generated/MouseButton";
+export type { TransitionActionValue } from "../generated/TransitionActionValue";
+export type { TransitionAction } from "../generated/TransitionAction";
 
 // =============================================================================
 // Domain Knowledge
 // =============================================================================
 
-export interface DomainKnowledge {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-}
+export type { DomainKnowledge } from "../generated/DomainKnowledge";
 
 // =============================================================================
 // State Machine Config
 // =============================================================================
 
-/**
- * A state machine configuration — a named collection of states and transitions
- * that describe the navigable structure of an application's UI.
- */
-export interface StateMachineConfig {
-  id: string;
-  name: string;
-  description?: string | null;
-  render_count: number;
-  element_count: number;
-  include_html_ids: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StateMachineConfigCreate {
-  name: string;
-  description?: string;
-}
-
-export interface StateMachineConfigUpdate {
-  name?: string;
-  description?: string;
-}
-
-/**
- * A config with all its states and transitions loaded.
- * Used when the full state machine needs to be displayed or exported.
- */
-export interface StateMachineConfigFull extends StateMachineConfig {
-  states: StateMachineState[];
-  transitions: StateMachineTransition[];
-}
+export type { StateMachineConfig } from "../generated/StateMachineConfig";
+export type { StateMachineConfigCreate } from "../generated/StateMachineConfigCreate";
+export type { StateMachineConfigUpdate } from "../generated/StateMachineConfigUpdate";
+export type { StateMachineConfigFull } from "../generated/StateMachineConfigFull";
 
 // =============================================================================
 // State
 // =============================================================================
 
-/**
- * A UI state, defined by which elements are present on screen.
- * States are discovered via co-occurrence analysis of DOM snapshots.
- */
-export interface StateMachineState {
-  id: string;
-  config_id: string;
-  state_id: string;
-  name: string;
-  description?: string | null;
-  element_ids: string[];
-  render_ids: string[];
-  confidence: number;
-  acceptance_criteria: string[];
-  extra_metadata: Record<string, unknown>;
-  domain_knowledge: DomainKnowledge[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StateMachineStateCreate {
-  state_id?: string;
-  name: string;
-  description?: string;
-  element_ids?: string[];
-  render_ids?: string[];
-  confidence?: number;
-  acceptance_criteria?: string[];
-  extra_metadata?: Record<string, unknown>;
-  domain_knowledge?: DomainKnowledge[];
-}
-
-export interface StateMachineStateUpdate {
-  name?: string;
-  description?: string;
-  element_ids?: string[];
-  render_ids?: string[];
-  confidence?: number;
-  acceptance_criteria?: string[];
-  extra_metadata?: Record<string, unknown>;
-  domain_knowledge?: DomainKnowledge[];
-}
+export type { StateMachineState } from "../generated/StateMachineState";
+export type { StateMachineStateCreate } from "../generated/StateMachineStateCreate";
+export type { StateMachineStateUpdate } from "../generated/StateMachineStateUpdate";
 
 // =============================================================================
 // Transition
 // =============================================================================
 
-/**
- * A transition between states, consisting of one or more actions.
- * Transitions define the edges of the state machine graph.
- */
-export interface StateMachineTransition {
-  id: string;
-  config_id: string;
-  transition_id: string;
-  name: string;
-  from_states: string[];
-  activate_states: string[];
-  exit_states: string[];
-  actions: TransitionAction[];
-  path_cost: number;
-  stays_visible: boolean;
-  extra_metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StateMachineTransitionCreate {
-  name: string;
-  from_states: string[];
-  activate_states: string[];
-  exit_states: string[];
-  actions: TransitionAction[];
-  path_cost?: number;
-  stays_visible?: boolean;
-  extra_metadata?: Record<string, unknown>;
-}
-
-export interface StateMachineTransitionUpdate {
-  name?: string;
-  from_states?: string[];
-  activate_states?: string[];
-  exit_states?: string[];
-  actions?: TransitionAction[];
-  path_cost?: number;
-  stays_visible?: boolean;
-  extra_metadata?: Record<string, unknown>;
-}
+export type { StateMachineTransition } from "../generated/StateMachineTransition";
+export type { StateMachineTransitionCreate } from "../generated/StateMachineTransitionCreate";
+export type { StateMachineTransitionUpdate } from "../generated/StateMachineTransitionUpdate";
 
 // =============================================================================
 // Pathfinding (Graph Editor Visualization)
@@ -241,128 +72,56 @@ export interface StateMachineTransitionUpdate {
  * Runtime navigation uses the qontinui Python library (multistate) directly.
  */
 
-export interface PathfindingRequest {
-  from_states: string[];
-  target_states: string[];
-}
-
-export interface PathfindingStep {
-  transition_id: string;
-  transition_name: string;
-  from_states: string[];
-  activate_states: string[];
-  exit_states: string[];
-  path_cost: number;
-}
-
-export interface PathfindingResult {
-  found: boolean;
-  steps: PathfindingStep[];
-  total_cost: number;
-  error?: string;
-}
+export type { PathfindingRequest } from "../generated/PathfindingRequest";
+export type { PathfindingStep } from "../generated/PathfindingStep";
+export type { PathfindingResult } from "../generated/PathfindingResult";
 
 // =============================================================================
 // Execution Results (Runtime)
 // =============================================================================
 
-/**
- * Result of executing a state transition at runtime.
- * Returned by the runner's Tauri commands or qontinui Python subprocess.
- */
-export interface TransitionExecutionResult {
-  success: boolean;
-  transition_id: string;
-  active_states: string[];
-  error?: string;
-}
+export type { TransitionExecutionResult } from "../generated/TransitionExecutionResult";
+export type { NavigationResult } from "../generated/NavigationResult";
+export type { ActiveStatesResult } from "../generated/ActiveStatesResult";
 
-/**
- * Result of navigating to one or more target states.
- * Navigation uses multistate pathfinding to determine the optimal path.
- */
-export interface NavigationResult {
-  success: boolean;
-  path: string[];
-  active_states: string[];
-  target_state?: string;
-  results?: NavigationResult[];
-  error?: string;
-}
-
-/**
- * Result of querying currently active states in the state machine.
- */
-export interface ActiveStatesResult {
-  success: boolean;
-  active_states: string[];
-  current_state?: string | null;
-  state_history?: string[];
-  error?: string;
-}
-
-/**
- * Information about a single available transition from the current state.
- */
-export interface TransitionInfo {
-  id: string;
-  from_state: string;
-  to_state: string | null;
-  workflows: string[];
-}
-
-/**
- * Result of querying available transitions from the current state.
- */
-export interface AvailableTransitionsResult {
-  success: boolean;
-  transitions: TransitionInfo[];
-  current_state?: string;
-  message?: string;
-  error?: string;
-}
+// TODO(schema-migration): generated `TransitionInfo.to_state` is optional
+// (`to_state?: string | null`) whereas the previous hand-authored shape made
+// it a required `string | null` field. Consumers that destructure `to_state`
+// unconditionally should be reviewed in Phase 4 before we fully rely on the
+// generated type's optionality.
+export type { TransitionInfo } from "../generated/TransitionInfo";
+export type { AvailableTransitionsResult } from "../generated/AvailableTransitionsResult";
 
 // =============================================================================
 // Initial States
 // =============================================================================
 
-/**
- * Source of initial states configuration.
- *
- * - "defaults": States with is_initial=true in the state machine definition
- * - "workflow": Initial states defined on the workflow (initialStateIds)
- * - "override": Session-only override from the runner UI
- */
-export type InitialStatesSource = "defaults" | "workflow" | "override";
-
-export interface ResolvedInitialStates {
-  stateIds: string[];
-  source: InitialStatesSource;
-  states?: Array<{ id: string; name: string }>;
-  workflowId?: string;
-}
-
-export interface ResolvedInitialStatesResult {
-  success: boolean;
-  stateIds: string[];
-  source: InitialStatesSource;
-  states: Array<{ id: string; name: string }>;
-  workflowId: string;
-  error?: string;
-}
+export type { InitialStatesSource } from "../generated/InitialStatesSource";
+export type { InitialStateRef } from "../generated/InitialStateRef";
+export type { ResolvedInitialStates } from "../generated/ResolvedInitialStates";
+export type { ResolvedInitialStatesResult } from "../generated/ResolvedInitialStatesResult";
 
 // =============================================================================
 // Discovery
 // =============================================================================
 
-export type DiscoveryStrategy = "auto" | "fingerprint";
+export type { DiscoveryStrategy } from "../generated/DiscoveryStrategy";
 
 // =============================================================================
 // Graph Display Types (ReactFlow)
 // =============================================================================
 
+// NOTE: `StateNodeData` is kept hand-authored because the generated DTO
+// intentionally omits the `onStartElementDrag` callback (a UI-layer concern
+// with no Rust analogue). Downstream ReactFlow nodes need the callback, so we
+// can't silently substitute the generated shape. The rest of the fields match
+// the generated `StateNodeData` one-for-one.
+
 /**
  * Data passed to a state node in the ReactFlow graph editor.
+ *
+ * UI-only sugar: mirrors the generated `StateNodeData` but adds the
+ * `onStartElementDrag` callback that the graph editor wires up at render time.
  */
 export interface StateNodeData {
   stateId: string;
@@ -382,30 +141,10 @@ export interface StateNodeData {
   elementThumbnails?: Record<string, string>;
 }
 
-/**
- * Data passed to a transition edge in the ReactFlow graph editor.
- */
-export interface TransitionEdgeData {
-  transitionId: string;
-  name: string;
-  pathCost: number;
-  actionCount: number;
-  actionTypes: StandardActionType[];
-  isHighlighted: boolean;
-  staysVisible: boolean;
-  firstActionTarget?: string;
-}
+export type { TransitionEdgeData } from "../generated/TransitionEdgeData";
 
 // =============================================================================
 // Export/Import
 // =============================================================================
 
-/**
- * Format for exporting a state machine config to JSON.
- * Compatible with UIBridgeRuntime.from_dict() in the qontinui library.
- */
-export interface StateMachineExportFormat {
-  states: Record<string, Record<string, unknown>>;
-  transitions: Record<string, Record<string, unknown>>;
-  config: Record<string, unknown>;
-}
+export type { StateMachineExportFormat } from "../generated/StateMachineExportFormat";

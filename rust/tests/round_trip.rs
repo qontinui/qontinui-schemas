@@ -1340,7 +1340,7 @@ fn task_run_finding_summary_roundtrips() {
 #[test]
 fn task_run_backend_detail_flattens_task() {
     let detail = TaskRunBackendDetail {
-        task: sample_task_run_backend(),
+        base: sample_task_run_backend(),
         sessions: vec![TaskRunSession {
             id: "sess-1".to_string(),
             task_id: "run-001".to_string(),
@@ -2610,4 +2610,26 @@ fn state_machine_export_format_roundtrips() {
     let back: StateMachineExportFormat = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
+}
+
+// ============================================================================
+// Execution — RunType / RunStatus enum snake_case wire form
+// ============================================================================
+
+use qontinui_types::execution::{RunStatus, RunType};
+
+#[test]
+fn run_type_qa_test_snake_case() {
+    let json = serde_json::to_string(&RunType::QaTest).expect("serialize");
+    assert_eq!(json, "\"qa_test\"", "RunType::QaTest wire form");
+    let back: RunType = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, RunType::QaTest);
+}
+
+#[test]
+fn run_status_completed_snake_case() {
+    let json = serde_json::to_string(&RunStatus::Completed).expect("serialize");
+    assert_eq!(json, "\"completed\"", "RunStatus::Completed wire form");
+    let back: RunStatus = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, RunStatus::Completed);
 }

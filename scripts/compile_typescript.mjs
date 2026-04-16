@@ -106,32 +106,61 @@ function applyRenames(source) {
 //      another top-level type (but not T itself — self-references stay local)
 //   3. Collect the set of externalized refs → used later for import injection
 //   4. Strip externalized entries from T's local $defs
+//
+// Collision handling: when two Rust types share a short name (e.g.
+// `tree_events::ActionType` and `execution::ActionType`), one of them is
+// renamed at the JSON-Schema layer via `#[schemars(title = "X")]`. The
+// renamed type appears as top-level key `X`, but inline `$defs[ActionType]`
+// entries (emitted under the Rust path name) still reference it — so a naive
+// lookup of `refName` against `typeNames` matches the non-renamed sibling
+// and rewrites the ref to the wrong file. To disambiguate, we consult the
+// inline `$defs[refName].title`: if that title itself is a top-level key,
+// use it in preference to the raw `refName`.
+
+/**
+ * Resolve a local `$defs` ref name to the top-level type name to import,
+ * honoring `title`-based schemars renames. Returns null if the ref does not
+ * point at a top-level type.
+ *
+ * @param {string} refName
+ * @param {Record<string, unknown> | undefined} localDefs
+ * @returns {string | null}
+ */
+function resolveTopLevelRefName(refName, localDefs) {
+  const def = localDefs?.[refName];
+  if (def && typeof def === 'object' && typeof def.title === 'string' && typeNames.has(def.title)) {
+    return def.title;
+  }
+  if (typeNames.has(refName)) return refName;
+  return null;
+}
 
 /**
  * @param {unknown} node
  * @param {string} selfName
  * @param {Set<string>} collected
+ * @param {Record<string, unknown> | undefined} localDefs
  * @returns {unknown}
  */
-function rewriteRefs(node, selfName, collected) {
+function rewriteRefs(node, selfName, collected, localDefs) {
   if (Array.isArray(node)) {
-    return node.map((n) => rewriteRefs(n, selfName, collected));
+    return node.map((n) => rewriteRefs(n, selfName, collected, localDefs));
   }
   if (node === null || typeof node !== 'object') return node;
   if (typeof node.$ref === 'string') {
     const m = node.$ref.match(/^#\/\$defs\/(.+)$/);
     if (m) {
-      const refName = m[1];
-      if (typeNames.has(refName) && refName !== selfName) {
-        collected.add(refName);
-        const out = { ...node, $ref: `./${refName}.schema.json` };
+      const resolved = resolveTopLevelRefName(m[1], localDefs);
+      if (resolved && resolved !== selfName) {
+        collected.add(resolved);
+        const out = { ...node, $ref: `./${resolved}.schema.json` };
         return out;
       }
     }
   }
   const out = {};
   for (const [k, v] of Object.entries(node)) {
-    out[k] = rewriteRefs(v, selfName, collected);
+    out[k] = rewriteRefs(v, selfName, collected, localDefs);
   }
   return out;
 }
@@ -230,7 +259,10 @@ mkdirSync(tmpDir, { recursive: true });
 
 for (const [name, schema] of Object.entries(schemas)) {
   const imports = new Set();
-  const rewritten = rewriteRefs(schema, name, imports);
+  // Pass the schema's own $defs so title-renamed inline defs can be resolved
+  // to their true top-level type names during ref rewriting.
+  const localDefs = (schema && typeof schema === 'object') ? schema.$defs : undefined;
+  const rewritten = rewriteRefs(schema, name, imports, localDefs);
   // Convert `$ref` + sibling property constraints into `allOf` so json2ts
   // preserves discriminator literals on tagged-union variants. Must run
   // before the compile call; order relative to `promoteDefaultsToRequired`
@@ -238,10 +270,17 @@ for (const [name, schema] of Object.entries(schemas)) {
   flattenRefSiblingsToAllOf(rewritten);
   promoteDefaultsToRequired(rewritten);
   // Strip externalized $defs — we don't want stubs emitted for them.
+  // Match by both raw def-key and (when present) title, since the imports
+  // set stores the resolved top-level name (which may be the title, not the
+  // key). Without this, title-renamed inline defs linger as stub declarations.
   if (rewritten.$defs) {
     const kept = {};
     for (const [k, v] of Object.entries(rewritten.$defs)) {
-      if (!imports.has(k)) kept[k] = v;
+      const defTitle = (v && typeof v === 'object') ? v.title : undefined;
+      if (imports.has(k) || (typeof defTitle === 'string' && imports.has(defTitle))) {
+        continue;
+      }
+      kept[k] = v;
     }
     if (Object.keys(kept).length === 0) delete rewritten.$defs;
     else rewritten.$defs = kept;
