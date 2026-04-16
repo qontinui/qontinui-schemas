@@ -58,3 +58,13 @@ export * from "./accessibility/_api";
 // because `config.Context` (AI-task context) collides with `library.Context`
 // (library item with richer shape). Consumers use the subpath:
 //   import { Context, Category } from "@qontinui/shared-types/config";
+
+// Target configuration (discriminated union for action targets) is subpath
+// only — `SearchStrategy` and other names overlap with action-schema
+// internals in consumer repos and the type surface is large.
+//   import { TargetConfig } from "@qontinui/shared-types/targets";
+
+// RAG API types are subpath only — `SearchResultItem` and `JobStatus`
+// collide with other modules that model unrelated "search result" / "job"
+// concepts.
+//   import { JobStatus, RAGDashboardStats } from "@qontinui/shared-types/rag";

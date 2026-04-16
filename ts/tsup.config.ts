@@ -15,6 +15,8 @@ export default defineConfig({
     "tree-events": "src/tree-events/index.ts",
     accessibility: "src/accessibility/index.ts",
     config: "src/config/index.ts",
+    targets: "src/targets/index.ts",
+    rag: "src/rag/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

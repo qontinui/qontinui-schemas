@@ -61,6 +61,16 @@
       "types": "./ts/dist/config.d.ts",
       "import": "./ts/dist/config.js",
       "require": "./ts/dist/config.cjs"
+    },
+    "./targets": {
+      "types": "./ts/dist/targets.d.ts",
+      "import": "./ts/dist/targets.js",
+      "require": "./ts/dist/targets.cjs"
+    },
+    "./rag": {
+      "types": "./ts/dist/rag.d.ts",
+      "import": "./ts/dist/rag.js",
+      "require": "./ts/dist/rag.cjs"
     }
   },
   "files": [
