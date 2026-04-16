@@ -1165,7 +1165,7 @@ fn sample_task_run_backend() -> TaskRunBackend {
 fn sample_task_run_finding() -> TaskRunFinding {
     TaskRunFinding {
         id: "find-1".to_string(),
-        task_id: "run-001".to_string(),
+        task_run_id: "run-001".to_string(),
         category: TaskRunFindingCategory::CodeBug,
         severity: TaskRunFindingSeverity::High,
         status: TaskRunFindingStatus::Detected,
@@ -1282,7 +1282,7 @@ fn task_run_backend_fully_populated_roundtrips() {
 fn task_run_session_fully_populated_roundtrips() {
     let s = TaskRunSession {
         id: "sess-1".to_string(),
-        task_id: "run-001".to_string(),
+        task_run_id: "run-001".to_string(),
         session_number: 2,
         started_at: "2026-04-14T01:00:00Z".to_string(),
         ended_at: Some("2026-04-14T01:05:00Z".to_string()),
@@ -1298,7 +1298,7 @@ fn task_run_session_fully_populated_roundtrips() {
 fn task_run_finding_fully_populated_roundtrips() {
     let f = TaskRunFinding {
         id: "f-1".to_string(),
-        task_id: "t-1".to_string(),
+        task_run_id: "t-1".to_string(),
         category: TaskRunFindingCategory::Security,
         severity: TaskRunFindingSeverity::Critical,
         status: TaskRunFindingStatus::NeedsInput,
@@ -1343,7 +1343,7 @@ fn task_run_backend_detail_flattens_task() {
         base: sample_task_run_backend(),
         sessions: vec![TaskRunSession {
             id: "sess-1".to_string(),
-            task_id: "run-001".to_string(),
+            task_run_id: "run-001".to_string(),
             session_number: 1,
             started_at: "2026-04-14T01:00:00Z".to_string(),
             ended_at: Some("2026-04-14T01:05:00Z".to_string()),

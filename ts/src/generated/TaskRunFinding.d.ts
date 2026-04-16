@@ -84,7 +84,7 @@ export interface TaskRunFinding {
   /**
    * Parent task run ID.
    */
-  task_id: string;
+  task_run_id: string;
   /**
    * Short human-readable title.
    */

@@ -2,6 +2,13 @@
 # Re-exports the top-level type from each per-type module.
 
 from .per_type.a11y_action import A11yAction
+from .per_type.accessibility_backend import AccessibilityBackend
+from .per_type.accessibility_bounds import AccessibilityBounds
+from .per_type.accessibility_node import AccessibilityNode
+from .per_type.accessibility_role import AccessibilityRole
+from .per_type.accessibility_selector import AccessibilitySelector
+from .per_type.accessibility_snapshot import AccessibilitySnapshot
+from .per_type.accessibility_state import AccessibilityState
 from .per_type.action_execution_create import ActionExecutionCreate
 from .per_type.action_execution_response import ActionExecutionResponse
 from .per_type.action_status import ActionStatus
@@ -17,14 +24,22 @@ from .per_type.api_variable_extraction import ApiVariableExtraction
 from .per_type.app_event import AppEvent
 from .per_type.available_transitions_result import AvailableTransitionsResult
 from .per_type.base_step_fields import BaseStepFields
+from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingRequest
+from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
+from .per_type.batch_embedding_result import BatchEmbeddingResult
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.canonical_step import CanonicalStep
+from .per_type.category import Category
 from .per_type.check_issue_detail import CheckIssueDetail
 from .per_type.check_type import CheckType
 from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
 from .per_type.command_step import CommandStep
 from .per_type.command_step_phase import CommandStepPhase
+from .per_type.compute_embedding_request import ComputeEmbeddingRequest
+from .per_type.compute_embedding_response import ComputeEmbeddingResponse
+from .per_type.compute_text_embedding_request import ComputeTextEmbeddingRequest
+from .per_type.compute_text_embedding_response import ComputeTextEmbeddingResponse
 from .per_type.condition_schedule_config import ConditionScheduleConfig
 from .per_type.condition_status import ConditionStatus
 from .per_type.confidence_level import ConfidenceLevel
@@ -34,6 +49,8 @@ from .per_type.constraint_proposal import ConstraintProposal
 from .per_type.constraint_result import ConstraintResult
 from .per_type.constraint_severity import ConstraintSeverity
 from .per_type.constraint_violation import ConstraintViolation
+from .per_type.context import Context
+from .per_type.context_auto_include import ContextAutoInclude
 from .per_type.coordinate_system import CoordinateSystem
 from .per_type.coordinates import Coordinates
 from .per_type.coverage_data import CoverageData
@@ -45,6 +62,11 @@ from .per_type.dag_loop_step import DagLoopStep
 from .per_type.discovery_strategy import DiscoveryStrategy
 from .per_type.display_node import DisplayNode
 from .per_type.domain_knowledge import DomainKnowledge
+from .per_type.embedding_item import EmbeddingItem
+from .per_type.embedding_list_response import EmbeddingListResponse
+from .per_type.embedding_result_item import EmbeddingResultItem
+from .per_type.embedding_results_request import EmbeddingResultsRequest
+from .per_type.embedding_results_response import EmbeddingResultsResponse
 from .per_type.error_type import ErrorType
 from .per_type.execute_playbook_step import ExecutePlaybookStep
 from .per_type.execution_action_type import ExecutionActionType
@@ -72,9 +94,15 @@ from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
 from .per_type.issue_severity import IssueSeverity
+from .per_type.job_item import JobItem
+from .per_type.job_list_response import JobListResponse
+from .per_type.job_status import JobStatus
+from .per_type.job_summary import JobSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.log_source_selection import LogSourceSelection
+from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
+from .per_type.match_method import MatchMethod
 from .per_type.model_override_config import ModelOverrideConfig
 from .per_type.monitor import Monitor
 from .per_type.monitor_position import MonitorPosition
@@ -86,16 +114,23 @@ from .per_type.next_task_info import NextTaskInfo
 from .per_type.node_metadata import NodeMetadata
 from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
+from .per_type.ocr_engine import OcrEngine
 from .per_type.outcome import Outcome
 from .per_type.pagination import Pagination
 from .per_type.path_element import PathElement
 from .per_type.pathfinding_request import PathfindingRequest
 from .per_type.pathfinding_result import PathfindingResult
 from .per_type.pathfinding_step import PathfindingStep
+from .per_type.pattern_options import PatternOptions
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
+from .per_type.polling_config import PollingConfig
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
+from .per_type.rag_dashboard_stats import RAGDashboardStats
+from .per_type.rag_completion_event import RagCompletionEvent
+from .per_type.rag_processing_status import RagProcessingStatus
+from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
@@ -127,11 +162,17 @@ from .per_type.screenshot_annotation import ScreenshotAnnotation
 from .per_type.screenshot_annotation_shape import ScreenshotAnnotationShape
 from .per_type.screenshot_type import ScreenshotType
 from .per_type.scroll_direction import ScrollDirection
+from .per_type.search_options import SearchOptions
+from .per_type.search_result_item import SearchResultItem
+from .per_type.search_strategy import SearchStrategy
+from .per_type.semantic_search_request import SemanticSearchRequest
+from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.stage_condition import StageCondition
 from .per_type.stage_input import StageInput
 from .per_type.stage_output import StageOutput
 from .per_type.standard_action_type import StandardActionType
 from .per_type.state_context import StateContext
+from .per_type.state_filter_item import StateFilterItem
 from .per_type.state_machine_config import StateMachineConfig
 from .per_type.state_machine_config_create import StateMachineConfigCreate
 from .per_type.state_machine_config_full import StateMachineConfigFull
@@ -144,10 +185,12 @@ from .per_type.state_machine_transition import StateMachineTransition
 from .per_type.state_machine_transition_create import StateMachineTransitionCreate
 from .per_type.state_machine_transition_update import StateMachineTransitionUpdate
 from .per_type.state_node_data import StateNodeData
+from .per_type.states_response import StatesResponse
 from .per_type.step_execution_config import StepExecutionConfig
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
 from .per_type.structured_signal import StructuredSignal
+from .per_type.target_config import TargetConfig
 from .per_type.task_execution_record import TaskExecutionRecord
 from .per_type.task_run import TaskRun
 from .per_type.task_run_backend import TaskRunBackend
@@ -170,6 +213,8 @@ from .per_type.task_run_status import TaskRunStatus
 from .per_type.task_run_update import TaskRunUpdate
 from .per_type.task_type import TaskType
 from .per_type.test_type import TestType
+from .per_type.text_match_type import TextMatchType
+from .per_type.text_search_options import TextSearchOptions
 from .per_type.timing_info import TimingInfo
 from .per_type.top_match import TopMatch
 from .per_type.transition_action import TransitionAction
@@ -218,6 +263,13 @@ from .per_type.write_config_response import WriteConfigResponse
 
 __all__ = [
     "A11yAction",
+    "AccessibilityBackend",
+    "AccessibilityBounds",
+    "AccessibilityNode",
+    "AccessibilityRole",
+    "AccessibilitySelector",
+    "AccessibilitySnapshot",
+    "AccessibilityState",
     "ActionExecutionCreate",
     "ActionExecutionResponse",
     "ActionStatus",
@@ -233,14 +285,22 @@ __all__ = [
     "AppEvent",
     "AvailableTransitionsResult",
     "BaseStepFields",
+    "BatchComputeEmbeddingRequest",
+    "BatchComputeEmbeddingResponse",
+    "BatchEmbeddingResult",
     "BuiltinOverrideProposal",
     "CanonicalStep",
+    "Category",
     "CheckIssueDetail",
     "CheckType",
     "CodeExecutionStep",
     "CommandMode",
     "CommandStep",
     "CommandStepPhase",
+    "ComputeEmbeddingRequest",
+    "ComputeEmbeddingResponse",
+    "ComputeTextEmbeddingRequest",
+    "ComputeTextEmbeddingResponse",
     "ConditionScheduleConfig",
     "ConditionStatus",
     "ConfidenceLevel",
@@ -250,6 +310,8 @@ __all__ = [
     "ConstraintResult",
     "ConstraintSeverity",
     "ConstraintViolation",
+    "Context",
+    "ContextAutoInclude",
     "CoordinateSystem",
     "Coordinates",
     "CoverageData",
@@ -261,6 +323,11 @@ __all__ = [
     "DiscoveryStrategy",
     "DisplayNode",
     "DomainKnowledge",
+    "EmbeddingItem",
+    "EmbeddingListResponse",
+    "EmbeddingResultItem",
+    "EmbeddingResultsRequest",
+    "EmbeddingResultsResponse",
     "ErrorType",
     "ExecutePlaybookStep",
     "ExecutionActionType",
@@ -288,9 +355,15 @@ __all__ = [
     "InitialStateRef",
     "InitialStatesSource",
     "IssueSeverity",
+    "JobItem",
+    "JobListResponse",
+    "JobStatus",
+    "JobSummary",
     "LLMMetrics",
     "LogSourceSelection",
+    "MatchAdjustment",
     "MatchLocation",
+    "MatchMethod",
     "ModelOverrideConfig",
     "Monitor",
     "MonitorPosition",
@@ -302,16 +375,23 @@ __all__ = [
     "NodeMetadata",
     "NodeStatus",
     "NodeType",
+    "OcrEngine",
     "Outcome",
     "Pagination",
     "PathElement",
     "PathfindingRequest",
     "PathfindingResult",
     "PathfindingStep",
+    "PatternOptions",
     "PlaywrightExecutionMode",
     "Point",
+    "PollingConfig",
     "PromptStep",
     "PromptStepPhase",
+    "RAGDashboardStats",
+    "RagCompletionEvent",
+    "RagProcessingStatus",
+    "RagProgressEvent",
     "ReadConfigResponse",
     "ReflectionFixOutput",
     "Region",
@@ -343,11 +423,17 @@ __all__ = [
     "ScreenshotAnnotationShape",
     "ScreenshotType",
     "ScrollDirection",
+    "SearchOptions",
+    "SearchResultItem",
+    "SearchStrategy",
+    "SemanticSearchRequest",
+    "SemanticSearchResponse",
     "StageCondition",
     "StageInput",
     "StageOutput",
     "StandardActionType",
     "StateContext",
+    "StateFilterItem",
     "StateMachineConfig",
     "StateMachineConfigCreate",
     "StateMachineConfigFull",
@@ -360,10 +446,12 @@ __all__ = [
     "StateMachineTransitionCreate",
     "StateMachineTransitionUpdate",
     "StateNodeData",
+    "StatesResponse",
     "StepExecutionConfig",
     "StructuredFinding",
     "StructuredOverride",
     "StructuredSignal",
+    "TargetConfig",
     "TaskExecutionRecord",
     "TaskRun",
     "TaskRunBackend",
@@ -386,6 +474,8 @@ __all__ = [
     "TaskRunUpdate",
     "TaskType",
     "TestType",
+    "TextMatchType",
+    "TextSearchOptions",
     "TimingInfo",
     "TopMatch",
     "TransitionAction",

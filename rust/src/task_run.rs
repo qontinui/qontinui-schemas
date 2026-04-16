@@ -186,7 +186,8 @@ pub struct TaskRunSession {
     /// Unique identifier (UUID v4 string).
     pub id: String,
     /// Parent task run ID.
-    pub task_id: String,
+    #[serde(alias = "task_id")]
+    pub task_run_id: String,
     /// 1-based session index within the parent task run.
     pub session_number: u32,
     /// ISO 8601 timestamp when the session started.
@@ -295,7 +296,8 @@ pub struct TaskRunFinding {
     /// Unique identifier (UUID v4 string).
     pub id: String,
     /// Parent task run ID.
-    pub task_id: String,
+    #[serde(alias = "task_id")]
+    pub task_run_id: String,
     /// Category (bug, security, performance, etc.).
     pub category: TaskRunFindingCategory,
     /// Severity of the finding.
