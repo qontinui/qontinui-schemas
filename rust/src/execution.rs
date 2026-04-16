@@ -25,6 +25,7 @@
 //! - `Record<string, unknown>` → `HashMap<String, serde_json::Value>`.
 //! - `Record<string, number>` → `HashMap<String, u32>`.
 
+use crate::task_run::Pagination;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -712,4 +713,503 @@ pub struct ExecutionRunCompleteResponse {
     /// Coverage data, if the run executed a workflow.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coverage: Option<CoverageData>,
+}
+
+// ============================================================================
+// Additional Enums (from qontinui-schemas/src/qontinui_schemas/api/execution.py)
+// ============================================================================
+
+/// Lifecycle status of an issue reported against a run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueStatus {
+    /// The issue has just been reported.
+    New,
+    /// The issue has been triaged and is open.
+    Open,
+    /// The issue is being worked on.
+    InProgress,
+    /// The issue has been resolved.
+    Resolved,
+    /// The issue is closed.
+    Closed,
+    /// The issue will not be fixed.
+    WontFix,
+}
+
+/// Category label describing the kind of issue detected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueType {
+    /// A functional/behavioral problem.
+    Functional,
+    /// A visual/appearance problem.
+    Visual,
+    /// A performance problem.
+    Performance,
+    /// The runtime crashed.
+    Crash,
+    /// An operation exceeded its time limit.
+    Timeout,
+    /// An assertion failed.
+    Assertion,
+    /// The observed state did not match expectations.
+    StateMismatch,
+    /// A target element could not be located.
+    ElementNotFound,
+    /// AI analysis flagged the issue.
+    AiDetected,
+    /// An uncategorized issue.
+    Other,
+}
+
+/// Source that detected an issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueSource {
+    /// Detected during automation execution.
+    Automation,
+    /// Detected by AI log/screenshot analysis.
+    AiAnalysis,
+    /// Detected by visual regression comparison.
+    VisualRegression,
+    /// Manually reported by a user.
+    UserReported,
+}
+
+// ============================================================================
+// Batch Request / Response Types
+// ============================================================================
+
+/// Batch wrapper for reporting multiple action executions in one request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActionExecutionBatch {
+    /// Actions to record (Python enforces `1..=100`; enforced by the backend).
+    pub actions: Vec<ActionExecutionCreate>,
+}
+
+/// Response envelope returned after creating a batch of action executions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActionExecutionBatchResponse {
+    /// Associated run ID.
+    pub run_id: String,
+    /// Number of actions recorded.
+    pub actions_recorded: u32,
+    /// Assigned action IDs, in the same order as the submitted batch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub action_ids: Vec<String>,
+}
+
+/// Batch wrapper for reporting multiple issues in one request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionIssueBatch {
+    /// Issues to record (Python enforces `1..=50`; enforced by the backend).
+    pub issues: Vec<ExecutionIssueCreate>,
+}
+
+/// Response envelope returned after creating a batch of issues.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionIssueBatchResponse {
+    /// Associated run ID.
+    pub run_id: String,
+    /// Number of issues recorded.
+    pub issues_recorded: u32,
+    /// Assigned issue IDs, in the same order as the submitted batch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub issue_ids: Vec<String>,
+}
+
+/// Request payload for updating an existing issue.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionIssueUpdate {
+    /// New lifecycle status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<IssueStatus>,
+    /// New severity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<IssueSeverity>,
+    /// User ID to assign the issue to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assigned_to_user_id: Option<String>,
+    /// Resolution notes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution_notes: Option<String>,
+}
+
+// ============================================================================
+// Visual Comparison
+// ============================================================================
+
+/// Result of visual comparison of a screenshot against a baseline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct VisualComparisonResult {
+    /// Comparison result ID.
+    pub comparison_id: String,
+    /// Baseline screenshot ID, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_id: Option<String>,
+    /// Similarity score in the range `[0.0, 1.0]`.
+    pub similarity_score: f64,
+    /// Threshold used for the pass/fail decision.
+    pub threshold: f64,
+    /// Whether the comparison passed.
+    pub passed: bool,
+    /// URL to a diff image, if generated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_image_url: Option<String>,
+    /// Number of diff regions detected.
+    pub diff_region_count: u32,
+}
+
+// ============================================================================
+// Detail Response Types (richer variants of the core response envelopes)
+// ============================================================================
+
+/// Detailed execution run information (superset of [`ExecutionRunResponse`]).
+///
+/// Python models this via inheritance; here all fields are inlined because Rust
+/// has no inheritance and the wire form is a flat object.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionRunDetail {
+    // ── Inherited from ExecutionRunResponse ──
+    /// Assigned run identifier.
+    pub run_id: String,
+    /// Owning project ID.
+    pub project_id: String,
+    /// Kind of run.
+    pub run_type: RunType,
+    /// Human-readable run name.
+    pub run_name: String,
+    /// Current lifecycle status.
+    pub status: RunStatus,
+    /// ISO 8601 timestamp when the run started.
+    pub started_at: String,
+    /// ISO 8601 timestamp when the run ended, if it has ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<String>,
+    /// Total duration in seconds, if the run has ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<f64>,
+    // ── ExecutionRunDetail additions ──
+    /// Run description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Runner environment metadata.
+    pub runner_metadata: RunnerMetadata,
+    /// Workflow metadata, if applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_metadata: Option<WorkflowMetadata>,
+    /// Configuration snapshot captured at run start.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub configuration: HashMap<String, Value>,
+    /// Aggregate execution statistics.
+    pub stats: ExecutionStats,
+    /// Coverage data, if applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<CoverageData>,
+    /// ISO 8601 timestamp when the record was created.
+    pub created_at: String,
+    /// ISO 8601 timestamp when the record was last updated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// Detailed issue information (superset of [`ExecutionIssueResponse`]).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionIssueDetail {
+    // ── Inherited from ExecutionIssueResponse ──
+    /// Issue ID.
+    pub id: String,
+    /// Associated run ID.
+    pub run_id: String,
+    /// Category label for the issue.
+    pub issue_type: IssueType,
+    /// Severity.
+    pub severity: IssueSeverity,
+    /// Current lifecycle status.
+    pub status: IssueStatus,
+    /// Source that detected the issue.
+    pub source: IssueSource,
+    /// Short title.
+    pub title: String,
+    /// Full description.
+    pub description: String,
+    /// State ID where the issue was observed, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_name: Option<String>,
+    /// Number of associated screenshots.
+    pub screenshot_count: u32,
+    /// ISO 8601 timestamp when the issue was created.
+    pub created_at: String,
+    /// ISO 8601 timestamp when the issue was last updated.
+    pub updated_at: String,
+    // ── ExecutionIssueDetail additions ──
+    /// Sequence number of the associated action, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_sequence_number: Option<u32>,
+    /// Steps to reproduce the issue.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reproduction_steps: Vec<String>,
+    /// Full screenshot records associated with the issue.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screenshots: Vec<ExecutionScreenshotResponse>,
+    /// Error details such as stack traces.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub error_details: HashMap<String, Value>,
+    /// Opaque additional metadata.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, Value>,
+    /// Assigned user record, if any. Shape is intentionally opaque here; the
+    /// Python source types this as `dict[str, Any]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assigned_to: Option<HashMap<String, Value>>,
+    /// Resolution notes, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution_notes: Option<String>,
+}
+
+// ============================================================================
+// List / Query Response Envelopes
+// ============================================================================
+
+/// Paginated list of execution runs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionRunListResponse {
+    /// Page of matching runs.
+    pub runs: Vec<ExecutionRunResponse>,
+    /// Pagination envelope.
+    pub pagination: Pagination,
+}
+
+/// Paginated list of action executions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActionExecutionListResponse {
+    /// Page of matching actions.
+    pub actions: Vec<ActionExecutionResponse>,
+    /// Pagination envelope.
+    pub pagination: Pagination,
+}
+
+/// Paginated list of issues with a severity/status summary.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionIssueListResponse {
+    /// Page of matching issues.
+    pub issues: Vec<ExecutionIssueResponse>,
+    /// Pagination envelope.
+    pub pagination: Pagination,
+    /// Summary keyed by severity or status. Shape is intentionally opaque.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub summary: HashMap<String, Value>,
+}
+
+// ============================================================================
+// Analytics
+// ============================================================================
+
+/// Reliability statistics aggregated for a single action type.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActionReliabilityStats {
+    /// Human-readable action name.
+    pub action_name: String,
+    /// Kind of action.
+    pub action_type: ActionType,
+    /// Total number of executions observed.
+    pub total_executions: u32,
+    /// Number of executions that succeeded.
+    pub successful_executions: u32,
+    /// Number of executions that failed.
+    pub failed_executions: u32,
+    /// Success rate as a percentage.
+    pub success_rate: f64,
+    /// Mean duration in milliseconds.
+    pub avg_duration_ms: u64,
+    /// Median duration in milliseconds.
+    pub p50_duration_ms: u64,
+    /// 95th-percentile duration in milliseconds.
+    pub p95_duration_ms: u64,
+    /// Common error categories, as opaque records. Python types this as
+    /// `list[dict[str, Any]]`; typing it further requires product input.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub common_errors: Vec<HashMap<String, Value>>,
+}
+
+/// Single data point in an execution-trend time series.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionTrendDataPoint {
+    /// Period label in `YYYY-MM-DD` format.
+    pub date: String,
+    /// Number of runs in the period.
+    pub runs_count: u32,
+    /// Success rate as a percentage.
+    pub success_rate: f64,
+    /// Mean run duration in seconds.
+    pub avg_duration_seconds: i64,
+    /// Total actions executed in the period.
+    pub total_actions: u32,
+    /// Issues detected in the period.
+    pub issues_count: u32,
+}
+
+/// Response envelope for the execution-trend analytics endpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ExecutionTrendResponse {
+    /// Project the trend was computed for.
+    pub project_id: String,
+    /// Run type filter, if applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_type: Option<RunType>,
+    /// Start date of the reporting window.
+    pub start_date: String,
+    /// End date of the reporting window.
+    pub end_date: String,
+    /// Granularity label (`"daily"`, `"weekly"`, `"monthly"`).
+    pub granularity: String,
+    /// Trend data points.
+    pub data_points: Vec<ExecutionTrendDataPoint>,
+    /// Overall statistics computed over the full window. Shape is
+    /// intentionally opaque (`dict[str, Any]` in Python).
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub overall_stats: HashMap<String, Value>,
+}
+
+/// Cost breakdown for a single LLM model.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ModelCostBreakdown {
+    /// LLM model identifier.
+    pub model: String,
+    /// Provider name (e.g., `"anthropic"`, `"openai"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Total input tokens for this model.
+    pub tokens_input: u64,
+    /// Total output tokens for this model.
+    pub tokens_output: u64,
+    /// Total cost in USD for this model.
+    pub cost_usd: f64,
+    /// Number of actions that used this model.
+    pub action_count: u32,
+}
+
+/// Aggregate LLM cost summary for an execution run.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct LLMCostSummary {
+    /// Associated run ID.
+    pub run_id: String,
+    /// Total input tokens across all models.
+    pub total_tokens_input: u64,
+    /// Total output tokens across all models.
+    pub total_tokens_output: u64,
+    /// Total estimated cost in USD.
+    pub total_cost_usd: f64,
+    /// Number of actions that used an LLM.
+    pub llm_action_count: u32,
+    /// Per-model cost breakdowns.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub per_model: Vec<ModelCostBreakdown>,
+}
+
+/// Single data point in a cost-trend time series.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CostTrendDataPoint {
+    /// Period label in `YYYY-MM-DD` format.
+    pub date: String,
+    /// Total input tokens for the period.
+    pub tokens_input: u64,
+    /// Total output tokens for the period.
+    pub tokens_output: u64,
+    /// Total cost in USD for the period.
+    pub cost_usd: f64,
+    /// Number of LLM actions in the period.
+    pub llm_action_count: u32,
+    /// Number of runs in the period.
+    pub runs_count: u32,
+}
+
+/// Response envelope for the cost-trend analytics endpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CostTrendResponse {
+    /// Project the trend was computed for.
+    pub project_id: String,
+    /// Start date of the reporting window.
+    pub start_date: String,
+    /// End date of the reporting window.
+    pub end_date: String,
+    /// Granularity label (`"daily"`, `"weekly"`, `"monthly"`).
+    pub granularity: String,
+    /// Cost trend data points.
+    pub data_points: Vec<CostTrendDataPoint>,
+    /// Overall cost statistics over the full window. Shape is intentionally
+    /// opaque (`dict[str, Any]` in Python).
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub overall_stats: HashMap<String, Value>,
+}
+
+// ============================================================================
+// Historical Playback (for integration testing)
+// ============================================================================
+
+/// Query filters for looking up historical action results.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct HistoricalActionQuery {
+    /// Filter by action type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_type: Option<ActionType>,
+    /// Filter by action name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_name: Option<String>,
+    /// Filter by state name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_name: Option<String>,
+    /// If true, only successful actions are returned.
+    pub success_only: bool,
+    /// Filter by project ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    /// Filter by workflow ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_id: Option<String>,
+    /// Maximum number of results to return (Python constrains to `1..=100`).
+    pub limit: u32,
+}
+
+/// A historical action execution, shaped for playback.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct HistoricalActionResult {
+    /// Action execution ID.
+    pub id: String,
+    /// Kind of action.
+    pub action_type: ActionType,
+    /// Human-readable action name.
+    pub action_name: String,
+    /// Outcome.
+    pub status: ActionStatus,
+    /// Source state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_state: Option<String>,
+    /// Target state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_state: Option<String>,
+    /// Input parameters captured for the action.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub input_data: HashMap<String, Value>,
+    /// Output produced by the action.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub output_data: HashMap<String, Value>,
+    /// Duration in milliseconds.
+    pub duration_ms: u64,
+    /// URL to an associated screenshot, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screenshot_url: Option<String>,
+    /// Whether a screenshot exists.
+    pub has_screenshot: bool,
+}
+
+/// Request payload asking for playback frames for a sequence of actions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PlaybackFrameRequest {
+    /// Action execution IDs, in playback order (Python constrains to
+    /// `1..=100`).
+    pub action_ids: Vec<String>,
+    /// Whether to include screenshot URLs.
+    pub include_screenshots: bool,
 }

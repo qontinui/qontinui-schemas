@@ -6,11 +6,16 @@ from .per_type.accessibility_backend import AccessibilityBackend
 from .per_type.accessibility_bounds import AccessibilityBounds
 from .per_type.accessibility_node import AccessibilityNode
 from .per_type.accessibility_role import AccessibilityRole
+from .per_type.accessibility_role_criterion import AccessibilityRoleCriterion
 from .per_type.accessibility_selector import AccessibilitySelector
 from .per_type.accessibility_snapshot import AccessibilitySnapshot
 from .per_type.accessibility_state import AccessibilityState
+from .per_type.action_execution_batch import ActionExecutionBatch
+from .per_type.action_execution_batch_response import ActionExecutionBatchResponse
 from .per_type.action_execution_create import ActionExecutionCreate
+from .per_type.action_execution_list_response import ActionExecutionListResponse
 from .per_type.action_execution_response import ActionExecutionResponse
+from .per_type.action_reliability_stats import ActionReliabilityStats
 from .per_type.action_status import ActionStatus
 from .per_type.action_type import ActionType
 from .per_type.active_states_result import ActiveStatesResult
@@ -53,6 +58,8 @@ from .per_type.context import Context
 from .per_type.context_auto_include import ContextAutoInclude
 from .per_type.coordinate_system import CoordinateSystem
 from .per_type.coordinates import Coordinates
+from .per_type.cost_trend_data_point import CostTrendDataPoint
+from .per_type.cost_trend_response import CostTrendResponse
 from .per_type.coverage_data import CoverageData
 from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
@@ -70,39 +77,67 @@ from .per_type.embedding_results_response import EmbeddingResultsResponse
 from .per_type.error_type import ErrorType
 from .per_type.execute_playbook_step import ExecutePlaybookStep
 from .per_type.execution_action_type import ExecutionActionType
+from .per_type.execution_issue_batch import ExecutionIssueBatch
+from .per_type.execution_issue_batch_response import ExecutionIssueBatchResponse
 from .per_type.execution_issue_create import ExecutionIssueCreate
+from .per_type.execution_issue_detail import ExecutionIssueDetail
+from .per_type.execution_issue_list_response import ExecutionIssueListResponse
 from .per_type.execution_issue_response import ExecutionIssueResponse
+from .per_type.execution_issue_update import ExecutionIssueUpdate
 from .per_type.execution_match_location import ExecutionMatchLocation
 from .per_type.execution_run_complete import ExecutionRunComplete
 from .per_type.execution_run_complete_response import ExecutionRunCompleteResponse
 from .per_type.execution_run_create import ExecutionRunCreate
+from .per_type.execution_run_detail import ExecutionRunDetail
+from .per_type.execution_run_list_response import ExecutionRunListResponse
 from .per_type.execution_run_response import ExecutionRunResponse
 from .per_type.execution_screenshot_create import ExecutionScreenshotCreate
 from .per_type.execution_screenshot_response import ExecutionScreenshotResponse
 from .per_type.execution_stats import ExecutionStats
 from .per_type.execution_tree_response import ExecutionTreeResponse
+from .per_type.execution_trend_data_point import ExecutionTrendDataPoint
+from .per_type.execution_trend_response import ExecutionTrendResponse
 from .per_type.file_change import FileChange
+from .per_type.finding_action_type import FindingActionType
+from .per_type.finding_batch_create import FindingBatchCreate
+from .per_type.finding_category import FindingCategory
+from .per_type.finding_code_context import FindingCodeContext
+from .per_type.finding_create import FindingCreate
+from .per_type.finding_detail import FindingDetail
+from .per_type.finding_list_response import FindingListResponse
 from .per_type.finding_output import FindingOutput
+from .per_type.finding_severity import FindingSeverity
+from .per_type.finding_status import FindingStatus
+from .per_type.finding_summary import FindingSummary
+from .per_type.finding_update import FindingUpdate
+from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
 from .per_type.full_runner_step import FullRunnerStep
 from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.health_check_url import HealthCheckUrl
+from .per_type.historical_action_query import HistoricalActionQuery
+from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
 from .per_type.issue_severity import IssueSeverity
+from .per_type.issue_source import IssueSource
+from .per_type.issue_status import IssueStatus
+from .per_type.issue_type import IssueType
 from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
+from .per_type.model_cost_breakdown import ModelCostBreakdown
 from .per_type.model_override_config import ModelOverrideConfig
 from .per_type.monitor import Monitor
 from .per_type.monitor_position import MonitorPosition
@@ -116,15 +151,22 @@ from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
 from .per_type.ocr_engine import OcrEngine
 from .per_type.outcome import Outcome
+from .per_type.output_line import OutputLine
+from .per_type.output_stream import OutputStream
 from .per_type.pagination import Pagination
+from .per_type.parser_type import ParserType
 from .per_type.path_element import PathElement
 from .per_type.pathfinding_request import PathfindingRequest
 from .per_type.pathfinding_result import PathfindingResult
 from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
+from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
 from .per_type.polling_config import PollingConfig
+from .per_type.process_config import ProcessConfig
+from .per_type.process_state import ProcessState
+from .per_type.process_status import ProcessStatus
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.rag_dashboard_stats import RAGDashboardStats
@@ -142,6 +184,7 @@ from .per_type.resource_limits import ResourceLimits
 from .per_type.restart_process_step import RestartProcessStep
 from .per_type.retry_policy import RetryPolicy
 from .per_type.retry_spec import RetrySpec
+from .per_type.role_criterion import RoleCriterion
 from .per_type.routing_rule import RoutingRule
 from .per_type.run_prompt_request import RunPromptRequest
 from .per_type.run_prompt_response import RunPromptResponse
@@ -215,6 +258,11 @@ from .per_type.task_type import TaskType
 from .per_type.test_type import TestType
 from .per_type.text_match_type import TextMatchType
 from .per_type.text_search_options import TextSearchOptions
+from .per_type.ticket import Ticket
+from .per_type.ticket_comment import TicketComment
+from .per_type.ticket_provider_config import TicketProviderConfig
+from .per_type.ticket_source import TicketSource
+from .per_type.ticket_state import TicketState
 from .per_type.timing_info import TimingInfo
 from .per_type.top_match import TopMatch
 from .per_type.transition_action import TransitionAction
@@ -249,6 +297,7 @@ from .per_type.verification_step_details import VerificationStepDetails
 from .per_type.verification_step_result import VerificationStepResult
 from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
+from .per_type.visual_comparison_result import VisualComparisonResult
 from .per_type.worker_output import WorkerOutput
 from .per_type.workflow_architecture import WorkflowArchitecture
 from .per_type.workflow_fixup_mode import WorkflowFixupMode
@@ -267,11 +316,16 @@ __all__ = [
     "AccessibilityBounds",
     "AccessibilityNode",
     "AccessibilityRole",
+    "AccessibilityRoleCriterion",
     "AccessibilitySelector",
     "AccessibilitySnapshot",
     "AccessibilityState",
+    "ActionExecutionBatch",
+    "ActionExecutionBatchResponse",
     "ActionExecutionCreate",
+    "ActionExecutionListResponse",
     "ActionExecutionResponse",
+    "ActionReliabilityStats",
     "ActionStatus",
     "ActionType",
     "ActiveStatesResult",
@@ -314,6 +368,8 @@ __all__ = [
     "ContextAutoInclude",
     "CoordinateSystem",
     "Coordinates",
+    "CostTrendDataPoint",
+    "CostTrendResponse",
     "CoverageData",
     "CreateScheduledTaskRequest",
     "CreateTaskRunRequest",
@@ -331,39 +387,67 @@ __all__ = [
     "ErrorType",
     "ExecutePlaybookStep",
     "ExecutionActionType",
+    "ExecutionIssueBatch",
+    "ExecutionIssueBatchResponse",
     "ExecutionIssueCreate",
+    "ExecutionIssueDetail",
+    "ExecutionIssueListResponse",
     "ExecutionIssueResponse",
+    "ExecutionIssueUpdate",
     "ExecutionMatchLocation",
     "ExecutionRunComplete",
     "ExecutionRunCompleteResponse",
     "ExecutionRunCreate",
+    "ExecutionRunDetail",
+    "ExecutionRunListResponse",
     "ExecutionRunResponse",
     "ExecutionScreenshotCreate",
     "ExecutionScreenshotResponse",
     "ExecutionStats",
     "ExecutionTreeResponse",
+    "ExecutionTrendDataPoint",
+    "ExecutionTrendResponse",
     "FileChange",
+    "FindingActionType",
+    "FindingBatchCreate",
+    "FindingCategory",
+    "FindingCodeContext",
+    "FindingCreate",
+    "FindingDetail",
+    "FindingListResponse",
     "FindingOutput",
+    "FindingSeverity",
+    "FindingStatus",
+    "FindingSummary",
+    "FindingUpdate",
+    "FindingUserInput",
     "FindingsSummary",
     "FlowEvent",
     "FullRunnerStep",
     "GateEvaluationResult",
     "HealthCheckUrl",
+    "HistoricalActionQuery",
+    "HistoricalActionResult",
     "HttpMethod",
     "IdleCondition",
     "IndividualCheckResult",
     "InitialStateRef",
     "InitialStatesSource",
     "IssueSeverity",
+    "IssueSource",
+    "IssueStatus",
+    "IssueType",
     "JobItem",
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "LLMCostSummary",
     "LLMMetrics",
     "LogSourceSelection",
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
+    "ModelCostBreakdown",
     "ModelOverrideConfig",
     "Monitor",
     "MonitorPosition",
@@ -377,15 +461,22 @@ __all__ = [
     "NodeType",
     "OcrEngine",
     "Outcome",
+    "OutputLine",
+    "OutputStream",
     "Pagination",
+    "ParserType",
     "PathElement",
     "PathfindingRequest",
     "PathfindingResult",
     "PathfindingStep",
     "PatternOptions",
+    "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
     "Point",
     "PollingConfig",
+    "ProcessConfig",
+    "ProcessState",
+    "ProcessStatus",
     "PromptStep",
     "PromptStepPhase",
     "RAGDashboardStats",
@@ -403,6 +494,7 @@ __all__ = [
     "RestartProcessStep",
     "RetryPolicy",
     "RetrySpec",
+    "RoleCriterion",
     "RoutingRule",
     "RunPromptRequest",
     "RunPromptResponse",
@@ -476,6 +568,11 @@ __all__ = [
     "TestType",
     "TextMatchType",
     "TextSearchOptions",
+    "Ticket",
+    "TicketComment",
+    "TicketProviderConfig",
+    "TicketSource",
+    "TicketState",
     "TimingInfo",
     "TopMatch",
     "TransitionAction",
@@ -510,6 +607,7 @@ __all__ = [
     "VerificationStepResult",
     "VirtualDesktop",
     "VisualAssertionType",
+    "VisualComparisonResult",
     "WorkerOutput",
     "WorkflowArchitecture",
     "WorkflowFixupMode",

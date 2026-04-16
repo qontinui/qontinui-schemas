@@ -7,6 +7,7 @@
 
 import type { AccessibilityRole } from './AccessibilityRole';
 import type { AccessibilityState } from './AccessibilityState';
+import type { RoleCriterion } from './RoleCriterion';
 
 /**
  * Selector for finding nodes in an accessibility tree.

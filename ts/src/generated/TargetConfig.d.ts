@@ -5,6 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+import type { AccessibilityRoleCriterion } from './AccessibilityRoleCriterion';
 import type { CoordinateSystem } from './CoordinateSystem';
 import type { Coordinates } from './Coordinates';
 import type { MatchAdjustment } from './MatchAdjustment';

@@ -1,0 +1,32 @@
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+import type { IssueSeverity } from './IssueSeverity';
+import type { IssueStatus } from './IssueStatus';
+
+/**
+ * Request payload for updating an existing issue.
+ */
+export interface ExecutionIssueUpdate {
+  /**
+   * User ID to assign the issue to.
+   */
+  assigned_to_user_id?: string | null;
+  /**
+   * Resolution notes.
+   */
+  resolution_notes?: string | null;
+  /**
+   * New severity.
+   */
+  severity?: IssueSeverity | null;
+  /**
+   * New lifecycle status.
+   */
+  status?: IssueStatus | null;
+  [k: string]: unknown;
+}

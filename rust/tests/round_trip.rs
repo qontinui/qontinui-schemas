@@ -10,6 +10,7 @@
 //! contract and the Rust types.
 
 use qontinui_types::constraints::*;
+use qontinui_types::process_management::*;
 use qontinui_types::scheduler::*;
 use qontinui_types::workflow::*;
 use qontinui_types::workflow_step::*;
@@ -2613,23 +2614,3597 @@ fn state_machine_export_format_roundtrips() {
 }
 
 // ============================================================================
-// Execution — RunType / RunStatus enum snake_case wire form
+// ── geometry ─────────────────────────────────────────────────────────────────
 // ============================================================================
 
-use qontinui_types::execution::{RunStatus, RunType};
+use qontinui_types::geometry::{
+    CoordinateSystem, Coordinates, Monitor, MonitorPosition, Region, VirtualDesktop,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
 
 #[test]
-fn run_type_qa_test_snake_case() {
-    let json = serde_json::to_string(&RunType::QaTest).expect("serialize");
-    assert_eq!(json, "\"qa_test\"", "RunType::QaTest wire form");
-    let back: RunType = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(back, RunType::QaTest);
+fn coordinate_system_snake_case() {
+    let cases = [
+        (CoordinateSystem::Screen, "\"screen\""),
+        (CoordinateSystem::Virtual, "\"virtual\""),
+        (CoordinateSystem::MonitorRelative, "\"monitor_relative\""),
+    ];
+    for (cs, expected) in cases {
+        let json = serde_json::to_string(&cs).expect("serialize");
+        assert_eq!(json, expected, "CoordinateSystem wire form mismatch");
+        let back: CoordinateSystem = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, cs);
+    }
 }
 
 #[test]
-fn run_status_completed_snake_case() {
-    let json = serde_json::to_string(&RunStatus::Completed).expect("serialize");
-    assert_eq!(json, "\"completed\"", "RunStatus::Completed wire form");
-    let back: RunStatus = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(back, RunStatus::Completed);
+fn monitor_position_lowercase() {
+    let cases = [
+        (MonitorPosition::Left, "\"left\""),
+        (MonitorPosition::Center, "\"center\""),
+        (MonitorPosition::Right, "\"right\""),
+    ];
+    for (p, expected) in cases {
+        let json = serde_json::to_string(&p).expect("serialize");
+        assert_eq!(json, expected);
+        let back: MonitorPosition = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, p);
+    }
 }
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn coordinates_monitor_relative_roundtrips() {
+    let c = Coordinates {
+        x: 100,
+        y: 200,
+        system: Some(CoordinateSystem::MonitorRelative),
+        monitor_index: Some(1),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["x"], 100);
+    assert_eq!(v["y"], 200);
+    assert_eq!(v["system"], "monitor_relative");
+    assert_eq!(v["monitor_index"], 1);
+    let back: Coordinates = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn coordinates_minimal_roundtrips() {
+    let c = Coordinates {
+        x: -50,
+        y: 0,
+        system: None,
+        monitor_index: None,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert!(v.get("system").is_none(), "None system must be omitted");
+    assert!(v.get("monitor_index").is_none());
+    let back: Coordinates = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn region_virtual_roundtrips() {
+    let r = Region {
+        x: 10,
+        y: 20,
+        width: 800,
+        height: 600,
+        system: Some(CoordinateSystem::Virtual),
+        monitor_index: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["system"], "virtual");
+    assert_eq!(v["width"], 800);
+    let back: Region = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn monitor_fully_populated_roundtrips() {
+    let m = Monitor {
+        index: 0,
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+        position: MonitorPosition::Center,
+        is_primary: true,
+        scale_factor: 1.5,
+        name: Some("DELL U2720Q".to_string()),
+    };
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["position"], "center");
+    assert_eq!(v["is_primary"], true);
+    assert_eq!(v["scale_factor"], 1.5);
+    assert_eq!(v["name"], "DELL U2720Q");
+    let back: Monitor = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn virtual_desktop_multimon_roundtrips() {
+    let vd = VirtualDesktop {
+        monitors: vec![
+            Monitor {
+                index: 0,
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+                position: MonitorPosition::Left,
+                is_primary: true,
+                scale_factor: 1.0,
+                name: None,
+            },
+            Monitor {
+                index: 1,
+                x: 1920,
+                y: 0,
+                width: 2560,
+                height: 1440,
+                position: MonitorPosition::Right,
+                is_primary: false,
+                scale_factor: 1.25,
+                name: Some("Secondary".to_string()),
+            },
+        ],
+    };
+    let json1 = serde_json::to_string(&vd).expect("serialize");
+    let back: VirtualDesktop = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── config ───────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::config::{Category, Context, ContextAutoInclude};
+
+#[test]
+fn context_auto_include_camelcase_roundtrips() {
+    let c = ContextAutoInclude {
+        task_mentions: Some(vec!["schema".to_string(), "flow".to_string()]),
+        action_types: Some(vec!["CLICK".to_string(), "FIND".to_string()]),
+        error_patterns: Some(vec!["E\\d{4}".to_string()]),
+        file_patterns: Some(vec!["*.rs".to_string(), "src/api/**".to_string()]),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    // camelCase rename checks — wire form must match Python consumers.
+    assert_eq!(v["taskMentions"][0], "schema");
+    assert_eq!(v["actionTypes"][1], "FIND");
+    assert_eq!(v["errorPatterns"][0], "E\\d{4}");
+    assert_eq!(v["filePatterns"][0], "*.rs");
+    assert!(
+        v.get("task_mentions").is_none(),
+        "snake_case field must not appear on the wire"
+    );
+    let back: ContextAutoInclude = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn context_fully_populated_roundtrips() {
+    let c = Context {
+        id: "ctx-schema-flow".to_string(),
+        name: "Schema Flow".to_string(),
+        content: "# Context\n\nRust is the source of truth.".to_string(),
+        category: Some("architecture".to_string()),
+        tags: vec!["schemas".to_string(), "types".to_string()],
+        auto_include: Some(ContextAutoInclude {
+            task_mentions: Some(vec!["schema".to_string()]),
+            action_types: None,
+            error_patterns: None,
+            file_patterns: None,
+        }),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        modified_at: "2026-04-14T12:30:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["createdAt"], "2026-01-01T00:00:00Z");
+    assert_eq!(v["modifiedAt"], "2026-04-14T12:30:00Z");
+    assert_eq!(v["autoInclude"]["taskMentions"][0], "schema");
+    let back: Context = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn category_automation_enabled_default_true() {
+    // The Python-side default is automationEnabled=true — exercise the default
+    // by deserializing JSON that omits the field.
+    let json_no_flag = r#"{"name":"Main"}"#;
+    let c: Category = serde_json::from_str(json_no_flag).expect("deserialize");
+    assert!(
+        c.automation_enabled,
+        "default_true must apply when field absent"
+    );
+
+    let c2 = Category {
+        name: "Testing".to_string(),
+        automation_enabled: false,
+    };
+    let json1 = serde_json::to_string(&c2).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["automationEnabled"], false);
+    assert_eq!(v["name"], "Testing");
+    let back: Category = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── accessibility ────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::accessibility::{
+    AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole,
+    AccessibilitySelector, AccessibilitySnapshot, AccessibilityState, RoleCriterion,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn accessibility_role_snake_case_representative_variants() {
+    let cases = [
+        (AccessibilityRole::Button, "\"button\""),
+        (AccessibilityRole::Textbox, "\"textbox\""),
+        (AccessibilityRole::StaticText, "\"static_text\""),
+        (AccessibilityRole::None, "\"none\""),
+        (AccessibilityRole::Menuitemcheckbox, "\"menuitemcheckbox\""),
+        (AccessibilityRole::Application, "\"application\""),
+        (AccessibilityRole::Treeitem, "\"treeitem\""),
+        (AccessibilityRole::Unknown, "\"unknown\""),
+        (AccessibilityRole::Splitbutton, "\"splitbutton\""),
+    ];
+    for (role, expected) in cases {
+        let json = serde_json::to_string(&role).expect("serialize");
+        assert_eq!(json, expected, "AccessibilityRole wire form mismatch");
+        let back: AccessibilityRole = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, role);
+    }
+}
+
+#[test]
+fn accessibility_backend_lowercase() {
+    let cases = [
+        (AccessibilityBackend::Auto, "\"auto\""),
+        (AccessibilityBackend::Cdp, "\"cdp\""),
+        (AccessibilityBackend::Uia, "\"uia\""),
+        (AccessibilityBackend::Atspi, "\"atspi\""),
+        (AccessibilityBackend::Ax, "\"ax\""),
+        (AccessibilityBackend::None, "\"none\""),
+    ];
+    for (b, expected) in cases {
+        let json = serde_json::to_string(&b).expect("serialize");
+        assert_eq!(json, expected);
+        let back: AccessibilityBackend = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, b);
+    }
+}
+
+#[test]
+fn role_criterion_untagged_single_and_any() {
+    // Single variant: wire is a bare string (well, a role-enum JSON value).
+    let single = RoleCriterion::Single(AccessibilityRole::Button);
+    let json = serde_json::to_string(&single).expect("serialize");
+    assert_eq!(
+        json, "\"button\"",
+        "untagged Single must serialize as bare role"
+    );
+    let back: RoleCriterion = serde_json::from_str(&json).expect("deserialize");
+    assert!(matches!(
+        back,
+        RoleCriterion::Single(AccessibilityRole::Button)
+    ));
+
+    // Any variant: wire is a JSON array of roles.
+    let any = RoleCriterion::Any(vec![
+        AccessibilityRole::Button,
+        AccessibilityRole::Link,
+        AccessibilityRole::Menuitem,
+    ]);
+    let json = serde_json::to_string(&any).expect("serialize");
+    assert_eq!(json, r#"["button","link","menuitem"]"#);
+    let back: RoleCriterion = serde_json::from_str(&json).expect("deserialize");
+    assert!(matches!(back, RoleCriterion::Any(ref v) if v.len() == 3));
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn accessibility_state_fully_populated_roundtrips() {
+    let s = AccessibilityState {
+        is_focused: true,
+        is_disabled: false,
+        is_hidden: false,
+        is_expanded: Some(true),
+        is_selected: Some(false),
+        is_checked: Some(true),
+        is_pressed: None,
+        is_readonly: false,
+        is_required: true,
+        is_multiselectable: false,
+        is_editable: true,
+        is_focusable: true,
+        is_modal: false,
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["is_focused"], true);
+    assert_eq!(v["is_expanded"], true);
+    assert!(
+        v.get("is_pressed").is_none(),
+        "None tri-state must be omitted"
+    );
+    let back: AccessibilityState = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn accessibility_bounds_roundtrips() {
+    let b = AccessibilityBounds {
+        x: 100,
+        y: 200,
+        width: 320,
+        height: 48,
+    };
+    let json1 = serde_json::to_string(&b).expect("serialize");
+    let back: AccessibilityBounds = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+fn sample_a11y_button_node() -> AccessibilityNode {
+    AccessibilityNode {
+        ref_id: "@e1".to_string(),
+        role: AccessibilityRole::Button,
+        name: Some("Submit".to_string()),
+        value: None,
+        description: Some("Send the form".to_string()),
+        bounds: Some(AccessibilityBounds {
+            x: 10,
+            y: 20,
+            width: 80,
+            height: 32,
+        }),
+        state: AccessibilityState {
+            is_focusable: true,
+            is_focused: true,
+            ..Default::default()
+        },
+        is_interactive: true,
+        level: None,
+        automation_id: Some("submit-btn".to_string()),
+        class_name: Some("btn btn-primary".to_string()),
+        html_tag: Some("button".to_string()),
+        url: None,
+        children: vec![],
+    }
+}
+
+#[test]
+fn accessibility_node_ref_id_renamed_to_ref() {
+    let n = sample_a11y_button_node();
+    let json1 = serde_json::to_string(&n).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    // `ref_id` must appear as `ref` on the wire.
+    assert_eq!(v["ref"], "@e1");
+    assert!(v.get("ref_id").is_none());
+    assert_eq!(v["role"], "button");
+    assert_eq!(v["automation_id"], "submit-btn");
+    assert_eq!(v["html_tag"], "button");
+    let back: AccessibilityNode = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn accessibility_node_tree_roundtrips() {
+    // Parent with one child — exercises recursion.
+    let child = sample_a11y_button_node();
+    let parent = AccessibilityNode {
+        ref_id: "@e0".to_string(),
+        role: AccessibilityRole::Form,
+        name: Some("Login form".to_string()),
+        value: None,
+        description: None,
+        bounds: None,
+        state: AccessibilityState::default(),
+        is_interactive: false,
+        level: Some(1),
+        automation_id: None,
+        class_name: None,
+        html_tag: Some("form".to_string()),
+        url: None,
+        children: vec![child],
+    };
+    let json1 = serde_json::to_string(&parent).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["children"][0]["ref"], "@e1");
+    let back: AccessibilityNode = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn accessibility_snapshot_roundtrips() {
+    let s = AccessibilitySnapshot {
+        root: sample_a11y_button_node(),
+        timestamp: 1_713_033_600.5,
+        backend: AccessibilityBackend::Cdp,
+        url: Some("https://app.example.com/login".to_string()),
+        title: Some("Login — Example App".to_string()),
+        total_nodes: 142,
+        interactive_nodes: 37,
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["backend"], "cdp");
+    assert_eq!(v["total_nodes"], 142);
+    let back: AccessibilitySnapshot = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn accessibility_selector_with_ancestor_roundtrips() {
+    let inner = AccessibilitySelector {
+        role: Some(RoleCriterion::Single(AccessibilityRole::Form)),
+        automation_id: Some("login-form".to_string()),
+        case_sensitive: true,
+        ..Default::default()
+    };
+    let sel = AccessibilitySelector {
+        role: Some(RoleCriterion::Any(vec![
+            AccessibilityRole::Button,
+            AccessibilityRole::Link,
+        ])),
+        name: None,
+        name_contains: Some("Submit".to_string()),
+        name_pattern: None,
+        value: None,
+        value_contains: None,
+        automation_id: None,
+        class_name: None,
+        html_tag: None,
+        state: Some(AccessibilityState {
+            is_focusable: true,
+            ..Default::default()
+        }),
+        is_interactive: Some(true),
+        ancestor: Some(Box::new(inner)),
+        max_depth: Some(10),
+        case_sensitive: false,
+    };
+    let json1 = serde_json::to_string(&sel).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    // role must serialize as an untagged array for the Any variant.
+    assert!(v["role"].is_array(), "RoleCriterion::Any must be an array");
+    assert_eq!(v["role"][0], "button");
+    assert_eq!(v["ancestor"]["role"], "form");
+    let back: AccessibilitySelector = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── targets ──────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::targets::{
+    AccessibilityRoleCriterion as TargetsRoleCriterion, MatchAdjustment, MatchMethod, OcrEngine,
+    PatternOptions, PollingConfig, SearchOptions, SearchStrategy, TargetConfig, TextMatchType,
+    TextSearchOptions,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn search_strategy_uppercase() {
+    let cases = [
+        (SearchStrategy::First, "\"FIRST\""),
+        (SearchStrategy::All, "\"ALL\""),
+        (SearchStrategy::Best, "\"BEST\""),
+        (SearchStrategy::Each, "\"EACH\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: SearchStrategy = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn match_method_uppercase() {
+    let cases = [
+        (MatchMethod::Correlation, "\"CORRELATION\""),
+        (MatchMethod::CorrelationNormed, "\"CORRELATION_NORMED\""),
+        (MatchMethod::SquaredDifference, "\"SQUARED_DIFFERENCE\""),
+        (
+            MatchMethod::SquaredDifferenceNormed,
+            "\"SQUARED_DIFFERENCE_NORMED\"",
+        ),
+    ];
+    for (m, expected) in cases {
+        let json = serde_json::to_string(&m).expect("serialize");
+        assert_eq!(json, expected);
+        let back: MatchMethod = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, m);
+    }
+}
+
+#[test]
+fn ocr_engine_uppercase() {
+    let cases = [
+        (OcrEngine::Tesseract, "\"TESSERACT\""),
+        (OcrEngine::EasyOcr, "\"EASYOCR\""),
+        (OcrEngine::PaddleOcr, "\"PADDLEOCR\""),
+        (OcrEngine::Native, "\"NATIVE\""),
+    ];
+    for (o, expected) in cases {
+        let json = serde_json::to_string(&o).expect("serialize");
+        assert_eq!(json, expected);
+        let back: OcrEngine = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, o);
+    }
+}
+
+#[test]
+fn text_match_type_uppercase_with_underscores() {
+    let cases = [
+        (TextMatchType::Exact, "\"EXACT\""),
+        (TextMatchType::Contains, "\"CONTAINS\""),
+        (TextMatchType::StartsWith, "\"STARTS_WITH\""),
+        (TextMatchType::EndsWith, "\"ENDS_WITH\""),
+        (TextMatchType::Regex, "\"REGEX\""),
+        (TextMatchType::Fuzzy, "\"FUZZY\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected);
+        let back: TextMatchType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn targets_accessibility_role_criterion_untagged() {
+    let single = TargetsRoleCriterion::Single("button".to_string());
+    let json = serde_json::to_string(&single).expect("serialize");
+    assert_eq!(json, "\"button\"");
+    let back: TargetsRoleCriterion = serde_json::from_str(&json).expect("deserialize");
+    assert!(matches!(back, TargetsRoleCriterion::Single(ref s) if s == "button"));
+
+    let any = TargetsRoleCriterion::Any(vec!["button".to_string(), "link".to_string()]);
+    let json = serde_json::to_string(&any).expect("serialize");
+    assert_eq!(json, r#"["button","link"]"#);
+    let back: TargetsRoleCriterion = serde_json::from_str(&json).expect("deserialize");
+    assert!(matches!(back, TargetsRoleCriterion::Any(ref v) if v.len() == 2));
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn polling_config_camelcase_roundtrips() {
+    let p = PollingConfig {
+        interval: Some(500),
+        max_attempts: Some(12),
+    };
+    let json1 = serde_json::to_string(&p).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["interval"], 500);
+    assert_eq!(v["maxAttempts"], 12);
+    assert!(v.get("max_attempts").is_none());
+    let back: PollingConfig = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn pattern_options_partial_roundtrips() {
+    // Exercise a representative subset — PatternOptions has 17 optional fields;
+    // populating a realistic subset is more informative than every field.
+    let p = PatternOptions {
+        match_method: Some(MatchMethod::CorrelationNormed),
+        scale_invariant: Some(true),
+        min_scale: Some(0.8),
+        max_scale: Some(1.2),
+        scale_step: Some(0.05),
+        use_grayscale: Some(true),
+        use_color_reduction: Some(false),
+        color_tolerance: Some(25.0),
+        use_edges: Some(false),
+        nms_threshold: Some(0.3),
+        ..Default::default()
+    };
+    let json1 = serde_json::to_string(&p).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["matchMethod"], "CORRELATION_NORMED");
+    assert_eq!(v["scaleInvariant"], true);
+    assert_eq!(v["useGrayscale"], true);
+    assert_eq!(v["colorTolerance"], 25.0);
+    assert_eq!(v["nmsThreshold"], 0.3);
+    // Absent fields must be skipped entirely.
+    assert!(v.get("minRotation").is_none());
+    let back: PatternOptions = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn match_adjustment_camelcase_roundtrips() {
+    let m = MatchAdjustment {
+        target_position: Some("TOP_LEFT".to_string()),
+        target_offset: Some(Coordinates {
+            x: 5,
+            y: 10,
+            system: None,
+            monitor_index: None,
+        }),
+        add_w: Some(4),
+        add_h: Some(2),
+        absolute_w: None,
+        absolute_h: None,
+        add_x: Some(-1),
+        add_y: None,
+    };
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["targetPosition"], "TOP_LEFT");
+    assert_eq!(v["targetOffset"]["x"], 5);
+    assert_eq!(v["addW"], 4);
+    assert_eq!(v["addX"], -1);
+    assert!(v.get("absoluteW").is_none());
+    assert!(v.get("addY").is_none());
+    let back: MatchAdjustment = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn search_options_nested_roundtrips() {
+    let so = SearchOptions {
+        similarity: Some(0.85),
+        timeout: Some(5000),
+        search_regions: Some(vec![Region {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            system: None,
+            monitor_index: None,
+        }]),
+        strategy: Some(SearchStrategy::Best),
+        use_defined_region: Some(false),
+        max_matches_to_act_on: Some(3),
+        min_matches: Some(1),
+        max_matches: Some(10),
+        polling: Some(PollingConfig {
+            interval: Some(250),
+            max_attempts: Some(20),
+        }),
+        pattern: Some(PatternOptions {
+            match_method: Some(MatchMethod::Correlation),
+            ..Default::default()
+        }),
+        adjustment: None,
+        capture_image: Some(true),
+    };
+    let json1 = serde_json::to_string(&so).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["similarity"], 0.85);
+    assert_eq!(v["searchStrategy"], "BEST");
+    assert_eq!(v["maxMatchesToActOn"], 3);
+    assert_eq!(v["captureImage"], true);
+    assert!(v.get("adjustment").is_none());
+    let back: SearchOptions = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn text_search_options_ocr_tesseract_roundtrips() {
+    let t = TextSearchOptions {
+        ocr_engine: Some(OcrEngine::Tesseract),
+        language: Some("eng".to_string()),
+        whitelist_chars: Some("0123456789.".to_string()),
+        blacklist_chars: None,
+        match_type: Some(TextMatchType::Fuzzy),
+        case_sensitive: Some(false),
+        ignore_whitespace: Some(true),
+        normalize_unicode: Some(true),
+        fuzzy_threshold: Some(0.8),
+        edit_distance: Some(2),
+        preprocessing: Some(vec!["grayscale".to_string(), "threshold".to_string()]),
+        scale_factor: Some(2.0),
+        psm_mode: Some(6),
+        oem_mode: Some(3),
+        confidence_threshold: Some(0.75),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["ocrEngine"], "TESSERACT");
+    assert_eq!(v["matchType"], "FUZZY");
+    assert_eq!(v["caseSensitive"], false);
+    assert_eq!(v["fuzzyThreshold"], 0.8);
+    assert_eq!(v["psmMode"], 6);
+    assert_eq!(v["confidenceThreshold"], 0.75);
+    let back: TextSearchOptions = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn target_config_image_variant_roundtrips() {
+    let t = TargetConfig::Image {
+        image_ids: vec!["img-1".to_string(), "img-2".to_string()],
+        search_options: Some(SearchOptions {
+            similarity: Some(0.9),
+            ..Default::default()
+        }),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "image");
+    assert_eq!(v["imageIds"][0], "img-1");
+    assert_eq!(v["searchOptions"]["similarity"], 0.9);
+    let back: TargetConfig = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn target_config_state_image_variant_roundtrips() {
+    let t = TargetConfig::StateImage {
+        state_id: "home".to_string(),
+        image_ids: vec!["logo".to_string()],
+        state_name: Some("Home Page".to_string()),
+        image_names: Some(vec!["Company logo".to_string()]),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "stateImage");
+    assert_eq!(v["stateId"], "home");
+    assert_eq!(v["imageIds"][0], "logo");
+    assert_eq!(v["stateName"], "Home Page");
+    let back: TargetConfig = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn target_config_unit_variants_roundtrip() {
+    // Unit-like variants carry only the `type` discriminator.
+    for (t, tag) in [
+        (TargetConfig::CurrentPosition, "currentPosition"),
+        (TargetConfig::LastFindResult, "lastFindResult"),
+        (TargetConfig::AllResults, "allResults"),
+    ] {
+        let json = serde_json::to_string(&t).expect("serialize");
+        let v: Value = serde_json::from_str(&json).expect("parse");
+        assert_eq!(v["type"], tag);
+        let back: TargetConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
+    }
+}
+
+#[test]
+fn target_config_accessibility_variant_camelcase_roundtrips() {
+    let t = TargetConfig::Accessibility {
+        r#ref: Some("@e7".to_string()),
+        role: Some(TargetsRoleCriterion::Any(vec![
+            "button".to_string(),
+            "link".to_string(),
+        ])),
+        name: None,
+        name_contains: Some("Submit".to_string()),
+        is_interactive: Some(true),
+        capture_first: true,
+        cdp_host: "localhost".to_string(),
+        cdp_port: 9222,
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "accessibility");
+    assert_eq!(v["ref"], "@e7");
+    assert!(v["role"].is_array());
+    assert_eq!(v["nameContains"], "Submit");
+    assert_eq!(v["isInteractive"], true);
+    assert_eq!(v["captureFirst"], true);
+    assert_eq!(v["cdpHost"], "localhost");
+    assert_eq!(v["cdpPort"], 9222);
+    let back: TargetConfig = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn target_config_result_by_image_roundtrips() {
+    let t = TargetConfig::ResultByImage {
+        image_id: "img-xyz".to_string(),
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "resultByImage");
+    assert_eq!(v["imageId"], "img-xyz");
+    let back: TargetConfig = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── execution ────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::execution::{
+    ActionExecutionCreate, ActionExecutionResponse, ActionStatus, ActionType as ExecActionType,
+    CoverageData, ErrorType, ExecutionIssueCreate, ExecutionIssueResponse, ExecutionRunComplete,
+    ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse, ExecutionScreenshotCreate,
+    ExecutionScreenshotResponse, ExecutionStats, IssueSeverity, LLMMetrics,
+    MatchLocation as ExecMatchLocation, RunStatus, RunType, RunnerMetadata, ScreenshotAnnotation,
+    ScreenshotAnnotationShape, ScreenshotType, WorkflowMetadata,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn run_type_all_variants_snake_case() {
+    let cases = [
+        (RunType::QaTest, "\"qa_test\""),
+        (RunType::IntegrationTest, "\"integration_test\""),
+        (RunType::LiveAutomation, "\"live_automation\""),
+        (RunType::Recording, "\"recording\""),
+        (RunType::Debug, "\"debug\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected, "RunType wire form mismatch");
+        let back: RunType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn run_status_all_variants_snake_case() {
+    let cases = [
+        (RunStatus::Pending, "\"pending\""),
+        (RunStatus::Running, "\"running\""),
+        (RunStatus::Completed, "\"completed\""),
+        (RunStatus::Failed, "\"failed\""),
+        (RunStatus::Timeout, "\"timeout\""),
+        (RunStatus::Cancelled, "\"cancelled\""),
+        (RunStatus::Paused, "\"paused\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: RunStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn action_status_all_variants_snake_case() {
+    let cases = [
+        (ActionStatus::Success, "\"success\""),
+        (ActionStatus::Failed, "\"failed\""),
+        (ActionStatus::Timeout, "\"timeout\""),
+        (ActionStatus::Skipped, "\"skipped\""),
+        (ActionStatus::Error, "\"error\""),
+        (ActionStatus::Pending, "\"pending\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: ActionStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn execution_action_type_representative_variants_snake_case() {
+    let cases = [
+        (ExecActionType::Find, "\"find\""),
+        (ExecActionType::FindAll, "\"find_all\""),
+        (ExecActionType::WaitUntilGone, "\"wait_until_gone\""),
+        (ExecActionType::DoubleClick, "\"double_click\""),
+        (ExecActionType::RightClick, "\"right_click\""),
+        (ExecActionType::PressKey, "\"press_key\""),
+        (ExecActionType::GoToState, "\"go_to_state\""),
+        (ExecActionType::VerifyState, "\"verify_state\""),
+        (ExecActionType::AiPrompt, "\"ai_prompt\""),
+        (ExecActionType::RunPromptSequence, "\"run_prompt_sequence\""),
+        (ExecActionType::Custom, "\"custom\""),
+    ];
+    for (a, expected) in cases {
+        let json = serde_json::to_string(&a).expect("serialize");
+        assert_eq!(json, expected, "execution::ActionType wire form");
+        let back: ExecActionType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, a);
+    }
+}
+
+#[test]
+fn error_type_all_variants_snake_case() {
+    let cases = [
+        (ErrorType::ElementNotFound, "\"element_not_found\""),
+        (ErrorType::Timeout, "\"timeout\""),
+        (ErrorType::AssertionFailed, "\"assertion_failed\""),
+        (ErrorType::Crash, "\"crash\""),
+        (ErrorType::NetworkError, "\"network_error\""),
+        (ErrorType::ValidationError, "\"validation_error\""),
+        (ErrorType::Other, "\"other\""),
+    ];
+    for (e, expected) in cases {
+        let json = serde_json::to_string(&e).expect("serialize");
+        assert_eq!(json, expected);
+        let back: ErrorType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, e);
+    }
+}
+
+#[test]
+fn issue_severity_all_variants_snake_case() {
+    let cases = [
+        (IssueSeverity::Critical, "\"critical\""),
+        (IssueSeverity::High, "\"high\""),
+        (IssueSeverity::Medium, "\"medium\""),
+        (IssueSeverity::Low, "\"low\""),
+        (IssueSeverity::Informational, "\"informational\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: IssueSeverity = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn screenshot_type_all_variants_snake_case() {
+    let cases = [
+        (ScreenshotType::Error, "\"error\""),
+        (ScreenshotType::Success, "\"success\""),
+        (ScreenshotType::Manual, "\"manual\""),
+        (ScreenshotType::Periodic, "\"periodic\""),
+        (ScreenshotType::ActionResult, "\"action_result\""),
+        (ScreenshotType::StateVerification, "\"state_verification\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected);
+        let back: ScreenshotType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn screenshot_annotation_shape_snake_case() {
+    let cases = [
+        (ScreenshotAnnotationShape::Box, "\"box\""),
+        (ScreenshotAnnotationShape::Circle, "\"circle\""),
+        (ScreenshotAnnotationShape::Arrow, "\"arrow\""),
+        (ScreenshotAnnotationShape::Text, "\"text\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: ScreenshotAnnotationShape = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn sample_runner_metadata() -> RunnerMetadata {
+    let mut extra = HashMap::new();
+    extra.insert("build".to_string(), json!("release"));
+    extra.insert("ci".to_string(), json!(false));
+    RunnerMetadata {
+        runner_version: "1.4.2".to_string(),
+        os: "windows".to_string(),
+        hostname: "dev-box-01".to_string(),
+        screen_resolution: Some("1920x1080".to_string()),
+        cpu_info: Some("AMD Ryzen 9 7950X".to_string()),
+        memory_mb: Some(65_536),
+        extra: Some(extra),
+    }
+}
+
+fn sample_workflow_metadata() -> WorkflowMetadata {
+    WorkflowMetadata {
+        workflow_id: "wf-login".to_string(),
+        workflow_name: "Login smoke test".to_string(),
+        workflow_version: Some("v3".to_string()),
+        total_states: Some(8),
+        total_transitions: Some(14),
+        tags: Some(vec!["smoke".to_string(), "login".to_string()]),
+        description: Some("Happy path login + logout".to_string()),
+        initial_state_ids: Some(vec!["landing".to_string()]),
+    }
+}
+
+fn sample_execution_stats() -> ExecutionStats {
+    ExecutionStats {
+        total_actions: 42,
+        successful_actions: 38,
+        failed_actions: 3,
+        timeout_actions: 1,
+        skipped_actions: 0,
+        total_duration_ms: 91_250,
+        avg_action_duration_ms: Some(2172.6),
+        total_tokens_input: Some(3200),
+        total_tokens_output: Some(1150),
+        total_cost_usd: Some(0.042),
+        llm_action_count: Some(4),
+    }
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn runner_metadata_roundtrips() {
+    let m = sample_runner_metadata();
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: RunnerMetadata = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn workflow_metadata_roundtrips() {
+    let m = sample_workflow_metadata();
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: WorkflowMetadata = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_stats_roundtrips() {
+    let s = sample_execution_stats();
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["total_actions"], 42);
+    assert_eq!(v["successful_actions"], 38);
+    let back: ExecutionStats = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn coverage_data_fully_populated_roundtrips() {
+    let mut state_counts = HashMap::new();
+    state_counts.insert("landing".to_string(), 1u32);
+    state_counts.insert("logged_in".to_string(), 2u32);
+    let mut trans_counts = HashMap::new();
+    trans_counts.insert("landing->login".to_string(), 1u32);
+    trans_counts.insert("login->logged_in".to_string(), 1u32);
+    let c = CoverageData {
+        coverage_percentage: 75.0,
+        states_covered: 6,
+        total_states: 8,
+        transitions_covered: 10,
+        total_transitions: 14,
+        uncovered_states: Some(vec!["error".to_string(), "settings".to_string()]),
+        uncovered_transitions: Some(vec!["login->error".to_string()]),
+        state_visit_counts: Some(state_counts),
+        transition_execution_counts: Some(trans_counts),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let back: CoverageData = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn llm_metrics_roundtrips() {
+    let mut params = HashMap::new();
+    params.insert("temperature".to_string(), json!(0.2));
+    params.insert("max_tokens".to_string(), json!(1024));
+    let m = LLMMetrics {
+        model: Some("claude-opus-4-6".to_string()),
+        provider: Some("anthropic".to_string()),
+        tokens_input: Some(2048),
+        tokens_output: Some(512),
+        tokens_total: Some(2560),
+        cost_usd: Some(0.018),
+        generation_params: Some(params),
+    };
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: LLMMetrics = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_run_create_roundtrips() {
+    let mut cfg = HashMap::new();
+    cfg.insert("headless".to_string(), json!(true));
+    cfg.insert("retries".to_string(), json!(2));
+    let c = ExecutionRunCreate {
+        project_id: "proj-alpha".to_string(),
+        run_type: RunType::QaTest,
+        run_name: "Smoke test 2026-04-14".to_string(),
+        description: Some("Nightly QA smoke suite".to_string()),
+        runner_metadata: sample_runner_metadata(),
+        workflow_metadata: Some(sample_workflow_metadata()),
+        configuration: Some(cfg),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["run_type"], "qa_test");
+    assert_eq!(v["project_id"], "proj-alpha");
+    let back: ExecutionRunCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_run_response_roundtrips() {
+    let r = ExecutionRunResponse {
+        run_id: "run-789".to_string(),
+        project_id: "proj-alpha".to_string(),
+        run_type: RunType::LiveAutomation,
+        run_name: "Prod check".to_string(),
+        status: RunStatus::Running,
+        started_at: "2026-04-14T03:00:00Z".to_string(),
+        ended_at: None,
+        duration_seconds: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["status"], "running");
+    assert!(v.get("ended_at").is_none());
+    let back: ExecutionRunResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn exec_match_location_roundtrips() {
+    let m = ExecMatchLocation {
+        x: 420,
+        y: 130,
+        width: Some(80),
+        height: Some(24),
+    };
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: ExecMatchLocation = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn action_execution_create_roundtrips() {
+    let mut input_data = HashMap::new();
+    input_data.insert("text".to_string(), json!("hello world"));
+    let a = ActionExecutionCreate {
+        sequence_number: 5,
+        action_type: ExecActionType::Click,
+        action_name: "Click Submit".to_string(),
+        status: ActionStatus::Success,
+        started_at: "2026-04-14T03:00:05.000Z".to_string(),
+        completed_at: "2026-04-14T03:00:05.122Z".to_string(),
+        duration_ms: 122,
+        from_state: Some("form".to_string()),
+        to_state: Some("submitted".to_string()),
+        active_states: Some(vec!["form".to_string()]),
+        pattern_id: Some("pat-submit".to_string()),
+        pattern_name: Some("Submit button".to_string()),
+        confidence_score: Some(0.97),
+        match_location: Some(ExecMatchLocation {
+            x: 200,
+            y: 400,
+            width: Some(80),
+            height: Some(32),
+        }),
+        error_message: None,
+        error_type: None,
+        error_stack: None,
+        screenshot_id: Some("scr-42".to_string()),
+        parent_action_id: None,
+        input_data: Some(input_data),
+        output_data: None,
+        metadata: None,
+        llm_metrics: None,
+        span_type: Some("tool".to_string()),
+        trace_id: Some("trc-xyz".to_string()),
+        parent_id: None,
+    };
+    let json1 = serde_json::to_string(&a).expect("serialize");
+    let back: ActionExecutionCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn action_execution_response_roundtrips() {
+    let r = ActionExecutionResponse {
+        recorded: 3,
+        run_id: "run-789".to_string(),
+        action_ids: Some(vec![
+            "act-1".to_string(),
+            "act-2".to_string(),
+            "act-3".to_string(),
+        ]),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ActionExecutionResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn screenshot_annotation_roundtrips() {
+    let a = ScreenshotAnnotation {
+        shape: ScreenshotAnnotationShape::Box,
+        x: 100,
+        y: 120,
+        width: Some(40),
+        height: Some(40),
+        label: Some("Focused button".to_string()),
+        color: Some("#FF5500".to_string()),
+    };
+    let json1 = serde_json::to_string(&a).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    // The `shape` field is renamed to `type` on the wire.
+    assert_eq!(v["type"], "box");
+    assert!(v.get("shape").is_none());
+    let back: ScreenshotAnnotation = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_screenshot_create_roundtrips() {
+    let c = ExecutionScreenshotCreate {
+        screenshot_id: "scr-42".to_string(),
+        sequence_number: 7,
+        screenshot_type: ScreenshotType::ActionResult,
+        timestamp: "2026-04-14T03:00:05.000Z".to_string(),
+        width: 1920,
+        height: 1080,
+        action_sequence_number: Some(5),
+        state: Some("form".to_string()),
+        active_states: Some(vec!["form".to_string()]),
+        annotations: Some(vec![ScreenshotAnnotation {
+            shape: ScreenshotAnnotationShape::Arrow,
+            x: 10,
+            y: 10,
+            width: None,
+            height: None,
+            label: None,
+            color: Some("#00AAFF".to_string()),
+        }]),
+        metadata: None,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["screenshot_type"], "action_result");
+    let back: ExecutionScreenshotCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_screenshot_response_roundtrips() {
+    let r = ExecutionScreenshotResponse {
+        screenshot_id: "scr-42".to_string(),
+        run_id: "run-789".to_string(),
+        image_url: "https://storage.example.com/scr/42.png".to_string(),
+        thumbnail_url: Some("https://storage.example.com/scr/42_thumb.png".to_string()),
+        uploaded_at: "2026-04-14T03:00:05.250Z".to_string(),
+        file_size_bytes: 183_421,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ExecutionScreenshotResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_create_roundtrips() {
+    let i = ExecutionIssueCreate {
+        title: "Button label drifted".to_string(),
+        description: "Submit button now reads 'Send' instead of 'Submit'".to_string(),
+        severity: IssueSeverity::Medium,
+        issue_type: "visual_regression".to_string(),
+        action_sequence_number: Some(5),
+        state: Some("form".to_string()),
+        screenshot_ids: Some(vec!["scr-42".to_string()]),
+        reproduction_steps: Some(vec![
+            "Navigate to login form".to_string(),
+            "Observe button label".to_string(),
+        ]),
+        expected_behavior: Some("Button reads 'Submit'".to_string()),
+        actual_behavior: Some("Button reads 'Send'".to_string()),
+        metadata: None,
+    };
+    let json1 = serde_json::to_string(&i).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["severity"], "medium");
+    let back: ExecutionIssueCreate = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_response_roundtrips() {
+    let r = ExecutionIssueResponse {
+        recorded: 2,
+        run_id: "run-789".to_string(),
+        issue_ids: Some(vec!["iss-1".to_string(), "iss-2".to_string()]),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ExecutionIssueResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_run_complete_roundtrips() {
+    let c = ExecutionRunComplete {
+        status: RunStatus::Completed,
+        ended_at: "2026-04-14T03:15:12Z".to_string(),
+        stats: sample_execution_stats(),
+        coverage: Some(CoverageData {
+            coverage_percentage: 85.7,
+            states_covered: 6,
+            total_states: 7,
+            transitions_covered: 12,
+            total_transitions: 14,
+            uncovered_states: None,
+            uncovered_transitions: None,
+            state_visit_counts: None,
+            transition_execution_counts: None,
+        }),
+        summary: Some("All critical paths passed".to_string()),
+        error_message: None,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["status"], "completed");
+    assert_eq!(v["coverage"]["coverage_percentage"], 85.7);
+    let back: ExecutionRunComplete = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_run_complete_response_roundtrips() {
+    let r = ExecutionRunCompleteResponse {
+        run_id: "run-789".to_string(),
+        status: RunStatus::Failed,
+        started_at: "2026-04-14T03:00:00Z".to_string(),
+        ended_at: "2026-04-14T03:05:42Z".to_string(),
+        duration_seconds: 342.5,
+        stats: sample_execution_stats(),
+        coverage: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["duration_seconds"], 342.5);
+    assert!(v.get("coverage").is_none());
+    let back: ExecutionRunCompleteResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+// ─── Additional types ported from api/execution.py ───────────────────────────
+
+use qontinui_types::execution::{
+    ActionExecutionBatch, ActionExecutionBatchResponse, ActionExecutionListResponse,
+    ActionReliabilityStats, CostTrendDataPoint, CostTrendResponse, ExecutionIssueBatch,
+    ExecutionIssueBatchResponse, ExecutionIssueDetail, ExecutionIssueListResponse,
+    ExecutionIssueUpdate, ExecutionRunDetail, ExecutionRunListResponse, ExecutionTrendDataPoint,
+    ExecutionTrendResponse, HistoricalActionQuery, HistoricalActionResult, IssueSource,
+    IssueStatus, IssueType, LLMCostSummary, ModelCostBreakdown, PlaybackFrameRequest,
+    VisualComparisonResult,
+};
+use qontinui_types::task_run::Pagination as TrPagination;
+
+#[test]
+fn issue_status_all_variants_snake_case() {
+    let cases = [
+        (IssueStatus::New, "\"new\""),
+        (IssueStatus::Open, "\"open\""),
+        (IssueStatus::InProgress, "\"in_progress\""),
+        (IssueStatus::Resolved, "\"resolved\""),
+        (IssueStatus::Closed, "\"closed\""),
+        (IssueStatus::WontFix, "\"wont_fix\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected, "IssueStatus wire form");
+        let back: IssueStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn issue_type_all_variants_snake_case() {
+    let cases = [
+        (IssueType::Functional, "\"functional\""),
+        (IssueType::Visual, "\"visual\""),
+        (IssueType::Performance, "\"performance\""),
+        (IssueType::Crash, "\"crash\""),
+        (IssueType::Timeout, "\"timeout\""),
+        (IssueType::Assertion, "\"assertion\""),
+        (IssueType::StateMismatch, "\"state_mismatch\""),
+        (IssueType::ElementNotFound, "\"element_not_found\""),
+        (IssueType::AiDetected, "\"ai_detected\""),
+        (IssueType::Other, "\"other\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected, "IssueType wire form");
+        let back: IssueType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn issue_source_all_variants_snake_case() {
+    let cases = [
+        (IssueSource::Automation, "\"automation\""),
+        (IssueSource::AiAnalysis, "\"ai_analysis\""),
+        (IssueSource::VisualRegression, "\"visual_regression\""),
+        (IssueSource::UserReported, "\"user_reported\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected, "IssueSource wire form");
+        let back: IssueSource = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn action_execution_batch_roundtrips() {
+    let a = ActionExecutionCreate {
+        sequence_number: 1,
+        action_type: ExecActionType::Click,
+        action_name: "Click Submit".to_string(),
+        status: ActionStatus::Success,
+        started_at: "2026-04-14T03:00:05.000Z".to_string(),
+        completed_at: "2026-04-14T03:00:05.122Z".to_string(),
+        duration_ms: 122,
+        from_state: None,
+        to_state: None,
+        active_states: None,
+        pattern_id: None,
+        pattern_name: None,
+        confidence_score: None,
+        match_location: None,
+        error_message: None,
+        error_type: None,
+        error_stack: None,
+        screenshot_id: None,
+        parent_action_id: None,
+        input_data: None,
+        output_data: None,
+        metadata: None,
+        llm_metrics: None,
+        span_type: None,
+        trace_id: None,
+        parent_id: None,
+    };
+    let batch = ActionExecutionBatch {
+        actions: vec![a.clone(), a],
+    };
+    let json1 = serde_json::to_string(&batch).expect("serialize");
+    let back: ActionExecutionBatch = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn action_execution_batch_response_roundtrips() {
+    let r = ActionExecutionBatchResponse {
+        run_id: "run-7".to_string(),
+        actions_recorded: 3,
+        action_ids: vec!["a-1".to_string(), "a-2".to_string(), "a-3".to_string()],
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ActionExecutionBatchResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_batch_roundtrips() {
+    let i = ExecutionIssueCreate {
+        title: "T".to_string(),
+        description: "D".to_string(),
+        severity: IssueSeverity::Low,
+        issue_type: "functional".to_string(),
+        action_sequence_number: None,
+        state: None,
+        screenshot_ids: None,
+        reproduction_steps: None,
+        expected_behavior: None,
+        actual_behavior: None,
+        metadata: None,
+    };
+    let b = ExecutionIssueBatch {
+        issues: vec![i.clone(), i],
+    };
+    let json1 = serde_json::to_string(&b).expect("serialize");
+    let back: ExecutionIssueBatch = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_issue_batch_response_roundtrips() {
+    let r = ExecutionIssueBatchResponse {
+        run_id: "run-7".to_string(),
+        issues_recorded: 2,
+        issue_ids: vec!["i-1".to_string(), "i-2".to_string()],
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ExecutionIssueBatchResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_update_roundtrips() {
+    let u = ExecutionIssueUpdate {
+        status: Some(IssueStatus::InProgress),
+        severity: Some(IssueSeverity::High),
+        assigned_to_user_id: Some("user-42".to_string()),
+        resolution_notes: Some("Investigating".to_string()),
+    };
+    let json1 = serde_json::to_string(&u).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["status"], "in_progress");
+    assert_eq!(v["severity"], "high");
+    let back: ExecutionIssueUpdate = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_update_empty_omits_all_fields() {
+    let u = ExecutionIssueUpdate::default();
+    let json1 = serde_json::to_string(&u).expect("serialize");
+    assert_eq!(json1, "{}");
+    let back: ExecutionIssueUpdate = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(back, u);
+}
+
+#[test]
+fn visual_comparison_result_roundtrips() {
+    let v = VisualComparisonResult {
+        comparison_id: "cmp-1".to_string(),
+        baseline_id: Some("base-7".to_string()),
+        similarity_score: 0.942,
+        threshold: 0.95,
+        passed: false,
+        diff_image_url: Some("https://example.com/diff.png".to_string()),
+        diff_region_count: 3,
+    };
+    let json1 = serde_json::to_string(&v).expect("serialize");
+    let back: VisualComparisonResult = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_run_detail_roundtrips() {
+    let mut cfg = HashMap::new();
+    cfg.insert("headless".to_string(), json!(true));
+    let d = ExecutionRunDetail {
+        run_id: "run-1".to_string(),
+        project_id: "proj-a".to_string(),
+        run_type: RunType::QaTest,
+        run_name: "Nightly".to_string(),
+        status: RunStatus::Completed,
+        started_at: "2026-04-14T03:00:00Z".to_string(),
+        ended_at: Some("2026-04-14T03:10:00Z".to_string()),
+        duration_seconds: Some(600.0),
+        description: Some("Scheduled nightly smoke".to_string()),
+        runner_metadata: sample_runner_metadata(),
+        workflow_metadata: Some(sample_workflow_metadata()),
+        configuration: cfg,
+        stats: sample_execution_stats(),
+        coverage: None,
+        created_at: "2026-04-14T02:59:59Z".to_string(),
+        updated_at: Some("2026-04-14T03:10:01Z".to_string()),
+    };
+    let json1 = serde_json::to_string(&d).expect("serialize");
+    let back: ExecutionRunDetail = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_issue_detail_roundtrips() {
+    let d = ExecutionIssueDetail {
+        id: "iss-1".to_string(),
+        run_id: "run-1".to_string(),
+        issue_type: IssueType::Visual,
+        severity: IssueSeverity::Medium,
+        status: IssueStatus::Open,
+        source: IssueSource::VisualRegression,
+        title: "Button drift".to_string(),
+        description: "Label changed".to_string(),
+        state_name: Some("form".to_string()),
+        screenshot_count: 1,
+        created_at: "2026-04-14T03:05:00Z".to_string(),
+        updated_at: "2026-04-14T03:06:00Z".to_string(),
+        action_sequence_number: Some(5),
+        reproduction_steps: vec!["Open form".to_string(), "Check label".to_string()],
+        screenshots: vec![],
+        error_details: HashMap::new(),
+        metadata: HashMap::new(),
+        assigned_to: None,
+        resolution_notes: None,
+    };
+    let json1 = serde_json::to_string(&d).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["source"], "visual_regression");
+    assert_eq!(v["status"], "open");
+    let back: ExecutionIssueDetail = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_run_list_response_roundtrips() {
+    let resp = ExecutionRunListResponse {
+        runs: vec![ExecutionRunResponse {
+            run_id: "r-1".to_string(),
+            project_id: "p-1".to_string(),
+            run_type: RunType::Debug,
+            run_name: "debug".to_string(),
+            status: RunStatus::Completed,
+            started_at: "2026-04-14T03:00:00Z".to_string(),
+            ended_at: None,
+            duration_seconds: None,
+        }],
+        pagination: TrPagination {
+            total: 1,
+            limit: 20,
+            offset: 0,
+            has_more: false,
+        },
+    };
+    let json1 = serde_json::to_string(&resp).expect("serialize");
+    let back: ExecutionRunListResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn action_execution_list_response_roundtrips() {
+    let resp = ActionExecutionListResponse {
+        actions: vec![ActionExecutionResponse {
+            recorded: 1,
+            run_id: "r-1".to_string(),
+            action_ids: Some(vec!["a-1".to_string()]),
+        }],
+        pagination: TrPagination {
+            total: 1,
+            limit: 10,
+            offset: 0,
+            has_more: false,
+        },
+    };
+    let json1 = serde_json::to_string(&resp).expect("serialize");
+    let back: ActionExecutionListResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_issue_list_response_roundtrips() {
+    let mut summary = HashMap::new();
+    summary.insert("critical".to_string(), json!(0));
+    summary.insert("high".to_string(), json!(2));
+    let resp = ExecutionIssueListResponse {
+        issues: vec![ExecutionIssueResponse {
+            recorded: 1,
+            run_id: "r-1".to_string(),
+            issue_ids: Some(vec!["i-1".to_string()]),
+        }],
+        pagination: TrPagination {
+            total: 1,
+            limit: 10,
+            offset: 0,
+            has_more: false,
+        },
+        summary,
+    };
+    let json1 = serde_json::to_string(&resp).expect("serialize");
+    let back: ExecutionIssueListResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn action_reliability_stats_roundtrips() {
+    let mut err = HashMap::new();
+    err.insert("type".to_string(), json!("timeout"));
+    err.insert("count".to_string(), json!(4));
+    let s = ActionReliabilityStats {
+        action_name: "Click Submit".to_string(),
+        action_type: ExecActionType::Click,
+        total_executions: 100,
+        successful_executions: 96,
+        failed_executions: 4,
+        success_rate: 96.0,
+        avg_duration_ms: 150,
+        p50_duration_ms: 120,
+        p95_duration_ms: 310,
+        common_errors: vec![err],
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let back: ActionReliabilityStats = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn execution_trend_response_roundtrips() {
+    let r = ExecutionTrendResponse {
+        project_id: "proj-a".to_string(),
+        run_type: Some(RunType::QaTest),
+        start_date: "2026-04-01".to_string(),
+        end_date: "2026-04-14".to_string(),
+        granularity: "daily".to_string(),
+        data_points: vec![ExecutionTrendDataPoint {
+            date: "2026-04-01".to_string(),
+            runs_count: 5,
+            success_rate: 80.0,
+            avg_duration_seconds: 120,
+            total_actions: 300,
+            issues_count: 2,
+        }],
+        overall_stats: HashMap::new(),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["granularity"], "daily");
+    assert_eq!(v["run_type"], "qa_test");
+    let back: ExecutionTrendResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn llm_cost_summary_roundtrips() {
+    let s = LLMCostSummary {
+        run_id: "run-1".to_string(),
+        total_tokens_input: 1000,
+        total_tokens_output: 500,
+        total_cost_usd: 0.025,
+        llm_action_count: 3,
+        per_model: vec![ModelCostBreakdown {
+            model: "claude-opus-4-6".to_string(),
+            provider: Some("anthropic".to_string()),
+            tokens_input: 1000,
+            tokens_output: 500,
+            cost_usd: 0.025,
+            action_count: 3,
+        }],
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let back: LLMCostSummary = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn cost_trend_response_roundtrips() {
+    let r = CostTrendResponse {
+        project_id: "proj-a".to_string(),
+        start_date: "2026-04-01".to_string(),
+        end_date: "2026-04-14".to_string(),
+        granularity: "weekly".to_string(),
+        data_points: vec![CostTrendDataPoint {
+            date: "2026-04-01".to_string(),
+            tokens_input: 1000,
+            tokens_output: 500,
+            cost_usd: 0.02,
+            llm_action_count: 2,
+            runs_count: 1,
+        }],
+        overall_stats: HashMap::new(),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: CostTrendResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn historical_action_query_roundtrips() {
+    let q = HistoricalActionQuery {
+        action_type: Some(ExecActionType::Click),
+        action_name: Some("Click Submit".to_string()),
+        state_name: None,
+        success_only: true,
+        project_id: Some("p-1".to_string()),
+        workflow_id: Some("wf-login".to_string()),
+        limit: 25,
+    };
+    let json1 = serde_json::to_string(&q).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["action_type"], "click");
+    assert_eq!(v["success_only"], true);
+    let back: HistoricalActionQuery = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn historical_action_result_roundtrips() {
+    let mut inp = HashMap::new();
+    inp.insert("x".to_string(), json!(10));
+    let mut out = HashMap::new();
+    out.insert("clicked".to_string(), json!(true));
+    let r = HistoricalActionResult {
+        id: "a-1".to_string(),
+        action_type: ExecActionType::Click,
+        action_name: "Click".to_string(),
+        status: ActionStatus::Success,
+        from_state: Some("form".to_string()),
+        to_state: Some("submitted".to_string()),
+        input_data: inp,
+        output_data: out,
+        duration_ms: 120,
+        screenshot_url: Some("https://example.com/s.png".to_string()),
+        has_screenshot: true,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: HistoricalActionResult = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn playback_frame_request_roundtrips() {
+    let r = PlaybackFrameRequest {
+        action_ids: vec!["a-1".to_string(), "a-2".to_string(), "a-3".to_string()],
+        include_screenshots: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: PlaybackFrameRequest = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── rag ──────────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::rag::{
+    BatchComputeEmbeddingRequest, BatchComputeEmbeddingResponse, BatchEmbeddingResult,
+    ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest,
+    ComputeTextEmbeddingResponse, EmbeddingItem, EmbeddingListResponse, EmbeddingResultItem,
+    EmbeddingResultsRequest, EmbeddingResultsResponse, JobItem, JobListResponse, JobStatus,
+    JobSummary, RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent,
+    SearchResultItem, SemanticSearchRequest, SemanticSearchResponse, StateFilterItem,
+    StatesResponse,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn job_status_all_variants_snake_case() {
+    let cases = [
+        (JobStatus::Pending, "\"pending\""),
+        (JobStatus::InProgress, "\"in_progress\""),
+        (JobStatus::Completed, "\"completed\""),
+        (JobStatus::Failed, "\"failed\""),
+        (JobStatus::Cancelled, "\"cancelled\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: JobStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn rag_processing_status_all_variants_snake_case() {
+    let cases = [
+        (RagProcessingStatus::NotStarted, "\"not_started\""),
+        (RagProcessingStatus::InProgress, "\"in_progress\""),
+        (RagProcessingStatus::Completed, "\"completed\""),
+        (RagProcessingStatus::Failed, "\"failed\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: RagProcessingStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn sample_embedding_item() -> EmbeddingItem {
+    let mut meta = HashMap::new();
+    meta.insert("capture_reason".to_string(), json!("discovery"));
+    EmbeddingItem {
+        id: "emb-001".to_string(),
+        pattern_id: "pat-001".to_string(),
+        pattern_name: Some("Login button".to_string()),
+        state_id: "state-login".to_string(),
+        state_name: "Login page".to_string(),
+        image_id: "img-001".to_string(),
+        image_storage_path: "projects/proj-alpha/images/img-001.png".to_string(),
+        image_url: Some("https://storage.example.com/proj-alpha/img-001.png".to_string()),
+        embedding_model: "clip-vit-b-32".to_string(),
+        embedding_version: "2026-01-01".to_string(),
+        image_width: 80,
+        image_height: 32,
+        text_description: Some("Blue rounded button labeled Login".to_string()),
+        has_text_embedding: true,
+        pattern_metadata: meta,
+        created_at: "2026-04-14T00:00:00Z".to_string(),
+        updated_at: "2026-04-14T01:00:00Z".to_string(),
+    }
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn compute_text_embedding_request_default_model() {
+    // Default model applies when the field is omitted on input.
+    let json_no_model = r#"{"text":"login button"}"#;
+    let r: ComputeTextEmbeddingRequest = serde_json::from_str(json_no_model).expect("deserialize");
+    assert_eq!(r.model, "clip", "default_clip_model must apply");
+
+    let r2 = ComputeTextEmbeddingRequest {
+        text: "submit form".to_string(),
+        model: "minilm".to_string(),
+    };
+    let json1 = serde_json::to_string(&r2).expect("serialize");
+    let back: ComputeTextEmbeddingRequest = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn compute_text_embedding_response_roundtrips() {
+    let r = ComputeTextEmbeddingResponse {
+        success: true,
+        embedding: Some(vec![0.1, -0.2, 0.33, 0.04]),
+        embedding_dim: 384,
+        processing_time_ms: 12.7,
+        error: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ComputeTextEmbeddingResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn compute_embedding_request_roundtrips() {
+    let r = ComputeEmbeddingRequest {
+        image_data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB".to_string(),
+        compute_text_embedding: true,
+        text_description: Some("Blue button".to_string()),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ComputeEmbeddingRequest = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn compute_embedding_response_roundtrips() {
+    let r = ComputeEmbeddingResponse {
+        success: true,
+        image_embedding: Some(vec![0.12, 0.34]),
+        text_embedding: Some(vec![0.55, 0.66]),
+        text_description: Some("Blue button".to_string()),
+        ocr_text: Some("Submit".to_string()),
+        ocr_confidence: Some(0.94),
+        processing_time_ms: 42.0,
+        error: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ComputeEmbeddingResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn batch_compute_embedding_request_defaults_true() {
+    // compute_text_embeddings / extract_ocr default to true when absent.
+    let json_min =
+        r#"{"images":[{"id":"a","image_data":"AAAA"},{"id":"b","image_data":"BBBB"}]}"#;
+    let r: BatchComputeEmbeddingRequest = serde_json::from_str(json_min).expect("deserialize");
+    assert!(r.compute_text_embeddings);
+    assert!(r.extract_ocr);
+
+    let r2 = BatchComputeEmbeddingRequest {
+        images: vec![{
+            let mut img = HashMap::new();
+            img.insert("id".to_string(), json!("a"));
+            img.insert("image_data".to_string(), json!("AAAA"));
+            img
+        }],
+        compute_text_embeddings: false,
+        extract_ocr: false,
+    };
+    let json1 = serde_json::to_string(&r2).expect("serialize");
+    let back: BatchComputeEmbeddingRequest = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn batch_embedding_result_roundtrips() {
+    let r = BatchEmbeddingResult {
+        id: "img-a".to_string(),
+        success: true,
+        image_embedding: Some(vec![0.1, 0.2, 0.3]),
+        text_embedding: Some(vec![0.4, 0.5, 0.6]),
+        text_description: Some("Header logo".to_string()),
+        ocr_text: Some("Brand".to_string()),
+        ocr_confidence: Some(0.88),
+        error: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: BatchEmbeddingResult = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn batch_compute_embedding_response_roundtrips() {
+    let r = BatchComputeEmbeddingResponse {
+        success: true,
+        results: vec![BatchEmbeddingResult {
+            id: "img-a".to_string(),
+            success: true,
+            image_embedding: Some(vec![0.1, 0.2]),
+            text_embedding: None,
+            text_description: None,
+            ocr_text: None,
+            ocr_confidence: None,
+            error: None,
+        }],
+        total_processed: 1,
+        successful: 1,
+        failed: 0,
+        processing_time_ms: 81.5,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: BatchComputeEmbeddingResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn embedding_result_item_roundtrips() {
+    let r = EmbeddingResultItem {
+        state_image_id: "si-001".to_string(),
+        success: true,
+        image_embedding: Some(vec![0.1; 4]),
+        text_embedding: Some(vec![0.2; 4]),
+        text_description: Some("Logo".to_string()),
+        ocr_text: None,
+        ocr_confidence: None,
+        error: None,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: EmbeddingResultItem = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn embedding_results_request_roundtrips() {
+    let r = EmbeddingResultsRequest {
+        project_id: "proj-alpha".to_string(),
+        results: vec![EmbeddingResultItem {
+            state_image_id: "si-001".to_string(),
+            success: true,
+            image_embedding: None,
+            text_embedding: None,
+            text_description: None,
+            ocr_text: None,
+            ocr_confidence: None,
+            error: Some("model not loaded".to_string()),
+        }],
+        total_processed: 1,
+        successful: 0,
+        failed: 1,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: EmbeddingResultsRequest = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn embedding_results_response_roundtrips() {
+    let r = EmbeddingResultsResponse {
+        success: true,
+        message: "Applied 3 embeddings".to_string(),
+        applied: 3,
+        failed: 0,
+        not_found: 1,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: EmbeddingResultsResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn rag_progress_event_roundtrips() {
+    let e = RagProgressEvent {
+        project_id: "proj-alpha".to_string(),
+        status: RagProcessingStatus::InProgress,
+        message: "Processing images 42 / 100".to_string(),
+        percent: Some(42.0),
+        elements_processed: Some(42),
+        total_elements: Some(100),
+        error: None,
+    };
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["status"], "in_progress");
+    assert_eq!(v["percent"], 42.0);
+    let back: RagProgressEvent = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn rag_completion_event_roundtrips() {
+    let e = RagCompletionEvent {
+        project_id: "proj-alpha".to_string(),
+        success: true,
+        results: vec![EmbeddingResultItem {
+            state_image_id: "si-001".to_string(),
+            success: true,
+            image_embedding: None,
+            text_embedding: None,
+            text_description: None,
+            ocr_text: None,
+            ocr_confidence: None,
+            error: None,
+        }],
+        total_processed: 1,
+        successful: 1,
+        failed: 0,
+        web_sync_success: Some(true),
+        web_sync_error: None,
+    };
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let back: RagCompletionEvent = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn job_summary_roundtrips() {
+    let j = JobSummary {
+        id: "job-001".to_string(),
+        status: JobStatus::InProgress,
+        progress_percent: 66.7,
+        total_patterns: 150,
+        processed_patterns: 100,
+        started_at: Some("2026-04-14T00:00:00Z".to_string()),
+        error_message: None,
+    };
+    let json1 = serde_json::to_string(&j).expect("serialize");
+    let back: JobSummary = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn rag_dashboard_stats_with_active_job_roundtrips() {
+    let s = RAGDashboardStats {
+        total_embeddings: 12_500,
+        total_states: 140,
+        total_patterns: 500,
+        last_sync_at: Some("2026-04-14T02:30:00Z".to_string()),
+        active_job: Some(JobSummary {
+            id: "job-001".to_string(),
+            status: JobStatus::InProgress,
+            progress_percent: 25.0,
+            total_patterns: 200,
+            processed_patterns: 50,
+            started_at: Some("2026-04-14T03:00:00Z".to_string()),
+            error_message: None,
+        }),
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let back: RAGDashboardStats = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn embedding_item_roundtrips() {
+    let e = sample_embedding_item();
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let back: EmbeddingItem = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn embedding_list_response_roundtrips() {
+    let r = EmbeddingListResponse {
+        items: vec![sample_embedding_item()],
+        total: 1,
+        page: 1,
+        limit: 50,
+        has_more: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: EmbeddingListResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn job_item_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("trigger".to_string(), json!("manual"));
+    let j = JobItem {
+        id: "job-001".to_string(),
+        status: JobStatus::Completed,
+        total_patterns: 200,
+        processed_patterns: 200,
+        progress_percent: 100.0,
+        error_message: None,
+        retry_count: 0,
+        max_retries: 3,
+        job_metadata: meta,
+        created_at: "2026-04-14T00:00:00Z".to_string(),
+        started_at: Some("2026-04-14T00:00:05Z".to_string()),
+        completed_at: Some("2026-04-14T00:12:30Z".to_string()),
+    };
+    let json1 = serde_json::to_string(&j).expect("serialize");
+    let back: JobItem = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn job_list_response_roundtrips() {
+    let mut meta = HashMap::new();
+    meta.insert("trigger".to_string(), json!("schedule"));
+    let r = JobListResponse {
+        items: vec![JobItem {
+            id: "job-002".to_string(),
+            status: JobStatus::Failed,
+            total_patterns: 200,
+            processed_patterns: 50,
+            progress_percent: 25.0,
+            error_message: Some("clip model unavailable".to_string()),
+            retry_count: 2,
+            max_retries: 3,
+            job_metadata: meta,
+            created_at: "2026-04-14T00:00:00Z".to_string(),
+            started_at: None,
+            completed_at: None,
+        }],
+        total: 1,
+        page: 1,
+        limit: 50,
+        has_more: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: JobListResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn semantic_search_request_defaults() {
+    let json_min = r#"{"query":"login button"}"#;
+    let r: SemanticSearchRequest = serde_json::from_str(json_min).expect("deserialize");
+    assert_eq!(r.limit, 20, "default_search_limit must apply");
+    assert!(
+        (r.min_similarity - 0.2).abs() < 1e-9,
+        "default_min_similarity must apply"
+    );
+
+    let r2 = SemanticSearchRequest {
+        query: "blue button".to_string(),
+        limit: 50,
+        min_similarity: 0.35,
+        state_filter: Some("state-login".to_string()),
+    };
+    let json1 = serde_json::to_string(&r2).expect("serialize");
+    let back: SemanticSearchRequest = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn search_result_item_roundtrips() {
+    let r = SearchResultItem {
+        embedding: sample_embedding_item(),
+        similarity_score: 0.87,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: SearchResultItem = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn semantic_search_response_roundtrips() {
+    let r = SemanticSearchResponse {
+        results: vec![SearchResultItem {
+            embedding: sample_embedding_item(),
+            similarity_score: 0.91,
+        }],
+        query: "blue button".to_string(),
+        total_found: 1,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: SemanticSearchResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn state_filter_item_and_states_response_roundtrip() {
+    let r = StatesResponse {
+        states: vec![
+            StateFilterItem {
+                state_id: "state-login".to_string(),
+                state_name: "Login page".to_string(),
+                count: 42,
+            },
+            StateFilterItem {
+                state_id: "state-home".to_string(),
+                state_name: "Home page".to_string(),
+                count: 18,
+            },
+        ],
+        count: 2,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: StatesResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ============================================================================
+// ── tree_events ──────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::tree_events::{
+    ActionType as TreeActionType, DisplayNode, ExecutionTreeResponse,
+    MatchLocation as TreeMatchLocation, NodeMetadata, NodeStatus, NodeType, Outcome, PathElement,
+    RuntimeData, StateContext, TimingInfo, TopMatch, TreeEvent, TreeEventCreate,
+    TreeEventListResponse, TreeEventResponse, TreeEventType, TreeNode,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn node_type_lowercase() {
+    let cases = [
+        (NodeType::Workflow, "\"workflow\""),
+        (NodeType::Action, "\"action\""),
+        (NodeType::Transition, "\"transition\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected);
+        let back: NodeType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn node_status_lowercase() {
+    let cases = [
+        (NodeStatus::Pending, "\"pending\""),
+        (NodeStatus::Running, "\"running\""),
+        (NodeStatus::Success, "\"success\""),
+        (NodeStatus::Failed, "\"failed\""),
+    ];
+    for (s, expected) in cases {
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert_eq!(json, expected);
+        let back: NodeStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, s);
+    }
+}
+
+#[test]
+fn tree_event_type_all_variants_snake_case() {
+    let cases = [
+        (TreeEventType::WorkflowStarted, "\"workflow_started\""),
+        (TreeEventType::WorkflowCompleted, "\"workflow_completed\""),
+        (TreeEventType::WorkflowFailed, "\"workflow_failed\""),
+        (TreeEventType::ActionStarted, "\"action_started\""),
+        (TreeEventType::ActionCompleted, "\"action_completed\""),
+        (TreeEventType::ActionFailed, "\"action_failed\""),
+        (TreeEventType::TransitionStarted, "\"transition_started\""),
+        (
+            TreeEventType::TransitionCompleted,
+            "\"transition_completed\"",
+        ),
+        (TreeEventType::TransitionFailed, "\"transition_failed\""),
+    ];
+    for (t, expected) in cases {
+        let json = serde_json::to_string(&t).expect("serialize");
+        assert_eq!(json, expected);
+        let back: TreeEventType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, t);
+    }
+}
+
+#[test]
+fn tree_events_action_type_representative_variants() {
+    // SCREAMING_SNAKE_CASE wire form preserved via explicit per-variant renames.
+    let cases = [
+        (TreeActionType::Find, "\"FIND\""),
+        (TreeActionType::FindStateImage, "\"FIND_STATE_IMAGE\""),
+        (TreeActionType::DoubleClick, "\"DOUBLE_CLICK\""),
+        (TreeActionType::MouseMove, "\"MOUSE_MOVE\""),
+        (TreeActionType::KeyPress, "\"KEY_PRESS\""),
+        (TreeActionType::TryCatch, "\"TRY_CATCH\""),
+        (TreeActionType::GoToState, "\"GO_TO_STATE\""),
+        (TreeActionType::RunWorkflow, "\"RUN_WORKFLOW\""),
+        (TreeActionType::CodeBlock, "\"CODE_BLOCK\""),
+        (TreeActionType::Custom, "\"CUSTOM\""),
+    ];
+    for (a, expected) in cases {
+        let json = serde_json::to_string(&a).expect("serialize");
+        assert_eq!(json, expected, "tree_events::ActionType wire form");
+        let back: TreeActionType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, a);
+    }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn sample_tree_match_location() -> TreeMatchLocation {
+    TreeMatchLocation {
+        x: 120,
+        y: 240,
+        w: Some(64),
+        h: Some(32),
+    }
+}
+
+fn sample_top_match() -> TopMatch {
+    TopMatch {
+        confidence: 0.93,
+        location: sample_tree_match_location(),
+        dimensions: Some(TreeMatchLocation {
+            x: 0,
+            y: 0,
+            w: Some(64),
+            h: Some(32),
+        }),
+    }
+}
+
+fn sample_runtime_data() -> RuntimeData {
+    RuntimeData {
+        image_id: Some("img-001".to_string()),
+        found: Some(true),
+        confidence: Some(0.93),
+        location: Some(sample_tree_match_location()),
+        dimensions: Some(TreeMatchLocation {
+            x: 0,
+            y: 0,
+            w: Some(64),
+            h: Some(32),
+        }),
+        match_method: Some("CORRELATION".to_string()),
+        top_matches: Some(vec![sample_top_match()]),
+        clicked_at: Some(sample_tree_match_location()),
+        button: Some("left".to_string()),
+        target_type: Some("image".to_string()),
+        ..Default::default()
+    }
+}
+
+fn sample_node_metadata() -> NodeMetadata {
+    let mut cfg = HashMap::new();
+    cfg.insert("imageIds".to_string(), json!(["img-001"]));
+    cfg.insert("similarity".to_string(), json!(0.85));
+    NodeMetadata {
+        config: Some(cfg),
+        is_expandable: false,
+        is_inline: false,
+        runtime: Some(sample_runtime_data()),
+        state_context: Some(StateContext {
+            active_before: vec!["home".to_string()],
+            active_after: vec!["login".to_string()],
+            changed: true,
+            activated: vec!["login".to_string()],
+            deactivated: vec!["home".to_string()],
+        }),
+        timing: Some(TimingInfo {
+            start_time: "2026-04-14T03:00:00.000Z".to_string(),
+            end_time: Some("2026-04-14T03:00:00.120Z".to_string()),
+            duration_ms: Some(120.0),
+        }),
+        outcome: Some(Outcome {
+            success: true,
+            error: None,
+            retry_count: 0,
+        }),
+        screenshot_reference: Some("screenshots/s-1.png".to_string()),
+        visual_debug_reference: None,
+    }
+}
+
+fn sample_tree_node() -> TreeNode {
+    TreeNode {
+        id: "n-1".to_string(),
+        node_type: NodeType::Action,
+        name: "Click Login".to_string(),
+        timestamp: 1_713_067_200.0,
+        end_timestamp: Some(1_713_067_200.12),
+        duration: Some(0.12),
+        parent_id: Some("n-0".to_string()),
+        status: NodeStatus::Success,
+        metadata: sample_node_metadata(),
+        error: None,
+    }
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn tree_match_location_point_form_skips_w_h() {
+    // Point-form (no width/height) must skip optional fields on the wire.
+    let m = TreeMatchLocation {
+        x: 5,
+        y: 10,
+        w: None,
+        h: None,
+    };
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert!(v.get("w").is_none());
+    assert!(v.get("h").is_none());
+    let back: TreeMatchLocation = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn top_match_roundtrips() {
+    let m = sample_top_match();
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: TopMatch = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn runtime_data_type_action_roundtrips() {
+    // RuntimeData is a union-of-optionals; the TYPE-action shape exercises a
+    // different subset of fields from FIND.
+    let r = RuntimeData {
+        typed_text: Some("hello world".to_string()),
+        character_count: Some(11),
+        ..Default::default()
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["typed_text"], "hello world");
+    assert_eq!(v["character_count"], 11);
+    assert!(
+        v.get("found").is_none(),
+        "unset optional fields must be skipped"
+    );
+    let back: RuntimeData = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn runtime_data_go_to_state_roundtrips() {
+    let r = RuntimeData {
+        source_states: Some(vec!["home".to_string()]),
+        target_states: Some(vec!["login".to_string()]),
+        targets_reached: Some(vec!["login".to_string()]),
+        transitions_executed: Some(vec!["home->login".to_string()]),
+        already_at_target: Some(false),
+        ..Default::default()
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: RuntimeData = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn state_context_roundtrips() {
+    let s = StateContext {
+        active_before: vec!["home".to_string(), "header".to_string()],
+        active_after: vec!["login".to_string(), "header".to_string()],
+        changed: true,
+        activated: vec!["login".to_string()],
+        deactivated: vec!["home".to_string()],
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let back: StateContext = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn timing_info_in_flight_omits_end_and_duration() {
+    let t = TimingInfo {
+        start_time: "2026-04-14T03:00:00.000Z".to_string(),
+        end_time: None,
+        duration_ms: None,
+    };
+    let json1 = serde_json::to_string(&t).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert!(v.get("end_time").is_none());
+    assert!(v.get("duration_ms").is_none());
+    let back: TimingInfo = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn outcome_failed_roundtrips() {
+    let o = Outcome {
+        success: false,
+        error: Some("element not found".to_string()),
+        retry_count: 3,
+    };
+    let json1 = serde_json::to_string(&o).expect("serialize");
+    let back: Outcome = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn node_metadata_roundtrips() {
+    let m = sample_node_metadata();
+    let json1 = serde_json::to_string(&m).expect("serialize");
+    let back: NodeMetadata = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn tree_node_roundtrips() {
+    let n = sample_tree_node();
+    let json1 = serde_json::to_string(&n).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["node_type"], "action");
+    assert_eq!(v["status"], "success");
+    let back: TreeNode = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn path_element_roundtrips() {
+    let p = PathElement {
+        id: "n-0".to_string(),
+        name: "Root workflow".to_string(),
+        node_type: NodeType::Workflow,
+    };
+    let json1 = serde_json::to_string(&p).expect("serialize");
+    let back: PathElement = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn tree_event_default_type_field() {
+    // When deserializing an event payload missing `type`, the default
+    // `"tree_event"` must fill in.
+    let json_no_type = r#"{
+        "event_type":"action_started",
+        "node":{"id":"n-1","node_type":"action","name":"Click","timestamp":1.0,"status":"running"},
+        "timestamp":1.0
+    }"#;
+    let e: TreeEvent = serde_json::from_str(json_no_type).expect("deserialize");
+    assert_eq!(e.r#type, "tree_event");
+
+    let e2 = TreeEvent {
+        r#type: "tree_event".to_string(),
+        event_type: TreeEventType::ActionCompleted,
+        node: sample_tree_node(),
+        path: vec![PathElement {
+            id: "n-0".to_string(),
+            name: "Root".to_string(),
+            node_type: NodeType::Workflow,
+        }],
+        timestamp: 1_713_067_200.0,
+        sequence: 17,
+    };
+    let json1 = serde_json::to_string(&e2).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["type"], "tree_event");
+    assert_eq!(v["event_type"], "action_completed");
+    let back: TreeEvent = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn display_node_is_expanded_default_true() {
+    let json_no_exp = r#"{
+        "id":"n-1",
+        "node_type":"action",
+        "name":"Click",
+        "timestamp":1.0,
+        "status":"success"
+    }"#;
+    let d: DisplayNode = serde_json::from_str(json_no_exp).expect("deserialize");
+    assert!(d.is_expanded, "is_expanded default must be true");
+    assert_eq!(d.level, 0);
+
+    let d2 = DisplayNode {
+        id: "n-1".to_string(),
+        node_type: NodeType::Action,
+        name: "Click".to_string(),
+        timestamp: 1_713_067_200.0,
+        end_timestamp: Some(1_713_067_200.12),
+        duration: Some(0.12),
+        status: NodeStatus::Success,
+        metadata: NodeMetadata::default(),
+        error: None,
+        children: vec![DisplayNode {
+            id: "n-2".to_string(),
+            node_type: NodeType::Action,
+            name: "Child".to_string(),
+            timestamp: 1_713_067_200.05,
+            end_timestamp: None,
+            duration: None,
+            status: NodeStatus::Running,
+            metadata: NodeMetadata::default(),
+            error: None,
+            children: vec![],
+            is_expanded: false,
+            level: 1,
+        }],
+        is_expanded: true,
+        level: 0,
+    };
+    let json1 = serde_json::to_string(&d2).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["children"][0]["is_expanded"], false);
+    assert_eq!(v["children"][0]["level"], 1);
+    let back: DisplayNode = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn tree_event_create_roundtrips() {
+    let c = TreeEventCreate {
+        event_type: TreeEventType::ActionStarted,
+        node: sample_tree_node(),
+        path: vec![PathElement {
+            id: "n-0".to_string(),
+            name: "Root".to_string(),
+            node_type: NodeType::Workflow,
+        }],
+        timestamp: 1_713_067_200.0,
+        sequence: 42,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let back: TreeEventCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn tree_event_response_roundtrips() {
+    let r = TreeEventResponse {
+        id: "te-001".to_string(),
+        run_id: "run-789".to_string(),
+        event_type: TreeEventType::ActionCompleted,
+        node_id: "n-1".to_string(),
+        node_type: NodeType::Action,
+        node_name: "Click Login".to_string(),
+        parent_node_id: Some("n-0".to_string()),
+        path: vec![PathElement {
+            id: "n-0".to_string(),
+            name: "Root".to_string(),
+            node_type: NodeType::Workflow,
+        }],
+        sequence: 1,
+        event_timestamp: 1_713_067_200.12,
+        status: NodeStatus::Success,
+        error_message: None,
+        metadata: Some(sample_node_metadata()),
+        created_at: "2026-04-14T03:00:00.200Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: TreeEventResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn tree_event_list_response_roundtrips() {
+    let r = TreeEventListResponse {
+        events: vec![],
+        total: 0,
+        limit: 50,
+        offset: 0,
+        has_more: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: TreeEventListResponse = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn execution_tree_response_roundtrips() {
+    let mut name_map = HashMap::new();
+    name_map.insert("state-login".to_string(), "Login page".to_string());
+    name_map.insert("state-home".to_string(), "Home page".to_string());
+    let r = ExecutionTreeResponse {
+        run_id: "run-789".to_string(),
+        root_nodes: vec![DisplayNode {
+            id: "n-0".to_string(),
+            node_type: NodeType::Workflow,
+            name: "Root workflow".to_string(),
+            timestamp: 1_713_067_200.0,
+            end_timestamp: Some(1_713_067_215.0),
+            duration: Some(15.0),
+            status: NodeStatus::Success,
+            metadata: NodeMetadata::default(),
+            error: None,
+            children: vec![],
+            is_expanded: true,
+            level: 0,
+        }],
+        total_events: 42,
+        workflow_name: Some("Login smoke test".to_string()),
+        status: NodeStatus::Success,
+        duration_ms: Some(15_000.0),
+        initial_state_ids: vec!["state-home".to_string()],
+        state_name_map: name_map,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ExecutionTreeResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+// ============================================================================
+// ── findings ─────────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::findings::{
+    FindingActionType, FindingBatchCreate, FindingCategory, FindingCodeContext, FindingCreate,
+    FindingDetail, FindingListResponse, FindingSeverity, FindingStatus, FindingSummary,
+    FindingUpdate, FindingUserInput,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn finding_category_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (FindingCategory::CodeBug, "code_bug"),
+        (FindingCategory::Security, "security"),
+        (FindingCategory::Performance, "performance"),
+        (FindingCategory::Todo, "todo"),
+        (FindingCategory::Enhancement, "enhancement"),
+        (FindingCategory::ConfigIssue, "config_issue"),
+        (FindingCategory::TestIssue, "test_issue"),
+        (FindingCategory::Documentation, "documentation"),
+        (FindingCategory::RuntimeIssue, "runtime_issue"),
+        (FindingCategory::AlreadyFixed, "already_fixed"),
+        (FindingCategory::ExpectedBehavior, "expected_behavior"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: FindingCategory = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn finding_severity_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (FindingSeverity::Critical, "critical"),
+        (FindingSeverity::High, "high"),
+        (FindingSeverity::Medium, "medium"),
+        (FindingSeverity::Low, "low"),
+        (FindingSeverity::Info, "info"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: FindingSeverity = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn finding_status_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (FindingStatus::Detected, "detected"),
+        (FindingStatus::InProgress, "in_progress"),
+        (FindingStatus::NeedsInput, "needs_input"),
+        (FindingStatus::Resolved, "resolved"),
+        (FindingStatus::WontFix, "wont_fix"),
+        (FindingStatus::Deferred, "deferred"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: FindingStatus = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+#[test]
+fn finding_action_type_all_variants_roundtrip() {
+    for (variant, expected) in [
+        (FindingActionType::AutoFix, "auto_fix"),
+        (FindingActionType::NeedsUserInput, "needs_user_input"),
+        (FindingActionType::Informational, "informational"),
+    ] {
+        let json = serde_json::to_string(&variant).expect("serialize");
+        assert_eq!(json, format!("\"{}\"", expected));
+        let back: FindingActionType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, variant);
+    }
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn finding_code_context_fully_populated_roundtrips() {
+    let c = FindingCodeContext {
+        file: Some("src/lib.rs".to_string()),
+        line: Some(42),
+        column: Some(8),
+        snippet: Some("let x = y + z;".to_string()),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["file"], "src/lib.rs");
+    assert_eq!(v["line"], 42);
+    assert_eq!(v["column"], 8);
+    assert_eq!(v["snippet"], "let x = y + z;");
+    let back: FindingCodeContext = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_code_context_empty_skips_all_fields() {
+    let c = FindingCodeContext::default();
+    let json = serde_json::to_string(&c).expect("serialize");
+    // All four fields are Optional with skip_serializing_if = "Option::is_none".
+    assert_eq!(json, "{}");
+}
+
+#[test]
+fn finding_user_input_fully_populated_roundtrips() {
+    let u = FindingUserInput {
+        question: "Which approach should we take?".to_string(),
+        input_type: "choice".to_string(),
+        options: Some(vec!["A".to_string(), "B".to_string()]),
+    };
+    let json1 = serde_json::to_string(&u).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["question"], "Which approach should we take?");
+    assert_eq!(v["input_type"], "choice");
+    assert_eq!(v["options"][0], "A");
+    let back: FindingUserInput = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_user_input_default_input_type_applied() {
+    // input_type has a Python-side default of "text". Omitting the field must
+    // deserialize to that default via serde(default = ...).
+    let json = r#"{"question":"Free-form question?"}"#;
+    let u: FindingUserInput = serde_json::from_str(json).expect("deserialize");
+    assert_eq!(u.input_type, "text");
+    assert_eq!(u.question, "Free-form question?");
+    assert!(u.options.is_none());
+}
+
+#[test]
+fn finding_create_fully_populated_roundtrips() {
+    let c = FindingCreate {
+        task_run_id: "run-abc".to_string(),
+        session_num: 3,
+        category: FindingCategory::CodeBug,
+        severity: FindingSeverity::High,
+        title: "Null pointer in parser".to_string(),
+        description: "Dereferences `ptr` without checking for null.".to_string(),
+        code_context: Some(FindingCodeContext {
+            file: Some("src/parser.rs".to_string()),
+            line: Some(120),
+            column: Some(17),
+            snippet: Some("let v = *ptr;".to_string()),
+        }),
+        signature_hash: Some("abc123".to_string()),
+        action_type: FindingActionType::AutoFix,
+        user_input: None,
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["task_run_id"], "run-abc");
+    assert_eq!(v["category"], "code_bug");
+    assert_eq!(v["severity"], "high");
+    assert_eq!(v["action_type"], "auto_fix");
+    assert_eq!(v["code_context"]["line"], 120);
+    assert!(
+        v.get("user_input").is_none(),
+        "None Option must be skipped on the wire"
+    );
+    let back: FindingCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_create_with_user_input_roundtrips() {
+    let c = FindingCreate {
+        task_run_id: "run-xyz".to_string(),
+        session_num: 1,
+        category: FindingCategory::ConfigIssue,
+        severity: FindingSeverity::Medium,
+        title: "Ambiguous config value".to_string(),
+        description: "Two plausible settings — user must pick.".to_string(),
+        code_context: None,
+        signature_hash: None,
+        action_type: FindingActionType::NeedsUserInput,
+        user_input: Some(FindingUserInput {
+            question: "Strict or lenient?".to_string(),
+            input_type: "choice".to_string(),
+            options: Some(vec!["strict".to_string(), "lenient".to_string()]),
+        }),
+    };
+    let json1 = serde_json::to_string(&c).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["user_input"]["question"], "Strict or lenient?");
+    assert_eq!(v["user_input"]["options"][1], "lenient");
+    let back: FindingCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_batch_create_roundtrips() {
+    let b = FindingBatchCreate {
+        findings: vec![
+            FindingCreate {
+                task_run_id: "run-1".to_string(),
+                session_num: 1,
+                category: FindingCategory::Todo,
+                severity: FindingSeverity::Low,
+                title: "TODO: factor out".to_string(),
+                description: "Inline helper should move to utils.".to_string(),
+                code_context: None,
+                signature_hash: None,
+                action_type: FindingActionType::Informational,
+                user_input: None,
+            },
+            FindingCreate {
+                task_run_id: "run-1".to_string(),
+                session_num: 1,
+                category: FindingCategory::Security,
+                severity: FindingSeverity::Critical,
+                title: "Secret in repo".to_string(),
+                description: "API key committed.".to_string(),
+                code_context: None,
+                signature_hash: Some("sec-dedupe".to_string()),
+                action_type: FindingActionType::AutoFix,
+                user_input: None,
+            },
+        ],
+    };
+    let json1 = serde_json::to_string(&b).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["findings"].as_array().unwrap().len(), 2);
+    assert_eq!(v["findings"][0]["category"], "todo");
+    assert_eq!(v["findings"][1]["severity"], "critical");
+    let back: FindingBatchCreate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_update_fully_populated_roundtrips() {
+    let u = FindingUpdate {
+        status: Some(FindingStatus::Resolved),
+        resolution: Some("Fixed in commit abc123.".to_string()),
+        resolved_in_session: Some(5),
+        user_response: Some("Looks good.".to_string()),
+    };
+    let json1 = serde_json::to_string(&u).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["status"], "resolved");
+    assert_eq!(v["resolved_in_session"], 5);
+    let back: FindingUpdate = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_update_all_none_serializes_empty() {
+    let u = FindingUpdate::default();
+    let json = serde_json::to_string(&u).expect("serialize");
+    assert_eq!(json, "{}");
+    let back: FindingUpdate = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, u);
+}
+
+#[test]
+fn finding_detail_fully_populated_roundtrips() {
+    let d = FindingDetail {
+        id: "11111111-2222-3333-4444-555555555555".to_string(),
+        task_run_id: "run-abc".to_string(),
+        session_num: 2,
+        category: FindingCategory::Performance,
+        severity: FindingSeverity::Medium,
+        status: FindingStatus::InProgress,
+        title: "Quadratic loop".to_string(),
+        description: "Inner loop scans the whole list.".to_string(),
+        resolution: Some("Switched to HashSet.".to_string()),
+        code_context: Some(FindingCodeContext {
+            file: Some("src/scan.rs".to_string()),
+            line: Some(88),
+            column: None,
+            snippet: None,
+        }),
+        signature_hash: Some("sig-abc".to_string()),
+        action_type: FindingActionType::AutoFix,
+        user_input: None,
+        user_response: None,
+        detected_at: "2026-04-14T12:00:00Z".to_string(),
+        resolved_at: Some("2026-04-14T13:00:00Z".to_string()),
+        resolved_in_session: Some(3),
+    };
+    let json1 = serde_json::to_string(&d).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["id"], "11111111-2222-3333-4444-555555555555");
+    assert_eq!(v["status"], "in_progress");
+    assert_eq!(v["detected_at"], "2026-04-14T12:00:00Z");
+    assert_eq!(v["resolved_at"], "2026-04-14T13:00:00Z");
+    assert_eq!(v["code_context"]["line"], 88);
+    let back: FindingDetail = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_list_response_empty_roundtrips() {
+    let r = FindingListResponse {
+        findings: vec![],
+        total: 0,
+        limit: 50,
+        offset: 0,
+        has_more: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["total"], 0);
+    assert_eq!(v["limit"], 50);
+    assert_eq!(v["has_more"], false);
+    let back: FindingListResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_list_response_populated_roundtrips() {
+    let detail = FindingDetail {
+        id: "id-1".to_string(),
+        task_run_id: "run-1".to_string(),
+        session_num: 1,
+        category: FindingCategory::Enhancement,
+        severity: FindingSeverity::Info,
+        status: FindingStatus::Detected,
+        title: "T".to_string(),
+        description: "D".to_string(),
+        resolution: None,
+        code_context: None,
+        signature_hash: None,
+        action_type: FindingActionType::Informational,
+        user_input: None,
+        user_response: None,
+        detected_at: "2026-04-14T12:00:00Z".to_string(),
+        resolved_at: None,
+        resolved_in_session: None,
+    };
+    let r = FindingListResponse {
+        findings: vec![detail],
+        total: 1,
+        limit: 25,
+        offset: 0,
+        has_more: false,
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: FindingListResponse = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_summary_fully_populated_roundtrips() {
+    let mut by_cat = HashMap::new();
+    by_cat.insert("security".to_string(), 2);
+    by_cat.insert("performance".to_string(), 1);
+    let mut by_sev = HashMap::new();
+    by_sev.insert("critical".to_string(), 1);
+    by_sev.insert("medium".to_string(), 2);
+    let mut by_status = HashMap::new();
+    by_status.insert("detected".to_string(), 1);
+    by_status.insert("resolved".to_string(), 2);
+
+    let s = FindingSummary {
+        task_run_id: "run-xyz".to_string(),
+        total: 3,
+        by_category: by_cat,
+        by_severity: by_sev,
+        by_status,
+        needs_input_count: 0,
+        resolved_count: 2,
+        outstanding_count: 1,
+    };
+    let json1 = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json1).expect("parse");
+    assert_eq!(v["task_run_id"], "run-xyz");
+    assert_eq!(v["total"], 3);
+    assert_eq!(v["by_category"]["security"], 2);
+    assert_eq!(v["by_severity"]["critical"], 1);
+    assert_eq!(v["by_status"]["resolved"], 2);
+    assert_eq!(v["resolved_count"], 2);
+    let back: FindingSummary = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn finding_summary_empty_maps_skipped() {
+    let s = FindingSummary {
+        task_run_id: "run-empty".to_string(),
+        ..Default::default()
+    };
+    let json = serde_json::to_string(&s).expect("serialize");
+    let v: Value = serde_json::from_str(&json).expect("parse");
+    // Empty HashMaps are skipped via skip_serializing_if = "HashMap::is_empty".
+    assert!(v.get("by_category").is_none());
+    assert!(v.get("by_severity").is_none());
+    assert!(v.get("by_status").is_none());
+    assert_eq!(v["total"], 0);
+    assert_eq!(v["needs_input_count"], 0);
+    assert_eq!(v["resolved_count"], 0);
+    assert_eq!(v["outstanding_count"], 0);
+}
+
+// ============================================================================
+// process_management ───────────────────────────────────────────────────────
+// ============================================================================
+
+#[test]
+fn parser_type_roundtrips_snake_case() {
+    // Generic is the default so an empty wire form round-trips to Generic.
+    let cases = [
+        (ParserType::Python, "\"python\""),
+        (ParserType::JavaScript, "\"javascript\""),
+        (ParserType::Rust, "\"rust\""),
+        (ParserType::Generic, "\"generic\""),
+    ];
+    for (pt, expected) in cases {
+        let json = serde_json::to_string(&pt).unwrap();
+        assert_eq!(json, expected, "ParserType snake_case mismatch");
+        let back: ParserType = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, pt);
+    }
+}
+
+#[test]
+fn parser_type_javascript_legacy_alias_deserializes() {
+    // Older settings files may contain `"java_script"` from the original
+    // rename_all = "snake_case" — the alias keeps them parseable.
+    let back: ParserType = serde_json::from_str("\"java_script\"").unwrap();
+    assert_eq!(back, ParserType::JavaScript);
+    // Canonical form stays `"javascript"`.
+    let json = serde_json::to_string(&back).unwrap();
+    assert_eq!(json, "\"javascript\"");
+}
+
+#[test]
+fn process_state_snake_case() {
+    let cases = [
+        (ProcessState::Stopped, "\"stopped\""),
+        (ProcessState::Starting, "\"starting\""),
+        (ProcessState::Building, "\"building\""),
+        (ProcessState::Running, "\"running\""),
+        (ProcessState::Healthy, "\"healthy\""),
+        (ProcessState::Stopping, "\"stopping\""),
+        (ProcessState::Failed, "\"failed\""),
+    ];
+    for (state, expected) in cases {
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, expected, "ProcessState snake_case mismatch");
+        let back: ProcessState = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, state);
+    }
+}
+
+#[test]
+fn output_stream_snake_case() {
+    let cases = [
+        (OutputStream::Stdout, "\"stdout\""),
+        (OutputStream::Stderr, "\"stderr\""),
+    ];
+    for (stream, expected) in cases {
+        let json = serde_json::to_string(&stream).unwrap();
+        assert_eq!(json, expected, "OutputStream snake_case mismatch");
+        let back: OutputStream = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, stream);
+    }
+}
+
+#[test]
+fn output_line_roundtrips() {
+    let line = OutputLine {
+        timestamp: "2026-04-16T12:34:56Z".to_string(),
+        stream: OutputStream::Stdout,
+        line: "hello world".to_string(),
+    };
+    let json1 = serde_json::to_string(&line).unwrap();
+    let back: OutputLine = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+}
+
+#[test]
+fn process_config_fully_populated_roundtrips() {
+    let mut env = HashMap::new();
+    env.insert("RUST_LOG".to_string(), "info".to_string());
+    let cfg = ProcessConfig {
+        id: "proc-1".to_string(),
+        name: "FastAPI Backend".to_string(),
+        command: "poetry".to_string(),
+        args: vec!["run".to_string(), "uvicorn".to_string(), "main:app".to_string()],
+        cwd: "/repo/backend".to_string(),
+        env,
+        health_port: Some(8000),
+        parser: ParserType::Python,
+        auto_start: true,
+        category: "backend".to_string(),
+        buffer_size: 2000,
+        enabled: true,
+        ignore_patterns: vec!["DEBUG: .*".to_string()],
+        start_group: 1,
+        dev_only: false,
+        rebuild_enabled: true,
+        build_command: Some("poetry".to_string()),
+        build_args: vec!["install".to_string()],
+    };
+    let json1 = serde_json::to_string(&cfg).unwrap();
+    let back: ProcessConfig = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn process_config_minimal_applies_serde_defaults() {
+    // Minimal wire form: only the non-defaulted fields. The rest must
+    // hydrate from the #[serde(default = "...")] helpers so older configs
+    // keep working.
+    let json = r#"{
+        "id": "proc-min",
+        "name": "Minimal",
+        "command": "echo",
+        "cwd": "/tmp"
+    }"#;
+    let cfg: ProcessConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(cfg.id, "proc-min");
+    assert!(cfg.args.is_empty());
+    assert!(cfg.env.is_empty());
+    assert_eq!(cfg.health_port, None);
+    assert_eq!(cfg.parser, ParserType::Generic);
+    assert!(!cfg.auto_start);
+    assert_eq!(cfg.category, "general");
+    assert_eq!(cfg.buffer_size, 2000);
+    assert!(cfg.enabled);
+    assert!(cfg.ignore_patterns.is_empty());
+    assert_eq!(cfg.start_group, 0);
+    assert!(!cfg.dev_only);
+    assert!(cfg.rebuild_enabled);
+    assert_eq!(cfg.build_command, None);
+    assert!(cfg.build_args.is_empty());
+}
+
+#[test]
+fn process_status_roundtrips() {
+    let status = ProcessStatus {
+        id: "proc-1".to_string(),
+        name: "FastAPI Backend".to_string(),
+        state: ProcessState::Healthy,
+        pid: Some(12345),
+        uptime_secs: Some(3600),
+        port_healthy: Some(true),
+        restart_count: 2,
+        error_count: 0,
+        category: "backend".to_string(),
+        has_build_command: true,
+    };
+    let json1 = serde_json::to_string(&status).unwrap();
+    let back: ProcessStatus = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    // Confirm state wire form.
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(v["state"], "healthy");
+}
+
+#[test]
+fn process_status_not_running_roundtrips() {
+    let status = ProcessStatus {
+        id: "proc-2".to_string(),
+        name: "Idle".to_string(),
+        state: ProcessState::Stopped,
+        pid: None,
+        uptime_secs: None,
+        port_healthy: None,
+        restart_count: 0,
+        error_count: 0,
+        category: "general".to_string(),
+        has_build_command: false,
+    };
+    let json1 = serde_json::to_string(&status).unwrap();
+    let back: ProcessStatus = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+}
+
+// ============================================================================
+// ── ticket_system ────────────────────────────────────────────────────────────
+// ============================================================================
+
+use qontinui_types::ticket_system::{
+    Ticket, TicketComment, TicketProviderConfig, TicketSource, TicketState,
+};
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn ticket_source_snake_case() {
+    let cases = [
+        (TicketSource::GitHub, "\"github\""),
+        (TicketSource::Linear, "\"linear\""),
+        (TicketSource::Jira, "\"jira\""),
+    ];
+    for (src, expected) in cases {
+        let json = serde_json::to_string(&src).unwrap();
+        assert_eq!(json, expected, "TicketSource snake_case mismatch");
+        let back: TicketSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, src);
+    }
+}
+
+#[test]
+fn ticket_state_snake_case() {
+    let cases = [
+        (TicketState::Open, "\"open\""),
+        (TicketState::InProgress, "\"in_progress\""),
+        (TicketState::Done, "\"done\""),
+        (TicketState::Closed, "\"closed\""),
+    ];
+    for (state, expected) in cases {
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, expected, "TicketState snake_case mismatch");
+        let back: TicketState = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, state);
+    }
+}
+
+// ─── Structs ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn ticket_fully_populated_roundtrips() {
+    let t = Ticket {
+        external_id: "42".to_string(),
+        source: TicketSource::GitHub,
+        title: "Null deref in parser".to_string(),
+        body: "See stack trace.".to_string(),
+        labels: vec!["bug".to_string(), "automate".to_string()],
+        assignee: Some("alice".to_string()),
+        url: "https://github.com/qontinui/runner/issues/42".to_string(),
+        state: TicketState::Open,
+        created_at: "2026-04-14T00:00:00Z".to_string(),
+        updated_at: "2026-04-14T01:00:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(v["external_id"], "42");
+    assert_eq!(v["source"], "github");
+    assert_eq!(v["state"], "open");
+    assert_eq!(v["labels"][1], "automate");
+    assert_eq!(v["assignee"], "alice");
+    let back: Ticket = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn ticket_minimal_skips_optional_fields() {
+    // No labels, no assignee — labels uses skip_serializing_if = Vec::is_empty,
+    // assignee uses skip_serializing_if = Option::is_none.
+    let t = Ticket {
+        external_id: "t-1".to_string(),
+        source: TicketSource::Linear,
+        title: "x".to_string(),
+        body: "y".to_string(),
+        labels: vec![],
+        assignee: None,
+        url: "https://linear.app/q/issue/ENG-1".to_string(),
+        state: TicketState::InProgress,
+        created_at: "2026-04-14T00:00:00Z".to_string(),
+        updated_at: "2026-04-14T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("labels").is_none(), "empty labels must be skipped");
+    assert!(
+        v.get("assignee").is_none(),
+        "None assignee must be skipped"
+    );
+    let back: Ticket = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), json);
+}
+
+#[test]
+fn ticket_comment_roundtrips() {
+    let c = TicketComment {
+        id: "c-100".to_string(),
+        author: "bob".to_string(),
+        body: "LGTM — merging.".to_string(),
+        created_at: "2026-04-14T12:00:00Z".to_string(),
+    };
+    let json1 = serde_json::to_string(&c).unwrap();
+    let back: TicketComment = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(v["id"], "c-100");
+    assert_eq!(v["author"], "bob");
+}
+
+#[test]
+fn ticket_provider_config_fully_populated_roundtrips() {
+    let cfg = TicketProviderConfig {
+        source: TicketSource::GitHub,
+        api_token: "ghp_secret_token".to_string(),
+        target: "qontinui/runner".to_string(),
+        actionable_labels: vec!["automate".to_string(), "qontinui".to_string()],
+        workflow_id: "wf-abc123".to_string(),
+        poll_interval_seconds: 120,
+        update_on_completion: true,
+    };
+    let json1 = serde_json::to_string(&cfg).unwrap();
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    // The api_token is intentionally on the wire — DB persistence relies
+    // on it. UI-facing consumers must redact it.
+    assert_eq!(v["api_token"], "ghp_secret_token");
+    assert_eq!(v["source"], "github");
+    assert_eq!(v["target"], "qontinui/runner");
+    assert_eq!(v["poll_interval_seconds"], 120);
+    assert_eq!(v["update_on_completion"], true);
+    let back: TicketProviderConfig = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn ticket_provider_config_minimal_applies_serde_defaults() {
+    // Minimum required fields; poll_interval_seconds and update_on_completion
+    // must hydrate from their serde defaults, and actionable_labels from its
+    // `#[serde(default, skip_serializing_if = "Vec::is_empty")]`.
+    let json = r#"{
+        "source": "linear",
+        "api_token": "lin_abc",
+        "target": "ENG",
+        "workflow_id": "wf-linear"
+    }"#;
+    let cfg: TicketProviderConfig = serde_json::from_str(json).unwrap();
+    assert!(matches!(cfg.source, TicketSource::Linear));
+    assert_eq!(cfg.api_token, "lin_abc");
+    assert_eq!(cfg.target, "ENG");
+    assert!(cfg.actionable_labels.is_empty());
+    assert_eq!(cfg.workflow_id, "wf-linear");
+    assert_eq!(cfg.poll_interval_seconds, 60);
+    assert!(cfg.update_on_completion);
+}
+
+#[test]
+fn ticket_provider_config_empty_labels_skipped() {
+    let cfg = TicketProviderConfig {
+        source: TicketSource::Jira,
+        api_token: "jira_tok".to_string(),
+        target: "PROJ".to_string(),
+        actionable_labels: vec![],
+        workflow_id: "wf-1".to_string(),
+        poll_interval_seconds: 60,
+        update_on_completion: true,
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(
+        v.get("actionable_labels").is_none(),
+        "empty actionable_labels must be skipped"
+    );
+}
+
