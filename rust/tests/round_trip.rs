@@ -13,6 +13,7 @@ use qontinui_types::constraints::*;
 use qontinui_types::orchestration_config::*;
 use qontinui_types::process_management::*;
 use qontinui_types::scheduler::*;
+use qontinui_types::terminal::*;
 use qontinui_types::workflow::*;
 use qontinui_types::workflow_step::*;
 use serde_json::{json, Value};
@@ -7553,3 +7554,337 @@ fn domain_verification_result_roundtrips() {
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 
+// ============================================================================
+// terminal ──────────────────────────────────────────────────────────────────
+// ============================================================================
+
+#[test]
+fn terminal_info_fully_populated_roundtrips() {
+    let info = TerminalInfo {
+        id: "term-1".to_string(),
+        title: "Terminal 1".to_string(),
+        pid: Some(4242),
+        cols: 120,
+        rows: 30,
+        working_dir: "/repo".to_string(),
+        is_alive: true,
+        exit_code: None,
+        created_at: 1_713_270_000_000,
+        total_bytes_produced: 1024,
+        page_id: "page-a".to_string(),
+    };
+    let json1 = serde_json::to_string(&info).unwrap();
+    let back: TerminalInfo = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    // Unset Option<T> fields must be skipped on the wire.
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert!(v.get("exit_code").is_none(), "None exit_code must be skipped");
+}
+
+#[test]
+fn terminal_info_exited_roundtrips() {
+    let info = TerminalInfo {
+        id: "term-2".to_string(),
+        title: "Done".to_string(),
+        pid: None,
+        cols: 80,
+        rows: 24,
+        working_dir: "/tmp".to_string(),
+        is_alive: false,
+        exit_code: Some(0),
+        created_at: 1_713_270_000_000,
+        total_bytes_produced: 0,
+        page_id: "default".to_string(),
+    };
+    let json1 = serde_json::to_string(&info).unwrap();
+    let back: TerminalInfo = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert!(v.get("pid").is_none(), "None pid must be skipped");
+    assert_eq!(v["exit_code"], 0);
+}
+
+#[test]
+fn terminal_info_page_id_default_hydrates() {
+    // Older wire forms without `page_id` must hydrate to "default".
+    let json = r#"{
+        "id": "term-old",
+        "title": "Legacy",
+        "cols": 80,
+        "rows": 24,
+        "working_dir": "/",
+        "is_alive": true,
+        "created_at": 0,
+        "total_bytes_produced": 0
+    }"#;
+    let info: TerminalInfo = serde_json::from_str(json).unwrap();
+    assert_eq!(info.page_id, "default");
+    assert_eq!(info.pid, None);
+    assert_eq!(info.exit_code, None);
+}
+
+#[test]
+fn terminal_output_event_roundtrips() {
+    let ev = TerminalOutputEvent {
+        terminal_id: "term-1".to_string(),
+        data: "SGVsbG8sIHdvcmxkIQ==".to_string(),
+    };
+    let json1 = serde_json::to_string(&ev).unwrap();
+    let back: TerminalOutputEvent = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(v["terminal_id"], "term-1");
+    assert_eq!(v["data"], "SGVsbG8sIHdvcmxkIQ==");
+}
+
+#[test]
+fn terminal_exit_event_with_code_roundtrips() {
+    let ev = TerminalExitEvent {
+        terminal_id: "term-1".to_string(),
+        exit_code: Some(137),
+    };
+    let json1 = serde_json::to_string(&ev).unwrap();
+    let back: TerminalExitEvent = serde_json::from_str(&json1).unwrap();
+    let json2 = serde_json::to_string(&back).unwrap();
+    assert_eq!(json1, json2);
+    let v: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(v["exit_code"], 137);
+}
+
+#[test]
+fn terminal_exit_event_without_code_skips_field() {
+    let ev = TerminalExitEvent {
+        terminal_id: "term-lost".to_string(),
+        exit_code: None,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("exit_code").is_none(), "None exit_code must be skipped");
+    let back: TerminalExitEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+
+// ── mcp_config ───────────────────────────────────────────────────────────────
+
+#[test]
+fn mcp_transport_lowercase() {
+    use qontinui_types::mcp_config::McpTransport;
+    assert_eq!(serde_json::to_string(&McpTransport::Stdio).unwrap(), "\"stdio\"");
+    assert_eq!(serde_json::to_string(&McpTransport::Http).unwrap(), "\"http\"");
+    let back: McpTransport = serde_json::from_str("\"stdio\"").unwrap();
+    assert_eq!(back, McpTransport::Stdio);
+}
+
+#[test]
+fn stdio_config_roundtrips() {
+    use qontinui_types::mcp_config::StdioConfig;
+    use std::collections::HashMap;
+    let mut env = HashMap::new();
+    env.insert("API_TOKEN".to_string(), "sk-test".to_string());
+    let cfg = StdioConfig {
+        command: "npx".to_string(),
+        args: vec!["-y".to_string(), "@anthropic/some-server".to_string()],
+        cwd: Some("D:/projects/x".to_string()),
+        env,
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["command"], "npx");
+    let back: StdioConfig = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&cfg).unwrap()
+    );
+}
+
+#[test]
+fn stdio_config_minimal_elides_empty() {
+    use qontinui_types::mcp_config::StdioConfig;
+    use std::collections::HashMap;
+    let cfg = StdioConfig {
+        command: "python".to_string(),
+        args: vec![],
+        cwd: None,
+        env: HashMap::new(),
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("args").is_none(), "empty args elided");
+    assert!(v.get("cwd").is_none(), "None cwd elided");
+    assert!(v.get("env").is_none(), "empty env elided");
+}
+
+#[test]
+fn http_config_roundtrips() {
+    use qontinui_types::mcp_config::HttpConfig;
+    use std::collections::HashMap;
+    let mut headers = HashMap::new();
+    headers.insert("Authorization".to_string(), "Bearer xyz".to_string());
+    let cfg = HttpConfig {
+        url: "http://localhost:8080/mcp".to_string(),
+        headers,
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let back: HttpConfig = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&cfg).unwrap()
+    );
+}
+
+#[test]
+fn mcp_server_config_stdio_roundtrips() {
+    use qontinui_types::mcp_config::{McpServerConfig, McpTransport, StdioConfig};
+    use std::collections::HashMap;
+    let cfg = McpServerConfig {
+        id: "srv-1".to_string(),
+        name: "My Server".to_string(),
+        description: Some("Local stdio MCP server".to_string()),
+        transport: McpTransport::Stdio,
+        stdio_config: Some(StdioConfig {
+            command: "node".to_string(),
+            args: vec!["server.js".to_string()],
+            cwd: None,
+            env: HashMap::new(),
+        }),
+        http_config: None,
+        enabled: true,
+        auto_start: false,
+        timeout_seconds: 30,
+        cached_tools: None,
+        tools_cached_at: None,
+        created_at: "2026-04-16T18:00:00Z".to_string(),
+        updated_at: "2026-04-16T18:00:00Z".to_string(),
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let v1: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v1["transport"], "stdio");
+    assert!(v1.get("http_config").is_none(), "None http_config elided");
+    let back: McpServerConfig = serde_json::from_str(&json).unwrap();
+    let v2 = serde_json::to_value(&back).unwrap();
+    assert_eq!(v1, v2);
+}
+
+#[test]
+fn mcp_tool_input_schema_renames_type() {
+    use qontinui_types::mcp_config::McpToolInputSchema;
+    let s = McpToolInputSchema {
+        schema_type: "object".to_string(),
+        description: Some("Args".to_string()),
+        properties: Some(serde_json::json!({"x": {"type": "string"}})),
+        required: Some(vec!["x".to_string()]),
+    };
+    let json = serde_json::to_string(&s).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // `schema_type` serializes as `"type"` per `#[serde(rename = "type")]`.
+    assert_eq!(v["type"], "object");
+    assert!(v.get("schema_type").is_none());
+    let back: McpToolInputSchema = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&s).unwrap()
+    );
+}
+
+#[test]
+fn mcp_tool_info_renames_input_schema() {
+    use qontinui_types::mcp_config::{McpToolInfo, McpToolInputSchema};
+    let info = McpToolInfo {
+        name: "read_file".to_string(),
+        description: Some("Read a file".to_string()),
+        input_schema: McpToolInputSchema {
+            schema_type: "object".to_string(),
+            description: None,
+            properties: None,
+            required: None,
+        },
+    };
+    let json = serde_json::to_string(&info).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    // `input_schema` serializes as camelCase `"inputSchema"` per MCP spec.
+    assert!(
+        v.get("inputSchema").is_some(),
+        "inputSchema must be camelCase"
+    );
+    assert!(v.get("input_schema").is_none());
+}
+
+#[test]
+fn mcp_server_status_roundtrips() {
+    use qontinui_types::mcp_config::{McpServerStatus, McpToolInfo, McpToolInputSchema};
+    let status = McpServerStatus {
+        server_id: "srv-1".to_string(),
+        connected: true,
+        error: None,
+        tools: Some(vec![McpToolInfo {
+            name: "ping".to_string(),
+            description: None,
+            input_schema: McpToolInputSchema {
+                schema_type: "object".to_string(),
+                description: None,
+                properties: None,
+                required: None,
+            },
+        }]),
+        last_connect_attempt: Some("2026-04-16T18:00:00Z".to_string()),
+        last_connected: Some("2026-04-16T18:00:00Z".to_string()),
+    };
+    let json = serde_json::to_string(&status).unwrap();
+    let back: McpServerStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&status).unwrap()
+    );
+}
+
+#[test]
+fn mcp_tool_call_result_roundtrips() {
+    use qontinui_types::mcp_config::McpToolCallResult;
+    let ok = McpToolCallResult {
+        success: true,
+        content: Some(serde_json::json!({"result": 42})),
+        error: None,
+        response_type: "json".to_string(),
+        duration_ms: 125,
+    };
+    let json = serde_json::to_string(&ok).unwrap();
+    let back: McpToolCallResult = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&ok).unwrap()
+    );
+}
+
+#[test]
+fn mcp_call_record_roundtrips() {
+    use qontinui_types::mcp_config::McpCallRecord;
+    let record = McpCallRecord {
+        id: "call-1".to_string(),
+        task_run_id: "tr-1".to_string(),
+        step_id: "step-a".to_string(),
+        step_name: Some("Fetch data".to_string()),
+        server_id: "srv-1".to_string(),
+        server_name: Some("My Server".to_string()),
+        tool_name: "query".to_string(),
+        arguments: Some("{\"q\":\"x\"}".to_string()),
+        resolved_arguments: Some("{\"q\":\"x\"}".to_string()),
+        response: Some("{\"ok\":true}".to_string()),
+        response_type: "json".to_string(),
+        duration_ms: 200,
+        extractions: None,
+        assertions: None,
+        success: true,
+        error_message: None,
+        created_at: "2026-04-16T18:00:00Z".to_string(),
+    };
+    let json = serde_json::to_string(&record).unwrap();
+    let back: McpCallRecord = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&record).unwrap()
+    );
+}

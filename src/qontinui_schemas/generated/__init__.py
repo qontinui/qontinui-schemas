@@ -64,6 +64,8 @@ from .per_type.coordinates import Coordinates
 from .per_type.cost_trend_data_point import CostTrendDataPoint
 from .per_type.cost_trend_response import CostTrendResponse
 from .per_type.coverage_data import CoverageData
+from .per_type.create_mcp_call_input import CreateMcpCallInput
+from .per_type.create_mcp_server_input import CreateMcpServerInput
 from .per_type.create_ol_config_request import CreateOlConfigRequest
 from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
@@ -139,6 +141,7 @@ from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.health_check_url import HealthCheckUrl
 from .per_type.historical_action_query import HistoricalActionQuery
 from .per_type.historical_action_result import HistoricalActionResult
+from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
 from .per_type.implement_fixes_config import ImplementFixesConfig
@@ -163,6 +166,14 @@ from .per_type.loop_phase import LoopPhase
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
+from .per_type.mcp_call_record import McpCallRecord
+from .per_type.mcp_calls_result import McpCallsResult
+from .per_type.mcp_server_config import McpServerConfig
+from .per_type.mcp_server_status import McpServerStatus
+from .per_type.mcp_tool_call_result import McpToolCallResult
+from .per_type.mcp_tool_info import McpToolInfo
+from .per_type.mcp_tool_input_schema import McpToolInputSchema
+from .per_type.mcp_transport import McpTransport
 from .per_type.model_cost_breakdown import ModelCostBreakdown
 from .per_type.model_override_config import ModelOverrideConfig
 from .per_type.monitor import Monitor
@@ -273,6 +284,7 @@ from .per_type.state_machine_transition_create import StateMachineTransitionCrea
 from .per_type.state_machine_transition_update import StateMachineTransitionUpdate
 from .per_type.state_node_data import StateNodeData
 from .per_type.states_response import StatesResponse
+from .per_type.stdio_config import StdioConfig
 from .per_type.step_execution_config import StepExecutionConfig
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
@@ -302,6 +314,9 @@ from .per_type.task_run_session import TaskRunSession
 from .per_type.task_run_status import TaskRunStatus
 from .per_type.task_run_update import TaskRunUpdate
 from .per_type.task_type import TaskType
+from .per_type.terminal_exit_event import TerminalExitEvent
+from .per_type.terminal_info import TerminalInfo
+from .per_type.terminal_output_event import TerminalOutputEvent
 from .per_type.test_type import TestType
 from .per_type.text_match_type import TextMatchType
 from .per_type.text_search_options import TextSearchOptions
@@ -334,6 +349,7 @@ from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
 from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionStep
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
+from .per_type.update_mcp_server_input import UpdateMcpServerInput
 from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
 from .per_type.validate_config_request import ValidateConfigRequest
@@ -432,6 +448,8 @@ __all__ = [
     "CostTrendDataPoint",
     "CostTrendResponse",
     "CoverageData",
+    "CreateMcpCallInput",
+    "CreateMcpServerInput",
     "CreateOlConfigRequest",
     "CreateScheduledTaskRequest",
     "CreateTaskRunRequest",
@@ -507,6 +525,7 @@ __all__ = [
     "HealthCheckUrl",
     "HistoricalActionQuery",
     "HistoricalActionResult",
+    "HttpConfig",
     "HttpMethod",
     "IdleCondition",
     "ImplementFixesConfig",
@@ -531,6 +550,14 @@ __all__ = [
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
+    "McpCallRecord",
+    "McpCallsResult",
+    "McpServerConfig",
+    "McpServerStatus",
+    "McpToolCallResult",
+    "McpToolInfo",
+    "McpToolInputSchema",
+    "McpTransport",
     "ModelCostBreakdown",
     "ModelOverrideConfig",
     "Monitor",
@@ -641,6 +668,7 @@ __all__ = [
     "StateMachineTransitionUpdate",
     "StateNodeData",
     "StatesResponse",
+    "StdioConfig",
     "StepExecutionConfig",
     "StructuredFinding",
     "StructuredOverride",
@@ -670,6 +698,9 @@ __all__ = [
     "TaskRunStatus",
     "TaskRunUpdate",
     "TaskType",
+    "TerminalExitEvent",
+    "TerminalInfo",
+    "TerminalOutputEvent",
     "TestType",
     "TextMatchType",
     "TextSearchOptions",
@@ -702,6 +733,7 @@ __all__ = [
     "UiBridgeVisualAssertionStep",
     "UnifiedStep",
     "UnifiedWorkflow",
+    "UpdateMcpServerInput",
     "UpdateOlConfigRequest",
     "UpdateScheduledTaskRequest",
     "ValidateConfigRequest",
