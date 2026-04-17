@@ -4463,12 +4463,13 @@ fn playback_frame_request_roundtrips() {
 
 use qontinui_types::rag::{
     BatchComputeEmbeddingRequest, BatchComputeEmbeddingResponse, BatchEmbeddingResult,
-    ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest,
-    ComputeTextEmbeddingResponse, EmbeddingItem, EmbeddingListResponse, EmbeddingResultItem,
-    EmbeddingResultsRequest, EmbeddingResultsResponse, JobItem, JobListResponse, JobStatus,
-    JobSummary, RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent,
+    BoundingBox, ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest,
+    ComputeTextEmbeddingResponse, ElementType, EmbeddedElement, EmbeddingItem,
+    EmbeddingListResponse, EmbeddingResultItem, EmbeddingResultsRequest, EmbeddingResultsResponse,
+    ExportResult, GUIElementChunk, JobItem, JobListResponse, JobStatus, JobSummary,
+    RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent,
     SearchResultItem, SemanticSearchRequest, SemanticSearchResponse, StateFilterItem,
-    StatesResponse,
+    StatesResponse, VectorSearchResult,
 };
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -4944,6 +4945,214 @@ fn state_filter_item_and_states_response_roundtrip() {
     let json1 = serde_json::to_string(&r).expect("serialize");
     let back: StatesResponse = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+// ─── GUI element chunking (rag/models.py) ───────────────────────────────────
+
+#[test]
+fn element_type_all_variants_snake_case() {
+    let cases = [
+        (ElementType::Button, "\"button\""),
+        (ElementType::IconButton, "\"icon_button\""),
+        (ElementType::ToggleButton, "\"toggle_button\""),
+        (ElementType::DropdownButton, "\"dropdown_button\""),
+        (ElementType::TextInput, "\"text_input\""),
+        (ElementType::SearchInput, "\"search_input\""),
+        (ElementType::PasswordInput, "\"password_input\""),
+        (ElementType::Textarea, "\"textarea\""),
+        (ElementType::Checkbox, "\"checkbox\""),
+        (ElementType::RadioButton, "\"radio_button\""),
+        (ElementType::Dropdown, "\"dropdown\""),
+        (ElementType::Combobox, "\"combobox\""),
+        (ElementType::Slider, "\"slider\""),
+        (ElementType::Link, "\"link\""),
+        (ElementType::Tab, "\"tab\""),
+        (ElementType::MenuItem, "\"menu_item\""),
+        (ElementType::Breadcrumb, "\"breadcrumb\""),
+        (ElementType::Modal, "\"modal\""),
+        (ElementType::Dialog, "\"dialog\""),
+        (ElementType::Panel, "\"panel\""),
+        (ElementType::Card, "\"card\""),
+        (ElementType::Icon, "\"icon\""),
+        (ElementType::Image, "\"image\""),
+        (ElementType::Label, "\"label\""),
+        (ElementType::Badge, "\"badge\""),
+        (ElementType::Tooltip, "\"tooltip\""),
+        (ElementType::TableCell, "\"table_cell\""),
+        (ElementType::TableHeader, "\"table_header\""),
+        (ElementType::ListItem, "\"list_item\""),
+        (ElementType::Progress, "\"progress\""),
+        (ElementType::Spinner, "\"spinner\""),
+        (ElementType::Unknown, "\"unknown\""),
+    ];
+    for (e, expected) in cases {
+        let json = serde_json::to_string(&e).expect("serialize");
+        assert_eq!(json, expected);
+        let back: ElementType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, e);
+    }
+}
+
+#[test]
+fn bounding_box_roundtrips() {
+    let b = BoundingBox {
+        x: 10,
+        y: 20,
+        width: 80,
+        height: 32,
+    };
+    let json1 = serde_json::to_string(&b).expect("serialize");
+    let back: BoundingBox = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+    assert_eq!(back, b);
+}
+
+fn sample_gui_element_chunk() -> GUIElementChunk {
+    GUIElementChunk {
+        id: "elem-001".to_string(),
+        created_at: Some("2026-04-14T00:00:00Z".to_string()),
+        updated_at: Some("2026-04-14T01:00:00Z".to_string()),
+        source_app: "calculator".to_string(),
+        source_state_id: Some("state-main".to_string()),
+        source_screenshot_id: Some("ss-001".to_string()),
+        extraction_method: "auto".to_string(),
+        bounding_box: Some(BoundingBox {
+            x: 100,
+            y: 200,
+            width: 80,
+            height: 32,
+        }),
+        width: 80,
+        height: 32,
+        aspect_ratio: 2.5,
+        area: 2560,
+        position_quadrant: "top-left".to_string(),
+        dominant_colors: vec![vec![255, 0, 0], vec![0, 0, 255]],
+        color_histogram: vec![10, 20, 30],
+        average_brightness: 0.75,
+        contrast_ratio: 4.5,
+        edge_density: 0.3,
+        has_text: true,
+        ocr_text: "Submit".to_string(),
+        ocr_confidence: 0.95,
+        text_length: 6,
+        element_type: ElementType::Button,
+        element_subtype: "primary".to_string(),
+        is_interactive: true,
+        interaction_type: "click".to_string(),
+        visual_state: "normal".to_string(),
+        is_enabled: true,
+        is_selected: false,
+        is_focused: false,
+        parent_region: Some("toolbar".to_string()),
+        depth_in_hierarchy: 2,
+        sibling_count: 3,
+        platform: "windows".to_string(),
+        text_embedding: Some(vec![0.1, 0.2, 0.3]),
+        text_description: "Blue submit button".to_string(),
+        image_embedding: Some(vec![0.4, 0.5, 0.6]),
+        state_id: Some("state-main".to_string()),
+        state_name: "Main screen".to_string(),
+        is_defining_element: true,
+        is_optional_element: false,
+        similarity_threshold: 0.85,
+        is_fixed_position: true,
+        is_shared: false,
+        probability: 0.99,
+        search_region_id: Some("region-toolbar".to_string()),
+        semantic_role: "submit".to_string(),
+        semantic_action: "submit_form".to_string(),
+        style_family: "fluent".to_string(),
+    }
+}
+
+#[test]
+fn gui_element_chunk_roundtrips() {
+    let e = sample_gui_element_chunk();
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let back: GUIElementChunk = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn gui_element_chunk_defaults_apply() {
+    let json_min = r#"{"id":"elem-min"}"#;
+    let e: GUIElementChunk = serde_json::from_str(json_min).expect("deserialize");
+    assert_eq!(e.extraction_method, "manual");
+    assert_eq!(e.element_type, ElementType::Unknown);
+    assert_eq!(e.visual_state, "normal");
+    assert!(e.is_enabled);
+    assert!((e.similarity_threshold - 0.8).abs() < 1e-9);
+    assert!((e.probability - 1.0).abs() < 1e-9);
+}
+
+#[test]
+fn embedded_element_roundtrips() {
+    let e = EmbeddedElement {
+        element: sample_gui_element_chunk(),
+        text_embedding: Some(vec![0.7, 0.8]),
+        image_embedding: Some(vec![0.9, 1.0]),
+        embedding_model: "clip-vit-b-32".to_string(),
+        embedding_timestamp: Some("2026-04-14T02:00:00Z".to_string()),
+    };
+    let json1 = serde_json::to_string(&e).expect("serialize");
+    let back: EmbeddedElement = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn vector_search_result_roundtrips() {
+    let r = VectorSearchResult {
+        element: sample_gui_element_chunk(),
+        score: 0.92,
+        distance: 0.08,
+        rank: 1,
+        matched_on: "hybrid".to_string(),
+        search_type: "hybrid".to_string(),
+        query_text: "blue submit button".to_string(),
+        query_timestamp: Some("2026-04-14T03:00:00Z".to_string()),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: VectorSearchResult = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&back).expect("re-serialize");
+    assert_json_values_equal(&json1, &json2);
+}
+
+#[test]
+fn vector_search_result_defaults() {
+    let json_min = r#"{"element":{"id":"e1"},"score":0.5}"#;
+    let r: VectorSearchResult = serde_json::from_str(json_min).expect("deserialize");
+    assert_eq!(r.matched_on, "text");
+    assert_eq!(r.search_type, "text");
+    assert_eq!(r.rank, 0);
+}
+
+#[test]
+fn export_result_roundtrips() {
+    let r = ExportResult {
+        success: true,
+        exported_count: 42,
+        failed_count: 2,
+        skipped_count: 5,
+        errors: vec!["timeout on elem-99".to_string()],
+        warnings: vec!["low confidence on elem-33".to_string()],
+        export_timestamp: Some("2026-04-14T04:00:00Z".to_string()),
+        export_path: "/tmp/export/rag_elements.json".to_string(),
+        format: "json".to_string(),
+    };
+    let json1 = serde_json::to_string(&r).expect("serialize");
+    let back: ExportResult = serde_json::from_str(&json1).expect("deserialize");
+    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
+}
+
+#[test]
+fn export_result_default_format() {
+    let json_min = r#"{"success":false}"#;
+    let r: ExportResult = serde_json::from_str(json_min).expect("deserialize");
+    assert_eq!(r.format, "json");
+    assert_eq!(r.exported_count, 0);
 }
 
 // ============================================================================
@@ -7887,4 +8096,278 @@ fn mcp_call_record_roundtrips() {
         serde_json::to_value(&back).unwrap(),
         serde_json::to_value(&record).unwrap()
     );
+}
+
+// ── ai_workflows ───────────────────────────────────────────────────────────
+
+#[test]
+fn execution_step_roundtrips() {
+    use qontinui_types::ai_workflows::ExecutionStep;
+    let step = ExecutionStep {
+        id: "step-1".to_string(),
+        step_type: "playwright".to_string(),
+        name: "Run login test".to_string(),
+        take_screenshot: true,
+        screenshot_delay: Some(1.5),
+        playwright_script_id: Some("script-abc".to_string()),
+        playwright_script_content: Some("page.goto('/')".to_string()),
+        playwright_target_url: Some("http://localhost:3000".to_string()),
+        prompt_id: None,
+        prompt_content: None,
+        action_type: None,
+        target_image_id: None,
+        target_image_name: None,
+        screenshot_monitor: Some(serde_json::json!(1)),
+    };
+    let json = serde_json::to_string(&step).unwrap();
+    let back: ExecutionStep = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&step).unwrap()
+    );
+}
+
+#[test]
+fn ai_workflow_roundtrips() {
+    use qontinui_types::ai_workflows::{AiWorkflow, ExecutionStep};
+    let wf = AiWorkflow {
+        id: "wf-1".to_string(),
+        name: "Smoke test".to_string(),
+        description: "End-to-end smoke".to_string(),
+        steps: vec![ExecutionStep {
+            id: "s1".to_string(),
+            step_type: "prompt".to_string(),
+            name: "Ask AI".to_string(),
+            prompt_content: Some("fix it".to_string()),
+            ..Default::default()
+        }],
+        goal: "Verify login flow".to_string(),
+        max_iterations: Some(5),
+        capture_input_validation: false,
+        category: "Testing".to_string(),
+        tags: vec!["smoke".to_string(), "login".to_string()],
+        context_ids: vec!["ctx-1".to_string()],
+        disabled_context_ids: vec![],
+        auto_include_contexts: true,
+        created_at: "2026-04-16T12:00:00Z".to_string(),
+        modified_at: "2026-04-16T12:00:00Z".to_string(),
+    };
+    let json = serde_json::to_string(&wf).unwrap();
+    let back: AiWorkflow = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&wf).unwrap()
+    );
+}
+
+#[test]
+fn ai_workflow_defaults_roundtrip() {
+    // Minimal JSON — only required fields — should deserialize with defaults.
+    let minimal = r#"{
+        "id": "wf-min",
+        "name": "Minimal",
+        "created_at": "2026-04-16T00:00:00Z",
+        "modified_at": "2026-04-16T00:00:00Z"
+    }"#;
+    let wf: qontinui_types::ai_workflows::AiWorkflow =
+        serde_json::from_str(minimal).unwrap();
+    assert_eq!(wf.id, "wf-min");
+    assert!(wf.steps.is_empty());
+    assert!(wf.auto_include_contexts); // default true
+    assert_eq!(wf.max_iterations, None);
+    // Re-serialize and round-trip.
+    let json2 = serde_json::to_string(&wf).unwrap();
+    let back: qontinui_types::ai_workflows::AiWorkflow =
+        serde_json::from_str(&json2).unwrap();
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&wf).unwrap()
+    );
+}
+
+// ── ui_bridge ───────────────────────────────────────────────────────────────
+
+#[test]
+fn element_rect_roundtrips() {
+    use qontinui_types::ui_bridge::ElementRect;
+    let rect = ElementRect {
+        x: 10.0,
+        y: 20.0,
+        width: 100.0,
+        height: 50.0,
+        top: 20.0,
+        right: 110.0,
+        bottom: 70.0,
+        left: 10.0,
+    };
+    let json = serde_json::to_string(&rect).unwrap();
+    let back: ElementRect = serde_json::from_str(&json).unwrap();
+    assert_eq!(rect, back);
+}
+
+#[test]
+fn element_state_roundtrips() {
+    use qontinui_types::ui_bridge::{ElementRect, ElementState};
+    let state = ElementState {
+        visible: true,
+        enabled: true,
+        focused: false,
+        rect: ElementRect {
+            x: 0.0,
+            y: 0.0,
+            width: 200.0,
+            height: 40.0,
+            top: 0.0,
+            right: 200.0,
+            bottom: 40.0,
+            left: 0.0,
+        },
+        value: Some("hello".to_string()),
+        checked: None,
+        selected_options: None,
+        text_content: Some("Click me".to_string()),
+    };
+    let json = serde_json::to_string(&state).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("checked").is_none(), "None checked must be skipped");
+    let back: ElementState = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn element_identifier_roundtrips() {
+    use qontinui_types::ui_bridge::ElementIdentifier;
+    let id = ElementIdentifier {
+        ui_id: Some("btn-submit".to_string()),
+        test_id: Some("submit-button".to_string()),
+        awas_id: None,
+        html_id: Some("submitBtn".to_string()),
+        xpath: "/html/body/form/button[1]".to_string(),
+        selector: "form > button.submit".to_string(),
+    };
+    let json = serde_json::to_string(&id).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["uiId"], "btn-submit", "camelCase rename");
+    assert!(v.get("awasId").is_none(), "None awasId must be skipped");
+    let back: ElementIdentifier = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn ui_bridge_element_roundtrips() {
+    use qontinui_types::ui_bridge::*;
+    let elem = UIBridgeElement {
+        id: "elem-1".to_string(),
+        element_type: "button".to_string(),
+        label: Some("Submit".to_string()),
+        actions: vec!["click".to_string()],
+        custom_actions: None,
+        identifier: ElementIdentifier {
+            ui_id: None,
+            test_id: None,
+            awas_id: None,
+            html_id: None,
+            xpath: "/button[1]".to_string(),
+            selector: "button".to_string(),
+        },
+        state: ElementState {
+            visible: true,
+            enabled: true,
+            focused: false,
+            rect: ElementRect {
+                x: 0.0, y: 0.0, width: 80.0, height: 30.0,
+                top: 0.0, right: 80.0, bottom: 30.0, left: 0.0,
+            },
+            value: None,
+            checked: None,
+            selected_options: None,
+            text_content: None,
+        },
+        registered_at: 1713200000000,
+        mounted: true,
+    };
+    let json = serde_json::to_string(&elem).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "button", "element_type renames to type");
+    let back: UIBridgeElement = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn discovery_request_default_roundtrips() {
+    use qontinui_types::ui_bridge::DiscoveryRequest;
+    let req = DiscoveryRequest::default();
+    let json = serde_json::to_string(&req).unwrap();
+    assert_eq!(json, "{}", "all-None DiscoveryRequest serializes to empty object");
+    let back: DiscoveryRequest = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn action_response_roundtrips() {
+    use qontinui_types::ui_bridge::ActionResponse;
+    let resp = ActionResponse {
+        success: true,
+        element_state: None,
+        result: Some(serde_json::json!({"clicked": true})),
+        error: None,
+        stack: None,
+        duration_ms: 42,
+        timestamp: 1713200000000,
+    };
+    let json = serde_json::to_string(&resp).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("elementState").is_none(), "None element_state skipped");
+    assert!(v.get("error").is_none(), "None error skipped");
+    let back: ActionResponse = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn wait_options_roundtrips() {
+    use qontinui_types::ui_bridge::WaitOptions;
+    let opts = WaitOptions {
+        visible: Some(true),
+        enabled: None,
+        focused: None,
+        timeout: Some(5000),
+        interval: None,
+    };
+    let json = serde_json::to_string(&opts).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert!(v.get("enabled").is_none(), "None enabled skipped");
+    let back: WaitOptions = serde_json::from_str(&json).unwrap();
+    assert_eq!(opts, back);
+}
+
+#[test]
+fn ui_bridge_snapshot_roundtrips() {
+    use qontinui_types::ui_bridge::UIBridgeSnapshot;
+    let snap = UIBridgeSnapshot {
+        timestamp: 1713200000000,
+        elements: vec![],
+        components: vec![],
+        workflows: vec![],
+    };
+    let json = serde_json::to_string(&snap).unwrap();
+    // Empty vecs should be skipped
+    assert_eq!(json, r#"{"timestamp":1713200000000}"#);
+    let back: UIBridgeSnapshot = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn workflow_info_roundtrips() {
+    use qontinui_types::ui_bridge::WorkflowInfo;
+    let wf = WorkflowInfo {
+        id: "wf-1".to_string(),
+        name: "Login Flow".to_string(),
+        description: Some("Tests the login page".to_string()),
+        step_count: 5,
+    };
+    let json = serde_json::to_string(&wf).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["stepCount"], 5, "camelCase rename");
+    let back: WorkflowInfo = serde_json::from_str(&json).unwrap();
+    assert_eq!(wf, back);
 }

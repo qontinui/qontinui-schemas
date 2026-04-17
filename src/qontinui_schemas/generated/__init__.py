@@ -16,11 +16,13 @@ from .per_type.action_execution_create import ActionExecutionCreate
 from .per_type.action_execution_list_response import ActionExecutionListResponse
 from .per_type.action_execution_response import ActionExecutionResponse
 from .per_type.action_reliability_stats import ActionReliabilityStats
+from .per_type.action_response import ActionResponse
 from .per_type.action_status import ActionStatus
 from .per_type.action_type import ActionType
 from .per_type.active_states_result import ActiveStatesResult
 from .per_type.agentic_phase_output import AgenticPhaseOutput
 from .per_type.agentic_status import AgenticStatus
+from .per_type.ai_workflow import AiWorkflow
 from .per_type.api_assertion import ApiAssertion
 from .per_type.api_assertion_operator import ApiAssertionOperator
 from .per_type.api_assertion_type import ApiAssertionType
@@ -33,6 +35,7 @@ from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingReque
 from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
 from .per_type.batch_embedding_result import BatchEmbeddingResult
 from .per_type.between_iterations import BetweenIterations
+from .per_type.bounding_box import BoundingBox
 from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.canonical_step import CanonicalStep
@@ -43,6 +46,8 @@ from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
 from .per_type.command_step import CommandStep
 from .per_type.command_step_phase import CommandStepPhase
+from .per_type.component_action_info import ComponentActionInfo
+from .per_type.component_action_request import ComponentActionRequest
 from .per_type.compute_embedding_request import ComputeEmbeddingRequest
 from .per_type.compute_embedding_response import ComputeEmbeddingResponse
 from .per_type.compute_text_embedding_request import ComputeTextEmbeddingRequest
@@ -77,10 +82,13 @@ from .per_type.dag_loop_step import DagLoopStep
 from .per_type.decomposer_config import DecomposerConfig
 from .per_type.diagnose_phase_config import DiagnosePhaseConfig
 from .per_type.diagnostic_result import DiagnosticResult
+from .per_type.discovered_element import DiscoveredElement
 from .per_type.discovered_state import DiscoveredState
 from .per_type.discovered_state_image import DiscoveredStateImage
 from .per_type.discovered_transition import DiscoveredTransition
 from .per_type.discovery_bounding_box import DiscoveryBoundingBox
+from .per_type.discovery_request import DiscoveryRequest
+from .per_type.discovery_response import DiscoveryResponse
 from .per_type.discovery_source_type import DiscoverySourceType
 from .per_type.discovery_strategy import DiscoveryStrategy
 from .per_type.discovery_transition_trigger import DiscoveryTransitionTrigger
@@ -88,6 +96,12 @@ from .per_type.display_node import DisplayNode
 from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
+from .per_type.element_action_request import ElementActionRequest
+from .per_type.element_identifier import ElementIdentifier
+from .per_type.element_rect import ElementRect
+from .per_type.element_state import ElementState
+from .per_type.element_type import ElementType
+from .per_type.embedded_element import EmbeddedElement
 from .per_type.embedding_item import EmbeddingItem
 from .per_type.embedding_list_response import EmbeddingListResponse
 from .per_type.embedding_result_item import EmbeddingResultItem
@@ -113,11 +127,13 @@ from .per_type.execution_run_response import ExecutionRunResponse
 from .per_type.execution_screenshot_create import ExecutionScreenshotCreate
 from .per_type.execution_screenshot_response import ExecutionScreenshotResponse
 from .per_type.execution_stats import ExecutionStats
+from .per_type.execution_step import ExecutionStep
 from .per_type.execution_tree_response import ExecutionTreeResponse
 from .per_type.execution_trend_data_point import ExecutionTrendDataPoint
 from .per_type.execution_trend_response import ExecutionTrendResponse
 from .per_type.exit_check_result import ExitCheckResult
 from .per_type.exit_strategy import ExitStrategy
+from .per_type.export_result import ExportResult
 from .per_type.extend_iterations_request import ExtendIterationsRequest
 from .per_type.file_change import FileChange
 from .per_type.finding import Finding
@@ -137,6 +153,7 @@ from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
 from .per_type.full_runner_step import FullRunnerStep
+from .per_type.gui_element_chunk import GUIElementChunk
 from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.health_check_url import HealthCheckUrl
 from .per_type.historical_action_query import HistoricalActionQuery
@@ -339,6 +356,9 @@ from .per_type.tree_event_list_response import TreeEventListResponse
 from .per_type.tree_event_response import TreeEventResponse
 from .per_type.tree_event_type import TreeEventType
 from .per_type.tree_node import TreeNode
+from .per_type.ui_bridge_component import UIBridgeComponent
+from .per_type.ui_bridge_element import UIBridgeElement
+from .per_type.ui_bridge_snapshot import UIBridgeSnapshot
 from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
@@ -354,6 +374,7 @@ from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
 from .per_type.validate_config_request import ValidateConfigRequest
 from .per_type.validate_config_response import ValidateConfigResponse
+from .per_type.vector_search_result import VectorSearchResult
 from .per_type.verification_agent_context import VerificationAgentContext
 from .per_type.verification_category_kind import VerificationCategoryKind
 from .per_type.verification_method import VerificationMethod
@@ -367,6 +388,7 @@ from .per_type.verification_step_result import VerificationStepResult
 from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
 from .per_type.visual_comparison_result import VisualComparisonResult
+from .per_type.wait_options import WaitOptions
 from .per_type.worker_coordination_message import WorkerCoordinationMessage
 from .per_type.worker_domain import WorkerDomain
 from .per_type.worker_instance import WorkerInstance
@@ -376,6 +398,7 @@ from .per_type.worker_status import WorkerStatus
 from .per_type.workflow_architecture import WorkflowArchitecture
 from .per_type.workflow_fixup_mode import WorkflowFixupMode
 from .per_type.workflow_fixup_step import WorkflowFixupStep
+from .per_type.workflow_info import WorkflowInfo
 from .per_type.workflow_metadata import WorkflowMetadata
 from .per_type.workflow_ref_step import WorkflowRefStep
 from .per_type.workflow_stage import WorkflowStage
@@ -400,11 +423,13 @@ __all__ = [
     "ActionExecutionListResponse",
     "ActionExecutionResponse",
     "ActionReliabilityStats",
+    "ActionResponse",
     "ActionStatus",
     "ActionType",
     "ActiveStatesResult",
     "AgenticPhaseOutput",
     "AgenticStatus",
+    "AiWorkflow",
     "ApiAssertion",
     "ApiAssertionOperator",
     "ApiAssertionType",
@@ -417,6 +442,7 @@ __all__ = [
     "BatchComputeEmbeddingResponse",
     "BatchEmbeddingResult",
     "BetweenIterations",
+    "BoundingBox",
     "BuildPhaseConfig",
     "BuiltinOverrideProposal",
     "CanonicalStep",
@@ -427,6 +453,8 @@ __all__ = [
     "CommandMode",
     "CommandStep",
     "CommandStepPhase",
+    "ComponentActionInfo",
+    "ComponentActionRequest",
     "ComputeEmbeddingRequest",
     "ComputeEmbeddingResponse",
     "ComputeTextEmbeddingRequest",
@@ -461,10 +489,13 @@ __all__ = [
     "DecomposerConfig",
     "DiagnosePhaseConfig",
     "DiagnosticResult",
+    "DiscoveredElement",
     "DiscoveredState",
     "DiscoveredStateImage",
     "DiscoveredTransition",
     "DiscoveryBoundingBox",
+    "DiscoveryRequest",
+    "DiscoveryResponse",
     "DiscoverySourceType",
     "DiscoveryStrategy",
     "DiscoveryTransitionTrigger",
@@ -472,6 +503,12 @@ __all__ = [
     "DomainAssignment",
     "DomainKnowledge",
     "DomainVerificationResult",
+    "ElementActionRequest",
+    "ElementIdentifier",
+    "ElementRect",
+    "ElementState",
+    "ElementType",
+    "EmbeddedElement",
     "EmbeddingItem",
     "EmbeddingListResponse",
     "EmbeddingResultItem",
@@ -497,11 +534,13 @@ __all__ = [
     "ExecutionScreenshotCreate",
     "ExecutionScreenshotResponse",
     "ExecutionStats",
+    "ExecutionStep",
     "ExecutionTreeResponse",
     "ExecutionTrendDataPoint",
     "ExecutionTrendResponse",
     "ExitCheckResult",
     "ExitStrategy",
+    "ExportResult",
     "ExtendIterationsRequest",
     "FileChange",
     "Finding",
@@ -521,6 +560,7 @@ __all__ = [
     "FindingsSummary",
     "FlowEvent",
     "FullRunnerStep",
+    "GUIElementChunk",
     "GateEvaluationResult",
     "HealthCheckUrl",
     "HistoricalActionQuery",
@@ -723,6 +763,9 @@ __all__ = [
     "TreeEventResponse",
     "TreeEventType",
     "TreeNode",
+    "UIBridgeComponent",
+    "UIBridgeElement",
+    "UIBridgeSnapshot",
     "UiBridgeAction",
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
@@ -738,6 +781,7 @@ __all__ = [
     "UpdateScheduledTaskRequest",
     "ValidateConfigRequest",
     "ValidateConfigResponse",
+    "VectorSearchResult",
     "VerificationAgentContext",
     "VerificationCategoryKind",
     "VerificationMethod",
@@ -751,6 +795,7 @@ __all__ = [
     "VirtualDesktop",
     "VisualAssertionType",
     "VisualComparisonResult",
+    "WaitOptions",
     "WorkerCoordinationMessage",
     "WorkerDomain",
     "WorkerInstance",
@@ -760,6 +805,7 @@ __all__ = [
     "WorkflowArchitecture",
     "WorkflowFixupMode",
     "WorkflowFixupStep",
+    "WorkflowInfo",
     "WorkflowMetadata",
     "WorkflowRefStep",
     "WorkflowStage",

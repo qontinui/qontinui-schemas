@@ -431,3 +431,346 @@ pub struct StatesResponse {
     /// Total number of states.
     pub count: i64,
 }
+
+// ============================================================================
+// GUI element chunking & retrieval (rag/models.py)
+// ============================================================================
+
+/// Type of GUI element detected and stored for RAG retrieval.
+///
+/// Mirrors `rag.models.ElementType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ElementType {
+    // Button types
+    Button,
+    IconButton,
+    ToggleButton,
+    DropdownButton,
+
+    // Input types
+    TextInput,
+    SearchInput,
+    PasswordInput,
+    Textarea,
+
+    // Selection types
+    Checkbox,
+    RadioButton,
+    Dropdown,
+    Combobox,
+    Slider,
+
+    // Navigation types
+    Link,
+    Tab,
+    MenuItem,
+    Breadcrumb,
+
+    // Container types
+    Modal,
+    Dialog,
+    Panel,
+    Card,
+
+    // Display types
+    Icon,
+    Image,
+    Label,
+    Badge,
+    Tooltip,
+
+    // Data display types
+    TableCell,
+    TableHeader,
+    ListItem,
+
+    // Feedback types
+    Progress,
+    Spinner,
+
+    // Unknown
+    Unknown,
+}
+
+/// Bounding box coordinates for a GUI element.
+///
+/// Mirrors `rag.models.BoundingBox`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct BoundingBox {
+    pub x: i64,
+    pub y: i64,
+    pub width: i64,
+    pub height: i64,
+}
+
+/// Complete representation of a GUI element chunk for RAG retrieval.
+///
+/// Contains all information needed for storing, searching, and retrieving GUI
+/// elements from a vector database. Mirrors `rag.models.GUIElementChunk`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GUIElementChunk {
+    // ── Identity ──────────────────────────────────────────────────────────
+    /// Unique identifier (UUID).
+    pub id: String,
+    /// ISO 8601 UTC timestamp (`Z` suffix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    /// ISO 8601 UTC timestamp (`Z` suffix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+
+    // ── Source information ─────────────────────────────────────────────────
+    /// Application name / identifier.
+    #[serde(default)]
+    pub source_app: String,
+    /// State-machine state ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_state_id: Option<String>,
+    /// Screenshot identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_screenshot_id: Option<String>,
+    /// How the element was extracted (e.g. `"manual"`).
+    #[serde(default = "default_extraction_method")]
+    pub extraction_method: String,
+
+    // ── Geometry ───────────────────────────────────────────────────────────
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    pub width: i64,
+    #[serde(default)]
+    pub height: i64,
+    #[serde(default)]
+    pub aspect_ratio: f64,
+    #[serde(default)]
+    pub area: i64,
+    /// `"top-left"`, `"top-right"`, `"bottom-left"`, `"bottom-right"`, or `"center"`.
+    #[serde(default)]
+    pub position_quadrant: String,
+
+    // ── Visual features ───────────────────────────────────────────────────
+    /// Dominant RGB colour tuples.
+    #[serde(default)]
+    pub dominant_colors: Vec<Vec<i64>>,
+    #[serde(default)]
+    pub color_histogram: Vec<i64>,
+    #[serde(default)]
+    pub average_brightness: f64,
+    #[serde(default)]
+    pub contrast_ratio: f64,
+    #[serde(default)]
+    pub edge_density: f64,
+
+    // ── Text content ──────────────────────────────────────────────────────
+    #[serde(default)]
+    pub has_text: bool,
+    #[serde(default)]
+    pub ocr_text: String,
+    #[serde(default)]
+    pub ocr_confidence: f64,
+    #[serde(default)]
+    pub text_length: i64,
+
+    // ── Classification ────────────────────────────────────────────────────
+    #[serde(default = "default_element_type")]
+    pub element_type: ElementType,
+    /// More specific classification.
+    #[serde(default)]
+    pub element_subtype: String,
+    #[serde(default)]
+    pub is_interactive: bool,
+    /// `"click"`, `"type"`, `"select"`, etc.
+    #[serde(default)]
+    pub interaction_type: String,
+
+    // ── State indicators ──────────────────────────────────────────────────
+    /// `"normal"`, `"hover"`, `"pressed"`, `"disabled"`.
+    #[serde(default = "default_visual_state")]
+    pub visual_state: String,
+    #[serde(default = "default_true_element")]
+    pub is_enabled: bool,
+    #[serde(default)]
+    pub is_selected: bool,
+    #[serde(default)]
+    pub is_focused: bool,
+
+    // ── Context ───────────────────────────────────────────────────────────
+    /// Parent container / region identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_region: Option<String>,
+    #[serde(default)]
+    pub depth_in_hierarchy: i64,
+    #[serde(default)]
+    pub sibling_count: i64,
+
+    // ── Platform ──────────────────────────────────────────────────────────
+    /// `"windows"`, `"macos"`, `"linux"`, `"web"`.
+    #[serde(default)]
+    pub platform: String,
+
+    // ── Embeddings ────────────────────────────────────────────────────────
+    /// Dense vector for text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_embedding: Option<Vec<f32>>,
+    /// Human-readable description for embedding.
+    #[serde(default)]
+    pub text_description: String,
+    /// Dense vector for visual features.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_embedding: Option<Vec<f32>>,
+
+    // ── State-machine integration ─────────────────────────────────────────
+    /// Associated state ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_id: Option<String>,
+    #[serde(default)]
+    pub state_name: String,
+    /// Is this element required for state identification?
+    #[serde(default)]
+    pub is_defining_element: bool,
+    /// Is this element optional in the state?
+    #[serde(default)]
+    pub is_optional_element: bool,
+    /// Threshold for matching (0-1).
+    #[serde(default = "default_similarity_threshold")]
+    pub similarity_threshold: f64,
+    /// Does the element stay in the same position?
+    #[serde(default)]
+    pub is_fixed_position: bool,
+    /// Is element shared across multiple states?
+    #[serde(default)]
+    pub is_shared: bool,
+    /// Probability of finding this element (0-1).
+    #[serde(default = "default_probability")]
+    pub probability: f64,
+    /// Search-region identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search_region_id: Option<String>,
+
+    // ── Cross-application semantics ───────────────────────────────────────
+    /// `"save"`, `"cancel"`, `"submit"`, `"close"`, etc.
+    #[serde(default)]
+    pub semantic_role: String,
+    /// Expected action when interacted with.
+    #[serde(default)]
+    pub semantic_action: String,
+    /// UI toolkit / style (e.g. `"material"`, `"fluent"`, `"gtk"`).
+    #[serde(default)]
+    pub style_family: String,
+}
+
+fn default_extraction_method() -> String {
+    "manual".to_string()
+}
+
+fn default_element_type() -> ElementType {
+    ElementType::Unknown
+}
+
+fn default_visual_state() -> String {
+    "normal".to_string()
+}
+
+fn default_true_element() -> bool {
+    true
+}
+
+fn default_similarity_threshold() -> f64 {
+    0.8
+}
+
+fn default_probability() -> f64 {
+    1.0
+}
+
+/// Result of embedding a GUI element.
+///
+/// Contains the original element plus computed embeddings.
+/// Mirrors `rag.models.EmbeddedElement`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EmbeddedElement {
+    /// The GUI element that was embedded.
+    pub element: GUIElementChunk,
+    /// Text embedding vector.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_embedding: Option<Vec<f32>>,
+    /// Image embedding vector.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_embedding: Option<Vec<f32>>,
+    /// Model used for embedding.
+    #[serde(default)]
+    pub embedding_model: String,
+    /// ISO 8601 UTC timestamp (`Z` suffix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding_timestamp: Option<String>,
+}
+
+/// Result from a vector database search query.
+///
+/// Contains the matched element and relevance scores.
+/// Mirrors `rag.models.SearchResult`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct VectorSearchResult {
+    /// The matched GUI element.
+    pub element: GUIElementChunk,
+    /// Similarity score (0-1).
+    pub score: f64,
+    /// Distance metric from query.
+    #[serde(default)]
+    pub distance: f64,
+    /// Position in result list.
+    #[serde(default)]
+    pub rank: i64,
+    /// Which embedding was matched: `"text"`, `"image"`, or `"hybrid"`.
+    #[serde(default = "default_matched_on")]
+    pub matched_on: String,
+    /// Type of search performed.
+    #[serde(default = "default_search_type")]
+    pub search_type: String,
+    /// The original query text.
+    #[serde(default)]
+    pub query_text: String,
+    /// ISO 8601 UTC timestamp (`Z` suffix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_timestamp: Option<String>,
+}
+
+fn default_matched_on() -> String {
+    "text".to_string()
+}
+
+fn default_search_type() -> String {
+    "text".to_string()
+}
+
+/// Result from the export pipeline.
+///
+/// Tracks what was exported and any errors that occurred.
+/// Mirrors `rag.models.ExportResult`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ExportResult {
+    pub success: bool,
+    #[serde(default)]
+    pub exported_count: i64,
+    #[serde(default)]
+    pub failed_count: i64,
+    #[serde(default)]
+    pub skipped_count: i64,
+    #[serde(default)]
+    pub errors: Vec<String>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    /// ISO 8601 UTC timestamp (`Z` suffix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_timestamp: Option<String>,
+    #[serde(default)]
+    pub export_path: String,
+    /// `"json"`, `"csv"`, `"parquet"`, etc.
+    #[serde(default = "default_export_format")]
+    pub format: String,
+}
+
+fn default_export_format() -> String {
+    "json".to_string()
+}
