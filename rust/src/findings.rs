@@ -105,6 +105,8 @@ pub enum FindingActionType {
     AutoFix,
     /// Requires user decision or input to resolve.
     NeedsUserInput,
+    /// Requires manual intervention.
+    Manual,
     /// No action needed — for awareness only.
     Informational,
 }

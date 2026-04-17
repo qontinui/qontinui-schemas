@@ -68,11 +68,13 @@ class FindingActionType(str, Enum):
 
     AUTO_FIX: Can be automatically fixed without user intervention.
     NEEDS_USER_INPUT: Requires user decision or input to resolve.
+    MANUAL: Requires manual intervention.
     INFORMATIONAL: No action needed, for awareness only.
     """
 
     AUTO_FIX = "auto_fix"
     NEEDS_USER_INPUT = "needs_user_input"
+    MANUAL = "manual"
     INFORMATIONAL = "informational"
 
 

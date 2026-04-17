@@ -19,6 +19,7 @@ class FindingActionType(StrEnum):
 
     auto_fix = 'auto_fix'
     needs_user_input = 'needs_user_input'
+    manual = 'manual'
     informational = 'informational'
 
 
