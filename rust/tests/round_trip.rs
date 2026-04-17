@@ -8371,3 +8371,183 @@ fn workflow_info_roundtrips() {
     let back: WorkflowInfo = serde_json::from_str(&json).unwrap();
     assert_eq!(wf, back);
 }
+
+// ============================================================================
+// ── app_events ───
+// ============================================================================
+
+#[test]
+fn flow_event_flow_started_roundtrips() {
+    use qontinui_types::app_events::FlowEvent;
+    let ev = FlowEvent::FlowStarted {
+        instance_id: "inst-1".to_string(),
+        flow_id: "flow-1".to_string(),
+        flow_name: "Login Flow".to_string(),
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "flow_started", "internally tagged with snake_case");
+    assert_eq!(v["instance_id"], "inst-1");
+    let back: FlowEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn flow_event_step_completed_roundtrips() {
+    use qontinui_types::app_events::FlowEvent;
+    let mut outputs = HashMap::new();
+    outputs.insert("result".to_string(), json!("ok"));
+    let ev = FlowEvent::StepCompleted {
+        instance_id: "inst-2".to_string(),
+        step_id: "step-1".to_string(),
+        success: true,
+        outputs,
+        error: None,
+        duration_ms: 1234,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "step_completed");
+    assert_eq!(v["duration_ms"], 1234);
+    // error is None + skip_serializing_if, so it should be absent
+    assert!(v.get("error").is_none(), "None error should be skipped");
+    let back: FlowEvent = serde_json::from_str(&json).unwrap();
+    assert_json_values_equal(&json, &serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn flow_event_parallel_progress_roundtrips() {
+    use qontinui_types::app_events::FlowEvent;
+    let ev = FlowEvent::ParallelProgress {
+        instance_id: "inst-3".to_string(),
+        step_id: "step-p".to_string(),
+        completed: 5,
+        total: 10,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["type"], "parallel_progress");
+    let back: FlowEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_executor_event_roundtrips() {
+    use qontinui_types::app_events::AppEvent;
+    let ev = AppEvent::ExecutorEvent {
+        event: "step_start".to_string(),
+        timestamp: 1713200000000,
+        sequence: 42,
+        data: json!({"step": "build"}),
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        v["event_type"], "ExecutorEvent",
+        "adjacently tagged on event_type"
+    );
+    assert!(v["data"].is_object(), "data payload must exist");
+    assert_eq!(v["data"]["event"], "step_start");
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_step_progress_adjacently_tagged() {
+    use qontinui_types::app_events::AppEvent;
+    let ev = AppEvent::StepProgress {
+        task_run_id: "tr-1".to_string(),
+        step_index: 2,
+        step_name: "Run tests".to_string(),
+        status: "completed".to_string(),
+        details: None,
+        timestamp: 1713200000000,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        v["event_type"], "StepProgress",
+        "adjacently tagged wire shape"
+    );
+    assert_eq!(v["data"]["step_index"], 2);
+    assert!(
+        v["data"].get("details").is_none(),
+        "None details should be skipped"
+    );
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_task_run_update_roundtrips() {
+    use qontinui_types::app_events::AppEvent;
+    let ev = AppEvent::TaskRunUpdate {
+        task_run_id: "tr-2".to_string(),
+        status: "running".to_string(),
+        iteration: Some(3),
+        details: Some(json!({"phase": "agentic"})),
+        timestamp: 1713200000000,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["event_type"], "TaskRunUpdate");
+    assert_eq!(v["data"]["iteration"], 3);
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_error_roundtrips() {
+    use qontinui_types::app_events::AppEvent;
+    let ev = AppEvent::Error {
+        message: "something failed".to_string(),
+        context: Some("during build".to_string()),
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["event_type"], "Error");
+    assert_eq!(v["data"]["message"], "something failed");
+    assert_eq!(v["data"]["context"], "during build");
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_cost_update_roundtrips() {
+    use qontinui_types::app_events::AppEvent;
+    let ev = AppEvent::CostUpdate {
+        task_run_id: "tr-cost".to_string(),
+        phase: "agentic".to_string(),
+        iteration: Some(2),
+        input_tokens: 1000,
+        output_tokens: 500,
+        cache_creation_tokens: 200,
+        cache_read_tokens: 800,
+        cost_usd: 0.05,
+        cumulative_cost_usd: 0.15,
+        cache_hit_rate: 0.4,
+        timestamp: 1713200000000,
+    };
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["event_type"], "CostUpdate");
+    assert_eq!(v["data"]["input_tokens"], 1000);
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn app_event_flow_event_wrapper_roundtrips() {
+    use qontinui_types::app_events::{AppEvent, FlowEvent};
+    let ev = AppEvent::FlowEvent(FlowEvent::FlowStarted {
+        instance_id: "inst-wrap".to_string(),
+        flow_id: "flow-wrap".to_string(),
+        flow_name: "Wrapped Flow".to_string(),
+    });
+    let json = serde_json::to_string(&ev).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["event_type"], "FlowEvent");
+    assert_eq!(v["data"]["type"], "flow_started");
+    let back: AppEvent = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}

@@ -22,6 +22,7 @@
 
 pub mod accessibility;
 pub mod ai_workflows;
+pub mod app_events;
 pub mod config;
 pub mod constraints;
 pub mod discovery;
