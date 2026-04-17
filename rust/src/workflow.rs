@@ -784,6 +784,28 @@ pub struct UnifiedWorkflow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phase_timeouts_json: Option<String>,
 
+    /// Whether HTN (Hierarchical Task Network) planning is enabled for this
+    /// workflow.
+    ///
+    /// When `true`, the loop attempts structured plan-based fixes before
+    /// falling back to AI agentic sessions.
+    #[serde(default)]
+    pub htn_enabled: bool,
+
+    /// UI Bridge URL for HTN planning (e.g., `"http://localhost:1420"`).
+    ///
+    /// When set, the HTN planner connects to UI Bridge for querying element
+    /// state. If `None`, HTN runs in plan-only mode without GUI execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub htn_ui_bridge_url: Option<String>,
+
+    /// Path to a serialized state machine JSON file for HTN planning.
+    ///
+    /// When `None` and HTN is enabled, defaults to the bundled
+    /// `data/runner_state_machine.json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub htn_state_machine_path: Option<String>,
+
     /// ISO 8601 timestamp of creation.
     #[serde(default)]
     pub created_at: String,

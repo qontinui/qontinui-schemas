@@ -171,6 +171,28 @@ export interface UnifiedWorkflow {
    */
   health_check_urls?: HealthCheckUrl[];
   /**
+   * Whether HTN (Hierarchical Task Network) planning is enabled for this
+   * workflow.
+   *
+   * When `true`, the loop attempts structured plan-based fixes before
+   * falling back to AI agentic sessions.
+   */
+  htn_enabled: boolean;
+  /**
+   * Path to a serialized state machine JSON file for HTN planning.
+   *
+   * When `None` and HTN is enabled, defaults to the bundled
+   * `data/runner_state_machine.json`.
+   */
+  htn_state_machine_path?: string | null;
+  /**
+   * UI Bridge URL for HTN planning (e.g., `"http://localhost:1420"`).
+   *
+   * When set, the HTN planner connects to UI Bridge for querying element
+   * state. If `None`, HTN runs in plan-only mode without GUI execution.
+   */
+  htn_ui_bridge_url?: string | null;
+  /**
    * Unique identifier (UUID v4).
    */
   id: string;
