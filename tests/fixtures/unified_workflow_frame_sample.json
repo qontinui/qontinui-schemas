@@ -3,7 +3,11 @@
   "name": "Two-stage build-and-test",
   "description": "Builds then tests the runner; demonstrates a multi-stage frame with overrides.",
   "category": "ci",
-  "tags": ["build", "test", "example"],
+  "tags": [
+    "build",
+    "test",
+    "example"
+  ],
   "setup_steps": [],
   "verification_steps": [],
   "agentic_steps": [],
@@ -52,7 +56,10 @@
       "approval_gate": false,
       "completion_prompts_first": false,
       "outputs": [
-        { "key": "build_artifact_path", "description": "Path to the built artifact." }
+        {
+          "key": "build_artifact_path",
+          "description": "Path to the built artifact."
+        }
       ]
     },
     {
@@ -70,7 +77,11 @@
       },
       "completion_prompts_first": false,
       "inputs": [
-        { "key": "build_artifact_path", "from_stage": "stage-build-0001", "required": true }
+        {
+          "key": "build_artifact_path",
+          "from_stage": "stage-build-0001",
+          "required": true
+        }
       ]
     }
   ],
@@ -86,5 +97,6 @@
   "workflow_architecture": "traditional",
   "ai_reviewed": true,
   "created_at": "2026-04-10T08:00:00Z",
-  "modified_at": "2026-04-14T09:00:00Z"
+  "modified_at": "2026-04-14T09:00:00Z",
+  "htn_enabled": false
 }

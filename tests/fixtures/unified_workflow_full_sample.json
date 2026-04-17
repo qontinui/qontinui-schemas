@@ -1,9 +1,13 @@
 {
   "id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
   "name": "Full runner step coverage",
-  "description": "Exercises every FullRunnerStep variant across the four workflow phases — acts as a cross-language DB round-trip fixture.",
+  "description": "Exercises every FullRunnerStep variant across the four workflow phases \u00e2\u20ac\u201d acts as a cross-language DB round-trip fixture.",
   "category": "ci",
-  "tags": ["coverage", "round-trip", "example"],
+  "tags": [
+    "coverage",
+    "round-trip",
+    "example"
+  ],
   "setup_steps": [
     {
       "type": "command",
@@ -82,7 +86,10 @@
       "id": "verify-visual-0103",
       "name": "Assert header text",
       "visual_assertion_type": "text",
-      "visual_assertion_query": { "role": "heading", "level": 1 },
+      "visual_assertion_query": {
+        "role": "heading",
+        "level": 1
+      },
       "visual_assertion_expected": "Qontinui Runner",
       "timeout_seconds": 10
     },
@@ -172,5 +179,6 @@
   "workflow_architecture": "traditional",
   "ai_reviewed": true,
   "created_at": "2026-04-10T08:00:00Z",
-  "modified_at": "2026-04-14T09:00:00Z"
+  "modified_at": "2026-04-14T09:00:00Z",
+  "htn_enabled": false
 }

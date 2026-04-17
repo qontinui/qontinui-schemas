@@ -1,7 +1,7 @@
 {
   "id": "cccccccc-dddd-4eee-8fff-000000000000",
   "name": "Workflow with unknown step types",
-  "description": "Mixes canonical steps with runner-internal and forward-compatible step types — exercises UnifiedStep::Other fallback.",
+  "description": "Mixes canonical steps with runner-internal and forward-compatible step types \u00e2\u20ac\u201d exercises UnifiedStep::Other fallback.",
   "category": "general",
   "tags": [],
   "setup_steps": [
@@ -62,5 +62,6 @@
   "use_worktree": false,
   "ai_reviewed": true,
   "created_at": "2026-04-12T08:00:00Z",
-  "modified_at": "2026-04-14T09:30:00Z"
+  "modified_at": "2026-04-14T09:30:00Z",
+  "htn_enabled": false
 }
