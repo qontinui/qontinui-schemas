@@ -950,10 +950,10 @@ interface TransitionInfo {
    */
   id: string;
   /**
-   * Destination state ID (may be `null`/`None` if the transition stays
-   * within the same state set).
+   * Destination state ID (`null` if the transition stays within the same
+   * state set — e.g. a self-transition or a guard-only action).
    */
-  to_state?: string | null;
+  to_state: string | null;
   /**
    * Names of workflows attached to this transition.
    */

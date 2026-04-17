@@ -605,9 +605,9 @@ pub struct TransitionInfo {
     pub id: String,
     /// Source state ID.
     pub from_state: String,
-    /// Destination state ID (may be `null`/`None` if the transition stays
-    /// within the same state set).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Destination state ID (`null` if the transition stays within the same
+    /// state set — e.g. a self-transition or a guard-only action).
+    #[serde(default)]
     pub to_state: Option<String>,
     /// Names of workflows attached to this transition.
     pub workflows: Vec<String>,

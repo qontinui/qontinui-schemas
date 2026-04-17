@@ -84,11 +84,6 @@ export type { TransitionExecutionResult } from "../generated/TransitionExecution
 export type { NavigationResult } from "../generated/NavigationResult";
 export type { ActiveStatesResult } from "../generated/ActiveStatesResult";
 
-// TODO(schema-migration): generated `TransitionInfo.to_state` is optional
-// (`to_state?: string | null`) whereas the previous hand-authored shape made
-// it a required `string | null` field. Consumers that destructure `to_state`
-// unconditionally should be reviewed in Phase 4 before we fully rely on the
-// generated type's optionality.
 export type { TransitionInfo } from "../generated/TransitionInfo";
 export type { AvailableTransitionsResult } from "../generated/AvailableTransitionsResult";
 
