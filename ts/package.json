@@ -107,6 +107,9 @@
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   },
+  "overrides": {
+    "picomatch": "^4.0.4"
+  },
   "publishConfig": {
     "access": "public"
   }
