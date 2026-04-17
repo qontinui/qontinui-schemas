@@ -669,9 +669,9 @@ pub struct InitialStateRef {
 /// The resolved set of initial states for a run, along with the source the
 /// resolution came from.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolvedInitialStates {
     /// Resolved initial state IDs.
-    #[serde(rename = "stateIds")]
     pub state_ids: Vec<String>,
     /// Where the resolution came from.
     pub source: InitialStatesSource,
@@ -679,11 +679,7 @@ pub struct ResolvedInitialStates {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub states: Option<Vec<InitialStateRef>>,
     /// Workflow ID when `source == Workflow`.
-    #[serde(
-        rename = "workflowId",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow_id: Option<String>,
 }
 
@@ -693,18 +689,17 @@ pub struct ResolvedInitialStates {
 /// `workflowId` are always present (possibly empty), and a `success` / `error`
 /// pair is provided.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolvedInitialStatesResult {
     /// Whether resolution succeeded.
     pub success: bool,
     /// Resolved initial state IDs.
-    #[serde(rename = "stateIds")]
     pub state_ids: Vec<String>,
     /// Where the resolution came from.
     pub source: InitialStatesSource,
     /// Display-ready references for each state.
     pub states: Vec<InitialStateRef>,
     /// Workflow ID (may be empty).
-    #[serde(rename = "workflowId")]
     pub workflow_id: String,
     /// Error message when resolution failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -737,91 +732,61 @@ pub enum DiscoveryStrategy {
 /// `onStartElementDrag` callback from the TS type is a UI-layer concern and is
 /// intentionally omitted from the DTO.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateNodeData {
     /// State ID this node represents.
-    #[serde(rename = "stateId")]
     pub state_id: String,
     /// Display name.
     pub name: String,
     /// Number of elements defining this state.
-    #[serde(rename = "elementCount")]
     pub element_count: u64,
     /// Discovery confidence.
     pub confidence: f64,
     /// Element IDs defining this state.
-    #[serde(rename = "elementIds")]
     pub element_ids: Vec<String>,
     /// Optional description (may be `null`).
     pub description: Option<String>,
     /// Whether the state blocks navigation.
-    #[serde(rename = "isBlocking")]
     pub is_blocking: bool,
     /// Whether the node is currently selected in the editor.
-    #[serde(rename = "isSelected")]
     pub is_selected: bool,
     /// Whether this is an initial state.
-    #[serde(rename = "isInitial")]
     pub is_initial: bool,
     /// Outgoing transition count.
-    #[serde(
-        rename = "outgoingCount",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outgoing_count: Option<u64>,
     /// Incoming transition count.
-    #[serde(
-        rename = "incomingCount",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incoming_count: Option<u64>,
     /// Whether this node is the current drop target (drag-and-drop).
-    #[serde(
-        rename = "isDropTarget",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_drop_target: Option<bool>,
     /// Optional map of element ID → base64 thumbnail image (data URL or raw
     /// base64 PNG).
-    #[serde(
-        rename = "elementThumbnails",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_thumbnails: Option<HashMap<String, String>>,
 }
 
 /// Data passed to a transition edge in the ReactFlow graph editor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TransitionEdgeData {
     /// Transition ID this edge represents.
-    #[serde(rename = "transitionId")]
     pub transition_id: String,
     /// Display name.
     pub name: String,
     /// Path cost.
-    #[serde(rename = "pathCost")]
     pub path_cost: f64,
     /// Number of actions in this transition.
-    #[serde(rename = "actionCount")]
     pub action_count: u64,
     /// Distinct action types used.
-    #[serde(rename = "actionTypes")]
     pub action_types: Vec<StandardActionType>,
     /// Whether the edge is highlighted (e.g., part of a path preview).
-    #[serde(rename = "isHighlighted")]
     pub is_highlighted: bool,
     /// Whether source states stay visible after activation.
-    #[serde(rename = "staysVisible")]
     pub stays_visible: bool,
     /// Target of the first action, for label rendering.
-    #[serde(
-        rename = "firstActionTarget",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_action_target: Option<String>,
 }
 

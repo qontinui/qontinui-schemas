@@ -110,23 +110,16 @@ pub struct DiscoveryBoundingBox {
 /// identifying fields are optional — different discovery sources populate
 /// different subsets.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveryTransitionTrigger {
     /// Type of trigger action. Defaults to `click` when omitted on the wire.
     #[serde(default)]
     pub r#type: TransitionTriggerType,
     /// ID of the image that was clicked/interacted with.
-    #[serde(
-        default,
-        rename = "imageId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_id: Option<String>,
     /// ID of the DOM element (for web extraction).
-    #[serde(
-        default,
-        rename = "elementId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_id: Option<String>,
     /// CSS selector for the trigger element.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -145,45 +138,26 @@ pub struct DiscoveryTransitionTrigger {
 /// Represents an image crop from a screenshot with its bounding box and
 /// optional pixel-level identification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveredStateImage {
     /// Unique identifier for the image.
     pub id: String,
     /// ID of the source screenshot.
-    #[serde(
-        default,
-        rename = "screenshotId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screenshot_id: Option<String>,
     /// URL to the source screenshot.
-    #[serde(
-        default,
-        rename = "screenshotUrl",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screenshot_url: Option<String>,
     /// Bounding box within the screenshot.
     pub bbox: DiscoveryBoundingBox,
     /// Hash of pixel data for deduplication.
-    #[serde(
-        default,
-        rename = "pixelHash",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pixel_hash: Option<String>,
     /// ID of the state this image belongs to.
-    #[serde(
-        default,
-        rename = "stateId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state_id: Option<String>,
     /// Semantic type of the element (e.g. `button`, `input`).
-    #[serde(
-        default,
-        rename = "elementType",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_type: Option<String>,
     /// Human-readable label for the image.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -201,31 +175,20 @@ pub struct DiscoveredStateImage {
 /// States represent distinct UI screens or views identified by the set of
 /// images that consistently appear together.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveredState {
     /// Unique identifier for the state.
     pub id: String,
     /// Human-readable name.
     pub name: String,
     /// IDs of images in this state.
-    #[serde(
-        default,
-        rename = "imageIds",
-        skip_serializing_if = "Vec::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub image_ids: Vec<String>,
     /// IDs of renders where this state appears.
-    #[serde(
-        default,
-        rename = "renderIds",
-        skip_serializing_if = "Vec::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub render_ids: Vec<String>,
     /// IDs of DOM elements (for web extraction).
-    #[serde(
-        default,
-        rename = "elementIds",
-        skip_serializing_if = "Vec::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub element_ids: Vec<String>,
     /// Confidence score for state detection (0.0–1.0). Defaults to `1.0`.
     #[serde(default = "default_confidence_one")]
@@ -243,14 +206,13 @@ pub struct DiscoveredState {
 /// Transitions represent actions that change the active set of states on the
 /// screen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveredTransition {
     /// Unique identifier for the transition.
     pub id: String,
     /// ID of the source state.
-    #[serde(rename = "fromStateId")]
     pub from_state_id: String,
     /// ID of the target state.
-    #[serde(rename = "toStateId")]
     pub to_state_id: String,
     /// What triggers this transition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -272,11 +234,11 @@ pub struct DiscoveredTransition {
 /// Unified output format regardless of the source (Playwright, UI Bridge,
 /// Recording, Vision, Manual).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateDiscoveryResult {
     /// Unique identifier for the result.
     pub id: String,
     /// ID of the project this belongs to.
-    #[serde(rename = "projectId")]
     pub project_id: String,
     /// Human-readable name.
     pub name: String,
@@ -284,21 +246,12 @@ pub struct StateDiscoveryResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// How this state machine was discovered.
-    #[serde(rename = "sourceType")]
     pub source_type: DiscoverySourceType,
     /// ID of the source session (extraction, recording, …).
-    #[serde(
-        default,
-        rename = "sourceSessionId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
     /// Strategy used for discovery (`auto`, `fingerprint`, `legacy`, …).
-    #[serde(
-        default,
-        rename = "discoveryStrategy",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_strategy: Option<String>,
     /// All discovered images.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -310,42 +263,32 @@ pub struct StateDiscoveryResult {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transitions: Vec<DiscoveredTransition>,
     /// Mapping of element IDs to render IDs where they appear.
-    #[serde(
-        default,
-        rename = "elementToRenders",
-        skip_serializing_if = "HashMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub element_to_renders: HashMap<String, Vec<String>>,
     /// Number of images (statistic).
-    #[serde(default, rename = "imageCount")]
+    #[serde(default)]
     pub image_count: i64,
     /// Number of states (statistic).
-    #[serde(default, rename = "stateCount")]
+    #[serde(default)]
     pub state_count: i64,
     /// Number of transitions (statistic).
-    #[serde(default, rename = "transitionCount")]
+    #[serde(default)]
     pub transition_count: i64,
     /// Number of renders analyzed (statistic).
-    #[serde(default, rename = "renderCount")]
+    #[serde(default)]
     pub render_count: i64,
     /// Number of unique elements (statistic).
-    #[serde(default, rename = "uniqueElementCount")]
+    #[serde(default)]
     pub unique_element_count: i64,
     /// Overall confidence score (0.0–1.0).
     #[serde(default)]
     pub confidence: f64,
     /// Additional discovery metadata.
-    #[serde(
-        default,
-        rename = "discoveryMetadata",
-        skip_serializing_if = "HashMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub discovery_metadata: HashMap<String, Value>,
     /// ISO 8601 timestamp of creation.
-    #[serde(rename = "createdAt")]
     pub created_at: String,
     /// ISO 8601 timestamp of last update.
-    #[serde(rename = "updatedAt")]
     pub updated_at: String,
 }
 
@@ -353,11 +296,11 @@ pub struct StateDiscoveryResult {
 ///
 /// Lightweight projection of `StateDiscoveryResult` used by list endpoints.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateDiscoveryResultSummary {
     /// Unique identifier.
     pub id: String,
     /// ID of the project.
-    #[serde(rename = "projectId")]
     pub project_id: String,
     /// Human-readable name.
     pub name: String,
@@ -365,29 +308,23 @@ pub struct StateDiscoveryResultSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Discovery source.
-    #[serde(rename = "sourceType")]
     pub source_type: DiscoverySourceType,
     /// Strategy used.
-    #[serde(
-        default,
-        rename = "discoveryStrategy",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_strategy: Option<String>,
     /// Number of images.
-    #[serde(default, rename = "imageCount")]
+    #[serde(default)]
     pub image_count: i64,
     /// Number of states.
-    #[serde(default, rename = "stateCount")]
+    #[serde(default)]
     pub state_count: i64,
     /// Number of transitions.
-    #[serde(default, rename = "transitionCount")]
+    #[serde(default)]
     pub transition_count: i64,
     /// Confidence score (0.0–1.0).
     #[serde(default)]
     pub confidence: f64,
     /// ISO 8601 timestamp of creation.
-    #[serde(rename = "createdAt")]
     pub created_at: String,
 }
 
@@ -406,6 +343,7 @@ pub struct StateDiscoveryResultListResponse {
 
 /// Request payload to create a state-discovery result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateDiscoveryResultCreate {
     /// Human-readable name.
     pub name: String,
@@ -413,21 +351,12 @@ pub struct StateDiscoveryResultCreate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Discovery source.
-    #[serde(rename = "sourceType")]
     pub source_type: DiscoverySourceType,
     /// ID of the source session.
-    #[serde(
-        default,
-        rename = "sourceSessionId",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
     /// Strategy used.
-    #[serde(
-        default,
-        rename = "discoveryStrategy",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_strategy: Option<String>,
     /// Discovered images.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -439,21 +368,13 @@ pub struct StateDiscoveryResultCreate {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transitions: Vec<DiscoveredTransition>,
     /// Element to renders mapping.
-    #[serde(
-        default,
-        rename = "elementToRenders",
-        skip_serializing_if = "HashMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub element_to_renders: HashMap<String, Vec<String>>,
     /// Confidence score (0.0–1.0).
     #[serde(default)]
     pub confidence: f64,
     /// Additional metadata.
-    #[serde(
-        default,
-        rename = "discoveryMetadata",
-        skip_serializing_if = "HashMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub discovery_metadata: HashMap<String, Value>,
 }
 
@@ -461,6 +382,7 @@ pub struct StateDiscoveryResultCreate {
 ///
 /// All fields optional; only supplied fields are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateDiscoveryResultUpdate {
     /// Human-readable name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -478,11 +400,7 @@ pub struct StateDiscoveryResultUpdate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transitions: Option<Vec<DiscoveredTransition>>,
     /// Updated metadata.
-    #[serde(
-        default,
-        rename = "discoveryMetadata",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_metadata: Option<HashMap<String, Value>>,
 }
 
@@ -496,6 +414,7 @@ pub struct StateDiscoveryResultUpdate {
 /// `source_type` is kept as a free-form `String` to match Python's
 /// `DiscoverySourceType | str` union (enabling imports that predate the enum).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateMachineExport {
     /// Export format version. Defaults to `"1.0.0"`.
     #[serde(default = "default_export_version")]
@@ -507,7 +426,6 @@ pub struct StateMachineExport {
     pub description: Option<String>,
     /// Original discovery source (string for forward compatibility — Python
     /// accepts `DiscoverySourceType | str`).
-    #[serde(rename = "sourceType")]
     pub source_type: String,
     /// State images.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -519,11 +437,7 @@ pub struct StateMachineExport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transitions: Vec<DiscoveredTransition>,
     /// Element to renders mapping.
-    #[serde(
-        default,
-        rename = "elementToRenders",
-        skip_serializing_if = "HashMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub element_to_renders: HashMap<String, Vec<String>>,
     /// Export metadata (original ID, export timestamp, …).
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -532,9 +446,9 @@ pub struct StateMachineExport {
 
 /// Request payload to import a state machine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StateMachineImport {
     /// The state machine to import.
-    #[serde(rename = "stateMachine")]
     pub state_machine: StateMachineExport,
     /// Override name (uses export name when omitted).
     #[serde(default, skip_serializing_if = "Option::is_none")]
