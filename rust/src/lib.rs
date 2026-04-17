@@ -42,5 +42,6 @@ pub mod ticket_system;
 pub mod tree_events;
 pub mod ui_bridge;
 pub mod verification;
+pub mod worker_output;
 pub mod workflow;
 pub mod workflow_step;

@@ -8551,3 +8551,162 @@ fn app_event_flow_event_wrapper_roundtrips() {
     let back: AppEvent = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
+
+// ── worker_output ───────────────────────────────────────────────────────────
+
+use qontinui_types::worker_output::*;
+
+#[test]
+fn worker_output_full_roundtrips() {
+    let wo = WorkerOutput {
+        work_summary: "Refactored module X".to_string(),
+        signals: vec![StructuredSignal {
+            signal_type: "complete".to_string(),
+            message: Some("All tasks done".to_string()),
+        }],
+        findings: vec![StructuredFinding {
+            category: "bug".to_string(),
+            severity: "high".to_string(),
+            title: "Null pointer".to_string(),
+            description: "Found null deref in foo()".to_string(),
+            needs_input: true,
+        }],
+        files_modified: vec!["src/main.rs".to_string()],
+        criterion_overrides: vec![StructuredOverride {
+            criterion: "coverage".to_string(),
+            status: "pass".to_string(),
+            justification: "Test added".to_string(),
+        }],
+        confidence: ConfidenceLevel::High,
+        next_action_suggestion: Some("Run integration tests".to_string()),
+        progress_estimate: Some(0.85),
+        notes: Some("Minor refactor needed".to_string()),
+    };
+    let json = serde_json::to_string(&wo).unwrap();
+    let back: WorkerOutput = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn confidence_level_high_lowercase() {
+    let json = serde_json::to_string(&ConfidenceLevel::High).unwrap();
+    assert_eq!(json, "\"high\"");
+    let back: ConfidenceLevel = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"high\"");
+}
+
+#[test]
+fn confidence_level_medium_lowercase() {
+    let json = serde_json::to_string(&ConfidenceLevel::Medium).unwrap();
+    assert_eq!(json, "\"medium\"");
+    let back: ConfidenceLevel = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"medium\"");
+}
+
+#[test]
+fn confidence_level_low_lowercase() {
+    let json = serde_json::to_string(&ConfidenceLevel::Low).unwrap();
+    assert_eq!(json, "\"low\"");
+    let back: ConfidenceLevel = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"low\"");
+}
+
+#[test]
+fn agentic_status_success_snake_case() {
+    let json = serde_json::to_string(&AgenticStatus::Success).unwrap();
+    assert_eq!(json, "\"success\"");
+    let back: AgenticStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"success\"");
+}
+
+#[test]
+fn agentic_status_partial_success_snake_case() {
+    let json = serde_json::to_string(&AgenticStatus::PartialSuccess).unwrap();
+    assert_eq!(json, "\"partial_success\"");
+    let back: AgenticStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"partial_success\"");
+}
+
+#[test]
+fn agentic_status_failed_snake_case() {
+    let json = serde_json::to_string(&AgenticStatus::Failed).unwrap();
+    assert_eq!(json, "\"failed\"");
+    let back: AgenticStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"failed\"");
+}
+
+#[test]
+fn agentic_status_unfixable_snake_case() {
+    let json = serde_json::to_string(&AgenticStatus::Unfixable).unwrap();
+    assert_eq!(json, "\"unfixable\"");
+    let back: AgenticStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), "\"unfixable\"");
+}
+
+#[test]
+fn agentic_phase_output_roundtrips() {
+    let apo = AgenticPhaseOutput {
+        status: AgenticStatus::PartialSuccess,
+        summary: "Fixed 3 of 4 issues".to_string(),
+        confidence: Some(0.75),
+        unfixable: false,
+        unfixable_reason: None,
+        files_modified: vec![FileChange {
+            path: "src/lib.rs".to_string(),
+            action: "modified".to_string(),
+        }],
+        injected_steps: vec![json!({"type": "command", "command": "cargo test"})],
+        reflection_fixes: vec![ReflectionFixOutput {
+            error_id: "err-001".to_string(),
+            description: "Added missing import".to_string(),
+        }],
+        findings: vec![FindingOutput {
+            category: "performance".to_string(),
+            severity: "medium".to_string(),
+            title: "Slow query".to_string(),
+            description: "N+1 query in list endpoint".to_string(),
+            needs_input: false,
+            resolved: true,
+        }],
+    };
+    let json = serde_json::to_string(&apo).unwrap();
+    let back: AgenticPhaseOutput = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn structured_signal_roundtrips() {
+    let sig = StructuredSignal {
+        signal_type: "blocked".to_string(),
+        message: Some("Waiting for approval".to_string()),
+    };
+    let json = serde_json::to_string(&sig).unwrap();
+    let back: StructuredSignal = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn structured_finding_roundtrips() {
+    let f = StructuredFinding {
+        category: "security".to_string(),
+        severity: "critical".to_string(),
+        title: "SQL injection".to_string(),
+        description: "Unescaped input in query".to_string(),
+        needs_input: true,
+    };
+    let json = serde_json::to_string(&f).unwrap();
+    let back: StructuredFinding = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn structured_override_roundtrips() {
+    let o = StructuredOverride {
+        criterion: "lint".to_string(),
+        status: "override_pass".to_string(),
+        justification: "False positive from clippy".to_string(),
+    };
+    let json = serde_json::to_string(&o).unwrap();
+    let back: StructuredOverride = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
