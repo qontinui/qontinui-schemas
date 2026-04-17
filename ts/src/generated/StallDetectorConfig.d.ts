@@ -15,18 +15,18 @@ export interface StallDetectorConfig {
   /**
    * Maximum times the same action may repeat before stall is declared.
    */
-  max_repeated_actions: number;
+  maxRepeatedActions: number;
   /**
    * Absolute ceiling on total steps across all iterations.
    */
-  max_total_steps: number;
+  maxTotalSteps: number;
   /**
    * Window (in actions) used to detect oscillation between two states.
    */
-  oscillation_window: number;
+  oscillationWindow: number;
   /**
    * Wall-clock seconds without progress before stall is declared.
    */
-  stall_timeout_secs: number;
+  stallTimeoutSecs: number;
   [k: string]: unknown;
 }

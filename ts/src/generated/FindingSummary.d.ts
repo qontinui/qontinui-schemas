@@ -15,37 +15,37 @@ export interface FindingSummary {
   /**
    * Count of findings by category.
    */
-  by_category?: {
+  byCategory?: {
     [k: string]: number;
   };
   /**
    * Count of findings by severity.
    */
-  by_severity?: {
+  bySeverity?: {
     [k: string]: number;
   };
   /**
    * Count of findings by status.
    */
-  by_status?: {
+  byStatus?: {
     [k: string]: number;
   };
   /**
    * Number of findings awaiting user input.
    */
-  needs_input_count: number;
+  needsInputCount: number;
   /**
    * Number of unresolved findings.
    */
-  outstanding_count: number;
+  outstandingCount: number;
   /**
    * Number of resolved findings.
    */
-  resolved_count: number;
+  resolvedCount: number;
   /**
    * Task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Total number of findings.
    */

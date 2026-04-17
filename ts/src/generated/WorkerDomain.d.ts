@@ -13,7 +13,7 @@ export interface WorkerDomain {
   /**
    * Files / paths this worker owns (glob patterns).
    */
-  file_patterns?: string[];
+  filePatterns?: string[];
   /**
    * Optional specialization label (e.g., "frontend", "tests").
    */
@@ -21,10 +21,10 @@ export interface WorkerDomain {
   /**
    * Additional system-prompt text to inject for this worker.
    */
-  system_prompt_additions?: string | null;
+  systemPromptAdditions?: string | null;
   /**
    * Worker identifier.
    */
-  worker_id: string;
+  workerId: string;
   [k: string]: unknown;
 }

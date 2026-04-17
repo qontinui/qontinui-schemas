@@ -25,6 +25,6 @@ export interface TerminalOutputEvent {
   /**
    * ID of the terminal session producing this output.
    */
-  terminal_id: string;
+  terminalId: string;
   [k: string]: unknown;
 }

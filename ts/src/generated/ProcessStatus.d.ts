@@ -17,26 +17,26 @@ export interface ProcessStatus {
   /**
    * Number of errors detected from this process
    */
-  error_count: number;
+  errorCount: number;
   /**
    * Whether this process has a build command configured
    */
-  has_build_command: boolean;
+  hasBuildCommand: boolean;
   id: string;
   name: string;
   pid?: number | null;
   /**
    * Whether the health port is responding
    */
-  port_healthy?: boolean | null;
+  portHealthy?: boolean | null;
   /**
    * Number of times this process has been restarted
    */
-  restart_count: number;
+  restartCount: number;
   state: ProcessState;
   /**
    * Uptime in seconds (None if not running)
    */
-  uptime_secs?: number | null;
+  uptimeSecs?: number | null;
   [k: string]: unknown;
 }

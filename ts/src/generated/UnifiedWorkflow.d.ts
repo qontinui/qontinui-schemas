@@ -51,13 +51,13 @@ export interface UnifiedWorkflow {
    *
    * Used by the canvas panel manager to show a live requirements tracker.
    */
-  acceptance_criteria?: {
+  acceptanceCriteria?: {
     [k: string]: unknown;
   };
   /**
    * Agentic phase steps (polymorphic JSON array).
    */
-  agentic_steps: UnifiedStep[];
+  agenticSteps: UnifiedStep[];
   /**
    * Whether the AI semantic review actually ran successfully during
    * generation.
@@ -66,16 +66,16 @@ export interface UnifiedWorkflow {
    * verification (e.g., all verification iterations failed at
    * infrastructure level).
    */
-  ai_reviewed: boolean;
+  aiReviewed: boolean;
   /**
    * Whether to pause for human approval after each agentic phase.
    */
-  approval_gate: boolean;
+  approvalGate: boolean;
   /**
    * Whether to auto-include contexts based on task mentions (default:
    * `true`).
    */
-  auto_include_contexts: boolean;
+  autoIncludeContexts: boolean;
   /**
    * Category for organization.
    */
@@ -87,12 +87,12 @@ export interface UnifiedWorkflow {
    * `save_workflow_artifact`. Default (`false`) runs automation first,
    * then prompts.
    */
-  completion_prompts_first: boolean;
+  completionPromptsFirst: boolean;
   /**
    * Completion phase steps (polymorphic JSON array) — runs once after the
    * verification loop exits.
    */
-  completion_steps: UnifiedStep[];
+  completionSteps: UnifiedStep[];
   /**
    * Per-constraint overrides: map of `constraint_id` to enabled (`true`) /
    * disabled (`false`).
@@ -100,27 +100,27 @@ export interface UnifiedWorkflow {
    * Applied to the constraint engine at execution time, after loading
    * builtins and config.
    */
-  constraint_overrides?: {
+  constraintOverrides?: {
     [k: string]: boolean;
   };
   /**
    * Manually added context IDs.
    */
-  context_ids?: string[];
+  contextIds?: string[];
   /**
    * Cost annotations computed during generation (opaque JSON blob).
    */
-  cost_annotations?: {
+  costAnnotations?: {
     [k: string]: unknown;
   };
   /**
    * ISO 8601 timestamp of creation.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Dependency graph computed during generation (opaque JSON blob).
    */
-  dependency_graph?: {
+  dependencyGraph?: {
     [k: string]: unknown;
   };
   /**
@@ -130,29 +130,29 @@ export interface UnifiedWorkflow {
   /**
    * Disabled context IDs (excluded from auto-include).
    */
-  disabled_context_ids?: string[];
+  disabledContextIds?: string[];
   /**
    * Whether to run a completion sweep after verification passes.
    *
    * The sweep reviews all completed work for gaps before proceeding to
    * completion.
    */
-  enable_sweep: boolean;
+  enableSweep: boolean;
   /**
    * When `true`, the pipeline will stop execution if accumulated token
    * usage exceeds the token budget. Disabled by default — only logs
    * warnings.
    */
-  enforce_token_budget: boolean;
+  enforceTokenBudget: boolean;
   /**
    * Flow control configuration as a JSON string (e.g., concurrency limits,
    * queue behavior).
    */
-  flow_control_json?: string | null;
+  flowControlJson?: string | null;
   /**
    * Task run ID that generated this workflow (for meta-workflow tracking).
    */
-  generated_by_task_run_id?: string | null;
+  generatedByTaskRunId?: string | null;
   /**
    * Whether to automatically include health check steps before
    * verification.
@@ -161,7 +161,7 @@ export interface UnifiedWorkflow {
    * are prepended to verification steps to verify configured servers are
    * running.
    */
-  health_check_enabled: boolean;
+  healthCheckEnabled: boolean;
   /**
    * URLs to health check before verification (user-configurable).
    *
@@ -169,7 +169,7 @@ export interface UnifiedWorkflow {
    * If empty, no health checks are performed even if `health_check_enabled`
    * is true.
    */
-  health_check_urls?: HealthCheckUrl[];
+  healthCheckUrls?: HealthCheckUrl[];
   /**
    * Whether HTN (Hierarchical Task Network) planning is enabled for this
    * workflow.
@@ -177,21 +177,21 @@ export interface UnifiedWorkflow {
    * When `true`, the loop attempts structured plan-based fixes before
    * falling back to AI agentic sessions.
    */
-  htn_enabled: boolean;
+  htnEnabled: boolean;
   /**
    * Path to a serialized state machine JSON file for HTN planning.
    *
    * When `None` and HTN is enabled, defaults to the bundled
    * `data/runner_state_machine.json`.
    */
-  htn_state_machine_path?: string | null;
+  htnStateMachinePath?: string | null;
   /**
    * UI Bridge URL for HTN planning (e.g., `"http://localhost:1420"`).
    *
    * When set, the HTN planner connects to UI Bridge for querying element
    * state. If `None`, HTN runs in plan-only mode without GUI execution.
    */
-  htn_ui_bridge_url?: string | null;
+  htnUiBridgeUrl?: string | null;
   /**
    * Unique identifier (UUID v4).
    */
@@ -199,21 +199,21 @@ export interface UnifiedWorkflow {
   /**
    * Whether this workflow is marked as a favorite for quick access.
    */
-  is_favorite: boolean;
-  log_source_selection?: LogSourceSelection;
+  isFavorite: boolean;
+  logSourceSelection?: LogSourceSelection;
   /**
    * Whether to automatically include a `log_watch` step before verification.
    *
    * When enabled (default), a `log_watch` step is prepended to
    * verification steps to detect runtime errors in backend/frontend logs.
    */
-  log_watch_enabled: boolean;
+  logWatchEnabled: boolean;
   /**
    * Maximum number of CI-triggered auto-resumes before requiring human
    * intervention. Used by the PR watcher integration. `0` = disabled.
    * Default: `10`.
    */
-  max_ci_auto_resumes: number;
+  maxCiAutoResumes: number;
   /**
    * Maximum consecutive non-improving fix attempts before escalating.
    *
@@ -221,18 +221,18 @@ export interface UnifiedWorkflow {
    * iterations, the loop exits with `fix_attempts_exhausted`. `0` =
    * disabled. Default: `3`.
    */
-  max_fix_attempts: number;
+  maxFixAttempts: number;
   /**
    * Maximum iterations for the agentic phase.
    *
    * `None` means no iteration cap — the loop terminates on success,
    * explicit stop, or fix-attempt exhaustion.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   /**
    * Maximum number of sweep iterations (default: `5`).
    */
-  max_sweep_iterations: number;
+  maxSweepIterations: number;
   /**
    * Model override.
    */
@@ -240,7 +240,7 @@ export interface UnifiedWorkflow {
   /**
    * Per-phase model overrides.
    */
-  model_overrides?: {
+  modelOverrides?: {
     [k: string]: ModelOverrideConfig;
   };
   /**
@@ -255,7 +255,7 @@ export interface UnifiedWorkflow {
    * specialized agents (quick-fix for lint/compilation, feature-fix for
    * missing functionality). Default: `true`.
    */
-  multi_agent_mode: boolean;
+  multiAgentMode: boolean;
   /**
    * Display name.
    */
@@ -263,7 +263,7 @@ export interface UnifiedWorkflow {
   /**
    * Per-phase timeout configuration as a JSON string.
    */
-  phase_timeouts_json?: string | null;
+  phaseTimeoutsJson?: string | null;
   /**
    * Whether to automatically include a pre-flight environment check at the
    * start of setup.
@@ -273,7 +273,7 @@ export interface UnifiedWorkflow {
    * Uses the global setting from Settings if not explicitly set per
    * workflow.
    */
-  preflight_check_enabled: boolean;
+  preflightCheckEnabled: boolean;
   /**
    * Custom developer prompt template for this workflow.
    *
@@ -282,7 +282,7 @@ export interface UnifiedWorkflow {
    * `{{ITERATION}}`, `{{MAX_ITERATIONS}}`, `{{GOAL}}`,
    * `{{EXECUTION_STEPS}}`, `{{WORKSPACE_ESCAPED}}`.
    */
-  prompt_template?: string | null;
+  promptTemplate?: string | null;
   /**
    * AI provider override.
    */
@@ -290,7 +290,7 @@ export interface UnifiedWorkflow {
   /**
    * Quality report from the revision phase (opaque JSON blob).
    */
-  quality_report?: {
+  qualityReport?: {
     [k: string]: unknown;
   };
   /**
@@ -299,13 +299,13 @@ export interface UnifiedWorkflow {
    * When `true`, the AI investigates root causes before fixing failures.
    * Default: `true` for user-created workflows.
    */
-  reflection_mode: boolean;
+  reflectionMode: boolean;
   /**
    * Policy for automatic git rollback when the workflow fails.
    *
    * Values: `"none"` (default), `"last_good"`, `"clean"`.
    */
-  rollback_policy?: string | null;
+  rollbackPolicy?: string | null;
   /**
    * Per-workflow security profile override.
    *
@@ -313,16 +313,16 @@ export interface UnifiedWorkflow {
    * this workflow. Values: `"permissive"`, `"standard"`, `"strict"`,
    * or `"custom"`. If `None`, uses the default from Settings > Security.
    */
-  security_profile?: string | null;
+  securityProfile?: string | null;
   /**
    * Setup phase steps (polymorphic JSON array; see module docs).
    */
-  setup_steps: UnifiedStep[];
+  setupSteps: UnifiedStep[];
   /**
    * Skip AI summary generation at the end (default: `false`, meaning the
    * AI summary is generated).
    */
-  skip_ai_summary: boolean;
+  skipAiSummary: boolean;
   /**
    * Optional stages for multi-stage workflows.
    *
@@ -337,14 +337,14 @@ export interface UnifiedWorkflow {
    * Default: `false` (autonomous mode — continue to the next stage even
    * if the previous failed).
    */
-  stop_on_failure: boolean;
+  stopOnFailure: boolean;
   /**
    * Restrict working directory resolution to the workspace boundary.
    *
    * When `true`, steps cannot resolve paths outside the workspace root.
    * Default: `false` (permissive, current behavior).
    */
-  strict_cwd: boolean;
+  strictCwd: boolean;
   /**
    * Tags for filtering.
    */
@@ -356,7 +356,7 @@ export interface UnifiedWorkflow {
    * as resolved. Used by error-fix workflows generated from the Error
    * Monitor.
    */
-  targeted_error_ids?: number[];
+  targetedErrorIds?: number[];
   /**
    * Optional inactivity timeout in seconds for AI sessions.
    *
@@ -365,14 +365,14 @@ export interface UnifiedWorkflow {
    *
    * Takes precedence over the global AI settings timeout.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Tags for per-execution tool whitelisting.
    *
    * When non-empty, only skills matching at least one tag are included in
    * the AI prompt context, reducing prompt bloat.
    */
-  tool_tags?: string[];
+  toolTags?: string[];
   /**
    * Run the workflow in an isolated git worktree.
    *
@@ -380,11 +380,11 @@ export interface UnifiedWorkflow {
    * Changes stay on the worktree branch and can be merged back after
    * review. Default: `false`.
    */
-  use_worktree: boolean;
+  useWorktree: boolean;
   /**
    * Verification phase steps (polymorphic JSON array).
    */
-  verification_steps: UnifiedStep[];
+  verificationSteps: UnifiedStep[];
   /**
    * Workflow execution architecture override.
    *
@@ -392,6 +392,6 @@ export interface UnifiedWorkflow {
    * instead of the default Traditional loop. When `None`, the system
    * infers the best architecture based on workflow complexity.
    */
-  workflow_architecture?: WorkflowArchitecture | null;
+  workflowArchitecture?: WorkflowArchitecture | null;
   [k: string]: unknown;
 }

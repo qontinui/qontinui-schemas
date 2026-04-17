@@ -22,7 +22,7 @@ export interface RoutingRule {
   /**
    * Max tokens override when this rule matches.
    */
-  max_tokens?: number | null;
+  maxTokens?: number | null;
   /**
    * Model to use when this rule matches.
    */

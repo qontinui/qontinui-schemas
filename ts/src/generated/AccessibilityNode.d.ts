@@ -20,7 +20,7 @@ export interface AccessibilityNode {
   /**
    * Automation ID / test-ID attribute.
    */
-  automation_id?: string | null;
+  automationId?: string | null;
   /**
    * Bounding rectangle in screen coordinates.
    */
@@ -32,7 +32,7 @@ export interface AccessibilityNode {
   /**
    * CSS class name or control class.
    */
-  class_name?: string | null;
+  className?: string | null;
   /**
    * Accessible description (additional context).
    */
@@ -40,11 +40,11 @@ export interface AccessibilityNode {
   /**
    * HTML tag name (for web elements).
    */
-  html_tag?: string | null;
+  htmlTag?: string | null;
   /**
    * Whether the element accepts user interaction.
    */
-  is_interactive: boolean;
+  isInteractive: boolean;
   /**
    * Hierarchical level (for headings, tree items).
    */

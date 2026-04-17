@@ -21,7 +21,7 @@ export interface AgenticPhaseOutput {
   /**
    * Files modified during this agentic phase.
    */
-  files_modified: FileChange[];
+  filesModified: FileChange[];
   /**
    * Findings reported by the AI.
    */
@@ -29,11 +29,11 @@ export interface AgenticPhaseOutput {
   /**
    * Dynamically injected verification steps.
    */
-  injected_steps: unknown[];
+  injectedSteps: unknown[];
   /**
    * Reflection fixes (when reflection_mode is enabled).
    */
-  reflection_fixes: ReflectionFixOutput[];
+  reflectionFixes: ReflectionFixOutput[];
   status: AgenticStatus;
   /**
    * Human-readable summary of what was done.
@@ -46,6 +46,6 @@ export interface AgenticPhaseOutput {
   /**
    * Reason why errors are unfixable (if unfixable is true).
    */
-  unfixable_reason: string | null;
+  unfixableReason: string | null;
   [k: string]: unknown;
 }

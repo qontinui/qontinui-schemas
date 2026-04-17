@@ -27,22 +27,22 @@ export interface NodeMetadata {
   /**
    * Whether this action can have child nodes.
    */
-  is_expandable: boolean;
+  isExpandable: boolean;
   /**
    * Whether this action is displayed inline.
    */
-  is_inline: boolean;
+  isInline: boolean;
   outcome?: Outcome | null;
   runtime?: RuntimeData | null;
   /**
    * Screenshot reference (path or URL).
    */
-  screenshot_reference?: string | null;
-  state_context?: StateContext | null;
+  screenshotReference?: string | null;
+  stateContext?: StateContext | null;
   timing?: TimingInfo | null;
   /**
    * Visual-debug image reference (path or URL).
    */
-  visual_debug_reference?: string | null;
+  visualDebugReference?: string | null;
   [k: string]: unknown;
 }

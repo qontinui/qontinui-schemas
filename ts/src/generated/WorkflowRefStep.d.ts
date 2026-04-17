@@ -17,11 +17,11 @@ export interface WorkflowRefStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -31,7 +31,7 @@ export interface WorkflowRefStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -49,17 +49,17 @@ export interface WorkflowRefStep {
   /**
    * Whether to inherit model overrides from the parent context (default: `true`).
    */
-  ref_inherit_model_overrides?: boolean | null;
+  refInheritModelOverrides?: boolean | null;
   /**
    * Input variables substituted into the child workflow's prompt.
    */
-  ref_workflow_inputs?: {
+  refWorkflowInputs?: {
     [k: string]: string;
   } | null;
   /**
    * Display name of the referenced workflow (denormalized for UI).
    */
-  ref_workflow_name?: string | null;
+  refWorkflowName?: string | null;
   /**
    * Whether this step is required (default: `true` on consumer side).
    */
@@ -75,20 +75,20 @@ export interface WorkflowRefStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   /**
    * ID of the saved workflow to run.
    */
-  workflow_id?: string | null;
+  workflowId?: string | null;
   [k: string]: unknown;
 }

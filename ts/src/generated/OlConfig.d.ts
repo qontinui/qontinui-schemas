@@ -18,13 +18,13 @@ export interface OlConfig {
   /**
    * The full [`OrchestrationLoopConfig`] as a JSON blob.
    */
-  config_json: {
+  configJson: {
     [k: string]: unknown;
   };
   /**
    * ISO 8601 creation timestamp.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Optional free-form description.
    */
@@ -36,7 +36,7 @@ export interface OlConfig {
   /**
    * Whether this preset is pinned as a favorite in the UI.
    */
-  is_favorite: boolean;
+  isFavorite: boolean;
   /**
    * Human-readable name (e.g., "Nightly regression sweep").
    */
@@ -44,6 +44,6 @@ export interface OlConfig {
   /**
    * ISO 8601 last-modified timestamp.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }

@@ -12,7 +12,7 @@ export interface CostTrendDataPoint {
   /**
    * Total cost in USD for the period.
    */
-  cost_usd: number;
+  costUsd: number;
   /**
    * Period label in `YYYY-MM-DD` format.
    */
@@ -20,18 +20,18 @@ export interface CostTrendDataPoint {
   /**
    * Number of LLM actions in the period.
    */
-  llm_action_count: number;
+  llmActionCount: number;
   /**
    * Number of runs in the period.
    */
-  runs_count: number;
+  runsCount: number;
   /**
    * Total input tokens for the period.
    */
-  tokens_input: number;
+  tokensInput: number;
   /**
    * Total output tokens for the period.
    */
-  tokens_output: number;
+  tokensOutput: number;
   [k: string]: unknown;
 }

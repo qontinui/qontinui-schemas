@@ -12,7 +12,7 @@ export interface WriteConfigRequest {
   /**
    * Project path for the `constraints.toml`. Defaults to workspace root.
    */
-  project_path?: string | null;
+  projectPath?: string | null;
   /**
    * Raw TOML content to validate and write.
    */

@@ -89,12 +89,16 @@ pub enum OutputStream {
 
 /// A single line of output from a managed process.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct OutputLine {
     /// ISO 8601 timestamp
+    #[serde(alias = "timestamp")]
     pub timestamp: String,
     /// Which stream this came from
+    #[serde(alias = "stream")]
     pub stream: OutputStream,
     /// The line content
+    #[serde(alias = "line")]
     pub line: String,
 }
 
@@ -124,60 +128,65 @@ fn default_true() -> bool {
 /// frontend through the `get_process_configs` command and to MCP consumers
 /// through the `processes` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessConfig {
     /// Unique identifier (UUID)
+    #[serde(alias = "id")]
     pub id: String,
     /// Human-readable name (e.g., "FastAPI Backend")
+    #[serde(alias = "name")]
     pub name: String,
     /// Command to execute (e.g., "python", "npm", "cargo")
+    #[serde(alias = "command")]
     pub command: String,
     /// Command arguments (e.g., ["run", "dev"])
-    #[serde(default)]
+    #[serde(default, alias = "args")]
     pub args: Vec<String>,
     /// Working directory (absolute path)
+    #[serde(alias = "cwd")]
     pub cwd: String,
     /// Extra environment variables
-    #[serde(default)]
+    #[serde(default, alias = "env")]
     pub env: HashMap<String, String>,
     /// Port to check for health (optional)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "health_port")]
     pub health_port: Option<u16>,
     /// Parser type for error detection
-    #[serde(default)]
+    #[serde(default, alias = "parser")]
     pub parser: ParserType,
     /// Start when runner launches
-    #[serde(default)]
+    #[serde(default, alias = "auto_start")]
     pub auto_start: bool,
     /// Category (e.g., "backend", "frontend")
-    #[serde(default = "default_category")]
+    #[serde(default = "default_category", alias = "category")]
     pub category: String,
     /// Ring buffer max lines (default 2000)
-    #[serde(default = "default_buffer_size")]
+    #[serde(default = "default_buffer_size", alias = "buffer_size")]
     pub buffer_size: usize,
     /// Whether this config is enabled
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "enabled")]
     pub enabled: bool,
     /// Regex patterns for errors to ignore (matched against error message and
     /// raw entry).
-    #[serde(default)]
+    #[serde(default, alias = "ignore_patterns")]
     pub ignore_patterns: Vec<String>,
     /// Startup group for ordered startup (lower groups start first, default 0).
     /// Processes in the same group start together. The runner waits for health
     /// ports in each group to be ready before starting the next group.
-    #[serde(default)]
+    #[serde(default, alias = "start_group")]
     pub start_group: u32,
     /// Whether this is a dev-mode-only service (not started in production
     /// builds).
-    #[serde(default)]
+    #[serde(default, alias = "dev_only")]
     pub dev_only: bool,
     /// Whether rebuild and AI fix features are enabled for this process.
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "rebuild_enabled")]
     pub rebuild_enabled: bool,
     /// Build command to run before restarting (e.g., "cargo", "npm").
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "build_command")]
     pub build_command: Option<String>,
     /// Build command arguments (e.g., ["build"], ["run", "build"]).
-    #[serde(default)]
+    #[serde(default, alias = "build_args")]
     pub build_args: Vec<String>,
 }
 
@@ -189,20 +198,31 @@ pub struct ProcessConfig {
 ///
 /// Derived from runtime state each time it is requested; never persisted.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessStatus {
+    #[serde(alias = "id")]
     pub id: String,
+    #[serde(alias = "name")]
     pub name: String,
+    #[serde(alias = "state")]
     pub state: ProcessState,
+    #[serde(alias = "pid")]
     pub pid: Option<u32>,
     /// Uptime in seconds (None if not running)
+    #[serde(alias = "uptime_secs")]
     pub uptime_secs: Option<u64>,
     /// Whether the health port is responding
+    #[serde(alias = "port_healthy")]
     pub port_healthy: Option<bool>,
     /// Number of times this process has been restarted
+    #[serde(alias = "restart_count")]
     pub restart_count: u32,
     /// Number of errors detected from this process
+    #[serde(alias = "error_count")]
     pub error_count: u32,
+    #[serde(alias = "category")]
     pub category: String,
     /// Whether this process has a build command configured
+    #[serde(alias = "has_build_command")]
     pub has_build_command: bool,
 }

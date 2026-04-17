@@ -20,23 +20,23 @@ export interface RunPromptRequest {
   /**
    * Display-only version of the prompt (shown in the UI).
    */
-  display_prompt?: string | null;
+  displayPrompt?: string | null;
   /**
    * Attached image paths.
    */
-  image_paths?: string[] | null;
+  imagePaths?: string[] | null;
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Cap on trace screenshots to include.
    */
-  max_trace_screenshots?: number | null;
+  maxTraceScreenshots?: number | null;
   /**
    * Cap on video frames to extract for the prompt.
    */
-  max_video_frames?: number | null;
+  maxVideoFrames?: number | null;
   /**
    * Display name for the task.
    */
@@ -44,14 +44,14 @@ export interface RunPromptRequest {
   /**
    * Hard timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Optional path to a trace file.
    */
-  trace_path?: string | null;
+  tracePath?: string | null;
   /**
    * Attached video paths.
    */
-  video_paths?: string[] | null;
+  videoPaths?: string[] | null;
   [k: string]: unknown;
 }

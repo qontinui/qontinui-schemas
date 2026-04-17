@@ -17,16 +17,16 @@ import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
  * possibly `null`), so they use `serde(default)` without `skip_serializing_if`.
  */
 export interface TaskRunFinding {
-  action_type: TaskRunFindingActionType;
+  actionType: TaskRunFindingActionType;
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
    */
-  code_snippet: string | null;
+  codeSnippet: string | null;
   /**
    * Column number where the issue was found.
    */
-  column_number: number | null;
+  columnNumber: number | null;
   /**
    * Full description.
    */
@@ -34,15 +34,15 @@ export interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the finding was detected.
    */
-  detected_at: string;
+  detectedAt: string;
   /**
    * Session number in which the finding was detected.
    */
-  detected_in_session: number;
+  detectedInSession: number;
   /**
    * File path where the issue was found.
    */
-  file_path: string | null;
+  filePath: string | null;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -50,15 +50,15 @@ export interface TaskRunFinding {
   /**
    * Suggested response options for the user, if input is needed.
    */
-  input_options: string[] | null;
+  inputOptions: string[] | null;
   /**
    * Line number where the issue was found.
    */
-  line_number: number | null;
+  lineNumber: number | null;
   /**
    * Whether this finding requires user input.
    */
-  needs_input: boolean;
+  needsInput: boolean;
   /**
    * Question posed to the user, if input is needed.
    */
@@ -70,21 +70,21 @@ export interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the finding was resolved.
    */
-  resolved_at: string | null;
+  resolvedAt: string | null;
   /**
    * Session number in which the finding was resolved.
    */
-  resolved_in_session: number | null;
+  resolvedInSession: number | null;
   severity: TaskRunFindingSeverity;
   /**
    * Hash used to deduplicate findings across runs.
    */
-  signature_hash: string | null;
+  signatureHash: string | null;
   status: TaskRunFindingStatus;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Short human-readable title.
    */
@@ -92,10 +92,10 @@ export interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   /**
    * The user's response, if any.
    */
-  user_response: string | null;
+  userResponse: string | null;
   [k: string]: unknown;
 }

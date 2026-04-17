@@ -25,11 +25,11 @@ export interface CreateMcpCallInput {
   /**
    * Wall-clock duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message if the call failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * JSON-serialized extractions (variables pulled from the response).
    */
@@ -37,7 +37,7 @@ export interface CreateMcpCallInput {
   /**
    * JSON-serialized arguments after variable resolution.
    */
-  resolved_arguments?: string | null;
+  resolvedArguments?: string | null;
   /**
    * JSON-serialized response body.
    */
@@ -45,16 +45,16 @@ export interface CreateMcpCallInput {
   /**
    * Response type tag (see [`McpToolCallResult::response_type`]).
    */
-  response_type: string;
-  server_id: string;
-  server_name?: string | null;
-  step_id: string;
-  step_name?: string | null;
+  responseType: string;
+  serverId: string;
+  serverName?: string | null;
+  stepId: string;
+  stepName?: string | null;
   /**
    * Whether the call succeeded.
    */
   success: boolean;
-  task_run_id: string;
-  tool_name: string;
+  taskRunId: string;
+  toolName: string;
   [k: string]: unknown;
 }

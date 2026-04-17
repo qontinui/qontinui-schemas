@@ -20,19 +20,19 @@ export interface VerificationResultResponse {
   /**
    * Whether all steps passed.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * ISO 8601 timestamp when the record was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Whether a critical step failure short-circuited the phase.
    */
-  critical_failure: boolean;
+  criticalFailure: boolean;
   /**
    * Number of steps that failed.
    */
-  failed_steps: number;
+  failedSteps: number;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -44,23 +44,23 @@ export interface VerificationResultResponse {
   /**
    * Number of steps that passed.
    */
-  passed_steps: number;
-  result_json: VerificationPhaseResult;
+  passedSteps: number;
+  resultJson: VerificationPhaseResult;
   /**
    * Number of steps that were skipped.
    */
-  skipped_steps: number;
+  skippedSteps: number;
   /**
    * ID of the owning task run.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Total duration of the phase in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Total number of steps executed.
    */
-  total_steps: number;
+  totalSteps: number;
   [k: string]: unknown;
 }

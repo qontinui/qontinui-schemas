@@ -8,53 +8,53 @@
     "test",
     "example"
   ],
-  "setup_steps": [],
-  "verification_steps": [],
-  "agentic_steps": [],
-  "completion_steps": [],
-  "max_iterations": 5,
-  "max_fix_attempts": 3,
-  "max_ci_auto_resumes": 10,
+  "setupSteps": [],
+  "verificationSteps": [],
+  "agenticSteps": [],
+  "completionSteps": [],
+  "maxIterations": 5,
+  "maxFixAttempts": 3,
+  "maxCiAutoResumes": 10,
   "provider": "anthropic",
   "model": "claude-opus-4-6",
-  "model_overrides": {
+  "modelOverrides": {
     "verification": {
       "provider": "anthropic",
       "model": "claude-haiku-4",
       "temperature": 0.2
     }
   },
-  "skip_ai_summary": false,
-  "log_source_selection": {
+  "skipAiSummary": false,
+  "logSourceSelection": {
     "profile_id": "runner-default-profile"
   },
-  "auto_include_contexts": true,
-  "log_watch_enabled": true,
-  "health_check_enabled": true,
-  "health_check_urls": [
+  "autoIncludeContexts": true,
+  "logWatchEnabled": true,
+  "healthCheckEnabled": true,
+  "healthCheckUrls": [
     {
       "name": "Backend API",
       "url": "http://localhost:8000/health",
-      "expected_status": 200,
-      "timeout_seconds": 30,
-      "is_critical": true
+      "expectedStatus": 200,
+      "timeoutSeconds": 30,
+      "isCritical": true
     }
   ],
-  "preflight_check_enabled": true,
-  "enable_sweep": false,
-  "max_sweep_iterations": 5,
+  "preflightCheckEnabled": true,
+  "enableSweep": false,
+  "maxSweepIterations": 5,
   "stages": [
     {
       "id": "stage-build-0001",
       "name": "Build",
       "description": "Compile the runner workspace.",
-      "setup_steps": [],
-      "verification_steps": [],
-      "agentic_steps": [],
-      "completion_steps": [],
-      "max_iterations": 3,
-      "approval_gate": false,
-      "completion_prompts_first": false,
+      "setupSteps": [],
+      "verificationSteps": [],
+      "agenticSteps": [],
+      "completionSteps": [],
+      "maxIterations": 3,
+      "approvalGate": false,
+      "completionPromptsFirst": false,
       "outputs": [
         {
           "key": "build_artifact_path",
@@ -66,37 +66,37 @@
       "id": "stage-test-0002",
       "name": "Test",
       "description": "Run the test suite against the build artifact.",
-      "setup_steps": [],
-      "verification_steps": [],
-      "agentic_steps": [],
-      "completion_steps": [],
-      "max_iterations": 5,
-      "approval_gate": false,
+      "setupSteps": [],
+      "verificationSteps": [],
+      "agenticSteps": [],
+      "completionSteps": [],
+      "maxIterations": 5,
+      "approvalGate": false,
       "condition": {
-        "if_previous": "passed"
+        "ifPrevious": "passed"
       },
-      "completion_prompts_first": false,
+      "completionPromptsFirst": false,
       "inputs": [
         {
           "key": "build_artifact_path",
-          "from_stage": "stage-build-0001",
+          "fromStage": "stage-build-0001",
           "required": true
         }
       ]
     }
   ],
-  "stop_on_failure": false,
-  "approval_gate": false,
-  "reflection_mode": true,
-  "completion_prompts_first": false,
-  "is_favorite": false,
-  "multi_agent_mode": true,
-  "enforce_token_budget": false,
-  "strict_cwd": false,
-  "use_worktree": false,
-  "workflow_architecture": "traditional",
-  "ai_reviewed": true,
-  "created_at": "2026-04-10T08:00:00Z",
+  "stopOnFailure": false,
+  "approvalGate": false,
+  "reflectionMode": true,
+  "completionPromptsFirst": false,
+  "isFavorite": false,
+  "multiAgentMode": true,
+  "enforceTokenBudget": false,
+  "strictCwd": false,
+  "useWorktree": false,
+  "workflowArchitecture": "traditional",
+  "aiReviewed": true,
+  "createdAt": "2026-04-10T08:00:00Z",
   "modified_at": "2026-04-14T09:00:00Z",
-  "htn_enabled": false
+  "htnEnabled": false
 }

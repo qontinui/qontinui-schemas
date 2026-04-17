@@ -20,7 +20,7 @@ export interface CreateScheduledTaskRequest {
   /**
    * Trigger auto-fix on failure.
    */
-  auto_fix_on_failure?: boolean | null;
+  autoFixOnFailure?: boolean | null;
   /**
    * Optional conditions that must be met before execution.
    */
@@ -37,11 +37,11 @@ export interface CreateScheduledTaskRequest {
   /**
    * Skip future runs once the task has succeeded.
    */
-  skip_if_completed?: boolean | null;
+  skipIfCompleted?: boolean | null;
   /**
    * Free-form success criteria description.
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   task: ScheduledTaskType;
   [k: string]: unknown;
 }

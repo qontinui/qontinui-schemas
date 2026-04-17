@@ -15,11 +15,11 @@ export interface ConstraintResult {
   /**
    * The id of the constraint that was evaluated.
    */
-  constraint_id: string;
+  constraintId: string;
   /**
    * The human-readable name of the constraint that was evaluated.
    */
-  constraint_name: string;
+  constraintName: string;
   /**
    * Whether the constraint passed.
    */

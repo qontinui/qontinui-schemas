@@ -24,28 +24,28 @@ export interface TaskRunBackendDetail {
   /**
    * Whether the task will auto-continue into another session on exit.
    */
-  auto_continue: boolean;
+  autoContinue: boolean;
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at: string | null;
+  completedAt: string | null;
   /**
    * ISO 8601 timestamp when the task was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * User who created the task run, if known.
    */
-  created_by_user_id: string | null;
+  createdByUserId: string | null;
   /**
    * Total duration in seconds.
    */
-  duration_seconds: number | null;
+  durationSeconds: number | null;
   /**
    * Error message if the task failed.
    */
-  error_message: string | null;
-  finding_summary: TaskRunFindingSummary;
+  errorMessage: string | null;
+  findingSummary: TaskRunFindingSummary;
   /**
    * Findings surfaced during this task run.
    */
@@ -53,7 +53,7 @@ export interface TaskRunBackendDetail {
   /**
    * Whether the full output log was persisted.
    */
-  full_output_stored: boolean;
+  fullOutputStored: boolean;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -61,15 +61,15 @@ export interface TaskRunBackendDetail {
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions: number | null;
+  maxSessions: number | null;
   /**
    * Short summary of the run output, if stored.
    */
-  output_summary: string | null;
+  outputSummary: string | null;
   /**
    * Owning project ID, if scoped to a project.
    */
-  project_id: string | null;
+  projectId: string | null;
   /**
    * Original prompt text.
    */
@@ -77,7 +77,7 @@ export interface TaskRunBackendDetail {
   /**
    * Runner instance that executed the task, if known.
    */
-  runner_id: string | null;
+  runnerId: string | null;
   /**
    * AI sessions associated with this task run.
    */
@@ -85,15 +85,15 @@ export interface TaskRunBackendDetail {
   /**
    * Number of AI sessions that have been run.
    */
-  sessions_count: number;
+  sessionsCount: number;
   status: TaskRunStatus;
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }

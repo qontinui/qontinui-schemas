@@ -45,13 +45,15 @@ pub enum SearchStrategy {
 
 /// Polling configuration for search operations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PollingConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "interval")]
     pub interval: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "maxAttempts"
+        rename = "maxAttempts",
+        alias = "max_attempts"
     )]
     pub max_attempts: Option<i64>,
 }
@@ -71,195 +73,224 @@ pub enum MatchMethod {
 
 /// Advanced pattern-matching options.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PatternOptions {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "matchMethod"
+        rename = "matchMethod",
+        alias = "match_method"
     )]
     pub match_method: Option<MatchMethod>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "scaleInvariant"
+        rename = "scaleInvariant",
+        alias = "scale_invariant"
     )]
     pub scale_invariant: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "rotationInvariant"
+        rename = "rotationInvariant",
+        alias = "rotation_invariant"
     )]
     pub rotation_invariant: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "minScale")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "minScale", alias = "min_scale")]
     pub min_scale: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "maxScale")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "maxScale", alias = "max_scale")]
     pub max_scale: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "scaleStep"
+        rename = "scaleStep",
+        alias = "scale_step"
     )]
     pub scale_step: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "minRotation"
+        rename = "minRotation",
+        alias = "min_rotation"
     )]
     pub min_rotation: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "maxRotation"
+        rename = "maxRotation",
+        alias = "max_rotation"
     )]
     pub max_rotation: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "rotationStep"
+        rename = "rotationStep",
+        alias = "rotation_step"
     )]
     pub rotation_step: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "useGrayscale"
+        rename = "useGrayscale",
+        alias = "use_grayscale"
     )]
     pub use_grayscale: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "useColorReduction"
+        rename = "useColorReduction",
+        alias = "use_color_reduction"
     )]
     pub use_color_reduction: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "colorTolerance"
+        rename = "colorTolerance",
+        alias = "color_tolerance"
     )]
     pub color_tolerance: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "useEdges")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "useEdges", alias = "use_edges")]
     pub use_edges: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "edgeThreshold1"
+        rename = "edgeThreshold1",
+        alias = "edge_threshold1"
     )]
     pub edge_threshold1: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "edgeThreshold2"
+        rename = "edgeThreshold2",
+        alias = "edge_threshold2"
     )]
     pub edge_threshold2: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "nonMaxSuppression"
+        rename = "nonMaxSuppression",
+        alias = "non_max_suppression"
     )]
     pub non_max_suppression: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "nmsThreshold"
+        rename = "nmsThreshold",
+        alias = "nms_threshold"
     )]
     pub nms_threshold: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "minDistanceBetweenMatches"
+        rename = "minDistanceBetweenMatches",
+        alias = "min_distance_between_matches"
     )]
     pub min_distance_between_matches: Option<f64>,
 }
 
 /// Match adjustment — modify the matched region before acting.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MatchAdjustment {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "targetPosition"
+        rename = "targetPosition",
+        alias = "target_position"
     )]
     pub target_position: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "targetOffset"
+        rename = "targetOffset",
+        alias = "target_offset"
     )]
     pub target_offset: Option<Coordinates>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addW")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addW", alias = "add_w")]
     pub add_w: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addH")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addH", alias = "add_h")]
     pub add_h: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "absoluteW"
+        rename = "absoluteW",
+        alias = "absolute_w"
     )]
     pub absolute_w: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "absoluteH"
+        rename = "absoluteH",
+        alias = "absolute_h"
     )]
     pub absolute_h: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addX")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addX", alias = "add_x")]
     pub add_x: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addY")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addY", alias = "add_y")]
     pub add_y: Option<i64>,
 }
 
 /// Search options for target finding.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchOptions {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "similarity")]
     pub similarity: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout")]
     pub timeout: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "searchRegions"
+        rename = "searchRegions",
+        alias = "search_regions"
     )]
     pub search_regions: Option<Vec<Region>>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "searchStrategy"
+        rename = "searchStrategy",
+        alias = "strategy"
     )]
     pub strategy: Option<SearchStrategy>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "useDefinedRegion"
+        rename = "useDefinedRegion",
+        alias = "use_defined_region"
     )]
     pub use_defined_region: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "maxMatchesToActOn"
+        rename = "maxMatchesToActOn",
+        alias = "max_matches_to_act_on"
     )]
     pub max_matches_to_act_on: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "minMatches"
+        rename = "minMatches",
+        alias = "min_matches"
     )]
     pub min_matches: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "maxMatches"
+        rename = "maxMatches",
+        alias = "max_matches"
     )]
     pub max_matches: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "polling")]
     pub polling: Option<PollingConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "pattern")]
     pub pattern: Option<PatternOptions>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "adjustment")]
     pub adjustment: Option<MatchAdjustment>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "captureImage"
+        rename = "captureImage",
+        alias = "capture_image"
     )]
     pub capture_image: Option<bool>,
 }
@@ -296,79 +327,91 @@ pub enum TextMatchType {
 
 /// Text search options for OCR-based finding.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TextSearchOptions {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "ocrEngine"
+        rename = "ocrEngine",
+        alias = "ocr_engine"
     )]
     pub ocr_engine: Option<OcrEngine>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "language")]
     pub language: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "whitelistChars"
+        rename = "whitelistChars",
+        alias = "whitelist_chars"
     )]
     pub whitelist_chars: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "blacklistChars"
+        rename = "blacklistChars",
+        alias = "blacklist_chars"
     )]
     pub blacklist_chars: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "matchType"
+        rename = "matchType",
+        alias = "match_type"
     )]
     pub match_type: Option<TextMatchType>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "caseSensitive"
+        rename = "caseSensitive",
+        alias = "case_sensitive"
     )]
     pub case_sensitive: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "ignoreWhitespace"
+        rename = "ignoreWhitespace",
+        alias = "ignore_whitespace"
     )]
     pub ignore_whitespace: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "normalizeUnicode"
+        rename = "normalizeUnicode",
+        alias = "normalize_unicode"
     )]
     pub normalize_unicode: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "fuzzyThreshold"
+        rename = "fuzzyThreshold",
+        alias = "fuzzy_threshold"
     )]
     pub fuzzy_threshold: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "editDistance"
+        rename = "editDistance",
+        alias = "edit_distance"
     )]
     pub edit_distance: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "preprocessing")]
     pub preprocessing: Option<Vec<String>>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "scaleFactor"
+        rename = "scaleFactor",
+        alias = "scale_factor"
     )]
     pub scale_factor: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "psmMode")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "psmMode", alias = "psm_mode")]
     pub psm_mode: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "oemMode")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "oemMode", alias = "oem_mode")]
     pub oem_mode: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "confidenceThreshold"
+        rename = "confidenceThreshold",
+        alias = "confidence_threshold"
     )]
     pub confidence_threshold: Option<f64>,
 }

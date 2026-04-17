@@ -18,12 +18,12 @@ import type { FindingUserInput } from './FindingUserInput';
  * observation.
  */
 export interface FindingCreate {
-  action_type: FindingActionType;
+  actionType: FindingActionType;
   category: FindingCategory;
   /**
    * Code context, if the finding relates to specific code.
    */
-  code_context?: FindingCodeContext | null;
+  codeContext?: FindingCodeContext | null;
   /**
    * Detailed description of the finding.
    */
@@ -31,16 +31,16 @@ export interface FindingCreate {
   /**
    * Session number where the finding was detected.
    */
-  session_num: number;
+  sessionNum: number;
   severity: FindingSeverity;
   /**
    * Hash used to deduplicate findings across sessions.
    */
-  signature_hash?: string | null;
+  signatureHash?: string | null;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Brief title describing the finding (max 500 chars on the Python side).
    */
@@ -48,6 +48,6 @@ export interface FindingCreate {
   /**
    * User-input request, if `action_type` requires a user decision.
    */
-  user_input?: FindingUserInput | null;
+  userInput?: FindingUserInput | null;
   [k: string]: unknown;
 }

@@ -12,7 +12,7 @@ export interface SchedulerSettings {
   /**
    * Default `auto_fix_on_failure` value for newly created tasks.
    */
-  default_auto_fix_on_failure: boolean;
+  defaultAutoFixOnFailure: boolean;
   /**
    * Whether the scheduler is enabled globally.
    */
@@ -20,7 +20,7 @@ export interface SchedulerSettings {
   /**
    * Maximum number of scheduled tasks allowed to run concurrently.
    */
-  max_concurrent: number;
+  maxConcurrent: number;
   /**
    * Timezone for schedule interpretation (IANA name). `None` = local time.
    */

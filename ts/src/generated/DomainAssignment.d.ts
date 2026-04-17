@@ -17,7 +17,7 @@ export interface DomainAssignment {
   /**
    * Workers currently assigned to this domain.
    */
-  assigned_workers?: string[];
+  assignedWorkers?: string[];
   /**
    * Description of what this domain covers.
    */
@@ -25,16 +25,16 @@ export interface DomainAssignment {
   /**
    * Success-criterion IDs that are specific to this domain.
    */
-  domain_criteria?: string[];
+  domainCriteria?: string[];
   /**
    * Unique identifier for this domain.
    */
-  domain_id: string;
+  domainId: string;
   /**
    * File patterns that belong to this domain
    * (e.g., `"src/frontend/** /*.ts"`).
    */
-  file_patterns?: string[];
+  filePatterns?: string[];
   /**
    * Keywords that help identify this domain.
    */
@@ -46,6 +46,6 @@ export interface DomainAssignment {
   /**
    * Additional system-prompt context for workers in this domain.
    */
-  system_prompt_context?: string | null;
+  systemPromptContext?: string | null;
   [k: string]: unknown;
 }

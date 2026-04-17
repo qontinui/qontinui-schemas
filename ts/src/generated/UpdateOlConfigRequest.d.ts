@@ -14,7 +14,7 @@ export interface UpdateOlConfigRequest {
   /**
    * Replace the stored config JSON blob.
    */
-  config_json?: {
+  configJson?: {
     [k: string]: unknown;
   };
   /**
@@ -24,7 +24,7 @@ export interface UpdateOlConfigRequest {
   /**
    * Toggle favorite status.
    */
-  is_favorite?: boolean | null;
+  isFavorite?: boolean | null;
   /**
    * Rename the preset.
    */

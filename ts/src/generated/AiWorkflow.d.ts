@@ -19,11 +19,11 @@ export interface AiWorkflow {
   /**
    * Whether to auto-include contexts based on task mentions (default: true).
    */
-  auto_include_contexts: boolean;
+  autoIncludeContexts: boolean;
   /**
    * Whether to capture input for coordinate validation.
    */
-  capture_input_validation?: boolean;
+  captureInputValidation?: boolean;
   /**
    * Category for organization (e.g., `"Testing"`, `"Development"`).
    */
@@ -31,11 +31,11 @@ export interface AiWorkflow {
   /**
    * Manually added context IDs.
    */
-  context_ids?: string[];
+  contextIds?: string[];
   /**
    * ISO 8601 timestamp of creation.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Optional description of what this workflow does.
    */
@@ -43,7 +43,7 @@ export interface AiWorkflow {
   /**
    * Disabled context IDs (excluded from auto-include).
    */
-  disabled_context_ids?: string[];
+  disabledContextIds?: string[];
   /**
    * The goal/objective for this workflow.
    */
@@ -56,11 +56,11 @@ export interface AiWorkflow {
    * Maximum iterations for the AI loop.
    * `None` (omitted) means no cap — loop until success or explicit stop.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   /**
    * ISO 8601 timestamp of last modification.
    */
-  modified_at: string;
+  modifiedAt: string;
   /**
    * Display name for the workflow.
    */

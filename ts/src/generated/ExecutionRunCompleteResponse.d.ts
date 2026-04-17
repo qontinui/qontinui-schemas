@@ -20,19 +20,19 @@ export interface ExecutionRunCompleteResponse {
   /**
    * Total duration in seconds.
    */
-  duration_seconds: number;
+  durationSeconds: number;
   /**
    * ISO 8601 timestamp when the run ended.
    */
-  ended_at: string;
+  endedAt: string;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * ISO 8601 timestamp when the run started.
    */
-  started_at: string;
+  startedAt: string;
   stats: ExecutionStats;
   status: RunStatus;
   [k: string]: unknown;

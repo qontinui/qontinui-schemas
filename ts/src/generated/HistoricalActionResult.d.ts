@@ -15,20 +15,20 @@ export interface HistoricalActionResult {
   /**
    * Human-readable action name.
    */
-  action_name: string;
-  action_type: ExecutionActionType;
+  actionName: string;
+  actionType: ExecutionActionType;
   /**
    * Duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Source state.
    */
-  from_state?: string | null;
+  fromState?: string | null;
   /**
    * Whether a screenshot exists.
    */
-  has_screenshot: boolean;
+  hasScreenshot: boolean;
   /**
    * Action execution ID.
    */
@@ -36,23 +36,23 @@ export interface HistoricalActionResult {
   /**
    * Input parameters captured for the action.
    */
-  input_data?: {
+  inputData?: {
     [k: string]: unknown;
   };
   /**
    * Output produced by the action.
    */
-  output_data?: {
+  outputData?: {
     [k: string]: unknown;
   };
   /**
    * URL to an associated screenshot, if any.
    */
-  screenshot_url?: string | null;
+  screenshotUrl?: string | null;
   status: ActionStatus;
   /**
    * Target state.
    */
-  to_state?: string | null;
+  toState?: string | null;
   [k: string]: unknown;
 }

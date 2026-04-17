@@ -13,7 +13,7 @@ export interface StageInput {
    * Which stage provides this input (stage id). If omitted, searches all
    * prior stages.
    */
-  from_stage?: string | null;
+  fromStage?: string | null;
   /**
    * The key to bind this input to (matches a [`StageOutput::key`] from a
    * prior stage).

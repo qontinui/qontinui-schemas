@@ -20,7 +20,7 @@ export interface TicketComment {
   /**
    * ISO 8601 timestamp when the comment was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Provider-assigned comment ID.
    */

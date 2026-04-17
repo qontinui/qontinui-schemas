@@ -26,7 +26,7 @@ export interface OrchestrationLoopConfig {
   /**
    * What to do between iterations.
    */
-  between_iterations?: BetweenIterations & {};
+  betweenIterations?: BetweenIterations & {};
   /**
    * Task-decomposition sub-config (omit to disable).
    */
@@ -34,12 +34,12 @@ export interface OrchestrationLoopConfig {
   /**
    * How to decide when to stop.
    */
-  exit_strategy?: ExitStrategy & {};
+  exitStrategy?: ExitStrategy & {};
   /**
    * Maximum number of iterations.
    * `None` (omitted) means no cap — loop until success or explicit stop.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   /**
    * Pipeline-mode configuration. When present, enables build / reflect /
    * fix phases.
@@ -50,11 +50,11 @@ export interface OrchestrationLoopConfig {
    * failure. Instead, the loop waits for the fixer workflow to complete,
    * then re-runs. The loop only exits on success or `max_iterations`.
    */
-  retry_on_failure: boolean;
+  retryOnFailure: boolean;
   /**
    * Stall-detection sub-config (omit to disable).
    */
-  stall_detection?: StallDetectorConfig | null;
+  stallDetection?: StallDetectorConfig | null;
   /**
    * Context-summarization sub-config (omit to disable).
    */
@@ -62,27 +62,27 @@ export interface OrchestrationLoopConfig {
   /**
    * Supervisor port for restart/build operations.
    */
-  supervisor_port: number;
+  supervisorPort: number;
   /**
    * Target runner ID (for supervisor restart calls). If `None`, uses
    * `"primary"`.
    */
-  target_runner_id?: string | null;
+  targetRunnerId?: string | null;
   /**
    * Target runner port to execute workflows on.
    * If `None`, targets self (this runner's own port).
    */
-  target_runner_port?: number | null;
+  targetRunnerPort?: number | null;
   /**
    * Whether to wait for the fixer workflow before starting the next
    * iteration. Only applies when `retry_on_failure` is `true`.
    */
-  wait_for_fixer: boolean;
+  waitForFixer: boolean;
   /**
    * Workflow ID to execute each iteration.
    * Required for simple mode; optional in pipeline mode if the build phase
    * is configured.
    */
-  workflow_id: string;
+  workflowId: string;
   [k: string]: unknown;
 }

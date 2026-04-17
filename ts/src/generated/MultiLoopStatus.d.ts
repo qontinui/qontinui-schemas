@@ -20,11 +20,11 @@ export interface MultiLoopStatus {
   /**
    * Whether every loop has reached a terminal phase.
    */
-  all_complete: boolean;
+  allComplete: boolean;
   /**
    * Whether any loop is in the `Error` phase.
    */
-  any_error: boolean;
+  anyError: boolean;
   /**
    * Per-loop status snapshots.
    */
@@ -33,6 +33,6 @@ export interface MultiLoopStatus {
    * Whether the multi-loop manager is configured to abort all loops on the
    * first error.
    */
-  stop_all_on_error: boolean;
+  stopAllOnError: boolean;
   [k: string]: unknown;
 }

@@ -26,15 +26,15 @@ export interface McpServerStatus {
   /**
    * ISO 8601 timestamp of the most recent connection attempt.
    */
-  last_connect_attempt?: string | null;
+  lastConnectAttempt?: string | null;
   /**
    * ISO 8601 timestamp of the most recent successful connection.
    */
-  last_connected?: string | null;
+  lastConnected?: string | null;
   /**
    * ID of the server this status refers to.
    */
-  server_id: string;
+  serverId: string;
   /**
    * Available tools — `Some(…)` when connected, `None` otherwise.
    */

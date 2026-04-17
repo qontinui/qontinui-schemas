@@ -20,7 +20,7 @@ export interface StructuredFinding {
   /**
    * Whether this finding requires human input.
    */
-  needs_input: boolean;
+  needsInput: boolean;
   /**
    * Severity level.
    */

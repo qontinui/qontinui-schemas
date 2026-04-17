@@ -17,7 +17,7 @@ export interface WorkerInstance {
   /**
    * ISO 8601 timestamp when the worker completed.
    */
-  completed_at?: string | null;
+  completedAt?: string | null;
   /**
    * Domain this worker is assigned to (if any).
    */
@@ -25,7 +25,7 @@ export interface WorkerInstance {
   /**
    * Error message if the worker is in error state.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Findings recorded by this worker.
    */
@@ -37,11 +37,11 @@ export interface WorkerInstance {
   /**
    * Last signal received from this worker.
    */
-  last_signal?: WorkerSignal | null;
+  lastSignal?: WorkerSignal | null;
   /**
    * Maximum iterations allowed for this worker.
    */
-  max_iterations: number;
+  maxIterations: number;
   /**
    * Human-readable name.
    */
@@ -49,15 +49,15 @@ export interface WorkerInstance {
   /**
    * ISO 8601 timestamp when the worker started.
    */
-  started_at?: string | null;
+  startedAt?: string | null;
   status: WorkerStatus;
   /**
    * Files this worker has touched.
    */
-  touched_files?: string[];
+  touchedFiles?: string[];
   /**
    * Unique identifier for this worker.
    */
-  worker_id: string;
+  workerId: string;
   [k: string]: unknown;
 }

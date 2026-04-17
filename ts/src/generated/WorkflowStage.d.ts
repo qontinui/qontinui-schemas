@@ -46,20 +46,20 @@ export interface WorkflowStage {
   /**
    * Agentic phase steps for this stage.
    */
-  agentic_steps: UnifiedStep[];
+  agenticSteps: UnifiedStep[];
   /**
    * Whether to pause for human approval after each agentic phase.
    */
-  approval_gate: boolean;
+  approvalGate: boolean;
   /**
    * When true, run completion prompt steps BEFORE automation steps.
    * Default (`false`) runs automation first, then prompts.
    */
-  completion_prompts_first: boolean;
+  completionPromptsFirst: boolean;
   /**
    * Completion phase steps for this stage.
    */
-  completion_steps: UnifiedStep[];
+  completionSteps: UnifiedStep[];
   /**
    * Optional condition for stage execution. When set, the stage is
    * evaluated against this condition before running. If the condition is
@@ -84,7 +84,7 @@ export interface WorkflowStage {
    * `None` (omitted in JSON) means no iteration cap — the loop terminates
    * on success, explicit stop, or fix-attempt exhaustion.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   /**
    * Model override for this stage.
    */
@@ -92,7 +92,7 @@ export interface WorkflowStage {
   /**
    * Per-phase model overrides for this stage.
    */
-  model_overrides?: {
+  modelOverrides?: {
     [k: string]: ModelOverrideConfig;
   };
   /**
@@ -110,18 +110,18 @@ export interface WorkflowStage {
   /**
    * Retry policy for this stage (overrides per-step defaults).
    */
-  retry_policy?: RetryPolicy | null;
+  retryPolicy?: RetryPolicy | null;
   /**
    * Setup phase steps for this stage (polymorphic; see module docs).
    */
-  setup_steps: UnifiedStep[];
+  setupSteps: UnifiedStep[];
   /**
    * Optional inactivity timeout in seconds for this stage's AI sessions.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Verification phase steps for this stage.
    */
-  verification_steps: UnifiedStep[];
+  verificationSteps: UnifiedStep[];
   [k: string]: unknown;
 }

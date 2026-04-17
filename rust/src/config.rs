@@ -22,13 +22,15 @@ use serde::{Deserialize, Serialize};
 /// which contexts should be auto-included. Multiple rules are OR'd together
 /// (any match triggers inclusion).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ContextAutoInclude {
     /// Keywords in the task prompt that trigger inclusion
     /// (case-insensitive).
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "taskMentions"
+        rename = "taskMentions",
+        alias = "task_mentions"
     )]
     pub task_mentions: Option<Vec<String>>,
     /// Action types in the loaded config that trigger inclusion
@@ -36,21 +38,24 @@ pub struct ContextAutoInclude {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "actionTypes"
+        rename = "actionTypes",
+        alias = "action_types"
     )]
     pub action_types: Option<Vec<String>>,
     /// Regex patterns in recent logs that trigger inclusion.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "errorPatterns"
+        rename = "errorPatterns",
+        alias = "error_patterns"
     )]
     pub error_patterns: Option<Vec<String>>,
     /// Glob patterns for files being worked on (e.g., `*.rs`, `src/api/**`).
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "filePatterns"
+        rename = "filePatterns",
+        alias = "file_patterns"
     )]
     pub file_patterns: Option<Vec<String>>,
 }
@@ -63,33 +68,38 @@ pub struct ContextAutoInclude {
 /// provide background knowledge, coding standards, architectural guidance,
 /// or debugging tips.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Context {
     /// Unique identifier (UUID v4 or a prefixed string like
     /// `"ctx-schema-flow"`).
+    #[serde(alias = "id")]
     pub id: String,
     /// Human-readable name for display.
+    #[serde(alias = "name")]
     pub name: String,
     /// Markdown content injected into AI prompts.
+    #[serde(alias = "content")]
     pub content: String,
     /// Category for organization (e.g., `"architecture"`, `"debugging"`,
     /// `"philosophy"`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "category")]
     pub category: Option<String>,
     /// Tags for flexible grouping and search.
-    #[serde(default)]
+    #[serde(default, alias = "tags")]
     pub tags: Vec<String>,
     /// Rules for automatic inclusion in AI tasks.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        rename = "autoInclude"
+        rename = "autoInclude",
+        alias = "auto_include"
     )]
     pub auto_include: Option<ContextAutoInclude>,
     /// ISO 8601 creation timestamp.
-    #[serde(rename = "createdAt")]
+    #[serde(rename = "createdAt", alias = "created_at")]
     pub created_at: String,
     /// ISO 8601 last-modification timestamp.
-    #[serde(rename = "modifiedAt")]
+    #[serde(rename = "modifiedAt", alias = "modified_at")]
     pub modified_at: String,
 }
 
@@ -103,11 +113,13 @@ pub struct Context {
 /// automation in the runner. Only workflows in categories with
 /// `automationEnabled = true` appear in the runner's workflow list.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Category {
     /// Category name (e.g., `"Main"`, `"Testing"`).
+    #[serde(alias = "name")]
     pub name: String,
     /// Whether workflows in this category are available for automation.
-    #[serde(default = "default_true", rename = "automationEnabled")]
+    #[serde(default = "default_true", rename = "automationEnabled", alias = "automation_enabled")]
     pub automation_enabled: bool,
 }
 

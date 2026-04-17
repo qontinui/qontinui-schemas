@@ -13,7 +13,7 @@ export interface CreateOlConfigRequest {
    * The full loop config as a JSON blob (should match the
    * [`OrchestrationLoopConfig`] shape).
    */
-  config_json: {
+  configJson: {
     [k: string]: unknown;
   };
   /**

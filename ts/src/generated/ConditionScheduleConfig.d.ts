@@ -13,6 +13,6 @@ export interface ConditionScheduleConfig {
    * Minutes to wait after an execution completes before re-evaluating
    * conditions for another run.
    */
-  rearm_delay_minutes: number;
+  rearmDelayMinutes: number;
   [k: string]: unknown;
 }

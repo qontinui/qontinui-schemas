@@ -26,20 +26,20 @@ export interface DisplayNode {
    */
   children: DisplayNode[];
   duration?: number | null;
-  end_timestamp?: number | null;
+  endTimestamp?: number | null;
   error?: string | null;
   id: string;
   /**
    * Whether this node should be expanded in the UI (default: true).
    */
-  is_expanded: boolean;
+  isExpanded: boolean;
   /**
    * Nesting level in the tree (0 for root, 1 for first-level children).
    */
   level: number;
   metadata?: NodeMetadata & {};
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   status: NodeStatus;
   timestamp: number;
   [k: string]: unknown;

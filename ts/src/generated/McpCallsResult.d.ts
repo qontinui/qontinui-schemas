@@ -22,24 +22,24 @@ export interface McpCallsResult {
   /**
    * Number of failed calls in the current page.
    */
-  failed_count: number;
+  failedCount: number;
   /**
    * Whether there are more rows after the current page.
    */
-  has_more: boolean;
+  hasMore: boolean;
   /**
    * Number of successful calls in the current page.
    */
-  success_count: number;
+  successCount: number;
   /**
    * Task run the query was scoped to.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Total matching rows across all pages. Defaults to `0` on older rows
    * that predate the field; consumers should prefer `count` when this is
    * absent.
    */
-  total_count: number;
+  totalCount: number;
   [k: string]: unknown;
 }

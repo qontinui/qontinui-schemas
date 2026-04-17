@@ -32,7 +32,7 @@ export interface ExecutionRunDetail {
   /**
    * ISO 8601 timestamp when the record was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Run description.
    */
@@ -40,38 +40,38 @@ export interface ExecutionRunDetail {
   /**
    * Total duration in seconds, if the run has ended.
    */
-  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   /**
    * ISO 8601 timestamp when the run ended, if it has ended.
    */
-  ended_at?: string | null;
+  endedAt?: string | null;
   /**
    * Owning project ID.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Assigned run identifier.
    */
-  run_id: string;
+  runId: string;
   /**
    * Human-readable run name.
    */
-  run_name: string;
-  run_type: RunType;
-  runner_metadata: RunnerMetadata;
+  runName: string;
+  runType: RunType;
+  runnerMetadata: RunnerMetadata;
   /**
    * ISO 8601 timestamp when the run started.
    */
-  started_at: string;
+  startedAt: string;
   stats: ExecutionStats;
   status: RunStatus;
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at?: string | null;
+  updatedAt?: string | null;
   /**
    * Workflow metadata, if applicable.
    */
-  workflow_metadata?: WorkflowMetadata | null;
+  workflowMetadata?: WorkflowMetadata | null;
   [k: string]: unknown;
 }

@@ -12,7 +12,7 @@ export interface ExecutionTrendDataPoint {
   /**
    * Mean run duration in seconds.
    */
-  avg_duration_seconds: number;
+  avgDurationSeconds: number;
   /**
    * Period label in `YYYY-MM-DD` format.
    */
@@ -20,18 +20,18 @@ export interface ExecutionTrendDataPoint {
   /**
    * Issues detected in the period.
    */
-  issues_count: number;
+  issuesCount: number;
   /**
    * Number of runs in the period.
    */
-  runs_count: number;
+  runsCount: number;
   /**
    * Success rate as a percentage.
    */
-  success_rate: number;
+  successRate: number;
   /**
    * Total actions executed in the period.
    */
-  total_actions: number;
+  totalActions: number;
   [k: string]: unknown;
 }

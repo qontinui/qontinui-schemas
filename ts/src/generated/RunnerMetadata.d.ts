@@ -12,7 +12,7 @@ export interface RunnerMetadata {
   /**
    * CPU description.
    */
-  cpu_info?: string | null;
+  cpuInfo?: string | null;
   /**
    * Arbitrary additional runner context.
    */
@@ -26,7 +26,7 @@ export interface RunnerMetadata {
   /**
    * Installed system memory in megabytes.
    */
-  memory_mb?: number | null;
+  memoryMb?: number | null;
   /**
    * Operating system identifier (e.g., `"windows"`, `"macos"`, `"linux"`).
    */
@@ -34,10 +34,10 @@ export interface RunnerMetadata {
   /**
    * Semantic version of the runner binary.
    */
-  runner_version: string;
+  runnerVersion: string;
   /**
    * Screen resolution as a free-form string (e.g., `"1920x1080"`).
    */
-  screen_resolution?: string | null;
+  screenResolution?: string | null;
   [k: string]: unknown;
 }

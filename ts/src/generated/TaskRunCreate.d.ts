@@ -14,15 +14,15 @@ export interface TaskRunCreate {
   /**
    * Whether the task should auto-continue.
    */
-  auto_continue?: boolean | null;
+  autoContinue?: boolean | null;
   /**
    * Workflow config ID to use.
    */
-  config_id?: string | null;
+  configId?: string | null;
   /**
    * Serialized execution steps, if provided ad-hoc.
    */
-  execution_steps_json?: string | null;
+  executionStepsJson?: string | null;
   /**
    * Optional client-generated ID.
    */
@@ -30,15 +30,15 @@ export interface TaskRunCreate {
   /**
    * Serialized log-sources configuration.
    */
-  log_sources_json?: string | null;
+  logSourcesJson?: string | null;
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Optional owning project.
    */
-  project_id?: string | null;
+  projectId?: string | null;
   /**
    * Prompt text, if applicable.
    */
@@ -46,18 +46,18 @@ export interface TaskRunCreate {
   /**
    * Optional runner that will execute the task.
    */
-  runner_id?: string | null;
+  runnerId?: string | null;
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * Task type.
    */
-  task_type?: TaskType | null;
+  taskType?: TaskType | null;
   /**
    * Workflow name to use.
    */
-  workflow_name?: string | null;
+  workflowName?: string | null;
   [k: string]: unknown;
 }

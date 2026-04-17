@@ -15,7 +15,7 @@ export interface BuiltinOverrideProposal {
   /**
    * Builtin suffix (e.g., `"no-secrets"`, `"no-debug-statements"`).
    */
-  builtin_suffix: string;
+  builtinSuffix: string;
   /**
    * Whether the builtin should be enabled.
    */

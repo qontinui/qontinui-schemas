@@ -12,26 +12,26 @@ export interface ExecutionScreenshotResponse {
   /**
    * File size in bytes.
    */
-  file_size_bytes: number;
+  fileSizeBytes: number;
   /**
    * URL to the full-size image.
    */
-  image_url: string;
+  imageUrl: string;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * Assigned screenshot identifier.
    */
-  screenshot_id: string;
+  screenshotId: string;
   /**
    * URL to a thumbnail image, if generated.
    */
-  thumbnail_url?: string | null;
+  thumbnailUrl?: string | null;
   /**
    * ISO 8601 timestamp when the image was uploaded.
    */
-  uploaded_at: string;
+  uploadedAt: string;
   [k: string]: unknown;
 }

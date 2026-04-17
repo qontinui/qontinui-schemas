@@ -25,11 +25,11 @@ export interface ScheduledTask {
   /**
    * Automatically trigger auto-fix when this task fails.
    */
-  auto_fix_on_failure: boolean;
+  autoFixOnFailure: boolean;
   /**
    * Present while the task is waiting for its conditions to be met.
    */
-  condition_status?: ConditionStatus | null;
+  conditionStatus?: ConditionStatus | null;
   /**
    * Optional conditions that must be met before execution.
    */
@@ -37,7 +37,7 @@ export interface ScheduledTask {
   /**
    * ISO 8601 timestamp of creation.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Optional human-readable description.
    */
@@ -53,11 +53,11 @@ export interface ScheduledTask {
   /**
    * Record of the most recent execution.
    */
-  last_run?: TaskExecutionRecord | null;
+  lastRun?: TaskExecutionRecord | null;
   /**
    * ISO 8601 timestamp of last modification.
    */
-  modified_at: string;
+  modifiedAt: string;
   /**
    * Display name for the task.
    */
@@ -65,16 +65,16 @@ export interface ScheduledTask {
   /**
    * Next scheduled run time (ISO 8601), computed by the runner.
    */
-  next_run?: string | null;
+  nextRun?: string | null;
   schedule: ScheduleExpression;
   /**
    * Skip future runs once the task has succeeded at least once.
    */
-  skip_if_completed: boolean;
+  skipIfCompleted: boolean;
   /**
    * Free-form description of success criteria, for human reference.
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   task: ScheduledTaskType;
   [k: string]: unknown;
 }

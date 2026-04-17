@@ -12,7 +12,7 @@ export interface ExtendIterationsRequest {
   /**
    * Additional iterations to add.
    */
-  additional_iterations: number;
+  additionalIterations: number;
   /**
    * Optional guidance for the worker.
    */

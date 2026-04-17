@@ -18,7 +18,7 @@ export interface OrchestrationLoopStatus {
   /**
    * Iteration index (1-based) currently executing or just completed.
    */
-  current_iteration: number;
+  currentIteration: number;
   /**
    * Terminal error message (only set in the `Error` phase).
    */
@@ -26,15 +26,15 @@ export interface OrchestrationLoopStatus {
   /**
    * Whether this loop is in pipeline mode.
    */
-  is_pipeline: boolean;
+  isPipeline: boolean;
   /**
    * Per-iteration results accumulated so far.
    */
-  iteration_results?: IterationResult[];
+  iterationResults?: IterationResult[];
   /**
    * Iteration cap for this run. `None` renders as `"∞"`/unlimited in the UI.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   phase: LoopPhase;
   /**
    * Whether the loop is currently running.
@@ -43,18 +43,18 @@ export interface OrchestrationLoopStatus {
   /**
    * ISO 8601 start timestamp.
    */
-  started_at?: string | null;
+  startedAt?: string | null;
   /**
    * Target runner ID.
    */
-  target_runner_id?: string | null;
+  targetRunnerId?: string | null;
   /**
    * Target runner port.
    */
-  target_runner_port: number;
+  targetRunnerPort: number;
   /**
    * The workflow ID being executed.
    */
-  workflow_id: string;
+  workflowId: string;
   [k: string]: unknown;
 }

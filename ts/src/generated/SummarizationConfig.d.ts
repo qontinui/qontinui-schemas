@@ -19,18 +19,18 @@ export interface SummarizationConfig {
   /**
    * Target maximum tokens for the full loop context.
    */
-  max_tokens_budget: number;
+  maxTokensBudget: number;
   /**
    * Number of most-recent iterations to keep verbatim (never summarized).
    */
-  preserve_last_n_iterations: number;
+  preserveLastNIterations: number;
   /**
    * Cap on tokens emitted by a single summarization pass.
    */
-  summary_max_tokens: number;
+  summaryMaxTokens: number;
   /**
    * Fraction of the token budget (0.0–1.0) at which summarization triggers.
    */
-  token_threshold_pct: number;
+  tokenThresholdPct: number;
   [k: string]: unknown;
 }

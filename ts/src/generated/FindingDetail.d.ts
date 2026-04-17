@@ -19,12 +19,12 @@ import type { FindingUserInput } from './FindingUserInput';
  * string (see crate-level wire-format note).
  */
 export interface FindingDetail {
-  action_type: FindingActionType;
+  actionType: FindingActionType;
   category: FindingCategory;
   /**
    * Code context, if the finding relates to specific code.
    */
-  code_context?: FindingCodeContext | null;
+  codeContext?: FindingCodeContext | null;
   /**
    * Detailed description of the finding.
    */
@@ -32,7 +32,7 @@ export interface FindingDetail {
   /**
    * ISO 8601 timestamp (UTC) when the finding was detected.
    */
-  detected_at: string;
+  detectedAt: string;
   /**
    * Finding ID (UUID v4 string).
    */
@@ -44,25 +44,25 @@ export interface FindingDetail {
   /**
    * ISO 8601 timestamp (UTC) when the finding was resolved.
    */
-  resolved_at?: string | null;
+  resolvedAt?: string | null;
   /**
    * Session number where the finding was resolved.
    */
-  resolved_in_session?: number | null;
+  resolvedInSession?: number | null;
   /**
    * Session number where the finding was detected.
    */
-  session_num: number;
+  sessionNum: number;
   severity: FindingSeverity;
   /**
    * Hash used to deduplicate findings across sessions.
    */
-  signature_hash?: string | null;
+  signatureHash?: string | null;
   status: FindingStatus;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Brief title describing the finding.
    */
@@ -70,10 +70,10 @@ export interface FindingDetail {
   /**
    * User-input request, if `action_type` requires a user decision.
    */
-  user_input?: FindingUserInput | null;
+  userInput?: FindingUserInput | null;
   /**
    * User's response, if input was requested.
    */
-  user_response?: string | null;
+  userResponse?: string | null;
   [k: string]: unknown;
 }

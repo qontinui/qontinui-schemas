@@ -25,11 +25,11 @@ export interface VerificationResultsListResponse {
   /**
    * Number of iterations that failed.
    */
-  failed_iterations: number;
+  failedIterations: number;
   /**
    * Number of iterations that passed.
    */
-  passed_iterations: number;
+  passedIterations: number;
   /**
    * All verification results for the task run.
    */
@@ -37,6 +37,6 @@ export interface VerificationResultsListResponse {
   /**
    * ID of the owning task run.
    */
-  task_run_id: string;
+  taskRunId: string;
   [k: string]: unknown;
 }

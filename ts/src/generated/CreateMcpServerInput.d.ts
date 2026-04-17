@@ -19,7 +19,7 @@ export interface CreateMcpServerInput {
   /**
    * Override for the default `auto_start = false`.
    */
-  auto_start?: boolean | null;
+  autoStart?: boolean | null;
   /**
    * Optional description.
    */
@@ -31,7 +31,7 @@ export interface CreateMcpServerInput {
   /**
    * HTTP config (required when `transport == Http`).
    */
-  http_config?: HttpConfig | null;
+  httpConfig?: HttpConfig | null;
   /**
    * Display name.
    */
@@ -39,11 +39,11 @@ export interface CreateMcpServerInput {
   /**
    * Stdio config (required when `transport == Stdio`).
    */
-  stdio_config?: StdioConfig | null;
+  stdioConfig?: StdioConfig | null;
   /**
    * Override for the default `timeout_seconds = 30`.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   transport: McpTransport;
   [k: string]: unknown;
 }

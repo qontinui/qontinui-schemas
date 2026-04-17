@@ -16,26 +16,26 @@ import type { TopMatch } from './TopMatch';
  * `flatten`-d map.
  */
 export interface RuntimeData {
-  already_at_target?: boolean | null;
-  branch_taken?: string | null;
+  alreadyAtTarget?: boolean | null;
+  branchTaken?: string | null;
   button?: string | null;
-  character_count?: number | null;
-  clicked_at?: MatchLocation | null;
-  condition_passed?: boolean | null;
+  characterCount?: number | null;
+  clickedAt?: MatchLocation | null;
+  conditionPassed?: boolean | null;
   confidence?: number | null;
   dimensions?: MatchLocation | null;
   found?: boolean | null;
-  image_id?: string | null;
+  imageId?: string | null;
   location?: MatchLocation | null;
-  match_method?: string | null;
-  source_states?: string[] | null;
-  target_states?: string[] | null;
-  target_type?: string | null;
-  targets_reached?: string[] | null;
-  top_matches?: TopMatch[] | null;
-  transitions_executed?: string[] | null;
-  typed_text?: string | null;
-  workflow_name?: string | null;
-  workflow_status?: string | null;
+  matchMethod?: string | null;
+  sourceStates?: string[] | null;
+  targetStates?: string[] | null;
+  targetType?: string | null;
+  targetsReached?: string[] | null;
+  topMatches?: TopMatch[] | null;
+  transitionsExecuted?: string[] | null;
+  typedText?: string | null;
+  workflowName?: string | null;
+  workflowStatus?: string | null;
   [k: string]: unknown;
 }

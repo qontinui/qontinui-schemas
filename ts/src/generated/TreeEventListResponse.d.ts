@@ -23,7 +23,7 @@ import type { TreeEventType } from './TreeEventType';
  */
 export interface TreeEventListResponse {
   events: TreeEventResponse[];
-  has_more: boolean;
+  hasMore: boolean;
   limit: number;
   offset: number;
   total: number;

@@ -77,7 +77,7 @@ fn schedule_expression_condition_roundtrips() {
     // Confirm the envelope shape.
     let v: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "Condition");
-    assert_eq!(v["value"]["rearm_delay_minutes"], 30);
+    assert_eq!(v["value"]["rearmDelayMinutes"], 30);
 }
 
 // ============================================================================
@@ -694,8 +694,8 @@ fn unified_step_workflow_roundtrips() {
     let v: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "workflow");
     assert_eq!(v["phase"], "completion");
-    assert_eq!(v["workflow_id"], "wf-abc");
-    assert_eq!(v["workflow_name"], "Sub Workflow");
+    assert_eq!(v["workflowId"], "wf-abc");
+    assert_eq!(v["workflowName"], "Sub Workflow");
 
     let back: UnifiedStep = serde_json::from_str(&json).unwrap();
     let json2 = serde_json::to_string(&back).unwrap();
@@ -1360,11 +1360,11 @@ fn task_run_backend_detail_flattens_task() {
     let v: Value = serde_json::from_str(&json).expect("parse");
     // `#[serde(flatten)]` should hoist TaskRunBackend fields to the top level.
     assert_eq!(v["id"], "run-001");
-    assert_eq!(v["task_name"], "Nightly verify");
+    assert_eq!(v["taskName"], "Nightly verify");
     assert!(v.get("task").is_none(), "flatten should inline the task");
     assert!(v["sessions"].is_array());
     assert!(v["findings"].is_array());
-    assert_eq!(v["finding_summary"]["total"], 3);
+    assert_eq!(v["findingSummary"]["total"], 3);
     let back: TaskRunBackendDetail = serde_json::from_str(&json).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json, &json2);
@@ -1399,7 +1399,7 @@ fn task_run_create_default_elides_all_options() {
     };
     let json = serde_json::to_string(&c).expect("serialize");
     // Only the required `task_name` should appear on the wire.
-    assert_eq!(json, r#"{"task_name":"only-required"}"#);
+    assert_eq!(json, r#"{"taskName":"only-required"}"#);
     let back: TaskRunCreate = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -1572,7 +1572,7 @@ fn pagination_roundtrips() {
     assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
     let v: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["total"], 137);
-    assert_eq!(v["has_more"], false);
+    assert_eq!(v["hasMore"], false);
 }
 
 #[test]
@@ -1705,7 +1705,7 @@ fn verification_step_details_roundtrips() {
 fn step_execution_config_preserves_extra_keys() {
     // Put an unknown key on the wire; StepExecutionConfig#extra must capture
     // it via `#[serde(flatten)]` and preserve it through round-trip.
-    let wire = r#"{"action_type":"click","target_image_id":"img-7","retries":3,"custom":{"a":1}}"#;
+    let wire = r#"{"actionType":"click","targetImageId":"img-7","retries":3,"custom":{"a":1}}"#;
     let cfg: StepExecutionConfig =
         serde_json::from_str(wire).expect("deserialize with extra keys");
     assert_eq!(cfg.action_type.as_deref(), Some("click"));
@@ -2670,7 +2670,7 @@ fn coordinates_monitor_relative_roundtrips() {
     assert_eq!(v["x"], 100);
     assert_eq!(v["y"], 200);
     assert_eq!(v["system"], "monitor_relative");
-    assert_eq!(v["monitor_index"], 1);
+    assert_eq!(v["monitorIndex"], 1);
     let back: Coordinates = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -2725,8 +2725,8 @@ fn monitor_fully_populated_roundtrips() {
     let json1 = serde_json::to_string(&m).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["position"], "center");
-    assert_eq!(v["is_primary"], true);
-    assert_eq!(v["scale_factor"], 1.5);
+    assert_eq!(v["isPrimary"], true);
+    assert_eq!(v["scaleFactor"], 1.5);
     assert_eq!(v["name"], "DELL U2720Q");
     let back: Monitor = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
@@ -2941,10 +2941,10 @@ fn accessibility_state_fully_populated_roundtrips() {
     };
     let json1 = serde_json::to_string(&s).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["is_focused"], true);
-    assert_eq!(v["is_expanded"], true);
+    assert_eq!(v["isFocused"], true);
+    assert_eq!(v["isExpanded"], true);
     assert!(
-        v.get("is_pressed").is_none(),
+        v.get("isPressed").is_none(),
         "None tri-state must be omitted"
     );
     let back: AccessibilityState = serde_json::from_str(&json1).expect("deserialize");
@@ -2999,10 +2999,10 @@ fn accessibility_node_ref_id_renamed_to_ref() {
     let v: Value = serde_json::from_str(&json1).expect("parse");
     // `ref_id` must appear as `ref` on the wire.
     assert_eq!(v["ref"], "@e1");
-    assert!(v.get("ref_id").is_none());
+    assert!(v.get("refId").is_none());
     assert_eq!(v["role"], "button");
-    assert_eq!(v["automation_id"], "submit-btn");
-    assert_eq!(v["html_tag"], "button");
+    assert_eq!(v["automationId"], "submit-btn");
+    assert_eq!(v["htmlTag"], "button");
     let back: AccessibilityNode = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -3048,7 +3048,7 @@ fn accessibility_snapshot_roundtrips() {
     let json1 = serde_json::to_string(&s).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["backend"], "cdp");
-    assert_eq!(v["total_nodes"], 142);
+    assert_eq!(v["totalNodes"], 142);
     let back: AccessibilitySnapshot = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -3662,8 +3662,8 @@ fn execution_stats_roundtrips() {
     let s = sample_execution_stats();
     let json1 = serde_json::to_string(&s).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["total_actions"], 42);
-    assert_eq!(v["successful_actions"], 38);
+    assert_eq!(v["totalActions"], 42);
+    assert_eq!(v["successfulActions"], 38);
     let back: ExecutionStats = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -3729,8 +3729,8 @@ fn execution_run_create_roundtrips() {
     };
     let json1 = serde_json::to_string(&c).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["run_type"], "qa_test");
-    assert_eq!(v["project_id"], "proj-alpha");
+    assert_eq!(v["runType"], "qa_test");
+    assert_eq!(v["projectId"], "proj-alpha");
     let back: ExecutionRunCreate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -3873,7 +3873,7 @@ fn execution_screenshot_create_roundtrips() {
     };
     let json1 = serde_json::to_string(&c).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["screenshot_type"], "action_result");
+    assert_eq!(v["screenshotType"], "action_result");
     let back: ExecutionScreenshotCreate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -3954,7 +3954,7 @@ fn execution_run_complete_roundtrips() {
     let json1 = serde_json::to_string(&c).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["status"], "completed");
-    assert_eq!(v["coverage"]["coverage_percentage"], 85.7);
+    assert_eq!(v["coverage"]["coveragePercentage"], 85.7);
     let back: ExecutionRunComplete = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -3973,7 +3973,7 @@ fn execution_run_complete_response_roundtrips() {
     };
     let json1 = serde_json::to_string(&r).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["duration_seconds"], 342.5);
+    assert_eq!(v["durationSeconds"], 342.5);
     assert!(v.get("coverage").is_none());
     let back: ExecutionRunCompleteResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
@@ -4351,7 +4351,7 @@ fn execution_trend_response_roundtrips() {
     let json1 = serde_json::to_string(&r).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["granularity"], "daily");
-    assert_eq!(v["run_type"], "qa_test");
+    assert_eq!(v["runType"], "qa_test");
     let back: ExecutionTrendResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -4415,8 +4415,8 @@ fn historical_action_query_roundtrips() {
     };
     let json1 = serde_json::to_string(&q).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["action_type"], "click");
-    assert_eq!(v["success_only"], true);
+    assert_eq!(v["actionType"], "click");
+    assert_eq!(v["successOnly"], true);
     let back: HistoricalActionQuery = serde_json::from_str(&json1).expect("deserialize");
     assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
@@ -5375,8 +5375,8 @@ fn runtime_data_type_action_roundtrips() {
     };
     let json1 = serde_json::to_string(&r).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["typed_text"], "hello world");
-    assert_eq!(v["character_count"], 11);
+    assert_eq!(v["typedText"], "hello world");
+    assert_eq!(v["characterCount"], 11);
     assert!(
         v.get("found").is_none(),
         "unset optional fields must be skipped"
@@ -5455,7 +5455,7 @@ fn tree_node_roundtrips() {
     let n = sample_tree_node();
     let json1 = serde_json::to_string(&n).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["node_type"], "action");
+    assert_eq!(v["nodeType"], "action");
     assert_eq!(v["status"], "success");
     let back: TreeNode = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
@@ -5501,7 +5501,7 @@ fn tree_event_default_type_field() {
     let json1 = serde_json::to_string(&e2).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["type"], "tree_event");
-    assert_eq!(v["event_type"], "action_completed");
+    assert_eq!(v["eventType"], "action_completed");
     let back: TreeEvent = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -5549,7 +5549,7 @@ fn display_node_is_expanded_default_true() {
     };
     let json1 = serde_json::to_string(&d2).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["children"][0]["is_expanded"], false);
+    assert_eq!(v["children"][0]["isExpanded"], false);
     assert_eq!(v["children"][0]["level"], 1);
     let back: DisplayNode = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
@@ -5771,7 +5771,7 @@ fn finding_user_input_fully_populated_roundtrips() {
     let json1 = serde_json::to_string(&u).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["question"], "Which approach should we take?");
-    assert_eq!(v["input_type"], "choice");
+    assert_eq!(v["inputType"], "choice");
     assert_eq!(v["options"][0], "A");
     let back: FindingUserInput = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
@@ -5810,13 +5810,13 @@ fn finding_create_fully_populated_roundtrips() {
     };
     let json1 = serde_json::to_string(&c).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["task_run_id"], "run-abc");
+    assert_eq!(v["taskRunId"], "run-abc");
     assert_eq!(v["category"], "code_bug");
     assert_eq!(v["severity"], "high");
-    assert_eq!(v["action_type"], "auto_fix");
-    assert_eq!(v["code_context"]["line"], 120);
+    assert_eq!(v["actionType"], "auto_fix");
+    assert_eq!(v["codeContext"]["line"], 120);
     assert!(
-        v.get("user_input").is_none(),
+        v.get("userInput").is_none(),
         "None Option must be skipped on the wire"
     );
     let back: FindingCreate = serde_json::from_str(&json1).expect("deserialize");
@@ -5844,8 +5844,8 @@ fn finding_create_with_user_input_roundtrips() {
     };
     let json1 = serde_json::to_string(&c).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["user_input"]["question"], "Strict or lenient?");
-    assert_eq!(v["user_input"]["options"][1], "lenient");
+    assert_eq!(v["userInput"]["question"], "Strict or lenient?");
+    assert_eq!(v["userInput"]["options"][1], "lenient");
     let back: FindingCreate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -5902,7 +5902,7 @@ fn finding_update_fully_populated_roundtrips() {
     let json1 = serde_json::to_string(&u).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["status"], "resolved");
-    assert_eq!(v["resolved_in_session"], 5);
+    assert_eq!(v["resolvedInSession"], 5);
     let back: FindingUpdate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -5947,9 +5947,9 @@ fn finding_detail_fully_populated_roundtrips() {
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["id"], "11111111-2222-3333-4444-555555555555");
     assert_eq!(v["status"], "in_progress");
-    assert_eq!(v["detected_at"], "2026-04-14T12:00:00Z");
-    assert_eq!(v["resolved_at"], "2026-04-14T13:00:00Z");
-    assert_eq!(v["code_context"]["line"], 88);
+    assert_eq!(v["detectedAt"], "2026-04-14T12:00:00Z");
+    assert_eq!(v["resolvedAt"], "2026-04-14T13:00:00Z");
+    assert_eq!(v["codeContext"]["line"], 88);
     let back: FindingDetail = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -5968,7 +5968,7 @@ fn finding_list_response_empty_roundtrips() {
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["total"], 0);
     assert_eq!(v["limit"], 50);
-    assert_eq!(v["has_more"], false);
+    assert_eq!(v["hasMore"], false);
     let back: FindingListResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -6032,12 +6032,12 @@ fn finding_summary_fully_populated_roundtrips() {
     };
     let json1 = serde_json::to_string(&s).expect("serialize");
     let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["task_run_id"], "run-xyz");
+    assert_eq!(v["taskRunId"], "run-xyz");
     assert_eq!(v["total"], 3);
-    assert_eq!(v["by_category"]["security"], 2);
-    assert_eq!(v["by_severity"]["critical"], 1);
-    assert_eq!(v["by_status"]["resolved"], 2);
-    assert_eq!(v["resolved_count"], 2);
+    assert_eq!(v["byCategory"]["security"], 2);
+    assert_eq!(v["bySeverity"]["critical"], 1);
+    assert_eq!(v["byStatus"]["resolved"], 2);
+    assert_eq!(v["resolvedCount"], 2);
     let back: FindingSummary = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
@@ -6052,13 +6052,13 @@ fn finding_summary_empty_maps_skipped() {
     let json = serde_json::to_string(&s).expect("serialize");
     let v: Value = serde_json::from_str(&json).expect("parse");
     // Empty HashMaps are skipped via skip_serializing_if = "HashMap::is_empty".
-    assert!(v.get("by_category").is_none());
-    assert!(v.get("by_severity").is_none());
-    assert!(v.get("by_status").is_none());
+    assert!(v.get("byCategory").is_none());
+    assert!(v.get("bySeverity").is_none());
+    assert!(v.get("byStatus").is_none());
     assert_eq!(v["total"], 0);
-    assert_eq!(v["needs_input_count"], 0);
-    assert_eq!(v["resolved_count"], 0);
-    assert_eq!(v["outstanding_count"], 0);
+    assert_eq!(v["needsInputCount"], 0);
+    assert_eq!(v["resolvedCount"], 0);
+    assert_eq!(v["outstandingCount"], 0);
 }
 
 // ============================================================================
@@ -6300,7 +6300,7 @@ fn ticket_fully_populated_roundtrips() {
     };
     let json1 = serde_json::to_string(&t).unwrap();
     let v: Value = serde_json::from_str(&json1).unwrap();
-    assert_eq!(v["external_id"], "42");
+    assert_eq!(v["externalId"], "42");
     assert_eq!(v["source"], "github");
     assert_eq!(v["state"], "open");
     assert_eq!(v["labels"][1], "automate");
@@ -6369,11 +6369,11 @@ fn ticket_provider_config_fully_populated_roundtrips() {
     let v: Value = serde_json::from_str(&json1).unwrap();
     // The api_token is intentionally on the wire — DB persistence relies
     // on it. UI-facing consumers must redact it.
-    assert_eq!(v["api_token"], "ghp_secret_token");
+    assert_eq!(v["apiToken"], "ghp_secret_token");
     assert_eq!(v["source"], "github");
     assert_eq!(v["target"], "qontinui/runner");
-    assert_eq!(v["poll_interval_seconds"], 120);
-    assert_eq!(v["update_on_completion"], true);
+    assert_eq!(v["pollIntervalSeconds"], 120);
+    assert_eq!(v["updateOnCompletion"], true);
     let back: TicketProviderConfig = serde_json::from_str(&json1).unwrap();
     let json2 = serde_json::to_string(&back).unwrap();
     assert_json_values_equal(&json1, &json2);
@@ -7337,7 +7337,7 @@ fn success_criterion_full_roundtrips() {
     let v: Value = serde_json::from_str(&json).unwrap();
     // Confirm the wire-side rename: `criterion_type` → `type`.
     assert_eq!(v["type"], "deterministic");
-    assert_eq!(v["verification_method"], "playwright");
+    assert_eq!(v["verificationMethod"], "playwright");
     assert_eq!(v["weight"], 0.5);
     assert_eq!(v["domain"], "frontend");
     let back: SuccessCriterion = serde_json::from_str(&json).unwrap();
@@ -7812,7 +7812,7 @@ fn terminal_info_exited_roundtrips() {
     assert_eq!(json1, json2);
     let v: Value = serde_json::from_str(&json1).unwrap();
     assert!(v.get("pid").is_none(), "None pid must be skipped");
-    assert_eq!(v["exit_code"], 0);
+    assert_eq!(v["exitCode"], 0);
 }
 
 #[test]
@@ -7845,7 +7845,7 @@ fn terminal_output_event_roundtrips() {
     let json2 = serde_json::to_string(&back).unwrap();
     assert_eq!(json1, json2);
     let v: Value = serde_json::from_str(&json1).unwrap();
-    assert_eq!(v["terminal_id"], "term-1");
+    assert_eq!(v["terminalId"], "term-1");
     assert_eq!(v["data"], "SGVsbG8sIHdvcmxkIQ==");
 }
 
@@ -7860,7 +7860,7 @@ fn terminal_exit_event_with_code_roundtrips() {
     let json2 = serde_json::to_string(&back).unwrap();
     assert_eq!(json1, json2);
     let v: Value = serde_json::from_str(&json1).unwrap();
-    assert_eq!(v["exit_code"], 137);
+    assert_eq!(v["exitCode"], 137);
 }
 
 #[test]

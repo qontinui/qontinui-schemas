@@ -12,7 +12,7 @@ export interface RepositoryWatch {
   /**
    * Minutes of inactivity required before the watch is considered met.
    */
-  inactive_minutes: number;
+  inactiveMinutes: number;
   /**
    * Path to the repository directory.
    */

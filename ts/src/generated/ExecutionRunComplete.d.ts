@@ -20,11 +20,11 @@ export interface ExecutionRunComplete {
   /**
    * ISO 8601 timestamp when the run ended.
    */
-  ended_at: string;
+  endedAt: string;
   /**
    * Error message if the run failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   stats: ExecutionStats;
   status: RunStatus;
   /**

@@ -15,27 +15,27 @@ export interface VerificationStepDetails {
   /**
    * Number of assertions that passed.
    */
-  assertions_passed: number | null;
+  assertionsPassed: number | null;
   /**
    * Total number of assertions.
    */
-  assertions_total: number | null;
+  assertionsTotal: number | null;
   /**
    * Results of individual named checks (e.g., lint, type, test).
    */
-  check_results: IndividualCheckResult[] | null;
+  checkResults: IndividualCheckResult[] | null;
   /**
    * Captured browser/console output.
    */
-  console_output: string | null;
+  consoleOutput: string | null;
   /**
    * Exit code of the spawned process.
    */
-  exit_code: number | null;
+  exitCode: number | null;
   /**
    * Captured page snapshot (HTML or serialized representation).
    */
-  page_snapshot: string | null;
+  pageSnapshot: string | null;
   /**
    * Phase the step belongs to (e.g., `"setup"`, `"verification"`).
    */
@@ -51,6 +51,6 @@ export interface VerificationStepDetails {
   /**
    * ID of the step this detail belongs to.
    */
-  step_id: string;
+  stepId: string;
   [k: string]: unknown;
 }

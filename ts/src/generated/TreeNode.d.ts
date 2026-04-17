@@ -27,7 +27,7 @@ export interface TreeNode {
   /**
    * When this node completed (Unix epoch seconds).
    */
-  end_timestamp?: number | null;
+  endTimestamp?: number | null;
   /**
    * Error message if `status == Failed`.
    */
@@ -41,11 +41,11 @@ export interface TreeNode {
    * Display name for this node.
    */
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   /**
    * ID of parent node, `None` for root.
    */
-  parent_id?: string | null;
+  parentId?: string | null;
   status: NodeStatus;
   /**
    * When this node was created (Unix epoch seconds).

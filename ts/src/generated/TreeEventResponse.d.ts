@@ -24,24 +24,24 @@ export interface TreeEventResponse {
   /**
    * ISO 8601 timestamp.
    */
-  created_at: string;
-  error_message?: string | null;
-  event_timestamp: number;
-  event_type: TreeEventType;
+  createdAt: string;
+  errorMessage?: string | null;
+  eventTimestamp: number;
+  eventType: TreeEventType;
   /**
    * UUID as string (wire-format — see crate-level docs).
    */
   id: string;
   metadata?: NodeMetadata | null;
-  node_id: string;
-  node_name: string;
-  node_type: NodeType;
-  parent_node_id?: string | null;
+  nodeId: string;
+  nodeName: string;
+  nodeType: NodeType;
+  parentNodeId?: string | null;
   path: PathElement[];
   /**
    * Run UUID as string.
    */
-  run_id: string;
+  runId: string;
   sequence: number;
   status: NodeStatus;
   [k: string]: unknown;

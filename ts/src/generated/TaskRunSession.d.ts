@@ -12,11 +12,11 @@ export interface TaskRunSession {
   /**
    * Duration of the session in seconds.
    */
-  duration_seconds: number | null;
+  durationSeconds: number | null;
   /**
    * ISO 8601 timestamp when the session ended.
    */
-  ended_at: string | null;
+  endedAt: string | null;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -24,18 +24,18 @@ export interface TaskRunSession {
   /**
    * Short summary of the session output, if stored.
    */
-  output_summary: string | null;
+  outputSummary: string | null;
   /**
    * 1-based session index within the parent task run.
    */
-  session_number: number;
+  sessionNumber: number;
   /**
    * ISO 8601 timestamp when the session started.
    */
-  started_at: string;
+  startedAt: string;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   [k: string]: unknown;
 }

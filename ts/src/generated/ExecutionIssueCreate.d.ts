@@ -14,11 +14,11 @@ export interface ExecutionIssueCreate {
   /**
    * Sequence number of the associated action, if any.
    */
-  action_sequence_number?: number | null;
+  actionSequenceNumber?: number | null;
   /**
    * Actual observed behavior.
    */
-  actual_behavior?: string | null;
+  actualBehavior?: string | null;
   /**
    * Full issue description.
    */
@@ -26,11 +26,11 @@ export interface ExecutionIssueCreate {
   /**
    * Expected behavior.
    */
-  expected_behavior?: string | null;
+  expectedBehavior?: string | null;
   /**
    * Free-form issue type label (e.g., `"visual_regression"`, `"flaky"`).
    */
-  issue_type: string;
+  issueType: string;
   /**
    * Opaque additional metadata.
    */
@@ -40,11 +40,11 @@ export interface ExecutionIssueCreate {
   /**
    * Steps to reproduce the issue.
    */
-  reproduction_steps?: string[] | null;
+  reproductionSteps?: string[] | null;
   /**
    * IDs of screenshots illustrating the issue.
    */
-  screenshot_ids?: string[] | null;
+  screenshotIds?: string[] | null;
   severity: IssueSeverity;
   /**
    * State ID active when the issue was observed.

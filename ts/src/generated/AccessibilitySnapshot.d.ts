@@ -22,7 +22,7 @@ export interface AccessibilitySnapshot {
   /**
    * Number of interactive nodes.
    */
-  interactive_nodes: number;
+  interactiveNodes: number;
   root: AccessibilityNode;
   /**
    * Unix timestamp of capture.
@@ -35,7 +35,7 @@ export interface AccessibilitySnapshot {
   /**
    * Total number of nodes in the tree.
    */
-  total_nodes: number;
+  totalNodes: number;
   /**
    * Page URL (for web targets).
    */

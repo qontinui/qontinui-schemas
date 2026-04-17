@@ -16,7 +16,7 @@ export interface WorkflowMetadata {
   /**
    * IDs of the states that are active when the workflow starts.
    */
-  initial_state_ids?: string[] | null;
+  initialStateIds?: string[] | null;
   /**
    * Free-form tags attached to the workflow.
    */
@@ -24,22 +24,22 @@ export interface WorkflowMetadata {
   /**
    * Number of states declared by the workflow.
    */
-  total_states?: number | null;
+  totalStates?: number | null;
   /**
    * Number of transitions declared by the workflow.
    */
-  total_transitions?: number | null;
+  totalTransitions?: number | null;
   /**
    * Workflow identifier.
    */
-  workflow_id: string;
+  workflowId: string;
   /**
    * Human-readable workflow name.
    */
-  workflow_name: string;
+  workflowName: string;
   /**
    * Workflow version, if tracked.
    */
-  workflow_version?: string | null;
+  workflowVersion?: string | null;
   [k: string]: unknown;
 }

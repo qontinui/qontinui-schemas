@@ -19,7 +19,7 @@ export interface Region {
   /**
    * Monitor index (required when `system` is `MonitorRelative`).
    */
-  monitor_index?: number | null;
+  monitorIndex?: number | null;
   /**
    * Coordinate system. `None` defaults to `Screen`.
    */

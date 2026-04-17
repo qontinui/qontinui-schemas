@@ -21,15 +21,15 @@ export interface CodeExecutionStep {
   /**
    * Path to a Python file to execute.
    */
-  code_file?: string | null;
+  codeFile?: string | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -39,7 +39,7 @@ export interface CodeExecutionStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -65,7 +65,7 @@ export interface CodeExecutionStep {
   /**
    * Sandbox mode: `"enforce"` (default) or `"warn"`.
    */
-  sandbox_mode?: string | null;
+  sandboxMode?: string | null;
   /**
    * Provenance of this step when generated from a skill template.
    *
@@ -73,16 +73,16 @@ export interface CodeExecutionStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

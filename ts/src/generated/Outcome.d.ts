@@ -10,7 +10,7 @@
  */
 export interface Outcome {
   error?: string | null;
-  retry_count: number;
+  retryCount: number;
   success: boolean;
   [k: string]: unknown;
 }

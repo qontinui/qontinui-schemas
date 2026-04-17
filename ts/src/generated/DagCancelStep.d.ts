@@ -17,15 +17,15 @@ export interface DagCancelStep {
   /**
    * Cancellation reason message.
    */
-  cancel_reason?: string | null;
+  cancelReason?: string | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -35,7 +35,7 @@ export interface DagCancelStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -65,12 +65,12 @@ export interface DagCancelStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

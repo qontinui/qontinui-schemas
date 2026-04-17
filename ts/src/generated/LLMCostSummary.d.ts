@@ -14,26 +14,26 @@ export interface LLMCostSummary {
   /**
    * Number of actions that used an LLM.
    */
-  llm_action_count: number;
+  llmActionCount: number;
   /**
    * Per-model cost breakdowns.
    */
-  per_model?: ModelCostBreakdown[];
+  perModel?: ModelCostBreakdown[];
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * Total estimated cost in USD.
    */
-  total_cost_usd: number;
+  totalCostUsd: number;
   /**
    * Total input tokens across all models.
    */
-  total_tokens_input: number;
+  totalTokensInput: number;
   /**
    * Total output tokens across all models.
    */
-  total_tokens_output: number;
+  totalTokensOutput: number;
   [k: string]: unknown;
 }

@@ -23,11 +23,11 @@ export interface TerminalInfo {
    * Used as the sort key for `TerminalManager::list` so the UI shows
    * terminals in creation order.
    */
-  created_at: number;
+  createdAt: number;
   /**
    * Process exit code, once the shell has exited.
    */
-  exit_code?: number | null;
+  exitCode?: number | null;
   /**
    * Unique session identifier (UUID v4 minted by the runner).
    */
@@ -35,14 +35,14 @@ export interface TerminalInfo {
   /**
    * Whether the shell process is still running.
    */
-  is_alive: boolean;
+  isAlive: boolean;
   /**
    * Which terminal page this session belongs to (for multi-page support).
    *
    * Older wire forms without this field hydrate to `"default"` via
    * [`default_page_id`].
    */
-  page_id: string;
+  pageId: string;
   /**
    * OS process ID of the spawned shell, if still known.
    */
@@ -61,10 +61,10 @@ export interface TerminalInfo {
    * Read by the frontend to detect missed output after a reconnect; the
    * scrollback buffer's `start_offset` is derived from this counter.
    */
-  total_bytes_produced: number;
+  totalBytesProduced: number;
   /**
    * Absolute working directory the shell was started in.
    */
-  working_dir: string;
+  workingDir: string;
   [k: string]: unknown;
 }

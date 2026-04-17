@@ -12,7 +12,7 @@ export interface ExecutionIssueResponse {
   /**
    * Assigned issue IDs, in the same order as the submitted batch.
    */
-  issue_ids?: string[] | null;
+  issueIds?: string[] | null;
   /**
    * Number of issues recorded.
    */
@@ -20,6 +20,6 @@ export interface ExecutionIssueResponse {
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }

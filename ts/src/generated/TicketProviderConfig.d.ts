@@ -24,17 +24,17 @@ export interface TicketProviderConfig {
    * Labels / filters that mark a ticket as "actionable" (i.e. eligible to
    * spawn a workflow task). All listed labels must be present for a match.
    */
-  actionable_labels?: string[];
+  actionableLabels?: string[];
   /**
    * API token for the provider. **Secret** — see security note above.
    * Persisted in the DB so the watcher can reconstruct a provider across
    * restarts; redact before exposing over UI-facing APIs.
    */
-  api_token: string;
+  apiToken: string;
   /**
    * Poll interval in seconds. Default: 60.
    */
-  poll_interval_seconds: number;
+  pollIntervalSeconds: number;
   source: TicketSource;
   /**
    * Provider-specific target:
@@ -47,10 +47,10 @@ export interface TicketProviderConfig {
    * Whether to update the remote ticket's state when the spawned task
    * completes. Default: true.
    */
-  update_on_completion: boolean;
+  updateOnCompletion: boolean;
   /**
    * ID of the workflow to spawn for matched tickets.
    */
-  workflow_id: string;
+  workflowId: string;
   [k: string]: unknown;
 }

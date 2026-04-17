@@ -73,7 +73,7 @@ def test_scheduled_task_validates_status_enum() -> None:
     # (not a `RootModel[Any]` pass-through).
     raw = (FIXTURES / "scheduled_task_sample.json").read_text()
     payload = json.loads(raw)
-    payload["last_run"]["status"] = "NOT_A_REAL_STATUS"
+    payload["lastRun"]["status"] = "NOT_A_REAL_STATUS"
     with pytest.raises(ValidationError):
         ScheduledTask.model_validate(payload)
 

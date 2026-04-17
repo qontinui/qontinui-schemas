@@ -15,20 +15,20 @@ export interface ResourceLimits {
   /**
    * Maximum agentic phase durations summed (milliseconds).
    */
-  max_agentic_time_ms?: number | null;
+  maxAgenticTimeMs?: number | null;
   /**
    * Maximum number of unique files modified across all iterations.
    */
-  max_files_modified?: number | null;
+  maxFilesModified?: number | null;
   /**
    * Maximum wall-clock time for the entire workflow (seconds).
    */
-  max_wall_time_secs?: number | null;
+  maxWallTimeSecs?: number | null;
   /**
    * Warning threshold as a fraction (0.0-1.0). When resource usage exceeds
    * this fraction of the limit, a warning is injected.
    * Default: 0.75 (warn at 75% of limit).
    */
-  warning_threshold?: number | null;
+  warningThreshold?: number | null;
   [k: string]: unknown;
 }

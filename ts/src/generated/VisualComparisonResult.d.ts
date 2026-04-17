@@ -12,19 +12,19 @@ export interface VisualComparisonResult {
   /**
    * Baseline screenshot ID, if any.
    */
-  baseline_id?: string | null;
+  baselineId?: string | null;
   /**
    * Comparison result ID.
    */
-  comparison_id: string;
+  comparisonId: string;
   /**
    * URL to a diff image, if generated.
    */
-  diff_image_url?: string | null;
+  diffImageUrl?: string | null;
   /**
    * Number of diff regions detected.
    */
-  diff_region_count: number;
+  diffRegionCount: number;
   /**
    * Whether the comparison passed.
    */
@@ -32,7 +32,7 @@ export interface VisualComparisonResult {
   /**
    * Similarity score in the range `[0.0, 1.0]`.
    */
-  similarity_score: number;
+  similarityScore: number;
   /**
    * Threshold used for the pass/fail decision.
    */

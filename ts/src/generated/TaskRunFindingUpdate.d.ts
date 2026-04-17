@@ -18,11 +18,11 @@ export interface TaskRunFindingUpdate {
   /**
    * ISO 8601 timestamp of resolution.
    */
-  resolved_at?: string | null;
+  resolvedAt?: string | null;
   /**
    * Session number in which the finding was resolved.
    */
-  resolved_in_session?: number | null;
+  resolvedInSession?: number | null;
   /**
    * New lifecycle status.
    */
@@ -30,6 +30,6 @@ export interface TaskRunFindingUpdate {
   /**
    * User response, if the finding needed input.
    */
-  user_response?: string | null;
+  userResponse?: string | null;
   [k: string]: unknown;
 }

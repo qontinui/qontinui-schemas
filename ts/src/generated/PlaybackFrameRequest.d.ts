@@ -13,10 +13,10 @@ export interface PlaybackFrameRequest {
    * Action execution IDs, in playback order (Python constrains to
    * `1..=100`).
    */
-  action_ids: string[];
+  actionIds: string[];
   /**
    * Whether to include screenshot URLs.
    */
-  include_screenshots: boolean;
+  includeScreenshots: boolean;
   [k: string]: unknown;
 }

@@ -15,11 +15,11 @@ export interface ExecutionIssueUpdate {
   /**
    * User ID to assign the issue to.
    */
-  assigned_to_user_id?: string | null;
+  assignedToUserId?: string | null;
   /**
    * Resolution notes.
    */
-  resolution_notes?: string | null;
+  resolutionNotes?: string | null;
   /**
    * New severity.
    */

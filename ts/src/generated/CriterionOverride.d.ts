@@ -15,7 +15,7 @@ export interface CriterionOverride {
   /**
    * The criterion ID being overridden.
    */
-  criterion_id: string;
+  criterionId: string;
   /**
    * What specifically is being overridden (e.g., class name, file path).
    */
@@ -31,10 +31,10 @@ export interface CriterionOverride {
   /**
    * ISO 8601 timestamp when the override was recorded.
    */
-  recorded_at: string;
+  recordedAt: string;
   /**
    * Worker ID that provided the override (if multi-worker).
    */
-  worker_id?: string | null;
+  workerId?: string | null;
   [k: string]: unknown;
 }

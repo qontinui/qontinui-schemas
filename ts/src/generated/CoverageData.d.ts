@@ -12,42 +12,42 @@ export interface CoverageData {
   /**
    * Overall coverage as a percentage in the range `[0.0, 100.0]`.
    */
-  coverage_percentage: number;
+  coveragePercentage: number;
   /**
    * Per-state visit counts, keyed by state ID.
    */
-  state_visit_counts?: {
+  stateVisitCounts?: {
     [k: string]: number;
   } | null;
   /**
    * Number of states visited at least once.
    */
-  states_covered: number;
+  statesCovered: number;
   /**
    * Total number of states in the workflow.
    */
-  total_states: number;
+  totalStates: number;
   /**
    * Total number of transitions in the workflow.
    */
-  total_transitions: number;
+  totalTransitions: number;
   /**
    * Per-transition execution counts, keyed by transition ID.
    */
-  transition_execution_counts?: {
+  transitionExecutionCounts?: {
     [k: string]: number;
   } | null;
   /**
    * Number of transitions executed at least once.
    */
-  transitions_covered: number;
+  transitionsCovered: number;
   /**
    * IDs of states that were not visited.
    */
-  uncovered_states?: string[] | null;
+  uncoveredStates?: string[] | null;
   /**
    * IDs of transitions that were not executed.
    */
-  uncovered_transitions?: string[] | null;
+  uncoveredTransitions?: string[] | null;
   [k: string]: unknown;
 }

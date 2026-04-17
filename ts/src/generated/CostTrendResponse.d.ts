@@ -14,11 +14,11 @@ export interface CostTrendResponse {
   /**
    * Cost trend data points.
    */
-  data_points: CostTrendDataPoint[];
+  dataPoints: CostTrendDataPoint[];
   /**
    * End date of the reporting window.
    */
-  end_date: string;
+  endDate: string;
   /**
    * Granularity label (`"daily"`, `"weekly"`, `"monthly"`).
    */
@@ -27,16 +27,16 @@ export interface CostTrendResponse {
    * Overall cost statistics over the full window. Shape is intentionally
    * opaque (`dict[str, Any]` in Python).
    */
-  overall_stats?: {
+  overallStats?: {
     [k: string]: unknown;
   };
   /**
    * Project the trend was computed for.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Start date of the reporting window.
    */
-  start_date: string;
+  startDate: string;
   [k: string]: unknown;
 }

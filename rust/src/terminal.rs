@@ -45,40 +45,49 @@ fn default_page_id() -> String {
 /// and emitted as the payload of the `terminal-created` event. Derived
 /// fresh from the live `TerminalSession` each time — never persisted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminalInfo {
     /// Unique session identifier (UUID v4 minted by the runner).
+    #[serde(alias = "id")]
     pub id: TerminalId,
     /// Human-readable title shown in the UI tab (e.g., "Terminal 1").
+    #[serde(alias = "title")]
     pub title: String,
     /// OS process ID of the spawned shell, if still known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "pid")]
     pub pid: Option<u32>,
     /// Current terminal width in columns.
+    #[serde(alias = "cols")]
     pub cols: u16,
     /// Current terminal height in rows.
+    #[serde(alias = "rows")]
     pub rows: u16,
     /// Absolute working directory the shell was started in.
+    #[serde(alias = "working_dir")]
     pub working_dir: String,
     /// Whether the shell process is still running.
+    #[serde(alias = "is_alive")]
     pub is_alive: bool,
     /// Process exit code, once the shell has exited.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "exit_code")]
     pub exit_code: Option<i32>,
     /// Unix timestamp in milliseconds when the session was created.
     ///
     /// Used as the sort key for `TerminalManager::list` so the UI shows
     /// terminals in creation order.
+    #[serde(alias = "created_at")]
     pub created_at: u64,
     /// Monotonic counter of all bytes ever produced by this PTY.
     ///
     /// Read by the frontend to detect missed output after a reconnect; the
     /// scrollback buffer's `start_offset` is derived from this counter.
+    #[serde(alias = "total_bytes_produced")]
     pub total_bytes_produced: u64,
     /// Which terminal page this session belongs to (for multi-page support).
     ///
     /// Older wire forms without this field hydrate to `"default"` via
     /// [`default_page_id`].
-    #[serde(default = "default_page_id")]
+    #[serde(default = "default_page_id", alias = "page_id")]
     pub page_id: String,
 }
 
@@ -90,13 +99,16 @@ pub struct TerminalInfo {
 /// can contain partial UTF-8 sequences that would corrupt a `String`
 /// field).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminalOutputEvent {
     /// ID of the terminal session producing this output.
+    #[serde(alias = "terminal_id")]
     pub terminal_id: TerminalId,
     /// Base64-encoded bytes produced by the PTY.
     ///
     /// Raw bytes are required (not UTF-8 text) because PTY output can
     /// contain partial UTF-8 sequences that span read boundaries.
+    #[serde(alias = "data")]
     pub data: String,
 }
 
@@ -107,11 +119,13 @@ pub struct TerminalOutputEvent {
 /// [`TerminalInfo::is_alive`] will be `false` and [`TerminalInfo::exit_code`]
 /// will carry the same value surfaced here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminalExitEvent {
     /// ID of the terminal session that exited.
+    #[serde(alias = "terminal_id")]
     pub terminal_id: TerminalId,
     /// Exit code reported by the OS, or `None` if the status could not be
     /// captured (e.g., the wait call itself errored).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "exit_code")]
     pub exit_code: Option<i32>,
 }

@@ -151,20 +151,22 @@ fn is_default_log_source(selection: &LogSourceSelection) -> bool {
 /// - Variables: `verification_failures`, `iteration`, `stage_index`
 /// - Operators: `>=`, `>`, `<=`, `<`, `==`, `!=`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RoutingRule {
     /// Condition expression, e.g. `"verification_failures >= 2"`.
+    #[serde(alias = "condition")]
     pub condition: String,
     /// Model to use when this rule matches.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
     /// Provider to use when this rule matches.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
     pub provider: Option<String>,
     /// Temperature override when this rule matches.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "temperature")]
     pub temperature: Option<f32>,
     /// Max tokens override when this rule matches.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_tokens")]
     pub max_tokens: Option<u32>,
 }
 
@@ -174,28 +176,29 @@ pub struct RoutingRule {
 /// optional temperature, max_tokens, fallback config, and conditional routing
 /// rules.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelOverrideConfig {
     /// Provider override for this phase.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
     pub provider: Option<String>,
     /// Model override for this phase.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
     /// Temperature override for this phase (`0.0`–`1.0`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "temperature")]
     pub temperature: Option<f32>,
     /// Max output tokens override for this phase.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_tokens")]
     pub max_tokens: Option<u32>,
     /// Fallback provider if the primary fails with a retryable error.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fallback_provider")]
     pub fallback_provider: Option<String>,
     /// Fallback model if the primary fails with a retryable error.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fallback_model")]
     pub fallback_model: Option<String>,
     /// Conditional routing rules evaluated at runtime. First matching rule
     /// wins; unmatched falls back to this config's static fields.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "routing_rules")]
     pub routing_rules: Option<Vec<RoutingRule>>,
 }
 
@@ -258,19 +261,22 @@ impl Default for LogSourceSelection {
 /// A workflow can have zero or more of these; they run before verification to
 /// confirm required services are up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct HealthCheckUrl {
     /// Display name for the health check (e.g., `"Backend Server"`).
+    #[serde(alias = "name")]
     pub name: String,
     /// URL to check (e.g., `"http://localhost:8000/health"`).
+    #[serde(alias = "url")]
     pub url: String,
     /// Expected HTTP status code (default: `200`).
-    #[serde(default = "default_expected_status")]
+    #[serde(default = "default_expected_status", alias = "expected_status")]
     pub expected_status: u16,
     /// Timeout in seconds (default: `30`).
-    #[serde(default = "default_health_timeout")]
+    #[serde(default = "default_health_timeout", alias = "timeout_seconds")]
     pub timeout_seconds: u64,
     /// Whether failure should stop the workflow (default: `true`).
-    #[serde(default = "default_is_critical")]
+    #[serde(default = "default_is_critical", alias = "is_critical")]
     pub is_critical: bool,
 }
 
@@ -323,65 +329,71 @@ impl std::fmt::Display for WorkflowArchitecture {
 /// with AND semantics — all specified conditions must be met for the stage to
 /// run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StageCondition {
     /// Run this stage only if the previous stage had this outcome.
     ///
     /// - `"passed"`: run only if previous stage verification passed
     /// - `"failed"`: run only if previous stage verification failed
     /// - `"any"`: always run regardless of previous outcome (default behavior)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "if_previous")]
     pub if_previous: Option<String>,
 
     /// Run this stage only after this many loop iterations have occurred
     /// (across all stages). Useful for "escalation" stages that only kick in
     /// after initial attempts have failed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "min_iteration")]
     pub min_iteration: Option<u32>,
 
     /// Skip this stage if the total number of failed stages so far is below
     /// this threshold. Useful for "recovery" stages that only run when
     /// multiple prior stages have failed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "min_failures")]
     pub min_failures: Option<u32>,
 }
 
 /// Retry policy for a step or stage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RetryPolicy {
     /// Number of retry attempts (`0` = no retries).
-    #[serde(default)]
+    #[serde(default, alias = "count")]
     pub count: u32,
     /// Delay between retries in milliseconds.
-    #[serde(default = "default_retry_delay_ms")]
+    #[serde(default = "default_retry_delay_ms", alias = "delay_ms")]
     pub delay_ms: u64,
     /// Whether to use exponential backoff.
-    #[serde(default)]
+    #[serde(default, alias = "backoff")]
     pub backoff: bool,
 }
 
 /// An output declared by a stage, available to subsequent stages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StageOutput {
     /// Unique key for this output (e.g. `"api_url"`, `"auth_token"`).
+    #[serde(alias = "key")]
     pub key: String,
     /// Human-readable description.
-    #[serde(default)]
+    #[serde(default, alias = "description")]
     pub description: String,
 }
 
 /// An input required by a stage, referencing a prior stage's output.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StageInput {
     /// The key to bind this input to (matches a [`StageOutput::key`] from a
     /// prior stage).
+    #[serde(alias = "key")]
     pub key: String,
     /// Which stage provides this input (stage id). If omitted, searches all
     /// prior stages.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "from_stage")]
     pub from_stage: Option<String>,
     /// Whether this input is required (default: `true`). Missing required
     /// inputs are Critical findings.
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "required")]
     pub required: bool,
 }
 
@@ -394,69 +406,71 @@ pub struct StageInput {
 /// stages. Step arrays are opaque `serde_json::Value` payloads pending the
 /// Wave 4 typed-step migration.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkflowStage {
     /// Unique identifier (UUID v4).
-    #[serde(default)]
+    #[serde(default, alias = "id")]
     pub id: String,
     /// Display name for this stage.
+    #[serde(alias = "name")]
     pub name: String,
     /// Description of what this stage does.
-    #[serde(default)]
+    #[serde(default, alias = "description")]
     pub description: String,
     /// Setup phase steps for this stage (polymorphic; see module docs).
-    #[serde(default)]
+    #[serde(default, alias = "setup_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub setup_steps: Vec<Value>,
     /// Verification phase steps for this stage.
-    #[serde(default)]
+    #[serde(default, alias = "verification_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub verification_steps: Vec<Value>,
     /// Agentic phase steps for this stage.
-    #[serde(default)]
+    #[serde(default, alias = "agentic_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub agentic_steps: Vec<Value>,
     /// Completion phase steps for this stage.
-    #[serde(default)]
+    #[serde(default, alias = "completion_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub completion_steps: Vec<Value>,
     /// Maximum iterations for this stage's verification-agentic loop.
     ///
     /// `None` (omitted in JSON) means no iteration cap — the loop terminates
     /// on success, explicit stop, or fix-attempt exhaustion.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
     pub max_iterations: Option<u32>,
     /// Optional inactivity timeout in seconds for this stage's AI sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
     pub timeout_seconds: Option<u64>,
     /// AI provider override for this stage.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
     pub provider: Option<String>,
     /// Model override for this stage.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
     /// Per-phase model overrides for this stage.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "model_overrides")]
     pub model_overrides: ModelOverrides,
     /// Whether to pause for human approval after each agentic phase.
-    #[serde(default)]
+    #[serde(default, alias = "approval_gate")]
     pub approval_gate: bool,
     /// Optional condition for stage execution. When set, the stage is
     /// evaluated against this condition before running. If the condition is
     /// not met, the stage is skipped.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "condition")]
     pub condition: Option<StageCondition>,
     /// When true, run completion prompt steps BEFORE automation steps.
     /// Default (`false`) runs automation first, then prompts.
-    #[serde(default)]
+    #[serde(default, alias = "completion_prompts_first")]
     pub completion_prompts_first: bool,
     /// Retry policy for this stage (overrides per-step defaults).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "retry_policy")]
     pub retry_policy: Option<RetryPolicy>,
     /// Declared outputs that this stage produces for downstream stages.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "outputs")]
     pub outputs: Option<Vec<StageOutput>>,
     /// Inputs required from prior stages.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "inputs")]
     pub inputs: Option<Vec<StageInput>>,
 }
 
@@ -472,37 +486,39 @@ pub struct WorkflowStage {
 /// criteria), and timestamps. Step arrays remain opaque until the Wave 4
 /// typed-step migration lands.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UnifiedWorkflow {
     /// Unique identifier (UUID v4).
-    #[serde(default)]
+    #[serde(default, alias = "id")]
     pub id: String,
     /// Display name.
+    #[serde(alias = "name")]
     pub name: String,
     /// Description of what this workflow does.
-    #[serde(default)]
+    #[serde(default, alias = "description")]
     pub description: String,
     /// Category for organization.
-    #[serde(default = "default_category")]
+    #[serde(default = "default_category", alias = "category")]
     pub category: String,
     /// Tags for filtering.
-    #[serde(default)]
+    #[serde(default, alias = "tags")]
     pub tags: Vec<String>,
 
     /// Setup phase steps (polymorphic JSON array; see module docs).
-    #[serde(default)]
+    #[serde(default, alias = "setup_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub setup_steps: Vec<Value>,
     /// Verification phase steps (polymorphic JSON array).
-    #[serde(default)]
+    #[serde(default, alias = "verification_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub verification_steps: Vec<Value>,
     /// Agentic phase steps (polymorphic JSON array).
-    #[serde(default)]
+    #[serde(default, alias = "agentic_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub agentic_steps: Vec<Value>,
     /// Completion phase steps (polymorphic JSON array) — runs once after the
     /// verification loop exits.
-    #[serde(default)]
+    #[serde(default, alias = "completion_steps")]
     #[schemars(with = "Vec<UnifiedStep>")]
     pub completion_steps: Vec<Value>,
 
@@ -510,7 +526,7 @@ pub struct UnifiedWorkflow {
     ///
     /// `None` means no iteration cap — the loop terminates on success,
     /// explicit stop, or fix-attempt exhaustion.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
     pub max_iterations: Option<u32>,
 
     /// Maximum consecutive non-improving fix attempts before escalating.
@@ -518,13 +534,13 @@ pub struct UnifiedWorkflow {
     /// When the verification check count does not improve across this many
     /// iterations, the loop exits with `fix_attempts_exhausted`. `0` =
     /// disabled. Default: `3`.
-    #[serde(default = "default_max_fix_attempts")]
+    #[serde(default = "default_max_fix_attempts", alias = "max_fix_attempts")]
     pub max_fix_attempts: u32,
 
     /// Maximum number of CI-triggered auto-resumes before requiring human
     /// intervention. Used by the PR watcher integration. `0` = disabled.
     /// Default: `10`.
-    #[serde(default = "default_max_ci_auto_resumes")]
+    #[serde(default = "default_max_ci_auto_resumes", alias = "max_ci_auto_resumes")]
     pub max_ci_auto_resumes: u32,
 
     /// Optional inactivity timeout in seconds for AI sessions.
@@ -533,23 +549,23 @@ pub struct UnifiedWorkflow {
     /// - `Some(N)`: kill AI session after `N` seconds of no output.
     ///
     /// Takes precedence over the global AI settings timeout.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
     pub timeout_seconds: Option<u64>,
 
     /// AI provider override.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
     pub provider: Option<String>,
     /// Model override.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
 
     /// Per-phase model overrides.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "model_overrides")]
     pub model_overrides: ModelOverrides,
 
     /// Skip AI summary generation at the end (default: `false`, meaning the
     /// AI summary is generated).
-    #[serde(default)]
+    #[serde(default, alias = "skip_ai_summary")]
     pub skip_ai_summary: bool,
 
     /// Error IDs targeted by this workflow (for auto-resolution on success).
@@ -557,7 +573,7 @@ pub struct UnifiedWorkflow {
     /// When the workflow completes successfully, these errors will be marked
     /// as resolved. Used by error-fix workflows generated from the Error
     /// Monitor.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "targeted_error_ids")]
     pub targeted_error_ids: Vec<i64>,
 
     /// Log source selection for this workflow.
@@ -566,20 +582,20 @@ pub struct UnifiedWorkflow {
     /// - `"ai"`: let AI automatically select relevant sources based on context
     /// - `"all"`: use all enabled log sources
     /// - `{ "profile_id": "..." }`: use a specific profile
-    #[serde(default, skip_serializing_if = "is_default_log_source")]
+    #[serde(default, skip_serializing_if = "is_default_log_source", alias = "log_source_selection")]
     pub log_source_selection: LogSourceSelection,
 
     /// Manually added context IDs.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "context_ids")]
     pub context_ids: Vec<String>,
 
     /// Disabled context IDs (excluded from auto-include).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "disabled_context_ids")]
     pub disabled_context_ids: Vec<String>,
 
     /// Whether to auto-include contexts based on task mentions (default:
     /// `true`).
-    #[serde(default = "default_auto_include_contexts")]
+    #[serde(default = "default_auto_include_contexts", alias = "auto_include_contexts")]
     pub auto_include_contexts: bool,
 
     /// Custom developer prompt template for this workflow.
@@ -588,14 +604,14 @@ pub struct UnifiedWorkflow {
     /// running the workflow. Supports variables: `{{SESSION_ID}}`,
     /// `{{ITERATION}}`, `{{MAX_ITERATIONS}}`, `{{GOAL}}`,
     /// `{{EXECUTION_STEPS}}`, `{{WORKSPACE_ESCAPED}}`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "prompt_template")]
     pub prompt_template: Option<String>,
 
     /// Whether to automatically include a `log_watch` step before verification.
     ///
     /// When enabled (default), a `log_watch` step is prepended to
     /// verification steps to detect runtime errors in backend/frontend logs.
-    #[serde(default = "default_log_watch_enabled")]
+    #[serde(default = "default_log_watch_enabled", alias = "log_watch_enabled")]
     pub log_watch_enabled: bool,
 
     /// Whether to automatically include health check steps before
@@ -604,7 +620,7 @@ pub struct UnifiedWorkflow {
     /// When enabled and `health_check_urls` is non-empty, health check steps
     /// are prepended to verification steps to verify configured servers are
     /// running.
-    #[serde(default = "default_health_check_enabled")]
+    #[serde(default = "default_health_check_enabled", alias = "health_check_enabled")]
     pub health_check_enabled: bool,
 
     /// URLs to health check before verification (user-configurable).
@@ -612,7 +628,7 @@ pub struct UnifiedWorkflow {
     /// Each entry specifies a URL to check, expected status, and timeout.
     /// If empty, no health checks are performed even if `health_check_enabled`
     /// is true.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "health_check_urls")]
     pub health_check_urls: Vec<HealthCheckUrl>,
 
     /// Whether to automatically include a pre-flight environment check at the
@@ -622,22 +638,22 @@ pub struct UnifiedWorkflow {
     /// space, Node.js/npm, Python/Poetry, Rust/Cargo, and Git availability.
     /// Uses the global setting from Settings if not explicitly set per
     /// workflow.
-    #[serde(default = "default_preflight_check_enabled")]
+    #[serde(default = "default_preflight_check_enabled", alias = "preflight_check_enabled")]
     pub preflight_check_enabled: bool,
 
     /// Whether to run a completion sweep after verification passes.
     ///
     /// The sweep reviews all completed work for gaps before proceeding to
     /// completion.
-    #[serde(default)]
+    #[serde(default, alias = "enable_sweep")]
     pub enable_sweep: bool,
 
     /// Maximum number of sweep iterations (default: `5`).
-    #[serde(default = "default_max_sweep_iterations")]
+    #[serde(default = "default_max_sweep_iterations", alias = "max_sweep_iterations")]
     pub max_sweep_iterations: u32,
 
     /// Task run ID that generated this workflow (for meta-workflow tracking).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "generated_by_task_run_id")]
     pub generated_by_task_run_id: Option<String>,
 
     /// Optional stages for multi-stage workflows.
@@ -648,7 +664,8 @@ pub struct UnifiedWorkflow {
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
-        deserialize_with = "deserialize_null_as_empty_vec"
+        deserialize_with = "deserialize_null_as_empty_vec",
+        alias = "stages"
     )]
     pub stages: Vec<WorkflowStage>,
 
@@ -656,7 +673,7 @@ pub struct UnifiedWorkflow {
     ///
     /// Default: `false` (autonomous mode — continue to the next stage even
     /// if the previous failed).
-    #[serde(default)]
+    #[serde(default, alias = "stop_on_failure")]
     pub stop_on_failure: bool,
 
     /// Per-constraint overrides: map of `constraint_id` to enabled (`true`) /
@@ -664,18 +681,18 @@ pub struct UnifiedWorkflow {
     ///
     /// Applied to the constraint engine at execution time, after loading
     /// builtins and config.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "constraint_overrides")]
     pub constraint_overrides: HashMap<String, bool>,
 
     /// Whether to pause for human approval after each agentic phase.
-    #[serde(default)]
+    #[serde(default, alias = "approval_gate")]
     pub approval_gate: bool,
 
     /// Whether to enable reflection mode during agentic iterations.
     ///
     /// When `true`, the AI investigates root causes before fixing failures.
     /// Default: `true` for user-created workflows.
-    #[serde(default = "default_reflection_mode")]
+    #[serde(default = "default_reflection_mode", alias = "reflection_mode")]
     pub reflection_mode: bool,
 
     /// When `true`, run completion prompt steps BEFORE automation steps.
@@ -683,29 +700,29 @@ pub struct UnifiedWorkflow {
     /// Used by meta-workflows so the AI hardener runs before
     /// `save_workflow_artifact`. Default (`false`) runs automation first,
     /// then prompts.
-    #[serde(default)]
+    #[serde(default, alias = "completion_prompts_first")]
     pub completion_prompts_first: bool,
 
     /// Whether this workflow is marked as a favorite for quick access.
-    #[serde(default)]
+    #[serde(default, alias = "is_favorite")]
     pub is_favorite: bool,
 
     /// Dependency graph computed during generation (opaque JSON blob).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "dependency_graph")]
     pub dependency_graph: Option<Value>,
 
     /// Cost annotations computed during generation (opaque JSON blob).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cost_annotations")]
     pub cost_annotations: Option<Value>,
 
     /// Acceptance criteria from the specification agent (opaque JSON blob).
     ///
     /// Used by the canvas panel manager to show a live requirements tracker.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acceptance_criteria")]
     pub acceptance_criteria: Option<Value>,
 
     /// Quality report from the revision phase (opaque JSON blob).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "quality_report")]
     pub quality_report: Option<Value>,
 
     /// Enable multi-agent fixer mode for the agentic phase.
@@ -713,33 +730,33 @@ pub struct UnifiedWorkflow {
     /// When `true`, verification failures are triaged and fixed by
     /// specialized agents (quick-fix for lint/compilation, feature-fix for
     /// missing functionality). Default: `true`.
-    #[serde(default = "default_multi_agent_mode")]
+    #[serde(default = "default_multi_agent_mode", alias = "multi_agent_mode")]
     pub multi_agent_mode: bool,
 
     /// Policy for automatic git rollback when the workflow fails.
     ///
     /// Values: `"none"` (default), `"last_good"`, `"clean"`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "rollback_policy")]
     pub rollback_policy: Option<String>,
 
     /// When `true`, the pipeline will stop execution if accumulated token
     /// usage exceeds the token budget. Disabled by default — only logs
     /// warnings.
-    #[serde(default)]
+    #[serde(default, alias = "enforce_token_budget")]
     pub enforce_token_budget: bool,
 
     /// Restrict working directory resolution to the workspace boundary.
     ///
     /// When `true`, steps cannot resolve paths outside the workspace root.
     /// Default: `false` (permissive, current behavior).
-    #[serde(default)]
+    #[serde(default, alias = "strict_cwd")]
     pub strict_cwd: bool,
 
     /// Tags for per-execution tool whitelisting.
     ///
     /// When non-empty, only skills matching at least one tag are included in
     /// the AI prompt context, reducing prompt bloat.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "tool_tags")]
     pub tool_tags: Vec<String>,
 
     /// Per-workflow security profile override.
@@ -747,7 +764,7 @@ pub struct UnifiedWorkflow {
     /// When set, overrides the default security profile from settings for
     /// this workflow. Values: `"permissive"`, `"standard"`, `"strict"`,
     /// or `"custom"`. If `None`, uses the default from Settings > Security.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "security_profile")]
     pub security_profile: Option<String>,
 
     /// Run the workflow in an isolated git worktree.
@@ -755,7 +772,7 @@ pub struct UnifiedWorkflow {
     /// When `true`, a new branch and worktree are created before execution.
     /// Changes stay on the worktree branch and can be merged back after
     /// review. Default: `false`.
-    #[serde(default)]
+    #[serde(default, alias = "use_worktree")]
     pub use_worktree: bool,
 
     /// Workflow execution architecture override.
@@ -763,7 +780,7 @@ pub struct UnifiedWorkflow {
     /// When set, forces the workflow to use a specific execution architecture
     /// instead of the default Traditional loop. When `None`, the system
     /// infers the best architecture based on workflow complexity.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_architecture")]
     pub workflow_architecture: Option<WorkflowArchitecture>,
 
     /// Whether the AI semantic review actually ran successfully during
@@ -772,16 +789,16 @@ pub struct UnifiedWorkflow {
     /// When `false`, the workflow passed through the pipeline without AI
     /// verification (e.g., all verification iterations failed at
     /// infrastructure level).
-    #[serde(default = "default_ai_reviewed")]
+    #[serde(default = "default_ai_reviewed", alias = "ai_reviewed")]
     pub ai_reviewed: bool,
 
     /// Flow control configuration as a JSON string (e.g., concurrency limits,
     /// queue behavior).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "flow_control_json")]
     pub flow_control_json: Option<String>,
 
     /// Per-phase timeout configuration as a JSON string.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "phase_timeouts_json")]
     pub phase_timeouts_json: Option<String>,
 
     /// Whether HTN (Hierarchical Task Network) planning is enabled for this
@@ -789,28 +806,28 @@ pub struct UnifiedWorkflow {
     ///
     /// When `true`, the loop attempts structured plan-based fixes before
     /// falling back to AI agentic sessions.
-    #[serde(default)]
+    #[serde(default, alias = "htn_enabled")]
     pub htn_enabled: bool,
 
     /// UI Bridge URL for HTN planning (e.g., `"http://localhost:1420"`).
     ///
     /// When set, the HTN planner connects to UI Bridge for querying element
     /// state. If `None`, HTN runs in plan-only mode without GUI execution.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "htn_ui_bridge_url")]
     pub htn_ui_bridge_url: Option<String>,
 
     /// Path to a serialized state machine JSON file for HTN planning.
     ///
     /// When `None` and HTN is enabled, defaults to the bundled
     /// `data/runner_state_machine.json`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "htn_state_machine_path")]
     pub htn_state_machine_path: Option<String>,
 
     /// ISO 8601 timestamp of creation.
-    #[serde(default)]
+    #[serde(default, alias = "created_at")]
     pub created_at: String,
     /// ISO 8601 timestamp of last modification (serialized as `"modified_at"`
     /// to match the frontend).
-    #[serde(rename = "modified_at", default)]
+    #[serde(rename = "modified_at", default, alias = "updated_at")]
     pub updated_at: String,
 }

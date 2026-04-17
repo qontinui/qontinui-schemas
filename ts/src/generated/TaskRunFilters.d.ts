@@ -14,7 +14,7 @@ export interface TaskRunFilters {
   /**
    * Include only runs before this ISO 8601 timestamp.
    */
-  end_date?: string | null;
+  endDate?: string | null;
   /**
    * Pagination limit.
    */
@@ -26,11 +26,11 @@ export interface TaskRunFilters {
   /**
    * Restrict to a given project.
    */
-  project_id?: string | null;
+  projectId?: string | null;
   /**
    * Include only runs after this ISO 8601 timestamp.
    */
-  start_date?: string | null;
+  startDate?: string | null;
   /**
    * Restrict to a given status.
    */

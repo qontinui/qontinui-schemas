@@ -16,15 +16,15 @@ export interface DomainVerificationResult {
   /**
    * Whether all domain criteria passed.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * Domain that was verified.
    */
-  domain_id: string;
+  domainId: string;
   /**
    * Summary of any failures.
    */
-  failure_summary?: string | null;
+  failureSummary?: string | null;
   /**
    * Verification results for domain-specific criteria.
    */
@@ -32,6 +32,6 @@ export interface DomainVerificationResult {
   /**
    * Workers that contributed to this domain.
    */
-  worker_ids: string[];
+  workerIds: string[];
   [k: string]: unknown;
 }

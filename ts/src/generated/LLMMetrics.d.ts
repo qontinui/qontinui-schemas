@@ -12,11 +12,11 @@ export interface LLMMetrics {
   /**
    * Estimated cost in USD.
    */
-  cost_usd?: number | null;
+  costUsd?: number | null;
   /**
    * Generation parameters (temperature, max_tokens, etc.).
    */
-  generation_params?: {
+  generationParams?: {
     [k: string]: unknown;
   } | null;
   /**
@@ -30,14 +30,14 @@ export interface LLMMetrics {
   /**
    * Input/prompt token count.
    */
-  tokens_input?: number | null;
+  tokensInput?: number | null;
   /**
    * Completion token count.
    */
-  tokens_output?: number | null;
+  tokensOutput?: number | null;
   /**
    * Computed total token count.
    */
-  tokens_total?: number | null;
+  tokensTotal?: number | null;
   [k: string]: unknown;
 }

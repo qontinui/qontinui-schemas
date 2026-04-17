@@ -23,7 +23,7 @@ export interface SuccessCriterion {
   /**
    * For AI-evaluated criteria: the evaluation prompt.
    */
-  evaluation_prompt?: string | null;
+  evaluationPrompt?: string | null;
   /**
    * Unique identifier for this criterion.
    */
@@ -33,7 +33,7 @@ export interface SuccessCriterion {
    * - `true` (default): failure blocks completion, worker must fix.
    * - `false`: failure is informational, doesn't block completion.
    */
-  is_critical: boolean;
+  isCritical: boolean;
   /**
    * Whether this criterion must pass for task completion.
    */
@@ -43,13 +43,13 @@ export interface SuccessCriterion {
    * Configuration blob for the verification method (command args, log
    * patterns, Playwright script path, etc.).
    */
-  verification_config?: {
+  verificationConfig?: {
     [k: string]: unknown;
   };
   /**
    * For deterministic criteria: the verification method to use.
    */
-  verification_method?: VerificationMethod | null;
+  verificationMethod?: VerificationMethod | null;
   /**
    * Optional weight for partial success scoring.
    */

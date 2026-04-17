@@ -15,7 +15,7 @@ export interface FindingUserInput {
   /**
    * Type of input expected — typically `"text"` or `"choice"`.
    */
-  input_type: string;
+  inputType: string;
   /**
    * Options for choice-type input.
    */

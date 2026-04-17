@@ -20,54 +20,54 @@ export interface ActionExecutionCreate {
   /**
    * Human-readable action name.
    */
-  action_name: string;
-  action_type: ExecutionActionType;
+  actionName: string;
+  actionType: ExecutionActionType;
   /**
    * IDs of states active when the action ran.
    */
-  active_states?: string[] | null;
+  activeStates?: string[] | null;
   /**
    * ISO 8601 timestamp when the action completed.
    */
-  completed_at: string;
+  completedAt: string;
   /**
    * Confidence score of the match in the range `[0.0, 1.0]`.
    */
-  confidence_score?: number | null;
+  confidenceScore?: number | null;
   /**
    * Action duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message if the action failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Captured stack trace, if any.
    */
-  error_stack?: string | null;
+  errorStack?: string | null;
   /**
    * Category of error, if any.
    */
-  error_type?: ErrorType | null;
+  errorType?: ErrorType | null;
   /**
    * Source state ID for state-machine actions.
    */
-  from_state?: string | null;
+  fromState?: string | null;
   /**
    * Opaque input data captured for the action.
    */
-  input_data?: {
+  inputData?: {
     [k: string]: unknown;
   } | null;
   /**
    * LLM token and cost metrics, if the action used an LLM.
    */
-  llm_metrics?: LLMMetrics | null;
+  llmMetrics?: LLMMetrics | null;
   /**
    * Pixel location of the match.
    */
-  match_location?: ExecutionMatchLocation | null;
+  matchLocation?: ExecutionMatchLocation | null;
   /**
    * Opaque additional metadata.
    */
@@ -77,49 +77,49 @@ export interface ActionExecutionCreate {
   /**
    * Opaque output data produced by the action.
    */
-  output_data?: {
+  outputData?: {
     [k: string]: unknown;
   } | null;
   /**
    * ID of a parent action, if this is a sub-action.
    */
-  parent_action_id?: string | null;
+  parentActionId?: string | null;
   /**
    * Parent action ID for child actions within a sequence.
    */
-  parent_id?: string | null;
+  parentId?: string | null;
   /**
    * ID of the pattern the action targeted.
    */
-  pattern_id?: string | null;
+  patternId?: string | null;
   /**
    * Human-readable pattern name.
    */
-  pattern_name?: string | null;
+  patternName?: string | null;
   /**
    * ID of a screenshot associated with the action.
    */
-  screenshot_id?: string | null;
+  screenshotId?: string | null;
   /**
    * Zero-based sequence number of the action within the run.
    */
-  sequence_number: number;
+  sequenceNumber: number;
   /**
    * Span type for tracing (e.g., `"llm"`, `"tool"`, `"agent"`).
    */
-  span_type?: string | null;
+  spanType?: string | null;
   /**
    * ISO 8601 timestamp when the action started.
    */
-  started_at: string;
+  startedAt: string;
   status: ActionStatus;
   /**
    * Destination state ID for state-machine actions.
    */
-  to_state?: string | null;
+  toState?: string | null;
   /**
    * Trace ID correlating related actions.
    */
-  trace_id?: string | null;
+  traceId?: string | null;
   [k: string]: unknown;
 }

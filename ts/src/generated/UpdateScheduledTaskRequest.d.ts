@@ -21,7 +21,7 @@ export interface UpdateScheduledTaskRequest {
   /**
    * Update `auto_fix_on_failure`.
    */
-  auto_fix_on_failure?: boolean | null;
+  autoFixOnFailure?: boolean | null;
   /**
    * Replace the conditions block (pass `null` to clear).
    */
@@ -45,11 +45,11 @@ export interface UpdateScheduledTaskRequest {
   /**
    * Update `skip_if_completed`.
    */
-  skip_if_completed?: boolean | null;
+  skipIfCompleted?: boolean | null;
   /**
    * Update the success criteria (pass `null` to clear).
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   /**
    * Replace the task definition.
    */

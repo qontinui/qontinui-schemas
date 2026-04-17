@@ -15,54 +15,54 @@ export interface AccessibilityState {
   /**
    * Checkable element's checked state.
    */
-  is_checked?: boolean | null;
+  isChecked?: boolean | null;
   /**
    * Element is disabled / non-interactive.
    */
-  is_disabled: boolean;
+  isDisabled: boolean;
   /**
    * Element content can be edited.
    */
-  is_editable: boolean;
+  isEditable: boolean;
   /**
    * Expandable element's expansion state.
    */
-  is_expanded?: boolean | null;
+  isExpanded?: boolean | null;
   /**
    * Element can receive focus.
    */
-  is_focusable: boolean;
+  isFocusable: boolean;
   /**
    * Element has keyboard focus.
    */
-  is_focused: boolean;
+  isFocused: boolean;
   /**
    * Element is hidden from the accessibility tree.
    */
-  is_hidden: boolean;
+  isHidden: boolean;
   /**
    * Element is a modal dialog.
    */
-  is_modal: boolean;
+  isModal: boolean;
   /**
    * Element allows multiple selections.
    */
-  is_multiselectable: boolean;
+  isMultiselectable: boolean;
   /**
    * Pressable element's pressed state.
    */
-  is_pressed?: boolean | null;
+  isPressed?: boolean | null;
   /**
    * Element is read-only.
    */
-  is_readonly: boolean;
+  isReadonly: boolean;
   /**
    * Element value is required.
    */
-  is_required: boolean;
+  isRequired: boolean;
   /**
    * Selectable element's selection state.
    */
-  is_selected?: boolean | null;
+  isSelected?: boolean | null;
   [k: string]: unknown;
 }

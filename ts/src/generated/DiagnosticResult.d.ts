@@ -14,7 +14,7 @@ export interface DiagnosticResult {
   /**
    * Assertion results (each with pass/fail and details).
    */
-  assertion_results: unknown[];
+  assertionResults: unknown[];
   /**
    * AI-generated explanation of the failure.
    */
@@ -22,7 +22,7 @@ export interface DiagnosticResult {
   /**
    * Page-health status blob from UI Bridge.
    */
-  page_health: {
+  pageHealth: {
     [k: string]: unknown;
   };
   /**
@@ -32,10 +32,10 @@ export interface DiagnosticResult {
   /**
    * AI-generated recommendation for the next iteration's prompt.
    */
-  prompt_rewrite_suggestion?: string | null;
+  promptRewriteSuggestion?: string | null;
   /**
    * Classified root cause (only meaningful when `passed == false`).
    */
-  root_cause?: RootCauseCategory | null;
+  rootCause?: RootCauseCategory | null;
   [k: string]: unknown;
 }

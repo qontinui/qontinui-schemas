@@ -16,28 +16,28 @@ export interface IterationResult {
   /**
    * ISO 8601 completion timestamp.
    */
-  completed_at: string;
+  completedAt: string;
   /**
    * Whether the loop context was summarized during this iteration.
    */
-  context_summarized?: boolean | null;
+  contextSummarized?: boolean | null;
   /**
    * Diagnostic-phase result (if the diagnose phase is configured).
    */
-  diagnostic_result?: DiagnosticResult | null;
-  exit_check: ExitCheckResult;
+  diagnosticResult?: DiagnosticResult | null;
+  exitCheck: ExitCheckResult;
   /**
    * Number of fixes proposed during reflection.
    */
-  fix_count?: number | null;
+  fixCount?: number | null;
   /**
    * Pipeline mode: whether fixes were implemented during this iteration.
    */
-  fixes_implemented?: boolean | null;
+  fixesImplemented?: boolean | null;
   /**
    * Pipeline mode: ID of the workflow generated during the build phase.
    */
-  generated_workflow_id?: string | null;
+  generatedWorkflowId?: string | null;
   /**
    * 1-based iteration index.
    */
@@ -45,22 +45,22 @@ export interface IterationResult {
   /**
    * Pipeline mode: whether a rebuild was triggered for the next iteration.
    */
-  rebuild_triggered?: boolean | null;
+  rebuildTriggered?: boolean | null;
   /**
    * Task-run ID produced by the reflection step (if any).
    */
-  reflection_task_run_id?: string | null;
+  reflectionTaskRunId?: string | null;
   /**
    * Stall-detection reason, if a stall was detected.
    */
-  stall_detected?: string | null;
+  stallDetected?: string | null;
   /**
    * ISO 8601 start timestamp.
    */
-  started_at: string;
+  startedAt: string;
   /**
    * Task-run ID produced by the workflow execution.
    */
-  task_run_id: string;
+  taskRunId: string;
   [k: string]: unknown;
 }

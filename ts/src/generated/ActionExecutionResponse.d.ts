@@ -12,7 +12,7 @@ export interface ActionExecutionResponse {
   /**
    * Assigned action IDs, in the same order as the submitted batch.
    */
-  action_ids?: string[] | null;
+  actionIds?: string[] | null;
   /**
    * Number of actions recorded.
    */
@@ -20,6 +20,6 @@ export interface ActionExecutionResponse {
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }

@@ -21,7 +21,7 @@ export interface FindingUpdate {
   /**
    * Session number where the finding was resolved.
    */
-  resolved_in_session?: number | null;
+  resolvedInSession?: number | null;
   /**
    * New status for the finding.
    */
@@ -29,6 +29,6 @@ export interface FindingUpdate {
   /**
    * User's response to a finding requiring input.
    */
-  user_response?: string | null;
+  userResponse?: string | null;
   [k: string]: unknown;
 }

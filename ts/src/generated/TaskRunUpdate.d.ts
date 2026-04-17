@@ -15,31 +15,31 @@ export interface TaskRunUpdate {
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at?: string | null;
+  completedAt?: string | null;
   /**
    * Total duration in seconds.
    */
-  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   /**
    * Error message to attach.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Full output log to persist.
    */
-  full_output?: string | null;
+  fullOutput?: string | null;
   /**
    * Whether the full output log has been stored.
    */
-  full_output_stored?: boolean | null;
+  fullOutputStored?: boolean | null;
   /**
    * Updated output summary.
    */
-  output_summary?: string | null;
+  outputSummary?: string | null;
   /**
    * Updated session count.
    */
-  sessions_count?: number | null;
+  sessionsCount?: number | null;
   /**
    * New lifecycle status.
    */

@@ -12,46 +12,46 @@ export interface ExecutionStats {
   /**
    * Mean per-action duration, in milliseconds.
    */
-  avg_action_duration_ms?: number | null;
+  avgActionDurationMs?: number | null;
   /**
    * Number of actions with [`ActionStatus::Failed`].
    */
-  failed_actions: number;
+  failedActions: number;
   /**
    * Number of actions that used an LLM.
    */
-  llm_action_count?: number | null;
+  llmActionCount?: number | null;
   /**
    * Number of actions with [`ActionStatus::Skipped`].
    */
-  skipped_actions: number;
+  skippedActions: number;
   /**
    * Number of actions with [`ActionStatus::Success`].
    */
-  successful_actions: number;
+  successfulActions: number;
   /**
    * Number of actions with [`ActionStatus::Timeout`].
    */
-  timeout_actions: number;
+  timeoutActions: number;
   /**
    * Total number of actions executed.
    */
-  total_actions: number;
+  totalActions: number;
   /**
    * Aggregate estimated cost in USD across all LLM actions.
    */
-  total_cost_usd?: number | null;
+  totalCostUsd?: number | null;
   /**
    * Sum of all action durations, in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Aggregate input tokens across all LLM actions.
    */
-  total_tokens_input?: number | null;
+  totalTokensInput?: number | null;
   /**
    * Aggregate output tokens across all LLM actions.
    */
-  total_tokens_output?: number | null;
+  totalTokensOutput?: number | null;
   [k: string]: unknown;
 }

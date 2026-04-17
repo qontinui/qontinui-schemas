@@ -120,18 +120,19 @@ pub enum FindingActionType {
 /// Provides location (file/line/column) and an optional snippet for findings
 /// that relate to specific code.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingCodeContext {
     /// File path where the finding was detected.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "file")]
     pub file: Option<String>,
     /// Line number where the finding was detected.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "line")]
     pub line: Option<i64>,
     /// Column number where the finding was detected.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "column")]
     pub column: Option<i64>,
     /// Code snippet related to the finding (max 1000 chars on the Python side).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "snippet")]
     pub snippet: Option<String>,
 }
 
@@ -140,14 +141,16 @@ pub struct FindingCodeContext {
 /// Defines the question to pose and the expected input format when a finding
 /// requires a user decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingUserInput {
     /// Question to present to the user.
+    #[serde(alias = "question")]
     pub question: String,
     /// Type of input expected — typically `"text"` or `"choice"`.
-    #[serde(default = "default_input_type")]
+    #[serde(default = "default_input_type", alias = "input_type")]
     pub input_type: String,
     /// Options for choice-type input.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "options")]
     pub options: Option<Vec<String>>,
 }
 
@@ -164,29 +167,37 @@ fn default_input_type() -> String {
 /// Sent by the runner when an AI analysis session detects an issue or
 /// observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingCreate {
     /// Parent task run ID.
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
     /// Session number where the finding was detected.
+    #[serde(alias = "session_num")]
     pub session_num: i64,
     /// Category of the finding.
+    #[serde(alias = "category")]
     pub category: FindingCategory,
     /// Severity level of the finding.
+    #[serde(alias = "severity")]
     pub severity: FindingSeverity,
     /// Brief title describing the finding (max 500 chars on the Python side).
+    #[serde(alias = "title")]
     pub title: String,
     /// Detailed description of the finding.
+    #[serde(alias = "description")]
     pub description: String,
     /// Code context, if the finding relates to specific code.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_context")]
     pub code_context: Option<FindingCodeContext>,
     /// Hash used to deduplicate findings across sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature_hash")]
     pub signature_hash: Option<String>,
     /// Type of action for this finding.
+    #[serde(alias = "action_type")]
     pub action_type: FindingActionType,
     /// User-input request, if `action_type` requires a user decision.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_input")]
     pub user_input: Option<FindingUserInput>,
 }
 
@@ -196,8 +207,10 @@ pub struct FindingCreate {
 /// enforces `1 <= len(findings) <= 50`; validators on the Rust side are
 /// intentionally omitted to keep this a pure wire-format layer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingBatchCreate {
     /// Findings to create (1–50 items on the Python side).
+    #[serde(alias = "findings")]
     pub findings: Vec<FindingCreate>,
 }
 
@@ -206,18 +219,19 @@ pub struct FindingBatchCreate {
 /// Used to update status, record a resolution, or capture a user response.
 /// All fields are optional; only those supplied are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingUpdate {
     /// New status for the finding.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
     pub status: Option<FindingStatus>,
     /// Resolution description.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution")]
     pub resolution: Option<String>,
     /// Session number where the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_in_session")]
     pub resolved_in_session: Option<i64>,
     /// User's response to a finding requiring input.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_response")]
     pub user_response: Option<String>,
 }
 
@@ -226,63 +240,79 @@ pub struct FindingUpdate {
 /// Used when retrieving individual finding details. The `id` is a UUID v4
 /// string (see crate-level wire-format note).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingDetail {
     /// Finding ID (UUID v4 string).
+    #[serde(alias = "id")]
     pub id: String,
     /// Parent task run ID.
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
     /// Session number where the finding was detected.
+    #[serde(alias = "session_num")]
     pub session_num: i64,
     /// Category of the finding.
+    #[serde(alias = "category")]
     pub category: FindingCategory,
     /// Severity level of the finding.
+    #[serde(alias = "severity")]
     pub severity: FindingSeverity,
     /// Current status of the finding.
+    #[serde(alias = "status")]
     pub status: FindingStatus,
     /// Brief title describing the finding.
+    #[serde(alias = "title")]
     pub title: String,
     /// Detailed description of the finding.
+    #[serde(alias = "description")]
     pub description: String,
     /// Resolution description if resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution")]
     pub resolution: Option<String>,
     /// Code context, if the finding relates to specific code.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_context")]
     pub code_context: Option<FindingCodeContext>,
     /// Hash used to deduplicate findings across sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature_hash")]
     pub signature_hash: Option<String>,
     /// Type of action for this finding.
+    #[serde(alias = "action_type")]
     pub action_type: FindingActionType,
     /// User-input request, if `action_type` requires a user decision.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_input")]
     pub user_input: Option<FindingUserInput>,
     /// User's response, if input was requested.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_response")]
     pub user_response: Option<String>,
     /// ISO 8601 timestamp (UTC) when the finding was detected.
+    #[serde(alias = "detected_at")]
     pub detected_at: String,
     /// ISO 8601 timestamp (UTC) when the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_at")]
     pub resolved_at: Option<String>,
     /// Session number where the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_in_session")]
     pub resolved_in_session: Option<i64>,
 }
 
 /// Response schema for a paginated finding list.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingListResponse {
     /// Findings on this page.
-    #[serde(default)]
+    #[serde(default, alias = "findings")]
     pub findings: Vec<FindingDetail>,
     /// Total count of findings matching the query.
+    #[serde(alias = "total")]
     pub total: i64,
     /// Maximum items per page.
+    #[serde(alias = "limit")]
     pub limit: i64,
     /// Number of items skipped.
+    #[serde(alias = "offset")]
     pub offset: i64,
     /// Whether more items exist beyond this page.
+    #[serde(alias = "has_more")]
     pub has_more: bool,
 }
 
@@ -291,28 +321,30 @@ pub struct FindingListResponse {
 /// Aggregated counts grouped along each axis (category, severity, status)
 /// plus roll-up counts for UI dashboards.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingSummary {
     /// Task run ID.
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
     /// Total number of findings.
-    #[serde(default)]
+    #[serde(default, alias = "total")]
     pub total: i64,
     /// Count of findings by category.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_category")]
     pub by_category: HashMap<String, i64>,
     /// Count of findings by severity.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_severity")]
     pub by_severity: HashMap<String, i64>,
     /// Count of findings by status.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_status")]
     pub by_status: HashMap<String, i64>,
     /// Number of findings awaiting user input.
-    #[serde(default)]
+    #[serde(default, alias = "needs_input_count")]
     pub needs_input_count: i64,
     /// Number of resolved findings.
-    #[serde(default)]
+    #[serde(default, alias = "resolved_count")]
     pub resolved_count: i64,
     /// Number of unresolved findings.
-    #[serde(default)]
+    #[serde(default, alias = "outstanding_count")]
     pub outstanding_count: i64,
 }

@@ -19,23 +19,23 @@ export interface VerificationPhaseResult {
   /**
    * Whether all steps passed.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * Whether a critical step failure short-circuited the phase.
    */
-  critical_failure: boolean;
+  criticalFailure: boolean;
   /**
    * Number of steps that failed.
    */
-  failed_steps: number;
+  failedSteps: number;
   /**
    * Whether pass/fail is determined by gates rather than overall step counts.
    */
-  gate_based_evaluation: boolean;
+  gateBasedEvaluation: boolean;
   /**
    * Per-gate evaluation results.
    */
-  gate_results: GateEvaluationResult[];
+  gateResults: GateEvaluationResult[];
   /**
    * 1-based iteration index within the workflow run.
    */
@@ -43,22 +43,22 @@ export interface VerificationPhaseResult {
   /**
    * Number of steps that passed.
    */
-  passed_steps: number;
+  passedSteps: number;
   /**
    * Number of steps that were skipped.
    */
-  skipped_steps: number;
+  skippedSteps: number;
   /**
    * Per-step results.
    */
-  step_results: VerificationStepResult[];
+  stepResults: VerificationStepResult[];
   /**
    * Total duration of the phase in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Total number of steps executed.
    */
-  total_steps: number;
+  totalSteps: number;
   [k: string]: unknown;
 }

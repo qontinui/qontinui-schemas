@@ -12,7 +12,7 @@ export interface Pagination {
   /**
    * Whether additional records are available after this page.
    */
-  has_more: boolean;
+  hasMore: boolean;
   /**
    * Maximum number of records returned per page.
    */

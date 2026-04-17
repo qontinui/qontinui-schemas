@@ -12,7 +12,7 @@ export interface ImplementFixesConfig {
   /**
    * Additional context to include in the fix prompt.
    */
-  additional_context?: string | null;
+  additionalContext?: string | null;
   /**
    * Model to use (e.g., `"claude-opus-4-6"`). Defaults to `claude-opus-4-6`
    * when unset.
@@ -21,6 +21,6 @@ export interface ImplementFixesConfig {
   /**
    * Timeout in seconds for the fix agent. Defaults to 600 when unset.
    */
-  timeout_secs?: number | null;
+  timeoutSecs?: number | null;
   [k: string]: unknown;
 }

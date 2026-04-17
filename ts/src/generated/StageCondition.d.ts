@@ -21,18 +21,18 @@ export interface StageCondition {
    * - `"failed"`: run only if previous stage verification failed
    * - `"any"`: always run regardless of previous outcome (default behavior)
    */
-  if_previous?: string | null;
+  ifPrevious?: string | null;
   /**
    * Skip this stage if the total number of failed stages so far is below
    * this threshold. Useful for "recovery" stages that only run when
    * multiple prior stages have failed.
    */
-  min_failures?: number | null;
+  minFailures?: number | null;
   /**
    * Run this stage only after this many loop iterations have occurred
    * (across all stages). Useful for "escalation" stages that only kick in
    * after initial attempts have failed.
    */
-  min_iteration?: number | null;
+  minIteration?: number | null;
   [k: string]: unknown;
 }

@@ -10,8 +10,8 @@
  */
 export interface StateContext {
   activated: string[];
-  active_after: string[];
-  active_before: string[];
+  activeAfter: string[];
+  activeBefore: string[];
   changed: boolean;
   deactivated: string[];
   [k: string]: unknown;

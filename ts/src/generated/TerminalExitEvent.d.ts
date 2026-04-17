@@ -18,10 +18,10 @@ export interface TerminalExitEvent {
    * Exit code reported by the OS, or `None` if the status could not be
    * captured (e.g., the wait call itself errored).
    */
-  exit_code?: number | null;
+  exitCode?: number | null;
   /**
    * ID of the terminal session that exited.
    */
-  terminal_id: string;
+  terminalId: string;
   [k: string]: unknown;
 }

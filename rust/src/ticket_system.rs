@@ -82,28 +82,37 @@ pub enum TicketState {
 /// provider-specific identifier (GitHub issue number, Linear identifier, Jira
 /// key) rather than a runner-assigned UUID.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Ticket {
     /// Provider-assigned external ID (issue number, ticket key, etc.).
+    #[serde(alias = "external_id")]
     pub external_id: String,
     /// Which provider this ticket came from.
+    #[serde(alias = "source")]
     pub source: TicketSource,
     /// Ticket title / summary.
+    #[serde(alias = "title")]
     pub title: String,
     /// Ticket body / description (Markdown for GitHub/Linear, wiki-markup on Jira).
+    #[serde(alias = "body")]
     pub body: String,
     /// Labels applied to the ticket by the provider.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "labels")]
     pub labels: Vec<String>,
     /// Assignee username / handle, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assignee")]
     pub assignee: Option<String>,
     /// Canonical URL to the ticket in the provider's UI.
+    #[serde(alias = "url")]
     pub url: String,
     /// Abstract lifecycle state.
+    #[serde(alias = "state")]
     pub state: TicketState,
     /// ISO 8601 timestamp when the ticket was created.
+    #[serde(alias = "created_at")]
     pub created_at: String,
     /// ISO 8601 timestamp when the ticket was last updated.
+    #[serde(alias = "updated_at")]
     pub updated_at: String,
 }
 
@@ -113,14 +122,19 @@ pub struct Ticket {
 
 /// A comment on a ticket.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TicketComment {
     /// Provider-assigned comment ID.
+    #[serde(alias = "id")]
     pub id: String,
     /// Comment author's username / handle.
+    #[serde(alias = "author")]
     pub author: String,
     /// Comment body (Markdown for GitHub/Linear, wiki-markup on Jira).
+    #[serde(alias = "body")]
     pub body: String,
     /// ISO 8601 timestamp when the comment was created.
+    #[serde(alias = "created_at")]
     pub created_at: String,
 }
 
@@ -139,30 +153,35 @@ pub struct TicketComment {
 /// responses exposing this config to end-user UIs MUST redact the token
 /// before returning. See the module-level doc for the full policy.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TicketProviderConfig {
     /// Which provider this config targets.
+    #[serde(alias = "source")]
     pub source: TicketSource,
     /// API token for the provider. **Secret** — see security note above.
     /// Persisted in the DB so the watcher can reconstruct a provider across
     /// restarts; redact before exposing over UI-facing APIs.
+    #[serde(alias = "api_token")]
     pub api_token: String,
     /// Provider-specific target:
     /// - GitHub: `"owner/repo"`
     /// - Linear: team key (e.g. `"ENG"`)
     /// - Jira: project key
+    #[serde(alias = "target")]
     pub target: String,
     /// Labels / filters that mark a ticket as "actionable" (i.e. eligible to
     /// spawn a workflow task). All listed labels must be present for a match.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "actionable_labels")]
     pub actionable_labels: Vec<String>,
     /// ID of the workflow to spawn for matched tickets.
+    #[serde(alias = "workflow_id")]
     pub workflow_id: String,
     /// Poll interval in seconds. Default: 60.
-    #[serde(default = "default_poll_interval")]
+    #[serde(default = "default_poll_interval", alias = "poll_interval_seconds")]
     pub poll_interval_seconds: u64,
     /// Whether to update the remote ticket's state when the spawned task
     /// completes. Default: true.
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "update_on_completion")]
     pub update_on_completion: bool,
 }
 

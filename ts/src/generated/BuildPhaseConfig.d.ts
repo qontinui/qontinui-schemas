@@ -16,7 +16,7 @@ export interface BuildPhaseConfig {
   /**
    * IDs of stored `Context` records to include.
    */
-  context_ids?: string[] | null;
+  contextIds?: string[] | null;
   /**
    * Human description of the desired workflow.
    */

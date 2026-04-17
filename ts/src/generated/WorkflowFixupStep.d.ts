@@ -18,11 +18,11 @@ export interface WorkflowFixupStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -32,19 +32,19 @@ export interface WorkflowFixupStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Path to criteria JSON file (for `validate_criteria` mode).
    */
-  fixup_criteria_path?: string | null;
+  fixupCriteriaPath?: string | null;
   /**
    * Path to the workflow JSON file to fix (supports `{{artifact_dir}}`).
    */
-  fixup_input_path?: string | null;
+  fixupInputPath?: string | null;
   /**
    * Fixup mode.
    */
-  fixup_mode?: WorkflowFixupMode | null;
+  fixupMode?: WorkflowFixupMode | null;
   /**
    * Unique identifier for the step.
    */
@@ -74,12 +74,12 @@ export interface WorkflowFixupStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

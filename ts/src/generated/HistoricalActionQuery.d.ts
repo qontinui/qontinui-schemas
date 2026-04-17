@@ -14,11 +14,11 @@ export interface HistoricalActionQuery {
   /**
    * Filter by action name.
    */
-  action_name?: string | null;
+  actionName?: string | null;
   /**
    * Filter by action type.
    */
-  action_type?: ExecutionActionType | null;
+  actionType?: ExecutionActionType | null;
   /**
    * Maximum number of results to return (Python constrains to `1..=100`).
    */
@@ -26,18 +26,18 @@ export interface HistoricalActionQuery {
   /**
    * Filter by project ID.
    */
-  project_id?: string | null;
+  projectId?: string | null;
   /**
    * Filter by state name.
    */
-  state_name?: string | null;
+  stateName?: string | null;
   /**
    * If true, only successful actions are returned.
    */
-  success_only: boolean;
+  successOnly: boolean;
   /**
    * Filter by workflow ID.
    */
-  workflow_id?: string | null;
+  workflowId?: string | null;
   [k: string]: unknown;
 }

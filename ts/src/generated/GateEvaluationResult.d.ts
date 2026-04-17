@@ -12,15 +12,15 @@ export interface GateEvaluationResult {
   /**
    * IDs of required steps that failed.
    */
-  failed_step_ids: string[];
+  failedStepIds: string[];
   /**
    * Name of the gate.
    */
-  gate_name: string;
+  gateName: string;
   /**
    * IDs of required steps that were missing.
    */
-  missing_step_ids: string[];
+  missingStepIds: string[];
   /**
    * Whether the gate passed overall.
    */
@@ -28,10 +28,10 @@ export interface GateEvaluationResult {
   /**
    * IDs of required steps that passed.
    */
-  passed_step_ids: string[];
+  passedStepIds: string[];
   /**
    * IDs of steps the gate required.
    */
-  required_step_ids: string[];
+  requiredStepIds: string[];
   [k: string]: unknown;
 }

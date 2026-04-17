@@ -28,7 +28,7 @@ export interface Finding {
    * issues, disk space, tools not installed) require user intervention and
    * should NOT trigger automatic retries.
    */
-  finding_type: string;
+  findingType: string;
   /**
    * Unique identifier.
    */
@@ -36,6 +36,6 @@ export interface Finding {
   /**
    * Related file paths.
    */
-  related_files?: string[];
+  relatedFiles?: string[];
   [k: string]: unknown;
 }

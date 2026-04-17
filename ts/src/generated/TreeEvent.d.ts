@@ -26,7 +26,7 @@ import type { TreeNode } from './TreeNode';
  * a sequence number for ordering.
  */
 export interface TreeEvent {
-  event_type: TreeEventType;
+  eventType: TreeEventType;
   node: TreeNode;
   /**
    * Path from root to this node (breadcrumb).

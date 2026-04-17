@@ -12,14 +12,14 @@ export interface ApiVariableExtraction {
   /**
    * Default value if the path does not resolve.
    */
-  default_value?: string | null;
+  defaultValue?: string | null;
   /**
    * JSONPath expression used to extract the value.
    */
-  json_path: string;
+  jsonPath: string;
   /**
    * Variable name to bind the extracted value to.
    */
-  variable_name: string;
+  variableName: string;
   [k: string]: unknown;
 }

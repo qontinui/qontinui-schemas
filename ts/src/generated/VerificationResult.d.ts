@@ -19,8 +19,8 @@ export interface VerificationResult {
   /**
    * The criterion that was checked.
    */
-  criterion_id: string;
-  criterion_type: CriterionType;
+  criterionId: string;
+  criterionType: CriterionType;
   /**
    * Issues found (if failed).
    */
@@ -36,7 +36,7 @@ export interface VerificationResult {
   /**
    * Raw output / details, e.g., captured command output.
    */
-  raw_output?: string | null;
+  rawOutput?: string | null;
   /**
    * Suggestions for fixing (if failed).
    */

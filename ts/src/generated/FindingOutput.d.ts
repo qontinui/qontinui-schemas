@@ -20,7 +20,7 @@ export interface FindingOutput {
   /**
    * Whether this finding requires human input.
    */
-  needs_input: boolean;
+  needsInput: boolean;
   /**
    * Whether this finding has been resolved.
    */

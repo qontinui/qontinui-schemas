@@ -22,7 +22,7 @@ export interface RunPromptResponse {
   /**
    * Path to the log file for the session.
    */
-  log_file?: string | null;
+  logFile?: string | null;
   /**
    * Immediate output if the call ran synchronously.
    */
@@ -34,11 +34,11 @@ export interface RunPromptResponse {
   /**
    * ID of the created AI session, if any.
    */
-  session_id?: string | null;
+  sessionId?: string | null;
   /**
    * Path to the state file tracking the session.
    */
-  state_file?: string | null;
+  stateFile?: string | null;
   /**
    * Whether the prompt was accepted and started successfully.
    */
@@ -46,6 +46,6 @@ export interface RunPromptResponse {
   /**
    * ID of the created task run, if any.
    */
-  task_run_id?: string | null;
+  taskRunId?: string | null;
   [k: string]: unknown;
 }

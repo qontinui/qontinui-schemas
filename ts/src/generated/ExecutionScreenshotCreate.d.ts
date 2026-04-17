@@ -16,11 +16,11 @@ export interface ExecutionScreenshotCreate {
   /**
    * Sequence number of the associated action, if any.
    */
-  action_sequence_number?: number | null;
+  actionSequenceNumber?: number | null;
   /**
    * IDs of states active when the screenshot was taken.
    */
-  active_states?: string[] | null;
+  activeStates?: string[] | null;
   /**
    * Overlaid annotations.
    */
@@ -38,12 +38,12 @@ export interface ExecutionScreenshotCreate {
   /**
    * Client-generated screenshot identifier.
    */
-  screenshot_id: string;
-  screenshot_type: ScreenshotType;
+  screenshotId: string;
+  screenshotType: ScreenshotType;
   /**
    * Sequence number of the screenshot within the run.
    */
-  sequence_number: number;
+  sequenceNumber: number;
   /**
    * State ID active when the screenshot was taken.
    */

@@ -43,16 +43,19 @@ pub enum CoordinateSystem {
 /// Coordinates without an explicit `system` default to
 /// [`CoordinateSystem::Screen`] for backward compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Coordinates {
     /// X coordinate (horizontal position).
+    #[serde(alias = "x")]
     pub x: i64,
     /// Y coordinate (vertical position).
+    #[serde(alias = "y")]
     pub y: i64,
     /// Coordinate system. `None` defaults to `Screen`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "system")]
     pub system: Option<CoordinateSystem>,
     /// Monitor index (required when `system` is `MonitorRelative`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "monitor_index")]
     pub monitor_index: Option<u32>,
 }
 
@@ -63,20 +66,25 @@ pub struct Coordinates {
 /// Rectangular region on screen. Like [`Coordinates`], can optionally specify
 /// which coordinate system the `x`/`y` are in.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Region {
     /// X coordinate of the top-left corner.
+    #[serde(alias = "x")]
     pub x: i64,
     /// Y coordinate of the top-left corner.
+    #[serde(alias = "y")]
     pub y: i64,
     /// Width of the region (must be positive).
+    #[serde(alias = "width")]
     pub width: u32,
     /// Height of the region (must be positive).
+    #[serde(alias = "height")]
     pub height: u32,
     /// Coordinate system. `None` defaults to `Screen`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "system")]
     pub system: Option<CoordinateSystem>,
     /// Monitor index (required when `system` is `MonitorRelative`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "monitor_index")]
     pub monitor_index: Option<u32>,
 }
 
@@ -98,27 +106,34 @@ pub enum MonitorPosition {
 /// Standardized monitor information — a physical display with its position
 /// in the virtual desktop and metadata for UI display.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Monitor {
     /// OS-assigned monitor index (hardware enumeration order).
+    #[serde(alias = "index")]
     pub index: u32,
     /// X position in absolute screen coordinates (can be negative).
+    #[serde(alias = "x")]
     pub x: i64,
     /// Y position in absolute screen coordinates (can be negative).
+    #[serde(alias = "y")]
     pub y: i64,
     /// Monitor width in pixels.
+    #[serde(alias = "width")]
     pub width: u32,
     /// Monitor height in pixels.
+    #[serde(alias = "height")]
     pub height: u32,
     /// Spatial position based on X coordinate (for UI display).
+    #[serde(alias = "position")]
     pub position: MonitorPosition,
     /// Whether this is the primary/main monitor.
-    #[serde(default)]
+    #[serde(default, alias = "is_primary")]
     pub is_primary: bool,
     /// DPI scale factor (1.0 = 100%, 1.5 = 150%, 2.0 = 200%).
-    #[serde(default = "default_scale_factor")]
+    #[serde(default = "default_scale_factor", alias = "scale_factor")]
     pub scale_factor: f32,
     /// Display name (e.g., "DELL U2720Q").
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
 }
 
@@ -136,7 +151,9 @@ fn default_scale_factor() -> f32 {
 /// - Size: bounding box containing all monitors
 /// - Monitors may have gaps between them or different resolutions/DPI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct VirtualDesktop {
     /// List of all monitors in the virtual desktop.
+    #[serde(alias = "monitors")]
     pub monitors: Vec<Monitor>,
 }

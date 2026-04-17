@@ -27,11 +27,11 @@ export interface Ticket {
   /**
    * ISO 8601 timestamp when the ticket was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Provider-assigned external ID (issue number, ticket key, etc.).
    */
-  external_id: string;
+  externalId: string;
   /**
    * Labels applied to the ticket by the provider.
    */
@@ -45,7 +45,7 @@ export interface Ticket {
   /**
    * ISO 8601 timestamp when the ticket was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   /**
    * Canonical URL to the ticket in the provider's UI.
    */

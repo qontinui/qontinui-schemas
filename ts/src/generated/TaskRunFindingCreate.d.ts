@@ -17,16 +17,16 @@ export interface TaskRunFindingCreate {
   /**
    * Action type (defaults server-side if omitted).
    */
-  action_type?: TaskRunFindingActionType | null;
+  actionType?: TaskRunFindingActionType | null;
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
    */
-  code_snippet?: string | null;
+  codeSnippet?: string | null;
   /**
    * Column number where the issue was found.
    */
-  column_number?: number | null;
+  columnNumber?: number | null;
   /**
    * Full description.
    */
@@ -34,11 +34,11 @@ export interface TaskRunFindingCreate {
   /**
    * Session number in which the finding was detected.
    */
-  detected_in_session: number;
+  detectedInSession: number;
   /**
    * File path where the issue was found.
    */
-  file_path?: string | null;
+  filePath?: string | null;
   /**
    * Optional client-generated ID.
    */
@@ -46,15 +46,15 @@ export interface TaskRunFindingCreate {
   /**
    * Suggested response options for the user.
    */
-  input_options?: string[] | null;
+  inputOptions?: string[] | null;
   /**
    * Line number where the issue was found.
    */
-  line_number?: number | null;
+  lineNumber?: number | null;
   /**
    * Whether this finding requires user input.
    */
-  needs_input?: boolean | null;
+  needsInput?: boolean | null;
   /**
    * Question to pose to the user, if input is needed.
    */
@@ -67,7 +67,7 @@ export interface TaskRunFindingCreate {
   /**
    * Deduplication hash.
    */
-  signature_hash?: string | null;
+  signatureHash?: string | null;
   /**
    * Initial status (defaults server-side if omitted).
    */

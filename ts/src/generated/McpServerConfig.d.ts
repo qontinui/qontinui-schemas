@@ -24,16 +24,16 @@ export interface McpServerConfig {
   /**
    * Auto-connect when the runner launches. Default: `false`.
    */
-  auto_start: boolean;
+  autoStart: boolean;
   /**
    * Serialized JSON list of tools cached from the last successful
    * connection. Stored as a string for DB portability.
    */
-  cached_tools?: string | null;
+  cachedTools?: string | null;
   /**
    * ISO 8601 creation timestamp.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Optional human-readable description.
    */
@@ -47,7 +47,7 @@ export interface McpServerConfig {
    * HTTP-transport settings. Expected to be `Some` iff
    * `transport == McpTransport::Http`.
    */
-  http_config?: HttpConfig | null;
+  httpConfig?: HttpConfig | null;
   /**
    * Unique identifier (UUID).
    */
@@ -60,19 +60,19 @@ export interface McpServerConfig {
    * Stdio-transport settings. Expected to be `Some` iff
    * `transport == McpTransport::Stdio`.
    */
-  stdio_config?: StdioConfig | null;
+  stdioConfig?: StdioConfig | null;
   /**
    * Per-request connection / tool-call timeout in seconds. Default: `30`.
    */
-  timeout_seconds: number;
+  timeoutSeconds: number;
   /**
    * ISO 8601 timestamp of when `cached_tools` was populated.
    */
-  tools_cached_at?: string | null;
+  toolsCachedAt?: string | null;
   transport: McpTransport;
   /**
    * ISO 8601 last-update timestamp.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }

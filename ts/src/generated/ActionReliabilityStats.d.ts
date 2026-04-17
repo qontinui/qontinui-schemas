@@ -14,42 +14,42 @@ export interface ActionReliabilityStats {
   /**
    * Human-readable action name.
    */
-  action_name: string;
-  action_type: ExecutionActionType;
+  actionName: string;
+  actionType: ExecutionActionType;
   /**
    * Mean duration in milliseconds.
    */
-  avg_duration_ms: number;
+  avgDurationMs: number;
   /**
    * Common error categories, as opaque records. Python types this as
    * `list[dict[str, Any]]`; typing it further requires product input.
    */
-  common_errors?: {
+  commonErrors?: {
     [k: string]: unknown;
   }[];
   /**
    * Number of executions that failed.
    */
-  failed_executions: number;
+  failedExecutions: number;
   /**
    * Median duration in milliseconds.
    */
-  p50_duration_ms: number;
+  p50DurationMs: number;
   /**
    * 95th-percentile duration in milliseconds.
    */
-  p95_duration_ms: number;
+  p95DurationMs: number;
   /**
    * Success rate as a percentage.
    */
-  success_rate: number;
+  successRate: number;
   /**
    * Number of executions that succeeded.
    */
-  successful_executions: number;
+  successfulExecutions: number;
   /**
    * Total number of executions observed.
    */
-  total_executions: number;
+  totalExecutions: number;
   [k: string]: unknown;
 }

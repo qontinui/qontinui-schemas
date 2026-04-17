@@ -25,25 +25,25 @@ export interface UiBridgeStep {
    * module into this crate; the TS side re-imports the typed `ActionPlan`
    * after regeneration.
    */
-  action_plan?: {
+  actionPlan?: {
     [k: string]: unknown;
   };
   /**
    * Assertion kind (for `assert`).
    */
-  assert_type?: UiBridgeAssertType | null;
+  assertType?: UiBridgeAssertType | null;
   /**
    * Comparison mode (for `compare` / `snapshot_assert`).
    */
-  comparison_mode?: UiBridgeComparisonMode | null;
+  comparisonMode?: UiBridgeComparisonMode | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Expected value for assertions.
    */
@@ -57,7 +57,7 @@ export interface UiBridgeStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -80,7 +80,7 @@ export interface UiBridgeStep {
   /**
    * Reference snapshot ID (for `compare` / `snapshot_assert`).
    */
-  reference_snapshot_id?: string | null;
+  referenceSnapshotId?: string | null;
   /**
    * Whether this step is required (default: `true` on consumer side).
    */
@@ -92,7 +92,7 @@ export interface UiBridgeStep {
   /**
    * Severity threshold (for `compare` / `snapshot_assert`).
    */
-  severity_threshold?: UiBridgeSeverity | null;
+  severityThreshold?: UiBridgeSeverity | null;
   /**
    * Provenance of this step when generated from a skill template.
    *
@@ -100,7 +100,7 @@ export interface UiBridgeStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
@@ -110,11 +110,11 @@ export interface UiBridgeStep {
   /**
    * Timeout in milliseconds.
    */
-  timeout_ms?: number | null;
+  timeoutMs?: number | null;
   /**
    * Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.
    */
-  ui_bridge_snapshot_target?: string | null;
+  uiBridgeSnapshotTarget?: string | null;
   /**
    * Navigation URL (for `navigate`).
    */
@@ -122,6 +122,6 @@ export interface UiBridgeStep {
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

@@ -11,14 +11,14 @@
  * doesn't depend on a chrono version).
  */
 export interface TimingInfo {
-  duration_ms?: number | null;
+  durationMs?: number | null;
   /**
    * ISO 8601 timestamp. `None` while the event is still in flight.
    */
-  end_time?: string | null;
+  endTime?: string | null;
   /**
    * ISO 8601 timestamp.
    */
-  start_time: string;
+  startTime: string;
   [k: string]: unknown;
 }

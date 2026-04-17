@@ -12,14 +12,14 @@ export interface ExecutionIssueBatchResponse {
   /**
    * Assigned issue IDs, in the same order as the submitted batch.
    */
-  issue_ids?: string[];
+  issueIds?: string[];
   /**
    * Number of issues recorded.
    */
-  issues_recorded: number;
+  issuesRecorded: number;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }

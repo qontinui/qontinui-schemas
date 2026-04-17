@@ -19,19 +19,19 @@ export interface VerificationPlan {
    * Stored as raw JSON values because the step discriminated union spans
    * several types that are outside this module's scope.
    */
-  execution_steps?: unknown[];
+  executionSteps?: unknown[];
   /**
    * Summary of the goal.
    */
-  goal_summary: string;
+  goalSummary: string;
   /**
    * All success criteria that must be verified.
    */
-  success_criteria: SuccessCriterion[];
+  successCriteria: SuccessCriterion[];
   /**
    * Suggested number of worker agents.
    */
-  suggested_worker_count: number;
+  suggestedWorkerCount: number;
   /**
    * Plan version (incremented on replan).
    */
@@ -39,6 +39,6 @@ export interface VerificationPlan {
   /**
    * Domain assignments for multiple workers.
    */
-  worker_domains?: WorkerDomain[] | null;
+  workerDomains?: WorkerDomain[] | null;
   [k: string]: unknown;
 }

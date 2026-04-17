@@ -19,14 +19,14 @@ export interface DecomposerConfig {
   /**
    * Upper bound on plan length.
    */
-  max_subtasks: number;
+  maxSubtasks: number;
   /**
    * Lower bound on plan length.
    */
-  min_subtasks: number;
+  minSubtasks: number;
   /**
    * Override the default AI model used for planning.
    */
-  model_override?: string | null;
+  modelOverride?: string | null;
   [k: string]: unknown;
 }

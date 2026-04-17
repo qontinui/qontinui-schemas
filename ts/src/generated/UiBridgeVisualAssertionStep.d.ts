@@ -18,11 +18,11 @@ export interface UiBridgeVisualAssertionStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -32,7 +32,7 @@ export interface UiBridgeVisualAssertionStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -62,36 +62,36 @@ export interface UiBridgeVisualAssertionStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   /**
    * Expected text (for text assertion) or element ID (for screenshot/highlight).
    */
-  visual_assertion_expected?: string | null;
+  visualAssertionExpected?: string | null;
   /**
    * Options JSON for the assertion.
    */
-  visual_assertion_options?: {
+  visualAssertionOptions?: {
     [k: string]: unknown;
   };
   /**
    * Element query JSON for text assertions.
    */
-  visual_assertion_query?: {
+  visualAssertionQuery?: {
     [k: string]: unknown;
   };
   /**
    * Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
    */
-  visual_assertion_type?: VisualAssertionType | null;
+  visualAssertionType?: VisualAssertionType | null;
   [k: string]: unknown;
 }

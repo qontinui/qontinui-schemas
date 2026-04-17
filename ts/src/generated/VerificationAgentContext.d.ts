@@ -13,14 +13,14 @@ export interface VerificationAgentContext {
   /**
    * The evaluation prompt from the criterion.
    */
-  evaluation_prompt: string;
+  evaluationPrompt: string;
   /**
    * Brief goal context (NOT work history).
    */
-  goal_context: string;
+  goalContext: string;
   /**
    * The screenshot to evaluate, base64-encoded.
    */
-  screenshot_base64: string;
+  screenshotBase64: string;
   [k: string]: unknown;
 }

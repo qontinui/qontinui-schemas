@@ -12,34 +12,34 @@
     "check_findings": true,
     "force_run": false
   },
-  "skip_if_completed": false,
-  "auto_fix_on_failure": true,
-  "success_criteria": "All auto-fixable findings resolved; no new Critical findings introduced.",
-  "created_at": "2026-04-01T12:00:00Z",
-  "modified_at": "2026-04-14T09:30:00Z",
-  "last_run": {
-    "execution_id": "11111111-2222-4333-8444-555555555555",
-    "session_id": "sess-abc-123",
-    "started_at": "2026-04-13T03:00:01Z",
-    "ended_at": "2026-04-13T03:14:22Z",
+  "skipIfCompleted": false,
+  "autoFixOnFailure": true,
+  "successCriteria": "All auto-fixable findings resolved; no new Critical findings introduced.",
+  "createdAt": "2026-04-01T12:00:00Z",
+  "modifiedAt": "2026-04-14T09:30:00Z",
+  "lastRun": {
+    "executionId": "11111111-2222-4333-8444-555555555555",
+    "sessionId": "sess-abc-123",
+    "startedAt": "2026-04-13T03:00:01Z",
+    "endedAt": "2026-04-13T03:14:22Z",
     "status": "completed",
     "success": true,
-    "triggered_auto_fix": false
+    "triggeredAutoFix": false
   },
-  "next_run": "2026-04-15T03:00:00Z",
+  "nextRun": "2026-04-15T03:00:00Z",
   "conditions": {
-    "require_idle": {
+    "requireIdle": {
       "enabled": true
     },
-    "require_repo_inactive": {
+    "requireRepoInactive": {
       "enabled": true,
       "repositories": [
         {
           "path": "D:/qontinui-root/qontinui-runner",
-          "inactive_minutes": 10
+          "inactiveMinutes": 10
         }
       ]
     },
-    "timeout_minutes": 60
+    "timeoutMinutes": 60
   }
 }

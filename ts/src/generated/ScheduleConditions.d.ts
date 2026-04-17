@@ -16,15 +16,15 @@ export interface ScheduleConditions {
   /**
    * Require the runner to be idle.
    */
-  require_idle?: IdleCondition | null;
+  requireIdle?: IdleCondition | null;
   /**
    * Require repository file inactivity across one or more paths.
    */
-  require_repo_inactive?: RepositoryInactiveCondition | null;
+  requireRepoInactive?: RepositoryInactiveCondition | null;
   /**
    * Maximum time to wait for conditions (minutes). `None` = wait
    * indefinitely.
    */
-  timeout_minutes?: number | null;
+  timeoutMinutes?: number | null;
   [k: string]: unknown;
 }

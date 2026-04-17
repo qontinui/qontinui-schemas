@@ -23,7 +23,7 @@ export interface Monitor {
   /**
    * Whether this is the primary/main monitor.
    */
-  is_primary: boolean;
+  isPrimary: boolean;
   /**
    * Display name (e.g., "DELL U2720Q").
    */
@@ -32,7 +32,7 @@ export interface Monitor {
   /**
    * DPI scale factor (1.0 = 100%, 1.5 = 150%, 2.0 = 200%).
    */
-  scale_factor: number;
+  scaleFactor: number;
   /**
    * Monitor width in pixels.
    */

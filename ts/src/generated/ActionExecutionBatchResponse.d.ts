@@ -12,14 +12,14 @@ export interface ActionExecutionBatchResponse {
   /**
    * Assigned action IDs, in the same order as the submitted batch.
    */
-  action_ids?: string[];
+  actionIds?: string[];
   /**
    * Number of actions recorded.
    */
-  actions_recorded: number;
+  actionsRecorded: number;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }

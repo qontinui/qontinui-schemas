@@ -22,15 +22,15 @@ export interface NativeAccessibilityStep {
   /**
    * Whether to clear existing text before typing.
    */
-  clear_first?: boolean | null;
+  clearFirst?: boolean | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -40,7 +40,7 @@ export interface NativeAccessibilityStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -48,7 +48,7 @@ export interface NativeAccessibilityStep {
   /**
    * Include hidden elements in `capture`.
    */
-  include_hidden?: boolean | null;
+  includeHidden?: boolean | null;
   /**
    * Named input bindings evaluated at step entry.
    */
@@ -58,15 +58,15 @@ export interface NativeAccessibilityStep {
   /**
    * Only include interactive elements (for `query` and `ai_context`).
    */
-  interactive_only?: boolean | null;
+  interactiveOnly?: boolean | null;
   /**
    * Maximum tree depth for `capture`.
    */
-  max_depth?: number | null;
+  maxDepth?: number | null;
   /**
    * Maximum elements for `ai_context` action (default: 50).
    */
-  max_elements?: number | null;
+  maxElements?: number | null;
   /**
    * Display name for the step.
    */
@@ -74,15 +74,15 @@ export interface NativeAccessibilityStep {
   /**
    * Label filter for `query` action.
    */
-  query_label?: string | null;
+  queryLabel?: string | null;
   /**
    * Role filter for `query` action (e.g. `"button"`, `"textbox"`).
    */
-  query_role?: string | null;
+  queryRole?: string | null;
   /**
    * Element ref ID for click/type/focus (e.g. `"@e3"`).
    */
-  ref_id?: string | null;
+  refId?: string | null;
   /**
    * Whether this step is required (default: `true` on consumer side).
    */
@@ -98,7 +98,7 @@ export interface NativeAccessibilityStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
@@ -112,10 +112,10 @@ export interface NativeAccessibilityStep {
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

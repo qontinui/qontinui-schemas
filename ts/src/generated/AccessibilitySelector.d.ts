@@ -24,27 +24,27 @@ export interface AccessibilitySelector {
   /**
    * Match by automation / test ID.
    */
-  automation_id?: string | null;
+  automationId?: string | null;
   /**
    * Whether string matching is case-sensitive.
    */
-  case_sensitive: boolean;
+  caseSensitive: boolean;
   /**
    * Match by CSS / control class name.
    */
-  class_name?: string | null;
+  className?: string | null;
   /**
    * Match by HTML tag name.
    */
-  html_tag?: string | null;
+  htmlTag?: string | null;
   /**
    * Filter by interactivity.
    */
-  is_interactive?: boolean | null;
+  isInteractive?: boolean | null;
   /**
    * Maximum tree depth to search.
    */
-  max_depth?: number | null;
+  maxDepth?: number | null;
   /**
    * Exact name match.
    */
@@ -52,11 +52,11 @@ export interface AccessibilitySelector {
   /**
    * Partial name match (contains).
    */
-  name_contains?: string | null;
+  nameContains?: string | null;
   /**
    * Regex pattern for name matching.
    */
-  name_pattern?: string | null;
+  namePattern?: string | null;
   /**
    * Match by role (single or list).
    */
@@ -72,6 +72,6 @@ export interface AccessibilitySelector {
   /**
    * Partial value match (contains).
    */
-  value_contains?: string | null;
+  valueContains?: string | null;
   [k: string]: unknown;
 }

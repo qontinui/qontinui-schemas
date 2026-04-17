@@ -24,7 +24,7 @@ export interface FindingListResponse {
   /**
    * Whether more items exist beyond this page.
    */
-  has_more: boolean;
+  hasMore: boolean;
   /**
    * Maximum items per page.
    */

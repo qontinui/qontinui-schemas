@@ -14,28 +14,28 @@ export interface TaskExecutionRecord {
   /**
    * Session ID of the auto-fix session, if one was triggered.
    */
-  auto_fix_session_id?: string | null;
+  autoFixSessionId?: string | null;
   /**
    * ISO 8601 timestamp when execution ended.
    */
-  ended_at?: string | null;
+  endedAt?: string | null;
   /**
    * Error message if the execution failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Unique ID for this execution (UUID v4 string).
    */
-  execution_id: string;
+  executionId: string;
   /**
    * Session ID if this execution triggered an AI session, used for
    * downstream success tracking.
    */
-  session_id?: string | null;
+  sessionId?: string | null;
   /**
    * ISO 8601 timestamp when execution started.
    */
-  started_at: string;
+  startedAt: string;
   status: ScheduledTaskStatus;
   /**
    * Whether the task succeeded, read from the session checkpoint.
@@ -44,6 +44,6 @@ export interface TaskExecutionRecord {
   /**
    * Whether auto-fix was triggered after this execution.
    */
-  triggered_auto_fix: boolean;
+  triggeredAutoFix: boolean;
   [k: string]: unknown;
 }

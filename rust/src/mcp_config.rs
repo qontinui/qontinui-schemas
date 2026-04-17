@@ -82,18 +82,20 @@ pub enum McpTransport {
 /// **Secret surface**: `command`, `args`, and `env` must be treated as
 /// execution-critical. See module-level docs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct StdioConfig {
     /// Command to execute (e.g. `"npx"`, `"python"`, `"/usr/local/bin/server"`).
+    #[serde(alias = "command")]
     pub command: String,
     /// Command arguments.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "args")]
     pub args: Vec<String>,
     /// Working directory (absolute path). `None` inherits the runner's cwd.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cwd")]
     pub cwd: Option<String>,
     /// Extra environment variables for the subprocess. **Secret surface** —
     /// frequently holds API tokens.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "env")]
     pub env: HashMap<String, String>,
 }
 
@@ -102,13 +104,15 @@ pub struct StdioConfig {
 /// **Secret surface**: `headers` typically carries an `Authorization` token.
 /// See module-level docs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct HttpConfig {
     /// Server URL (e.g. `"http://localhost:8080/mcp"`). The runner appends
     /// `/tools/list` and `/tools/call` to this base.
+    #[serde(alias = "url")]
     pub url: String,
     /// HTTP headers to include on every request. **Secret surface** —
     /// typically includes `Authorization: Bearer …`.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "headers")]
     pub headers: HashMap<String, String>,
 }
 
@@ -138,54 +142,60 @@ fn default_timeout() -> u64 {
 /// **Secret surface**: the nested `stdio_config` / `http_config` carry secrets
 /// — see their own docs and the module-level security note.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpServerConfig {
     /// Unique identifier (UUID).
+    #[serde(alias = "id")]
     pub id: String,
     /// Display name.
+    #[serde(alias = "name")]
     pub name: String,
     /// Optional human-readable description.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
     pub description: Option<String>,
 
     /// Which transport this server uses.
+    #[serde(alias = "transport")]
     pub transport: McpTransport,
 
     /// Stdio-transport settings. Expected to be `Some` iff
     /// `transport == McpTransport::Stdio`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
     pub stdio_config: Option<StdioConfig>,
 
     /// HTTP-transport settings. Expected to be `Some` iff
     /// `transport == McpTransport::Http`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
     pub http_config: Option<HttpConfig>,
 
     /// Whether this server is enabled. Disabled servers won't be connected
     /// even if `auto_start` is true. Default: `true`.
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "enabled")]
     pub enabled: bool,
 
     /// Auto-connect when the runner launches. Default: `false`.
-    #[serde(default)]
+    #[serde(default, alias = "auto_start")]
     pub auto_start: bool,
 
     /// Per-request connection / tool-call timeout in seconds. Default: `30`.
-    #[serde(default = "default_timeout")]
+    #[serde(default = "default_timeout", alias = "timeout_seconds")]
     pub timeout_seconds: u64,
 
     /// Serialized JSON list of tools cached from the last successful
     /// connection. Stored as a string for DB portability.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cached_tools")]
     pub cached_tools: Option<String>,
 
     /// ISO 8601 timestamp of when `cached_tools` was populated.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tools_cached_at")]
     pub tools_cached_at: Option<String>,
 
     /// ISO 8601 creation timestamp.
+    #[serde(alias = "created_at")]
     pub created_at: String,
 
     /// ISO 8601 last-update timestamp.
+    #[serde(alias = "updated_at")]
     pub updated_at: String,
 }
 
@@ -199,31 +209,34 @@ pub struct McpServerConfig {
 /// before dispatching a `tools/call`. The `properties` and `required` fields
 /// are passed through verbatim from the server.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpToolInputSchema {
     /// JSON Schema `type` (typically `"object"`).
-    #[serde(rename = "type")]
+    #[serde(rename = "type", alias = "schema_type")]
     pub schema_type: String,
     /// Optional human-readable description.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
     pub description: Option<String>,
     /// JSON-Schema-shaped property descriptors, kept as opaque JSON.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "properties")]
     pub properties: Option<serde_json::Value>,
     /// Names of required properties.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "required")]
     pub required: Option<Vec<String>>,
 }
 
 /// Single tool exposed by an MCP server, as returned by `tools/list`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpToolInfo {
     /// Tool name (the argument passed back on `tools/call`).
+    #[serde(alias = "name")]
     pub name: String,
     /// Tool description shown to users.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
     pub description: Option<String>,
     /// Input-argument schema. Wire field is `"inputSchema"` per MCP spec.
-    #[serde(rename = "inputSchema")]
+    #[serde(alias = "input_schema")]
     pub input_schema: McpToolInputSchema,
 }
 
@@ -236,22 +249,25 @@ pub struct McpToolInfo {
 /// Derived from runtime connection state; never persisted. `tools` is
 /// populated only when `connected == true`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpServerStatus {
     /// ID of the server this status refers to.
+    #[serde(alias = "server_id")]
     pub server_id: String,
     /// Whether the client currently holds a live connection.
+    #[serde(alias = "connected")]
     pub connected: bool,
     /// Last connection / tool-call error, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error")]
     pub error: Option<String>,
     /// Available tools — `Some(…)` when connected, `None` otherwise.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tools")]
     pub tools: Option<Vec<McpToolInfo>>,
     /// ISO 8601 timestamp of the most recent connection attempt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "last_connect_attempt")]
     pub last_connect_attempt: Option<String>,
     /// ISO 8601 timestamp of the most recent successful connection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "last_connected")]
     pub last_connected: Option<String>,
 }
 
@@ -264,28 +280,31 @@ pub struct McpServerStatus {
 /// **Secret surface**: as with [`McpServerConfig`], the nested transport
 /// configs carry secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateMcpServerInput {
     /// Display name.
+    #[serde(alias = "name")]
     pub name: String,
     /// Optional description.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
     pub description: Option<String>,
     /// Transport selector.
+    #[serde(alias = "transport")]
     pub transport: McpTransport,
     /// Stdio config (required when `transport == Stdio`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
     pub stdio_config: Option<StdioConfig>,
     /// HTTP config (required when `transport == Http`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
     pub http_config: Option<HttpConfig>,
     /// Override for the default `enabled = true`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabled")]
     pub enabled: Option<bool>,
     /// Override for the default `auto_start = false`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_start")]
     pub auto_start: Option<bool>,
     /// Override for the default `timeout_seconds = 30`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -295,22 +314,23 @@ pub struct CreateMcpServerInput {
 /// **Secret surface**: as with [`McpServerConfig`], the nested transport
 /// configs carry secrets.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateMcpServerInput {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
     pub description: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "transport")]
     pub transport: Option<McpTransport>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
     pub stdio_config: Option<StdioConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
     pub http_config: Option<HttpConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabled")]
     pub enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_start")]
     pub auto_start: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -323,19 +343,23 @@ pub struct UpdateMcpServerInput {
 /// Shape is always the same regardless of success / failure: check `success`
 /// first, then read `content` (on success) or `error` (on failure).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpToolCallResult {
     /// Whether the call succeeded.
+    #[serde(alias = "success")]
     pub success: bool,
     /// Response content (present on success). Usually a JSON object/array,
     /// but can be a primitive if the tool returned text-only content.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "content")]
     pub content: Option<serde_json::Value>,
     /// Error message (present on failure).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error")]
     pub error: Option<String>,
     /// Response type tag: `"json"`, `"text"`, or `"error"`.
+    #[serde(alias = "response_type")]
     pub response_type: String,
     /// Wall-clock duration of the call in milliseconds.
+    #[serde(alias = "duration_ms")]
     pub duration_ms: u64,
 }
 
@@ -350,38 +374,46 @@ pub struct McpToolCallResult {
 /// because the DB layer stores them as `TEXT` / `JSONB` strings and does not
 /// round-trip through a `Value`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateMcpCallInput {
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
+    #[serde(alias = "step_id")]
     pub step_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "step_name")]
     pub step_name: Option<String>,
+    #[serde(alias = "server_id")]
     pub server_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "server_name")]
     pub server_name: Option<String>,
+    #[serde(alias = "tool_name")]
     pub tool_name: String,
     /// JSON-serialized arguments as originally submitted.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "arguments")]
     pub arguments: Option<String>,
     /// JSON-serialized arguments after variable resolution.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_arguments")]
     pub resolved_arguments: Option<String>,
     /// JSON-serialized response body.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "response")]
     pub response: Option<String>,
     /// Response type tag (see [`McpToolCallResult::response_type`]).
+    #[serde(alias = "response_type")]
     pub response_type: String,
     /// Wall-clock duration in milliseconds.
+    #[serde(alias = "duration_ms")]
     pub duration_ms: i64,
     /// JSON-serialized extractions (variables pulled from the response).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "extractions")]
     pub extractions: Option<String>,
     /// JSON-serialized assertion results.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assertions")]
     pub assertions: Option<String>,
     /// Whether the call succeeded.
+    #[serde(alias = "success")]
     pub success: bool,
     /// Error message if the call failed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
     pub error_message: Option<String>,
 }
 
@@ -390,54 +422,70 @@ pub struct CreateMcpCallInput {
 /// Same shape as [`CreateMcpCallInput`] plus the row id and creation
 /// timestamp.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpCallRecord {
+    #[serde(alias = "id")]
     pub id: String,
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
+    #[serde(alias = "step_id")]
     pub step_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "step_name")]
     pub step_name: Option<String>,
+    #[serde(alias = "server_id")]
     pub server_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "server_name")]
     pub server_name: Option<String>,
+    #[serde(alias = "tool_name")]
     pub tool_name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "arguments")]
     pub arguments: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_arguments")]
     pub resolved_arguments: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "response")]
     pub response: Option<String>,
+    #[serde(alias = "response_type")]
     pub response_type: String,
+    #[serde(alias = "duration_ms")]
     pub duration_ms: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "extractions")]
     pub extractions: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assertions")]
     pub assertions: Option<String>,
+    #[serde(alias = "success")]
     pub success: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
     pub error_message: Option<String>,
     /// ISO 8601 creation timestamp.
+    #[serde(alias = "created_at")]
     pub created_at: String,
 }
 
 /// Result envelope for an `mcp_calls` query scoped to a single task run.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct McpCallsResult {
     /// Task run the query was scoped to.
+    #[serde(alias = "task_run_id")]
     pub task_run_id: String,
     /// Matched call records (paginated; see `total_count` for the full size).
+    #[serde(alias = "calls")]
     pub calls: Vec<McpCallRecord>,
     /// Number of calls returned in `calls`.
+    #[serde(alias = "count")]
     pub count: usize,
     /// Total matching rows across all pages. Defaults to `0` on older rows
     /// that predate the field; consumers should prefer `count` when this is
     /// absent.
-    #[serde(default)]
+    #[serde(default, alias = "total_count")]
     pub total_count: usize,
     /// Number of successful calls in the current page.
+    #[serde(alias = "success_count")]
     pub success_count: usize,
     /// Number of failed calls in the current page.
+    #[serde(alias = "failed_count")]
     pub failed_count: usize,
     /// Whether there are more rows after the current page.
-    #[serde(default)]
+    #[serde(default, alias = "has_more")]
     pub has_more: bool,
 }

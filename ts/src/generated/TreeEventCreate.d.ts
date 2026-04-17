@@ -22,7 +22,7 @@ import type { TreeNode } from './TreeNode';
  * Request to store a tree event.
  */
 export interface TreeEventCreate {
-  event_type: TreeEventType;
+  eventType: TreeEventType;
   node: TreeNode;
   path: PathElement[];
   sequence: number;

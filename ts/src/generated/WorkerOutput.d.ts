@@ -21,11 +21,11 @@ export interface WorkerOutput {
   /**
    * Criterion overrides with justifications.
    */
-  criterion_overrides: StructuredOverride[];
+  criterionOverrides: StructuredOverride[];
   /**
    * Files that were modified in this iteration.
    */
-  files_modified: string[];
+  filesModified: string[];
   /**
    * Findings discovered during work.
    */
@@ -33,7 +33,7 @@ export interface WorkerOutput {
   /**
    * Optional suggestion for next action if work continues.
    */
-  next_action_suggestion?: string | null;
+  nextActionSuggestion?: string | null;
   /**
    * Optional notes for debugging or context.
    */
@@ -41,7 +41,7 @@ export interface WorkerOutput {
   /**
    * Optional progress estimate (0.0 to 1.0).
    */
-  progress_estimate?: number | null;
+  progressEstimate?: number | null;
   /**
    * Signals for orchestrator control flow.
    */
@@ -49,6 +49,6 @@ export interface WorkerOutput {
   /**
    * Summary of work performed in this iteration.
    */
-  work_summary: string;
+  workSummary: string;
   [k: string]: unknown;
 }

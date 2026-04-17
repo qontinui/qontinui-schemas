@@ -15,11 +15,11 @@ export interface ExecutionTrendResponse {
   /**
    * Trend data points.
    */
-  data_points: ExecutionTrendDataPoint[];
+  dataPoints: ExecutionTrendDataPoint[];
   /**
    * End date of the reporting window.
    */
-  end_date: string;
+  endDate: string;
   /**
    * Granularity label (`"daily"`, `"weekly"`, `"monthly"`).
    */
@@ -28,20 +28,20 @@ export interface ExecutionTrendResponse {
    * Overall statistics computed over the full window. Shape is
    * intentionally opaque (`dict[str, Any]` in Python).
    */
-  overall_stats?: {
+  overallStats?: {
     [k: string]: unknown;
   };
   /**
    * Project the trend was computed for.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Run type filter, if applied.
    */
-  run_type?: RunType | null;
+  runType?: RunType | null;
   /**
    * Start date of the reporting window.
    */
-  start_date: string;
+  startDate: string;
   [k: string]: unknown;
 }

@@ -22,11 +22,11 @@ export interface ApiAssertion {
   /**
    * Header name for `header` assertions.
    */
-  header_name?: string | null;
+  headerName?: string | null;
   /**
    * JSONPath for `json_path` assertions.
    */
-  json_path?: string | null;
+  jsonPath?: string | null;
   /**
    * Comparison operator; defaults to `equals` on the consumer side.
    */

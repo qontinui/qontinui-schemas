@@ -17,20 +17,20 @@ export interface McpCallRecord {
   /**
    * ISO 8601 creation timestamp.
    */
-  created_at: string;
-  duration_ms: number;
-  error_message?: string | null;
+  createdAt: string;
+  durationMs: number;
+  errorMessage?: string | null;
   extractions?: string | null;
   id: string;
-  resolved_arguments?: string | null;
+  resolvedArguments?: string | null;
   response?: string | null;
-  response_type: string;
-  server_id: string;
-  server_name?: string | null;
-  step_id: string;
-  step_name?: string | null;
+  responseType: string;
+  serverId: string;
+  serverName?: string | null;
+  stepId: string;
+  stepName?: string | null;
   success: boolean;
-  task_run_id: string;
-  tool_name: string;
+  taskRunId: string;
+  toolName: string;
   [k: string]: unknown;
 }

@@ -18,11 +18,11 @@ export interface VerificationStepResult {
   /**
    * Step duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * ISO 8601 timestamp when the step ended.
    */
-  ended_at: string | null;
+  endedAt: string | null;
   /**
    * Error message if the step failed.
    */
@@ -30,33 +30,33 @@ export interface VerificationStepResult {
   /**
    * Arbitrary structured output produced by the step.
    */
-  output_data: {
+  outputData: {
     [k: string]: unknown;
   } | null;
   /**
    * Path to a screenshot captured for the step.
    */
-  screenshot_path: string | null;
+  screenshotPath: string | null;
   /**
    * ISO 8601 timestamp when the step started.
    */
-  started_at: string | null;
+  startedAt: string | null;
   /**
    * ID of the step, if assigned.
    */
-  step_id: string | null;
+  stepId: string | null;
   /**
    * Zero-based index of the step within the phase.
    */
-  step_index: number;
+  stepIndex: number;
   /**
    * Display name of the step.
    */
-  step_name: string;
+  stepName: string;
   /**
    * Free-form step type label.
    */
-  step_type: string;
+  stepType: string;
   /**
    * Whether the step succeeded.
    */
@@ -64,6 +64,6 @@ export interface VerificationStepResult {
   /**
    * Detailed captured output, if any.
    */
-  verification_details: VerificationStepDetails | null;
+  verificationDetails: VerificationStepDetails | null;
   [k: string]: unknown;
 }

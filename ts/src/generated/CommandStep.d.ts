@@ -23,7 +23,7 @@ export interface CommandStep {
   /**
    * Whether to auto-fix during the check.
    */
-  auto_fix?: boolean | null;
+  autoFix?: boolean | null;
   /**
    * Branch selector for repository-targeted steps.
    */
@@ -31,15 +31,15 @@ export interface CommandStep {
   /**
    * Saved check-group ID.
    */
-  check_group_id?: string | null;
+  checkGroupId?: string | null;
   /**
    * Saved check definition ID.
    */
-  check_id?: string | null;
+  checkId?: string | null;
   /**
    * Kind of deterministic check (for `check` / `check_group` modes).
    */
-  check_type?: CheckType | null;
+  checkType?: CheckType | null;
   /**
    * Inline code body (e.g., Python snippet).
    */
@@ -51,19 +51,19 @@ export interface CommandStep {
   /**
    * Path to the check's config file.
    */
-  config_path?: string | null;
+  configPath?: string | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Execution mode for Playwright tests.
    */
-  execution_mode?: PlaywrightExecutionMode | null;
+  executionMode?: PlaywrightExecutionMode | null;
   /**
    * Extractions published to subsequent steps.
    */
@@ -73,19 +73,19 @@ export interface CommandStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Whether non-zero exit status fails the step.
    */
-  fail_on_error?: boolean | null;
+  failOnError?: boolean | null;
   /**
    * Fail the step on warnings in addition to errors.
    */
-  fail_on_warning?: boolean | null;
+  failOnWarning?: boolean | null;
   /**
    * Saved fused-script ID.
    */
-  fused_script_id?: string | null;
+  fusedScriptId?: string | null;
   /**
    * Unique identifier for the step.
    */
@@ -120,19 +120,19 @@ export interface CommandStep {
   /**
    * Re-run this step on every verification-agentic iteration.
    */
-  run_on_subsequent_iterations?: boolean | null;
+  runOnSubsequentIterations?: boolean | null;
   /**
    * Inline script contents.
    */
-  script_content?: string | null;
+  scriptContent?: string | null;
   /**
    * Saved script ID.
    */
-  script_id?: string | null;
+  scriptId?: string | null;
   /**
    * Saved shell command template ID.
    */
-  shell_command_id?: string | null;
+  shellCommandId?: string | null;
   /**
    * Provenance of this step when generated from a skill template.
    *
@@ -140,25 +140,25 @@ export interface CommandStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Target URL for navigation-style tests.
    */
-  target_url?: string | null;
+  targetUrl?: string | null;
   /**
    * Saved test ID.
    */
-  test_id?: string | null;
+  testId?: string | null;
   /**
    * Test runner kind.
    */
-  test_type?: TestType | null;
+  testType?: TestType | null;
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Tool identifier (e.g., `eslint`, `ruff`).
    */
@@ -166,18 +166,18 @@ export interface CommandStep {
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   /**
    * Whether the caller waits for the workflow to complete.
    */
-  wait_for_completion?: boolean | null;
+  waitForCompletion?: boolean | null;
   /**
    * Name of a workflow to invoke.
    */
-  workflow_name?: string | null;
+  workflowName?: string | null;
   /**
    * Working directory for the command.
    */
-  working_directory?: string | null;
+  workingDirectory?: string | null;
   [k: string]: unknown;
 }

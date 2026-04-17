@@ -12,11 +12,11 @@ export interface ModelCostBreakdown {
   /**
    * Number of actions that used this model.
    */
-  action_count: number;
+  actionCount: number;
   /**
    * Total cost in USD for this model.
    */
-  cost_usd: number;
+  costUsd: number;
   /**
    * LLM model identifier.
    */
@@ -28,10 +28,10 @@ export interface ModelCostBreakdown {
   /**
    * Total input tokens for this model.
    */
-  tokens_input: number;
+  tokensInput: number;
   /**
    * Total output tokens for this model.
    */
-  tokens_output: number;
+  tokensOutput: number;
   [k: string]: unknown;
 }

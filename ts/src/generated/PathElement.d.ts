@@ -13,6 +13,6 @@ import type { NodeType } from './NodeType';
 export interface PathElement {
   id: string;
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   [k: string]: unknown;
 }

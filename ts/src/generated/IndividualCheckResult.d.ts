@@ -14,15 +14,15 @@ export interface IndividualCheckResult {
   /**
    * How long the check took, in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message, if the check itself failed to run.
    */
-  error_message: string | null;
+  errorMessage: string | null;
   /**
    * Number of files the check inspected.
    */
-  files_checked: number;
+  filesChecked: number;
   /**
    * Specific issue details.
    */
@@ -30,11 +30,11 @@ export interface IndividualCheckResult {
   /**
    * Number of issues auto-fixed by this check.
    */
-  issues_fixed: number;
+  issuesFixed: number;
   /**
    * Number of issues surfaced by this check.
    */
-  issues_found: number;
+  issuesFound: number;
   /**
    * Name of the check.
    */

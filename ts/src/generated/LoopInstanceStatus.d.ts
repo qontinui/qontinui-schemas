@@ -23,7 +23,7 @@ export interface LoopInstanceStatus {
   /**
    * Unique identifier for this loop.
    */
-  loop_id: string;
+  loopId: string;
   status: OrchestrationLoopStatus;
   [k: string]: unknown;
 }

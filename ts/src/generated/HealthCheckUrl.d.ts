@@ -15,11 +15,11 @@ export interface HealthCheckUrl {
   /**
    * Expected HTTP status code (default: `200`).
    */
-  expected_status: number;
+  expectedStatus: number;
   /**
    * Whether failure should stop the workflow (default: `true`).
    */
-  is_critical: boolean;
+  isCritical: boolean;
   /**
    * Display name for the health check (e.g., `"Backend Server"`).
    */
@@ -27,7 +27,7 @@ export interface HealthCheckUrl {
   /**
    * Timeout in seconds (default: `30`).
    */
-  timeout_seconds: number;
+  timeoutSeconds: number;
   /**
    * URL to check (e.g., `"http://localhost:8000/health"`).
    */

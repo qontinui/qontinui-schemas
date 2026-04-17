@@ -17,11 +17,11 @@ export interface DagLoopStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
-  criterion_ids?: string[];
+  criterionIds?: string[];
   /**
    * IDs of other steps that must complete first.
    */
-  depends_on?: string[];
+  dependsOn?: string[];
   /**
    * Extractions published to subsequent steps.
    */
@@ -31,7 +31,7 @@ export interface DagLoopStep {
   /**
    * If `Some(true)`, a console-error signal from the UI fails this step.
    */
-  fail_on_console_errors?: boolean | null;
+  failOnConsoleErrors?: boolean | null;
   /**
    * Unique identifier for the step.
    */
@@ -45,11 +45,11 @@ export interface DagLoopStep {
   /**
    * Condition to evaluate each iteration (JSON expression or step ID).
    */
-  loop_condition?: string | null;
+  loopCondition?: string | null;
   /**
    * Maximum number of loop iterations.
    */
-  max_iterations?: number | null;
+  maxIterations?: number | null;
   /**
    * Display name for the step.
    */
@@ -69,12 +69,12 @@ export interface DagLoopStep {
    * dependency chain into this module; the TS side re-imports the typed
    * `SkillOrigin` after regeneration.
    */
-  skill_origin?: {
+  skillOrigin?: {
     [k: string]: unknown;
   };
   /**
    * Verification depth category.
    */
-  verification_category?: VerificationCategoryKind | null;
+  verificationCategory?: VerificationCategoryKind | null;
   [k: string]: unknown;
 }

@@ -12,19 +12,19 @@ export interface TaskRunFindingSummary {
   /**
    * Count of findings by category.
    */
-  by_category: {
+  byCategory: {
     [k: string]: number;
   };
   /**
    * Count of findings by severity.
    */
-  by_severity: {
+  bySeverity: {
     [k: string]: number;
   };
   /**
    * Count of findings by status.
    */
-  by_status: {
+  byStatus: {
     [k: string]: number;
   };
   /**

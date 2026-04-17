@@ -22,7 +22,7 @@ export interface McpToolCallResult {
   /**
    * Wall-clock duration of the call in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message (present on failure).
    */
@@ -30,7 +30,7 @@ export interface McpToolCallResult {
   /**
    * Response type tag: `"json"`, `"text"`, or `"error"`.
    */
-  response_type: string;
+  responseType: string;
   /**
    * Whether the call succeeded.
    */

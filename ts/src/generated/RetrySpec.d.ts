@@ -20,6 +20,6 @@ export interface RetrySpec {
   /**
    * Delay between retries in milliseconds.
    */
-  delay_ms: number;
+  delayMs: number;
   [k: string]: unknown;
 }

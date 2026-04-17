@@ -18,18 +18,18 @@ export interface ExecutionIssueDetail {
   /**
    * Sequence number of the associated action, if any.
    */
-  action_sequence_number?: number | null;
+  actionSequenceNumber?: number | null;
   /**
    * Assigned user record, if any. Shape is intentionally opaque here; the
    * Python source types this as `dict[str, Any]`.
    */
-  assigned_to?: {
+  assignedTo?: {
     [k: string]: unknown;
   } | null;
   /**
    * ISO 8601 timestamp when the issue was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Full description.
    */
@@ -37,14 +37,14 @@ export interface ExecutionIssueDetail {
   /**
    * Error details such as stack traces.
    */
-  error_details?: {
+  errorDetails?: {
     [k: string]: unknown;
   };
   /**
    * Issue ID.
    */
   id: string;
-  issue_type: IssueType;
+  issueType: IssueType;
   /**
    * Opaque additional metadata.
    */
@@ -54,19 +54,19 @@ export interface ExecutionIssueDetail {
   /**
    * Steps to reproduce the issue.
    */
-  reproduction_steps?: string[];
+  reproductionSteps?: string[];
   /**
    * Resolution notes, if any.
    */
-  resolution_notes?: string | null;
+  resolutionNotes?: string | null;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * Number of associated screenshots.
    */
-  screenshot_count: number;
+  screenshotCount: number;
   /**
    * Full screenshot records associated with the issue.
    */
@@ -76,7 +76,7 @@ export interface ExecutionIssueDetail {
   /**
    * State ID where the issue was observed, if any.
    */
-  state_name?: string | null;
+  stateName?: string | null;
   status: IssueStatus;
   /**
    * Short title.
@@ -85,6 +85,6 @@ export interface ExecutionIssueDetail {
   /**
    * ISO 8601 timestamp when the issue was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }

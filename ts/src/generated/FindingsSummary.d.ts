@@ -21,19 +21,19 @@ export interface FindingsSummary {
   /**
    * Count by category.
    */
-  by_category: {
+  byCategory: {
     [k: string]: number;
   };
   /**
    * Count by severity.
    */
-  by_severity: {
+  bySeverity: {
     [k: string]: number;
   };
   /**
    * Count by status.
    */
-  by_status: {
+  byStatus: {
     [k: string]: number;
   };
   /**

@@ -21,15 +21,15 @@ export interface DiagnosePhaseConfig {
   /**
    * Whether to capture a full DOM snapshot for AI triage context.
    */
-  capture_snapshot: boolean;
+  captureSnapshot: boolean;
   /**
    * Model override for the triage AI call. If `None`, uses default routing.
    */
-  model_override?: string | null;
+  modelOverride?: string | null;
   /**
    * Maximum characters to include from the snapshot in the AI triage
    * prompt.
    */
-  snapshot_max_chars: number;
+  snapshotMaxChars: number;
   [k: string]: unknown;
 }

@@ -22,19 +22,19 @@ export interface ProcessConfig {
   /**
    * Start when runner launches
    */
-  auto_start: boolean;
+  autoStart: boolean;
   /**
    * Ring buffer max lines (default 2000)
    */
-  buffer_size: number;
+  bufferSize: number;
   /**
    * Build command arguments (e.g., ["build"], ["run", "build"]).
    */
-  build_args: string[];
+  buildArgs: string[];
   /**
    * Build command to run before restarting (e.g., "cargo", "npm").
    */
-  build_command?: string | null;
+  buildCommand?: string | null;
   /**
    * Category (e.g., "backend", "frontend")
    */
@@ -51,7 +51,7 @@ export interface ProcessConfig {
    * Whether this is a dev-mode-only service (not started in production
    * builds).
    */
-  dev_only: boolean;
+  devOnly: boolean;
   /**
    * Whether this config is enabled
    */
@@ -65,7 +65,7 @@ export interface ProcessConfig {
   /**
    * Port to check for health (optional)
    */
-  health_port?: number | null;
+  healthPort?: number | null;
   /**
    * Unique identifier (UUID)
    */
@@ -74,7 +74,7 @@ export interface ProcessConfig {
    * Regex patterns for errors to ignore (matched against error message and
    * raw entry).
    */
-  ignore_patterns: string[];
+  ignorePatterns: string[];
   /**
    * Human-readable name (e.g., "FastAPI Backend")
    */
@@ -86,12 +86,12 @@ export interface ProcessConfig {
   /**
    * Whether rebuild and AI fix features are enabled for this process.
    */
-  rebuild_enabled: boolean;
+  rebuildEnabled: boolean;
   /**
    * Startup group for ordered startup (lower groups start first, default 0).
    * Processes in the same group start together. The runner waits for health
    * ports in each group to be ready before starting the next group.
    */
-  start_group: number;
+  startGroup: number;
   [k: string]: unknown;
 }

@@ -16,6 +16,6 @@ export interface StructuredSignal {
   /**
    * Signal type (e.g., "complete", "blocked", "needs_input").
    */
-  signal_type: string;
+  signalType: string;
   [k: string]: unknown;
 }

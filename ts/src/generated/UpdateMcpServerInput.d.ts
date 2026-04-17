@@ -17,13 +17,13 @@ import type { StdioConfig } from './StdioConfig';
  * configs carry secrets.
  */
 export interface UpdateMcpServerInput {
-  auto_start?: boolean | null;
+  autoStart?: boolean | null;
   description?: string | null;
   enabled?: boolean | null;
-  http_config?: HttpConfig | null;
+  httpConfig?: HttpConfig | null;
   name?: string | null;
-  stdio_config?: StdioConfig | null;
-  timeout_seconds?: number | null;
+  stdioConfig?: StdioConfig | null;
+  timeoutSeconds?: number | null;
   transport?: McpTransport | null;
   [k: string]: unknown;
 }

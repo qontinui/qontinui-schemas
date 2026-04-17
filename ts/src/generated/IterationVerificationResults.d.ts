@@ -17,31 +17,31 @@ export interface IterationVerificationResults {
   /**
    * Whether all required AI checks passed (true if no AI criteria).
    */
-  ai_passed: boolean;
+  aiPassed: boolean;
   /**
    * AI verification results (empty if skipped).
    */
-  ai_results: VerificationResult[];
+  aiResults: VerificationResult[];
   /**
    * Overall pass/fail.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * Criterion overrides applied in this iteration.
    */
-  applied_overrides?: CriterionOverride[];
+  appliedOverrides?: CriterionOverride[];
   /**
    * Whether all required deterministic checks passed.
    */
-  deterministic_passed: boolean;
+  deterministicPassed: boolean;
   /**
    * Deterministic verification results.
    */
-  deterministic_results: VerificationResult[];
+  deterministicResults: VerificationResult[];
   /**
    * Human-readable summary of failures.
    */
-  failure_summary?: string | null;
+  failureSummary?: string | null;
   /**
    * Iteration number.
    */
@@ -49,6 +49,6 @@ export interface IterationVerificationResults {
   /**
    * Criteria that failed but were accepted due to overrides.
    */
-  overridden_criteria?: string[];
+  overriddenCriteria?: string[];
   [k: string]: unknown;
 }

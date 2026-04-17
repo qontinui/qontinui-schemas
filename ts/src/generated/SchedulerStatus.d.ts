@@ -19,14 +19,14 @@ export interface SchedulerStatus {
   /**
    * The next task scheduled to run, if any.
    */
-  next_task?: NextTaskInfo | null;
+  nextTask?: NextTaskInfo | null;
   /**
    * Number of tasks scheduled but not yet running.
    */
-  pending_tasks: number;
+  pendingTasks: number;
   /**
    * Number of tasks currently running.
    */
-  running_tasks: number;
+  runningTasks: number;
   [k: string]: unknown;
 }

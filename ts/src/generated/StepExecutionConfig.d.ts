@@ -16,22 +16,22 @@ export interface StepExecutionConfig {
   /**
    * Action type (e.g., click, type, wait).
    */
-  action_type?: string | null;
+  actionType?: string | null;
   /**
    * Check type for verification steps.
    */
-  check_type?: string | null;
+  checkType?: string | null;
   /**
    * Target image ID, if the action references an image.
    */
-  target_image_id?: string | null;
+  targetImageId?: string | null;
   /**
    * Target image name, if the action references an image.
    */
-  target_image_name?: string | null;
+  targetImageName?: string | null;
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   [k: string]: unknown;
 }

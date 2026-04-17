@@ -20,24 +20,24 @@ import type { TopMatch } from './TopMatch';
  * Full execution tree reconstructed from events.
  */
 export interface ExecutionTreeResponse {
-  duration_ms?: number | null;
+  durationMs?: number | null;
   /**
    * Initial active states when the workflow started.
    */
-  initial_state_ids: string[];
-  root_nodes: DisplayNode[];
+  initialStateIds: string[];
+  rootNodes: DisplayNode[];
   /**
    * Run UUID as string.
    */
-  run_id: string;
+  runId: string;
   /**
    * Mapping of state IDs to display names.
    */
-  state_name_map: {
+  stateNameMap: {
     [k: string]: string;
   };
   status: NodeStatus;
-  total_events: number;
-  workflow_name?: string | null;
+  totalEvents: number;
+  workflowName?: string | null;
   [k: string]: unknown;
 }

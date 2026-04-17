@@ -26,16 +26,16 @@ export interface ExecutionRunCreate {
   /**
    * Owning project ID.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Human-readable run name.
    */
-  run_name: string;
-  run_type: RunType;
-  runner_metadata: RunnerMetadata;
+  runName: string;
+  runType: RunType;
+  runnerMetadata: RunnerMetadata;
   /**
    * Workflow metadata, if the run executes a workflow.
    */
-  workflow_metadata?: WorkflowMetadata | null;
+  workflowMetadata?: WorkflowMetadata | null;
   [k: string]: unknown;
 }
