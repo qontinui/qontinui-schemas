@@ -9,7 +9,13 @@
  * A reflection fix reported by the AI.
  */
 export interface ReflectionFixOutput {
+  /**
+   * Description of the fix applied.
+   */
   description: string;
+  /**
+   * Identifier for the error being fixed.
+   */
   error_id: string;
   [k: string]: unknown;
 }

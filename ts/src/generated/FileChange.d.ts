@@ -9,7 +9,13 @@
  * A file change made during the agentic phase.
  */
 export interface FileChange {
+  /**
+   * Action performed on the file (e.g., "modified", "created", "deleted").
+   */
   action: string;
+  /**
+   * Path of the changed file.
+   */
   path: string;
   [k: string]: unknown;
 }

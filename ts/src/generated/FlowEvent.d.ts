@@ -7,6 +7,8 @@
 
 /**
  * Events emitted during flow execution for UI updates.
+ *
+ * Internally tagged with `"type"` and snake_case variant names.
  */
 export type FlowEvent =
   | {

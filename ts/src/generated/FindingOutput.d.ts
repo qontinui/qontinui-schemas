@@ -9,11 +9,29 @@
  * A finding reported by the AI.
  */
 export interface FindingOutput {
+  /**
+   * Finding category.
+   */
   category: string;
+  /**
+   * Detailed description.
+   */
   description: string;
+  /**
+   * Whether this finding requires human input.
+   */
   needs_input: boolean;
+  /**
+   * Whether this finding has been resolved.
+   */
   resolved: boolean;
+  /**
+   * Severity level.
+   */
   severity: string;
+  /**
+   * Short title describing the finding.
+   */
   title: string;
   [k: string]: unknown;
 }
