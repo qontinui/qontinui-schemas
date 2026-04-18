@@ -61,8 +61,13 @@ Types for the render logging system used for AI-assisted debugging:
 
 ### Naming Convention
 
-Field names use **snake_case** to match Rust/Python JSON serialization.
-This ensures compatibility across all services.
+Field names use **camelCase**. All public Rust structs are annotated with
+`#[serde(rename_all = "camelCase")]` and `#[serde(deny_unknown_fields)]`, so
+the generated TypeScript interfaces are closed (no `[k: string]: unknown`
+fallback) and expect camelCase keys at construction time.
+
+See [CONTRACT.md](./CONTRACT.md) for the full wire-format contract, the
+reasoning, and the migration guide for consumer code.
 
 ## Development
 
