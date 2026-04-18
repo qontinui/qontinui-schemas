@@ -29,5 +29,4 @@ export interface MultiLoopEntry {
    * Unique identifier for this loop instance.
    */
   loopId: string;
-  [k: string]: unknown;
 }

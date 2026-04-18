@@ -45,5 +45,4 @@ export interface VectorSearchResult {
    * Type of search performed.
    */
   search_type: string;
-  [k: string]: unknown;
 }

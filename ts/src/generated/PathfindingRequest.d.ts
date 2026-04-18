@@ -21,5 +21,4 @@ export interface PathfindingRequest {
    * States that must all be active at the end.
    */
   target_states: string[];
-  [k: string]: unknown;
 }

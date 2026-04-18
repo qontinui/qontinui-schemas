@@ -14,5 +14,4 @@ export interface AccessibilityBounds {
   width: number;
   x: number;
   y: number;
-  [k: string]: unknown;
 }

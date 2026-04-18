@@ -38,5 +38,4 @@ export interface ProcessStatus {
    * Uptime in seconds (None if not running)
    */
   uptimeSecs?: number | null;
-  [k: string]: unknown;
 }

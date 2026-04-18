@@ -28,5 +28,4 @@ export interface PipelineConfig {
    * Implement fixes via Claude CLI after reflection finds issues.
    */
   implementFixes?: ImplementFixesConfig | null;
-  [k: string]: unknown;
 }

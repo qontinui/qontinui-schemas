@@ -17,5 +17,4 @@ export interface ActionExecutionListResponse {
    */
   actions: ActionExecutionResponse[];
   pagination: Pagination;
-  [k: string]: unknown;
 }

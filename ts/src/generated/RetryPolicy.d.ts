@@ -21,5 +21,4 @@ export interface RetryPolicy {
    * Delay between retries in milliseconds.
    */
   delayMs: number;
-  [k: string]: unknown;
 }

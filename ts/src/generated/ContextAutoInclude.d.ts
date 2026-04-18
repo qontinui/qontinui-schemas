@@ -31,5 +31,4 @@ export interface ContextAutoInclude {
    * (case-insensitive).
    */
   taskMentions?: string[] | null;
-  [k: string]: unknown;
 }

@@ -14,5 +14,4 @@ export interface TopMatch {
   confidence: number;
   dimensions?: MatchLocation | null;
   location: MatchLocation;
-  [k: string]: unknown;
 }

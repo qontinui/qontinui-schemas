@@ -17,5 +17,4 @@ export interface FileChange {
    * Path of the changed file.
    */
   path: string;
-  [k: string]: unknown;
 }

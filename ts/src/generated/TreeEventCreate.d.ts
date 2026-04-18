@@ -27,5 +27,4 @@ export interface TreeEventCreate {
   path: PathElement[];
   sequence: number;
   timestamp: number;
-  [k: string]: unknown;
 }

@@ -11,5 +11,4 @@
 export interface PollingConfig {
   interval?: number | null;
   maxAttempts?: number | null;
-  [k: string]: unknown;
 }

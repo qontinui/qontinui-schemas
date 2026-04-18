@@ -68,5 +68,4 @@ export interface StateMachineState {
    * ISO 8601 timestamp of last modification.
    */
   updated_at: string;
-  [k: string]: unknown;
 }

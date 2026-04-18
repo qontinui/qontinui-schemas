@@ -23,5 +23,4 @@ export interface SemanticSearchRequest {
    */
   query: string;
   state_filter?: string | null;
-  [k: string]: unknown;
 }

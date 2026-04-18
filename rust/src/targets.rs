@@ -46,6 +46,7 @@ pub enum SearchStrategy {
 /// Polling configuration for search operations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct PollingConfig {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "interval")]
     pub interval: Option<i64>,
@@ -74,6 +75,7 @@ pub enum MatchMethod {
 /// Advanced pattern-matching options.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct PatternOptions {
     #[serde(
         default,
@@ -191,6 +193,7 @@ pub struct PatternOptions {
 /// Match adjustment — modify the matched region before acting.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct MatchAdjustment {
     #[serde(
         default,
@@ -233,6 +236,7 @@ pub struct MatchAdjustment {
 /// Search options for target finding.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct SearchOptions {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "similarity")]
     pub similarity: Option<f64>,
@@ -328,6 +332,7 @@ pub enum TextMatchType {
 /// Text search options for OCR-based finding.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TextSearchOptions {
     #[serde(
         default,

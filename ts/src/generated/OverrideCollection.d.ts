@@ -15,5 +15,4 @@ export interface OverrideCollection {
    * All recorded overrides.
    */
   overrides?: CriterionOverride[];
-  [k: string]: unknown;
 }

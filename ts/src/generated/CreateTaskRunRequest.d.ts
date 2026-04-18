@@ -48,5 +48,4 @@ export interface CreateTaskRunRequest {
    * Workflow name to use.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }

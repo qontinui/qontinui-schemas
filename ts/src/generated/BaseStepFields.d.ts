@@ -69,5 +69,4 @@ export interface BaseStepFields {
    * Verification depth category.
    */
   verificationCategory?: VerificationCategoryKind | null;
-  [k: string]: unknown;
 }

@@ -28,5 +28,4 @@ export interface ExecutionMatchLocation {
    * Y coordinate in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }

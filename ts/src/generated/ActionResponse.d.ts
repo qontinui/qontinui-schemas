@@ -42,5 +42,4 @@ export interface ActionResponse {
    * Unix-epoch millisecond timestamp when the action completed.
    */
   timestamp: number;
-  [k: string]: unknown;
 }

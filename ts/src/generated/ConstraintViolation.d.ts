@@ -21,5 +21,4 @@ export interface ConstraintViolation {
    * Line number (if applicable).
    */
   line?: number | null;
-  [k: string]: unknown;
 }

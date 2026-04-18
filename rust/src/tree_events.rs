@@ -140,6 +140,7 @@ pub enum ActionType {
 /// Location of a pattern match on screen.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct MatchLocation {
     #[serde(alias = "x")]
     pub x: i64,
@@ -156,6 +157,7 @@ pub struct MatchLocation {
 /// A single match result with confidence and location.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TopMatch {
     #[serde(alias = "confidence")]
     pub confidence: f64,
@@ -172,6 +174,7 @@ pub struct TopMatch {
 /// `flatten`-d map.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RuntimeData {
     // TYPE actions
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "typed_text")]
@@ -231,6 +234,7 @@ pub struct RuntimeData {
 /// State-machine context captured before/after an action.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateContext {
     #[serde(default, alias = "active_before")]
     pub active_before: Vec<String>,
@@ -249,6 +253,7 @@ pub struct StateContext {
 /// doesn't depend on a chrono version).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TimingInfo {
     /// ISO 8601 timestamp.
     #[serde(alias = "start_time")]
@@ -263,6 +268,7 @@ pub struct TimingInfo {
 /// Execution outcome of an action.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Outcome {
     #[serde(alias = "success")]
     pub success: bool,
@@ -281,6 +287,7 @@ pub struct Outcome {
 /// types populate different fields.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct NodeMetadata {
     /// Action configuration (JSON object — shape varies by `ActionType`).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "config")]
@@ -314,6 +321,7 @@ pub struct NodeMetadata {
 /// in the execution hierarchy.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TreeNode {
     /// Unique identifier for this node.
     #[serde(alias = "id")]
@@ -353,6 +361,7 @@ pub struct TreeNode {
 /// Element in a tree path (for breadcrumb navigation).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct PathElement {
     #[serde(alias = "id")]
     pub id: String,
@@ -369,6 +378,7 @@ pub struct PathElement {
 /// a sequence number for ordering.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TreeEvent {
     /// Event type identifier — always `"tree_event"` on the wire.
     #[serde(default = "default_tree_event_type", alias = "type")]
@@ -403,6 +413,7 @@ fn default_tree_event_type() -> String {
 /// from `TreeNode` data for UI display.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DisplayNode {
     #[serde(alias = "id")]
     pub id: String,
@@ -445,6 +456,7 @@ fn default_true() -> bool {
 /// Request to store a tree event.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TreeEventCreate {
     #[serde(alias = "event_type")]
     pub event_type: TreeEventType,
@@ -461,6 +473,7 @@ pub struct TreeEventCreate {
 /// Response for a stored tree event.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TreeEventResponse {
     /// UUID as string (wire-format — see crate-level docs).
     #[serde(alias = "id")]
@@ -498,6 +511,7 @@ pub struct TreeEventResponse {
 /// Paginated list of tree events.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TreeEventListResponse {
     #[serde(alias = "events")]
     pub events: Vec<TreeEventResponse>,
@@ -514,6 +528,7 @@ pub struct TreeEventListResponse {
 /// Full execution tree reconstructed from events.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionTreeResponse {
     /// Run UUID as string.
     #[serde(alias = "run_id")]

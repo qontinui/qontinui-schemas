@@ -121,6 +121,7 @@ pub enum FindingActionType {
 /// that relate to specific code.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingCodeContext {
     /// File path where the finding was detected.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "file")]
@@ -142,6 +143,7 @@ pub struct FindingCodeContext {
 /// requires a user decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingUserInput {
     /// Question to present to the user.
     #[serde(alias = "question")]
@@ -168,6 +170,7 @@ fn default_input_type() -> String {
 /// observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingCreate {
     /// Parent task run ID.
     #[serde(alias = "task_run_id")]
@@ -208,6 +211,7 @@ pub struct FindingCreate {
 /// intentionally omitted to keep this a pure wire-format layer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingBatchCreate {
     /// Findings to create (1–50 items on the Python side).
     #[serde(alias = "findings")]
@@ -220,6 +224,7 @@ pub struct FindingBatchCreate {
 /// All fields are optional; only those supplied are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingUpdate {
     /// New status for the finding.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
@@ -241,6 +246,7 @@ pub struct FindingUpdate {
 /// string (see crate-level wire-format note).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingDetail {
     /// Finding ID (UUID v4 string).
     #[serde(alias = "id")]
@@ -298,6 +304,7 @@ pub struct FindingDetail {
 /// Response schema for a paginated finding list.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingListResponse {
     /// Findings on this page.
     #[serde(default, alias = "findings")]
@@ -322,6 +329,7 @@ pub struct FindingListResponse {
 /// plus roll-up counts for UI dashboards.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingSummary {
     /// Task run ID.
     #[serde(alias = "task_run_id")]

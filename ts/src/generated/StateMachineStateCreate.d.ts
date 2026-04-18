@@ -49,5 +49,4 @@ export interface StateMachineStateCreate {
    * Optional stable logical state ID (generated if omitted).
    */
   state_id?: string | null;
-  [k: string]: unknown;
 }

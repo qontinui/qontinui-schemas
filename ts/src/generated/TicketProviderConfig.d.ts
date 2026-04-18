@@ -52,5 +52,4 @@ export interface TicketProviderConfig {
    * ID of the workflow to spawn for matched tickets.
    */
   workflowId: string;
-  [k: string]: unknown;
 }

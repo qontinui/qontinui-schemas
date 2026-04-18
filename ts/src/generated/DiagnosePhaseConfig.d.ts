@@ -31,5 +31,4 @@ export interface DiagnosePhaseConfig {
    * prompt.
    */
   snapshotMaxChars: number;
-  [k: string]: unknown;
 }

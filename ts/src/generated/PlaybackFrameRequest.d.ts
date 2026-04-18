@@ -18,5 +18,4 @@ export interface PlaybackFrameRequest {
    * Whether to include screenshot URLs.
    */
   includeScreenshots: boolean;
-  [k: string]: unknown;
 }

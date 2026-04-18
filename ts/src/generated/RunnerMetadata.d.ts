@@ -39,5 +39,4 @@ export interface RunnerMetadata {
    * Screen resolution as a free-form string (e.g., `"1920x1080"`).
    */
   screenResolution?: string | null;
-  [k: string]: unknown;
 }

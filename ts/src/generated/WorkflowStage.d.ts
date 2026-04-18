@@ -123,5 +123,4 @@ export interface WorkflowStage {
    * Verification phase steps for this stage.
    */
   verificationSteps: UnifiedStep[];
-  [k: string]: unknown;
 }

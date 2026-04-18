@@ -26,5 +26,4 @@ export interface ConditionStatus {
    * ISO 8601 timestamp when conditions began being evaluated.
    */
   waitingSince: string;
-  [k: string]: unknown;
 }

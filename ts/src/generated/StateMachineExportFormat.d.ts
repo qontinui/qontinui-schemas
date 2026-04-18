@@ -36,5 +36,4 @@ export interface StateMachineExportFormat {
       [k: string]: unknown;
     };
   };
-  [k: string]: unknown;
 }

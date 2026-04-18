@@ -46,5 +46,4 @@ export interface DiscoveredState {
    * IDs of renders where this state appears.
    */
   renderIds?: string[];
-  [k: string]: unknown;
 }

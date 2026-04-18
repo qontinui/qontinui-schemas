@@ -68,5 +68,4 @@ export interface StateNodeData {
    * State ID this node represents.
    */
   stateId: string;
-  [k: string]: unknown;
 }

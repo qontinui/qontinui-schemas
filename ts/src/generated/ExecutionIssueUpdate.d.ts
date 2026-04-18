@@ -28,5 +28,4 @@ export interface ExecutionIssueUpdate {
    * New lifecycle status.
    */
   status?: IssueStatus | null;
-  [k: string]: unknown;
 }

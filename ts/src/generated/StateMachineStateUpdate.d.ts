@@ -45,5 +45,4 @@ export interface StateMachineStateUpdate {
    * New render ID set.
    */
   render_ids?: string[] | null;
-  [k: string]: unknown;
 }

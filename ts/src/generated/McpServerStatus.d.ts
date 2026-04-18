@@ -39,5 +39,4 @@ export interface McpServerStatus {
    * Available tools — `Some(…)` when connected, `None` otherwise.
    */
   tools?: McpToolInfo[] | null;
-  [k: string]: unknown;
 }

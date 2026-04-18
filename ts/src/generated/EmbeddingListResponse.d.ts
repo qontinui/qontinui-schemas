@@ -19,5 +19,4 @@ export interface EmbeddingListResponse {
    */
   page: number;
   total: number;
-  [k: string]: unknown;
 }

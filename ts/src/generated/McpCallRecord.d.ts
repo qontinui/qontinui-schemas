@@ -32,5 +32,4 @@ export interface McpCallRecord {
   success: boolean;
   taskRunId: string;
   toolName: string;
-  [k: string]: unknown;
 }

@@ -21,5 +21,4 @@ export interface ActionExecutionResponse {
    * Associated run ID.
    */
   runId: string;
-  [k: string]: unknown;
 }

@@ -34,5 +34,4 @@ export interface StageCondition {
    * after initial attempts have failed.
    */
   minIteration?: number | null;
-  [k: string]: unknown;
 }

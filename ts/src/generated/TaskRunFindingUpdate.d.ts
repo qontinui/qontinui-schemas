@@ -31,5 +31,4 @@ export interface TaskRunFindingUpdate {
    * User response, if the finding needed input.
    */
   userResponse?: string | null;
-  [k: string]: unknown;
 }

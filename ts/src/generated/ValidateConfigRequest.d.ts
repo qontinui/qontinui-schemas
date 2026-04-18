@@ -13,5 +13,4 @@ export interface ValidateConfigRequest {
    * Raw TOML content to validate.
    */
   toml: string;
-  [k: string]: unknown;
 }

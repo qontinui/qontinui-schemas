@@ -25,5 +25,4 @@ export interface UpdateMcpServerInput {
   stdioConfig?: StdioConfig | null;
   timeoutSeconds?: number | null;
   transport?: McpTransport | null;
-  [k: string]: unknown;
 }

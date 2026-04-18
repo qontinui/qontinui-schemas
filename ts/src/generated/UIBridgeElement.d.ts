@@ -46,5 +46,4 @@ export interface UIBridgeElement {
    * Element type (e.g. `"button"`, `"input"`, `"select"`).
    */
   type: string;
-  [k: string]: unknown;
 }

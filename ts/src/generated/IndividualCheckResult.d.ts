@@ -47,5 +47,4 @@ export interface IndividualCheckResult {
    * Free-form status string (e.g., `"passed"`, `"failed"`, `"skipped"`).
    */
   status: string;
-  [k: string]: unknown;
 }

@@ -61,5 +61,4 @@ export interface StateMachineExport {
    * Export format version. Defaults to `"1.0.0"`.
    */
   version: string;
-  [k: string]: unknown;
 }

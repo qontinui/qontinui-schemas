@@ -229,6 +229,7 @@ pub enum ScreenshotType {
 /// Information about the runner environment that produced the run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RunnerMetadata {
     /// Semantic version of the runner binary.
     #[serde(alias = "runner_version")]
@@ -256,6 +257,7 @@ pub struct RunnerMetadata {
 /// Information about the workflow being executed in the run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkflowMetadata {
     /// Workflow identifier.
     #[serde(alias = "workflow_id")]
@@ -286,6 +288,7 @@ pub struct WorkflowMetadata {
 /// Aggregate execution statistics for a completed run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionStats {
     /// Total number of actions executed.
     #[serde(alias = "total_actions")]
@@ -325,6 +328,7 @@ pub struct ExecutionStats {
 /// Coverage data computed for a workflow run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CoverageData {
     /// Overall coverage as a percentage in the range `[0.0, 100.0]`.
     #[serde(alias = "coverage_percentage")]
@@ -362,6 +366,7 @@ pub struct CoverageData {
 /// Token usage and cost metrics for an LLM-powered action.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct LLMMetrics {
     /// LLM model identifier.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
@@ -393,6 +398,7 @@ pub struct LLMMetrics {
 /// Request payload for creating a new execution run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunCreate {
     /// Owning project ID.
     #[serde(alias = "project_id")]
@@ -420,6 +426,7 @@ pub struct ExecutionRunCreate {
 /// Response envelope returned when a run is created or fetched.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunResponse {
     /// Assigned run identifier.
     #[serde(alias = "run_id")]
@@ -460,6 +467,7 @@ pub struct ExecutionRunResponse {
 // Rename-on-schema only; see note on `ActionType` above — `tree_events` has
 // a structurally different `MatchLocation` on the shared schema registry.
 #[schemars(title = "ExecutionMatchLocation")]
+#[schemars(deny_unknown_fields)]
 pub struct MatchLocation {
     /// X coordinate in pixels.
     #[serde(alias = "x")]
@@ -480,6 +488,7 @@ pub struct MatchLocation {
 /// Usually submitted as part of a batch; see [`ActionExecutionResponse`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionExecutionCreate {
     /// Zero-based sequence number of the action within the run.
     #[serde(alias = "sequence_number")]
@@ -564,6 +573,7 @@ pub struct ActionExecutionCreate {
 /// Response envelope returned after reporting action executions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionExecutionResponse {
     /// Number of actions recorded.
     #[serde(alias = "recorded")]
@@ -597,6 +607,7 @@ pub enum ScreenshotAnnotationShape {
 /// Annotation overlaid on a screenshot (box, circle, arrow, or text).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ScreenshotAnnotation {
     /// Shape of the annotation.
     #[serde(rename = "type", alias = "shape")]
@@ -624,6 +635,7 @@ pub struct ScreenshotAnnotation {
 /// Request payload describing a screenshot being uploaded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionScreenshotCreate {
     /// Client-generated screenshot identifier.
     #[serde(alias = "screenshot_id")]
@@ -663,6 +675,7 @@ pub struct ExecutionScreenshotCreate {
 /// Response envelope returned after uploading a screenshot.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionScreenshotResponse {
     /// Assigned screenshot identifier.
     #[serde(alias = "screenshot_id")]
@@ -691,6 +704,7 @@ pub struct ExecutionScreenshotResponse {
 /// Request payload for reporting an issue observed during a run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueCreate {
     /// Short human-readable title.
     #[serde(alias = "title")]
@@ -730,6 +744,7 @@ pub struct ExecutionIssueCreate {
 /// Response envelope returned after reporting issues.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueResponse {
     /// Number of issues recorded.
     #[serde(alias = "recorded")]
@@ -749,6 +764,7 @@ pub struct ExecutionIssueResponse {
 /// Request payload for marking a run complete.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunComplete {
     /// Final lifecycle status.
     #[serde(alias = "status")]
@@ -773,6 +789,7 @@ pub struct ExecutionRunComplete {
 /// Response envelope returned after completing a run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunCompleteResponse {
     /// Associated run ID.
     #[serde(alias = "run_id")]
@@ -866,6 +883,7 @@ pub enum IssueSource {
 /// Batch wrapper for reporting multiple action executions in one request.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionExecutionBatch {
     /// Actions to record (Python enforces `1..=100`; enforced by the backend).
     #[serde(alias = "actions")]
@@ -875,6 +893,7 @@ pub struct ActionExecutionBatch {
 /// Response envelope returned after creating a batch of action executions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionExecutionBatchResponse {
     /// Associated run ID.
     #[serde(alias = "run_id")]
@@ -890,6 +909,7 @@ pub struct ActionExecutionBatchResponse {
 /// Batch wrapper for reporting multiple issues in one request.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueBatch {
     /// Issues to record (Python enforces `1..=50`; enforced by the backend).
     #[serde(alias = "issues")]
@@ -899,6 +919,7 @@ pub struct ExecutionIssueBatch {
 /// Response envelope returned after creating a batch of issues.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueBatchResponse {
     /// Associated run ID.
     #[serde(alias = "run_id")]
@@ -914,6 +935,7 @@ pub struct ExecutionIssueBatchResponse {
 /// Request payload for updating an existing issue.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueUpdate {
     /// New lifecycle status.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
@@ -936,6 +958,7 @@ pub struct ExecutionIssueUpdate {
 /// Result of visual comparison of a screenshot against a baseline.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VisualComparisonResult {
     /// Comparison result ID.
     #[serde(alias = "comparison_id")]
@@ -970,6 +993,7 @@ pub struct VisualComparisonResult {
 /// has no inheritance and the wire form is a flat object.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunDetail {
     // ── Inherited from ExecutionRunResponse ──
     /// Assigned run identifier.
@@ -1026,6 +1050,7 @@ pub struct ExecutionRunDetail {
 /// Detailed issue information (superset of [`ExecutionIssueResponse`]).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueDetail {
     // ── Inherited from ExecutionIssueResponse ──
     /// Issue ID.
@@ -1096,6 +1121,7 @@ pub struct ExecutionIssueDetail {
 /// Paginated list of execution runs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionRunListResponse {
     /// Page of matching runs.
     #[serde(alias = "runs")]
@@ -1108,6 +1134,7 @@ pub struct ExecutionRunListResponse {
 /// Paginated list of action executions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionExecutionListResponse {
     /// Page of matching actions.
     #[serde(alias = "actions")]
@@ -1120,6 +1147,7 @@ pub struct ActionExecutionListResponse {
 /// Paginated list of issues with a severity/status summary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionIssueListResponse {
     /// Page of matching issues.
     #[serde(alias = "issues")]
@@ -1139,6 +1167,7 @@ pub struct ExecutionIssueListResponse {
 /// Reliability statistics aggregated for a single action type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionReliabilityStats {
     /// Human-readable action name.
     #[serde(alias = "action_name")]
@@ -1176,6 +1205,7 @@ pub struct ActionReliabilityStats {
 /// Single data point in an execution-trend time series.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionTrendDataPoint {
     /// Period label in `YYYY-MM-DD` format.
     #[serde(alias = "date")]
@@ -1200,6 +1230,7 @@ pub struct ExecutionTrendDataPoint {
 /// Response envelope for the execution-trend analytics endpoint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionTrendResponse {
     /// Project the trend was computed for.
     #[serde(alias = "project_id")]
@@ -1228,6 +1259,7 @@ pub struct ExecutionTrendResponse {
 /// Cost breakdown for a single LLM model.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ModelCostBreakdown {
     /// LLM model identifier.
     #[serde(alias = "model")]
@@ -1252,6 +1284,7 @@ pub struct ModelCostBreakdown {
 /// Aggregate LLM cost summary for an execution run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct LLMCostSummary {
     /// Associated run ID.
     #[serde(alias = "run_id")]
@@ -1276,6 +1309,7 @@ pub struct LLMCostSummary {
 /// Single data point in a cost-trend time series.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CostTrendDataPoint {
     /// Period label in `YYYY-MM-DD` format.
     #[serde(alias = "date")]
@@ -1300,6 +1334,7 @@ pub struct CostTrendDataPoint {
 /// Response envelope for the cost-trend analytics endpoint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CostTrendResponse {
     /// Project the trend was computed for.
     #[serde(alias = "project_id")]
@@ -1329,6 +1364,7 @@ pub struct CostTrendResponse {
 /// Query filters for looking up historical action results.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct HistoricalActionQuery {
     /// Filter by action type.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_type")]
@@ -1356,6 +1392,7 @@ pub struct HistoricalActionQuery {
 /// A historical action execution, shaped for playback.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct HistoricalActionResult {
     /// Action execution ID.
     #[serde(alias = "id")]
@@ -1395,6 +1432,7 @@ pub struct HistoricalActionResult {
 /// Request payload asking for playback frames for a sequence of actions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct PlaybackFrameRequest {
     /// Action execution IDs, in playback order (Python constrains to
     /// `1..=100`).

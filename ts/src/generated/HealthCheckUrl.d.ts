@@ -32,5 +32,4 @@ export interface HealthCheckUrl {
    * URL to check (e.g., `"http://localhost:8000/health"`).
    */
   url: string;
-  [k: string]: unknown;
 }

@@ -14,5 +14,4 @@ export interface IdleCondition {
    * Whether this condition is active.
    */
   enabled: boolean;
-  [k: string]: unknown;
 }

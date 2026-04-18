@@ -17,5 +17,4 @@ export interface RunPromptResponseData {
    * Final response text.
    */
   response?: string | null;
-  [k: string]: unknown;
 }

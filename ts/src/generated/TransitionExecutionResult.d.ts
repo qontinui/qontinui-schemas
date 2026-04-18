@@ -27,5 +27,4 @@ export interface TransitionExecutionResult {
    * Logical transition ID that was executed.
    */
   transition_id: string;
-  [k: string]: unknown;
 }

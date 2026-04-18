@@ -64,5 +64,4 @@ export interface AccessibilityState {
    * Selectable element's selection state.
    */
   isSelected?: boolean | null;
-  [k: string]: unknown;
 }

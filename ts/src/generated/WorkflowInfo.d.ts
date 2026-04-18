@@ -25,5 +25,4 @@ export interface WorkflowInfo {
    * Number of steps in the workflow.
    */
   stepCount: number;
-  [k: string]: unknown;
 }

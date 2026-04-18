@@ -42,5 +42,4 @@ export interface UIBridgeComponent {
    * Unix-epoch millisecond timestamp when the component was registered.
    */
   registeredAt: number;
-  [k: string]: unknown;
 }

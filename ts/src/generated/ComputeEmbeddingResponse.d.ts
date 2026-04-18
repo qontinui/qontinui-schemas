@@ -35,5 +35,4 @@ export interface ComputeEmbeddingResponse {
    * Text embedding vector (384 dimensions).
    */
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }

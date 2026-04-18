@@ -36,5 +36,4 @@ export interface CriterionOverride {
    * Worker ID that provided the override (if multi-worker).
    */
   workerId?: string | null;
-  [k: string]: unknown;
 }

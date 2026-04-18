@@ -53,5 +53,4 @@ export interface RunPromptRequest {
    * Attached video paths.
    */
   videoPaths?: string[] | null;
-  [k: string]: unknown;
 }

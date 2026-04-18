@@ -26,5 +26,4 @@ export interface WorkerDomain {
    * Worker identifier.
    */
   workerId: string;
-  [k: string]: unknown;
 }

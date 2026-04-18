@@ -54,5 +54,4 @@ export interface HistoricalActionResult {
    * Target state.
    */
   toState?: string | null;
-  [k: string]: unknown;
 }

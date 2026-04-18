@@ -29,5 +29,4 @@ export interface UpdateOlConfigRequest {
    * Rename the preset.
    */
   name?: string | null;
-  [k: string]: unknown;
 }

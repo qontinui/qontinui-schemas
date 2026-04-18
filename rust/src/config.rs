@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 /// (any match triggers inclusion).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ContextAutoInclude {
     /// Keywords in the task prompt that trigger inclusion
     /// (case-insensitive).
@@ -69,6 +70,7 @@ pub struct ContextAutoInclude {
 /// or debugging tips.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Context {
     /// Unique identifier (UUID v4 or a prefixed string like
     /// `"ctx-schema-flow"`).
@@ -114,6 +116,7 @@ pub struct Context {
 /// `automationEnabled = true` appear in the runner's workflow list.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Category {
     /// Category name (e.g., `"Main"`, `"Testing"`).
     #[serde(alias = "name")]

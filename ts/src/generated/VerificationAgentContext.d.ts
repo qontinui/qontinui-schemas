@@ -22,5 +22,4 @@ export interface VerificationAgentContext {
    * The screenshot to evaluate, base64-encoded.
    */
   screenshotBase64: string;
-  [k: string]: unknown;
 }

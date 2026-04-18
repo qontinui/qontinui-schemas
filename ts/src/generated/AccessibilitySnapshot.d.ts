@@ -40,5 +40,4 @@ export interface AccessibilitySnapshot {
    * Page URL (for web targets).
    */
   url?: string | null;
-  [k: string]: unknown;
 }

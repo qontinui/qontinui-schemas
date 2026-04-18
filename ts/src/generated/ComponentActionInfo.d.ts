@@ -21,5 +21,4 @@ export interface ComponentActionInfo {
    * Human-readable label.
    */
   label?: string | null;
-  [k: string]: unknown;
 }

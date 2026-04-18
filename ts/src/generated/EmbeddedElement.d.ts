@@ -33,5 +33,4 @@ export interface EmbeddedElement {
    * Text embedding vector.
    */
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }

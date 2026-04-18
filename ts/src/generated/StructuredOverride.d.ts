@@ -21,5 +21,4 @@ export interface StructuredOverride {
    * The new status.
    */
   status: string;
-  [k: string]: unknown;
 }

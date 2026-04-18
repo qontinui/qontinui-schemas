@@ -38,5 +38,4 @@ export interface ExecutionRunResponse {
    */
   startedAt: string;
   status: RunStatus;
-  [k: string]: unknown;
 }

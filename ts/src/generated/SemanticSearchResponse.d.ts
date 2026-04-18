@@ -18,5 +18,4 @@ export interface SemanticSearchResponse {
   query: string;
   results: SearchResultItem[];
   total_found: number;
-  [k: string]: unknown;
 }

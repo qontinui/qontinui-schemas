@@ -49,5 +49,4 @@ export interface FindingCreate {
    * User-input request, if `action_type` requires a user decision.
    */
   userInput?: FindingUserInput | null;
-  [k: string]: unknown;
 }

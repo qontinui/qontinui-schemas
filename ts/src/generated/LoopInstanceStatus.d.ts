@@ -25,5 +25,4 @@ export interface LoopInstanceStatus {
    */
   loopId: string;
   status: OrchestrationLoopStatus;
-  [k: string]: unknown;
 }

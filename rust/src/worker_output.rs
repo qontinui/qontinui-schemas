@@ -20,6 +20,7 @@ use serde_json::Value;
 /// Structured output from an AI worker agent.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkerOutput {
     /// Summary of work performed in this iteration.
     #[serde(alias = "work_summary")]
@@ -53,6 +54,7 @@ pub struct WorkerOutput {
 /// A signal from the worker to the orchestrator.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StructuredSignal {
     /// Signal type (e.g., "complete", "blocked", "needs_input").
     #[serde(alias = "signal_type")]
@@ -65,6 +67,7 @@ pub struct StructuredSignal {
 /// A finding discovered during work.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StructuredFinding {
     /// Finding category (e.g., "bug", "security", "performance").
     #[serde(alias = "category")]
@@ -86,6 +89,7 @@ pub struct StructuredFinding {
 /// A criterion override with justification.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StructuredOverride {
     /// The criterion being overridden.
     #[serde(alias = "criterion")]
@@ -130,6 +134,7 @@ pub enum AgenticStatus {
 /// A file change made during the agentic phase.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FileChange {
     /// Path of the changed file.
     #[serde(alias = "path")]
@@ -142,6 +147,7 @@ pub struct FileChange {
 /// A finding reported by the AI.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingOutput {
     /// Finding category.
     #[serde(alias = "category")]
@@ -166,6 +172,7 @@ pub struct FindingOutput {
 /// A reflection fix reported by the AI.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ReflectionFixOutput {
     /// Identifier for the error being fixed.
     #[serde(alias = "error_id")]
@@ -178,6 +185,7 @@ pub struct ReflectionFixOutput {
 /// Canonical structured output from the agentic phase.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AgenticPhaseOutput {
     /// Overall status of the agentic phase.
     #[serde(alias = "status")]

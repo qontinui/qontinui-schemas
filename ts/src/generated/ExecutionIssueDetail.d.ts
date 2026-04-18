@@ -86,5 +86,4 @@ export interface ExecutionIssueDetail {
    * ISO 8601 timestamp when the issue was last updated.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }

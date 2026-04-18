@@ -37,5 +37,4 @@ export interface ExecutionRunCreate {
    * Workflow metadata, if the run executes a workflow.
    */
   workflowMetadata?: WorkflowMetadata | null;
-  [k: string]: unknown;
 }

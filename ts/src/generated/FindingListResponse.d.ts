@@ -37,5 +37,4 @@ export interface FindingListResponse {
    * Total count of findings matching the query.
    */
   total: number;
-  [k: string]: unknown;
 }

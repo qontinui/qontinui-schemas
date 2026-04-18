@@ -97,5 +97,4 @@ export interface TaskRunFinding {
    * The user's response, if any.
    */
   userResponse: string | null;
-  [k: string]: unknown;
 }

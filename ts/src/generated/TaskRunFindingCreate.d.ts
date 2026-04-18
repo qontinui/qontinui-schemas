@@ -76,5 +76,4 @@ export interface TaskRunFindingCreate {
    * Short title.
    */
   title: string;
-  [k: string]: unknown;
 }

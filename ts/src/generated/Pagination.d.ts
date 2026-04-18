@@ -25,5 +25,4 @@ export interface Pagination {
    * Total number of matching records.
    */
   total: number;
-  [k: string]: unknown;
 }

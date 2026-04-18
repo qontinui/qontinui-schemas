@@ -14,5 +14,4 @@ export interface EmbeddingResultsResponse {
   message: string;
   not_found: number;
   success: boolean;
-  [k: string]: unknown;
 }

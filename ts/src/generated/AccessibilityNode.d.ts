@@ -70,5 +70,4 @@ export interface AccessibilityNode {
    * Current value (for inputs).
    */
   value?: string | null;
-  [k: string]: unknown;
 }

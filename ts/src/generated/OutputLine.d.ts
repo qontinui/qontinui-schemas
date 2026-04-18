@@ -20,5 +20,4 @@ export interface OutputLine {
    * ISO 8601 timestamp
    */
   timestamp: string;
-  [k: string]: unknown;
 }

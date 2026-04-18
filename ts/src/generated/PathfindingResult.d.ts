@@ -27,5 +27,4 @@ export interface PathfindingResult {
    * Sum of `path_cost` across steps.
    */
   total_cost: number;
-  [k: string]: unknown;
 }

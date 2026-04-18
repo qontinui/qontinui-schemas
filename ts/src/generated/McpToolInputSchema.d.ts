@@ -31,5 +31,4 @@ export interface McpToolInputSchema {
    * JSON Schema `type` (typically `"object"`).
    */
   type: string;
-  [k: string]: unknown;
 }

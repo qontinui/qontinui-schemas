@@ -21,5 +21,4 @@ export interface Category {
    * Category name (e.g., `"Main"`, `"Testing"`).
    */
   name: string;
-  [k: string]: unknown;
 }

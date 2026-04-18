@@ -36,5 +36,4 @@ export interface UIBridgeSnapshot {
    * Active workflows.
    */
   workflows?: WorkflowInfo[];
-  [k: string]: unknown;
 }

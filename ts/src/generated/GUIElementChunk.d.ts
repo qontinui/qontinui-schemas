@@ -148,5 +148,4 @@ export interface GUIElementChunk {
    */
   visual_state: string;
   width: number;
-  [k: string]: unknown;
 }

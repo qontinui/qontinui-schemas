@@ -31,5 +31,4 @@ export interface AvailableTransitionsResult {
    * Transitions available from the current state.
    */
   transitions: TransitionInfo[];
-  [k: string]: unknown;
 }

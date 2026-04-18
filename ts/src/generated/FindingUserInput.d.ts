@@ -24,5 +24,4 @@ export interface FindingUserInput {
    * Question to present to the user.
    */
   question: string;
-  [k: string]: unknown;
 }

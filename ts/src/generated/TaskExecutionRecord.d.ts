@@ -45,5 +45,4 @@ export interface TaskExecutionRecord {
    * Whether auto-fix was triggered after this execution.
    */
   triggeredAutoFix: boolean;
-  [k: string]: unknown;
 }

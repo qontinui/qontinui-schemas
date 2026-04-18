@@ -43,5 +43,4 @@ export interface TransitionEdgeData {
    * Transition ID this edge represents.
    */
   transitionId: string;
-  [k: string]: unknown;
 }

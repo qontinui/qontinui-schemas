@@ -47,5 +47,4 @@ export interface RunPromptResponse {
    * ID of the created task run, if any.
    */
   taskRunId?: string | null;
-  [k: string]: unknown;
 }

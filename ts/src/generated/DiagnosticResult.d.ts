@@ -37,5 +37,4 @@ export interface DiagnosticResult {
    * Classified root cause (only meaningful when `passed == false`).
    */
   rootCause?: RootCauseCategory | null;
-  [k: string]: unknown;
 }

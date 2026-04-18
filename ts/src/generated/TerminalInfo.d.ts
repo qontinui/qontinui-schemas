@@ -66,5 +66,4 @@ export interface TerminalInfo {
    * Absolute working directory the shell was started in.
    */
   workingDir: string;
-  [k: string]: unknown;
 }

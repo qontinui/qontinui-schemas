@@ -41,5 +41,4 @@ export interface DiscoveredTransition {
    * What triggers this transition.
    */
   trigger?: DiscoveryTransitionTrigger | null;
-  [k: string]: unknown;
 }

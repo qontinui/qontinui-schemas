@@ -29,5 +29,4 @@ export interface PatternOptions {
   useColorReduction?: boolean | null;
   useEdges?: boolean | null;
   useGrayscale?: boolean | null;
-  [k: string]: unknown;
 }

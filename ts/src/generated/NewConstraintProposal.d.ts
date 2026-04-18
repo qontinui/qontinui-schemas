@@ -17,5 +17,4 @@ import type { ConstraintSeverity } from './ConstraintSeverity';
  */
 export interface NewConstraintProposal {
   constraint: Constraint;
-  [k: string]: unknown;
 }

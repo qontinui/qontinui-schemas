@@ -31,5 +31,4 @@ export interface StdioConfig {
   env?: {
     [k: string]: string;
   };
-  [k: string]: unknown;
 }

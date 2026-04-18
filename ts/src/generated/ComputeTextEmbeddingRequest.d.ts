@@ -17,5 +17,4 @@ export interface ComputeTextEmbeddingRequest {
    * Text to encode into embedding space.
    */
   text: string;
-  [k: string]: unknown;
 }

@@ -29,5 +29,4 @@ export interface MultiLoopConfig {
    * Stop all loops if any single loop errors out.
    */
   stopAllOnError: boolean;
-  [k: string]: unknown;
 }

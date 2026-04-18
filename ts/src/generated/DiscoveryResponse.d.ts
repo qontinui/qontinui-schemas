@@ -29,5 +29,4 @@ export interface DiscoveryResponse {
    * Total number of elements found (before any limit).
    */
   total: number;
-  [k: string]: unknown;
 }

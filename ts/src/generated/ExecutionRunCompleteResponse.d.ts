@@ -35,5 +35,4 @@ export interface ExecutionRunCompleteResponse {
   startedAt: string;
   stats: ExecutionStats;
   status: RunStatus;
-  [k: string]: unknown;
 }

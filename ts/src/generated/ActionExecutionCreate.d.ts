@@ -121,5 +121,4 @@ export interface ActionExecutionCreate {
    * Trace ID correlating related actions.
    */
   traceId?: string | null;
-  [k: string]: unknown;
 }

@@ -23,5 +23,4 @@ export interface ExecutionIssueListResponse {
   summary?: {
     [k: string]: unknown;
   };
-  [k: string]: unknown;
 }

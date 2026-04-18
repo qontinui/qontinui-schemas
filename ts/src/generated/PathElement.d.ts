@@ -14,5 +14,4 @@ export interface PathElement {
   id: string;
   name: string;
   nodeType: NodeType;
-  [k: string]: unknown;
 }

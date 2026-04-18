@@ -19,5 +19,4 @@ export interface ExecutionRunListResponse {
    * Page of matching runs.
    */
   runs: ExecutionRunResponse[];
-  [k: string]: unknown;
 }

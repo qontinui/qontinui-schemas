@@ -51,6 +51,7 @@ fn default_version() -> u32 {
 /// A success criterion that must be met for task completion.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct SuccessCriterion {
     /// Unique identifier for this criterion.
     #[serde(alias = "id")]
@@ -133,6 +134,7 @@ pub enum VerificationMethod {
 /// The verification plan created by the planning agent.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationPlan {
     /// Summary of the goal.
     #[serde(alias = "goal_summary")]
@@ -165,6 +167,7 @@ pub struct VerificationPlan {
 /// [`VerificationPlan`]'s `worker_domains` list).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkerDomain {
     /// Worker identifier.
     #[serde(alias = "worker_id")]
@@ -195,6 +198,7 @@ pub struct WorkerDomain {
 /// multi-worker verification.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DomainAssignment {
     /// Unique identifier for this domain.
     #[serde(alias = "domain_id")]
@@ -251,6 +255,7 @@ pub enum WorkerStatus {
 /// Instance tracking for an individual worker.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkerInstance {
     /// Unique identifier for this worker.
     #[serde(alias = "worker_id")]
@@ -360,6 +365,7 @@ pub enum WorkerCoordinationMessage {
 /// Result of domain-scoped verification.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DomainVerificationResult {
     /// Domain that was verified.
     #[serde(alias = "domain_id")]
@@ -421,6 +427,7 @@ pub enum WorkerSignal {
 /// A finding recorded by a worker agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Finding {
     /// Unique identifier.
     #[serde(alias = "id")]
@@ -471,6 +478,7 @@ pub enum Confidence {
 /// Result of a single verification check.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationResult {
     /// The criterion that was checked.
     #[serde(alias = "criterion_id")]
@@ -508,6 +516,7 @@ pub struct VerificationResult {
 /// Aggregated verification results for a single iteration.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct IterationVerificationResults {
     /// Iteration number.
     #[serde(alias = "iteration")]
@@ -550,6 +559,7 @@ pub struct IterationVerificationResults {
 /// include work history, to avoid biasing AI evaluation).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationAgentContext {
     /// The screenshot to evaluate, base64-encoded.
     #[serde(alias = "screenshot_base64")]
@@ -567,6 +577,7 @@ pub struct VerificationAgentContext {
 /// Request to extend iterations after the max has been reached.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExtendIterationsRequest {
     /// Additional iterations to add.
     #[serde(alias = "additional_iterations")]
@@ -587,6 +598,7 @@ pub struct ExtendIterationsRequest {
 /// accepted as-is with justification, rather than requiring a fix.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CriterionOverride {
     /// The criterion ID being overridden.
     #[serde(alias = "criterion_id")]
@@ -616,6 +628,7 @@ pub struct CriterionOverride {
 /// Collection of overrides for a task run.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct OverrideCollection {
     /// All recorded overrides.
     #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "overrides")]
@@ -689,6 +702,7 @@ pub enum TaskCompletionResult {
 /// Used for building the stage-based timeline on the recap page.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StageTransition {
     /// Previous stage.
     #[serde(alias = "from")]

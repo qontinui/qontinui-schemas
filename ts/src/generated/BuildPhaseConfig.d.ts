@@ -21,5 +21,4 @@ export interface BuildPhaseConfig {
    * Human description of the desired workflow.
    */
   description: string;
-  [k: string]: unknown;
 }

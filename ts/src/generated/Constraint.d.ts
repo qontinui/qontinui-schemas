@@ -30,5 +30,4 @@ export interface Constraint {
    */
   name: string;
   severity: ConstraintSeverity;
-  [k: string]: unknown;
 }

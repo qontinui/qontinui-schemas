@@ -37,5 +37,4 @@ export interface VisualComparisonResult {
    * Threshold used for the pass/fail decision.
    */
   threshold: number;
-  [k: string]: unknown;
 }

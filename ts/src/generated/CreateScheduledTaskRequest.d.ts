@@ -43,5 +43,4 @@ export interface CreateScheduledTaskRequest {
    */
   successCriteria?: string | null;
   task: ScheduledTaskType;
-  [k: string]: unknown;
 }

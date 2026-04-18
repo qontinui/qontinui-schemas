@@ -33,5 +33,4 @@ export interface PathfindingStep {
    * Display name of the transition.
    */
   transition_name: string;
-  [k: string]: unknown;
 }

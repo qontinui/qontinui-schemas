@@ -47,6 +47,7 @@ pub enum RagProcessingStatus {
 
 /// Request to compute a text embedding for semantic search.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ComputeTextEmbeddingRequest {
     /// Text to encode into embedding space.
     pub text: String,
@@ -61,6 +62,7 @@ fn default_clip_model() -> String {
 
 /// Response with a computed text embedding.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ComputeTextEmbeddingResponse {
     /// Whether the embedding computation succeeded.
     pub success: bool,
@@ -84,6 +86,7 @@ fn default_embedding_dim() -> i64 {
 
 /// Request to compute embeddings for a single image.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ComputeEmbeddingRequest {
     /// Base64-encoded image data.
     pub image_data: String,
@@ -97,6 +100,7 @@ pub struct ComputeEmbeddingRequest {
 
 /// Response with computed embeddings for a single image.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ComputeEmbeddingResponse {
     pub success: bool,
     /// CLIP image embedding vector (512 dimensions).
@@ -123,6 +127,7 @@ pub struct ComputeEmbeddingResponse {
 
 /// Request to compute embeddings for multiple images.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct BatchComputeEmbeddingRequest {
     /// Images, each a map with `id`, `image_data` (base64), and optional
     /// `text_description`.
@@ -141,6 +146,7 @@ fn default_true() -> bool {
 
 /// Result for a single image in batch processing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct BatchEmbeddingResult {
     /// Image identifier from the request.
     pub id: String,
@@ -161,6 +167,7 @@ pub struct BatchEmbeddingResult {
 
 /// Response with batch-computed embeddings.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct BatchComputeEmbeddingResponse {
     /// Whether the batch succeeded overall.
     pub success: bool,
@@ -178,6 +185,7 @@ pub struct BatchComputeEmbeddingResponse {
 
 /// Single embedding result from the runner.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddingResultItem {
     /// ID of the state image that was processed.
     pub state_image_id: String,
@@ -200,6 +208,7 @@ pub struct EmbeddingResultItem {
 
 /// Request containing embedding results from the runner.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddingResultsRequest {
     pub project_id: String,
     pub results: Vec<EmbeddingResultItem>,
@@ -210,6 +219,7 @@ pub struct EmbeddingResultsRequest {
 
 /// Response after applying embedding results.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddingResultsResponse {
     pub success: bool,
     pub message: String,
@@ -224,6 +234,7 @@ pub struct EmbeddingResultsResponse {
 
 /// Progress event emitted during RAG processing.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct RagProgressEvent {
     pub project_id: String,
     pub status: RagProcessingStatus,
@@ -242,6 +253,7 @@ pub struct RagProgressEvent {
 
 /// Completion event emitted when RAG processing finishes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct RagCompletionEvent {
     pub project_id: String,
     pub success: bool,
@@ -262,6 +274,7 @@ pub struct RagCompletionEvent {
 
 /// Summary of an embedding-generation job.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct JobSummary {
     /// Job UUID.
     pub id: String,
@@ -279,6 +292,7 @@ pub struct JobSummary {
 
 /// Summary statistics for the RAG dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct RAGDashboardStats {
     pub total_embeddings: i64,
     pub total_states: i64,
@@ -293,6 +307,7 @@ pub struct RAGDashboardStats {
 
 /// Single embedding record for display.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddingItem {
     /// Embedding UUID.
     pub id: String,
@@ -326,6 +341,7 @@ pub struct EmbeddingItem {
 
 /// Paginated list of embeddings.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddingListResponse {
     pub items: Vec<EmbeddingItem>,
     pub total: i64,
@@ -337,6 +353,7 @@ pub struct EmbeddingListResponse {
 
 /// Single job record for display.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct JobItem {
     pub id: String,
     pub status: JobStatus,
@@ -359,6 +376,7 @@ pub struct JobItem {
 
 /// Paginated list of jobs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct JobListResponse {
     pub items: Vec<JobItem>,
     pub total: i64,
@@ -373,6 +391,7 @@ pub struct JobListResponse {
 
 /// Request for semantic search.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct SemanticSearchRequest {
     /// Search query text (min length 1).
     pub query: String,
@@ -396,6 +415,7 @@ fn default_min_similarity() -> f64 {
 
 /// Single search result.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct SearchResultItem {
     pub embedding: EmbeddingItem,
     /// Similarity score (0-1).
@@ -404,6 +424,7 @@ pub struct SearchResultItem {
 
 /// Response from semantic search.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct SemanticSearchResponse {
     pub results: Vec<SearchResultItem>,
     /// The original search query.
@@ -417,6 +438,7 @@ pub struct SemanticSearchResponse {
 
 /// State item for the filter dropdown.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateFilterItem {
     pub state_id: String,
     pub state_name: String,
@@ -426,6 +448,7 @@ pub struct StateFilterItem {
 
 /// Response with list of states for filtering.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StatesResponse {
     pub states: Vec<StateFilterItem>,
     /// Total number of states.
@@ -497,6 +520,7 @@ pub enum ElementType {
 ///
 /// Mirrors `rag.models.BoundingBox`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct BoundingBox {
     pub x: i64,
     pub y: i64,
@@ -509,6 +533,7 @@ pub struct BoundingBox {
 /// Contains all information needed for storing, searching, and retrieving GUI
 /// elements from a vector database. Mirrors `rag.models.GUIElementChunk`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct GUIElementChunk {
     // ── Identity ──────────────────────────────────────────────────────────
     /// Unique identifier (UUID).
@@ -689,6 +714,7 @@ fn default_probability() -> f64 {
 /// Contains the original element plus computed embeddings.
 /// Mirrors `rag.models.EmbeddedElement`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct EmbeddedElement {
     /// The GUI element that was embedded.
     pub element: GUIElementChunk,
@@ -711,6 +737,7 @@ pub struct EmbeddedElement {
 /// Contains the matched element and relevance scores.
 /// Mirrors `rag.models.SearchResult`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct VectorSearchResult {
     /// The matched GUI element.
     pub element: GUIElementChunk,
@@ -749,6 +776,7 @@ fn default_search_type() -> String {
 /// Tracks what was exported and any errors that occurred.
 /// Mirrors `rag.models.ExportResult`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ExportResult {
     pub success: bool,
     #[serde(default)]

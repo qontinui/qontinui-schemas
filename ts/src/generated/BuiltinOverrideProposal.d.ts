@@ -24,5 +24,4 @@ export interface BuiltinOverrideProposal {
    * Human-readable justification for the override.
    */
   reason: string;
-  [k: string]: unknown;
 }

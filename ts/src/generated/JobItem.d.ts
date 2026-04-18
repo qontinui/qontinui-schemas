@@ -28,5 +28,4 @@ export interface JobItem {
   started_at?: string | null;
   status: JobStatus;
   total_patterns: number;
-  [k: string]: unknown;
 }

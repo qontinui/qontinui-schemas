@@ -29,5 +29,4 @@ export interface StructuredFinding {
    * Short title describing the finding.
    */
   title: string;
-  [k: string]: unknown;
 }

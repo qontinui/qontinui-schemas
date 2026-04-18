@@ -39,5 +39,4 @@ export interface HistoricalActionQuery {
    * Filter by workflow ID.
    */
   workflowId?: string | null;
-  [k: string]: unknown;
 }

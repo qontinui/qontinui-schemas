@@ -37,5 +37,4 @@ export interface DiscoveryRequest {
    * Filter by element types (e.g. `["button", "input"]`).
    */
   types?: string[] | null;
-  [k: string]: unknown;
 }

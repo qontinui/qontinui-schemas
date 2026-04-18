@@ -15,5 +15,4 @@ export interface BoundingBox {
   width: number;
   x: number;
   y: number;
-  [k: string]: unknown;
 }

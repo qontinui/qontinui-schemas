@@ -51,5 +51,4 @@ export interface TreeNode {
    * When this node was created (Unix epoch seconds).
    */
   timestamp: number;
-  [k: string]: unknown;
 }

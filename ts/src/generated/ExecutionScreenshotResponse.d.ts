@@ -33,5 +33,4 @@ export interface ExecutionScreenshotResponse {
    * ISO 8601 timestamp when the image was uploaded.
    */
   uploadedAt: string;
-  [k: string]: unknown;
 }

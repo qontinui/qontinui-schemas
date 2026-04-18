@@ -25,5 +25,4 @@ export interface TicketComment {
    * Provider-assigned comment ID.
    */
   id: string;
-  [k: string]: unknown;
 }

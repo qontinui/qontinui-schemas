@@ -62,5 +62,4 @@ export interface StateDiscoveryResultCreate {
    * Discovered transitions.
    */
   transitions?: DiscoveredTransition[];
-  [k: string]: unknown;
 }

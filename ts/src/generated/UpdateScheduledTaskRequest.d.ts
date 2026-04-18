@@ -54,5 +54,4 @@ export interface UpdateScheduledTaskRequest {
    * Replace the task definition.
    */
   task?: ScheduledTaskType | null;
-  [k: string]: unknown;
 }

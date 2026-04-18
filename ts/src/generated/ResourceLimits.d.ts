@@ -30,5 +30,4 @@ export interface ResourceLimits {
    * Default: 0.75 (warn at 75% of limit).
    */
   warningThreshold?: number | null;
-  [k: string]: unknown;
 }

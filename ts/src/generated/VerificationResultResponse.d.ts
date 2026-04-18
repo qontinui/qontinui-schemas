@@ -62,5 +62,4 @@ export interface VerificationResultResponse {
    * Total number of steps executed.
    */
   totalSteps: number;
-  [k: string]: unknown;
 }

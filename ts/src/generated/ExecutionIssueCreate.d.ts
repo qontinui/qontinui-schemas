@@ -54,5 +54,4 @@ export interface ExecutionIssueCreate {
    * Short human-readable title.
    */
   title: string;
-  [k: string]: unknown;
 }

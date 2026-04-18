@@ -50,5 +50,4 @@ export interface FindingSummary {
    * Total number of findings.
    */
   total: number;
-  [k: string]: unknown;
 }

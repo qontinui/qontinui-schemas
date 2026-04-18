@@ -85,5 +85,4 @@ export interface TaskRun {
    * Name of the workflow used to run this task, if any.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }

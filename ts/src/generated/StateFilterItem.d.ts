@@ -15,5 +15,4 @@ export interface StateFilterItem {
   count: number;
   state_id: string;
   state_name: string;
-  [k: string]: unknown;
 }

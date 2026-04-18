@@ -47,5 +47,4 @@ export interface DomainAssignment {
    * Additional system-prompt context for workers in this domain.
    */
   systemPromptContext?: string | null;
-  [k: string]: unknown;
 }

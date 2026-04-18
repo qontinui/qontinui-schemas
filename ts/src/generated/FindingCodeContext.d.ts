@@ -28,5 +28,4 @@ export interface FindingCodeContext {
    * Code snippet related to the finding (max 1000 chars on the Python side).
    */
   snippet?: string | null;
-  [k: string]: unknown;
 }

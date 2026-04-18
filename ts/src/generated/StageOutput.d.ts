@@ -17,5 +17,4 @@ export interface StageOutput {
    * Unique key for this output (e.g. `"api_url"`, `"auth_token"`).
    */
   key: string;
-  [k: string]: unknown;
 }

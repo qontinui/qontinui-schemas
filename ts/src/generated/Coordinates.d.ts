@@ -30,5 +30,4 @@ export interface Coordinates {
    * Y coordinate (vertical position).
    */
   y: number;
-  [k: string]: unknown;
 }

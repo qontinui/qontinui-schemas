@@ -42,5 +42,4 @@ export interface DisplayNode {
   nodeType: NodeType;
   status: NodeStatus;
   timestamp: number;
-  [k: string]: unknown;
 }

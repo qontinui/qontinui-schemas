@@ -50,5 +50,4 @@ export interface StateMachineTransitionCreate {
    * Whether source states stay visible after activation.
    */
   stays_visible?: boolean | null;
-  [k: string]: unknown;
 }

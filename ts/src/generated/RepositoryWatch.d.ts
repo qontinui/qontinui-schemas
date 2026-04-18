@@ -17,5 +17,4 @@ export interface RepositoryWatch {
    * Path to the repository directory.
    */
   path: string;
-  [k: string]: unknown;
 }

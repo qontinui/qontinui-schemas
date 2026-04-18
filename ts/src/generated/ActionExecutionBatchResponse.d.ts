@@ -21,5 +21,4 @@ export interface ActionExecutionBatchResponse {
    * Associated run ID.
    */
   runId: string;
-  [k: string]: unknown;
 }

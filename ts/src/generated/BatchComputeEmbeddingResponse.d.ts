@@ -20,5 +20,4 @@ export interface BatchComputeEmbeddingResponse {
   success: boolean;
   successful: number;
   total_processed: number;
-  [k: string]: unknown;
 }

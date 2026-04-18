@@ -101,5 +101,4 @@ export interface StateDiscoveryResult {
    * ISO 8601 timestamp of last update.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }

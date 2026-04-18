@@ -44,5 +44,4 @@ export interface ModelOverrideConfig {
    * Temperature override for this phase (`0.0`–`1.0`).
    */
   temperature?: number | null;
-  [k: string]: unknown;
 }

@@ -20,5 +20,4 @@ export interface McpToolInfo {
    * Tool name (the argument passed back on `tools/call`).
    */
   name: string;
-  [k: string]: unknown;
 }

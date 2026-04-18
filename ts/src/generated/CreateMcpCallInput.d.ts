@@ -56,5 +56,4 @@ export interface CreateMcpCallInput {
   success: boolean;
   taskRunId: string;
   toolName: string;
-  [k: string]: unknown;
 }

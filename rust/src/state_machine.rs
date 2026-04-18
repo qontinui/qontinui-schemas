@@ -102,6 +102,7 @@ pub enum StandardActionType {
 
 /// An (x, y) pixel offset used by the click-position and related parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct Point {
     /// Horizontal offset in pixels.
     pub x: f64,
@@ -157,6 +158,7 @@ pub enum TransitionActionValue {
 /// Each action targets an element and performs an interaction. Most fields are
 /// only meaningful for specific action types — see the per-field docs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct TransitionAction {
     /// The kind of action to perform.
     #[serde(rename = "type")]
@@ -224,6 +226,7 @@ pub struct TransitionAction {
 /// A piece of domain knowledge attached to a state — free-form notes that
 /// help the AI reason about what a state represents.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct DomainKnowledge {
     /// Unique identifier for this knowledge entry.
     pub id: String,
@@ -242,6 +245,7 @@ pub struct DomainKnowledge {
 /// A state machine configuration — a named collection of states and
 /// transitions that describe the navigable structure of an application's UI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineConfig {
     /// Unique identifier (UUID).
     pub id: String,
@@ -264,6 +268,7 @@ pub struct StateMachineConfig {
 
 /// Payload for creating a new state machine configuration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineConfigCreate {
     /// Display name.
     pub name: String,
@@ -274,6 +279,7 @@ pub struct StateMachineConfigCreate {
 
 /// Payload for updating an existing state machine configuration.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineConfigUpdate {
     /// New display name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -307,6 +313,7 @@ pub struct StateMachineConfigFull {
 ///
 /// States are discovered via co-occurrence analysis of DOM snapshots.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineState {
     /// Unique database identifier (UUID).
     pub id: String,
@@ -340,6 +347,7 @@ pub struct StateMachineState {
 
 /// Payload for creating a new state within a config.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineStateCreate {
     /// Optional stable logical state ID (generated if omitted).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -371,6 +379,7 @@ pub struct StateMachineStateCreate {
 
 /// Payload for updating an existing state.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineStateUpdate {
     /// New display name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -406,6 +415,7 @@ pub struct StateMachineStateUpdate {
 ///
 /// Transitions define the edges of the state machine graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineTransition {
     /// Unique database identifier (UUID).
     pub id: String,
@@ -437,6 +447,7 @@ pub struct StateMachineTransition {
 
 /// Payload for creating a new transition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineTransitionCreate {
     /// Display name.
     pub name: String,
@@ -461,6 +472,7 @@ pub struct StateMachineTransitionCreate {
 
 /// Payload for updating an existing transition.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineTransitionUpdate {
     /// New display name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -498,6 +510,7 @@ pub struct StateMachineTransitionUpdate {
 /// Runtime navigation uses the qontinui Python library (`multistate`)
 /// directly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct PathfindingRequest {
     /// States assumed to be active at the start of the search.
     pub from_states: Vec<String>,
@@ -507,6 +520,7 @@ pub struct PathfindingRequest {
 
 /// A single step on a computed path.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct PathfindingStep {
     /// Logical transition ID taken in this step.
     pub transition_id: String,
@@ -524,6 +538,7 @@ pub struct PathfindingStep {
 
 /// Result of a pathfinding search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct PathfindingResult {
     /// Whether a valid path was found.
     pub found: bool,
@@ -544,6 +559,7 @@ pub struct PathfindingResult {
 ///
 /// Returned by the runner's Tauri commands or the qontinui Python subprocess.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct TransitionExecutionResult {
     /// Whether the transition executed successfully.
     pub success: bool,
@@ -562,6 +578,7 @@ pub struct TransitionExecutionResult {
 /// Nested `results` allow a single top-level navigation to fan out to several
 /// targets and report per-target outcomes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct NavigationResult {
     /// Whether the overall navigation succeeded.
     pub success: bool,
@@ -582,6 +599,7 @@ pub struct NavigationResult {
 
 /// Result of querying currently active states in the state machine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ActiveStatesResult {
     /// Whether the query succeeded.
     pub success: bool,
@@ -600,6 +618,7 @@ pub struct ActiveStatesResult {
 
 /// Information about a single available transition from the current state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct TransitionInfo {
     /// Transition ID.
     pub id: String,
@@ -615,6 +634,7 @@ pub struct TransitionInfo {
 
 /// Result of querying available transitions from the current state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct AvailableTransitionsResult {
     /// Whether the query succeeded.
     pub success: bool,
@@ -659,6 +679,7 @@ pub enum InitialStatesSource {
 /// Used in [`ResolvedInitialStates`] and [`ResolvedInitialStatesResult`] to
 /// let the UI render human-readable lists without a separate lookup.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct InitialStateRef {
     /// State ID.
     pub id: String,
@@ -670,6 +691,7 @@ pub struct InitialStateRef {
 /// resolution came from.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ResolvedInitialStates {
     /// Resolved initial state IDs.
     pub state_ids: Vec<String>,
@@ -690,6 +712,7 @@ pub struct ResolvedInitialStates {
 /// pair is provided.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ResolvedInitialStatesResult {
     /// Whether resolution succeeded.
     pub success: bool,
@@ -733,6 +756,7 @@ pub enum DiscoveryStrategy {
 /// intentionally omitted from the DTO.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateNodeData {
     /// State ID this node represents.
     pub state_id: String,
@@ -770,6 +794,7 @@ pub struct StateNodeData {
 /// Data passed to a transition edge in the ReactFlow graph editor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TransitionEdgeData {
     /// Transition ID this edge represents.
     pub transition_id: String,
@@ -801,6 +826,7 @@ pub struct TransitionEdgeData {
 /// because the exporter serializes implementation-specific fields not captured
 /// by the DTO types.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineExportFormat {
     /// State ID → state payload.
     pub states: HashMap<String, HashMap<String, Value>>,

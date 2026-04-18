@@ -152,6 +152,7 @@ fn is_default_log_source(selection: &LogSourceSelection) -> bool {
 /// - Operators: `>=`, `>`, `<=`, `<`, `==`, `!=`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RoutingRule {
     /// Condition expression, e.g. `"verification_failures >= 2"`.
     #[serde(alias = "condition")]
@@ -177,6 +178,7 @@ pub struct RoutingRule {
 /// rules.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ModelOverrideConfig {
     /// Provider override for this phase.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
@@ -262,6 +264,7 @@ impl Default for LogSourceSelection {
 /// confirm required services are up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct HealthCheckUrl {
     /// Display name for the health check (e.g., `"Backend Server"`).
     #[serde(alias = "name")]
@@ -330,6 +333,7 @@ impl std::fmt::Display for WorkflowArchitecture {
 /// run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StageCondition {
     /// Run this stage only if the previous stage had this outcome.
     ///
@@ -355,6 +359,7 @@ pub struct StageCondition {
 /// Retry policy for a step or stage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RetryPolicy {
     /// Number of retry attempts (`0` = no retries).
     #[serde(default, alias = "count")]
@@ -370,6 +375,7 @@ pub struct RetryPolicy {
 /// An output declared by a stage, available to subsequent stages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StageOutput {
     /// Unique key for this output (e.g. `"api_url"`, `"auth_token"`).
     #[serde(alias = "key")]
@@ -382,6 +388,7 @@ pub struct StageOutput {
 /// An input required by a stage, referencing a prior stage's output.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StageInput {
     /// The key to bind this input to (matches a [`StageOutput::key`] from a
     /// prior stage).
@@ -407,6 +414,7 @@ pub struct StageInput {
 /// Wave 4 typed-step migration.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkflowStage {
     /// Unique identifier (UUID v4).
     #[serde(default, alias = "id")]
@@ -487,6 +495,7 @@ pub struct WorkflowStage {
 /// typed-step migration lands.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UnifiedWorkflow {
     /// Unique identifier (UUID v4).
     #[serde(default, alias = "id")]

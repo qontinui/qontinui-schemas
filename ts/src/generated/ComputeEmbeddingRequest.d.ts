@@ -21,5 +21,4 @@ export interface ComputeEmbeddingRequest {
    * Optional text description for the text embedding.
    */
   text_description?: string | null;
-  [k: string]: unknown;
 }

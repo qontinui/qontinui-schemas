@@ -28,5 +28,4 @@ export interface DecomposerConfig {
    * Override the default AI model used for planning.
    */
   modelOverride?: string | null;
-  [k: string]: unknown;
 }

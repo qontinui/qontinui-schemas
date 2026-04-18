@@ -17,5 +17,4 @@ export interface ReadConfigResponse {
    * Raw TOML content of the `constraints.toml` file (empty string if not found).
    */
   toml: string;
-  [k: string]: unknown;
 }

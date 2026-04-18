@@ -44,5 +44,4 @@ export interface TreeEventResponse {
   runId: string;
   sequence: number;
   status: NodeStatus;
-  [k: string]: unknown;
 }

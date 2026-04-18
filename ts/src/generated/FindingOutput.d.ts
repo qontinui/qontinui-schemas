@@ -33,5 +33,4 @@ export interface FindingOutput {
    * Short title describing the finding.
    */
   title: string;
-  [k: string]: unknown;
 }

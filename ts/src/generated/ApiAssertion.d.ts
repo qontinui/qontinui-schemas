@@ -32,5 +32,4 @@ export interface ApiAssertion {
    */
   operator?: ApiAssertionOperator | null;
   type: ApiAssertionType;
-  [k: string]: unknown;
 }

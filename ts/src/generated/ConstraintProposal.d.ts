@@ -5,11 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { BuiltinOverrideProposal } from './BuiltinOverrideProposal';
 import type { Constraint } from './Constraint';
 import type { ConstraintCheck } from './ConstraintCheck';
 import type { ConstraintSeverity } from './ConstraintSeverity';
-import type { NewConstraintProposal } from './NewConstraintProposal';
 
 /**
  * A constraint proposal from the AI.
@@ -18,9 +16,22 @@ import type { NewConstraintProposal } from './NewConstraintProposal';
  * discriminated union `{ type: "new_constraint" | "builtin_override", ... }`.
  */
 export type ConstraintProposal =
-  | (NewConstraintProposal & {
+  | {
+      constraint: Constraint;
       type: "new_constraint";
-    })
-  | (BuiltinOverrideProposal & {
+    }
+  | {
+      /**
+       * Builtin suffix (e.g., `"no-secrets"`, `"no-debug-statements"`).
+       */
+      builtinSuffix: string;
+      /**
+       * Whether the builtin should be enabled.
+       */
+      enabled: boolean;
+      /**
+       * Human-readable justification for the override.
+       */
+      reason: string;
       type: "builtin_override";
-    });
+    };

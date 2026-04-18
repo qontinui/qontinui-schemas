@@ -20,5 +20,4 @@ export interface ActionExecutionBatch {
    * Actions to record (Python enforces `1..=100`; enforced by the backend).
    */
   actions: ActionExecutionCreate[];
-  [k: string]: unknown;
 }

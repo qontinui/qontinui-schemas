@@ -39,5 +39,4 @@ export interface LLMMetrics {
    * Computed total token count.
    */
   tokensTotal?: number | null;
-  [k: string]: unknown;
 }

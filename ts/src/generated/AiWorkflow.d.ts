@@ -73,5 +73,4 @@ export interface AiWorkflow {
    * Tags for filtering/searching.
    */
   tags?: string[];
-  [k: string]: unknown;
 }

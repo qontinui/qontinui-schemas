@@ -93,6 +93,7 @@ impl Default for TransitionTriggerType {
 /// on the Python side (validator not duplicated here — this is a wire-format
 /// layer).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveryBoundingBox {
     /// X coordinate of the top-left corner (pixels).
     pub x: f64,
@@ -111,6 +112,7 @@ pub struct DiscoveryBoundingBox {
 /// different subsets.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveryTransitionTrigger {
     /// Type of trigger action. Defaults to `click` when omitted on the wire.
     #[serde(default)]
@@ -139,6 +141,7 @@ pub struct DiscoveryTransitionTrigger {
 /// optional pixel-level identification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveredStateImage {
     /// Unique identifier for the image.
     pub id: String,
@@ -176,6 +179,7 @@ pub struct DiscoveredStateImage {
 /// images that consistently appear together.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveredState {
     /// Unique identifier for the state.
     pub id: String,
@@ -207,6 +211,7 @@ pub struct DiscoveredState {
 /// screen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveredTransition {
     /// Unique identifier for the transition.
     pub id: String,
@@ -235,6 +240,7 @@ pub struct DiscoveredTransition {
 /// Recording, Vision, Manual).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateDiscoveryResult {
     /// Unique identifier for the result.
     pub id: String,
@@ -297,6 +303,7 @@ pub struct StateDiscoveryResult {
 /// Lightweight projection of `StateDiscoveryResult` used by list endpoints.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateDiscoveryResultSummary {
     /// Unique identifier.
     pub id: String,
@@ -330,6 +337,7 @@ pub struct StateDiscoveryResultSummary {
 
 /// API response for listing discovery results.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct StateDiscoveryResultListResponse {
     /// List of result summaries.
     pub items: Vec<StateDiscoveryResultSummary>,
@@ -344,6 +352,7 @@ pub struct StateDiscoveryResultListResponse {
 /// Request payload to create a state-discovery result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateDiscoveryResultCreate {
     /// Human-readable name.
     pub name: String,
@@ -383,6 +392,7 @@ pub struct StateDiscoveryResultCreate {
 /// All fields optional; only supplied fields are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateDiscoveryResultUpdate {
     /// Human-readable name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -415,6 +425,7 @@ pub struct StateDiscoveryResultUpdate {
 /// `DiscoverySourceType | str` union (enabling imports that predate the enum).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineExport {
     /// Export format version. Defaults to `"1.0.0"`.
     #[serde(default = "default_export_version")]
@@ -447,6 +458,7 @@ pub struct StateMachineExport {
 /// Request payload to import a state machine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StateMachineImport {
     /// The state machine to import.
     pub state_machine: StateMachineExport,

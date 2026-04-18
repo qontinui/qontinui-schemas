@@ -21,5 +21,4 @@ export interface TaskRunFindingsListResponse {
    */
   findings: TaskRunFinding[];
   summary: TaskRunFindingSummary;
-  [k: string]: unknown;
 }

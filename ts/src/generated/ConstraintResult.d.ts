@@ -29,5 +29,4 @@ export interface ConstraintResult {
    * Details about the violation (empty if passed).
    */
   violations: ConstraintViolation[];
-  [k: string]: unknown;
 }

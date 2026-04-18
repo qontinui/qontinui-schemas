@@ -83,5 +83,4 @@ export interface TaskRunBackend {
    * ISO 8601 timestamp when the record was last updated.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }

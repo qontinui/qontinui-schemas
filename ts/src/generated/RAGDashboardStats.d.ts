@@ -23,5 +23,4 @@ export interface RAGDashboardStats {
   total_embeddings: number;
   total_patterns: number;
   total_states: number;
-  [k: string]: unknown;
 }

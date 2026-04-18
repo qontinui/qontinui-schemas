@@ -100,6 +100,7 @@ fn default_timeout_secs() -> u64 {
 /// A constraint definition.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Constraint {
     /// Unique identifier (e.g., `"builtin:no-secrets"`, `"project:no-todos"`).
     #[serde(alias = "id")]
@@ -133,6 +134,7 @@ fn default_true() -> bool {
 /// A specific violation found during constraint evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ConstraintViolation {
     /// File where the violation was found (if applicable).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "file")]
@@ -148,6 +150,7 @@ pub struct ConstraintViolation {
 /// Result of evaluating a single constraint.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ConstraintResult {
     /// The id of the constraint that was evaluated.
     #[serde(alias = "constraint_id")]
@@ -176,6 +179,7 @@ pub struct ConstraintResult {
 /// emits context injection actions. When exceeded, it emits stronger actions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ResourceLimits {
     /// Maximum wall-clock time for the entire workflow (seconds).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_wall_time_secs")]
@@ -203,6 +207,7 @@ pub struct ResourceLimits {
 /// enum's internal tag.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct NewConstraintProposal {
     /// The proposed constraint definition.
     #[serde(alias = "constraint")]
@@ -215,6 +220,7 @@ pub struct NewConstraintProposal {
 /// enum's internal tag.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct BuiltinOverrideProposal {
     /// Builtin suffix (e.g., `"no-secrets"`, `"no-debug-statements"`).
     #[serde(alias = "builtin_suffix")]
@@ -247,6 +253,7 @@ pub enum ConstraintProposal {
 /// Request body for `POST /constraints/validate`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ValidateConfigRequest {
     /// Raw TOML content to validate.
     #[serde(alias = "toml")]
@@ -256,6 +263,7 @@ pub struct ValidateConfigRequest {
 /// Response for `POST /constraints/validate`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ValidateConfigResponse {
     /// Whether the config is fully valid (parseable with no errors or warnings).
     #[serde(alias = "valid")]
@@ -271,6 +279,7 @@ pub struct ValidateConfigResponse {
 /// Response for `GET /constraints/config`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ReadConfigResponse {
     /// Raw TOML content of the `constraints.toml` file (empty string if not found).
     #[serde(alias = "toml")]
@@ -283,6 +292,7 @@ pub struct ReadConfigResponse {
 /// Request body for `POST /constraints/config`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WriteConfigRequest {
     /// Project path for the `constraints.toml`. Defaults to workspace root.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "project_path")]
@@ -295,6 +305,7 @@ pub struct WriteConfigRequest {
 /// Response for `POST /constraints/config`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WriteConfigResponse {
     /// Whether the config is fully valid (parseable with no errors or warnings).
     #[serde(alias = "valid")]

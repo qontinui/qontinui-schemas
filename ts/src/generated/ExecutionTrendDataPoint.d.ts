@@ -33,5 +33,4 @@ export interface ExecutionTrendDataPoint {
    * Total actions executed in the period.
    */
   totalActions: number;
-  [k: string]: unknown;
 }

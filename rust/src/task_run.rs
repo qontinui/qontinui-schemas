@@ -68,6 +68,7 @@ pub enum TaskType {
 /// `?` in TypeScript, so they are omitted on the wire when missing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRun {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -142,6 +143,7 @@ pub struct TaskRun {
 /// are always serialized (including as `null`) to preserve the wire shape.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunBackend {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -203,6 +205,7 @@ pub struct TaskRunBackend {
 /// A single AI session within a task run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunSession {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -317,6 +320,7 @@ pub enum TaskRunFindingActionType {
 /// possibly `null`), so they use `serde(default)` without `skip_serializing_if`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFinding {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -403,6 +407,7 @@ pub type TaskRunFindingResponse = TaskRunFinding;
 /// Aggregated finding counts grouped along each axis.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFindingSummary {
     /// Count of findings by category.
     #[serde(alias = "by_category")]
@@ -446,6 +451,7 @@ pub struct TaskRunBackendDetail {
 /// Request payload for creating a task run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunCreate {
     /// Optional client-generated ID.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "id")]
@@ -489,6 +495,7 @@ pub struct TaskRunCreate {
 /// only those supplied are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunUpdate {
     /// New lifecycle status.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
@@ -519,6 +526,7 @@ pub struct TaskRunUpdate {
 /// Request payload for creating a finding.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFindingCreate {
     /// Optional client-generated ID.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "id")]
@@ -576,6 +584,7 @@ pub struct TaskRunFindingCreate {
 /// Request payload for updating a finding. All fields are optional.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFindingUpdate {
     /// New lifecycle status.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
@@ -601,6 +610,7 @@ pub struct TaskRunFindingUpdate {
 /// Inline `data` payload on a [`RunPromptResponse`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RunPromptResponseData {
     /// AI output text.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "output")]
@@ -613,6 +623,7 @@ pub struct RunPromptResponseData {
 /// Response from the runner's `run_prompt` endpoint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RunPromptResponse {
     /// Whether the prompt was accepted and started successfully.
     #[serde(alias = "success")]
@@ -646,6 +657,7 @@ pub struct RunPromptResponse {
 /// Request body for the runner's `run_prompt` endpoint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RunPromptRequest {
     /// Display name for the task.
     #[serde(alias = "name")]
@@ -686,6 +698,7 @@ pub struct RunPromptRequest {
 /// create-task endpoint).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CreateTaskRunRequest {
     /// Display name.
     #[serde(alias = "task_name")]
@@ -723,6 +736,7 @@ pub struct CreateTaskRunRequest {
 /// Filter parameters for listing task runs.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFilters {
     /// Restrict to a given project.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "project_id")]
@@ -747,6 +761,7 @@ pub struct TaskRunFilters {
 /// Filter parameters for listing findings.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFindingFilters {
     /// Restrict to a given category.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "category")]
@@ -766,6 +781,7 @@ pub struct TaskRunFindingFilters {
 /// Pagination envelope attached to list responses.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Pagination {
     /// Total number of matching records.
     #[serde(alias = "total")]
@@ -784,6 +800,7 @@ pub struct Pagination {
 /// Response for `GET /task-runs`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunListResponse {
     /// Page of matching task runs.
     #[serde(alias = "tasks")]
@@ -796,6 +813,7 @@ pub struct TaskRunListResponse {
 /// Response for `GET /task-runs/{id}/findings`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskRunFindingsListResponse {
     /// Findings for the task run.
     #[serde(alias = "findings")]
@@ -811,6 +829,7 @@ pub struct TaskRunFindingsListResponse {
 /// in Rust we use `TaskRunFinding` directly.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FindingsSummary {
     /// Total number of findings.
     #[serde(alias = "total")]
@@ -836,6 +855,7 @@ pub struct FindingsSummary {
 /// A specific issue detail from an individual verification check.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CheckIssueDetail {
     /// File path where the issue was detected.
     #[serde(alias = "file")]
@@ -863,6 +883,7 @@ pub struct CheckIssueDetail {
 /// Result of a single named verification check (e.g., `"eslint"`, `"mypy"`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct IndividualCheckResult {
     /// Name of the check.
     #[serde(alias = "name")]
@@ -896,6 +917,7 @@ pub struct IndividualCheckResult {
 /// Detailed output captured for a single verification step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationStepDetails {
     /// ID of the step this detail belongs to.
     #[serde(alias = "step_id")]
@@ -961,6 +983,7 @@ pub struct StepExecutionConfig {
 /// Result of a single step within a verification phase.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationStepResult {
     /// Zero-based index of the step within the phase.
     #[serde(alias = "step_index")]
@@ -1006,6 +1029,7 @@ pub struct VerificationStepResult {
 /// Result of evaluating a named gate across a set of steps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct GateEvaluationResult {
     /// Name of the gate.
     #[serde(alias = "gate_name")]
@@ -1030,6 +1054,7 @@ pub struct GateEvaluationResult {
 /// Result of a single iteration of the verification phase.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationPhaseResult {
     /// 1-based iteration index within the workflow run.
     #[serde(alias = "iteration")]
@@ -1069,6 +1094,7 @@ pub struct VerificationPhaseResult {
 /// Response record for a single stored verification result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationResultResponse {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -1111,6 +1137,7 @@ pub struct VerificationResultResponse {
 /// Response for listing verification results for a task run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VerificationResultsListResponse {
     /// ID of the owning task run.
     #[serde(alias = "task_run_id")]

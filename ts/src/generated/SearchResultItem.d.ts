@@ -16,5 +16,4 @@ export interface SearchResultItem {
    * Similarity score (0-1).
    */
   similarity_score: number;
-  [k: string]: unknown;
 }

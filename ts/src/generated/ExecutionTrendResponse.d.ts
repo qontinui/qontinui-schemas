@@ -43,5 +43,4 @@ export interface ExecutionTrendResponse {
    * Start date of the reporting window.
    */
   startDate: string;
-  [k: string]: unknown;
 }

@@ -24,5 +24,4 @@ export interface HttpConfig {
    * `/tools/list` and `/tools/call` to this base.
    */
   url: string;
-  [k: string]: unknown;
 }

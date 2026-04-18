@@ -38,5 +38,4 @@ export interface VerificationResultsListResponse {
    * ID of the owning task run.
    */
   taskRunId: string;
-  [k: string]: unknown;
 }

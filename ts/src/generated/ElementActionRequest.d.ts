@@ -25,5 +25,4 @@ export interface ElementActionRequest {
    * Optional wait conditions to satisfy before executing.
    */
   waitOptions?: WaitOptions | null;
-  [k: string]: unknown;
 }

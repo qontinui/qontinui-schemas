@@ -18,5 +18,4 @@ export interface TaskRunListResponse {
    * Page of matching task runs.
    */
   tasks: TaskRunBackend[];
-  [k: string]: unknown;
 }

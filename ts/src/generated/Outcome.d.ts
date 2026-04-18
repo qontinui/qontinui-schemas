@@ -12,5 +12,4 @@ export interface Outcome {
   error?: string | null;
   retryCount: number;
   success: boolean;
-  [k: string]: unknown;
 }

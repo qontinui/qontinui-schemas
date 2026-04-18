@@ -24,5 +24,4 @@ export interface FindingBatchCreate {
    * Findings to create (1–50 items on the Python side).
    */
   findings: FindingCreate[];
-  [k: string]: unknown;
 }

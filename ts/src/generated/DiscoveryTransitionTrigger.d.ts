@@ -35,5 +35,4 @@ export interface DiscoveryTransitionTrigger {
    * Value for type actions (text input).
    */
   value?: string | null;
-  [k: string]: unknown;
 }

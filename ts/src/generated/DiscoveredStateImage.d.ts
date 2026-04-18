@@ -53,5 +53,4 @@ export interface DiscoveredStateImage {
    * ID of the state this image belongs to.
    */
   stateId?: string | null;
-  [k: string]: unknown;
 }

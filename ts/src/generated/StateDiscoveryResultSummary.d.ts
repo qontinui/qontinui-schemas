@@ -54,5 +54,4 @@ export interface StateDiscoveryResultSummary {
    * Number of transitions.
    */
   transitionCount: number;
-  [k: string]: unknown;
 }

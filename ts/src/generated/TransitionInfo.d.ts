@@ -26,5 +26,4 @@ export interface TransitionInfo {
    * Names of workflows attached to this transition.
    */
   workflows: string[];
-  [k: string]: unknown;
 }

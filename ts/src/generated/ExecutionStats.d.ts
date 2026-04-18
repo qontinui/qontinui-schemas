@@ -53,5 +53,4 @@ export interface ExecutionStats {
    * Aggregate output tokens across all LLM actions.
    */
   totalTokensOutput?: number | null;
-  [k: string]: unknown;
 }

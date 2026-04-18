@@ -56,5 +56,4 @@ export interface ExecutionScreenshotCreate {
    * Image width in pixels.
    */
   width: number;
-  [k: string]: unknown;
 }

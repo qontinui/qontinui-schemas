@@ -73,5 +73,4 @@ export interface ExecutionRunDetail {
    * Workflow metadata, if applicable.
    */
   workflowMetadata?: WorkflowMetadata | null;
-  [k: string]: unknown;
 }

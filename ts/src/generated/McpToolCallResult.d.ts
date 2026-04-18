@@ -35,5 +35,4 @@ export interface McpToolCallResult {
    * Whether the call succeeded.
    */
   success: boolean;
-  [k: string]: unknown;
 }

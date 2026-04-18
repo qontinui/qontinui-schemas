@@ -19,5 +19,4 @@ export interface MatchLocation {
   w?: number | null;
   x: number;
   y: number;
-  [k: string]: unknown;
 }

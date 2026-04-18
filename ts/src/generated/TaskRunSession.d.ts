@@ -37,5 +37,4 @@ export interface TaskRunSession {
    * Parent task run ID.
    */
   taskRunId: string;
-  [k: string]: unknown;
 }

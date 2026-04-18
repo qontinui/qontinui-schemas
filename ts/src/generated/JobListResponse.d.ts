@@ -17,5 +17,4 @@ export interface JobListResponse {
   limit: number;
   page: number;
   total: number;
-  [k: string]: unknown;
 }

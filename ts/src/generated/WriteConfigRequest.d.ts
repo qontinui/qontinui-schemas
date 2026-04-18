@@ -17,5 +17,4 @@ export interface WriteConfigRequest {
    * Raw TOML content to validate and write.
    */
   toml: string;
-  [k: string]: unknown;
 }

@@ -25,5 +25,4 @@ export interface SchedulerSettings {
    * Timezone for schedule interpretation (IANA name). `None` = local time.
    */
   timezone?: string | null;
-  [k: string]: unknown;
 }

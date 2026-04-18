@@ -95,6 +95,7 @@ pub enum ApiContentType {
 /// Extract a named variable from an API response via JSONPath.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ApiVariableExtraction {
     /// Variable name to bind the extracted value to.
     #[serde(alias = "variable_name")]
@@ -132,6 +133,7 @@ pub enum ApiAssertionOperator {
 /// A single assertion evaluated against an API response.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ApiAssertion {
     /// Kind of assertion.
     #[serde(rename = "type", alias = "assertion_type")]
@@ -219,6 +221,7 @@ pub enum VerificationCategoryKind {
 /// DTOs inherited from the TS `BaseStep` interface.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RetrySpec {
     /// Number of retry attempts (`0` = no retries).
     #[serde(alias = "count")]
@@ -238,6 +241,7 @@ pub struct RetrySpec {
 /// stays flat (no nested `"base": { … }` envelope).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct BaseStepFields {
     /// Unique identifier for the step.
     #[serde(alias = "id")]

@@ -30,5 +30,4 @@ export interface FindingUpdate {
    * User's response to a finding requiring input.
    */
   userResponse?: string | null;
-  [k: string]: unknown;
 }

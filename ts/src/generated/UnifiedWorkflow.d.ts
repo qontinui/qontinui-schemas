@@ -393,5 +393,4 @@ export interface UnifiedWorkflow {
    * infers the best architecture based on workflow complexity.
    */
   workflowArchitecture?: WorkflowArchitecture | null;
-  [k: string]: unknown;
 }

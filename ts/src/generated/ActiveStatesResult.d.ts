@@ -29,5 +29,4 @@ export interface ActiveStatesResult {
    * Whether the query succeeded.
    */
   success: boolean;
-  [k: string]: unknown;
 }

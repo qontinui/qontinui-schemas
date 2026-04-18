@@ -17,5 +17,4 @@ export interface ExtendIterationsRequest {
    * Optional guidance for the worker.
    */
   guidance?: string | null;
-  [k: string]: unknown;
 }

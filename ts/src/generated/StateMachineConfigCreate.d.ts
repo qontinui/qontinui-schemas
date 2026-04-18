@@ -17,5 +17,4 @@ export interface StateMachineConfigCreate {
    * Display name.
    */
   name: string;
-  [k: string]: unknown;
 }

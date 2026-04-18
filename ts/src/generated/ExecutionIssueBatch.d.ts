@@ -16,5 +16,4 @@ export interface ExecutionIssueBatch {
    * Issues to record (Python enforces `1..=50`; enforced by the backend).
    */
   issues: ExecutionIssueCreate[];
-  [k: string]: unknown;
 }

@@ -26,5 +26,4 @@ export interface ScheduleConditions {
    * indefinitely.
    */
   timeoutMinutes?: number | null;
-  [k: string]: unknown;
 }

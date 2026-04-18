@@ -44,5 +44,4 @@ export interface TreeEvent {
    * Event type identifier — always `"tree_event"` on the wire.
    */
   type: string;
-  [k: string]: unknown;
 }

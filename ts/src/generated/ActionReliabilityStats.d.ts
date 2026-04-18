@@ -51,5 +51,4 @@ export interface ActionReliabilityStats {
    * Total number of executions observed.
    */
   totalExecutions: number;
-  [k: string]: unknown;
 }

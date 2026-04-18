@@ -140,6 +140,7 @@ pub enum AccessibilityBackend {
 /// Tri-state booleans use `Option<bool>` — `None` means "not applicable."
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AccessibilityState {
     /// Element has keyboard focus.
     #[serde(default, alias = "is_focused")]
@@ -190,6 +191,7 @@ pub struct AccessibilityState {
 /// pixels, typically absolute screen coordinates.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AccessibilityBounds {
     #[serde(alias = "x")]
     pub x: i64,
@@ -212,6 +214,7 @@ pub struct AccessibilityBounds {
 /// identifier for AI-driven automation (e.g., `@e1`, `@e2`).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AccessibilityNode {
     /// Reference ID like `@e1`, `@e2` for AI interaction.
     #[serde(rename = "ref")]
@@ -267,6 +270,7 @@ pub struct AccessibilityNode {
 /// capture source and summary statistics.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AccessibilitySnapshot {
     /// Root node of the accessibility tree.
     #[serde(alias = "root")]
@@ -311,6 +315,7 @@ pub enum RoleCriterion {
 /// AND logic.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AccessibilitySelector {
     /// Match by role (single or list).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "role")]

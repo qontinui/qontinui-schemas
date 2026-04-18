@@ -14,5 +14,4 @@ export interface StateContext {
   activeBefore: string[];
   changed: boolean;
   deactivated: string[];
-  [k: string]: unknown;
 }

@@ -45,5 +45,4 @@ export interface CreateMcpServerInput {
    */
   timeoutSeconds?: number | null;
   transport: McpTransport;
-  [k: string]: unknown;
 }

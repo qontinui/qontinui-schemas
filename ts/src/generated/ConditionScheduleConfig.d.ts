@@ -14,5 +14,4 @@ export interface ConditionScheduleConfig {
    * conditions for another run.
    */
   rearmDelayMinutes: number;
-  [k: string]: unknown;
 }

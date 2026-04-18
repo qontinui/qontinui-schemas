@@ -27,5 +27,4 @@ export interface TreeEventListResponse {
   limit: number;
   offset: number;
   total: number;
-  [k: string]: unknown;
 }

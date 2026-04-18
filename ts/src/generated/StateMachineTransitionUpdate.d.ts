@@ -50,5 +50,4 @@ export interface StateMachineTransitionUpdate {
    * New stays-visible flag.
    */
   stays_visible?: boolean | null;
-  [k: string]: unknown;
 }

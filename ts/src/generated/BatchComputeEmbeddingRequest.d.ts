@@ -24,5 +24,4 @@ export interface BatchComputeEmbeddingRequest {
   images: {
     [k: string]: unknown;
   }[];
-  [k: string]: unknown;
 }

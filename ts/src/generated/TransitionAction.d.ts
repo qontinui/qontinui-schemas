@@ -90,5 +90,4 @@ export interface TransitionAction {
    * Value to select or set (`select` / `setValue` actions).
    */
   value?: TransitionActionValue | null;
-  [k: string]: unknown;
 }

@@ -46,6 +46,7 @@ fn is_empty_string(s: &str) -> bool {
 /// apply to the given `step_type` have their branch fields set to `None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExecutionStep {
     /// Unique identifier for this step.
     #[serde(alias = "id")]
@@ -164,6 +165,7 @@ fn default_auto_include_contexts() -> bool {
 /// surfaces them through Tauri commands and the HTTP API.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct AiWorkflow {
     /// Unique identifier (UUID v4).
     #[serde(alias = "id")]

@@ -20,5 +20,4 @@ export interface StateDiscoveryResultListResponse {
    * Total count of results.
    */
   total: number;
-  [k: string]: unknown;
 }

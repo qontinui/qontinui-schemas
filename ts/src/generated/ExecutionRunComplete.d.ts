@@ -31,5 +31,4 @@ export interface ExecutionRunComplete {
    * Free-form run summary.
    */
   summary?: string | null;
-  [k: string]: unknown;
 }

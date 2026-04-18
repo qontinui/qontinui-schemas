@@ -20,5 +20,4 @@ export interface InitialStateRef {
    * Display name.
    */
   name: string;
-  [k: string]: unknown;
 }

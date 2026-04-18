@@ -27,5 +27,4 @@ export interface ExportResult {
   skipped_count: number;
   success: boolean;
   warnings: string[];
-  [k: string]: unknown;
 }

@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 /// Contains both the origin+size pair (`x`, `y`, `width`, `height`) and the
 /// edge offsets (`top`, `right`, `bottom`, `left`) for consumer convenience.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct ElementRect {
     /// X coordinate of the element's origin (same as `left`).
     pub x: f64,
@@ -65,6 +66,7 @@ pub struct ElementRect {
 /// visibility, interactivity, and form-control value.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ElementState {
     /// Whether the element is currently visible in the viewport.
     pub visible: bool,
@@ -99,6 +101,7 @@ pub struct ElementState {
 /// fields are always present; the named IDs are optional.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ElementIdentifier {
     /// Application-assigned UI Bridge ID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -128,6 +131,7 @@ pub struct ElementIdentifier {
 /// includes identity, available actions, current state, and lifecycle info.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UIBridgeElement {
     /// Unique element ID within the registry.
     pub id: String,
@@ -156,6 +160,7 @@ pub struct UIBridgeElement {
 /// Information about a single action exposed by a UI Bridge component.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ComponentActionInfo {
     /// Unique action identifier within the component.
     pub id: String,
@@ -173,6 +178,7 @@ pub struct ComponentActionInfo {
 /// (e.g. "submit form", "reset filters").
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UIBridgeComponent {
     /// Unique component ID within the registry.
     pub id: String,
@@ -203,6 +209,7 @@ pub struct UIBridgeComponent {
 /// target element reaches a specified visibility/enabled/focused state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WaitOptions {
     /// Wait until the element is visible (or hidden if `false`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -224,6 +231,7 @@ pub struct WaitOptions {
 /// Request to execute an action on a UI Bridge element.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ElementActionRequest {
     /// Action name (e.g. `"click"`, `"type"`, `"select"`).
     pub action: String,
@@ -238,6 +246,7 @@ pub struct ElementActionRequest {
 /// Request to execute an action on a UI Bridge component.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ComponentActionRequest {
     /// Action name.
     pub action: String,
@@ -249,6 +258,7 @@ pub struct ComponentActionRequest {
 /// Response from executing an action on an element or component.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ActionResponse {
     /// Whether the action completed successfully.
     pub success: bool,
@@ -281,6 +291,7 @@ pub struct ActionResponse {
 /// bridge registry.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveryRequest {
     /// CSS selector for the root element to start scanning from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -305,6 +316,7 @@ pub struct DiscoveryRequest {
 /// An element found during a discovery scan.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveredElement {
     /// Unique element ID.
     pub id: String,
@@ -334,6 +346,7 @@ pub struct DiscoveredElement {
 /// Response from a UI Bridge discovery scan.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiscoveryResponse {
     /// Discovered elements matching the request filters.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -353,6 +366,7 @@ pub struct DiscoveryResponse {
 /// Workflow metadata included in a UI Bridge snapshot.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct WorkflowInfo {
     /// Workflow ID.
     pub id: String,
@@ -371,6 +385,7 @@ pub struct WorkflowInfo {
 /// at a single point in time.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UIBridgeSnapshot {
     /// Unix-epoch millisecond timestamp of the snapshot.
     pub timestamp: i64,

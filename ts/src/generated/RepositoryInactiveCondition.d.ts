@@ -21,5 +21,4 @@ export interface RepositoryInactiveCondition {
    * List of repositories to watch. ALL must be inactive simultaneously.
    */
   repositories: RepositoryWatch[];
-  [k: string]: unknown;
 }

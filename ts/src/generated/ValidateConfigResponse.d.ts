@@ -25,5 +25,4 @@ export interface ValidateConfigResponse {
    * Whether the config is fully valid (parseable with no errors or warnings).
    */
   valid: boolean;
-  [k: string]: unknown;
 }

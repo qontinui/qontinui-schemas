@@ -93,5 +93,4 @@ export interface ProcessConfig {
    * ports in each group to be ready before starting the next group.
    */
   startGroup: number;
-  [k: string]: unknown;
 }

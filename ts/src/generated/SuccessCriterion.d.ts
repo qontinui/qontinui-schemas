@@ -54,5 +54,4 @@ export interface SuccessCriterion {
    * Optional weight for partial success scoring.
    */
   weight?: number | null;
-  [k: string]: unknown;
 }

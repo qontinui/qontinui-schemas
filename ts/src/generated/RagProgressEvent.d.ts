@@ -24,5 +24,4 @@ export interface RagProgressEvent {
   project_id: string;
   status: RagProcessingStatus;
   total_elements?: number | null;
-  [k: string]: unknown;
 }

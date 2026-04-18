@@ -84,5 +84,4 @@ export interface OrchestrationLoopConfig {
    * is configured.
    */
   workflowId: string;
-  [k: string]: unknown;
 }

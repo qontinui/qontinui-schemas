@@ -26,5 +26,4 @@ export interface ResolvedInitialStates {
    * Workflow ID when `source == Workflow`.
    */
   workflowId?: string | null;
-  [k: string]: unknown;
 }

@@ -45,5 +45,4 @@ export interface ElementRect {
    * Y coordinate of the element's origin (same as `top`).
    */
   y: number;
-  [k: string]: unknown;
 }

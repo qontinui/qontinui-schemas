@@ -49,5 +49,4 @@ export interface CoverageData {
    * IDs of transitions that were not executed.
    */
   uncoveredTransitions?: string[] | null;
-  [k: string]: unknown;
 }

@@ -32,5 +32,4 @@ export interface SummarizationConfig {
    * Fraction of the token budget (0.0–1.0) at which summarization triggers.
    */
   tokenThresholdPct: number;
-  [k: string]: unknown;
 }

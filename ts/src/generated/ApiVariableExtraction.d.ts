@@ -21,5 +21,4 @@ export interface ApiVariableExtraction {
    * Variable name to bind the extracted value to.
    */
   variableName: string;
-  [k: string]: unknown;
 }

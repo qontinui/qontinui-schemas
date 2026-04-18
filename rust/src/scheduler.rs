@@ -41,6 +41,7 @@ pub enum ScheduleExpression {
 /// Configuration for condition-only schedules.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ConditionScheduleConfig {
     /// Minutes to wait after an execution completes before re-evaluating
     /// conditions for another run.
@@ -68,6 +69,7 @@ fn default_rearm_delay() -> u32 {
 /// AI tasks) before the task may run.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct IdleCondition {
     /// Whether this condition is active.
     #[serde(alias = "enabled")]
@@ -77,6 +79,7 @@ pub struct IdleCondition {
 /// A single repository to monitor for inactivity.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RepositoryWatch {
     /// Path to the repository directory.
     #[serde(alias = "path")]
@@ -91,6 +94,7 @@ pub struct RepositoryWatch {
 /// condition to be met.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct RepositoryInactiveCondition {
     /// Whether this condition is active.
     #[serde(alias = "enabled")]
@@ -103,6 +107,7 @@ pub struct RepositoryInactiveCondition {
 /// Conditions that must ALL be met before task execution.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ScheduleConditions {
     /// Require the runner to be idle.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "require_idle")]
@@ -119,6 +124,7 @@ pub struct ScheduleConditions {
 /// Status of condition checking for a deferred task.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ConditionStatus {
     /// ISO 8601 timestamp when conditions began being evaluated.
     #[serde(alias = "waiting_since")]
@@ -240,6 +246,7 @@ pub enum ScheduledTaskStatus {
 /// Record of a single task execution.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TaskExecutionRecord {
     /// Unique ID for this execution (UUID v4 string).
     #[serde(alias = "execution_id")]
@@ -280,6 +287,7 @@ pub struct TaskExecutionRecord {
 /// (`conditions`, `condition_status`).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ScheduledTask {
     /// Unique identifier (UUID v4 string).
     #[serde(alias = "id")]
@@ -335,6 +343,7 @@ pub struct ScheduledTask {
 /// Global scheduler settings.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct SchedulerSettings {
     /// Whether the scheduler is enabled globally.
     #[serde(default = "default_true", alias = "enabled")]
@@ -373,6 +382,7 @@ impl Default for SchedulerSettings {
 /// API.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct SchedulerStatus {
     /// Whether the scheduler is enabled.
     #[serde(alias = "enabled")]
@@ -391,6 +401,7 @@ pub struct SchedulerStatus {
 /// Minimal description of the next task due to run.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct NextTaskInfo {
     /// Task ID.
     #[serde(alias = "id")]
@@ -410,6 +421,7 @@ pub struct NextTaskInfo {
 /// Request body for creating a new scheduled task.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CreateScheduledTaskRequest {
     /// Display name.
     #[serde(alias = "name")]
@@ -441,6 +453,7 @@ pub struct CreateScheduledTaskRequest {
 /// optional; only those supplied are applied.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UpdateScheduledTaskRequest {
     /// New display name.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]

@@ -38,5 +38,4 @@ export interface CostTrendResponse {
    * Start date of the reporting window.
    */
   startDate: string;
-  [k: string]: unknown;
 }

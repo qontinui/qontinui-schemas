@@ -20,5 +20,4 @@ export interface MatchAdjustment {
   addY?: number | null;
   targetOffset?: Coordinates | null;
   targetPosition?: string | null;
-  [k: string]: unknown;
 }

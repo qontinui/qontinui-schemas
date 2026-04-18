@@ -23,5 +23,4 @@ export interface TerminalExitEvent {
    * ID of the terminal session that exited.
    */
   terminalId: string;
-  [k: string]: unknown;
 }

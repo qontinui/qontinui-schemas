@@ -45,5 +45,4 @@ export interface Monitor {
    * Y position in absolute screen coordinates (can be negative).
    */
   y: number;
-  [k: string]: unknown;
 }

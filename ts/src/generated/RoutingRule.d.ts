@@ -35,5 +35,4 @@ export interface RoutingRule {
    * Temperature override when this rule matches.
    */
   temperature?: number | null;
-  [k: string]: unknown;
 }

@@ -40,5 +40,4 @@ export interface VerificationPlan {
    * Domain assignments for multiple workers.
    */
   workerDomains?: WorkerDomain[] | null;
-  [k: string]: unknown;
 }

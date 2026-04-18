@@ -41,5 +41,4 @@ export interface VerificationResult {
    * Suggestions for fixing (if failed).
    */
   suggestions?: string[];
-  [k: string]: unknown;
 }

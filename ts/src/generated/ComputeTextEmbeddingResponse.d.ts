@@ -29,5 +29,4 @@ export interface ComputeTextEmbeddingResponse {
    * Whether the embedding computation succeeded.
    */
   success: boolean;
-  [k: string]: unknown;
 }

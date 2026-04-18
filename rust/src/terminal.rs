@@ -46,6 +46,7 @@ fn default_page_id() -> String {
 /// fresh from the live `TerminalSession` each time — never persisted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TerminalInfo {
     /// Unique session identifier (UUID v4 minted by the runner).
     #[serde(alias = "id")]
@@ -100,6 +101,7 @@ pub struct TerminalInfo {
 /// field).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TerminalOutputEvent {
     /// ID of the terminal session producing this output.
     #[serde(alias = "terminal_id")]
@@ -120,6 +122,7 @@ pub struct TerminalOutputEvent {
 /// will carry the same value surfaced here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TerminalExitEvent {
     /// ID of the terminal session that exited.
     #[serde(alias = "terminal_id")]

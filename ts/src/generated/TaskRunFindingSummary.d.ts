@@ -31,5 +31,4 @@ export interface TaskRunFindingSummary {
    * Total number of findings.
    */
   total: number;
-  [k: string]: unknown;
 }

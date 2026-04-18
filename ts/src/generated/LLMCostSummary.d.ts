@@ -35,5 +35,4 @@ export interface LLMCostSummary {
    * Total output tokens across all models.
    */
   totalTokensOutput: number;
-  [k: string]: unknown;
 }

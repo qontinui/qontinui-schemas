@@ -74,5 +74,4 @@ export interface McpServerConfig {
    * ISO 8601 last-update timestamp.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }

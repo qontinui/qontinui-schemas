@@ -24,5 +24,4 @@ export interface StageInput {
    * inputs are Critical findings.
    */
   required: boolean;
-  [k: string]: unknown;
 }

@@ -28,5 +28,4 @@ export interface SchedulerStatus {
    * Number of tasks currently running.
    */
   runningTasks: number;
-  [k: string]: unknown;
 }

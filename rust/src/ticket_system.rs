@@ -83,6 +83,7 @@ pub enum TicketState {
 /// key) rather than a runner-assigned UUID.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Ticket {
     /// Provider-assigned external ID (issue number, ticket key, etc.).
     #[serde(alias = "external_id")]
@@ -123,6 +124,7 @@ pub struct Ticket {
 /// A comment on a ticket.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TicketComment {
     /// Provider-assigned comment ID.
     #[serde(alias = "id")]
@@ -154,6 +156,7 @@ pub struct TicketComment {
 /// before returning. See the module-level doc for the full policy.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct TicketProviderConfig {
     /// Which provider this config targets.
     #[serde(alias = "source")]

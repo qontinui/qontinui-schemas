@@ -39,5 +39,4 @@ export interface ExecutionTreeResponse {
   status: NodeStatus;
   totalEvents: number;
   workflowName?: string | null;
-  [k: string]: unknown;
 }

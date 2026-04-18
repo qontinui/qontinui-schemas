@@ -17,5 +17,4 @@ export interface ReflectionFixOutput {
    * Identifier for the error being fixed.
    */
   errorId: string;
-  [k: string]: unknown;
 }

@@ -37,5 +37,4 @@ export interface Finding {
    * Related file paths.
    */
   relatedFiles?: string[];
-  [k: string]: unknown;
 }

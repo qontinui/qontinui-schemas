@@ -50,5 +50,4 @@ export interface IterationVerificationResults {
    * Criteria that failed but were accepted due to overrides.
    */
   overriddenCriteria?: string[];
-  [k: string]: unknown;
 }

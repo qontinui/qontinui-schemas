@@ -46,5 +46,4 @@ export interface EmbeddingItem {
    * ISO 8601 UTC timestamp (`Z` suffix).
    */
   updated_at: string;
-  [k: string]: unknown;
 }

@@ -27,5 +27,4 @@ export interface TextSearchOptions {
   psmMode?: number | null;
   scaleFactor?: number | null;
   whitelistChars?: string | null;
-  [k: string]: unknown;
 }

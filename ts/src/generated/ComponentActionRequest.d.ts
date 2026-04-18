@@ -19,5 +19,4 @@ export interface ComponentActionRequest {
   params?: {
     [k: string]: unknown;
   };
-  [k: string]: unknown;
 }

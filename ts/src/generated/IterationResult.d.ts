@@ -62,5 +62,4 @@ export interface IterationResult {
    * Task-run ID produced by the workflow execution.
    */
   taskRunId: string;
-  [k: string]: unknown;
 }

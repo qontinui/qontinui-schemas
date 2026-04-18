@@ -75,5 +75,4 @@ export interface ExecutionStep {
    * `"action"`, or `"screenshot"`.
    */
   type: string;
-  [k: string]: unknown;
 }

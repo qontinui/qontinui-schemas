@@ -34,5 +34,4 @@ export interface MultiLoopStatus {
    * first error.
    */
   stopAllOnError: boolean;
-  [k: string]: unknown;
 }

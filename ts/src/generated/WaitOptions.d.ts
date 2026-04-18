@@ -32,5 +32,4 @@ export interface WaitOptions {
    * Wait until the element is visible (or hidden if `false`).
    */
   visible?: boolean | null;
-  [k: string]: unknown;
 }

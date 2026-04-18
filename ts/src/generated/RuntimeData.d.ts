@@ -37,5 +37,4 @@ export interface RuntimeData {
   typedText?: string | null;
   workflowName?: string | null;
   workflowStatus?: string | null;
-  [k: string]: unknown;
 }

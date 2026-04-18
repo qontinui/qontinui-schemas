@@ -33,5 +33,4 @@ export interface GateEvaluationResult {
    * IDs of steps the gate required.
    */
   requiredStepIds: string[];
-  [k: string]: unknown;
 }

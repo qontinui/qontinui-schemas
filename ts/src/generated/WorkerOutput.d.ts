@@ -50,5 +50,4 @@ export interface WorkerOutput {
    * Summary of work performed in this iteration.
    */
   workSummary: string;
-  [k: string]: unknown;
 }

@@ -44,5 +44,4 @@ export interface ElementState {
    * Whether the element is currently visible in the viewport.
    */
   visible: boolean;
-  [k: string]: unknown;
 }

@@ -33,5 +33,4 @@ export interface DomainVerificationResult {
    * Workers that contributed to this domain.
    */
   workerIds: string[];
-  [k: string]: unknown;
 }

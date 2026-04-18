@@ -59,5 +59,4 @@ export interface TaskRunCreate {
    * Workflow name to use.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }

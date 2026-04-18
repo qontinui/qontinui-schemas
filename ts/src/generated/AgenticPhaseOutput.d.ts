@@ -47,5 +47,4 @@ export interface AgenticPhaseOutput {
    * Reason why errors are unfixable (if unfixable is true).
    */
   unfixableReason: string | null;
-  [k: string]: unknown;
 }

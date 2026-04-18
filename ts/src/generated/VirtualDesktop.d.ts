@@ -20,5 +20,4 @@ export interface VirtualDesktop {
    * List of all monitors in the virtual desktop.
    */
   monitors: Monitor[];
-  [k: string]: unknown;
 }

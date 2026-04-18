@@ -52,5 +52,4 @@ export interface VerificationStepDetails {
    * ID of the step this detail belongs to.
    */
   stepId: string;
-  [k: string]: unknown;
 }

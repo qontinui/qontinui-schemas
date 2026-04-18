@@ -17,5 +17,4 @@ export interface StateMachineConfigUpdate {
    * New display name.
    */
   name?: string | null;
-  [k: string]: unknown;
 }

@@ -33,5 +33,4 @@ export interface CostTrendDataPoint {
    * Total output tokens for the period.
    */
   tokensOutput: number;
-  [k: string]: unknown;
 }

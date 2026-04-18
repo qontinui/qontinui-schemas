@@ -83,6 +83,7 @@ pub enum McpTransport {
 /// execution-critical. See module-level docs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StdioConfig {
     /// Command to execute (e.g. `"npx"`, `"python"`, `"/usr/local/bin/server"`).
     #[serde(alias = "command")]
@@ -105,6 +106,7 @@ pub struct StdioConfig {
 /// See module-level docs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct HttpConfig {
     /// Server URL (e.g. `"http://localhost:8080/mcp"`). The runner appends
     /// `/tools/list` and `/tools/call` to this base.
@@ -143,6 +145,7 @@ fn default_timeout() -> u64 {
 /// — see their own docs and the module-level security note.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpServerConfig {
     /// Unique identifier (UUID).
     #[serde(alias = "id")]
@@ -210,6 +213,7 @@ pub struct McpServerConfig {
 /// are passed through verbatim from the server.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpToolInputSchema {
     /// JSON Schema `type` (typically `"object"`).
     #[serde(rename = "type", alias = "schema_type")]
@@ -228,6 +232,7 @@ pub struct McpToolInputSchema {
 /// Single tool exposed by an MCP server, as returned by `tools/list`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpToolInfo {
     /// Tool name (the argument passed back on `tools/call`).
     #[serde(alias = "name")]
@@ -250,6 +255,7 @@ pub struct McpToolInfo {
 /// populated only when `connected == true`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpServerStatus {
     /// ID of the server this status refers to.
     #[serde(alias = "server_id")]
@@ -281,6 +287,7 @@ pub struct McpServerStatus {
 /// configs carry secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CreateMcpServerInput {
     /// Display name.
     #[serde(alias = "name")]
@@ -315,6 +322,7 @@ pub struct CreateMcpServerInput {
 /// configs carry secrets.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UpdateMcpServerInput {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
@@ -344,6 +352,7 @@ pub struct UpdateMcpServerInput {
 /// first, then read `content` (on success) or `error` (on failure).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpToolCallResult {
     /// Whether the call succeeded.
     #[serde(alias = "success")]
@@ -375,6 +384,7 @@ pub struct McpToolCallResult {
 /// round-trip through a `Value`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CreateMcpCallInput {
     #[serde(alias = "task_run_id")]
     pub task_run_id: String,
@@ -423,6 +433,7 @@ pub struct CreateMcpCallInput {
 /// timestamp.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpCallRecord {
     #[serde(alias = "id")]
     pub id: String,
@@ -464,6 +475,7 @@ pub struct McpCallRecord {
 /// Result envelope for an `mcp_calls` query scoped to a single task run.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct McpCallsResult {
     /// Task run the query was scoped to.
     #[serde(alias = "task_run_id")]

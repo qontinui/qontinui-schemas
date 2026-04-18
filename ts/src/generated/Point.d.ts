@@ -17,5 +17,4 @@ export interface Point {
    * Vertical offset in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }

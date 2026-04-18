@@ -90,6 +90,7 @@ pub enum OutputStream {
 /// A single line of output from a managed process.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct OutputLine {
     /// ISO 8601 timestamp
     #[serde(alias = "timestamp")]
@@ -129,6 +130,7 @@ fn default_true() -> bool {
 /// through the `processes` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ProcessConfig {
     /// Unique identifier (UUID)
     #[serde(alias = "id")]
@@ -199,6 +201,7 @@ pub struct ProcessConfig {
 /// Derived from runtime state each time it is requested; never persisted.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ProcessStatus {
     #[serde(alias = "id")]
     pub id: String,

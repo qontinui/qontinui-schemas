@@ -44,5 +44,4 @@ export interface TaskRunUpdate {
    * New lifecycle status.
    */
   status?: TaskRunStatus | null;
-  [k: string]: unknown;
 }

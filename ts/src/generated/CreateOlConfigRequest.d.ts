@@ -24,5 +24,4 @@ export interface CreateOlConfigRequest {
    * Human-readable name for the new preset.
    */
   name: string;
-  [k: string]: unknown;
 }

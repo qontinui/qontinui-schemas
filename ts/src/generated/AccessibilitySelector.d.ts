@@ -73,5 +73,4 @@ export interface AccessibilitySelector {
    * Partial value match (contains).
    */
   valueContains?: string | null;
-  [k: string]: unknown;
 }

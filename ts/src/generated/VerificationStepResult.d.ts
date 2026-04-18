@@ -65,5 +65,4 @@ export interface VerificationStepResult {
    * Detailed captured output, if any.
    */
   verificationDetails: VerificationStepDetails | null;
-  [k: string]: unknown;
 }

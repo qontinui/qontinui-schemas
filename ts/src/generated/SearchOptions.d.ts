@@ -30,5 +30,4 @@ export interface SearchOptions {
   similarity?: number | null;
   timeout?: number | null;
   useDefinedRegion?: boolean | null;
-  [k: string]: unknown;
 }

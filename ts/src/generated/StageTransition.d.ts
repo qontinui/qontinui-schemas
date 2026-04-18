@@ -27,5 +27,4 @@ export interface StageTransition {
    * New stage.
    */
   to: string;
-  [k: string]: unknown;
 }

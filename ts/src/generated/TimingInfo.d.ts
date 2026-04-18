@@ -20,5 +20,4 @@ export interface TimingInfo {
    * ISO 8601 timestamp.
    */
   startTime: string;
-  [k: string]: unknown;
 }

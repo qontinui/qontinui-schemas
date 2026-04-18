@@ -37,5 +37,4 @@ export interface NavigationResult {
    * Target state for this navigation branch (if applicable).
    */
   target_state?: string | null;
-  [k: string]: unknown;
 }

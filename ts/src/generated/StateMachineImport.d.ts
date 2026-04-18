@@ -22,5 +22,4 @@ export interface StateMachineImport {
    */
   name?: string | null;
   stateMachine: StateMachineExport;
-  [k: string]: unknown;
 }

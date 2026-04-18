@@ -16,5 +16,4 @@ export interface EmbeddingResultsRequest {
   results: EmbeddingResultItem[];
   successful: number;
   total_processed: number;
-  [k: string]: unknown;
 }

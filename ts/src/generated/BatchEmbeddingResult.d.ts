@@ -20,5 +20,4 @@ export interface BatchEmbeddingResult {
   success: boolean;
   text_description?: string | null;
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }

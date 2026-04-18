@@ -26,5 +26,4 @@ export interface EmbeddingResultItem {
    * Text embedding vector (384 dimensions for all-MiniLM-L6-v2).
    */
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }

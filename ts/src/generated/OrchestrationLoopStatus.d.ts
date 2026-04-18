@@ -56,5 +56,4 @@ export interface OrchestrationLoopStatus {
    * The workflow ID being executed.
    */
   workflowId: string;
-  [k: string]: unknown;
 }

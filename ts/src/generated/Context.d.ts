@@ -47,5 +47,4 @@ export interface Context {
    * Tags for flexible grouping and search.
    */
   tags: string[];
-  [k: string]: unknown;
 }

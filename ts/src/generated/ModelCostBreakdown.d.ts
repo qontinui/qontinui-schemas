@@ -33,5 +33,4 @@ export interface ModelCostBreakdown {
    * Total output tokens for this model.
    */
   tokensOutput: number;
-  [k: string]: unknown;
 }

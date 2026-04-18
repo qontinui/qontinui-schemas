@@ -41,5 +41,4 @@ export interface WorkflowMetadata {
    * Workflow version, if tracked.
    */
   workflowVersion?: string | null;
-  [k: string]: unknown;
 }

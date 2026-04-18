@@ -41,5 +41,4 @@ export interface McpCallsResult {
    * absent.
    */
   totalCount: number;
-  [k: string]: unknown;
 }

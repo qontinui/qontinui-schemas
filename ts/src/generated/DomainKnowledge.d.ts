@@ -26,5 +26,4 @@ export interface DomainKnowledge {
    * Short title / headline.
    */
   title: string;
-  [k: string]: unknown;
 }

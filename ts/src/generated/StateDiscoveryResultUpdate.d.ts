@@ -44,5 +44,4 @@ export interface StateDiscoveryResultUpdate {
    * Updated transitions.
    */
   transitions?: DiscoveredTransition[] | null;
-  [k: string]: unknown;
 }

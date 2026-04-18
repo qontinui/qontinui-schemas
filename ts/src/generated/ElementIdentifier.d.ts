@@ -37,5 +37,4 @@ export interface ElementIdentifier {
    * Full XPath to the element.
    */
   xpath: string;
-  [k: string]: unknown;
 }

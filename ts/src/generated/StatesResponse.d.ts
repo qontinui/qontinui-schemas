@@ -16,5 +16,4 @@ export interface StatesResponse {
    */
   count: number;
   states: StateFilterItem[];
-  [k: string]: unknown;
 }

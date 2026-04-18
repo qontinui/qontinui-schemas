@@ -29,5 +29,4 @@ export interface DiscoveryBoundingBox {
    * Y coordinate of the top-left corner (pixels).
    */
   y: number;
-  [k: string]: unknown;
 }

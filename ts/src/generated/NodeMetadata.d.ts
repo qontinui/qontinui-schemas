@@ -44,5 +44,4 @@ export interface NodeMetadata {
    * Visual-debug image reference (path or URL).
    */
   visualDebugReference?: string | null;
-  [k: string]: unknown;
 }

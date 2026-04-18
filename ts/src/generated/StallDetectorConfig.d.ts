@@ -28,5 +28,4 @@ export interface StallDetectorConfig {
    * Wall-clock seconds without progress before stall is declared.
    */
   stallTimeoutSecs: number;
-  [k: string]: unknown;
 }

@@ -44,6 +44,7 @@ pub enum CoordinateSystem {
 /// [`CoordinateSystem::Screen`] for backward compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Coordinates {
     /// X coordinate (horizontal position).
     #[serde(alias = "x")]
@@ -67,6 +68,7 @@ pub struct Coordinates {
 /// which coordinate system the `x`/`y` are in.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Region {
     /// X coordinate of the top-left corner.
     #[serde(alias = "x")]
@@ -107,6 +109,7 @@ pub enum MonitorPosition {
 /// in the virtual desktop and metadata for UI display.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct Monitor {
     /// OS-assigned monitor index (hardware enumeration order).
     #[serde(alias = "index")]
@@ -152,6 +155,7 @@ fn default_scale_factor() -> f32 {
 /// - Monitors may have gaps between them or different resolutions/DPI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct VirtualDesktop {
     /// List of all monitors in the virtual desktop.
     #[serde(alias = "monitors")]

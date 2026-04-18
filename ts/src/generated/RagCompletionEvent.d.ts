@@ -22,5 +22,4 @@ export interface RagCompletionEvent {
    * Whether sync to the web backend succeeded.
    */
   web_sync_success?: boolean | null;
-  [k: string]: unknown;
 }

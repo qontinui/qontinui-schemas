@@ -36,5 +36,4 @@ export interface Region {
    * Y coordinate of the top-left corner.
    */
   y: number;
-  [k: string]: unknown;
 }

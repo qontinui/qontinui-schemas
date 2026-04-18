@@ -48,6 +48,7 @@ use serde::{Deserialize, Serialize};
 /// compatibility with older presets if the config schema grows new fields.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct OlConfig {
     /// UUID v4 identifier.
     #[serde(alias = "id")]
@@ -75,6 +76,7 @@ pub struct OlConfig {
 /// Request payload for creating a new saved orchestration-loop config.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct CreateOlConfigRequest {
     /// Human-readable name for the new preset.
     #[serde(alias = "name")]
@@ -93,6 +95,7 @@ pub struct CreateOlConfigRequest {
 /// All fields are optional — only those set are applied.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct UpdateOlConfigRequest {
     /// Rename the preset.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
@@ -125,6 +128,7 @@ pub type LoopId = String;
 /// oscillation / runaway-step pattern and forces an exit.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct StallDetectorConfig {
     /// Maximum times the same action may repeat before stall is declared.
     #[serde(alias = "max_repeated_actions")]
@@ -157,6 +161,7 @@ impl Default for StallDetectorConfig {
 /// iterations are compressed into a summary to keep the prompt small.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct SummarizationConfig {
     /// Whether summarization is active.
     #[serde(alias = "enabled")]
@@ -193,6 +198,7 @@ impl Default for SummarizationConfig {
 /// sub-tasks executed in sequence within the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DecomposerConfig {
     /// Whether decomposition is active.
     #[serde(alias = "enabled")]
@@ -250,6 +256,7 @@ fn default_snapshot_max_chars() -> usize {
 /// phases) when `pipeline` is populated.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct OrchestrationLoopConfig {
     /// Target runner port to execute workflows on.
     /// If `None`, targets self (this runner's own port).
@@ -321,6 +328,7 @@ pub struct OrchestrationLoopConfig {
 /// fix cycle.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct PipelineConfig {
     /// Generate the workflow from a description (optional — if absent, the
     /// top-level `workflow_id` is used).
@@ -338,6 +346,7 @@ pub struct PipelineConfig {
 /// Configuration for the build (workflow-generation) phase.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct BuildPhaseConfig {
     /// Human description of the desired workflow.
     #[serde(alias = "description")]
@@ -353,6 +362,7 @@ pub struct BuildPhaseConfig {
 /// Configuration for the implement-fixes phase (Claude CLI).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ImplementFixesConfig {
     /// Model to use (e.g., `"claude-opus-4-6"`). Defaults to `claude-opus-4-6`
     /// when unset.
@@ -372,6 +382,7 @@ pub struct ImplementFixesConfig {
 /// causes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiagnosePhaseConfig {
     /// Assertions to run against the UI after workflow execution.
     /// Each assertion is a JSON object passed to
@@ -418,6 +429,7 @@ pub enum RootCauseCategory {
 /// Result of a single diagnostic evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DiagnosticResult {
     /// Whether all assertions passed and the page is healthy.
     #[serde(alias = "passed")]
@@ -526,6 +538,7 @@ pub enum LoopPhase {
 /// Runtime state of an orchestration loop.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct OrchestrationLoopStatus {
     /// Whether the loop is currently running.
     #[serde(alias = "running")]
@@ -565,6 +578,7 @@ pub struct OrchestrationLoopStatus {
 /// Result of a single iteration.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct IterationResult {
     /// 1-based iteration index.
     #[serde(alias = "iteration")]
@@ -610,6 +624,7 @@ pub struct IterationResult {
 /// Result of evaluating whether the loop should exit.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ExitCheckResult {
     /// Whether the loop should stop after this iteration.
     #[serde(alias = "should_exit")]
@@ -626,6 +641,7 @@ pub struct ExitCheckResult {
 /// Configuration for launching multiple loops at once.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct MultiLoopConfig {
     /// Individual loop configurations, each targeting a different runner.
     #[serde(alias = "loops")]
@@ -638,6 +654,7 @@ pub struct MultiLoopConfig {
 /// A single entry in a multi-loop configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct MultiLoopEntry {
     /// Unique identifier for this loop instance.
     #[serde(alias = "loop_id")]
@@ -653,6 +670,7 @@ pub struct MultiLoopEntry {
 /// Aggregated status across all active loops.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct MultiLoopStatus {
     /// Per-loop status snapshots.
     #[serde(alias = "loops")]
@@ -672,6 +690,7 @@ pub struct MultiLoopStatus {
 /// Status of a single loop instance within a multi-loop.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct LoopInstanceStatus {
     /// Unique identifier for this loop.
     #[serde(alias = "loop_id")]

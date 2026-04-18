@@ -75,5 +75,4 @@ export interface FindingDetail {
    * User's response, if input was requested.
    */
   userResponse?: string | null;
-  [k: string]: unknown;
 }

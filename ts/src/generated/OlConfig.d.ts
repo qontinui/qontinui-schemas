@@ -45,5 +45,4 @@ export interface OlConfig {
    * ISO 8601 last-modified timestamp.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }

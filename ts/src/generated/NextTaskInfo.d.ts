@@ -21,5 +21,4 @@ export interface NextTaskInfo {
    * ISO 8601 timestamp of the next scheduled run.
    */
   nextRun: string;
-  [k: string]: unknown;
 }

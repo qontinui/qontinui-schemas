@@ -22,5 +22,4 @@ export interface ImplementFixesConfig {
    * Timeout in seconds for the fix agent. Defaults to 600 when unset.
    */
   timeoutSecs?: number | null;
-  [k: string]: unknown;
 }

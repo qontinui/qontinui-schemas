@@ -36,5 +36,4 @@ export interface ScreenshotAnnotation {
    * Y coordinate in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }

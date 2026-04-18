@@ -59,5 +59,4 @@ export interface WorkerInstance {
    * Unique identifier for this worker.
    */
   workerId: string;
-  [k: string]: unknown;
 }

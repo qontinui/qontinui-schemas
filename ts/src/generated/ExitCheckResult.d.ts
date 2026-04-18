@@ -17,5 +17,4 @@ export interface ExitCheckResult {
    * Whether the loop should stop after this iteration.
    */
   shouldExit: boolean;
-  [k: string]: unknown;
 }

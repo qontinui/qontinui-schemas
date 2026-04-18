@@ -50,5 +50,4 @@ export interface Ticket {
    * Canonical URL to the ticket in the provider's UI.
    */
   url: string;
-  [k: string]: unknown;
 }

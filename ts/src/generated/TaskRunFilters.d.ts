@@ -35,5 +35,4 @@ export interface TaskRunFilters {
    * Restrict to a given status.
    */
   status?: TaskRunStatus | null;
-  [k: string]: unknown;
 }

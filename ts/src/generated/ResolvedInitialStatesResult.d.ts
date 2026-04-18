@@ -37,5 +37,4 @@ export interface ResolvedInitialStatesResult {
    * Workflow ID (may be empty).
    */
   workflowId: string;
-  [k: string]: unknown;
 }

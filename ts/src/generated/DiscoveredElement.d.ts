@@ -45,5 +45,4 @@ export interface DiscoveredElement {
    * Element type (e.g. `"button"`, `"input"`).
    */
   type: string;
-  [k: string]: unknown;
 }

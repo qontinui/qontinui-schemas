@@ -37,5 +37,4 @@ export interface CheckIssueDetail {
    * Severity label (free-form string from the upstream check).
    */
   severity: string;
-  [k: string]: unknown;
 }
