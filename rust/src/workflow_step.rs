@@ -1277,7 +1277,6 @@ mod tests {
             base: base("swa1", "Save Generated Workflow"),
             artifact_input_path: Some("{{artifact_dir}}/workflow.json".into()),
             artifact_capture_prompts: Some(true),
-            ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "save_workflow_artifact");
@@ -1304,7 +1303,6 @@ mod tests {
         let step = FullRunnerStep::UiBridgeDesignAudit(UiBridgeDesignAuditStep {
             base: base("da1", "Design Audit"),
             timeout_seconds: Some(30),
-            ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "ui_bridge_design_audit");
@@ -1345,7 +1343,6 @@ mod tests {
         let step = FullRunnerStep::DagCancel(DagCancelStep {
             base: base("dc1", "Cancel on Failure"),
             cancel_reason: Some("Build failed".into()),
-            ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "dag_cancel");
@@ -1359,7 +1356,6 @@ mod tests {
             base: base("da1", "Approval Gate"),
             approval_prompt: Some("Approve deployment?".into()),
             timeout_seconds: Some(3600),
-            ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "dag_approval");
@@ -1373,7 +1369,6 @@ mod tests {
             base: base("dl1", "Retry Loop"),
             max_iterations: Some(5),
             loop_condition: Some("not_passing".into()),
-            ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "dag_loop");
