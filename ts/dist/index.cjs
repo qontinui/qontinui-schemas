@@ -71,39 +71,39 @@ var SOURCE_TYPE_COLORS = {
 function toStateDiscoveryResult(data) {
   return {
     id: data.id,
-    project_id: data.project_id,
+    projectId: data.projectId ?? data.project_id,
     name: data.name,
     description: data.description,
-    source_type: data.source_type,
-    source_session_id: data.source_session_id,
-    discovery_strategy: data.discovery_strategy,
+    sourceType: data.sourceType ?? data.source_type,
+    sourceSessionId: data.sourceSessionId ?? data.source_session_id,
+    discoveryStrategy: data.discoveryStrategy ?? data.discovery_strategy,
     images: (data.images || []).map(toDiscoveredStateImage),
     states: (data.states || []).map(toDiscoveredState),
     transitions: (data.transitions || []).map(
       toDiscoveredTransition
     ),
-    element_to_renders: data.element_to_renders || {},
-    image_count: data.image_count,
-    state_count: data.state_count,
-    transition_count: data.transition_count,
-    render_count: data.render_count,
-    unique_element_count: data.unique_element_count,
+    elementToRenders: (data.elementToRenders ?? data.element_to_renders) || {},
+    imageCount: data.imageCount ?? data.image_count,
+    stateCount: data.stateCount ?? data.state_count,
+    transitionCount: data.transitionCount ?? data.transition_count,
+    renderCount: data.renderCount ?? data.render_count,
+    uniqueElementCount: data.uniqueElementCount ?? data.unique_element_count,
     confidence: data.confidence,
-    discovery_metadata: data.discovery_metadata || {},
-    created_at: data.created_at,
-    updated_at: data.updated_at
+    discoveryMetadata: (data.discoveryMetadata ?? data.discovery_metadata) || {},
+    createdAt: data.createdAt ?? data.created_at,
+    updatedAt: data.updatedAt ?? data.updated_at
   };
 }
 function toDiscoveredStateImage(data) {
   const d = data;
   return {
     id: d.id,
-    screenshot_id: d.screenshot_id,
-    screenshot_url: d.screenshot_url,
+    screenshotId: d.screenshotId ?? d.screenshot_id,
+    screenshotUrl: d.screenshotUrl ?? d.screenshot_url,
     bbox: d.bbox,
-    pixel_hash: d.pixel_hash,
-    state_id: d.state_id,
-    element_type: d.element_type,
+    pixelHash: d.pixelHash ?? d.pixel_hash,
+    stateId: d.stateId ?? d.state_id,
+    elementType: d.elementType ?? d.element_type,
     label: d.label,
     confidence: d.confidence ?? 1,
     metadata: d.metadata
@@ -114,9 +114,9 @@ function toDiscoveredState(data) {
   return {
     id: d.id,
     name: d.name,
-    image_ids: d.image_ids || [],
-    render_ids: d.render_ids || [],
-    element_ids: d.element_ids || [],
+    imageIds: (d.imageIds ?? d.image_ids) || [],
+    renderIds: (d.renderIds ?? d.render_ids) || [],
+    elementIds: (d.elementIds ?? d.element_ids) || [],
     confidence: d.confidence ?? 1,
     description: d.description,
     metadata: d.metadata
@@ -127,12 +127,12 @@ function toDiscoveredTransition(data) {
   const trigger = d.trigger;
   return {
     id: d.id,
-    from_state_id: d.from_state_id,
-    to_state_id: d.to_state_id,
+    fromStateId: d.fromStateId ?? d.from_state_id,
+    toStateId: d.toStateId ?? d.to_state_id,
     trigger: trigger ? {
-      type: trigger.type,
-      image_id: trigger.image_id,
-      element_id: trigger.element_id,
+      type: trigger.type ?? "click",
+      imageId: trigger.imageId ?? trigger.image_id,
+      elementId: trigger.elementId ?? trigger.element_id,
       selector: trigger.selector,
       value: trigger.value
     } : void 0,
@@ -143,16 +143,16 @@ function toDiscoveredTransition(data) {
 function toStateDiscoveryResultSummary(data) {
   return {
     id: data.id,
-    project_id: data.project_id,
+    projectId: data.projectId ?? data.project_id,
     name: data.name,
     description: data.description,
-    source_type: data.source_type,
-    discovery_strategy: data.discovery_strategy,
-    image_count: data.image_count,
-    state_count: data.state_count,
-    transition_count: data.transition_count,
+    sourceType: data.sourceType ?? data.source_type,
+    discoveryStrategy: data.discoveryStrategy ?? data.discovery_strategy,
+    imageCount: data.imageCount ?? data.image_count,
+    stateCount: data.stateCount ?? data.state_count,
+    transitionCount: data.transitionCount ?? data.transition_count,
     confidence: data.confidence,
-    created_at: data.created_at
+    createdAt: data.createdAt ?? data.created_at
   };
 }
 

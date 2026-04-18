@@ -144,7 +144,7 @@ interface RunnerMetadata {
   /**
    * CPU description.
    */
-  cpu_info?: string | null;
+  cpuInfo?: string | null;
   /**
    * Arbitrary additional runner context.
    */
@@ -158,7 +158,7 @@ interface RunnerMetadata {
   /**
    * Installed system memory in megabytes.
    */
-  memory_mb?: number | null;
+  memoryMb?: number | null;
   /**
    * Operating system identifier (e.g., `"windows"`, `"macos"`, `"linux"`).
    */
@@ -166,11 +166,11 @@ interface RunnerMetadata {
   /**
    * Semantic version of the runner binary.
    */
-  runner_version: string;
+  runnerVersion: string;
   /**
    * Screen resolution as a free-form string (e.g., `"1920x1080"`).
    */
-  screen_resolution?: string | null;
+  screenResolution?: string | null;
   [k: string]: unknown;
 }
 
@@ -192,7 +192,7 @@ interface WorkflowMetadata {
   /**
    * IDs of the states that are active when the workflow starts.
    */
-  initial_state_ids?: string[] | null;
+  initialStateIds?: string[] | null;
   /**
    * Free-form tags attached to the workflow.
    */
@@ -200,23 +200,23 @@ interface WorkflowMetadata {
   /**
    * Number of states declared by the workflow.
    */
-  total_states?: number | null;
+  totalStates?: number | null;
   /**
    * Number of transitions declared by the workflow.
    */
-  total_transitions?: number | null;
+  totalTransitions?: number | null;
   /**
    * Workflow identifier.
    */
-  workflow_id: string;
+  workflowId: string;
   /**
    * Human-readable workflow name.
    */
-  workflow_name: string;
+  workflowName: string;
   /**
    * Workflow version, if tracked.
    */
-  workflow_version?: string | null;
+  workflowVersion?: string | null;
   [k: string]: unknown;
 }
 
@@ -234,47 +234,47 @@ interface ExecutionStats {
   /**
    * Mean per-action duration, in milliseconds.
    */
-  avg_action_duration_ms?: number | null;
+  avgActionDurationMs?: number | null;
   /**
    * Number of actions with [`ActionStatus::Failed`].
    */
-  failed_actions: number;
+  failedActions: number;
   /**
    * Number of actions that used an LLM.
    */
-  llm_action_count?: number | null;
+  llmActionCount?: number | null;
   /**
    * Number of actions with [`ActionStatus::Skipped`].
    */
-  skipped_actions: number;
+  skippedActions: number;
   /**
    * Number of actions with [`ActionStatus::Success`].
    */
-  successful_actions: number;
+  successfulActions: number;
   /**
    * Number of actions with [`ActionStatus::Timeout`].
    */
-  timeout_actions: number;
+  timeoutActions: number;
   /**
    * Total number of actions executed.
    */
-  total_actions: number;
+  totalActions: number;
   /**
    * Aggregate estimated cost in USD across all LLM actions.
    */
-  total_cost_usd?: number | null;
+  totalCostUsd?: number | null;
   /**
    * Sum of all action durations, in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Aggregate input tokens across all LLM actions.
    */
-  total_tokens_input?: number | null;
+  totalTokensInput?: number | null;
   /**
    * Aggregate output tokens across all LLM actions.
    */
-  total_tokens_output?: number | null;
+  totalTokensOutput?: number | null;
   [k: string]: unknown;
 }
 
@@ -292,43 +292,43 @@ interface CoverageData {
   /**
    * Overall coverage as a percentage in the range `[0.0, 100.0]`.
    */
-  coverage_percentage: number;
+  coveragePercentage: number;
   /**
    * Per-state visit counts, keyed by state ID.
    */
-  state_visit_counts?: {
+  stateVisitCounts?: {
     [k: string]: number;
   } | null;
   /**
    * Number of states visited at least once.
    */
-  states_covered: number;
+  statesCovered: number;
   /**
    * Total number of states in the workflow.
    */
-  total_states: number;
+  totalStates: number;
   /**
    * Total number of transitions in the workflow.
    */
-  total_transitions: number;
+  totalTransitions: number;
   /**
    * Per-transition execution counts, keyed by transition ID.
    */
-  transition_execution_counts?: {
+  transitionExecutionCounts?: {
     [k: string]: number;
   } | null;
   /**
    * Number of transitions executed at least once.
    */
-  transitions_covered: number;
+  transitionsCovered: number;
   /**
    * IDs of states that were not visited.
    */
-  uncovered_states?: string[] | null;
+  uncoveredStates?: string[] | null;
   /**
    * IDs of transitions that were not executed.
    */
-  uncovered_transitions?: string[] | null;
+  uncoveredTransitions?: string[] | null;
   [k: string]: unknown;
 }
 
@@ -346,11 +346,11 @@ interface LLMMetrics {
   /**
    * Estimated cost in USD.
    */
-  cost_usd?: number | null;
+  costUsd?: number | null;
   /**
    * Generation parameters (temperature, max_tokens, etc.).
    */
-  generation_params?: {
+  generationParams?: {
     [k: string]: unknown;
   } | null;
   /**
@@ -364,15 +364,15 @@ interface LLMMetrics {
   /**
    * Input/prompt token count.
    */
-  tokens_input?: number | null;
+  tokensInput?: number | null;
   /**
    * Completion token count.
    */
-  tokens_output?: number | null;
+  tokensOutput?: number | null;
   /**
    * Computed total token count.
    */
-  tokens_total?: number | null;
+  tokensTotal?: number | null;
   [k: string]: unknown;
 }
 
@@ -402,17 +402,17 @@ interface ExecutionRunCreate {
   /**
    * Owning project ID.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Human-readable run name.
    */
-  run_name: string;
-  run_type: RunType$1;
-  runner_metadata: RunnerMetadata;
+  runName: string;
+  runType: RunType$1;
+  runnerMetadata: RunnerMetadata;
   /**
    * Workflow metadata, if the run executes a workflow.
    */
-  workflow_metadata?: WorkflowMetadata | null;
+  workflowMetadata?: WorkflowMetadata | null;
   [k: string]: unknown;
 }
 
@@ -432,28 +432,28 @@ interface ExecutionRunResponse {
   /**
    * Total duration in seconds, if the run has ended.
    */
-  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   /**
    * ISO 8601 timestamp when the run ended, if it has ended.
    */
-  ended_at?: string | null;
+  endedAt?: string | null;
   /**
    * Owning project ID.
    */
-  project_id: string;
+  projectId: string;
   /**
    * Assigned run identifier.
    */
-  run_id: string;
+  runId: string;
   /**
    * Human-readable run name.
    */
-  run_name: string;
-  run_type: RunType$1;
+  runName: string;
+  runType: RunType$1;
   /**
    * ISO 8601 timestamp when the run started.
    */
-  started_at: string;
+  startedAt: string;
   status: RunStatus$1;
   [k: string]: unknown;
 }
@@ -509,54 +509,54 @@ interface ActionExecutionCreate {
   /**
    * Human-readable action name.
    */
-  action_name: string;
-  action_type: ExecutionActionType;
+  actionName: string;
+  actionType: ExecutionActionType;
   /**
    * IDs of states active when the action ran.
    */
-  active_states?: string[] | null;
+  activeStates?: string[] | null;
   /**
    * ISO 8601 timestamp when the action completed.
    */
-  completed_at: string;
+  completedAt: string;
   /**
    * Confidence score of the match in the range `[0.0, 1.0]`.
    */
-  confidence_score?: number | null;
+  confidenceScore?: number | null;
   /**
    * Action duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message if the action failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Captured stack trace, if any.
    */
-  error_stack?: string | null;
+  errorStack?: string | null;
   /**
    * Category of error, if any.
    */
-  error_type?: ErrorType$1 | null;
+  errorType?: ErrorType$1 | null;
   /**
    * Source state ID for state-machine actions.
    */
-  from_state?: string | null;
+  fromState?: string | null;
   /**
    * Opaque input data captured for the action.
    */
-  input_data?: {
+  inputData?: {
     [k: string]: unknown;
   } | null;
   /**
    * LLM token and cost metrics, if the action used an LLM.
    */
-  llm_metrics?: LLMMetrics | null;
+  llmMetrics?: LLMMetrics | null;
   /**
    * Pixel location of the match.
    */
-  match_location?: ExecutionMatchLocation | null;
+  matchLocation?: ExecutionMatchLocation | null;
   /**
    * Opaque additional metadata.
    */
@@ -566,50 +566,50 @@ interface ActionExecutionCreate {
   /**
    * Opaque output data produced by the action.
    */
-  output_data?: {
+  outputData?: {
     [k: string]: unknown;
   } | null;
   /**
    * ID of a parent action, if this is a sub-action.
    */
-  parent_action_id?: string | null;
+  parentActionId?: string | null;
   /**
    * Parent action ID for child actions within a sequence.
    */
-  parent_id?: string | null;
+  parentId?: string | null;
   /**
    * ID of the pattern the action targeted.
    */
-  pattern_id?: string | null;
+  patternId?: string | null;
   /**
    * Human-readable pattern name.
    */
-  pattern_name?: string | null;
+  patternName?: string | null;
   /**
    * ID of a screenshot associated with the action.
    */
-  screenshot_id?: string | null;
+  screenshotId?: string | null;
   /**
    * Zero-based sequence number of the action within the run.
    */
-  sequence_number: number;
+  sequenceNumber: number;
   /**
    * Span type for tracing (e.g., `"llm"`, `"tool"`, `"agent"`).
    */
-  span_type?: string | null;
+  spanType?: string | null;
   /**
    * ISO 8601 timestamp when the action started.
    */
-  started_at: string;
+  startedAt: string;
   status: ActionStatus$1;
   /**
    * Destination state ID for state-machine actions.
    */
-  to_state?: string | null;
+  toState?: string | null;
   /**
    * Trace ID correlating related actions.
    */
-  trace_id?: string | null;
+  traceId?: string | null;
   [k: string]: unknown;
 }
 
@@ -627,7 +627,7 @@ interface ActionExecutionResponse {
   /**
    * Assigned action IDs, in the same order as the submitted batch.
    */
-  action_ids?: string[] | null;
+  actionIds?: string[] | null;
   /**
    * Number of actions recorded.
    */
@@ -635,7 +635,7 @@ interface ActionExecutionResponse {
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }
 
@@ -696,11 +696,11 @@ interface ExecutionScreenshotCreate {
   /**
    * Sequence number of the associated action, if any.
    */
-  action_sequence_number?: number | null;
+  actionSequenceNumber?: number | null;
   /**
    * IDs of states active when the screenshot was taken.
    */
-  active_states?: string[] | null;
+  activeStates?: string[] | null;
   /**
    * Overlaid annotations.
    */
@@ -718,12 +718,12 @@ interface ExecutionScreenshotCreate {
   /**
    * Client-generated screenshot identifier.
    */
-  screenshot_id: string;
-  screenshot_type: ScreenshotType$1;
+  screenshotId: string;
+  screenshotType: ScreenshotType$1;
   /**
    * Sequence number of the screenshot within the run.
    */
-  sequence_number: number;
+  sequenceNumber: number;
   /**
    * State ID active when the screenshot was taken.
    */
@@ -753,27 +753,27 @@ interface ExecutionScreenshotResponse {
   /**
    * File size in bytes.
    */
-  file_size_bytes: number;
+  fileSizeBytes: number;
   /**
    * URL to the full-size image.
    */
-  image_url: string;
+  imageUrl: string;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * Assigned screenshot identifier.
    */
-  screenshot_id: string;
+  screenshotId: string;
   /**
    * URL to a thumbnail image, if generated.
    */
-  thumbnail_url?: string | null;
+  thumbnailUrl?: string | null;
   /**
    * ISO 8601 timestamp when the image was uploaded.
    */
-  uploaded_at: string;
+  uploadedAt: string;
   [k: string]: unknown;
 }
 
@@ -793,11 +793,11 @@ interface ExecutionIssueCreate {
   /**
    * Sequence number of the associated action, if any.
    */
-  action_sequence_number?: number | null;
+  actionSequenceNumber?: number | null;
   /**
    * Actual observed behavior.
    */
-  actual_behavior?: string | null;
+  actualBehavior?: string | null;
   /**
    * Full issue description.
    */
@@ -805,11 +805,11 @@ interface ExecutionIssueCreate {
   /**
    * Expected behavior.
    */
-  expected_behavior?: string | null;
+  expectedBehavior?: string | null;
   /**
    * Free-form issue type label (e.g., `"visual_regression"`, `"flaky"`).
    */
-  issue_type: string;
+  issueType: string;
   /**
    * Opaque additional metadata.
    */
@@ -819,11 +819,11 @@ interface ExecutionIssueCreate {
   /**
    * Steps to reproduce the issue.
    */
-  reproduction_steps?: string[] | null;
+  reproductionSteps?: string[] | null;
   /**
    * IDs of screenshots illustrating the issue.
    */
-  screenshot_ids?: string[] | null;
+  screenshotIds?: string[] | null;
   severity: IssueSeverity$1;
   /**
    * State ID active when the issue was observed.
@@ -850,7 +850,7 @@ interface ExecutionIssueResponse {
   /**
    * Assigned issue IDs, in the same order as the submitted batch.
    */
-  issue_ids?: string[] | null;
+  issueIds?: string[] | null;
   /**
    * Number of issues recorded.
    */
@@ -858,7 +858,7 @@ interface ExecutionIssueResponse {
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   [k: string]: unknown;
 }
 
@@ -882,11 +882,11 @@ interface ExecutionRunComplete {
   /**
    * ISO 8601 timestamp when the run ended.
    */
-  ended_at: string;
+  endedAt: string;
   /**
    * Error message if the run failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   stats: ExecutionStats;
   status: RunStatus$1;
   /**
@@ -916,19 +916,19 @@ interface ExecutionRunCompleteResponse {
   /**
    * Total duration in seconds.
    */
-  duration_seconds: number;
+  durationSeconds: number;
   /**
    * ISO 8601 timestamp when the run ended.
    */
-  ended_at: string;
+  endedAt: string;
   /**
    * Associated run ID.
    */
-  run_id: string;
+  runId: string;
   /**
    * ISO 8601 timestamp when the run started.
    */
-  started_at: string;
+  startedAt: string;
   stats: ExecutionStats;
   status: RunStatus$1;
   [k: string]: unknown;

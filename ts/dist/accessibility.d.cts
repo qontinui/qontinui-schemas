@@ -122,55 +122,55 @@ interface AccessibilityState {
   /**
    * Checkable element's checked state.
    */
-  is_checked?: boolean | null;
+  isChecked?: boolean | null;
   /**
    * Element is disabled / non-interactive.
    */
-  is_disabled: boolean;
+  isDisabled: boolean;
   /**
    * Element content can be edited.
    */
-  is_editable: boolean;
+  isEditable: boolean;
   /**
    * Expandable element's expansion state.
    */
-  is_expanded?: boolean | null;
+  isExpanded?: boolean | null;
   /**
    * Element can receive focus.
    */
-  is_focusable: boolean;
+  isFocusable: boolean;
   /**
    * Element has keyboard focus.
    */
-  is_focused: boolean;
+  isFocused: boolean;
   /**
    * Element is hidden from the accessibility tree.
    */
-  is_hidden: boolean;
+  isHidden: boolean;
   /**
    * Element is a modal dialog.
    */
-  is_modal: boolean;
+  isModal: boolean;
   /**
    * Element allows multiple selections.
    */
-  is_multiselectable: boolean;
+  isMultiselectable: boolean;
   /**
    * Pressable element's pressed state.
    */
-  is_pressed?: boolean | null;
+  isPressed?: boolean | null;
   /**
    * Element is read-only.
    */
-  is_readonly: boolean;
+  isReadonly: boolean;
   /**
    * Element value is required.
    */
-  is_required: boolean;
+  isRequired: boolean;
   /**
    * Selectable element's selection state.
    */
-  is_selected?: boolean | null;
+  isSelected?: boolean | null;
   [k: string]: unknown;
 }
 
@@ -213,7 +213,7 @@ interface AccessibilityNode {
   /**
    * Automation ID / test-ID attribute.
    */
-  automation_id?: string | null;
+  automationId?: string | null;
   /**
    * Bounding rectangle in screen coordinates.
    */
@@ -225,7 +225,7 @@ interface AccessibilityNode {
   /**
    * CSS class name or control class.
    */
-  class_name?: string | null;
+  className?: string | null;
   /**
    * Accessible description (additional context).
    */
@@ -233,11 +233,11 @@ interface AccessibilityNode {
   /**
    * HTML tag name (for web elements).
    */
-  html_tag?: string | null;
+  htmlTag?: string | null;
   /**
    * Whether the element accepts user interaction.
    */
-  is_interactive: boolean;
+  isInteractive: boolean;
   /**
    * Hierarchical level (for headings, tree items).
    */
@@ -286,7 +286,7 @@ interface AccessibilitySnapshot {
   /**
    * Number of interactive nodes.
    */
-  interactive_nodes: number;
+  interactiveNodes: number;
   root: AccessibilityNode;
   /**
    * Unix timestamp of capture.
@@ -299,7 +299,7 @@ interface AccessibilitySnapshot {
   /**
    * Total number of nodes in the tree.
    */
-  total_nodes: number;
+  totalNodes: number;
   /**
    * Page URL (for web targets).
    */
@@ -346,27 +346,27 @@ interface AccessibilitySelector {
   /**
    * Match by automation / test ID.
    */
-  automation_id?: string | null;
+  automationId?: string | null;
   /**
    * Whether string matching is case-sensitive.
    */
-  case_sensitive: boolean;
+  caseSensitive: boolean;
   /**
    * Match by CSS / control class name.
    */
-  class_name?: string | null;
+  className?: string | null;
   /**
    * Match by HTML tag name.
    */
-  html_tag?: string | null;
+  htmlTag?: string | null;
   /**
    * Filter by interactivity.
    */
-  is_interactive?: boolean | null;
+  isInteractive?: boolean | null;
   /**
    * Maximum tree depth to search.
    */
-  max_depth?: number | null;
+  maxDepth?: number | null;
   /**
    * Exact name match.
    */
@@ -374,11 +374,11 @@ interface AccessibilitySelector {
   /**
    * Partial name match (contains).
    */
-  name_contains?: string | null;
+  nameContains?: string | null;
   /**
    * Regex pattern for name matching.
    */
-  name_pattern?: string | null;
+  namePattern?: string | null;
   /**
    * Match by role (single or list).
    */
@@ -394,7 +394,7 @@ interface AccessibilitySelector {
   /**
    * Partial value match (contains).
    */
-  value_contains?: string | null;
+  valueContains?: string | null;
   [k: string]: unknown;
 }
 

@@ -41,27 +41,27 @@ interface TaskRun {
   /**
    * Whether the task will auto-continue into another session on exit.
    */
-  auto_continue: boolean;
+  autoContinue: boolean;
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at?: string | null;
+  completedAt?: string | null;
   /**
    * ID of the workflow config used to run this task, if any.
    */
-  config_id?: string | null;
+  configId?: string | null;
   /**
    * ISO 8601 timestamp when the task was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Error message if the task failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Whether the task's goal was achieved (AI assessment).
    */
-  goal_achieved?: boolean | null;
+  goalAchieved?: boolean | null;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -69,11 +69,11 @@ interface TaskRun {
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Accumulated output log for the task run.
    */
-  output_log: string;
+  outputLog: string;
   /**
    * Original prompt text, if applicable.
    */
@@ -81,11 +81,11 @@ interface TaskRun {
   /**
    * Description of any remaining work (AI assessment).
    */
-  remaining_work?: string | null;
+  remainingWork?: string | null;
   /**
    * Number of AI sessions that have been run.
    */
-  sessions_count: number;
+  sessionsCount: number;
   status: TaskRunStatus;
   /**
    * AI-generated summary of the task run.
@@ -94,20 +94,20 @@ interface TaskRun {
   /**
    * ISO 8601 timestamp when the summary was generated.
    */
-  summary_generated_at?: string | null;
+  summaryGeneratedAt?: string | null;
   /**
    * Display name of the task.
    */
-  task_name: string;
-  task_type: TaskType;
+  taskName: string;
+  taskType: TaskType;
   /**
    * ISO 8601 timestamp when the task record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   /**
    * Name of the workflow used to run this task, if any.
    */
-  workflow_name?: string | null;
+  workflowName?: string | null;
   [k: string]: unknown;
 }
 
@@ -134,31 +134,31 @@ interface TaskRunBackend {
   /**
    * Whether the task will auto-continue into another session on exit.
    */
-  auto_continue: boolean;
+  autoContinue: boolean;
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at: string | null;
+  completedAt: string | null;
   /**
    * ISO 8601 timestamp when the task was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * User who created the task run, if known.
    */
-  created_by_user_id: string | null;
+  createdByUserId: string | null;
   /**
    * Total duration in seconds.
    */
-  duration_seconds: number | null;
+  durationSeconds: number | null;
   /**
    * Error message if the task failed.
    */
-  error_message: string | null;
+  errorMessage: string | null;
   /**
    * Whether the full output log was persisted.
    */
-  full_output_stored: boolean;
+  fullOutputStored: boolean;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -166,15 +166,15 @@ interface TaskRunBackend {
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions: number | null;
+  maxSessions: number | null;
   /**
    * Short summary of the run output, if stored.
    */
-  output_summary: string | null;
+  outputSummary: string | null;
   /**
    * Owning project ID, if scoped to a project.
    */
-  project_id: string | null;
+  projectId: string | null;
   /**
    * Original prompt text.
    */
@@ -182,20 +182,20 @@ interface TaskRunBackend {
   /**
    * Runner instance that executed the task, if known.
    */
-  runner_id: string | null;
+  runnerId: string | null;
   /**
    * Number of AI sessions that have been run.
    */
-  sessions_count: number;
+  sessionsCount: number;
   status: TaskRunStatus;
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }
 
@@ -213,11 +213,11 @@ interface TaskRunSession {
   /**
    * Duration of the session in seconds.
    */
-  duration_seconds: number | null;
+  durationSeconds: number | null;
   /**
    * ISO 8601 timestamp when the session ended.
    */
-  ended_at: string | null;
+  endedAt: string | null;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -225,19 +225,19 @@ interface TaskRunSession {
   /**
    * Short summary of the session output, if stored.
    */
-  output_summary: string | null;
+  outputSummary: string | null;
   /**
    * 1-based session index within the parent task run.
    */
-  session_number: number;
+  sessionNumber: number;
   /**
    * ISO 8601 timestamp when the session started.
    */
-  started_at: string;
+  startedAt: string;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   [k: string]: unknown;
 }
 
@@ -318,16 +318,16 @@ type TaskRunFindingActionType = "auto_fix" | "needs_user_input" | "manual" | "in
  * possibly `null`), so they use `serde(default)` without `skip_serializing_if`.
  */
 interface TaskRunFinding {
-  action_type: TaskRunFindingActionType;
+  actionType: TaskRunFindingActionType;
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
    */
-  code_snippet: string | null;
+  codeSnippet: string | null;
   /**
    * Column number where the issue was found.
    */
-  column_number: number | null;
+  columnNumber: number | null;
   /**
    * Full description.
    */
@@ -335,15 +335,15 @@ interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the finding was detected.
    */
-  detected_at: string;
+  detectedAt: string;
   /**
    * Session number in which the finding was detected.
    */
-  detected_in_session: number;
+  detectedInSession: number;
   /**
    * File path where the issue was found.
    */
-  file_path: string | null;
+  filePath: string | null;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -351,15 +351,15 @@ interface TaskRunFinding {
   /**
    * Suggested response options for the user, if input is needed.
    */
-  input_options: string[] | null;
+  inputOptions: string[] | null;
   /**
    * Line number where the issue was found.
    */
-  line_number: number | null;
+  lineNumber: number | null;
   /**
    * Whether this finding requires user input.
    */
-  needs_input: boolean;
+  needsInput: boolean;
   /**
    * Question posed to the user, if input is needed.
    */
@@ -371,21 +371,21 @@ interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the finding was resolved.
    */
-  resolved_at: string | null;
+  resolvedAt: string | null;
   /**
    * Session number in which the finding was resolved.
    */
-  resolved_in_session: number | null;
+  resolvedInSession: number | null;
   severity: TaskRunFindingSeverity;
   /**
    * Hash used to deduplicate findings across runs.
    */
-  signature_hash: string | null;
+  signatureHash: string | null;
   status: TaskRunFindingStatus;
   /**
    * Parent task run ID.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Short human-readable title.
    */
@@ -393,11 +393,11 @@ interface TaskRunFinding {
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   /**
    * The user's response, if any.
    */
-  user_response: string | null;
+  userResponse: string | null;
   [k: string]: unknown;
 }
 
@@ -415,19 +415,19 @@ interface TaskRunFindingSummary {
   /**
    * Count of findings by category.
    */
-  by_category: {
+  byCategory: {
     [k: string]: number;
   };
   /**
    * Count of findings by severity.
    */
-  by_severity: {
+  bySeverity: {
     [k: string]: number;
   };
   /**
    * Count of findings by status.
    */
-  by_status: {
+  byStatus: {
     [k: string]: number;
   };
   /**
@@ -456,28 +456,28 @@ interface TaskRunBackendDetail {
   /**
    * Whether the task will auto-continue into another session on exit.
    */
-  auto_continue: boolean;
+  autoContinue: boolean;
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at: string | null;
+  completedAt: string | null;
   /**
    * ISO 8601 timestamp when the task was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * User who created the task run, if known.
    */
-  created_by_user_id: string | null;
+  createdByUserId: string | null;
   /**
    * Total duration in seconds.
    */
-  duration_seconds: number | null;
+  durationSeconds: number | null;
   /**
    * Error message if the task failed.
    */
-  error_message: string | null;
-  finding_summary: TaskRunFindingSummary;
+  errorMessage: string | null;
+  findingSummary: TaskRunFindingSummary;
   /**
    * Findings surfaced during this task run.
    */
@@ -485,7 +485,7 @@ interface TaskRunBackendDetail {
   /**
    * Whether the full output log was persisted.
    */
-  full_output_stored: boolean;
+  fullOutputStored: boolean;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -493,15 +493,15 @@ interface TaskRunBackendDetail {
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions: number | null;
+  maxSessions: number | null;
   /**
    * Short summary of the run output, if stored.
    */
-  output_summary: string | null;
+  outputSummary: string | null;
   /**
    * Owning project ID, if scoped to a project.
    */
-  project_id: string | null;
+  projectId: string | null;
   /**
    * Original prompt text.
    */
@@ -509,7 +509,7 @@ interface TaskRunBackendDetail {
   /**
    * Runner instance that executed the task, if known.
    */
-  runner_id: string | null;
+  runnerId: string | null;
   /**
    * AI sessions associated with this task run.
    */
@@ -517,16 +517,16 @@ interface TaskRunBackendDetail {
   /**
    * Number of AI sessions that have been run.
    */
-  sessions_count: number;
+  sessionsCount: number;
   status: TaskRunStatus;
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * ISO 8601 timestamp when the record was last updated.
    */
-  updated_at: string;
+  updatedAt: string;
   [k: string]: unknown;
 }
 
@@ -546,15 +546,15 @@ interface TaskRunCreate {
   /**
    * Whether the task should auto-continue.
    */
-  auto_continue?: boolean | null;
+  autoContinue?: boolean | null;
   /**
    * Workflow config ID to use.
    */
-  config_id?: string | null;
+  configId?: string | null;
   /**
    * Serialized execution steps, if provided ad-hoc.
    */
-  execution_steps_json?: string | null;
+  executionStepsJson?: string | null;
   /**
    * Optional client-generated ID.
    */
@@ -562,15 +562,15 @@ interface TaskRunCreate {
   /**
    * Serialized log-sources configuration.
    */
-  log_sources_json?: string | null;
+  logSourcesJson?: string | null;
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Optional owning project.
    */
-  project_id?: string | null;
+  projectId?: string | null;
   /**
    * Prompt text, if applicable.
    */
@@ -578,19 +578,19 @@ interface TaskRunCreate {
   /**
    * Optional runner that will execute the task.
    */
-  runner_id?: string | null;
+  runnerId?: string | null;
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * Task type.
    */
-  task_type?: TaskType | null;
+  taskType?: TaskType | null;
   /**
    * Workflow name to use.
    */
-  workflow_name?: string | null;
+  workflowName?: string | null;
   [k: string]: unknown;
 }
 
@@ -611,31 +611,31 @@ interface TaskRunUpdate {
   /**
    * ISO 8601 timestamp when the task completed.
    */
-  completed_at?: string | null;
+  completedAt?: string | null;
   /**
    * Total duration in seconds.
    */
-  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   /**
    * Error message to attach.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Full output log to persist.
    */
-  full_output?: string | null;
+  fullOutput?: string | null;
   /**
    * Whether the full output log has been stored.
    */
-  full_output_stored?: boolean | null;
+  fullOutputStored?: boolean | null;
   /**
    * Updated output summary.
    */
-  output_summary?: string | null;
+  outputSummary?: string | null;
   /**
    * Updated session count.
    */
-  sessions_count?: number | null;
+  sessionsCount?: number | null;
   /**
    * New lifecycle status.
    */
@@ -659,16 +659,16 @@ interface TaskRunFindingCreate {
   /**
    * Action type (defaults server-side if omitted).
    */
-  action_type?: TaskRunFindingActionType | null;
+  actionType?: TaskRunFindingActionType | null;
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
    */
-  code_snippet?: string | null;
+  codeSnippet?: string | null;
   /**
    * Column number where the issue was found.
    */
-  column_number?: number | null;
+  columnNumber?: number | null;
   /**
    * Full description.
    */
@@ -676,11 +676,11 @@ interface TaskRunFindingCreate {
   /**
    * Session number in which the finding was detected.
    */
-  detected_in_session: number;
+  detectedInSession: number;
   /**
    * File path where the issue was found.
    */
-  file_path?: string | null;
+  filePath?: string | null;
   /**
    * Optional client-generated ID.
    */
@@ -688,15 +688,15 @@ interface TaskRunFindingCreate {
   /**
    * Suggested response options for the user.
    */
-  input_options?: string[] | null;
+  inputOptions?: string[] | null;
   /**
    * Line number where the issue was found.
    */
-  line_number?: number | null;
+  lineNumber?: number | null;
   /**
    * Whether this finding requires user input.
    */
-  needs_input?: boolean | null;
+  needsInput?: boolean | null;
   /**
    * Question to pose to the user, if input is needed.
    */
@@ -709,7 +709,7 @@ interface TaskRunFindingCreate {
   /**
    * Deduplication hash.
    */
-  signature_hash?: string | null;
+  signatureHash?: string | null;
   /**
    * Initial status (defaults server-side if omitted).
    */
@@ -741,11 +741,11 @@ interface TaskRunFindingUpdate {
   /**
    * ISO 8601 timestamp of resolution.
    */
-  resolved_at?: string | null;
+  resolvedAt?: string | null;
   /**
    * Session number in which the finding was resolved.
    */
-  resolved_in_session?: number | null;
+  resolvedInSession?: number | null;
   /**
    * New lifecycle status.
    */
@@ -753,7 +753,7 @@ interface TaskRunFindingUpdate {
   /**
    * User response, if the finding needed input.
    */
-  user_response?: string | null;
+  userResponse?: string | null;
   [k: string]: unknown;
 }
 
@@ -803,7 +803,7 @@ interface RunPromptResponse {
   /**
    * Path to the log file for the session.
    */
-  log_file?: string | null;
+  logFile?: string | null;
   /**
    * Immediate output if the call ran synchronously.
    */
@@ -815,11 +815,11 @@ interface RunPromptResponse {
   /**
    * ID of the created AI session, if any.
    */
-  session_id?: string | null;
+  sessionId?: string | null;
   /**
    * Path to the state file tracking the session.
    */
-  state_file?: string | null;
+  stateFile?: string | null;
   /**
    * Whether the prompt was accepted and started successfully.
    */
@@ -827,7 +827,7 @@ interface RunPromptResponse {
   /**
    * ID of the created task run, if any.
    */
-  task_run_id?: string | null;
+  taskRunId?: string | null;
   [k: string]: unknown;
 }
 
@@ -853,23 +853,23 @@ interface RunPromptRequest {
   /**
    * Display-only version of the prompt (shown in the UI).
    */
-  display_prompt?: string | null;
+  displayPrompt?: string | null;
   /**
    * Attached image paths.
    */
-  image_paths?: string[] | null;
+  imagePaths?: string[] | null;
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Cap on trace screenshots to include.
    */
-  max_trace_screenshots?: number | null;
+  maxTraceScreenshots?: number | null;
   /**
    * Cap on video frames to extract for the prompt.
    */
-  max_video_frames?: number | null;
+  maxVideoFrames?: number | null;
   /**
    * Display name for the task.
    */
@@ -877,15 +877,15 @@ interface RunPromptRequest {
   /**
    * Hard timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   /**
    * Optional path to a trace file.
    */
-  trace_path?: string | null;
+  tracePath?: string | null;
   /**
    * Attached video paths.
    */
-  video_paths?: string[] | null;
+  videoPaths?: string[] | null;
   [k: string]: unknown;
 }
 
@@ -906,23 +906,23 @@ interface CreateTaskRunRequest {
   /**
    * Whether the task should auto-continue.
    */
-  auto_continue?: boolean | null;
+  autoContinue?: boolean | null;
   /**
    * Workflow config ID to use.
    */
-  config_id?: string | null;
+  configId?: string | null;
   /**
    * Serialized execution steps, if provided ad-hoc.
    */
-  execution_steps_json?: string | null;
+  executionStepsJson?: string | null;
   /**
    * Serialized log-sources configuration.
    */
-  log_sources_json?: string | null;
+  logSourcesJson?: string | null;
   /**
    * Optional cap on AI sessions.
    */
-  max_sessions?: number | null;
+  maxSessions?: number | null;
   /**
    * Prompt text, if applicable.
    */
@@ -930,15 +930,15 @@ interface CreateTaskRunRequest {
   /**
    * Display name.
    */
-  task_name: string;
+  taskName: string;
   /**
    * Task type.
    */
-  task_type?: TaskType | null;
+  taskType?: TaskType | null;
   /**
    * Workflow name to use.
    */
-  workflow_name?: string | null;
+  workflowName?: string | null;
   [k: string]: unknown;
 }
 
@@ -958,7 +958,7 @@ interface TaskRunFilters {
   /**
    * Include only runs before this ISO 8601 timestamp.
    */
-  end_date?: string | null;
+  endDate?: string | null;
   /**
    * Pagination limit.
    */
@@ -970,11 +970,11 @@ interface TaskRunFilters {
   /**
    * Restrict to a given project.
    */
-  project_id?: string | null;
+  projectId?: string | null;
   /**
    * Include only runs after this ISO 8601 timestamp.
    */
-  start_date?: string | null;
+  startDate?: string | null;
   /**
    * Restrict to a given status.
    */
@@ -1024,7 +1024,7 @@ interface Pagination {
   /**
    * Whether additional records are available after this page.
    */
-  has_more: boolean;
+  hasMore: boolean;
   /**
    * Maximum number of records returned per page.
    */
@@ -1101,19 +1101,19 @@ interface FindingsSummary {
   /**
    * Count by category.
    */
-  by_category: {
+  byCategory: {
     [k: string]: number;
   };
   /**
    * Count by severity.
    */
-  by_severity: {
+  bySeverity: {
     [k: string]: number;
   };
   /**
    * Count by status.
    */
-  by_status: {
+  byStatus: {
     [k: string]: number;
   };
   /**
@@ -1185,15 +1185,15 @@ interface IndividualCheckResult {
   /**
    * How long the check took, in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * Error message, if the check itself failed to run.
    */
-  error_message: string | null;
+  errorMessage: string | null;
   /**
    * Number of files the check inspected.
    */
-  files_checked: number;
+  filesChecked: number;
   /**
    * Specific issue details.
    */
@@ -1201,11 +1201,11 @@ interface IndividualCheckResult {
   /**
    * Number of issues auto-fixed by this check.
    */
-  issues_fixed: number;
+  issuesFixed: number;
   /**
    * Number of issues surfaced by this check.
    */
-  issues_found: number;
+  issuesFound: number;
   /**
    * Name of the check.
    */
@@ -1237,27 +1237,27 @@ interface VerificationStepDetails {
   /**
    * Number of assertions that passed.
    */
-  assertions_passed: number | null;
+  assertionsPassed: number | null;
   /**
    * Total number of assertions.
    */
-  assertions_total: number | null;
+  assertionsTotal: number | null;
   /**
    * Results of individual named checks (e.g., lint, type, test).
    */
-  check_results: IndividualCheckResult[] | null;
+  checkResults: IndividualCheckResult[] | null;
   /**
    * Captured browser/console output.
    */
-  console_output: string | null;
+  consoleOutput: string | null;
   /**
    * Exit code of the spawned process.
    */
-  exit_code: number | null;
+  exitCode: number | null;
   /**
    * Captured page snapshot (HTML or serialized representation).
    */
-  page_snapshot: string | null;
+  pageSnapshot: string | null;
   /**
    * Phase the step belongs to (e.g., `"setup"`, `"verification"`).
    */
@@ -1273,7 +1273,7 @@ interface VerificationStepDetails {
   /**
    * ID of the step this detail belongs to.
    */
-  step_id: string;
+  stepId: string;
   [k: string]: unknown;
 }
 
@@ -1295,23 +1295,23 @@ interface StepExecutionConfig {
   /**
    * Action type (e.g., click, type, wait).
    */
-  action_type?: string | null;
+  actionType?: string | null;
   /**
    * Check type for verification steps.
    */
-  check_type?: string | null;
+  checkType?: string | null;
   /**
    * Target image ID, if the action references an image.
    */
-  target_image_id?: string | null;
+  targetImageId?: string | null;
   /**
    * Target image name, if the action references an image.
    */
-  target_image_name?: string | null;
+  targetImageName?: string | null;
   /**
    * Timeout in seconds.
    */
-  timeout_seconds?: number | null;
+  timeoutSeconds?: number | null;
   [k: string]: unknown;
 }
 
@@ -1332,11 +1332,11 @@ interface VerificationStepResult {
   /**
    * Step duration in milliseconds.
    */
-  duration_ms: number;
+  durationMs: number;
   /**
    * ISO 8601 timestamp when the step ended.
    */
-  ended_at: string | null;
+  endedAt: string | null;
   /**
    * Error message if the step failed.
    */
@@ -1344,33 +1344,33 @@ interface VerificationStepResult {
   /**
    * Arbitrary structured output produced by the step.
    */
-  output_data: {
+  outputData: {
     [k: string]: unknown;
   } | null;
   /**
    * Path to a screenshot captured for the step.
    */
-  screenshot_path: string | null;
+  screenshotPath: string | null;
   /**
    * ISO 8601 timestamp when the step started.
    */
-  started_at: string | null;
+  startedAt: string | null;
   /**
    * ID of the step, if assigned.
    */
-  step_id: string | null;
+  stepId: string | null;
   /**
    * Zero-based index of the step within the phase.
    */
-  step_index: number;
+  stepIndex: number;
   /**
    * Display name of the step.
    */
-  step_name: string;
+  stepName: string;
   /**
    * Free-form step type label.
    */
-  step_type: string;
+  stepType: string;
   /**
    * Whether the step succeeded.
    */
@@ -1378,7 +1378,7 @@ interface VerificationStepResult {
   /**
    * Detailed captured output, if any.
    */
-  verification_details: VerificationStepDetails | null;
+  verificationDetails: VerificationStepDetails | null;
   [k: string]: unknown;
 }
 
@@ -1396,15 +1396,15 @@ interface GateEvaluationResult {
   /**
    * IDs of required steps that failed.
    */
-  failed_step_ids: string[];
+  failedStepIds: string[];
   /**
    * Name of the gate.
    */
-  gate_name: string;
+  gateName: string;
   /**
    * IDs of required steps that were missing.
    */
-  missing_step_ids: string[];
+  missingStepIds: string[];
   /**
    * Whether the gate passed overall.
    */
@@ -1412,11 +1412,11 @@ interface GateEvaluationResult {
   /**
    * IDs of required steps that passed.
    */
-  passed_step_ids: string[];
+  passedStepIds: string[];
   /**
    * IDs of steps the gate required.
    */
-  required_step_ids: string[];
+  requiredStepIds: string[];
   [k: string]: unknown;
 }
 
@@ -1436,23 +1436,23 @@ interface VerificationPhaseResult {
   /**
    * Whether all steps passed.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * Whether a critical step failure short-circuited the phase.
    */
-  critical_failure: boolean;
+  criticalFailure: boolean;
   /**
    * Number of steps that failed.
    */
-  failed_steps: number;
+  failedSteps: number;
   /**
    * Whether pass/fail is determined by gates rather than overall step counts.
    */
-  gate_based_evaluation: boolean;
+  gateBasedEvaluation: boolean;
   /**
    * Per-gate evaluation results.
    */
-  gate_results: GateEvaluationResult[];
+  gateResults: GateEvaluationResult[];
   /**
    * 1-based iteration index within the workflow run.
    */
@@ -1460,23 +1460,23 @@ interface VerificationPhaseResult {
   /**
    * Number of steps that passed.
    */
-  passed_steps: number;
+  passedSteps: number;
   /**
    * Number of steps that were skipped.
    */
-  skipped_steps: number;
+  skippedSteps: number;
   /**
    * Per-step results.
    */
-  step_results: VerificationStepResult[];
+  stepResults: VerificationStepResult[];
   /**
    * Total duration of the phase in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Total number of steps executed.
    */
-  total_steps: number;
+  totalSteps: number;
   [k: string]: unknown;
 }
 
@@ -1496,19 +1496,19 @@ interface VerificationResultResponse {
   /**
    * Whether all steps passed.
    */
-  all_passed: boolean;
+  allPassed: boolean;
   /**
    * ISO 8601 timestamp when the record was created.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Whether a critical step failure short-circuited the phase.
    */
-  critical_failure: boolean;
+  criticalFailure: boolean;
   /**
    * Number of steps that failed.
    */
-  failed_steps: number;
+  failedSteps: number;
   /**
    * Unique identifier (UUID v4 string).
    */
@@ -1520,24 +1520,24 @@ interface VerificationResultResponse {
   /**
    * Number of steps that passed.
    */
-  passed_steps: number;
-  result_json: VerificationPhaseResult;
+  passedSteps: number;
+  resultJson: VerificationPhaseResult;
   /**
    * Number of steps that were skipped.
    */
-  skipped_steps: number;
+  skippedSteps: number;
   /**
    * ID of the owning task run.
    */
-  task_run_id: string;
+  taskRunId: string;
   /**
    * Total duration of the phase in milliseconds.
    */
-  total_duration_ms: number;
+  totalDurationMs: number;
   /**
    * Total number of steps executed.
    */
-  total_steps: number;
+  totalSteps: number;
   [k: string]: unknown;
 }
 
@@ -1561,11 +1561,11 @@ interface VerificationResultsListResponse {
   /**
    * Number of iterations that failed.
    */
-  failed_iterations: number;
+  failedIterations: number;
   /**
    * Number of iterations that passed.
    */
-  passed_iterations: number;
+  passedIterations: number;
   /**
    * All verification results for the task run.
    */
@@ -1573,7 +1573,7 @@ interface VerificationResultsListResponse {
   /**
    * ID of the owning task run.
    */
-  task_run_id: string;
+  taskRunId: string;
   [k: string]: unknown;
 }
 

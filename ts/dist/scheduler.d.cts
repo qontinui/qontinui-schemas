@@ -13,7 +13,7 @@ interface ConditionScheduleConfig {
    * Minutes to wait after an execution completes before re-evaluating
    * conditions for another run.
    */
-  rearm_delay_minutes: number;
+  rearmDelayMinutes: number;
   [k: string]: unknown;
 }
 
@@ -90,7 +90,7 @@ interface RepositoryWatch {
   /**
    * Minutes of inactivity required before the watch is considered met.
    */
-  inactive_minutes: number;
+  inactiveMinutes: number;
   /**
    * Path to the repository directory.
    */
@@ -140,16 +140,16 @@ interface ScheduleConditions {
   /**
    * Require the runner to be idle.
    */
-  require_idle?: IdleCondition | null;
+  requireIdle?: IdleCondition | null;
   /**
    * Require repository file inactivity across one or more paths.
    */
-  require_repo_inactive?: RepositoryInactiveCondition | null;
+  requireRepoInactive?: RepositoryInactiveCondition | null;
   /**
    * Maximum time to wait for conditions (minutes). `None` = wait
    * indefinitely.
    */
-  timeout_minutes?: number | null;
+  timeoutMinutes?: number | null;
   [k: string]: unknown;
 }
 
@@ -168,19 +168,19 @@ interface ConditionStatus {
    * Current idle-condition result. `None` if not yet checked,
    * `Some(true)` if idle, `Some(false)` if busy.
    */
-  idle_met?: boolean | null;
+  idleMet?: boolean | null;
   /**
    * Current repository-inactive status per repository: `(path, is_inactive)`.
    */
-  repo_inactive_met?: [unknown, unknown][] | null;
+  repoInactiveMet?: [unknown, unknown][] | null;
   /**
    * Whether the overall condition-wait timeout has been exceeded.
    */
-  timed_out: boolean;
+  timedOut: boolean;
   /**
    * ISO 8601 timestamp when conditions began being evaluated.
    */
-  waiting_since: string;
+  waitingSince: string;
   [k: string]: unknown;
 }
 
@@ -297,28 +297,28 @@ interface TaskExecutionRecord {
   /**
    * Session ID of the auto-fix session, if one was triggered.
    */
-  auto_fix_session_id?: string | null;
+  autoFixSessionId?: string | null;
   /**
    * ISO 8601 timestamp when execution ended.
    */
-  ended_at?: string | null;
+  endedAt?: string | null;
   /**
    * Error message if the execution failed.
    */
-  error_message?: string | null;
+  errorMessage?: string | null;
   /**
    * Unique ID for this execution (UUID v4 string).
    */
-  execution_id: string;
+  executionId: string;
   /**
    * Session ID if this execution triggered an AI session, used for
    * downstream success tracking.
    */
-  session_id?: string | null;
+  sessionId?: string | null;
   /**
    * ISO 8601 timestamp when execution started.
    */
-  started_at: string;
+  startedAt: string;
   status: ScheduledTaskStatus;
   /**
    * Whether the task succeeded, read from the session checkpoint.
@@ -327,7 +327,7 @@ interface TaskExecutionRecord {
   /**
    * Whether auto-fix was triggered after this execution.
    */
-  triggered_auto_fix: boolean;
+  triggeredAutoFix: boolean;
   [k: string]: unknown;
 }
 
@@ -349,11 +349,11 @@ interface ScheduledTask {
   /**
    * Automatically trigger auto-fix when this task fails.
    */
-  auto_fix_on_failure: boolean;
+  autoFixOnFailure: boolean;
   /**
    * Present while the task is waiting for its conditions to be met.
    */
-  condition_status?: ConditionStatus | null;
+  conditionStatus?: ConditionStatus | null;
   /**
    * Optional conditions that must be met before execution.
    */
@@ -361,7 +361,7 @@ interface ScheduledTask {
   /**
    * ISO 8601 timestamp of creation.
    */
-  created_at: string;
+  createdAt: string;
   /**
    * Optional human-readable description.
    */
@@ -377,11 +377,11 @@ interface ScheduledTask {
   /**
    * Record of the most recent execution.
    */
-  last_run?: TaskExecutionRecord | null;
+  lastRun?: TaskExecutionRecord | null;
   /**
    * ISO 8601 timestamp of last modification.
    */
-  modified_at: string;
+  modifiedAt: string;
   /**
    * Display name for the task.
    */
@@ -389,16 +389,16 @@ interface ScheduledTask {
   /**
    * Next scheduled run time (ISO 8601), computed by the runner.
    */
-  next_run?: string | null;
+  nextRun?: string | null;
   schedule: ScheduleExpression;
   /**
    * Skip future runs once the task has succeeded at least once.
    */
-  skip_if_completed: boolean;
+  skipIfCompleted: boolean;
   /**
    * Free-form description of success criteria, for human reference.
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   task: ScheduledTaskType;
   [k: string]: unknown;
 }
@@ -417,7 +417,7 @@ interface SchedulerSettings {
   /**
    * Default `auto_fix_on_failure` value for newly created tasks.
    */
-  default_auto_fix_on_failure: boolean;
+  defaultAutoFixOnFailure: boolean;
   /**
    * Whether the scheduler is enabled globally.
    */
@@ -425,7 +425,7 @@ interface SchedulerSettings {
   /**
    * Maximum number of scheduled tasks allowed to run concurrently.
    */
-  max_concurrent: number;
+  maxConcurrent: number;
   /**
    * Timezone for schedule interpretation (IANA name). `None` = local time.
    */
@@ -455,7 +455,7 @@ interface NextTaskInfo {
   /**
    * ISO 8601 timestamp of the next scheduled run.
    */
-  next_run: string;
+  nextRun: string;
   [k: string]: unknown;
 }
 
@@ -480,15 +480,15 @@ interface SchedulerStatus {
   /**
    * The next task scheduled to run, if any.
    */
-  next_task?: NextTaskInfo | null;
+  nextTask?: NextTaskInfo | null;
   /**
    * Number of tasks scheduled but not yet running.
    */
-  pending_tasks: number;
+  pendingTasks: number;
   /**
    * Number of tasks currently running.
    */
-  running_tasks: number;
+  runningTasks: number;
   [k: string]: unknown;
 }
 
@@ -508,7 +508,7 @@ interface CreateScheduledTaskRequest {
   /**
    * Trigger auto-fix on failure.
    */
-  auto_fix_on_failure?: boolean | null;
+  autoFixOnFailure?: boolean | null;
   /**
    * Optional conditions that must be met before execution.
    */
@@ -525,11 +525,11 @@ interface CreateScheduledTaskRequest {
   /**
    * Skip future runs once the task has succeeded.
    */
-  skip_if_completed?: boolean | null;
+  skipIfCompleted?: boolean | null;
   /**
    * Free-form success criteria description.
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   task: ScheduledTaskType;
   [k: string]: unknown;
 }
@@ -551,7 +551,7 @@ interface UpdateScheduledTaskRequest {
   /**
    * Update `auto_fix_on_failure`.
    */
-  auto_fix_on_failure?: boolean | null;
+  autoFixOnFailure?: boolean | null;
   /**
    * Replace the conditions block (pass `null` to clear).
    */
@@ -575,11 +575,11 @@ interface UpdateScheduledTaskRequest {
   /**
    * Update `skip_if_completed`.
    */
-  skip_if_completed?: boolean | null;
+  skipIfCompleted?: boolean | null;
   /**
    * Update the success criteria (pass `null` to clear).
    */
-  success_criteria?: string | null;
+  successCriteria?: string | null;
   /**
    * Replace the task definition.
    */

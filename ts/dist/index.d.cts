@@ -6,7 +6,7 @@ export { AccentColor, AccentColorClasses, ActionColorClasses, ActionColorType, B
 export { AiMessage, AiSessionState } from './chat.cjs';
 export { ActiveStatesResult, AvailableTransitionsResult, DiscoveryStrategy, DomainKnowledge, InitialStateRef, InitialStatesSource, MouseButton, NavigationResult, PathfindingRequest, PathfindingResult, PathfindingStep, Point, ResolvedInitialStates, ResolvedInitialStatesResult, ScrollDirection, StandardActionType, StateMachineConfig, StateMachineConfigCreate, StateMachineConfigFull, StateMachineConfigUpdate, StateMachineExportFormat, StateMachineState, StateMachineStateCreate, StateMachineStateUpdate, StateMachineTransition, StateMachineTransitionCreate, StateMachineTransitionUpdate, StateNodeData, TransitionAction, TransitionActionValue, TransitionEdgeData, TransitionExecutionResult, TransitionInfo } from './state-machine.cjs';
 export { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse } from './constraints.cjs';
-export { C as CoordinateSystem, a as Coordinates, R as Region } from './Region.d-Ba5dWM7L.cjs';
+export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-CqNVcR0n.cjs';
 export { Monitor, MonitorPosition, VirtualDesktop } from './geometry.cjs';
 export { AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole, AccessibilitySelector, AccessibilitySnapshot, AccessibilityState } from './accessibility.cjs';
 
@@ -283,6 +283,633 @@ declare function isComponentRenderLog(entry: RenderLogEntry): entry is Component
  */
 declare function isDomSnapshotRenderLog(entry: RenderLogEntry): entry is DomSnapshotRenderLogEntry;
 
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Source of a state-discovery result.
+ *
+ * Identifies which discovery pathway produced the state machine. Mirrors
+ * Python `DiscoverySourceType(str, Enum)`.
+ */
+type DiscoverySourceType = "playwright" | "ui_bridge" | "recording" | "vision" | "manual";
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Type of action that triggers a state transition.
+ *
+ * Mirrors Python `TransitionTriggerType(str, Enum)`.
+ */
+type TransitionTriggerType = "click" | "type" | "scroll" | "hover" | "custom";
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Bounding box for a discovered image element.
+ *
+ * Pixel-space rectangle on a source screenshot. `width` / `height` are `> 0`
+ * on the Python side (validator not duplicated here — this is a wire-format
+ * layer).
+ */
+interface DiscoveryBoundingBox {
+  /**
+   * Height of the bounding box (pixels, positive).
+   */
+  height: number;
+  /**
+   * Width of the bounding box (pixels, positive).
+   */
+  width: number;
+  /**
+   * X coordinate of the top-left corner (pixels).
+   */
+  x: number;
+  /**
+   * Y coordinate of the top-left corner (pixels).
+   */
+  y: number;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Trigger for a discovered state transition.
+ *
+ * Describes the action (click, type, …) that caused a transition. All
+ * identifying fields are optional — different discovery sources populate
+ * different subsets.
+ */
+interface DiscoveryTransitionTrigger {
+  /**
+   * ID of the DOM element (for web extraction).
+   */
+  elementId?: string | null;
+  /**
+   * ID of the image that was clicked/interacted with.
+   */
+  imageId?: string | null;
+  /**
+   * CSS selector for the trigger element.
+   */
+  selector?: string | null;
+  /**
+   * Type of trigger action. Defaults to `click` when omitted on the wire.
+   */
+  type?: TransitionTriggerType & string;
+  /**
+   * Value for type actions (text input).
+   */
+  value?: string | null;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Visual element within a discovered state.
+ *
+ * Represents an image crop from a screenshot with its bounding box and
+ * optional pixel-level identification.
+ */
+interface DiscoveredStateImage {
+  bbox: DiscoveryBoundingBox;
+  /**
+   * Confidence score for this image (0.0–1.0). Defaults to `1.0`.
+   */
+  confidence: number;
+  /**
+   * Semantic type of the element (e.g. `button`, `input`).
+   */
+  elementType?: string | null;
+  /**
+   * Unique identifier for the image.
+   */
+  id: string;
+  /**
+   * Human-readable label for the image.
+   */
+  label?: string | null;
+  /**
+   * Additional free-form metadata.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Hash of pixel data for deduplication.
+   */
+  pixelHash?: string | null;
+  /**
+   * ID of the source screenshot.
+   */
+  screenshotId?: string | null;
+  /**
+   * URL to the source screenshot.
+   */
+  screenshotUrl?: string | null;
+  /**
+   * ID of the state this image belongs to.
+   */
+  stateId?: string | null;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * A discovered UI state (collection of co-occurring elements).
+ *
+ * States represent distinct UI screens or views identified by the set of
+ * images that consistently appear together.
+ */
+interface DiscoveredState {
+  /**
+   * Confidence score for state detection (0.0–1.0). Defaults to `1.0`.
+   */
+  confidence: number;
+  /**
+   * Description of what this state represents.
+   */
+  description?: string | null;
+  /**
+   * IDs of DOM elements (for web extraction).
+   */
+  elementIds?: string[];
+  /**
+   * Unique identifier for the state.
+   */
+  id: string;
+  /**
+   * IDs of images in this state.
+   */
+  imageIds?: string[];
+  /**
+   * Additional free-form metadata.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Human-readable name.
+   */
+  name: string;
+  /**
+   * IDs of renders where this state appears.
+   */
+  renderIds?: string[];
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * A transition between discovered states.
+ *
+ * Transitions represent actions that change the active set of states on the
+ * screen.
+ */
+interface DiscoveredTransition {
+  /**
+   * Confidence score for transition detection (0.0–1.0). Defaults to `1.0`.
+   */
+  confidence: number;
+  /**
+   * ID of the source state.
+   */
+  fromStateId: string;
+  /**
+   * Unique identifier for the transition.
+   */
+  id: string;
+  /**
+   * Additional free-form metadata.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  } | null;
+  /**
+   * ID of the target state.
+   */
+  toStateId: string;
+  /**
+   * What triggers this transition.
+   */
+  trigger?: DiscoveryTransitionTrigger | null;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Complete state-machine result from discovery.
+ *
+ * Unified output format regardless of the source (Playwright, UI Bridge,
+ * Recording, Vision, Manual).
+ */
+interface StateDiscoveryResult {
+  /**
+   * Overall confidence score (0.0–1.0).
+   */
+  confidence: number;
+  /**
+   * ISO 8601 timestamp of creation.
+   */
+  createdAt: string;
+  /**
+   * Description of this state machine.
+   */
+  description?: string | null;
+  /**
+   * Additional discovery metadata.
+   */
+  discoveryMetadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Strategy used for discovery (`auto`, `fingerprint`, `legacy`, …).
+   */
+  discoveryStrategy?: string | null;
+  /**
+   * Mapping of element IDs to render IDs where they appear.
+   */
+  elementToRenders?: {
+    [k: string]: string[];
+  };
+  /**
+   * Unique identifier for the result.
+   */
+  id: string;
+  /**
+   * Number of images (statistic).
+   */
+  imageCount: number;
+  /**
+   * All discovered images.
+   */
+  images?: DiscoveredStateImage[];
+  /**
+   * Human-readable name.
+   */
+  name: string;
+  /**
+   * ID of the project this belongs to.
+   */
+  projectId: string;
+  /**
+   * Number of renders analyzed (statistic).
+   */
+  renderCount: number;
+  /**
+   * ID of the source session (extraction, recording, …).
+   */
+  sourceSessionId?: string | null;
+  sourceType: DiscoverySourceType;
+  /**
+   * Number of states (statistic).
+   */
+  stateCount: number;
+  /**
+   * All discovered states.
+   */
+  states?: DiscoveredState[];
+  /**
+   * Number of transitions (statistic).
+   */
+  transitionCount: number;
+  /**
+   * All discovered transitions.
+   */
+  transitions?: DiscoveredTransition[];
+  /**
+   * Number of unique elements (statistic).
+   */
+  uniqueElementCount: number;
+  /**
+   * ISO 8601 timestamp of last update.
+   */
+  updatedAt: string;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Summary of a state-discovery result (for listings).
+ *
+ * Lightweight projection of `StateDiscoveryResult` used by list endpoints.
+ */
+interface StateDiscoveryResultSummary {
+  /**
+   * Confidence score (0.0–1.0).
+   */
+  confidence: number;
+  /**
+   * ISO 8601 timestamp of creation.
+   */
+  createdAt: string;
+  /**
+   * Description.
+   */
+  description?: string | null;
+  /**
+   * Strategy used.
+   */
+  discoveryStrategy?: string | null;
+  /**
+   * Unique identifier.
+   */
+  id: string;
+  /**
+   * Number of images.
+   */
+  imageCount: number;
+  /**
+   * Human-readable name.
+   */
+  name: string;
+  /**
+   * ID of the project.
+   */
+  projectId: string;
+  sourceType: DiscoverySourceType;
+  /**
+   * Number of states.
+   */
+  stateCount: number;
+  /**
+   * Number of transitions.
+   */
+  transitionCount: number;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * API response for listing discovery results.
+ */
+interface StateDiscoveryResultListResponse {
+  /**
+   * List of result summaries.
+   */
+  items: StateDiscoveryResultSummary[];
+  /**
+   * Total count of results.
+   */
+  total: number;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Request payload to create a state-discovery result.
+ */
+interface StateDiscoveryResultCreate {
+  /**
+   * Confidence score (0.0–1.0).
+   */
+  confidence: number;
+  /**
+   * Description.
+   */
+  description?: string | null;
+  /**
+   * Additional metadata.
+   */
+  discoveryMetadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Strategy used.
+   */
+  discoveryStrategy?: string | null;
+  /**
+   * Element to renders mapping.
+   */
+  elementToRenders?: {
+    [k: string]: string[];
+  };
+  /**
+   * Discovered images.
+   */
+  images?: DiscoveredStateImage[];
+  /**
+   * Human-readable name.
+   */
+  name: string;
+  /**
+   * ID of the source session.
+   */
+  sourceSessionId?: string | null;
+  sourceType: DiscoverySourceType;
+  /**
+   * Discovered states.
+   */
+  states?: DiscoveredState[];
+  /**
+   * Discovered transitions.
+   */
+  transitions?: DiscoveredTransition[];
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Request payload to update a state-discovery result.
+ *
+ * All fields optional; only supplied fields are applied.
+ */
+interface StateDiscoveryResultUpdate {
+  /**
+   * Description.
+   */
+  description?: string | null;
+  /**
+   * Updated metadata.
+   */
+  discoveryMetadata?: {
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Updated images.
+   */
+  images?: DiscoveredStateImage[] | null;
+  /**
+   * Human-readable name.
+   */
+  name?: string | null;
+  /**
+   * Updated states.
+   */
+  states?: DiscoveredState[] | null;
+  /**
+   * Updated transitions.
+   */
+  transitions?: DiscoveredTransition[] | null;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Portable export format for state machines.
+ *
+ * Used when exporting a discovery result to a shareable artifact.
+ * `source_type` is kept as a free-form `String` to match Python's
+ * `DiscoverySourceType | str` union (enabling imports that predate the enum).
+ */
+interface StateMachineExport {
+  /**
+   * Description.
+   */
+  description?: string | null;
+  /**
+   * Element to renders mapping.
+   */
+  elementToRenders?: {
+    [k: string]: string[];
+  };
+  /**
+   * State images.
+   */
+  images?: DiscoveredStateImage[];
+  /**
+   * Export metadata (original ID, export timestamp, …).
+   */
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * State machine name.
+   */
+  name: string;
+  /**
+   * Original discovery source (string for forward compatibility — Python
+   * accepts `DiscoverySourceType | str`).
+   */
+  sourceType: string;
+  /**
+   * States.
+   */
+  states?: DiscoveredState[];
+  /**
+   * Transitions.
+   */
+  transitions?: DiscoveredTransition[];
+  /**
+   * Export format version. Defaults to `"1.0.0"`.
+   */
+  version: string;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Request payload to import a state machine.
+ */
+interface StateMachineImport {
+  /**
+   * Override name (uses export name when omitted).
+   */
+  name?: string | null;
+  stateMachine: StateMachineExport;
+  [k: string]: unknown;
+}
+
 /**
  * Unified State Discovery Result types.
  *
@@ -292,129 +919,15 @@ declare function isDomSnapshotRenderLog(entry: RenderLogEntry): entry is DomSnap
  * - Recording (user session recording)
  * - Vision (screenshot analysis)
  * - Manual (user-defined)
+ *
+ * All types use camelCase field names to match the generated types from Rust
+ * schemas. Converter functions are provided to transform snake_case API
+ * responses into these typed objects.
  */
-type DiscoverySourceType = "playwright" | "ui_bridge" | "recording" | "vision" | "manual";
-type TransitionTriggerType = "click" | "type" | "scroll" | "hover" | "custom";
-interface DiscoveryBoundingBox {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-interface DiscoveryTransitionTrigger {
-    type: TransitionTriggerType;
-    image_id?: string;
-    element_id?: string;
-    selector?: string;
-    value?: string;
-}
-interface DiscoveredStateImage {
-    id: string;
-    screenshot_id?: string;
-    screenshot_url?: string;
-    bbox: DiscoveryBoundingBox;
-    pixel_hash?: string;
-    state_id?: string;
-    element_type?: string;
-    label?: string;
-    confidence: number;
-    metadata?: Record<string, unknown>;
-}
-interface DiscoveredState {
-    id: string;
-    name: string;
-    image_ids: string[];
-    render_ids: string[];
-    element_ids: string[];
-    confidence: number;
-    description?: string;
-    metadata?: Record<string, unknown>;
-}
-interface DiscoveredTransition {
-    id: string;
-    from_state_id: string;
-    to_state_id: string;
-    trigger?: DiscoveryTransitionTrigger;
-    confidence: number;
-    metadata?: Record<string, unknown>;
-}
-interface StateDiscoveryResult {
-    id: string;
-    project_id: string;
-    name: string;
-    description?: string;
-    source_type: DiscoverySourceType;
-    source_session_id?: string;
-    discovery_strategy?: string;
-    images: DiscoveredStateImage[];
-    states: DiscoveredState[];
-    transitions: DiscoveredTransition[];
-    element_to_renders: Record<string, string[]>;
-    image_count: number;
-    state_count: number;
-    transition_count: number;
-    render_count: number;
-    unique_element_count: number;
-    confidence: number;
-    discovery_metadata: Record<string, unknown>;
-    created_at: string;
-    updated_at: string;
-}
-interface StateDiscoveryResultSummary {
-    id: string;
-    project_id: string;
-    name: string;
-    description?: string;
-    source_type: DiscoverySourceType;
-    discovery_strategy?: string;
-    image_count: number;
-    state_count: number;
-    transition_count: number;
-    confidence: number;
-    created_at: string;
-}
-interface StateDiscoveryResultListResponse {
-    items: StateDiscoveryResultSummary[];
-    total: number;
-}
-interface StateDiscoveryResultCreate {
-    name: string;
-    description?: string;
-    source_type: DiscoverySourceType;
-    source_session_id?: string;
-    discovery_strategy?: string;
-    images: DiscoveredStateImage[];
-    states: DiscoveredState[];
-    transitions: DiscoveredTransition[];
-    element_to_renders: Record<string, string[]>;
-    confidence: number;
-    discovery_metadata: Record<string, unknown>;
-}
-interface StateDiscoveryResultUpdate {
-    name?: string;
-    description?: string;
-    images?: DiscoveredStateImage[];
-    states?: DiscoveredState[];
-    transitions?: DiscoveredTransition[];
-    discovery_metadata?: Record<string, unknown>;
-}
-interface StateMachineExport {
-    version: string;
-    name: string;
-    description?: string;
-    source_type: DiscoverySourceType | string;
-    images: DiscoveredStateImage[];
-    states: DiscoveredState[];
-    transitions: DiscoveredTransition[];
-    element_to_renders: Record<string, string[]>;
-    metadata: Record<string, unknown>;
-}
-interface StateMachineImport {
-    state_machine: StateMachineExport;
-    name?: string;
-}
+
 declare const SOURCE_TYPE_LABELS: Record<DiscoverySourceType, string>;
 declare const SOURCE_TYPE_COLORS: Record<DiscoverySourceType, string>;
+
 declare function toStateDiscoveryResult(data: Record<string, unknown>): StateDiscoveryResult;
 declare function toDiscoveredStateImage(data: unknown): DiscoveredStateImage;
 declare function toDiscoveredState(data: unknown): DiscoveredState;

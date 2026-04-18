@@ -1,4 +1,4 @@
-import { a as Coordinates, R as Region } from './Region.d-Ba5dWM7L.js';
+import { C as Coordinates, R as Region } from './Region.d-CqNVcR0n.js';
 
 /* eslint-disable */
 /**

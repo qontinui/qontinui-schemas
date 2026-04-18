@@ -145,27 +145,27 @@ interface TopMatch {
  * `flatten`-d map.
  */
 interface RuntimeData {
-  already_at_target?: boolean | null;
-  branch_taken?: string | null;
+  alreadyAtTarget?: boolean | null;
+  branchTaken?: string | null;
   button?: string | null;
-  character_count?: number | null;
-  clicked_at?: MatchLocation | null;
-  condition_passed?: boolean | null;
+  characterCount?: number | null;
+  clickedAt?: MatchLocation | null;
+  conditionPassed?: boolean | null;
   confidence?: number | null;
   dimensions?: MatchLocation | null;
   found?: boolean | null;
-  image_id?: string | null;
+  imageId?: string | null;
   location?: MatchLocation | null;
-  match_method?: string | null;
-  source_states?: string[] | null;
-  target_states?: string[] | null;
-  target_type?: string | null;
-  targets_reached?: string[] | null;
-  top_matches?: TopMatch[] | null;
-  transitions_executed?: string[] | null;
-  typed_text?: string | null;
-  workflow_name?: string | null;
-  workflow_status?: string | null;
+  matchMethod?: string | null;
+  sourceStates?: string[] | null;
+  targetStates?: string[] | null;
+  targetType?: string | null;
+  targetsReached?: string[] | null;
+  topMatches?: TopMatch[] | null;
+  transitionsExecuted?: string[] | null;
+  typedText?: string | null;
+  workflowName?: string | null;
+  workflowStatus?: string | null;
   [k: string]: unknown;
 }
 
@@ -181,8 +181,8 @@ interface RuntimeData {
  */
 interface StateContext {
   activated: string[];
-  active_after: string[];
-  active_before: string[];
+  activeAfter: string[];
+  activeBefore: string[];
   changed: boolean;
   deactivated: string[];
   [k: string]: unknown;
@@ -201,15 +201,15 @@ interface StateContext {
  * doesn't depend on a chrono version).
  */
 interface TimingInfo {
-  duration_ms?: number | null;
+  durationMs?: number | null;
   /**
    * ISO 8601 timestamp. `None` while the event is still in flight.
    */
-  end_time?: string | null;
+  endTime?: string | null;
   /**
    * ISO 8601 timestamp.
    */
-  start_time: string;
+  startTime: string;
   [k: string]: unknown;
 }
 
@@ -225,7 +225,7 @@ interface TimingInfo {
  */
 interface Outcome {
   error?: string | null;
-  retry_count: number;
+  retryCount: number;
   success: boolean;
   [k: string]: unknown;
 }
@@ -254,23 +254,23 @@ interface NodeMetadata {
   /**
    * Whether this action can have child nodes.
    */
-  is_expandable: boolean;
+  isExpandable: boolean;
   /**
    * Whether this action is displayed inline.
    */
-  is_inline: boolean;
+  isInline: boolean;
   outcome?: Outcome | null;
   runtime?: RuntimeData | null;
   /**
    * Screenshot reference (path or URL).
    */
-  screenshot_reference?: string | null;
-  state_context?: StateContext | null;
+  screenshotReference?: string | null;
+  stateContext?: StateContext | null;
   timing?: TimingInfo | null;
   /**
    * Visual-debug image reference (path or URL).
    */
-  visual_debug_reference?: string | null;
+  visualDebugReference?: string | null;
   [k: string]: unknown;
 }
 
@@ -295,7 +295,7 @@ interface TreeNode {
   /**
    * When this node completed (Unix epoch seconds).
    */
-  end_timestamp?: number | null;
+  endTimestamp?: number | null;
   /**
    * Error message if `status == Failed`.
    */
@@ -309,11 +309,11 @@ interface TreeNode {
    * Display name for this node.
    */
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   /**
    * ID of parent node, `None` for root.
    */
-  parent_id?: string | null;
+  parentId?: string | null;
   status: NodeStatus;
   /**
    * When this node was created (Unix epoch seconds).
@@ -337,7 +337,7 @@ interface TreeNode {
 interface PathElement {
   id: string;
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   [k: string]: unknown;
 }
 
@@ -358,7 +358,7 @@ interface PathElement {
  * a sequence number for ordering.
  */
 interface TreeEvent {
-  event_type: TreeEventType;
+  eventType: TreeEventType;
   node: TreeNode;
   /**
    * Path from root to this node (breadcrumb).
@@ -399,20 +399,20 @@ interface DisplayNode {
    */
   children: DisplayNode[];
   duration?: number | null;
-  end_timestamp?: number | null;
+  endTimestamp?: number | null;
   error?: string | null;
   id: string;
   /**
    * Whether this node should be expanded in the UI (default: true).
    */
-  is_expanded: boolean;
+  isExpanded: boolean;
   /**
    * Nesting level in the tree (0 for root, 1 for first-level children).
    */
   level: number;
   metadata?: NodeMetadata & {};
   name: string;
-  node_type: NodeType;
+  nodeType: NodeType;
   status: NodeStatus;
   timestamp: number;
   [k: string]: unknown;
@@ -431,7 +431,7 @@ interface DisplayNode {
  * Request to store a tree event.
  */
 interface TreeEventCreate {
-  event_type: TreeEventType;
+  eventType: TreeEventType;
   node: TreeNode;
   path: PathElement[];
   sequence: number;
@@ -455,24 +455,24 @@ interface TreeEventResponse {
   /**
    * ISO 8601 timestamp.
    */
-  created_at: string;
-  error_message?: string | null;
-  event_timestamp: number;
-  event_type: TreeEventType;
+  createdAt: string;
+  errorMessage?: string | null;
+  eventTimestamp: number;
+  eventType: TreeEventType;
   /**
    * UUID as string (wire-format — see crate-level docs).
    */
   id: string;
   metadata?: NodeMetadata | null;
-  node_id: string;
-  node_name: string;
-  node_type: NodeType;
-  parent_node_id?: string | null;
+  nodeId: string;
+  nodeName: string;
+  nodeType: NodeType;
+  parentNodeId?: string | null;
   path: PathElement[];
   /**
    * Run UUID as string.
    */
-  run_id: string;
+  runId: string;
   sequence: number;
   status: NodeStatus;
   [k: string]: unknown;
@@ -492,7 +492,7 @@ interface TreeEventResponse {
  */
 interface TreeEventListResponse {
   events: TreeEventResponse[];
-  has_more: boolean;
+  hasMore: boolean;
   limit: number;
   offset: number;
   total: number;
@@ -512,25 +512,25 @@ interface TreeEventListResponse {
  * Full execution tree reconstructed from events.
  */
 interface ExecutionTreeResponse {
-  duration_ms?: number | null;
+  durationMs?: number | null;
   /**
    * Initial active states when the workflow started.
    */
-  initial_state_ids: string[];
-  root_nodes: DisplayNode[];
+  initialStateIds: string[];
+  rootNodes: DisplayNode[];
   /**
    * Run UUID as string.
    */
-  run_id: string;
+  runId: string;
   /**
    * Mapping of state IDs to display names.
    */
-  state_name_map: {
+  stateNameMap: {
     [k: string]: string;
   };
   status: NodeStatus;
-  total_events: number;
-  workflow_name?: string | null;
+  totalEvents: number;
+  workflowName?: string | null;
   [k: string]: unknown;
 }
 
