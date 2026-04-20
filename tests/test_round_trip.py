@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from qontinui_schemas.generated import (
     Constraint,
@@ -22,7 +22,7 @@ from qontinui_schemas.generated import (
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _roundtrip(model_cls, fixture_name: str) -> None:
+def _roundtrip(model_cls: type[BaseModel], fixture_name: str) -> None:
     raw = (FIXTURES / fixture_name).read_text()
     parsed = model_cls.model_validate_json(raw)
     re_raw = parsed.model_dump_json(exclude_none=True, by_alias=True)
