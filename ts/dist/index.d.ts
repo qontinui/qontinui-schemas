@@ -6,7 +6,7 @@ export { AccentColor, AccentColorClasses, ActionColorClasses, ActionColorType, B
 export { AiMessage, AiSessionState } from './chat.js';
 export { ActiveStatesResult, AvailableTransitionsResult, DiscoveryStrategy, DomainKnowledge, InitialStateRef, InitialStatesSource, MouseButton, NavigationResult, PathfindingRequest, PathfindingResult, PathfindingStep, Point, ResolvedInitialStates, ResolvedInitialStatesResult, ScrollDirection, StandardActionType, StateMachineConfig, StateMachineConfigCreate, StateMachineConfigFull, StateMachineConfigUpdate, StateMachineExportFormat, StateMachineState, StateMachineStateCreate, StateMachineStateUpdate, StateMachineTransition, StateMachineTransitionCreate, StateMachineTransitionUpdate, StateNodeData, TransitionAction, TransitionActionValue, TransitionEdgeData, TransitionExecutionResult, TransitionInfo } from './state-machine.js';
 export { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse } from './constraints.js';
-export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-CqNVcR0n.js';
+export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-BbpFAWF4.js';
 export { Monitor, MonitorPosition, VirtualDesktop } from './geometry.js';
 export { AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole, AccessibilitySelector, AccessibilitySnapshot, AccessibilityState } from './accessibility.js';
 
@@ -343,7 +343,6 @@ interface DiscoveryBoundingBox {
    * Y coordinate of the top-left corner (pixels).
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -383,7 +382,6 @@ interface DiscoveryTransitionTrigger {
    * Value for type actions (text input).
    */
   value?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -441,7 +439,6 @@ interface DiscoveredStateImage {
    * ID of the state this image belongs to.
    */
   stateId?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -492,7 +489,6 @@ interface DiscoveredState {
    * IDs of renders where this state appears.
    */
   renderIds?: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -537,7 +533,6 @@ interface DiscoveredTransition {
    * What triggers this transition.
    */
   trigger?: DiscoveryTransitionTrigger | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -637,7 +632,6 @@ interface StateDiscoveryResult {
    * ISO 8601 timestamp of last update.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -696,7 +690,6 @@ interface StateDiscoveryResultSummary {
    * Number of transitions.
    */
   transitionCount: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -720,7 +713,6 @@ interface StateDiscoveryResultListResponse {
    * Total count of results.
    */
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -781,7 +773,6 @@ interface StateDiscoveryResultCreate {
    * Discovered transitions.
    */
   transitions?: DiscoveredTransition[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -825,7 +816,6 @@ interface StateDiscoveryResultUpdate {
    * Updated transitions.
    */
   transitions?: DiscoveredTransition[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -886,7 +876,6 @@ interface StateMachineExport {
    * Export format version. Defaults to `"1.0.0"`.
    */
   version: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -907,7 +896,6 @@ interface StateMachineImport {
    */
   name?: string | null;
   stateMachine: StateMachineExport;
-  [k: string]: unknown;
 }
 
 /**

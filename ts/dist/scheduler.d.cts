@@ -14,7 +14,6 @@ interface ConditionScheduleConfig {
    * conditions for another run.
    */
   rearmDelayMinutes: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -73,7 +72,6 @@ interface IdleCondition {
    * Whether this condition is active.
    */
   enabled: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -95,7 +93,6 @@ interface RepositoryWatch {
    * Path to the repository directory.
    */
   path: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -121,7 +118,6 @@ interface RepositoryInactiveCondition {
    * List of repositories to watch. ALL must be inactive simultaneously.
    */
   repositories: RepositoryWatch[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -150,7 +146,6 @@ interface ScheduleConditions {
    * indefinitely.
    */
   timeoutMinutes?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -181,7 +176,6 @@ interface ConditionStatus {
    * ISO 8601 timestamp when conditions began being evaluated.
    */
   waitingSince: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -328,7 +322,6 @@ interface TaskExecutionRecord {
    * Whether auto-fix was triggered after this execution.
    */
   triggeredAutoFix: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -400,7 +393,6 @@ interface ScheduledTask {
    */
   successCriteria?: string | null;
   task: ScheduledTaskType;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -430,7 +422,6 @@ interface SchedulerSettings {
    * Timezone for schedule interpretation (IANA name). `None` = local time.
    */
   timezone?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -456,7 +447,6 @@ interface NextTaskInfo {
    * ISO 8601 timestamp of the next scheduled run.
    */
   nextRun: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -489,7 +479,6 @@ interface SchedulerStatus {
    * Number of tasks currently running.
    */
   runningTasks: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -531,7 +520,6 @@ interface CreateScheduledTaskRequest {
    */
   successCriteria?: string | null;
   task: ScheduledTaskType;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -584,7 +572,6 @@ interface UpdateScheduledTaskRequest {
    * Replace the task definition.
    */
   task?: ScheduledTaskType | null;
-  [k: string]: unknown;
 }
 
 export type { ConditionScheduleConfig, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleExpression, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest };

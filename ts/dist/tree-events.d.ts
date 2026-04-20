@@ -106,7 +106,6 @@ interface MatchLocation {
   w?: number | null;
   x: number;
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -125,7 +124,6 @@ interface TopMatch {
   confidence: number;
   dimensions?: MatchLocation | null;
   location: MatchLocation;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -166,7 +164,6 @@ interface RuntimeData {
   typedText?: string | null;
   workflowName?: string | null;
   workflowStatus?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -185,7 +182,6 @@ interface StateContext {
   activeBefore: string[];
   changed: boolean;
   deactivated: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -210,7 +206,6 @@ interface TimingInfo {
    * ISO 8601 timestamp.
    */
   startTime: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -227,7 +222,6 @@ interface Outcome {
   error?: string | null;
   retryCount: number;
   success: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -271,7 +265,6 @@ interface NodeMetadata {
    * Visual-debug image reference (path or URL).
    */
   visualDebugReference?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -319,7 +312,6 @@ interface TreeNode {
    * When this node was created (Unix epoch seconds).
    */
   timestamp: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -338,7 +330,6 @@ interface PathElement {
   id: string;
   name: string;
   nodeType: NodeType;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -376,7 +367,6 @@ interface TreeEvent {
    * Event type identifier — always `"tree_event"` on the wire.
    */
   type: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -415,7 +405,6 @@ interface DisplayNode {
   nodeType: NodeType;
   status: NodeStatus;
   timestamp: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -436,7 +425,6 @@ interface TreeEventCreate {
   path: PathElement[];
   sequence: number;
   timestamp: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -475,7 +463,6 @@ interface TreeEventResponse {
   runId: string;
   sequence: number;
   status: NodeStatus;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -496,7 +483,6 @@ interface TreeEventListResponse {
   limit: number;
   offset: number;
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -531,7 +517,6 @@ interface ExecutionTreeResponse {
   status: NodeStatus;
   totalEvents: number;
   workflowName?: string | null;
-  [k: string]: unknown;
 }
 
 export type { ActionType, DisplayNode, ExecutionTreeResponse, MatchLocation, NodeMetadata, NodeStatus, NodeType, Outcome, PathElement, RuntimeData, StateContext, TimingInfo, TopMatch, TreeEvent, TreeEventCreate, TreeEventListResponse, TreeEventResponse, TreeEventType, TreeNode };

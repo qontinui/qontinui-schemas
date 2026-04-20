@@ -31,7 +31,6 @@ interface ContextAutoInclude {
    * (case-insensitive).
    */
   taskMentions?: string[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -83,7 +82,6 @@ interface Context {
    * Tags for flexible grouping and search.
    */
   tags: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -109,7 +107,6 @@ interface Category {
    * Category name (e.g., `"Main"`, `"Testing"`).
    */
   name: string;
-  [k: string]: unknown;
 }
 
 export type { Category, Context, ContextAutoInclude };

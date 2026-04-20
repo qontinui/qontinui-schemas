@@ -1,4 +1,4 @@
-import { C as Coordinates, R as Region } from './Region.d-CqNVcR0n.js';
+import { C as Coordinates, R as Region } from './Region.d-BbpFAWF4.js';
 
 /* eslint-disable */
 /**
@@ -35,7 +35,6 @@ interface MatchAdjustment {
   addY?: number | null;
   targetOffset?: Coordinates | null;
   targetPosition?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -93,7 +92,6 @@ interface PatternOptions {
   useColorReduction?: boolean | null;
   useEdges?: boolean | null;
   useGrayscale?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -109,7 +107,6 @@ interface PatternOptions {
 interface PollingConfig {
   interval?: number | null;
   maxAttempts?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -152,7 +149,6 @@ interface SearchOptions {
   similarity?: number | null;
   timeout?: number | null;
   useDefinedRegion?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -195,7 +191,6 @@ interface TextSearchOptions {
   psmMode?: number | null;
   scaleFactor?: number | null;
   whitelistChars?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */

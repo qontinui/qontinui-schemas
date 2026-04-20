@@ -58,7 +58,6 @@ interface Point {
    * Vertical offset in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -192,7 +191,6 @@ interface TransitionAction {
    * Value to select or set (`select` / `setValue` actions).
    */
   value?: TransitionActionValue | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -223,7 +221,6 @@ interface DomainKnowledge {
    * Short title / headline.
    */
   title: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -270,7 +267,6 @@ interface StateMachineConfig {
    * ISO 8601 timestamp of last modification.
    */
   updated_at: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -292,7 +288,6 @@ interface StateMachineConfigCreate {
    * Display name.
    */
   name: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -314,7 +309,6 @@ interface StateMachineConfigUpdate {
    * New display name.
    */
   name?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -387,7 +381,6 @@ interface StateMachineState {
    * ISO 8601 timestamp of last modification.
    */
   updated_at: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -459,7 +452,6 @@ interface StateMachineTransition {
    * ISO 8601 timestamp of last modification.
    */
   updated_at: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -573,7 +565,6 @@ interface StateMachineStateCreate {
    * Optional stable logical state ID (generated if omitted).
    */
   state_id?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -623,7 +614,6 @@ interface StateMachineStateUpdate {
    * New render ID set.
    */
   render_ids?: string[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -673,7 +663,6 @@ interface StateMachineTransitionCreate {
    * Whether source states stay visible after activation.
    */
   stays_visible?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -723,7 +712,6 @@ interface StateMachineTransitionUpdate {
    * New stays-visible flag.
    */
   stays_visible?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -749,7 +737,6 @@ interface PathfindingRequest {
    * States that must all be active at the end.
    */
   target_states: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -787,7 +774,6 @@ interface PathfindingStep {
    * Display name of the transition.
    */
   transition_name: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -819,7 +805,6 @@ interface PathfindingResult {
    * Sum of `path_cost` across steps.
    */
   total_cost: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -851,7 +836,6 @@ interface TransitionExecutionResult {
    * Logical transition ID that was executed.
    */
   transition_id: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -893,7 +877,6 @@ interface NavigationResult {
    * Target state for this navigation branch (if applicable).
    */
   target_state?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -927,7 +910,6 @@ interface ActiveStatesResult {
    * Whether the query succeeded.
    */
   success: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -958,7 +940,6 @@ interface TransitionInfo {
    * Names of workflows attached to this transition.
    */
   workflows: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -994,7 +975,6 @@ interface AvailableTransitionsResult {
    * Transitions available from the current state.
    */
   transitions: TransitionInfo[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1038,7 +1018,6 @@ interface InitialStateRef {
    * Display name.
    */
   name: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1068,7 +1047,6 @@ interface ResolvedInitialStates {
    * Workflow ID when `source == Workflow`.
    */
   workflowId?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1109,7 +1087,6 @@ interface ResolvedInitialStatesResult {
    * Workflow ID (may be empty).
    */
   workflowId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1171,7 +1148,6 @@ interface TransitionEdgeData {
    * Transition ID this edge represents.
    */
   transitionId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1212,7 +1188,6 @@ interface StateMachineExportFormat {
       [k: string]: unknown;
     };
   };
-  [k: string]: unknown;
 }
 
 /**

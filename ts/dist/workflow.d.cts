@@ -58,7 +58,6 @@ interface HealthCheckUrl {
    * URL to check (e.g., `"http://localhost:8000/health"`).
    */
   url: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -98,7 +97,6 @@ interface RoutingRule {
    * Temperature override when this rule matches.
    */
   temperature?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -147,7 +145,6 @@ interface ModelOverrideConfig {
    * Temperature override for this phase (`0.0`–`1.0`).
    */
   temperature?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -186,7 +183,6 @@ interface StageCondition {
    * after initial attempts have failed.
    */
   minIteration?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -212,7 +208,6 @@ interface RetryPolicy {
    * Delay between retries in milliseconds.
    */
   delayMs: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -234,7 +229,6 @@ interface StageOutput {
    * Unique key for this output (e.g. `"api_url"`, `"auth_token"`).
    */
   key: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -263,7 +257,6 @@ interface StageInput {
    * inputs are Critical findings.
    */
   required: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -347,7 +340,6 @@ interface RetrySpec {
    * Delay between retries in milliseconds.
    */
   delayMs: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1132,7 +1124,6 @@ interface WorkflowStage {
    * Verification phase steps for this stage.
    */
   verificationSteps: UnifiedStep[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1518,7 +1509,6 @@ interface UnifiedWorkflow {
    * infers the best architecture based on workflow complexity.
    */
   workflowArchitecture?: WorkflowArchitecture | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1591,7 +1581,6 @@ interface BaseStepFields {
    * Verification depth category.
    */
   verificationCategory?: VerificationCategoryKind | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1677,7 +1666,6 @@ interface ApiAssertion {
    */
   operator?: ApiAssertionOperator | null;
   type: ApiAssertionType;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1703,7 +1691,6 @@ interface ApiVariableExtraction {
    * Variable name to bind the extracted value to.
    */
   variableName: string;
-  [k: string]: unknown;
 }
 
 /**

@@ -108,7 +108,6 @@ interface TaskRun {
    * Name of the workflow used to run this task, if any.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -196,7 +195,6 @@ interface TaskRunBackend {
    * ISO 8601 timestamp when the record was last updated.
    */
   updatedAt: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -238,7 +236,6 @@ interface TaskRunSession {
    * Parent task run ID.
    */
   taskRunId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -398,7 +395,6 @@ interface TaskRunFinding {
    * The user's response, if any.
    */
   userResponse: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -434,7 +430,6 @@ interface TaskRunFindingSummary {
    * Total number of findings.
    */
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -591,7 +586,6 @@ interface TaskRunCreate {
    * Workflow name to use.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -640,7 +634,6 @@ interface TaskRunUpdate {
    * New lifecycle status.
    */
   status?: TaskRunStatus | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -718,7 +711,6 @@ interface TaskRunFindingCreate {
    * Short title.
    */
   title: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -754,7 +746,6 @@ interface TaskRunFindingUpdate {
    * User response, if the finding needed input.
    */
   userResponse?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -776,7 +767,6 @@ interface RunPromptResponseData {
    * Final response text.
    */
   response?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -828,7 +818,6 @@ interface RunPromptResponse {
    * ID of the created task run, if any.
    */
   taskRunId?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -886,7 +875,6 @@ interface RunPromptRequest {
    * Attached video paths.
    */
   videoPaths?: string[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -939,7 +927,6 @@ interface CreateTaskRunRequest {
    * Workflow name to use.
    */
   workflowName?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -979,7 +966,6 @@ interface TaskRunFilters {
    * Restrict to a given status.
    */
   status?: TaskRunStatus | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1007,7 +993,6 @@ interface TaskRunFindingFilters {
    * Restrict to a given status.
    */
   status?: TaskRunFindingStatus | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1037,7 +1022,6 @@ interface Pagination {
    * Total number of matching records.
    */
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1058,7 +1042,6 @@ interface TaskRunListResponse {
    * Page of matching task runs.
    */
   tasks: TaskRunBackend[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1079,7 +1062,6 @@ interface TaskRunFindingsListResponse {
    */
   findings: TaskRunFinding[];
   summary: TaskRunFindingSummary;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1124,7 +1106,6 @@ interface FindingsSummary {
    * Total number of findings.
    */
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1166,7 +1147,6 @@ interface CheckIssueDetail {
    * Severity label (free-form string from the upstream check).
    */
   severity: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1218,7 +1198,6 @@ interface IndividualCheckResult {
    * Free-form status string (e.g., `"passed"`, `"failed"`, `"skipped"`).
    */
   status: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1274,7 +1253,6 @@ interface VerificationStepDetails {
    * ID of the step this detail belongs to.
    */
   stepId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1379,7 +1357,6 @@ interface VerificationStepResult {
    * Detailed captured output, if any.
    */
   verificationDetails: VerificationStepDetails | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1417,7 +1394,6 @@ interface GateEvaluationResult {
    * IDs of steps the gate required.
    */
   requiredStepIds: string[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1477,7 +1453,6 @@ interface VerificationPhaseResult {
    * Total number of steps executed.
    */
   totalSteps: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1538,7 +1513,6 @@ interface VerificationResultResponse {
    * Total number of steps executed.
    */
   totalSteps: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -1574,7 +1548,6 @@ interface VerificationResultsListResponse {
    * ID of the owning task run.
    */
   taskRunId: string;
-  [k: string]: unknown;
 }
 
 /**

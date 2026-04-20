@@ -43,7 +43,6 @@ interface Coordinates {
    * Y coordinate (vertical position).
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -84,7 +83,6 @@ interface Region {
    * Y coordinate of the top-left corner.
    */
   y: number;
-  [k: string]: unknown;
 }
 
 export type { Coordinates as C, Region as R, CoordinateSystem as a };

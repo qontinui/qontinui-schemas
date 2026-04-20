@@ -41,7 +41,6 @@ interface ComputeTextEmbeddingRequest {
    * Text to encode into embedding space.
    */
   text: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -75,7 +74,6 @@ interface ComputeTextEmbeddingResponse {
    * Whether the embedding computation succeeded.
    */
   success: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -101,7 +99,6 @@ interface ComputeEmbeddingRequest {
    * Optional text description for the text embedding.
    */
   text_description?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -141,7 +138,6 @@ interface ComputeEmbeddingResponse {
    * Text embedding vector (384 dimensions).
    */
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -170,7 +166,6 @@ interface BatchComputeEmbeddingRequest {
   images: {
     [k: string]: unknown;
   }[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -195,7 +190,6 @@ interface BatchEmbeddingResult {
   success: boolean;
   text_description?: string | null;
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -220,7 +214,6 @@ interface BatchComputeEmbeddingResponse {
   success: boolean;
   successful: number;
   total_processed: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -251,7 +244,6 @@ interface EmbeddingResultItem {
    * Text embedding vector (384 dimensions for all-MiniLM-L6-v2).
    */
   text_embedding?: number[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -272,7 +264,6 @@ interface EmbeddingResultsRequest {
   results: EmbeddingResultItem[];
   successful: number;
   total_processed: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -291,7 +282,6 @@ interface EmbeddingResultsResponse {
   message: string;
   not_found: number;
   success: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -320,7 +310,6 @@ interface RagProgressEvent {
   project_id: string;
   status: RagProcessingStatus;
   total_elements?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -347,7 +336,6 @@ interface RagCompletionEvent {
    * Whether sync to the web backend succeeded.
    */
   web_sync_success?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -379,7 +367,6 @@ interface JobSummary {
   started_at?: string | null;
   status: JobStatus;
   total_patterns: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -406,7 +393,6 @@ interface RAGDashboardStats {
   total_embeddings: number;
   total_patterns: number;
   total_states: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -457,7 +443,6 @@ interface EmbeddingItem {
    * ISO 8601 UTC timestamp (`Z` suffix).
    */
   updated_at: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -481,7 +466,6 @@ interface EmbeddingListResponse {
    */
   page: number;
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -514,7 +498,6 @@ interface JobItem {
   started_at?: string | null;
   status: JobStatus;
   total_patterns: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -535,7 +518,6 @@ interface JobListResponse {
   limit: number;
   page: number;
   total: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -563,7 +545,6 @@ interface SemanticSearchRequest {
    */
   query: string;
   state_filter?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -584,7 +565,6 @@ interface SearchResultItem {
    * Similarity score (0-1).
    */
   similarity_score: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -606,7 +586,6 @@ interface SemanticSearchResponse {
   query: string;
   results: SearchResultItem[];
   total_found: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -626,7 +605,6 @@ interface StateFilterItem {
   count: number;
   state_id: string;
   state_name: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -647,7 +625,6 @@ interface StatesResponse {
    */
   count: number;
   states: StateFilterItem[];
-  [k: string]: unknown;
 }
 
 export type { BatchComputeEmbeddingRequest, BatchComputeEmbeddingResponse, BatchEmbeddingResult, ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest, ComputeTextEmbeddingResponse, EmbeddingItem, EmbeddingListResponse, EmbeddingResultItem, EmbeddingResultsRequest, EmbeddingResultsResponse, JobItem, JobListResponse, JobStatus, JobSummary, RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent, SearchResultItem, SemanticSearchRequest, SemanticSearchResponse, StateFilterItem, StatesResponse };

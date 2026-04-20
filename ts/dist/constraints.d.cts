@@ -111,7 +111,6 @@ interface Constraint {
    */
   name: string;
   severity: ConstraintSeverity;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -137,7 +136,6 @@ interface ConstraintViolation {
    * Line number (if applicable).
    */
   line?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -170,7 +168,6 @@ interface ConstraintResult {
    * Details about the violation (empty if passed).
    */
   violations: ConstraintViolation[];
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -205,7 +202,61 @@ interface ResourceLimits {
    * Default: 0.75 (warn at 75% of limit).
    */
   warningThreshold?: number | null;
-  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * A constraint proposal from the AI.
+ *
+ * Internally tagged by `type` so the on-the-wire shape matches the TypeScript
+ * discriminated union `{ type: "new_constraint" | "builtin_override", ... }`.
+ */
+type ConstraintProposal =
+  | {
+      constraint: Constraint;
+      type: "new_constraint";
+    }
+  | {
+      /**
+       * Builtin suffix (e.g., `"no-secrets"`, `"no-debug-statements"`).
+       */
+      builtinSuffix: string;
+      /**
+       * Whether the builtin should be enabled.
+       */
+      enabled: boolean;
+      /**
+       * Human-readable justification for the override.
+       */
+      reason: string;
+      type: "builtin_override";
+    };
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * A new constraint proposed by the AI during an agentic phase.
+ *
+ * Serialized with `"type": "new_constraint"` via the `ConstraintProposal`
+ * enum's internal tag.
+ */
+interface NewConstraintProposal {
+  constraint: Constraint;
 }
 
 /* eslint-disable */
@@ -234,51 +285,7 @@ interface BuiltinOverrideProposal {
    * Human-readable justification for the override.
    */
   reason: string;
-  [k: string]: unknown;
 }
-
-/* eslint-disable */
-/**
- * This file was automatically generated.
- * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
- * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
- */
-
-
-
-/**
- * A new constraint proposed by the AI during an agentic phase.
- *
- * Serialized with `"type": "new_constraint"` via the `ConstraintProposal`
- * enum's internal tag.
- */
-interface NewConstraintProposal {
-  constraint: Constraint;
-  [k: string]: unknown;
-}
-
-/* eslint-disable */
-/**
- * This file was automatically generated.
- * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
- * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
- */
-
-
-
-/**
- * A constraint proposal from the AI.
- *
- * Internally tagged by `type` so the on-the-wire shape matches the TypeScript
- * discriminated union `{ type: "new_constraint" | "builtin_override", ... }`.
- */
-type ConstraintProposal =
-  | (NewConstraintProposal & {
-      type: "new_constraint";
-    })
-  | (BuiltinOverrideProposal & {
-      type: "builtin_override";
-    });
 
 /* eslint-disable */
 /**
@@ -295,7 +302,6 @@ interface ValidateConfigRequest {
    * Raw TOML content to validate.
    */
   toml: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -323,7 +329,6 @@ interface ValidateConfigResponse {
    * Whether the config is fully valid (parseable with no errors or warnings).
    */
   valid: boolean;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -345,7 +350,6 @@ interface ReadConfigResponse {
    * Raw TOML content of the `constraints.toml` file (empty string if not found).
    */
   toml: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -367,7 +371,6 @@ interface WriteConfigRequest {
    * Raw TOML content to validate and write.
    */
   toml: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -393,7 +396,6 @@ interface WriteConfigResponse {
    * Whether the config is fully valid (parseable with no errors or warnings).
    */
   valid: boolean;
-  [k: string]: unknown;
 }
 
 export type { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse };

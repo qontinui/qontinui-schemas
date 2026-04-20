@@ -171,7 +171,6 @@ interface AccessibilityState {
    * Selectable element's selection state.
    */
   isSelected?: boolean | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -190,7 +189,6 @@ interface AccessibilityBounds {
   width: number;
   x: number;
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -263,7 +261,6 @@ interface AccessibilityNode {
    * Current value (for inputs).
    */
   value?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -304,7 +301,6 @@ interface AccessibilitySnapshot {
    * Page URL (for web targets).
    */
   url?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -395,7 +391,6 @@ interface AccessibilitySelector {
    * Partial value match (contains).
    */
   valueContains?: string | null;
-  [k: string]: unknown;
 }
 
 export type { AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole, AccessibilitySelector, AccessibilitySnapshot, AccessibilityState };

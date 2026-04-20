@@ -1,4 +1,4 @@
-export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-CqNVcR0n.cjs';
+export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-BbpFAWF4.cjs';
 
 /* eslint-disable */
 /**
@@ -61,7 +61,6 @@ interface Monitor {
    * Y position in absolute screen coordinates (can be negative).
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -85,7 +84,6 @@ interface VirtualDesktop {
    * List of all monitors in the virtual desktop.
    */
   monitors: Monitor[];
-  [k: string]: unknown;
 }
 
 export type { Monitor, MonitorPosition, VirtualDesktop };

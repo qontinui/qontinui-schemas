@@ -171,7 +171,6 @@ interface RunnerMetadata {
    * Screen resolution as a free-form string (e.g., `"1920x1080"`).
    */
   screenResolution?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -217,7 +216,6 @@ interface WorkflowMetadata {
    * Workflow version, if tracked.
    */
   workflowVersion?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -275,7 +273,6 @@ interface ExecutionStats {
    * Aggregate output tokens across all LLM actions.
    */
   totalTokensOutput?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -329,7 +326,6 @@ interface CoverageData {
    * IDs of transitions that were not executed.
    */
   uncoveredTransitions?: string[] | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -373,7 +369,6 @@ interface LLMMetrics {
    * Computed total token count.
    */
   tokensTotal?: number | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -413,7 +408,6 @@ interface ExecutionRunCreate {
    * Workflow metadata, if the run executes a workflow.
    */
   workflowMetadata?: WorkflowMetadata | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -455,7 +449,6 @@ interface ExecutionRunResponse {
    */
   startedAt: string;
   status: RunStatus$1;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -488,7 +481,6 @@ interface ExecutionMatchLocation {
    * Y coordinate in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -610,7 +602,6 @@ interface ActionExecutionCreate {
    * Trace ID correlating related actions.
    */
   traceId?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -636,7 +627,6 @@ interface ActionExecutionResponse {
    * Associated run ID.
    */
   runId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -677,7 +667,6 @@ interface ScreenshotAnnotation {
    * Y coordinate in pixels.
    */
   y: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -736,7 +725,6 @@ interface ExecutionScreenshotCreate {
    * Image width in pixels.
    */
   width: number;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -774,7 +762,6 @@ interface ExecutionScreenshotResponse {
    * ISO 8601 timestamp when the image was uploaded.
    */
   uploadedAt: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -833,7 +820,6 @@ interface ExecutionIssueCreate {
    * Short human-readable title.
    */
   title: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -859,7 +845,6 @@ interface ExecutionIssueResponse {
    * Associated run ID.
    */
   runId: string;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -893,7 +878,6 @@ interface ExecutionRunComplete {
    * Free-form run summary.
    */
   summary?: string | null;
-  [k: string]: unknown;
 }
 
 /* eslint-disable */
@@ -931,7 +915,6 @@ interface ExecutionRunCompleteResponse {
   startedAt: string;
   stats: ExecutionStats;
   status: RunStatus$1;
-  [k: string]: unknown;
 }
 
 /**
