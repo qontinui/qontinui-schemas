@@ -6,6 +6,7 @@
  */
 
 import type { ComponentActionInfo } from './ComponentActionInfo';
+import type { ElementBbox } from './ElementBbox';
 import type { ElementIdentifier } from './ElementIdentifier';
 import type { ElementRect } from './ElementRect';
 import type { ElementState } from './ElementState';

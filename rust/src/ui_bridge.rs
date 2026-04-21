@@ -29,6 +29,28 @@ use serde::{Deserialize, Serialize};
 // Element geometry
 // ============================================================================
 
+/// Viewport-relative bounding box in CSS pixels.
+///
+/// This is the live on-screen geometry captured at snapshot time via
+/// `Element.getBoundingClientRect()`. Present only when the SDK has a
+/// live DOM ref for the element; absent when the element is registered
+/// without a ref or when the snapshot is served from the DOM-fallback
+/// scanner.
+///
+/// Click target for a hit is `(x + width/2, y + height/2)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct ElementBbox {
+    /// X coordinate of the bbox origin in viewport CSS pixels.
+    pub x: f64,
+    /// Y coordinate of the bbox origin in viewport CSS pixels.
+    pub y: f64,
+    /// Width of the bbox in CSS pixels.
+    pub width: f64,
+    /// Height of the bbox in CSS pixels.
+    pub height: f64,
+}
+
 /// Bounding rectangle of a DOM element, mirroring the output of
 /// `Element.getBoundingClientRect()`.
 ///
@@ -155,6 +177,16 @@ pub struct UIBridgeElement {
     pub registered_at: i64,
     /// Whether the element's React component is currently mounted.
     pub mounted: bool,
+    /// Viewport-relative bounding box in CSS pixels, when the SDK has a
+    /// live DOM ref. Absent for elements registered without a ref or when
+    /// the snapshot is served from the DOM-fallback scanner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bbox: Option<ElementBbox>,
+    /// Cheap viewport-visibility signal derived by the SDK as
+    /// `bbox.width > 0 && bbox.height > 0`. Use `state.visible` for the
+    /// richer occlusion check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
 }
 
 /// Information about a single action exposed by a UI Bridge component.

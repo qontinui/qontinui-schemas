@@ -5,6 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+import type { ElementBbox } from './ElementBbox';
 import type { ElementIdentifier } from './ElementIdentifier';
 import type { ElementRect } from './ElementRect';
 import type { ElementState } from './ElementState';
@@ -20,6 +21,12 @@ export interface UIBridgeElement {
    * Standard actions available on this element.
    */
   actions?: string[];
+  /**
+   * Viewport-relative bounding box in CSS pixels, when the SDK has a
+   * live DOM ref. Absent for elements registered without a ref or when
+   * the snapshot is served from the DOM-fallback scanner.
+   */
+  bbox?: ElementBbox | null;
   /**
    * Custom (application-defined) actions.
    */
@@ -46,4 +53,10 @@ export interface UIBridgeElement {
    * Element type (e.g. `"button"`, `"input"`, `"select"`).
    */
   type: string;
+  /**
+   * Cheap viewport-visibility signal derived by the SDK as
+   * `bbox.width > 0 && bbox.height > 0`. Use `state.visible` for the
+   * richer occlusion check.
+   */
+  visible?: boolean | null;
 }

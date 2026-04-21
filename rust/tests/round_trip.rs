@@ -8285,10 +8285,56 @@ fn ui_bridge_element_roundtrips() {
         },
         registered_at: 1713200000000,
         mounted: true,
+        bbox: None,
+        visible: None,
     };
     let json = serde_json::to_string(&elem).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["type"], "button", "element_type renames to type");
+    let back: UIBridgeElement = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn ui_bridge_element_with_bbox_roundtrips() {
+    use qontinui_types::ui_bridge::*;
+    let elem = UIBridgeElement {
+        id: "elem-2".to_string(),
+        element_type: "button".to_string(),
+        label: Some("Save".to_string()),
+        actions: vec!["click".to_string()],
+        custom_actions: None,
+        identifier: ElementIdentifier {
+            ui_id: None,
+            test_id: None,
+            awas_id: None,
+            html_id: None,
+            xpath: "/button[2]".to_string(),
+            selector: "button.save".to_string(),
+        },
+        state: ElementState {
+            visible: true,
+            enabled: true,
+            focused: false,
+            rect: ElementRect {
+                x: 120.0, y: 44.0, width: 88.0, height: 32.0,
+                top: 44.0, right: 208.0, bottom: 76.0, left: 120.0,
+            },
+            value: None,
+            checked: None,
+            selected_options: None,
+            text_content: None,
+        },
+        registered_at: 1713200000000,
+        mounted: true,
+        bbox: Some(ElementBbox { x: 120.0, y: 44.0, width: 88.0, height: 32.0 }),
+        visible: Some(true),
+    };
+    let json = serde_json::to_string(&elem).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["bbox"]["x"], 120.0);
+    assert_eq!(v["bbox"]["width"], 88.0);
+    assert_eq!(v["visible"], true);
     let back: UIBridgeElement = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }

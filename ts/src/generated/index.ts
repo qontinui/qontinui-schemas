@@ -95,6 +95,7 @@ export type { DomainAssignment } from './DomainAssignment';
 export type { DomainKnowledge } from './DomainKnowledge';
 export type { DomainVerificationResult } from './DomainVerificationResult';
 export type { ElementActionRequest } from './ElementActionRequest';
+export type { ElementBbox } from './ElementBbox';
 export type { ElementIdentifier } from './ElementIdentifier';
 export type { ElementRect } from './ElementRect';
 export type { ElementState } from './ElementState';
