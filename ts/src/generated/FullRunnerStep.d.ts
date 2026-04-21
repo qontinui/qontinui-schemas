@@ -32,6 +32,8 @@ import type { UiBridgeStep } from './UiBridgeStep';
 import type { UiBridgeStepPhase } from './UiBridgeStepPhase';
 import type { UiBridgeVisualAssertionStep } from './UiBridgeVisualAssertionStep';
 import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { VgaAction } from './VgaAction';
+import type { VgaAutomateStep } from './VgaAutomateStep';
 import type { VisualAssertionType } from './VisualAssertionType';
 import type { WorkflowFixupMode } from './WorkflowFixupMode';
 import type { WorkflowFixupStep } from './WorkflowFixupStep';
@@ -76,6 +78,7 @@ import type { WorkflowStepPhase } from './WorkflowStepPhase';
  * | `WorkflowFixup` | `"workflow_fixup"` | `WorkflowFixupHandler` |
  * | `UiBridgeDesignAudit` | `"ui_bridge_design_audit"` | `UiBridgeDesignAuditHandler` |
  * | `UiBridgeVisualAssertion` | `"ui_bridge_visual_assertion"` | `UiBridgeVisualAssertionHandler` |
+ * | `VgaAutomate` | `"vga_automate"` | `VgaAutomateHandler` |
  * | `WorkflowRef` | `"workflow_ref"` | `WorkflowRefHandler` |
  * | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
  * | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
@@ -123,6 +126,9 @@ export type FullRunnerStep =
     })
   | (UiBridgeVisualAssertionStep & {
       type: "ui_bridge_visual_assertion";
+    })
+  | (VgaAutomateStep & {
+      type: "vga_automate";
     })
   | (WorkflowRefStep & {
       type: "workflow_ref";

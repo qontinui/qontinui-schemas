@@ -386,6 +386,9 @@ from .per_type.verification_result_response import VerificationResultResponse
 from .per_type.verification_results_list_response import VerificationResultsListResponse
 from .per_type.verification_step_details import VerificationStepDetails
 from .per_type.verification_step_result import VerificationStepResult
+from .per_type.vga_action import VgaAction
+from .per_type.vga_action_kind import VgaActionKind
+from .per_type.vga_automate_step import VgaAutomateStep
 from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
 from .per_type.visual_comparison_result import VisualComparisonResult
@@ -794,6 +797,9 @@ __all__ = [
     "VerificationResultsListResponse",
     "VerificationStepDetails",
     "VerificationStepResult",
+    "VgaAction",
+    "VgaActionKind",
+    "VgaAutomateStep",
     "VirtualDesktop",
     "VisualAssertionType",
     "VisualComparisonResult",

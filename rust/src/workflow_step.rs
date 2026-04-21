@@ -900,6 +900,125 @@ pub struct UiBridgeDesignAuditStep {
     pub timeout_seconds: Option<u64>,
 }
 
+// ── VgaAutomateStep ──────────────────────────────────────────────────────────
+
+/// Kinds of action supported by a [`VgaAutomateStep`] `action_sequence` entry.
+///
+/// Mirrors the TS `VgaActionKind` literal union. Each variant carries its own
+/// set of fields (see [`VgaAction`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VgaActionKind {
+    #[default]
+    Click,
+    Type,
+    WaitFor,
+}
+
+/// A single action inside a [`VgaAutomateStep`] action sequence.
+///
+/// Wire shape is internally tagged with `"kind"`:
+/// - `{ "kind": "click", "elementId": "<uuid>", "timeoutMs": 10000 }`
+/// - `{ "kind": "type", "text": "hello", "elementId": "<uuid>", "timeoutMs": 10000 }`
+///   (`elementId` omitted/null = type into the currently focused element)
+/// - `{ "kind": "wait_for", "elementId": "<uuid>", "timeoutMs": 30000 }`
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum VgaAction {
+    /// Click the element identified by `element_id` (UUID referencing an
+    /// element inside the VGA state machine).
+    Click {
+        /// UUID of the target element in the VGA state machine's element set.
+        #[serde(rename = "elementId", alias = "element_id")]
+        element_id: String,
+        /// Per-action timeout in milliseconds. Defaults to `10000` on the
+        /// consumer side.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "timeoutMs",
+            alias = "timeout_ms"
+        )]
+        timeout_ms: Option<u64>,
+    },
+    /// Type `text` into `element_id`, or into the currently focused element
+    /// when `element_id` is absent/`null`.
+    Type {
+        /// Literal text to type.
+        #[serde(alias = "text")]
+        text: String,
+        /// UUID of the target element. Absent / `null` means "type into
+        /// whichever element currently has focus".
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "elementId",
+            alias = "element_id"
+        )]
+        element_id: Option<String>,
+        /// Per-action timeout in milliseconds. Defaults to `10000` on the
+        /// consumer side.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "timeoutMs",
+            alias = "timeout_ms"
+        )]
+        timeout_ms: Option<u64>,
+    },
+    /// Wait for `element_id` to become visible / actionable.
+    WaitFor {
+        /// UUID of the target element.
+        #[serde(rename = "elementId", alias = "element_id")]
+        element_id: String,
+        /// Per-action timeout in milliseconds. Defaults to `30000` on the
+        /// consumer side.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "timeoutMs",
+            alias = "timeout_ms"
+        )]
+        timeout_ms: Option<u64>,
+    },
+}
+
+/// Run a Visual GUI Automation (VGA) action sequence against a target process.
+///
+/// Wire tag: `"vga_automate"`.
+///
+/// Delegates to the Python `qontinui.vga.worker` via the `python-bridge` IPC.
+/// The worker loads the referenced state machine (`state_machine_id` →
+/// `runner.vga_state_machines`), focuses `target_process`, and executes each
+/// entry in `action_sequence` by grounding the element prompt against a fresh
+/// screenshot and dispatching the HAL click/type/wait primitive.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VgaAutomateStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// UUID referencing `runner.vga_state_machines.id` — the persisted state
+    /// machine that defines the elements this step may click / type into /
+    /// wait for.
+    #[serde(alias = "state_machine_id")]
+    pub state_machine_id: String,
+    /// Target process / window — e.g. `"notepad++.exe"`. Used by the HAL to
+    /// focus the correct top-level window before each action.
+    #[serde(alias = "target_process")]
+    pub target_process: String,
+    /// Ordered sequence of VGA actions to execute.
+    #[serde(default, skip_serializing_if = "vec_is_empty", alias = "action_sequence")]
+    pub action_sequence: Vec<VgaAction>,
+    /// Overall step timeout in milliseconds. Defaults to `300000` (5 minutes)
+    /// on the consumer side; bounds `[1000, 3600000]`.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_ms")]
+    pub timeout_ms: Option<u64>,
+    /// Reserved for future async mode. Currently must be `false` (or omitted)
+    /// — the handler rejects `true` until async mode is implemented.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "async")]
+    pub r#async: Option<bool>,
+}
+
 // ── UiBridgeVisualAssertionStep ──────────────────────────────────────────────
 
 /// Visual assertion type.
@@ -1055,6 +1174,7 @@ pub struct DagLoopStep {
 /// | `WorkflowFixup` | `"workflow_fixup"` | `WorkflowFixupHandler` |
 /// | `UiBridgeDesignAudit` | `"ui_bridge_design_audit"` | `UiBridgeDesignAuditHandler` |
 /// | `UiBridgeVisualAssertion` | `"ui_bridge_visual_assertion"` | `UiBridgeVisualAssertionHandler` |
+/// | `VgaAutomate` | `"vga_automate"` | `VgaAutomateHandler` |
 /// | `WorkflowRef` | `"workflow_ref"` | `WorkflowRefHandler` |
 /// | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
 /// | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
@@ -1083,6 +1203,7 @@ pub enum FullRunnerStep {
     WorkflowFixup(WorkflowFixupStep),
     UiBridgeDesignAudit(UiBridgeDesignAuditStep),
     UiBridgeVisualAssertion(UiBridgeVisualAssertionStep),
+    VgaAutomate(VgaAutomateStep),
     WorkflowRef(WorkflowRefStep),
     DagCancel(DagCancelStep),
     DagApproval(DagApprovalStep),
@@ -1105,6 +1226,7 @@ impl FullRunnerStep {
             Self::WorkflowFixup(_) => "workflow_fixup",
             Self::UiBridgeDesignAudit(_) => "ui_bridge_design_audit",
             Self::UiBridgeVisualAssertion(_) => "ui_bridge_visual_assertion",
+            Self::VgaAutomate(_) => "vga_automate",
             Self::WorkflowRef(_) => "workflow_ref",
             Self::DagCancel(_) => "dag_cancel",
             Self::DagApproval(_) => "dag_approval",
@@ -1307,6 +1429,43 @@ mod tests {
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "ui_bridge_design_audit");
         assert_eq!(json["timeoutSeconds"], 30);
+        assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn vga_automate_step_round_trip() {
+        let step = FullRunnerStep::VgaAutomate(VgaAutomateStep {
+            base: base("vga1", "Drive Notepad++"),
+            state_machine_id: "11111111-1111-1111-1111-111111111111".into(),
+            target_process: "notepad++.exe".into(),
+            action_sequence: vec![
+                VgaAction::WaitFor {
+                    element_id: "22222222-2222-2222-2222-222222222222".into(),
+                    timeout_ms: Some(30000),
+                },
+                VgaAction::Click {
+                    element_id: "22222222-2222-2222-2222-222222222222".into(),
+                    timeout_ms: None,
+                },
+                VgaAction::Type {
+                    text: "hello world".into(),
+                    element_id: None,
+                    timeout_ms: Some(10000),
+                },
+            ],
+            timeout_ms: Some(300000),
+            r#async: Some(false),
+        });
+        let json = serde_json::to_value(&step).unwrap();
+        assert_type_tag(&json, "vga_automate");
+        assert_eq!(json["stateMachineId"], "11111111-1111-1111-1111-111111111111");
+        assert_eq!(json["targetProcess"], "notepad++.exe");
+        assert_eq!(json["actionSequence"][0]["kind"], "wait_for");
+        assert_eq!(json["actionSequence"][1]["kind"], "click");
+        assert_eq!(json["actionSequence"][2]["kind"], "type");
+        assert_eq!(json["actionSequence"][2]["text"], "hello world");
+        assert_eq!(json["timeoutMs"], 300000);
+        assert_eq!(json["async"], false);
         assert_eq!(roundtrip(&step), step);
     }
 
