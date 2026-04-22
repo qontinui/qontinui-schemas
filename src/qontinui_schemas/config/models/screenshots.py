@@ -236,8 +236,7 @@ class Screenshot(BaseModel):
     monitors: list[int] = Field(
         default_factory=lambda: [0],
         description=(
-            "Monitor indices this screenshot is from/for"
-            " (default: [0] for primary)"
+            "Monitor indices this screenshot is from/for (default: [0] for primary)"
         ),
     )
     source: ScreenshotSource | None = Field(

@@ -186,8 +186,7 @@ class StateImage(BaseModel):
     patterns: list[Pattern] = Field(
         default_factory=list,
         description=(
-            "Multiple patterns for visual variations"
-            " (e.g., normal, hover, clicked)"
+            "Multiple patterns for visual variations (e.g., normal, hover, clicked)"
         ),
     )
     shared: bool = Field(
@@ -197,8 +196,7 @@ class StateImage(BaseModel):
     source: str | None = Field(
         default=None,
         description=(
-            "How the image was created"
-            " (upload, pattern-optimization, image-extraction)"
+            "How the image was created (upload, pattern-optimization, image-extraction)"
         ),
     )
     probability: float | None = Field(

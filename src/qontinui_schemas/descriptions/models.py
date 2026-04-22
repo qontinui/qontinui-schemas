@@ -48,8 +48,7 @@ class StateDescription(BaseModel):
     verification_prompt: str | None = Field(
         None,
         description=(
-            "Custom hints for AI verification"
-            " - specific things to check or look for"
+            "Custom hints for AI verification - specific things to check or look for"
         ),
     )
 
@@ -75,8 +74,7 @@ class ActionDescription(BaseModel):
     postconditions: list[str] | None = Field(
         None,
         description=(
-            "Conditions that should be true after"
-            " this action completes successfully"
+            "Conditions that should be true after this action completes successfully"
         ),
     )
     failure_modes: list[str] | None = Field(
@@ -104,17 +102,11 @@ class TransitionDescription(BaseModel):
     )
     preconditions: list[str] | None = Field(
         None,
-        description=(
-            "Conditions that must be true"
-            " before this transition can occur"
-        ),
+        description=("Conditions that must be true before this transition can occur"),
     )
     postconditions: list[str] | None = Field(
         None,
-        description=(
-            "Conditions that should be true"
-            " after this transition completes"
-        ),
+        description=("Conditions that should be true after this transition completes"),
     )
     failure_modes: list[str] | None = Field(
         None,
@@ -143,8 +135,7 @@ class WorkflowDescription(BaseModel):
     purpose: str = Field(
         ...,
         description=(
-            "Overall goal of the workflow"
-            " (e.g., 'Complete user registration process')"
+            "Overall goal of the workflow (e.g., 'Complete user registration process')"
         ),
     )
     success_criteria: str = Field(
@@ -157,16 +148,12 @@ class WorkflowDescription(BaseModel):
     steps_summary: list[str] | None = Field(
         None,
         description=(
-            "Human-readable summary of the workflow steps"
-            " for quick understanding"
+            "Human-readable summary of the workflow steps for quick understanding"
         ),
     )
     business_context: str | None = Field(
         None,
-        description=(
-            "Why this workflow exists"
-            " and its importance in the application"
-        ),
+        description=("Why this workflow exists and its importance in the application"),
     )
 
 

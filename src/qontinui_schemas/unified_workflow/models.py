@@ -159,8 +159,7 @@ class BaseStep(BaseModel):
     extract: dict[str, str] | None = Field(
         None,
         description=(
-            "Output variable extractions"
-            " (variable_name -> extraction expression)"
+            "Output variable extractions (variable_name -> extraction expression)"
         ),
     )
     depends_on: list[str] | None = Field(
@@ -472,8 +471,7 @@ class UnifiedWorkflow(BaseModel):
     enforce_token_budget: bool | None = Field(
         None,
         description=(
-            "Whether to stop execution if accumulated"
-            " token usage exceeds the budget"
+            "Whether to stop execution if accumulated token usage exceeds the budget"
         ),
     )
     strict_cwd: bool | None = Field(
@@ -537,8 +535,7 @@ class UnifiedWorkflow(BaseModel):
     prompt_template: str | None = Field(
         None,
         description=(
-            "Template for constructing the agentic prompt"
-            " from verification results"
+            "Template for constructing the agentic prompt from verification results"
         ),
     )
     stages: list[WorkflowStage] | None = Field(
@@ -558,8 +555,7 @@ class UnifiedWorkflow(BaseModel):
     constraint_overrides: dict[str, bool] | None = Field(
         None,
         description=(
-            "Per-constraint overrides:"
-            " map of constraint_id to enabled/disabled"
+            "Per-constraint overrides: map of constraint_id to enabled/disabled"
         ),
     )
     dependency_graph: dict[str, Any] | None = Field(
@@ -587,8 +583,7 @@ class UnifiedWorkflow(BaseModel):
     category: str = Field(
         ...,
         description=(
-            "Category for organizing workflows"
-            " (e.g., 'development', 'testing')"
+            "Category for organizing workflows (e.g., 'development', 'testing')"
         ),
     )
     tags: list[str] = Field(

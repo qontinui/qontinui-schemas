@@ -100,8 +100,7 @@ class TransitionExecutionResult(BaseModel):
     error: str | None = Field(
         None,
         description=(
-            "Error message if the transition failed"
-            " (undefined if success is true)"
+            "Error message if the transition failed (undefined if success is true)"
         ),
     )
 

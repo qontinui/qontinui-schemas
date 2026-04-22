@@ -17,6 +17,7 @@ output is rewritten in place (or to `--output`).
 Idempotent: re-running on a schema that already has `discriminator`
 leaves it unchanged.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,11 +62,7 @@ def _annotate(node: Any) -> int:
     count = 0
     if isinstance(node, dict):
         one_of = node.get("oneOf")
-        if (
-            isinstance(one_of, list)
-            and one_of
-            and "discriminator" not in node
-        ):
+        if isinstance(one_of, list) and one_of and "discriminator" not in node:
             prop = _find_discriminator(one_of)
             if prop is not None:
                 node["discriminator"] = {"propertyName": prop}

@@ -100,8 +100,7 @@ class Coordinates(BaseModel):
     system: Optional[CoordinateSystem] = Field(
         default=None,
         description=(
-            "Coordinate system. None defaults to SCREEN"
-            " for backward compatibility."
+            "Coordinate system. None defaults to SCREEN for backward compatibility."
         ),
     )
     monitor_index: Optional[int] = Field(
@@ -154,8 +153,7 @@ class Region(BaseModel):
     system: Optional[CoordinateSystem] = Field(
         default=None,
         description=(
-            "Coordinate system. None defaults to SCREEN"
-            " for backward compatibility."
+            "Coordinate system. None defaults to SCREEN for backward compatibility."
         ),
     )
     monitor_index: Optional[int] = Field(

@@ -46,8 +46,7 @@ class ContextAutoInclude(BaseModel):
         default=None,
         alias="filePatterns",
         description=(
-            "Glob patterns for files being worked on"
-            " (e.g., '*.rs', 'src/api/**')"
+            "Glob patterns for files being worked on (e.g., '*.rs', 'src/api/**')"
         ),
     )
 

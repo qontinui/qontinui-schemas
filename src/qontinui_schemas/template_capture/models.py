@@ -752,8 +752,7 @@ class GenerateStateMachineRequest(BaseModel):
         default=None,
         alias="stateAssignments",
         description=(
-            "Explicit state-to-template mappings"
-            " (required if using user_assignments)"
+            "Explicit state-to-template mappings (required if using user_assignments)"
         ),
     )
     session_id: str | None = Field(
