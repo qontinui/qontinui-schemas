@@ -142,10 +142,9 @@ poetry install
 
 ```bash
 # Format code
-poetry run black src/
-poetry run isort src/
+poetry run ruff format src/
 
-# Lint
+# Lint (includes import sorting via the `I` rule)
 poetry run ruff check src/
 
 # Type check
