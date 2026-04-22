@@ -59,9 +59,7 @@ pub enum ParserType {
 /// Ordering mirrors the lifecycle progression:
 /// `Stopped → Starting → (Building) → Running → Healthy → Stopping → Stopped`,
 /// or to `Failed` on any abnormal exit.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessState {
     Stopped,
@@ -78,9 +76,7 @@ pub enum ProcessState {
 // ============================================================================
 
 /// Which output stream a captured line came from.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputStream {
     Stdout,
@@ -151,7 +147,11 @@ pub struct ProcessConfig {
     #[serde(default, alias = "env")]
     pub env: HashMap<String, String>,
     /// Port to check for health (optional)
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "health_port")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "health_port"
+    )]
     pub health_port: Option<u16>,
     /// Parser type for error detection
     #[serde(default, alias = "parser")]
@@ -185,7 +185,11 @@ pub struct ProcessConfig {
     #[serde(default = "default_true", alias = "rebuild_enabled")]
     pub rebuild_enabled: bool,
     /// Build command to run before restarting (e.g., "cargo", "npm").
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "build_command")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "build_command"
+    )]
     pub build_command: Option<String>,
     /// Build command arguments (e.g., ["build"], ["run", "build"]).
     #[serde(default, alias = "build_args")]

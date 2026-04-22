@@ -40,8 +40,7 @@ fn schedule_expression_once_roundtrips() {
     let expr = ScheduleExpression::Once("2026-04-14T03:00:00Z".to_string());
     let json = serde_json::to_string(&expr).unwrap();
     assert_eq!(
-        json,
-        r#"{"type":"Once","value":"2026-04-14T03:00:00Z"}"#,
+        json, r#"{"type":"Once","value":"2026-04-14T03:00:00Z"}"#,
         "wire shape must be externally tagged {{type, value}}"
     );
     let back: ScheduleExpression = serde_json::from_str(&json).unwrap();
@@ -495,10 +494,12 @@ fn log_source_selection_profile_is_object() {
 #[test]
 fn log_source_selection_deserializes_both_wire_shapes() {
     let from_string: LogSourceSelection = serde_json::from_str("\"default\"").unwrap();
-    assert_eq!(from_string, LogSourceSelection::Mode(LogSourceMode::Default));
+    assert_eq!(
+        from_string,
+        LogSourceSelection::Mode(LogSourceMode::Default)
+    );
 
-    let from_obj: LogSourceSelection =
-        serde_json::from_str(r#"{"profile_id": "abc"}"#).unwrap();
+    let from_obj: LogSourceSelection = serde_json::from_str(r#"{"profile_id": "abc"}"#).unwrap();
     assert_eq!(
         from_obj,
         LogSourceSelection::Profile {
@@ -604,7 +605,10 @@ fn unified_step_command_roundtrips() {
         "missing discriminator: {json}"
     );
     assert!(json.contains("\"id\":\"s1\""), "base not flattened: {json}");
-    assert!(json.contains("\"phase\":\"setup\""), "phase missing: {json}");
+    assert!(
+        json.contains("\"phase\":\"setup\""),
+        "phase missing: {json}"
+    );
     assert!(json.contains("\"mode\":\"shell\""), "mode missing: {json}");
     assert!(
         json.contains("\"command\":\"cargo build\""),
@@ -902,12 +906,13 @@ fn full_fixture_every_step_decodes_as_full_runner_step() {
                 .to_string();
 
             // Decode as FullRunnerStep.
-            let decoded: FullRunnerStep = serde_json::from_value(step.clone()).unwrap_or_else(|e| {
-                panic!(
-                    "{}[{}] (type={:?}): failed to decode as FullRunnerStep: {}",
-                    phase, idx, wire_type, e
-                )
-            });
+            let decoded: FullRunnerStep =
+                serde_json::from_value(step.clone()).unwrap_or_else(|e| {
+                    panic!(
+                        "{}[{}] (type={:?}): failed to decode as FullRunnerStep: {}",
+                        phase, idx, wire_type, e
+                    )
+                });
 
             // Variant's step_type() must match the wire tag.
             assert_eq!(
@@ -980,13 +985,12 @@ fn unknown_fixture_unified_step_fallback() {
                 .unwrap_or_else(|| panic!("{}[{}]: missing `type`", phase, idx))
                 .to_string();
 
-            let decoded: UnifiedStep =
-                serde_json::from_value(step.clone()).unwrap_or_else(|e| {
-                    panic!(
-                        "{}[{}] (type={:?}): failed to decode as UnifiedStep: {}",
-                        phase, idx, wire_type, e
-                    )
-                });
+            let decoded: UnifiedStep = serde_json::from_value(step.clone()).unwrap_or_else(|e| {
+                panic!(
+                    "{}[{}] (type={:?}): failed to decode as UnifiedStep: {}",
+                    phase, idx, wire_type, e
+                )
+            });
 
             if canonical_tags.contains(&wire_type.as_str()) {
                 assert!(
@@ -1128,10 +1132,7 @@ fn task_run_finding_action_type_snake_case() {
             "\"needs_user_input\"",
         ),
         (TaskRunFindingActionType::Manual, "\"manual\""),
-        (
-            TaskRunFindingActionType::Informational,
-            "\"informational\"",
-        ),
+        (TaskRunFindingActionType::Informational, "\"informational\""),
     ];
     for (at, expected) in cases {
         let json = serde_json::to_string(&at).expect("serialize");
@@ -1598,8 +1599,7 @@ fn task_run_findings_list_response_roundtrips() {
         summary: sample_finding_summary(),
     };
     let json1 = serde_json::to_string(&resp).expect("serialize");
-    let back: TaskRunFindingsListResponse =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: TaskRunFindingsListResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -1706,8 +1706,7 @@ fn step_execution_config_preserves_extra_keys() {
     // Put an unknown key on the wire; StepExecutionConfig#extra must capture
     // it via `#[serde(flatten)]` and preserve it through round-trip.
     let wire = r#"{"actionType":"click","targetImageId":"img-7","retries":3,"custom":{"a":1}}"#;
-    let cfg: StepExecutionConfig =
-        serde_json::from_str(wire).expect("deserialize with extra keys");
+    let cfg: StepExecutionConfig = serde_json::from_str(wire).expect("deserialize with extra keys");
     assert_eq!(cfg.action_type.as_deref(), Some("click"));
     assert_eq!(cfg.target_image_id.as_deref(), Some("img-7"));
     assert_eq!(cfg.extra.get("retries"), Some(&json!(3)));
@@ -1836,8 +1835,7 @@ fn verification_results_list_response_roundtrips() {
         failed_iterations: 0,
     };
     let json = serde_json::to_string(&resp).expect("serialize");
-    let back: VerificationResultsListResponse =
-        serde_json::from_str(&json).expect("deserialize");
+    let back: VerificationResultsListResponse = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
 }
 
@@ -2282,8 +2280,7 @@ fn state_machine_transition_update_roundtrips() {
         extra_metadata: None,
     };
     let json = serde_json::to_string(&u).expect("serialize");
-    let back: StateMachineTransitionUpdate =
-        serde_json::from_str(&json).expect("deserialize");
+    let back: StateMachineTransitionUpdate = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
 }
 
@@ -2486,8 +2483,7 @@ fn resolved_initial_states_result_roundtrips() {
     let v: Value = serde_json::from_str(&json).expect("parse");
     assert!(v["stateIds"].is_array());
     assert_eq!(v["workflowId"], "");
-    let back: ResolvedInitialStatesResult =
-        serde_json::from_str(&json).expect("deserialize");
+    let back: ResolvedInitialStatesResult = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(json, serde_json::to_string(&back).expect("re-serialize"));
 }
 
@@ -3437,10 +3433,10 @@ fn target_config_result_by_image_roundtrips() {
 use qontinui_types::execution::{
     ActionExecutionCreate, ActionExecutionResponse, ActionStatus, ActionType as ExecActionType,
     CoverageData, ErrorType, ExecutionIssueCreate, ExecutionIssueResponse, ExecutionRunComplete,
-    ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse, ExecutionScreenshotCreate,
-    ExecutionScreenshotResponse, ExecutionStats, IssueSeverity, LLMMetrics,
-    MatchLocation as ExecMatchLocation, RunStatus, RunType, RunnerMetadata, ScreenshotAnnotation,
-    ScreenshotAnnotationShape, ScreenshotType, WorkflowMetadata,
+    ExecutionRunCompleteResponse, ExecutionRunCreate, ExecutionRunResponse,
+    ExecutionScreenshotCreate, ExecutionScreenshotResponse, ExecutionStats, IssueSeverity,
+    LLMMetrics, MatchLocation as ExecMatchLocation, RunStatus, RunType, RunnerMetadata,
+    ScreenshotAnnotation, ScreenshotAnnotationShape, ScreenshotType, WorkflowMetadata,
 };
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -4462,14 +4458,14 @@ fn playback_frame_request_roundtrips() {
 // ============================================================================
 
 use qontinui_types::rag::{
-    BatchComputeEmbeddingRequest, BatchComputeEmbeddingResponse, BatchEmbeddingResult,
-    BoundingBox, ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest,
+    BatchComputeEmbeddingRequest, BatchComputeEmbeddingResponse, BatchEmbeddingResult, BoundingBox,
+    ComputeEmbeddingRequest, ComputeEmbeddingResponse, ComputeTextEmbeddingRequest,
     ComputeTextEmbeddingResponse, ElementType, EmbeddedElement, EmbeddingItem,
     EmbeddingListResponse, EmbeddingResultItem, EmbeddingResultsRequest, EmbeddingResultsResponse,
     ExportResult, GUIElementChunk, JobItem, JobListResponse, JobStatus, JobSummary,
-    RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent,
-    SearchResultItem, SemanticSearchRequest, SemanticSearchResponse, StateFilterItem,
-    StatesResponse, VectorSearchResult,
+    RAGDashboardStats, RagCompletionEvent, RagProcessingStatus, RagProgressEvent, SearchResultItem,
+    SemanticSearchRequest, SemanticSearchResponse, StateFilterItem, StatesResponse,
+    VectorSearchResult,
 };
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -4597,8 +4593,7 @@ fn compute_embedding_response_roundtrips() {
 #[test]
 fn batch_compute_embedding_request_defaults_true() {
     // compute_text_embeddings / extract_ocr default to true when absent.
-    let json_min =
-        r#"{"images":[{"id":"a","image_data":"AAAA"},{"id":"b","image_data":"BBBB"}]}"#;
+    let json_min = r#"{"images":[{"id":"a","image_data":"AAAA"},{"id":"b","image_data":"BBBB"}]}"#;
     let r: BatchComputeEmbeddingRequest = serde_json::from_str(json_min).expect("deserialize");
     assert!(r.compute_text_embeddings);
     assert!(r.extract_ocr);
@@ -6147,7 +6142,11 @@ fn process_config_fully_populated_roundtrips() {
         id: "proc-1".to_string(),
         name: "FastAPI Backend".to_string(),
         command: "poetry".to_string(),
-        args: vec!["run".to_string(), "uvicorn".to_string(), "main:app".to_string()],
+        args: vec![
+            "run".to_string(),
+            "uvicorn".to_string(),
+            "main:app".to_string(),
+        ],
         cwd: "/repo/backend".to_string(),
         env,
         health_port: Some(8000),
@@ -6329,10 +6328,7 @@ fn ticket_minimal_skips_optional_fields() {
     let json = serde_json::to_string(&t).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
     assert!(v.get("labels").is_none(), "empty labels must be skipped");
-    assert!(
-        v.get("assignee").is_none(),
-        "None assignee must be skipped"
-    );
+    assert!(v.get("assignee").is_none(), "None assignee must be skipped");
     let back: Ticket = serde_json::from_str(&json).unwrap();
     assert_eq!(serde_json::to_string(&back).unwrap(), json);
 }
@@ -6453,14 +6449,8 @@ fn exit_strategy_roundtrips_tagged_snake_case() {
 #[test]
 fn between_iterations_roundtrips_with_payload() {
     let cases = [
-        (
-            BetweenIterations::None,
-            r#"{"type":"none"}"#,
-        ),
-        (
-            BetweenIterations::WaitHealthy,
-            r#"{"type":"wait_healthy"}"#,
-        ),
+        (BetweenIterations::None, r#"{"type":"none"}"#),
+        (BetweenIterations::WaitHealthy, r#"{"type":"wait_healthy"}"#),
         (
             BetweenIterations::RestartRunner { rebuild: true },
             r#"{"type":"restart_runner","rebuild":true}"#,
@@ -6621,7 +6611,10 @@ fn create_ol_config_request_omits_optional_description() {
     };
     let json = serde_json::to_string(&req).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("description").is_none(), "description must be skipped");
+    assert!(
+        v.get("description").is_none(),
+        "description must be skipped"
+    );
 }
 
 #[test]
@@ -6698,9 +6691,8 @@ fn multi_loop_config_roundtrips() {
 use qontinui_types::discovery::{
     DiscoveredState, DiscoveredStateImage, DiscoveredTransition, DiscoveryBoundingBox,
     DiscoverySourceType, DiscoveryTransitionTrigger, StateDiscoveryResult,
-    StateDiscoveryResultCreate, StateDiscoveryResultListResponse,
-    StateDiscoveryResultSummary, StateDiscoveryResultUpdate, StateMachineExport,
-    StateMachineImport, TransitionTriggerType,
+    StateDiscoveryResultCreate, StateDiscoveryResultListResponse, StateDiscoveryResultSummary,
+    StateDiscoveryResultUpdate, StateMachineExport, StateMachineImport, TransitionTriggerType,
 };
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -6732,8 +6724,7 @@ fn transition_trigger_type_all_variants_roundtrip() {
     ] {
         let json = serde_json::to_string(&variant).expect("serialize");
         assert_eq!(json, format!("\"{}\"", expected));
-        let back: TransitionTriggerType =
-            serde_json::from_str(&json).expect("deserialize");
+        let back: TransitionTriggerType = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(back, variant);
     }
 }
@@ -6742,7 +6733,10 @@ fn transition_trigger_type_all_variants_roundtrip() {
 fn transition_trigger_type_default_is_click() {
     // Mirrors Python `default=TransitionTriggerType.CLICK` on
     // `DiscoveryTransitionTrigger.type`.
-    assert_eq!(TransitionTriggerType::default(), TransitionTriggerType::Click);
+    assert_eq!(
+        TransitionTriggerType::default(),
+        TransitionTriggerType::Click
+    );
 }
 
 // ─── Structs ─────────────────────────────────────────────────────────────────
@@ -6782,8 +6776,7 @@ fn discovery_transition_trigger_fully_populated_roundtrips() {
     assert_eq!(v["elementId"], "el-42");
     assert_eq!(v["selector"], "#login-button");
     assert_eq!(v["value"], "hello");
-    let back: DiscoveryTransitionTrigger =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: DiscoveryTransitionTrigger = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -6856,7 +6849,10 @@ fn discovered_state_image_confidence_defaults_to_one() {
 #[test]
 fn discovered_state_fully_populated_roundtrips() {
     let mut meta = HashMap::new();
-    meta.insert("source".to_string(), Value::String("playwright".to_string()));
+    meta.insert(
+        "source".to_string(),
+        Value::String("playwright".to_string()),
+    );
     let s = DiscoveredState {
         id: "st-1".to_string(),
         name: "Login page".to_string(),
@@ -7047,8 +7043,7 @@ fn state_discovery_result_summary_roundtrips() {
     assert_eq!(v["stateCount"], 3);
     assert_eq!(v["transitionCount"], 4);
     assert_eq!(v["createdAt"], "2026-04-16T00:00:00Z");
-    let back: StateDiscoveryResultSummary =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: StateDiscoveryResultSummary = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -7075,8 +7070,7 @@ fn state_discovery_result_list_response_roundtrips() {
     let v: Value = serde_json::from_str(&json1).expect("parse");
     assert_eq!(v["total"], 1);
     assert_eq!(v["items"][0]["sourceType"], "manual");
-    let back: StateDiscoveryResultListResponse =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: StateDiscoveryResultListResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -7111,8 +7105,7 @@ fn state_discovery_result_create_fully_populated_roundtrips() {
     assert!(v.get("images").is_none());
     assert!(v.get("states").is_none());
     assert!(v.get("transitions").is_none());
-    let back: StateDiscoveryResultCreate =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: StateDiscoveryResultCreate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -7137,8 +7130,7 @@ fn state_discovery_result_update_fully_populated_roundtrips() {
     assert!(v["images"].is_array());
     assert_eq!(v["images"].as_array().unwrap().len(), 0);
     assert_eq!(v["discoveryMetadata"]["v"], 2);
-    let back: StateDiscoveryResultUpdate =
-        serde_json::from_str(&json1).expect("deserialize");
+    let back: StateDiscoveryResultUpdate = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
 }
@@ -7153,10 +7145,7 @@ fn state_discovery_result_update_all_none_serializes_empty() {
 #[test]
 fn state_machine_export_fully_populated_roundtrips() {
     let mut meta = HashMap::new();
-    meta.insert(
-        "originalId".to_string(),
-        Value::String("res-1".to_string()),
-    );
+    meta.insert("originalId".to_string(), Value::String("res-1".to_string()));
     let mut e2r: HashMap<String, Vec<String>> = HashMap::new();
     e2r.insert("el-a".to_string(), vec!["r-a".to_string()]);
     let e = StateMachineExport {
@@ -7244,7 +7233,10 @@ fn state_machine_import_name_optional() {
     };
     let json = serde_json::to_string(&i).expect("serialize");
     let v: Value = serde_json::from_str(&json).expect("parse");
-    assert!(v.get("name").is_none(), "None override name must be skipped");
+    assert!(
+        v.get("name").is_none(),
+        "None override name must be skipped"
+    );
 }
 
 // ============================================================================
@@ -7257,9 +7249,9 @@ use qontinui_types::verification::{
     Confidence, CriterionOverride, CriterionType, DomainAssignment, DomainVerificationResult,
     ExtendIterationsRequest, Finding as VerificationFinding, IterationVerificationResults,
     OverrideCollection, StageTransition, SuccessCriterion, TaskCompletionResult,
-    VerificationAgentContext, VerificationMethod as VerifMethod,
-    VerificationPlan as VerifPlan, VerificationResult as VerifResult,
-    WorkerCoordinationMessage, WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
+    VerificationAgentContext, VerificationMethod as VerifMethod, VerificationPlan as VerifPlan,
+    VerificationResult as VerifResult, WorkerCoordinationMessage, WorkerDomain, WorkerInstance,
+    WorkerSignal, WorkerStatus,
 };
 
 #[test]
@@ -7744,7 +7736,10 @@ fn extend_iterations_request_roundtrips() {
     };
     let json2 = serde_json::to_string(&r2).unwrap();
     let v2: Value = serde_json::from_str(&json2).unwrap();
-    assert!(v2.get("guidance").is_none(), "None guidance must be skipped");
+    assert!(
+        v2.get("guidance").is_none(),
+        "None guidance must be skipped"
+    );
 }
 
 #[test]
@@ -7788,7 +7783,10 @@ fn terminal_info_fully_populated_roundtrips() {
     assert_eq!(json1, json2);
     // Unset Option<T> fields must be skipped on the wire.
     let v: Value = serde_json::from_str(&json1).unwrap();
-    assert!(v.get("exit_code").is_none(), "None exit_code must be skipped");
+    assert!(
+        v.get("exit_code").is_none(),
+        "None exit_code must be skipped"
+    );
 }
 
 #[test]
@@ -7871,19 +7869,27 @@ fn terminal_exit_event_without_code_skips_field() {
     };
     let json = serde_json::to_string(&ev).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("exit_code").is_none(), "None exit_code must be skipped");
+    assert!(
+        v.get("exit_code").is_none(),
+        "None exit_code must be skipped"
+    );
     let back: TerminalExitEvent = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
-
 
 // ── mcp_config ───────────────────────────────────────────────────────────────
 
 #[test]
 fn mcp_transport_lowercase() {
     use qontinui_types::mcp_config::McpTransport;
-    assert_eq!(serde_json::to_string(&McpTransport::Stdio).unwrap(), "\"stdio\"");
-    assert_eq!(serde_json::to_string(&McpTransport::Http).unwrap(), "\"http\"");
+    assert_eq!(
+        serde_json::to_string(&McpTransport::Stdio).unwrap(),
+        "\"stdio\""
+    );
+    assert_eq!(
+        serde_json::to_string(&McpTransport::Http).unwrap(),
+        "\"http\""
+    );
     let back: McpTransport = serde_json::from_str("\"stdio\"").unwrap();
     assert_eq!(back, McpTransport::Stdio);
 }
@@ -8169,16 +8175,14 @@ fn ai_workflow_defaults_roundtrip() {
         "created_at": "2026-04-16T00:00:00Z",
         "modified_at": "2026-04-16T00:00:00Z"
     }"#;
-    let wf: qontinui_types::ai_workflows::AiWorkflow =
-        serde_json::from_str(minimal).unwrap();
+    let wf: qontinui_types::ai_workflows::AiWorkflow = serde_json::from_str(minimal).unwrap();
     assert_eq!(wf.id, "wf-min");
     assert!(wf.steps.is_empty());
     assert!(wf.auto_include_contexts); // default true
     assert_eq!(wf.max_iterations, None);
     // Re-serialize and round-trip.
     let json2 = serde_json::to_string(&wf).unwrap();
-    let back: qontinui_types::ai_workflows::AiWorkflow =
-        serde_json::from_str(&json2).unwrap();
+    let back: qontinui_types::ai_workflows::AiWorkflow = serde_json::from_str(&json2).unwrap();
     assert_eq!(
         serde_json::to_value(&back).unwrap(),
         serde_json::to_value(&wf).unwrap()
@@ -8275,8 +8279,14 @@ fn ui_bridge_element_roundtrips() {
             enabled: true,
             focused: false,
             rect: ElementRect {
-                x: 0.0, y: 0.0, width: 80.0, height: 30.0,
-                top: 0.0, right: 80.0, bottom: 30.0, left: 0.0,
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 30.0,
+                top: 0.0,
+                right: 80.0,
+                bottom: 30.0,
+                left: 0.0,
             },
             value: None,
             checked: None,
@@ -8317,8 +8327,14 @@ fn ui_bridge_element_with_bbox_roundtrips() {
             enabled: true,
             focused: false,
             rect: ElementRect {
-                x: 120.0, y: 44.0, width: 88.0, height: 32.0,
-                top: 44.0, right: 208.0, bottom: 76.0, left: 120.0,
+                x: 120.0,
+                y: 44.0,
+                width: 88.0,
+                height: 32.0,
+                top: 44.0,
+                right: 208.0,
+                bottom: 76.0,
+                left: 120.0,
             },
             value: None,
             checked: None,
@@ -8327,7 +8343,12 @@ fn ui_bridge_element_with_bbox_roundtrips() {
         },
         registered_at: 1713200000000,
         mounted: true,
-        bbox: Some(ElementBbox { x: 120.0, y: 44.0, width: 88.0, height: 32.0 }),
+        bbox: Some(ElementBbox {
+            x: 120.0,
+            y: 44.0,
+            width: 88.0,
+            height: 32.0,
+        }),
         visible: Some(true),
     };
     let json = serde_json::to_string(&elem).unwrap();
@@ -8344,7 +8365,10 @@ fn discovery_request_default_roundtrips() {
     use qontinui_types::ui_bridge::DiscoveryRequest;
     let req = DiscoveryRequest::default();
     let json = serde_json::to_string(&req).unwrap();
-    assert_eq!(json, "{}", "all-None DiscoveryRequest serializes to empty object");
+    assert_eq!(
+        json, "{}",
+        "all-None DiscoveryRequest serializes to empty object"
+    );
     let back: DiscoveryRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
@@ -8363,7 +8387,10 @@ fn action_response_roundtrips() {
     };
     let json = serde_json::to_string(&resp).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("elementState").is_none(), "None element_state skipped");
+    assert!(
+        v.get("elementState").is_none(),
+        "None element_state skipped"
+    );
     assert!(v.get("error").is_none(), "None error skipped");
     let back: ActionResponse = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
@@ -8432,7 +8459,10 @@ fn flow_event_flow_started_roundtrips() {
     };
     let json = serde_json::to_string(&ev).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["type"], "flow_started", "internally tagged with snake_case");
+    assert_eq!(
+        v["type"], "flow_started",
+        "internally tagged with snake_case"
+    );
     assert_eq!(v["instance_id"], "inst-1");
     let back: FlowEvent = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());

@@ -191,10 +191,18 @@ pub struct FindingCreate {
     #[serde(alias = "description")]
     pub description: String,
     /// Code context, if the finding relates to specific code.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_context")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "code_context"
+    )]
     pub code_context: Option<FindingCodeContext>,
     /// Hash used to deduplicate findings across sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature_hash")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "signature_hash"
+    )]
     pub signature_hash: Option<String>,
     /// Type of action for this finding.
     #[serde(alias = "action_type")]
@@ -233,10 +241,18 @@ pub struct FindingUpdate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution")]
     pub resolution: Option<String>,
     /// Session number where the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_in_session")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_in_session"
+    )]
     pub resolved_in_session: Option<i64>,
     /// User's response to a finding requiring input.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_response")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "user_response"
+    )]
     pub user_response: Option<String>,
 }
 
@@ -276,10 +292,18 @@ pub struct FindingDetail {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution")]
     pub resolution: Option<String>,
     /// Code context, if the finding relates to specific code.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_context")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "code_context"
+    )]
     pub code_context: Option<FindingCodeContext>,
     /// Hash used to deduplicate findings across sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature_hash")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "signature_hash"
+    )]
     pub signature_hash: Option<String>,
     /// Type of action for this finding.
     #[serde(alias = "action_type")]
@@ -288,16 +312,28 @@ pub struct FindingDetail {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_input")]
     pub user_input: Option<FindingUserInput>,
     /// User's response, if input was requested.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_response")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "user_response"
+    )]
     pub user_response: Option<String>,
     /// ISO 8601 timestamp (UTC) when the finding was detected.
     #[serde(alias = "detected_at")]
     pub detected_at: String,
     /// ISO 8601 timestamp (UTC) when the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_at"
+    )]
     pub resolved_at: Option<String>,
     /// Session number where the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_in_session")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_in_session"
+    )]
     pub resolved_in_session: Option<i64>,
 }
 
@@ -338,13 +374,25 @@ pub struct FindingSummary {
     #[serde(default, alias = "total")]
     pub total: i64,
     /// Count of findings by category.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_category")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "by_category"
+    )]
     pub by_category: HashMap<String, i64>,
     /// Count of findings by severity.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_severity")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "by_severity"
+    )]
     pub by_severity: HashMap<String, i64>,
     /// Count of findings by status.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "by_status")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "by_status"
+    )]
     pub by_status: HashMap<String, i64>,
     /// Number of findings awaiting user input.
     #[serde(default, alias = "needs_input_count")]

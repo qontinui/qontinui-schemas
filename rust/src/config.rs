@@ -122,7 +122,11 @@ pub struct Category {
     #[serde(alias = "name")]
     pub name: String,
     /// Whether workflows in this category are available for automation.
-    #[serde(default = "default_true", rename = "automationEnabled", alias = "automation_enabled")]
+    #[serde(
+        default = "default_true",
+        rename = "automationEnabled",
+        alias = "automation_enabled"
+    )]
     pub automation_enabled: bool,
 }
 

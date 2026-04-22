@@ -179,7 +179,11 @@ pub struct RuntimeData {
     // TYPE actions
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "typed_text")]
     pub typed_text: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "character_count")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "character_count"
+    )]
     pub character_count: Option<i64>,
 
     // FIND / IF actions — pattern matching
@@ -193,9 +197,17 @@ pub struct RuntimeData {
     pub location: Option<MatchLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "dimensions")]
     pub dimensions: Option<MatchLocation>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "match_method")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "match_method"
+    )]
     pub match_method: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "top_matches")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "top_matches"
+    )]
     pub top_matches: Option<Vec<TopMatch>>,
 
     // CLICK actions
@@ -203,31 +215,71 @@ pub struct RuntimeData {
     pub clicked_at: Option<MatchLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "button")]
     pub button: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_type"
+    )]
     pub target_type: Option<String>,
 
     // GO_TO_STATE actions
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "source_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "source_states"
+    )]
     pub source_states: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_states"
+    )]
     pub target_states: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "targets_reached")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "targets_reached"
+    )]
     pub targets_reached: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "transitions_executed")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "transitions_executed"
+    )]
     pub transitions_executed: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "already_at_target")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "already_at_target"
+    )]
     pub already_at_target: Option<bool>,
 
     // IF actions
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "condition_passed")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "condition_passed"
+    )]
     pub condition_passed: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "branch_taken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "branch_taken"
+    )]
     pub branch_taken: Option<String>,
 
     // RUN_WORKFLOW actions
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_status")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_status"
+    )]
     pub workflow_status: Option<String>,
 }
 
@@ -261,7 +313,11 @@ pub struct TimingInfo {
     /// ISO 8601 timestamp. `None` while the event is still in flight.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "end_time")]
     pub end_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration_ms")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "duration_ms"
+    )]
     pub duration_ms: Option<f64>,
 }
 
@@ -302,7 +358,11 @@ pub struct NodeMetadata {
 
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "runtime")]
     pub runtime: Option<RuntimeData>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "state_context")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "state_context"
+    )]
     pub state_context: Option<StateContext>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "timing")]
     pub timing: Option<TimingInfo>,
@@ -310,10 +370,18 @@ pub struct NodeMetadata {
     pub outcome: Option<Outcome>,
 
     /// Screenshot reference (path or URL).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "screenshot_reference")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "screenshot_reference"
+    )]
     pub screenshot_reference: Option<String>,
     /// Visual-debug image reference (path or URL).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "visual_debug_reference")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "visual_debug_reference"
+    )]
     pub visual_debug_reference: Option<String>,
 }
 
@@ -337,7 +405,11 @@ pub struct TreeNode {
     #[serde(alias = "timestamp")]
     pub timestamp: f64,
     /// When this node completed (Unix epoch seconds).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "end_timestamp")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "end_timestamp"
+    )]
     pub end_timestamp: Option<f64>,
     /// Duration in seconds.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration")]
@@ -423,7 +495,11 @@ pub struct DisplayNode {
     pub name: String,
     #[serde(alias = "timestamp")]
     pub timestamp: f64,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "end_timestamp")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "end_timestamp"
+    )]
     pub end_timestamp: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration")]
     pub duration: Option<f64>,
@@ -489,7 +565,11 @@ pub struct TreeEventResponse {
     pub node_type: NodeType,
     #[serde(alias = "node_name")]
     pub node_name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "parent_node_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "parent_node_id"
+    )]
     pub parent_node_id: Option<String>,
     #[serde(alias = "path")]
     pub path: Vec<PathElement>,
@@ -499,7 +579,11 @@ pub struct TreeEventResponse {
     pub event_timestamp: f64,
     #[serde(alias = "status")]
     pub status: NodeStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "metadata")]
     pub metadata: Option<NodeMetadata>,
@@ -537,11 +621,19 @@ pub struct ExecutionTreeResponse {
     pub root_nodes: Vec<DisplayNode>,
     #[serde(alias = "total_events")]
     pub total_events: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
     #[serde(alias = "status")]
     pub status: NodeStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration_ms")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "duration_ms"
+    )]
     pub duration_ms: Option<f64>,
     /// Initial active states when the workflow started.
     #[serde(default, alias = "initial_state_ids")]

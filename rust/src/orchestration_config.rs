@@ -57,7 +57,11 @@ pub struct OlConfig {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional free-form description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Whether this preset is pinned as a favorite in the UI.
     #[serde(alias = "is_favorite")]
@@ -82,7 +86,11 @@ pub struct CreateOlConfigRequest {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// The full loop config as a JSON blob (should match the
     /// [`OrchestrationLoopConfig`] shape).
@@ -101,13 +109,25 @@ pub struct UpdateOlConfigRequest {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
     /// Replace the description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Toggle favorite status.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_favorite")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "is_favorite"
+    )]
     pub is_favorite: Option<bool>,
     /// Replace the stored config JSON blob.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "config_json")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "config_json"
+    )]
     pub config_json: Option<serde_json::Value>,
 }
 
@@ -210,7 +230,11 @@ pub struct DecomposerConfig {
     #[serde(alias = "max_subtasks")]
     pub max_subtasks: u32,
     /// Override the default AI model used for planning.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model_override")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "model_override"
+    )]
     pub model_override: Option<String>,
 }
 
@@ -260,12 +284,20 @@ fn default_snapshot_max_chars() -> usize {
 pub struct OrchestrationLoopConfig {
     /// Target runner port to execute workflows on.
     /// If `None`, targets self (this runner's own port).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_runner_port")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_runner_port"
+    )]
     pub target_runner_port: Option<u16>,
 
     /// Target runner ID (for supervisor restart calls). If `None`, uses
     /// `"primary"`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_runner_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_runner_id"
+    )]
     pub target_runner_id: Option<String>,
 
     /// Supervisor port for restart/build operations.
@@ -280,7 +312,11 @@ pub struct OrchestrationLoopConfig {
 
     /// Maximum number of iterations.
     /// `None` (omitted) means no cap — loop until success or explicit stop.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_iterations"
+    )]
     pub max_iterations: Option<u32>,
 
     /// How to decide when to stop.
@@ -308,15 +344,27 @@ pub struct OrchestrationLoopConfig {
     pub pipeline: Option<PipelineConfig>,
 
     /// Stall-detection sub-config (omit to disable).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stall_detection")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "stall_detection"
+    )]
     pub stall_detection: Option<StallDetectorConfig>,
 
     /// Context-summarization sub-config (omit to disable).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "summarization")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "summarization"
+    )]
     pub summarization: Option<SummarizationConfig>,
 
     /// Task-decomposition sub-config (omit to disable).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "decomposition")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "decomposition"
+    )]
     pub decomposition: Option<DecomposerConfig>,
 }
 
@@ -335,7 +383,11 @@ pub struct PipelineConfig {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "build")]
     pub build: Option<BuildPhaseConfig>,
     /// Implement fixes via Claude CLI after reflection finds issues.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "implement_fixes")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "implement_fixes"
+    )]
     pub implement_fixes: Option<ImplementFixesConfig>,
     /// Diagnostic-evaluation phase — runs after Execute, before Reflect.
     /// Captures UI state via UI Bridge and classifies failure root causes.
@@ -355,7 +407,11 @@ pub struct BuildPhaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "context")]
     pub context: Option<String>,
     /// IDs of stored `Context` records to include.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "context_ids")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "context_ids"
+    )]
     pub context_ids: Option<Vec<String>>,
 }
 
@@ -369,10 +425,18 @@ pub struct ImplementFixesConfig {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
     /// Timeout in seconds for the fix agent. Defaults to 600 when unset.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_secs")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_secs"
+    )]
     pub timeout_secs: Option<u64>,
     /// Additional context to include in the fix prompt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "additional_context")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "additional_context"
+    )]
     pub additional_context: Option<String>,
 }
 
@@ -397,7 +461,11 @@ pub struct DiagnosePhaseConfig {
     #[serde(default = "default_snapshot_max_chars", alias = "snapshot_max_chars")]
     pub snapshot_max_chars: usize,
     /// Model override for the triage AI call. If `None`, uses default routing.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "model_override")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "model_override"
+    )]
     pub model_override: Option<String>,
 }
 
@@ -447,7 +515,11 @@ pub struct DiagnosticResult {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "diagnosis")]
     pub diagnosis: Option<String>,
     /// AI-generated recommendation for the next iteration's prompt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "prompt_rewrite_suggestion")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "prompt_rewrite_suggestion"
+    )]
     pub prompt_rewrite_suggestion: Option<String>,
 }
 
@@ -550,7 +622,11 @@ pub struct OrchestrationLoopStatus {
     #[serde(alias = "current_iteration")]
     pub current_iteration: u32,
     /// Iteration cap for this run. `None` renders as `"∞"`/unlimited in the UI.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_iterations"
+    )]
     pub max_iterations: Option<u32>,
     /// The workflow ID being executed.
     #[serde(alias = "workflow_id")]
@@ -559,7 +635,11 @@ pub struct OrchestrationLoopStatus {
     #[serde(alias = "target_runner_port")]
     pub target_runner_port: u16,
     /// Target runner ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_runner_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_runner_id"
+    )]
     pub target_runner_id: Option<String>,
     /// Whether this loop is in pipeline mode.
     #[serde(alias = "is_pipeline")]
@@ -571,7 +651,11 @@ pub struct OrchestrationLoopStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "error")]
     pub error: Option<String>,
     /// Per-iteration results accumulated so far.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "iteration_results")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "iteration_results"
+    )]
     pub iteration_results: Vec<IterationResult>,
 }
 
@@ -593,7 +677,11 @@ pub struct IterationResult {
     #[serde(alias = "task_run_id")]
     pub task_run_id: String,
     /// Task-run ID produced by the reflection step (if any).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reflection_task_run_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "reflection_task_run_id"
+    )]
     pub reflection_task_run_id: Option<String>,
     /// Number of fixes proposed during reflection.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "fix_count")]
@@ -602,22 +690,46 @@ pub struct IterationResult {
     #[serde(alias = "exit_check")]
     pub exit_check: ExitCheckResult,
     /// Pipeline mode: ID of the workflow generated during the build phase.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "generated_workflow_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "generated_workflow_id"
+    )]
     pub generated_workflow_id: Option<String>,
     /// Pipeline mode: whether fixes were implemented during this iteration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixes_implemented")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fixes_implemented"
+    )]
     pub fixes_implemented: Option<bool>,
     /// Pipeline mode: whether a rebuild was triggered for the next iteration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "rebuild_triggered")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "rebuild_triggered"
+    )]
     pub rebuild_triggered: Option<bool>,
     /// Stall-detection reason, if a stall was detected.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stall_detected")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "stall_detected"
+    )]
     pub stall_detected: Option<String>,
     /// Whether the loop context was summarized during this iteration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "context_summarized")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "context_summarized"
+    )]
     pub context_summarized: Option<bool>,
     /// Diagnostic-phase result (if the diagnose phase is configured).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "diagnostic_result")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "diagnostic_result"
+    )]
     pub diagnostic_result: Option<DiagnosticResult>,
 }
 

@@ -110,14 +110,26 @@ pub struct RepositoryInactiveCondition {
 #[schemars(deny_unknown_fields)]
 pub struct ScheduleConditions {
     /// Require the runner to be idle.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "require_idle")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "require_idle"
+    )]
     pub require_idle: Option<IdleCondition>,
     /// Require repository file inactivity across one or more paths.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "require_repo_inactive")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "require_repo_inactive"
+    )]
     pub require_repo_inactive: Option<RepositoryInactiveCondition>,
     /// Maximum time to wait for conditions (minutes). `None` = wait
     /// indefinitely.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_minutes")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_minutes"
+    )]
     pub timeout_minutes: Option<u32>,
 }
 
@@ -134,7 +146,11 @@ pub struct ConditionStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "idle_met")]
     pub idle_met: Option<bool>,
     /// Current repository-inactive status per repository: `(path, is_inactive)`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "repo_inactive_met")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "repo_inactive_met"
+    )]
     pub repo_inactive_met: Option<Vec<(String, bool)>>,
     /// Whether the overall condition-wait timeout has been exceeded.
     #[serde(default, alias = "timed_out")]
@@ -268,13 +284,21 @@ pub struct TaskExecutionRecord {
     #[serde(default, alias = "success")]
     pub success: bool,
     /// Error message if the execution failed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     /// Whether auto-fix was triggered after this execution.
     #[serde(default, alias = "triggered_auto_fix")]
     pub triggered_auto_fix: bool,
     /// Session ID of the auto-fix session, if one was triggered.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_fix_session_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_fix_session_id"
+    )]
     pub auto_fix_session_id: Option<String>,
 }
 
@@ -296,7 +320,11 @@ pub struct ScheduledTask {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional human-readable description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Whether the task is enabled and eligible to run.
     #[serde(default = "default_true", alias = "enabled")]
@@ -314,7 +342,11 @@ pub struct ScheduledTask {
     #[serde(default, alias = "auto_fix_on_failure")]
     pub auto_fix_on_failure: bool,
     /// Free-form description of success criteria, for human reference.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "success_criteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "success_criteria"
+    )]
     pub success_criteria: Option<String>,
     /// ISO 8601 timestamp of creation.
     #[serde(alias = "created_at")]
@@ -332,7 +364,11 @@ pub struct ScheduledTask {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "conditions")]
     pub conditions: Option<ScheduleConditions>,
     /// Present while the task is waiting for its conditions to be met.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "condition_status")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "condition_status"
+    )]
     pub condition_status: Option<ConditionStatus>,
 }
 
@@ -427,7 +463,11 @@ pub struct CreateScheduledTaskRequest {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Schedule configuration.
     #[serde(alias = "schedule")]
@@ -436,13 +476,25 @@ pub struct CreateScheduledTaskRequest {
     #[serde(alias = "task")]
     pub task: ScheduledTaskType,
     /// Skip future runs once the task has succeeded.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "skip_if_completed")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "skip_if_completed"
+    )]
     pub skip_if_completed: Option<bool>,
     /// Trigger auto-fix on failure.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_fix_on_failure")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_fix_on_failure"
+    )]
     pub auto_fix_on_failure: Option<bool>,
     /// Free-form success criteria description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "success_criteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "success_criteria"
+    )]
     pub success_criteria: Option<String>,
     /// Optional conditions that must be met before execution.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "conditions")]
@@ -459,7 +511,11 @@ pub struct UpdateScheduledTaskRequest {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
     /// New description (pass `null` to clear).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Enable/disable the task.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabled")]
@@ -471,13 +527,25 @@ pub struct UpdateScheduledTaskRequest {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "task")]
     pub task: Option<ScheduledTaskType>,
     /// Update `skip_if_completed`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "skip_if_completed")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "skip_if_completed"
+    )]
     pub skip_if_completed: Option<bool>,
     /// Update `auto_fix_on_failure`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_fix_on_failure")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_fix_on_failure"
+    )]
     pub auto_fix_on_failure: Option<bool>,
     /// Update the success criteria (pass `null` to clear).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "success_criteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "success_criteria"
+    )]
     pub success_criteria: Option<String>,
     /// Replace the conditions block (pass `null` to clear).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "conditions")]

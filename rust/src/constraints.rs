@@ -182,18 +182,34 @@ pub struct ConstraintResult {
 #[schemars(deny_unknown_fields)]
 pub struct ResourceLimits {
     /// Maximum wall-clock time for the entire workflow (seconds).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_wall_time_secs")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_wall_time_secs"
+    )]
     pub max_wall_time_secs: Option<u64>,
     /// Maximum number of unique files modified across all iterations.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_files_modified")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_files_modified"
+    )]
     pub max_files_modified: Option<u64>,
     /// Maximum agentic phase durations summed (milliseconds).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_agentic_time_ms")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_agentic_time_ms"
+    )]
     pub max_agentic_time_ms: Option<u64>,
     /// Warning threshold as a fraction (0.0-1.0). When resource usage exceeds
     /// this fraction of the limit, a warning is injected.
     /// Default: 0.75 (warn at 75% of limit).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "warning_threshold")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "warning_threshold"
+    )]
     pub warning_threshold: Option<f64>,
 }
 
@@ -295,7 +311,11 @@ pub struct ReadConfigResponse {
 #[schemars(deny_unknown_fields)]
 pub struct WriteConfigRequest {
     /// Project path for the `constraints.toml`. Defaults to workspace root.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "project_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "project_path"
+    )]
     pub project_path: Option<String>,
     /// Raw TOML content to validate and write.
     #[serde(alias = "toml")]

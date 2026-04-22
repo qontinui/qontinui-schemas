@@ -152,10 +152,18 @@ pub struct AccessibilityState {
     #[serde(default, alias = "is_hidden")]
     pub is_hidden: bool,
     /// Expandable element's expansion state.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_expanded")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "is_expanded"
+    )]
     pub is_expanded: Option<bool>,
     /// Selectable element's selection state.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_selected")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "is_selected"
+    )]
     pub is_selected: Option<bool>,
     /// Checkable element's checked state.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_checked")]
@@ -229,7 +237,11 @@ pub struct AccessibilityNode {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "value")]
     pub value: Option<String>,
     /// Accessible description (additional context).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Bounding rectangle in screen coordinates.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "bounds")]
@@ -244,7 +256,11 @@ pub struct AccessibilityNode {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "level")]
     pub level: Option<i64>,
     /// Automation ID / test-ID attribute.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "automation_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "automation_id"
+    )]
     pub automation_id: Option<String>,
     /// CSS class name or control class.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "class_name")]
@@ -324,19 +340,35 @@ pub struct AccessibilitySelector {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
     /// Partial name match (contains).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "name_contains")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "name_contains"
+    )]
     pub name_contains: Option<String>,
     /// Regex pattern for name matching.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "name_pattern")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "name_pattern"
+    )]
     pub name_pattern: Option<String>,
     /// Exact value match.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "value")]
     pub value: Option<String>,
     /// Partial value match (contains).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "value_contains")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "value_contains"
+    )]
     pub value_contains: Option<String>,
     /// Match by automation / test ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "automation_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "automation_id"
+    )]
     pub automation_id: Option<String>,
     /// Match by CSS / control class name.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "class_name")]
@@ -348,7 +380,11 @@ pub struct AccessibilitySelector {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "state")]
     pub state: Option<AccessibilityState>,
     /// Filter by interactivity.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_interactive")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "is_interactive"
+    )]
     pub is_interactive: Option<bool>,
     /// Required ancestor selector.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "ancestor")]

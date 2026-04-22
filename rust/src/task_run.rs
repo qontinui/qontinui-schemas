@@ -86,7 +86,11 @@ pub struct TaskRun {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "config_id")]
     pub config_id: Option<String>,
     /// Name of the workflow used to run this task, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
     /// Current lifecycle status.
     #[serde(alias = "status")]
@@ -95,7 +99,11 @@ pub struct TaskRun {
     #[serde(alias = "sessions_count")]
     pub sessions_count: u32,
     /// Optional cap on AI sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_sessions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_sessions"
+    )]
     pub max_sessions: Option<u32>,
     /// Whether the task will auto-continue into another session on exit.
     #[serde(alias = "auto_continue")]
@@ -104,19 +112,35 @@ pub struct TaskRun {
     #[serde(alias = "output_log")]
     pub output_log: String,
     /// Error message if the task failed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     /// AI-generated summary of the task run.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "summary")]
     pub summary: Option<String>,
     /// Whether the task's goal was achieved (AI assessment).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "goal_achieved")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "goal_achieved"
+    )]
     pub goal_achieved: Option<bool>,
     /// Description of any remaining work (AI assessment).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "remaining_work")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "remaining_work"
+    )]
     pub remaining_work: Option<String>,
     /// ISO 8601 timestamp when the summary was generated.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "summary_generated_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "summary_generated_at"
+    )]
     pub summary_generated_at: Option<String>,
     /// ISO 8601 timestamp when the task was created.
     #[serde(alias = "created_at")]
@@ -125,7 +149,11 @@ pub struct TaskRun {
     #[serde(alias = "updated_at")]
     pub updated_at: String,
     /// ISO 8601 timestamp when the task completed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "completed_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "completed_at"
+    )]
     pub completed_at: Option<String>,
 }
 
@@ -469,10 +497,18 @@ pub struct TaskRunCreate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "prompt")]
     pub prompt: Option<String>,
     /// Optional cap on AI sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_sessions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_sessions"
+    )]
     pub max_sessions: Option<u32>,
     /// Whether the task should auto-continue.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_continue")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_continue"
+    )]
     pub auto_continue: Option<bool>,
     /// Task type.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "task_type")]
@@ -481,13 +517,25 @@ pub struct TaskRunCreate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "config_id")]
     pub config_id: Option<String>,
     /// Workflow name to use.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
     /// Serialized execution steps, if provided ad-hoc.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "execution_steps_json")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "execution_steps_json"
+    )]
     pub execution_steps_json: Option<String>,
     /// Serialized log-sources configuration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "log_sources_json")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "log_sources_json"
+    )]
     pub log_sources_json: Option<String>,
 }
 
@@ -501,25 +549,53 @@ pub struct TaskRunUpdate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
     pub status: Option<TaskRunStatus>,
     /// Updated session count.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "sessions_count")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "sessions_count"
+    )]
     pub sessions_count: Option<u32>,
     /// Updated output summary.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "output_summary")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "output_summary"
+    )]
     pub output_summary: Option<String>,
     /// Full output log to persist.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "full_output")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "full_output"
+    )]
     pub full_output: Option<String>,
     /// Whether the full output log has been stored.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "full_output_stored")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "full_output_stored"
+    )]
     pub full_output_stored: Option<bool>,
     /// Error message to attach.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     /// Total duration in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "duration_seconds"
+    )]
     pub duration_seconds: Option<i64>,
     /// ISO 8601 timestamp when the task completed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "completed_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "completed_at"
+    )]
     pub completed_at: Option<String>,
 }
 
@@ -541,10 +617,18 @@ pub struct TaskRunFindingCreate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "status")]
     pub status: Option<TaskRunFindingStatus>,
     /// Action type (defaults server-side if omitted).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_type"
+    )]
     pub action_type: Option<TaskRunFindingActionType>,
     /// Deduplication hash.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature_hash")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "signature_hash"
+    )]
     pub signature_hash: Option<String>,
     /// Short title.
     #[serde(alias = "title")]
@@ -559,25 +643,45 @@ pub struct TaskRunFindingCreate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "file_path")]
     pub file_path: Option<String>,
     /// Line number where the issue was found.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "line_number")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "line_number"
+    )]
     pub line_number: Option<u32>,
     /// Column number where the issue was found.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "column_number")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "column_number"
+    )]
     pub column_number: Option<u32>,
     /// Snippet of code illustrating the issue.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_snippet")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "code_snippet"
+    )]
     pub code_snippet: Option<String>,
     /// Session number in which the finding was detected.
     #[serde(alias = "detected_in_session")]
     pub detected_in_session: u32,
     /// Whether this finding requires user input.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "needs_input")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "needs_input"
+    )]
     pub needs_input: Option<bool>,
     /// Question to pose to the user, if input is needed.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "question")]
     pub question: Option<String>,
     /// Suggested response options for the user.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "input_options")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "input_options"
+    )]
     pub input_options: Option<Vec<String>>,
 }
 
@@ -593,13 +697,25 @@ pub struct TaskRunFindingUpdate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution")]
     pub resolution: Option<String>,
     /// Session number in which the finding was resolved.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_in_session")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_in_session"
+    )]
     pub resolved_in_session: Option<u32>,
     /// ISO 8601 timestamp of resolution.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_at"
+    )]
     pub resolved_at: Option<String>,
     /// User response, if the finding needed input.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "user_response")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "user_response"
+    )]
     pub user_response: Option<String>,
 }
 
@@ -629,7 +745,11 @@ pub struct RunPromptResponse {
     #[serde(alias = "success")]
     pub success: bool,
     /// ID of the created task run, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "task_run_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "task_run_id"
+    )]
     pub task_run_id: Option<String>,
     /// ID of the created AI session, if any.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "session_id")]
@@ -666,31 +786,59 @@ pub struct RunPromptRequest {
     #[serde(alias = "content")]
     pub content: String,
     /// Optional cap on AI sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_sessions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_sessions"
+    )]
     pub max_sessions: Option<u32>,
     /// Display-only version of the prompt (shown in the UI).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "display_prompt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "display_prompt"
+    )]
     pub display_prompt: Option<String>,
     /// Hard timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
     /// Optional free-form context string appended to the prompt.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "context")]
     pub context: Option<String>,
     /// Attached image paths.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "image_paths")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "image_paths"
+    )]
     pub image_paths: Option<Vec<String>>,
     /// Attached video paths.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "video_paths")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "video_paths"
+    )]
     pub video_paths: Option<Vec<String>>,
     /// Optional path to a trace file.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "trace_path")]
     pub trace_path: Option<String>,
     /// Cap on video frames to extract for the prompt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_video_frames")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_video_frames"
+    )]
     pub max_video_frames: Option<u32>,
     /// Cap on trace screenshots to include.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_trace_screenshots")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_trace_screenshots"
+    )]
     pub max_trace_screenshots: Option<u32>,
 }
 
@@ -713,19 +861,39 @@ pub struct CreateTaskRunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "config_id")]
     pub config_id: Option<String>,
     /// Workflow name to use.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
     /// Optional cap on AI sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_sessions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_sessions"
+    )]
     pub max_sessions: Option<u32>,
     /// Whether the task should auto-continue.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_continue")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_continue"
+    )]
     pub auto_continue: Option<bool>,
     /// Serialized execution steps, if provided ad-hoc.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "execution_steps_json")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "execution_steps_json"
+    )]
     pub execution_steps_json: Option<String>,
     /// Serialized log-sources configuration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "log_sources_json")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "log_sources_json"
+    )]
     pub log_sources_json: Option<String>,
 }
 
@@ -960,19 +1128,35 @@ pub struct VerificationStepDetails {
 #[serde(rename_all = "camelCase")]
 pub struct StepExecutionConfig {
     /// Action type (e.g., click, type, wait).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_type"
+    )]
     pub action_type: Option<String>,
     /// Target image ID, if the action references an image.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_image_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_image_id"
+    )]
     pub target_image_id: Option<String>,
     /// Target image name, if the action references an image.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_image_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "target_image_name"
+    )]
     pub target_image_name: Option<String>,
     /// Check type for verification steps.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "check_type")]
     pub check_type: Option<String>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
     /// Additional step-specific configuration fields. Mirrors the TS index
     /// signature `[key: string]: unknown`.

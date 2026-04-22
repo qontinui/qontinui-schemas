@@ -60,9 +60,7 @@ use std::collections::HashMap;
 /// Serialized as lowercase to match the existing DB column values
 /// (`"stdio"` / `"http"`). Defaults to `Stdio` to preserve the pre-extraction
 /// default from the runner.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum McpTransport {
     /// Stdio subprocess transport — launches the configured command and
@@ -154,7 +152,11 @@ pub struct McpServerConfig {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional human-readable description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
 
     /// Which transport this server uses.
@@ -163,12 +165,20 @@ pub struct McpServerConfig {
 
     /// Stdio-transport settings. Expected to be `Some` iff
     /// `transport == McpTransport::Stdio`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "stdio_config"
+    )]
     pub stdio_config: Option<StdioConfig>,
 
     /// HTTP-transport settings. Expected to be `Some` iff
     /// `transport == McpTransport::Http`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "http_config"
+    )]
     pub http_config: Option<HttpConfig>,
 
     /// Whether this server is enabled. Disabled servers won't be connected
@@ -186,11 +196,19 @@ pub struct McpServerConfig {
 
     /// Serialized JSON list of tools cached from the last successful
     /// connection. Stored as a string for DB portability.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cached_tools")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "cached_tools"
+    )]
     pub cached_tools: Option<String>,
 
     /// ISO 8601 timestamp of when `cached_tools` was populated.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tools_cached_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "tools_cached_at"
+    )]
     pub tools_cached_at: Option<String>,
 
     /// ISO 8601 creation timestamp.
@@ -219,7 +237,11 @@ pub struct McpToolInputSchema {
     #[serde(rename = "type", alias = "schema_type")]
     pub schema_type: String,
     /// Optional human-readable description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// JSON-Schema-shaped property descriptors, kept as opaque JSON.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "properties")]
@@ -238,7 +260,11 @@ pub struct McpToolInfo {
     #[serde(alias = "name")]
     pub name: String,
     /// Tool description shown to users.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Input-argument schema. Wire field is `"inputSchema"` per MCP spec.
     #[serde(alias = "input_schema")]
@@ -270,10 +296,18 @@ pub struct McpServerStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "tools")]
     pub tools: Option<Vec<McpToolInfo>>,
     /// ISO 8601 timestamp of the most recent connection attempt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "last_connect_attempt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "last_connect_attempt"
+    )]
     pub last_connect_attempt: Option<String>,
     /// ISO 8601 timestamp of the most recent successful connection.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "last_connected")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "last_connected"
+    )]
     pub last_connected: Option<String>,
 }
 
@@ -293,16 +327,28 @@ pub struct CreateMcpServerInput {
     #[serde(alias = "name")]
     pub name: String,
     /// Optional description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Transport selector.
     #[serde(alias = "transport")]
     pub transport: McpTransport,
     /// Stdio config (required when `transport == Stdio`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "stdio_config"
+    )]
     pub stdio_config: Option<StdioConfig>,
     /// HTTP config (required when `transport == Http`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "http_config"
+    )]
     pub http_config: Option<HttpConfig>,
     /// Override for the default `enabled = true`.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabled")]
@@ -311,7 +357,11 @@ pub struct CreateMcpServerInput {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_start")]
     pub auto_start: Option<bool>,
     /// Override for the default `timeout_seconds = 30`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -326,19 +376,35 @@ pub struct CreateMcpServerInput {
 pub struct UpdateMcpServerInput {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "name")]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "transport")]
     pub transport: Option<McpTransport>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "stdio_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "stdio_config"
+    )]
     pub stdio_config: Option<StdioConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "http_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "http_config"
+    )]
     pub http_config: Option<HttpConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabled")]
     pub enabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_start")]
     pub auto_start: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -394,7 +460,11 @@ pub struct CreateMcpCallInput {
     pub step_name: Option<String>,
     #[serde(alias = "server_id")]
     pub server_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "server_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "server_name"
+    )]
     pub server_name: Option<String>,
     #[serde(alias = "tool_name")]
     pub tool_name: String,
@@ -402,7 +472,11 @@ pub struct CreateMcpCallInput {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "arguments")]
     pub arguments: Option<String>,
     /// JSON-serialized arguments after variable resolution.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_arguments")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_arguments"
+    )]
     pub resolved_arguments: Option<String>,
     /// JSON-serialized response body.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "response")]
@@ -414,7 +488,11 @@ pub struct CreateMcpCallInput {
     #[serde(alias = "duration_ms")]
     pub duration_ms: i64,
     /// JSON-serialized extractions (variables pulled from the response).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "extractions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "extractions"
+    )]
     pub extractions: Option<String>,
     /// JSON-serialized assertion results.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "assertions")]
@@ -423,7 +501,11 @@ pub struct CreateMcpCallInput {
     #[serde(alias = "success")]
     pub success: bool,
     /// Error message if the call failed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
 }
 
@@ -445,13 +527,21 @@ pub struct McpCallRecord {
     pub step_name: Option<String>,
     #[serde(alias = "server_id")]
     pub server_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "server_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "server_name"
+    )]
     pub server_name: Option<String>,
     #[serde(alias = "tool_name")]
     pub tool_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "arguments")]
     pub arguments: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolved_arguments")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolved_arguments"
+    )]
     pub resolved_arguments: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "response")]
     pub response: Option<String>,
@@ -459,13 +549,21 @@ pub struct McpCallRecord {
     pub response_type: String,
     #[serde(alias = "duration_ms")]
     pub duration_ms: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "extractions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "extractions"
+    )]
     pub extractions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "assertions")]
     pub assertions: Option<String>,
     #[serde(alias = "success")]
     pub success: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     /// ISO 8601 creation timestamp.
     #[serde(alias = "created_at")]

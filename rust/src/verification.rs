@@ -66,16 +66,28 @@ pub struct SuccessCriterion {
     pub criterion_type: CriterionType,
 
     /// For deterministic criteria: the verification method to use.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "verification_method")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "verification_method"
+    )]
     pub verification_method: Option<VerificationMethod>,
 
     /// Configuration blob for the verification method (command args, log
     /// patterns, Playwright script path, etc.).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "verification_config")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "verification_config"
+    )]
     pub verification_config: Option<serde_json::Value>,
 
     /// For AI-evaluated criteria: the evaluation prompt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "evaluation_prompt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "evaluation_prompt"
+    )]
     pub evaluation_prompt: Option<String>,
 
     /// Whether this criterion must pass for task completion.
@@ -147,7 +159,11 @@ pub struct VerificationPlan {
     /// Execution steps to run before verification (GUI automation / setup).
     /// Stored as raw JSON values because the step discriminated union spans
     /// several types that are outside this module's scope.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "execution_steps")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "execution_steps"
+    )]
     pub execution_steps: Vec<serde_json::Value>,
 
     /// Suggested number of worker agents.
@@ -155,7 +171,11 @@ pub struct VerificationPlan {
     pub suggested_worker_count: u32,
 
     /// Domain assignments for multiple workers.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "worker_domains")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "worker_domains"
+    )]
     pub worker_domains: Option<Vec<WorkerDomain>>,
 
     /// Plan version (incremented on replan).
@@ -174,15 +194,27 @@ pub struct WorkerDomain {
     pub worker_id: String,
 
     /// Optional specialization label (e.g., "frontend", "tests").
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "specialization")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "specialization"
+    )]
     pub specialization: Option<String>,
 
     /// Files / paths this worker owns (glob patterns).
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "file_patterns")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "file_patterns"
+    )]
     pub file_patterns: Vec<String>,
 
     /// Additional system-prompt text to inject for this worker.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "system_prompt_additions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "system_prompt_additions"
+    )]
     pub system_prompt_additions: Option<String>,
 }
 
@@ -214,7 +246,11 @@ pub struct DomainAssignment {
 
     /// File patterns that belong to this domain
     /// (e.g., `"src/frontend/**/*.ts"`).
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "file_patterns")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "file_patterns"
+    )]
     pub file_patterns: Vec<String>,
 
     /// Keywords that help identify this domain.
@@ -222,15 +258,27 @@ pub struct DomainAssignment {
     pub keywords: Vec<String>,
 
     /// Workers currently assigned to this domain.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "assigned_workers")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "assigned_workers"
+    )]
     pub assigned_workers: Vec<String>,
 
     /// Success-criterion IDs that are specific to this domain.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "domain_criteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "domain_criteria"
+    )]
     pub domain_criteria: Vec<String>,
 
     /// Additional system-prompt context for workers in this domain.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "system_prompt_context")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "system_prompt_context"
+    )]
     pub system_prompt_context: Option<String>,
 }
 
@@ -282,7 +330,11 @@ pub struct WorkerInstance {
     pub max_iterations: u32,
 
     /// Last signal received from this worker.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "last_signal")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "last_signal"
+    )]
     pub last_signal: Option<WorkerSignal>,
 
     /// Findings recorded by this worker.
@@ -290,7 +342,11 @@ pub struct WorkerInstance {
     pub findings: Vec<Finding>,
 
     /// Files this worker has touched.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "touched_files")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "touched_files"
+    )]
     pub touched_files: Vec<String>,
 
     /// ISO 8601 timestamp when the worker started.
@@ -298,11 +354,19 @@ pub struct WorkerInstance {
     pub started_at: Option<String>,
 
     /// ISO 8601 timestamp when the worker completed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "completed_at")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "completed_at"
+    )]
     pub completed_at: Option<String>,
 
     /// Error message if the worker is in error state.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
 }
 
@@ -384,7 +448,11 @@ pub struct DomainVerificationResult {
     pub all_passed: bool,
 
     /// Summary of any failures.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "failure_summary")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "failure_summary"
+    )]
     pub failure_summary: Option<String>,
 }
 
@@ -455,7 +523,11 @@ pub struct Finding {
     pub confidence: Confidence,
 
     /// Related file paths.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "related_files")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "related_files"
+    )]
     pub related_files: Vec<String>,
 }
 
@@ -543,15 +615,27 @@ pub struct IterationVerificationResults {
     pub all_passed: bool,
 
     /// Human-readable summary of failures.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "failure_summary")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "failure_summary"
+    )]
     pub failure_summary: Option<String>,
 
     /// Criterion overrides applied in this iteration.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "applied_overrides")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "applied_overrides"
+    )]
     pub applied_overrides: Vec<CriterionOverride>,
 
     /// Criteria that failed but were accepted due to overrides.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "overridden_criteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "overridden_criteria"
+    )]
     pub overridden_criteria: Vec<String>,
 }
 

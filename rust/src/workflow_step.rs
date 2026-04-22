@@ -104,7 +104,11 @@ pub struct ApiVariableExtraction {
     #[serde(alias = "json_path")]
     pub json_path: String,
     /// Default value if the path does not resolve.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "default_value")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "default_value"
+    )]
     pub default_value: Option<String>,
 }
 
@@ -146,7 +150,11 @@ pub struct ApiAssertion {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "json_path")]
     pub json_path: Option<String>,
     /// Header name for `header` assertions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "header_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "header_name"
+    )]
     pub header_name: Option<String>,
     /// Comparison operator; defaults to `equals` on the consumer side.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "operator")]
@@ -250,7 +258,11 @@ pub struct BaseStepFields {
     #[serde(alias = "name")]
     pub name: String,
     /// If `Some(true)`, a console-error signal from the UI fails this step.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fail_on_console_errors")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fail_on_console_errors"
+    )]
     pub fail_on_console_errors: Option<bool>,
     /// Named input bindings evaluated at step entry.
     #[serde(default, skip_serializing_if = "hashmap_is_empty", alias = "inputs")]
@@ -271,14 +283,22 @@ pub struct BaseStepFields {
     #[serde(default, skip_serializing_if = "vec_is_empty", alias = "criterion_ids")]
     pub criterion_ids: Vec<String>,
     /// Verification depth category.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "verification_category")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "verification_category"
+    )]
     pub verification_category: Option<VerificationCategoryKind>,
     /// Provenance of this step when generated from a skill template.
     ///
     /// Typed as `serde_json::Value` here to avoid pulling the `skill`
     /// dependency chain into this module; the TS side re-imports the typed
     /// `SkillOrigin` after regeneration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "skill_origin")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "skill_origin"
+    )]
     pub skill_origin: Option<serde_json::Value>,
 }
 
@@ -365,19 +385,39 @@ pub struct CommandStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "command")]
     pub command: Option<String>,
     /// Working directory for the command.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "working_directory")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "working_directory"
+    )]
     pub working_directory: Option<String>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
     /// Whether non-zero exit status fails the step.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fail_on_error")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fail_on_error"
+    )]
     pub fail_on_error: Option<bool>,
     /// Re-run this step on every verification-agentic iteration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "run_on_subsequent_iterations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "run_on_subsequent_iterations"
+    )]
     pub run_on_subsequent_iterations: Option<bool>,
     /// Saved shell command template ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "shell_command_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "shell_command_id"
+    )]
     pub shell_command_id: Option<String>,
     /// Kind of deterministic check (for `check` / `check_group` modes).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "check_type")]
@@ -389,28 +429,48 @@ pub struct CommandStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "check_id")]
     pub check_id: Option<String>,
     /// Path to the check's config file.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "config_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "config_path"
+    )]
     pub config_path: Option<String>,
     /// Whether to auto-fix during the check.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "auto_fix")]
     pub auto_fix: Option<bool>,
     /// Fail the step on warnings in addition to errors.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fail_on_warning")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fail_on_warning"
+    )]
     pub fail_on_warning: Option<bool>,
     /// Repository selector for repository-targeted steps.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "repository")]
     pub repository: Option<String>,
     /// Name of a workflow to invoke.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_name"
+    )]
     pub workflow_name: Option<String>,
     /// Branch selector for repository-targeted steps.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "branch")]
     pub branch: Option<String>,
     /// Whether the caller waits for the workflow to complete.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "wait_for_completion")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "wait_for_completion"
+    )]
     pub wait_for_completion: Option<bool>,
     /// Saved check-group ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "check_group_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "check_group_id"
+    )]
     pub check_group_id: Option<String>,
     /// Test runner kind.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "test_type")]
@@ -425,16 +485,28 @@ pub struct CommandStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "script_id")]
     pub script_id: Option<String>,
     /// Inline script contents.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "script_content")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "script_content"
+    )]
     pub script_content: Option<String>,
     /// Target URL for navigation-style tests.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "target_url")]
     pub target_url: Option<String>,
     /// Saved fused-script ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fused_script_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fused_script_id"
+    )]
     pub fused_script_id: Option<String>,
     /// Execution mode for Playwright tests.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "execution_mode")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "execution_mode"
+    )]
     pub execution_mode: Option<PlaywrightExecutionMode>,
 }
 
@@ -464,7 +536,11 @@ pub struct PromptStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "model")]
     pub model: Option<String>,
     /// Marks this prompt as the summary step at the end of completion.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "is_summary_step")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "is_summary_step"
+    )]
     pub is_summary_step: Option<bool>,
 }
 
@@ -532,13 +608,21 @@ pub struct UiBridgeStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "url")]
     pub url: Option<String>,
     /// Free-form instruction text (for `execute`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "instruction")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "instruction"
+    )]
     pub instruction: Option<String>,
     /// Target selector or element ID.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "target")]
     pub target: Option<String>,
     /// Assertion kind (for `assert`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assert_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "assert_type"
+    )]
     pub assert_type: Option<UiBridgeAssertType>,
     /// Expected value for assertions.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "expected")]
@@ -547,23 +631,43 @@ pub struct UiBridgeStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_ms")]
     pub timeout_ms: Option<u64>,
     /// Comparison mode (for `compare` / `snapshot_assert`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "comparison_mode")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "comparison_mode"
+    )]
     pub comparison_mode: Option<UiBridgeComparisonMode>,
     /// Reference snapshot ID (for `compare` / `snapshot_assert`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reference_snapshot_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "reference_snapshot_id"
+    )]
     pub reference_snapshot_id: Option<String>,
     /// Severity threshold (for `compare` / `snapshot_assert`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "severity_threshold")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "severity_threshold"
+    )]
     pub severity_threshold: Option<UiBridgeSeverity>,
     /// Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "ui_bridge_snapshot_target")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "ui_bridge_snapshot_target"
+    )]
     pub ui_bridge_snapshot_target: Option<String>,
     /// Structured action plan (for `action_plan`).
     ///
     /// Typed as `serde_json::Value` here to avoid pulling the `action-plan`
     /// module into this crate; the TS side re-imports the typed `ActionPlan`
     /// after regeneration.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_plan")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_plan"
+    )]
     pub action_plan: Option<serde_json::Value>,
 }
 
@@ -723,10 +827,18 @@ pub struct CodeExecutionStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "code_file")]
     pub code_file: Option<String>,
     /// Sandbox mode: `"enforce"` (default) or `"warn"`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "sandbox_mode")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "sandbox_mode"
+    )]
     pub sandbox_mode: Option<String>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -744,10 +856,18 @@ pub struct ExecutePlaybookStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "content")]
     pub content: Option<String>,
     /// Path to a playbook file.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "playbook_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "playbook_path"
+    )]
     pub playbook_path: Option<String>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -787,28 +907,52 @@ pub struct NativeAccessibilityStep {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "text")]
     pub text: Option<String>,
     /// Whether to clear existing text before typing.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "clear_first")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "clear_first"
+    )]
     pub clear_first: Option<bool>,
     /// Role filter for `query` action (e.g. `"button"`, `"textbox"`).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "query_role")]
     pub query_role: Option<String>,
     /// Label filter for `query` action.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "query_label")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "query_label"
+    )]
     pub query_label: Option<String>,
     /// Only include interactive elements (for `query` and `ai_context`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "interactive_only")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "interactive_only"
+    )]
     pub interactive_only: Option<bool>,
     /// Maximum elements for `ai_context` action (default: 50).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_elements")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_elements"
+    )]
     pub max_elements: Option<u32>,
     /// Include hidden elements in `capture`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "include_hidden")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "include_hidden"
+    )]
     pub include_hidden: Option<bool>,
     /// Maximum tree depth for `capture`.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_depth")]
     pub max_depth: Option<u32>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -823,16 +967,32 @@ pub struct RestartProcessStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Process config ID to restart.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "restart_process_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "restart_process_id"
+    )]
     pub restart_process_id: Option<String>,
     /// Process name to restart (resolved to ID at runtime).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "restart_process_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "restart_process_name"
+    )]
     pub restart_process_name: Option<String>,
     /// Whether to wait for health port after restart (default: `true`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "restart_wait_for_health")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "restart_wait_for_health"
+    )]
     pub restart_wait_for_health: Option<bool>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -847,10 +1007,18 @@ pub struct SaveWorkflowArtifactStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Path to the workflow JSON file to save.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "artifact_input_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "artifact_input_path"
+    )]
     pub artifact_input_path: Option<String>,
     /// When `true`, also creates a `PipelineArtifact` from the artifact directory.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "artifact_capture_prompts")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "artifact_capture_prompts"
+    )]
     pub artifact_capture_prompts: Option<bool>,
 }
 
@@ -875,13 +1043,21 @@ pub struct WorkflowFixupStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Path to the workflow JSON file to fix (supports `{{artifact_dir}}`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixup_input_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fixup_input_path"
+    )]
     pub fixup_input_path: Option<String>,
     /// Fixup mode.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixup_mode")]
     pub fixup_mode: Option<WorkflowFixupMode>,
     /// Path to criteria JSON file (for `validate_criteria` mode).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixup_criteria_path")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "fixup_criteria_path"
+    )]
     pub fixup_criteria_path: Option<String>,
 }
 
@@ -896,7 +1072,11 @@ pub struct UiBridgeDesignAuditStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -1013,7 +1193,11 @@ pub struct VgaAutomateStep {
     #[serde(alias = "target_process")]
     pub target_process: String,
     /// Ordered sequence of VGA actions to execute.
-    #[serde(default, skip_serializing_if = "vec_is_empty", alias = "action_sequence")]
+    #[serde(
+        default,
+        skip_serializing_if = "vec_is_empty",
+        alias = "action_sequence"
+    )]
     pub action_sequence: Vec<VgaAction>,
     /// Overall step timeout in milliseconds. Defaults to `300000` (5 minutes)
     /// on the consumer side; bounds `[1000, 3600000]`.
@@ -1046,19 +1230,39 @@ pub struct UiBridgeVisualAssertionStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "visual_assertion_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "visual_assertion_type"
+    )]
     pub visual_assertion_type: Option<VisualAssertionType>,
     /// Element query JSON for text assertions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "visual_assertion_query")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "visual_assertion_query"
+    )]
     pub visual_assertion_query: Option<serde_json::Value>,
     /// Expected text (for text assertion) or element ID (for screenshot/highlight).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "visual_assertion_expected")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "visual_assertion_expected"
+    )]
     pub visual_assertion_expected: Option<String>,
     /// Options JSON for the assertion.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "visual_assertion_options")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "visual_assertion_options"
+    )]
     pub visual_assertion_options: Option<serde_json::Value>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -1073,19 +1277,39 @@ pub struct WorkflowRefStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// ID of the saved workflow to run.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_id"
+    )]
     pub workflow_id: Option<String>,
     /// Display name of the referenced workflow (denormalized for UI).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "ref_workflow_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "ref_workflow_name"
+    )]
     pub ref_workflow_name: Option<String>,
     /// Input variables substituted into the child workflow's prompt.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "ref_workflow_inputs")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "ref_workflow_inputs"
+    )]
     pub ref_workflow_inputs: Option<HashMap<String, String>>,
     /// Whether to inherit model overrides from the parent context (default: `true`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "ref_inherit_model_overrides")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "ref_inherit_model_overrides"
+    )]
     pub ref_inherit_model_overrides: Option<bool>,
     /// Timeout in seconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -1100,7 +1324,11 @@ pub struct DagCancelStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Cancellation reason message.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cancel_reason")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "cancel_reason"
+    )]
     pub cancel_reason: Option<String>,
 }
 
@@ -1115,10 +1343,18 @@ pub struct DagApprovalStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Prompt shown to the approver.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "approval_prompt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "approval_prompt"
+    )]
     pub approval_prompt: Option<String>,
     /// Timeout in seconds before auto-approving (to prevent permanent block).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_seconds"
+    )]
     pub timeout_seconds: Option<u64>,
 }
 
@@ -1133,10 +1369,18 @@ pub struct DagLoopStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
     /// Maximum number of loop iterations.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_iterations"
+    )]
     pub max_iterations: Option<u32>,
     /// Condition to evaluate each iteration (JSON expression or step ID).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "loop_condition")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "loop_condition"
+    )]
     pub loop_condition: Option<String>,
 }
 
@@ -1464,7 +1708,10 @@ mod tests {
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "vga_automate");
-        assert_eq!(json["stateMachineId"], "11111111-1111-1111-1111-111111111111");
+        assert_eq!(
+            json["stateMachineId"],
+            "11111111-1111-1111-1111-111111111111"
+        );
         assert_eq!(json["targetProcess"], "notepad++.exe");
         assert_eq!(json["actionSequence"][0]["kind"], "wait_for");
         assert_eq!(json["actionSequence"][1]["kind"], "click");

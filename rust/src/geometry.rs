@@ -56,7 +56,11 @@ pub struct Coordinates {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "system")]
     pub system: Option<CoordinateSystem>,
     /// Monitor index (required when `system` is `MonitorRelative`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "monitor_index")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "monitor_index"
+    )]
     pub monitor_index: Option<u32>,
 }
 
@@ -86,7 +90,11 @@ pub struct Region {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "system")]
     pub system: Option<CoordinateSystem>,
     /// Monitor index (required when `system` is `MonitorRelative`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "monitor_index")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "monitor_index"
+    )]
     pub monitor_index: Option<u32>,
 }
 

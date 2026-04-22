@@ -98,11 +98,7 @@ pub struct ExecutionStep {
     pub playwright_target_url: Option<String>,
 
     /// For prompt steps: the prompt ID from the library.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "prompt_id"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "prompt_id")]
     pub prompt_id: Option<String>,
 
     /// For prompt steps: the actual prompt content.
@@ -176,7 +172,11 @@ pub struct AiWorkflow {
     pub name: String,
 
     /// Optional description of what this workflow does.
-    #[serde(default, skip_serializing_if = "is_empty_string", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "is_empty_string",
+        alias = "description"
+    )]
     pub description: String,
 
     /// The ordered list of execution steps.
@@ -189,11 +189,19 @@ pub struct AiWorkflow {
 
     /// Maximum iterations for the AI loop.
     /// `None` (omitted) means no cap — loop until success or explicit stop.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_iterations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "max_iterations"
+    )]
     pub max_iterations: Option<u32>,
 
     /// Whether to capture input for coordinate validation.
-    #[serde(default, skip_serializing_if = "is_false", alias = "capture_input_validation")]
+    #[serde(
+        default,
+        skip_serializing_if = "is_false",
+        alias = "capture_input_validation"
+    )]
     pub capture_input_validation: bool,
 
     /// Category for organization (e.g., `"Testing"`, `"Development"`).
@@ -209,11 +217,18 @@ pub struct AiWorkflow {
     pub context_ids: Vec<String>,
 
     /// Disabled context IDs (excluded from auto-include).
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "disabled_context_ids")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "disabled_context_ids"
+    )]
     pub disabled_context_ids: Vec<String>,
 
     /// Whether to auto-include contexts based on task mentions (default: true).
-    #[serde(default = "default_auto_include_contexts", alias = "auto_include_contexts")]
+    #[serde(
+        default = "default_auto_include_contexts",
+        alias = "auto_include_contexts"
+    )]
     pub auto_include_contexts: bool,
 
     /// ISO 8601 timestamp of creation.

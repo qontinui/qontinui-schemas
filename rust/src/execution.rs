@@ -241,7 +241,11 @@ pub struct RunnerMetadata {
     #[serde(alias = "hostname")]
     pub hostname: String,
     /// Screen resolution as a free-form string (e.g., `"1920x1080"`).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "screen_resolution")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "screen_resolution"
+    )]
     pub screen_resolution: Option<String>,
     /// CPU description.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "cpu_info")]
@@ -266,22 +270,42 @@ pub struct WorkflowMetadata {
     #[serde(alias = "workflow_name")]
     pub workflow_name: String,
     /// Workflow version, if tracked.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_version")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_version"
+    )]
     pub workflow_version: Option<String>,
     /// Number of states declared by the workflow.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "total_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "total_states"
+    )]
     pub total_states: Option<u32>,
     /// Number of transitions declared by the workflow.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "total_transitions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "total_transitions"
+    )]
     pub total_transitions: Option<u32>,
     /// Free-form tags attached to the workflow.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "tags")]
     pub tags: Option<Vec<String>>,
     /// Workflow description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// IDs of the states that are active when the workflow starts.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "initial_state_ids")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "initial_state_ids"
+    )]
     pub initial_state_ids: Option<Vec<String>>,
 }
 
@@ -309,19 +333,39 @@ pub struct ExecutionStats {
     #[serde(alias = "total_duration_ms")]
     pub total_duration_ms: u64,
     /// Mean per-action duration, in milliseconds.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "avg_action_duration_ms")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "avg_action_duration_ms"
+    )]
     pub avg_action_duration_ms: Option<f64>,
     /// Aggregate input tokens across all LLM actions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "total_tokens_input")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "total_tokens_input"
+    )]
     pub total_tokens_input: Option<u64>,
     /// Aggregate output tokens across all LLM actions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "total_tokens_output")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "total_tokens_output"
+    )]
     pub total_tokens_output: Option<u64>,
     /// Aggregate estimated cost in USD across all LLM actions.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "total_cost_usd")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "total_cost_usd"
+    )]
     pub total_cost_usd: Option<f64>,
     /// Number of actions that used an LLM.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "llm_action_count")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "llm_action_count"
+    )]
     pub llm_action_count: Option<u32>,
 }
 
@@ -346,16 +390,32 @@ pub struct CoverageData {
     #[serde(alias = "total_transitions")]
     pub total_transitions: u32,
     /// IDs of states that were not visited.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "uncovered_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "uncovered_states"
+    )]
     pub uncovered_states: Option<Vec<String>>,
     /// IDs of transitions that were not executed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "uncovered_transitions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "uncovered_transitions"
+    )]
     pub uncovered_transitions: Option<Vec<String>>,
     /// Per-state visit counts, keyed by state ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "state_visit_counts")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "state_visit_counts"
+    )]
     pub state_visit_counts: Option<HashMap<String, u32>>,
     /// Per-transition execution counts, keyed by transition ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "transition_execution_counts")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "transition_execution_counts"
+    )]
     pub transition_execution_counts: Option<HashMap<String, u32>>,
 }
 
@@ -375,19 +435,35 @@ pub struct LLMMetrics {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "provider")]
     pub provider: Option<String>,
     /// Input/prompt token count.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tokens_input")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "tokens_input"
+    )]
     pub tokens_input: Option<u64>,
     /// Completion token count.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tokens_output")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "tokens_output"
+    )]
     pub tokens_output: Option<u64>,
     /// Computed total token count.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tokens_total")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "tokens_total"
+    )]
     pub tokens_total: Option<u64>,
     /// Estimated cost in USD.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "cost_usd")]
     pub cost_usd: Option<f64>,
     /// Generation parameters (temperature, max_tokens, etc.).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "generation_params")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "generation_params"
+    )]
     pub generation_params: Option<HashMap<String, Value>>,
 }
 
@@ -410,16 +486,28 @@ pub struct ExecutionRunCreate {
     #[serde(alias = "run_name")]
     pub run_name: String,
     /// Optional free-form description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Runner environment metadata.
     #[serde(alias = "runner_metadata")]
     pub runner_metadata: RunnerMetadata,
     /// Workflow metadata, if the run executes a workflow.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_metadata")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_metadata"
+    )]
     pub workflow_metadata: Option<WorkflowMetadata>,
     /// Run configuration bag (opaque to this layer).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "configuration")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "configuration"
+    )]
     pub configuration: Option<HashMap<String, Value>>,
 }
 
@@ -450,7 +538,11 @@ pub struct ExecutionRunResponse {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "ended_at")]
     pub ended_at: Option<String>,
     /// Total duration in seconds, if the run has ended.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "duration_seconds"
+    )]
     pub duration_seconds: Option<f64>,
 }
 
@@ -518,46 +610,86 @@ pub struct ActionExecutionCreate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "to_state")]
     pub to_state: Option<String>,
     /// IDs of states active when the action ran.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "active_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "active_states"
+    )]
     pub active_states: Option<Vec<String>>,
     /// ID of the pattern the action targeted.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "pattern_id")]
     pub pattern_id: Option<String>,
     /// Human-readable pattern name.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "pattern_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "pattern_name"
+    )]
     pub pattern_name: Option<String>,
     /// Confidence score of the match in the range `[0.0, 1.0]`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "confidence_score")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "confidence_score"
+    )]
     pub confidence_score: Option<f64>,
     /// Pixel location of the match.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "match_location")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "match_location"
+    )]
     pub match_location: Option<MatchLocation>,
     /// Error message if the action failed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
     /// Category of error, if any.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_type")]
     pub error_type: Option<ErrorType>,
     /// Captured stack trace, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_stack")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_stack"
+    )]
     pub error_stack: Option<String>,
     /// ID of a screenshot associated with the action.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "screenshot_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "screenshot_id"
+    )]
     pub screenshot_id: Option<String>,
     /// ID of a parent action, if this is a sub-action.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "parent_action_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "parent_action_id"
+    )]
     pub parent_action_id: Option<String>,
     /// Opaque input data captured for the action.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "input_data")]
     pub input_data: Option<HashMap<String, Value>>,
     /// Opaque output data produced by the action.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "output_data")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "output_data"
+    )]
     pub output_data: Option<HashMap<String, Value>>,
     /// Opaque additional metadata.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "metadata")]
     pub metadata: Option<HashMap<String, Value>>,
     /// LLM token and cost metrics, if the action used an LLM.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "llm_metrics")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "llm_metrics"
+    )]
     pub llm_metrics: Option<LLMMetrics>,
     /// Span type for tracing (e.g., `"llm"`, `"tool"`, `"agent"`).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "span_type")]
@@ -656,16 +788,28 @@ pub struct ExecutionScreenshotCreate {
     #[serde(alias = "height")]
     pub height: u32,
     /// Sequence number of the associated action, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_sequence_number")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_sequence_number"
+    )]
     pub action_sequence_number: Option<u32>,
     /// State ID active when the screenshot was taken.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "state")]
     pub state: Option<String>,
     /// IDs of states active when the screenshot was taken.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "active_states")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "active_states"
+    )]
     pub active_states: Option<Vec<String>>,
     /// Overlaid annotations.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "annotations")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "annotations"
+    )]
     pub annotations: Option<Vec<ScreenshotAnnotation>>,
     /// Opaque additional metadata.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "metadata")]
@@ -687,7 +831,11 @@ pub struct ExecutionScreenshotResponse {
     #[serde(alias = "image_url")]
     pub image_url: String,
     /// URL to a thumbnail image, if generated.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "thumbnail_url")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "thumbnail_url"
+    )]
     pub thumbnail_url: Option<String>,
     /// ISO 8601 timestamp when the image was uploaded.
     #[serde(alias = "uploaded_at")]
@@ -719,22 +867,42 @@ pub struct ExecutionIssueCreate {
     #[serde(alias = "issue_type")]
     pub issue_type: String,
     /// Sequence number of the associated action, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_sequence_number")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_sequence_number"
+    )]
     pub action_sequence_number: Option<u32>,
     /// State ID active when the issue was observed.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "state")]
     pub state: Option<String>,
     /// IDs of screenshots illustrating the issue.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "screenshot_ids")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "screenshot_ids"
+    )]
     pub screenshot_ids: Option<Vec<String>>,
     /// Steps to reproduce the issue.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reproduction_steps")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "reproduction_steps"
+    )]
     pub reproduction_steps: Option<Vec<String>>,
     /// Expected behavior.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "expected_behavior")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "expected_behavior"
+    )]
     pub expected_behavior: Option<String>,
     /// Actual observed behavior.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "actual_behavior")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "actual_behavior"
+    )]
     pub actual_behavior: Option<String>,
     /// Opaque additional metadata.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "metadata")]
@@ -782,7 +950,11 @@ pub struct ExecutionRunComplete {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "summary")]
     pub summary: Option<String>,
     /// Error message if the run failed.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "error_message")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "error_message"
+    )]
     pub error_message: Option<String>,
 }
 
@@ -944,10 +1116,18 @@ pub struct ExecutionIssueUpdate {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "severity")]
     pub severity: Option<IssueSeverity>,
     /// User ID to assign the issue to.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assigned_to_user_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "assigned_to_user_id"
+    )]
     pub assigned_to_user_id: Option<String>,
     /// Resolution notes.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution_notes")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolution_notes"
+    )]
     pub resolution_notes: Option<String>,
 }
 
@@ -964,7 +1144,11 @@ pub struct VisualComparisonResult {
     #[serde(alias = "comparison_id")]
     pub comparison_id: String,
     /// Baseline screenshot ID, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "baseline_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "baseline_id"
+    )]
     pub baseline_id: Option<String>,
     /// Similarity score in the range `[0.0, 1.0]`.
     #[serde(alias = "similarity_score")]
@@ -976,7 +1160,11 @@ pub struct VisualComparisonResult {
     #[serde(alias = "passed")]
     pub passed: bool,
     /// URL to a diff image, if generated.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "diff_image_url")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "diff_image_url"
+    )]
     pub diff_image_url: Option<String>,
     /// Number of diff regions detected.
     #[serde(alias = "diff_region_count")]
@@ -1018,20 +1206,36 @@ pub struct ExecutionRunDetail {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "ended_at")]
     pub ended_at: Option<String>,
     /// Total duration in seconds, if the run has ended.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "duration_seconds")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "duration_seconds"
+    )]
     pub duration_seconds: Option<f64>,
     // ── ExecutionRunDetail additions ──
     /// Run description.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "description")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "description"
+    )]
     pub description: Option<String>,
     /// Runner environment metadata.
     #[serde(alias = "runner_metadata")]
     pub runner_metadata: RunnerMetadata,
     /// Workflow metadata, if applicable.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_metadata")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_metadata"
+    )]
     pub workflow_metadata: Option<WorkflowMetadata>,
     /// Configuration snapshot captured at run start.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "configuration")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "configuration"
+    )]
     pub configuration: HashMap<String, Value>,
     /// Aggregate execution statistics.
     #[serde(alias = "stats")]
@@ -1091,26 +1295,46 @@ pub struct ExecutionIssueDetail {
     pub updated_at: String,
     // ── ExecutionIssueDetail additions ──
     /// Sequence number of the associated action, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_sequence_number")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_sequence_number"
+    )]
     pub action_sequence_number: Option<u32>,
     /// Steps to reproduce the issue.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "reproduction_steps")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "reproduction_steps"
+    )]
     pub reproduction_steps: Vec<String>,
     /// Full screenshot records associated with the issue.
     #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "screenshots")]
     pub screenshots: Vec<ExecutionScreenshotResponse>,
     /// Error details such as stack traces.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "error_details")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "error_details"
+    )]
     pub error_details: HashMap<String, Value>,
     /// Opaque additional metadata.
     #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "metadata")]
     pub metadata: HashMap<String, Value>,
     /// Assigned user record, if any. Shape is intentionally opaque here; the
     /// Python source types this as `dict[str, Any]`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "assigned_to")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "assigned_to"
+    )]
     pub assigned_to: Option<HashMap<String, Value>>,
     /// Resolution notes, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "resolution_notes")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "resolution_notes"
+    )]
     pub resolution_notes: Option<String>,
 }
 
@@ -1198,7 +1422,11 @@ pub struct ActionReliabilityStats {
     pub p95_duration_ms: u64,
     /// Common error categories, as opaque records. Python types this as
     /// `list[dict[str, Any]]`; typing it further requires product input.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "common_errors")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "common_errors"
+    )]
     pub common_errors: Vec<HashMap<String, Value>>,
 }
 
@@ -1252,7 +1480,11 @@ pub struct ExecutionTrendResponse {
     pub data_points: Vec<ExecutionTrendDataPoint>,
     /// Overall statistics computed over the full window. Shape is
     /// intentionally opaque (`dict[str, Any]` in Python).
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "overall_stats")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "overall_stats"
+    )]
     pub overall_stats: HashMap<String, Value>,
 }
 
@@ -1353,7 +1585,11 @@ pub struct CostTrendResponse {
     pub data_points: Vec<CostTrendDataPoint>,
     /// Overall cost statistics over the full window. Shape is intentionally
     /// opaque (`dict[str, Any]` in Python).
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "overall_stats")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "overall_stats"
+    )]
     pub overall_stats: HashMap<String, Value>,
 }
 
@@ -1367,10 +1603,18 @@ pub struct CostTrendResponse {
 #[schemars(deny_unknown_fields)]
 pub struct HistoricalActionQuery {
     /// Filter by action type.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_type")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_type"
+    )]
     pub action_type: Option<ActionType>,
     /// Filter by action name.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "action_name")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_name"
+    )]
     pub action_name: Option<String>,
     /// Filter by state name.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "state_name")]
@@ -1382,7 +1626,11 @@ pub struct HistoricalActionQuery {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "project_id")]
     pub project_id: Option<String>,
     /// Filter by workflow ID.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "workflow_id")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "workflow_id"
+    )]
     pub workflow_id: Option<String>,
     /// Maximum number of results to return (Python constrains to `1..=100`).
     #[serde(alias = "limit")]
@@ -1413,16 +1661,28 @@ pub struct HistoricalActionResult {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "to_state")]
     pub to_state: Option<String>,
     /// Input parameters captured for the action.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "input_data")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "input_data"
+    )]
     pub input_data: HashMap<String, Value>,
     /// Output produced by the action.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty", alias = "output_data")]
+    #[serde(
+        default,
+        skip_serializing_if = "HashMap::is_empty",
+        alias = "output_data"
+    )]
     pub output_data: HashMap<String, Value>,
     /// Duration in milliseconds.
     #[serde(alias = "duration_ms")]
     pub duration_ms: u64,
     /// URL to an associated screenshot, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "screenshot_url")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "screenshot_url"
+    )]
     pub screenshot_url: Option<String>,
     /// Whether a screenshot exists.
     #[serde(alias = "has_screenshot")]

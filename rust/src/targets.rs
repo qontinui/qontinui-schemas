@@ -98,9 +98,19 @@ pub struct PatternOptions {
         alias = "rotation_invariant"
     )]
     pub rotation_invariant: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "minScale", alias = "min_scale")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "minScale",
+        alias = "min_scale"
+    )]
     pub min_scale: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "maxScale", alias = "max_scale")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "maxScale",
+        alias = "max_scale"
+    )]
     pub max_scale: Option<f64>,
     #[serde(
         default,
@@ -151,7 +161,12 @@ pub struct PatternOptions {
         alias = "color_tolerance"
     )]
     pub color_tolerance: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "useEdges", alias = "use_edges")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "useEdges",
+        alias = "use_edges"
+    )]
     pub use_edges: Option<bool>,
     #[serde(
         default,
@@ -209,9 +224,19 @@ pub struct MatchAdjustment {
         alias = "target_offset"
     )]
     pub target_offset: Option<Coordinates>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addW", alias = "add_w")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "addW",
+        alias = "add_w"
+    )]
     pub add_w: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addH", alias = "add_h")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "addH",
+        alias = "add_h"
+    )]
     pub add_h: Option<i64>,
     #[serde(
         default,
@@ -227,9 +252,19 @@ pub struct MatchAdjustment {
         alias = "absolute_h"
     )]
     pub absolute_h: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addX", alias = "add_x")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "addX",
+        alias = "add_x"
+    )]
     pub add_x: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "addY", alias = "add_y")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "addY",
+        alias = "add_y"
+    )]
     pub add_y: Option<i64>,
 }
 
@@ -399,7 +434,11 @@ pub struct TextSearchOptions {
         alias = "edit_distance"
     )]
     pub edit_distance: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "preprocessing")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "preprocessing"
+    )]
     pub preprocessing: Option<Vec<String>>,
     #[serde(
         default,
@@ -408,9 +447,19 @@ pub struct TextSearchOptions {
         alias = "scale_factor"
     )]
     pub scale_factor: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "psmMode", alias = "psm_mode")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "psmMode",
+        alias = "psm_mode"
+    )]
     pub psm_mode: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "oemMode", alias = "oem_mode")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "oemMode",
+        alias = "oem_mode"
+    )]
     pub oem_mode: Option<i64>,
     #[serde(
         default,
@@ -492,11 +541,7 @@ pub enum TargetConfig {
         state_id: String,
         #[serde(rename = "stringIds")]
         string_ids: Vec<String>,
-        #[serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            rename = "useAll"
-        )]
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "useAll")]
         use_all: Option<bool>,
     },
 
@@ -524,11 +569,7 @@ pub enum TargetConfig {
         state_id: String,
         #[serde(rename = "imageIds")]
         image_ids: Vec<String>,
-        #[serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            rename = "stateName"
-        )]
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "stateName")]
         state_name: Option<String>,
         #[serde(
             default,

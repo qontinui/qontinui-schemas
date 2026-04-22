@@ -174,7 +174,11 @@ pub struct TicketProviderConfig {
     pub target: String,
     /// Labels / filters that mark a ticket as "actionable" (i.e. eligible to
     /// spawn a workflow task). All listed labels must be present for a match.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "actionable_labels")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        alias = "actionable_labels"
+    )]
     pub actionable_labels: Vec<String>,
     /// ID of the workflow to spawn for matched tickets.
     #[serde(alias = "workflow_id")]

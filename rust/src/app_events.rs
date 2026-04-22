@@ -84,7 +84,6 @@ pub enum FlowEvent {
 #[serde(tag = "event_type", content = "data")]
 pub enum AppEvent {
     // ── Executor Events ──
-
     /// Standard executor event with data payload.
     ExecutorEvent {
         event: String,
@@ -123,7 +122,6 @@ pub enum AppEvent {
     ImageRecognition { data: Value },
 
     // ── Extraction Events ──
-
     /// Web extraction event with data payload.
     ExtractionEvent {
         event: String,
@@ -150,7 +148,6 @@ pub enum AppEvent {
     },
 
     // ── RAG Events ──
-
     /// RAG processing progress update.
     RagProgress {
         project_id: String,
@@ -179,12 +176,10 @@ pub enum AppEvent {
     },
 
     // ── Flow Events ──
-
     /// Flow execution event (wraps [`FlowEvent`]).
     FlowEvent(FlowEvent),
 
     // ── AI Output Events ──
-
     /// AI session output event.
     AiOutput {
         session_id: String,
@@ -194,7 +189,6 @@ pub enum AppEvent {
     },
 
     // ── Findings Events ──
-
     /// Finding detected during AI analysis.
     FindingDetected { finding: Value },
 
@@ -202,7 +196,6 @@ pub enum AppEvent {
     FindingResolved { finding: Value },
 
     // ── Navigation Events ──
-
     /// Test navigation event for UI.
     TestNavigation { data: Value },
 
@@ -210,7 +203,6 @@ pub enum AppEvent {
     UiBridgeRequest { data: Value },
 
     // ── Orchestrator State Events ──
-
     /// Orchestrator state change event for real-time UI updates.
     OrchestratorStateChange {
         /// Task run ID.
@@ -260,7 +252,6 @@ pub enum AppEvent {
     },
 
     // ── Approval Events ──
-
     /// Approval required -- workflow is paused waiting for human review.
     ApprovalRequired {
         /// Task run ID.
@@ -286,7 +277,6 @@ pub enum AppEvent {
     },
 
     // ── Deferred Feedback Events ──
-
     /// A deferred question was created during autonomous execution.
     DeferredQuestionCreated {
         /// Task run ID.
@@ -316,7 +306,6 @@ pub enum AppEvent {
     },
 
     // ── Canvas Events ──
-
     /// Canvas panel created, updated, or removed.
     CanvasUpdate {
         action: String,
@@ -328,7 +317,6 @@ pub enum AppEvent {
     },
 
     // ── AI Output Streaming Events ──
-
     /// Real-time AI output chunk for live streaming to the frontend.
     AiOutputChunk {
         /// Task run ID this output belongs to.
@@ -340,7 +328,6 @@ pub enum AppEvent {
     },
 
     // ── Convergence Tracking Events ──
-
     /// Per-iteration metrics for tracking convergence.
     IterationMetrics {
         /// Task run ID.
@@ -362,7 +349,6 @@ pub enum AppEvent {
     },
 
     // ── Blame Attribution Events ──
-
     /// Blame attribution results from the blame engine.
     BlameAttribution {
         /// Task run ID.
@@ -380,7 +366,6 @@ pub enum AppEvent {
     },
 
     // ── Constraint Engine Events ──
-
     /// Constraint evaluation results after an agentic phase.
     ConstraintResults {
         /// Task run ID.
@@ -396,7 +381,6 @@ pub enum AppEvent {
     },
 
     // ── Queue Events ──
-
     /// Workflow has been added to the execution queue.
     WorkflowQueued {
         /// Task run ID for the queued workflow.
@@ -418,7 +402,6 @@ pub enum AppEvent {
     },
 
     // ── Cost Management Events ──
-
     /// Real-time cost update after each AI call.
     CostUpdate {
         task_run_id: String,
@@ -457,7 +440,6 @@ pub enum AppEvent {
     },
 
     // ── Generic Events ──
-
     /// Generic error event.
     Error {
         message: String,

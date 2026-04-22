@@ -41,7 +41,10 @@ pub struct WorkerOutput {
     #[serde(default, alias = "confidence")]
     pub confidence: ConfidenceLevel,
     /// Optional suggestion for next action if work continues.
-    #[serde(skip_serializing_if = "Option::is_none", alias = "next_action_suggestion")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        alias = "next_action_suggestion"
+    )]
     pub next_action_suggestion: Option<String>,
     /// Optional progress estimate (0.0 to 1.0).
     #[serde(skip_serializing_if = "Option::is_none", alias = "progress_estimate")]
