@@ -24,7 +24,6 @@ python = "^3.12"
 pydantic = "^2.0.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^26"
 ruff = "^0.15"
 mypy = "^1.14"
 pydantic-to-typescript = "^2.0"
