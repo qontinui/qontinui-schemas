@@ -72,6 +72,21 @@ export interface UnifiedWorkflow {
    */
   approvalGate: boolean;
   /**
+   * Auto-commit files touched by sub-agents on successful terminal state.
+   *
+   * Phase C of the Commit Progress feature. Commits the file-set recorded
+   * in `session_touched_files` to the workflow's worktree branch when the
+   * sub-agent reaches a successful terminal state, so the parent workflow
+   * sees an atomic delta instead of a half-edited working tree.
+   *
+   * - `Some(true)` — commit after success regardless of worktree state.
+   * - `Some(false)` — never commit, even with worktree.
+   * - `None` (default) — commit if and only if the workflow uses a worktree.
+   *
+   * Failure to commit never fails the workflow — best-effort durability.
+   */
+  autoCommitSubagents?: boolean | null;
+  /**
    * Whether to auto-include contexts based on task mentions (default:
    * `true`).
    */

@@ -359,9 +359,14 @@ from .per_type.tree_event_list_response import TreeEventListResponse
 from .per_type.tree_event_response import TreeEventResponse
 from .per_type.tree_event_type import TreeEventType
 from .per_type.tree_node import TreeNode
+from .per_type.ui_bridge_captured_toast import UIBridgeCapturedToast
 from .per_type.ui_bridge_component import UIBridgeComponent
 from .per_type.ui_bridge_element import UIBridgeElement
+from .per_type.ui_bridge_modal_info import UIBridgeModalInfo
+from .per_type.ui_bridge_modal_stack import UIBridgeModalStack
 from .per_type.ui_bridge_snapshot import UIBridgeSnapshot
+from .per_type.ui_bridge_toast_context import UIBridgeToastContext
+from .per_type.ui_bridge_undo_context import UIBridgeUndoContext
 from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
@@ -772,9 +777,14 @@ __all__ = [
     "TreeEventResponse",
     "TreeEventType",
     "TreeNode",
+    "UIBridgeCapturedToast",
     "UIBridgeComponent",
     "UIBridgeElement",
+    "UIBridgeModalInfo",
+    "UIBridgeModalStack",
     "UIBridgeSnapshot",
+    "UIBridgeToastContext",
+    "UIBridgeUndoContext",
     "UiBridgeAction",
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
