@@ -207,6 +207,8 @@ fn scheduled_task_fully_populated_roundtrips() {
             error_message: None,
             triggered_auto_fix: false,
             auto_fix_session_id: None,
+            scheduled_for: Some("2026-04-13T03:00:00Z".to_string()),
+            catch_up_run: false,
         }),
         next_run: Some("2026-04-15T03:00:00Z".to_string()),
         conditions: Some(ScheduleConditions {
@@ -215,6 +217,10 @@ fn scheduled_task_fully_populated_roundtrips() {
             timeout_minutes: Some(30),
         }),
         condition_status: None,
+        catch_up_policy: CatchUpPolicy::RunOnce,
+        catch_up_grace_seconds: 300,
+        consecutive_launch_failures: 0,
+        launch_failure_backoff_seconds: 60,
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -243,6 +249,10 @@ fn scheduled_task_minimally_populated_roundtrips() {
         next_run: None,
         conditions: None,
         condition_status: None,
+        catch_up_policy: CatchUpPolicy::RunOnce,
+        catch_up_grace_seconds: 300,
+        consecutive_launch_failures: 0,
+        launch_failure_backoff_seconds: 60,
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -273,6 +283,10 @@ fn scheduled_task_minimal_elides_none_fields() {
         next_run: None,
         conditions: None,
         condition_status: None,
+        catch_up_policy: CatchUpPolicy::RunOnce,
+        catch_up_grace_seconds: 300,
+        consecutive_launch_failures: 0,
+        launch_failure_backoff_seconds: 60,
     };
     let json = serde_json::to_string(&task).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();

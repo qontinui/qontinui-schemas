@@ -17,3 +17,5 @@ export type { SchedulerStatus } from "../generated/SchedulerStatus";
 export type { NextTaskInfo } from "../generated/NextTaskInfo";
 export type { CreateScheduledTaskRequest } from "../generated/CreateScheduledTaskRequest";
 export type { UpdateScheduledTaskRequest } from "../generated/UpdateScheduledTaskRequest";
+export type { CatchUpPolicy } from "../generated/CatchUpPolicy";
+export type { McpConnectionRef } from "../generated/McpConnectionRef";

@@ -5,9 +5,11 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+import type { CatchUpPolicy } from './CatchUpPolicy';
 import type { ConditionScheduleConfig } from './ConditionScheduleConfig';
 import type { ConditionStatus } from './ConditionStatus';
 import type { IdleCondition } from './IdleCondition';
+import type { McpConnectionRef } from './McpConnectionRef';
 import type { RepositoryInactiveCondition } from './RepositoryInactiveCondition';
 import type { RepositoryWatch } from './RepositoryWatch';
 import type { ScheduleConditions } from './ScheduleConditions';
@@ -27,6 +29,16 @@ export interface ScheduledTask {
    */
   autoFixOnFailure: boolean;
   /**
+   * Slots within this number of seconds of "now" are not treated as
+   * missed (the normal scheduler will pick them up). Default 300s.
+   */
+  catchUpGraceSeconds: number;
+  /**
+   * Catch-up policy applied when the runner restarts after missing one
+   * or more scheduled slots.
+   */
+  catchUpPolicy?: CatchUpPolicy & string;
+  /**
    * Present while the task is waiting for its conditions to be met.
    */
   conditionStatus?: ConditionStatus | null;
@@ -34,6 +46,12 @@ export interface ScheduledTask {
    * Optional conditions that must be met before execution.
    */
   conditions?: ScheduleConditions | null;
+  /**
+   * Number of consecutive launch failures since the task last started
+   * successfully. Drives exponential backoff. Reset to 0 on the next
+   * successful launch.
+   */
+  consecutiveLaunchFailures: number;
   /**
    * ISO 8601 timestamp of creation.
    */
@@ -54,6 +72,13 @@ export interface ScheduledTask {
    * Record of the most recent execution.
    */
   lastRun?: TaskExecutionRecord | null;
+  /**
+   * **Base** backoff in seconds for launch failures (not the current
+   * accumulated backoff). The runner computes the effective delay as
+   * `min(base * 2^(consecutive_launch_failures - 1), 86400)`.
+   * Default 60s.
+   */
+  launchFailureBackoffSeconds: number;
   /**
    * ISO 8601 timestamp of last modification.
    */

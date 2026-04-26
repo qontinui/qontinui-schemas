@@ -19,6 +19,12 @@ import type { VgaAction } from './VgaAction';
  * `runner.vga_state_machines`), focuses `target_process`, and executes each
  * entry in `action_sequence` by grounding the element prompt against a fresh
  * screenshot and dispatching the HAL click/type/wait primitive.
+ *
+ * Canonical field name for the VGA state machine reference is
+ * `vgaStateMachineId` (camelCase) in emitted/accepted JSON. Two
+ * legacy aliases exist for back-compat: `vga_state_machine_id`
+ * (snake_case) and the bare `stateMachineId`. New code must emit
+ * `vgaStateMachineId`. Aliases may be removed after 2026-Q3.
  */
 export interface VgaAutomateStep {
   /**

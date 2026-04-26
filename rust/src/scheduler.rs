@@ -221,10 +221,100 @@ pub enum ScheduledTaskType {
         #[serde(default = "default_true")]
         capture_on_focus_change: bool,
     },
+    /// Run an ad-hoc Claude agent prompt without pre-registering it in the
+    /// Prompt Library. Reuses the runner's existing `POST /prompts/run`
+    /// ad-hoc surface — no separate Claude CLI plumbing required.
+    RemoteAgent {
+        /// The prompt content to send to the Claude session.
+        prompt: String,
+        /// Working directory for the spawned session. `None` means the
+        /// runner's project root. Stored as a string (not `PathBuf`) to keep
+        /// this crate JSON-Schema-friendly.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        working_directory: Option<String>,
+        /// Allowed tool names (e.g. `["Bash", "Read", "Write", "Edit"]`).
+        /// Empty = use the runner's default tool allow-list.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        allowed_tools: Vec<String>,
+        /// Optional model override. `None` = runner default
+        /// (typically `claude-sonnet-4-6`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Optional MCP connection references resolved at dispatch time
+        /// against the runner's existing MCP config. Empty = inherit
+        /// whatever the runner currently has configured.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        mcp_connections: Vec<McpConnectionRef>,
+        /// Hard cap on Claude turns per run (safety bound). `None` =
+        /// runner's default cap (typically 50).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_turns: Option<u32>,
+        /// Wall-clock timeout in seconds. `None` = runner default
+        /// (typically 600s = 10 min).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
+    },
+}
+
+/// Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
+///
+/// `name` is the MCP server name as registered in the runner's MCP config.
+/// `url` is an optional override; when omitted the runner resolves the URL
+/// from its existing MCP config at dispatch time.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct McpConnectionRef {
+    /// MCP server name as registered in the runner's MCP config.
+    pub name: String,
+    /// Optional URL override; falls back to the runner's MCP config when
+    /// `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// Catch-up policy applied when the runner restarts after missing one or
+/// more scheduled slots.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CatchUpPolicy {
+    /// Run the missed slot once for each occurrence that was skipped.
+    Run,
+    /// Skip all missed slots; emit `MissedRunnerDown` history rows for
+    /// audit but do not execute.
+    Skip,
+    /// Collapse multiple missed slots into a single catch-up run.
+    RunOnce,
+}
+
+impl Default for CatchUpPolicy {
+    fn default() -> Self {
+        Self::RunOnce
+    }
+}
+
+fn default_catch_up_policy() -> CatchUpPolicy {
+    CatchUpPolicy::RunOnce
+}
+
+fn default_catch_up_grace_seconds() -> u32 {
+    300
+}
+
+fn default_consecutive_launch_failures() -> u32 {
+    0
+}
+
+fn default_launch_failure_backoff_seconds() -> u32 {
+    60
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_catch_up_run() -> bool {
+    false
 }
 
 fn default_capture_interval() -> u64 {
@@ -246,13 +336,23 @@ pub enum ScheduledTaskStatus {
     Running,
     /// Finished successfully.
     Completed,
-    /// Finished with an error.
+    /// Finished with an error after the task had started running.
     Failed,
+    /// The task could not even start (workflow file missing, prompt resolve
+    /// failure, ai_session spawn error, etc.). Distinct from `Failed` because
+    /// it drives the launch-failure backoff in
+    /// [`ScheduledTask::launch_failure_backoff_seconds`].
+    LaunchFailed,
     /// Skipped because the task had already completed successfully and
     /// `skip_if_completed` is `true`.
     Skipped,
     /// Cancelled before or during execution.
     Cancelled,
+    /// Slot detected as missed during catch-up reconciliation while the
+    /// runner was offline. Recorded as a history row when
+    /// [`CatchUpPolicy::Skip`] is in effect; never returned for currently
+    /// queued tasks.
+    MissedRunnerDown,
 }
 
 // ============================================================================
@@ -300,6 +400,21 @@ pub struct TaskExecutionRecord {
         alias = "auto_fix_session_id"
     )]
     pub auto_fix_session_id: Option<String>,
+    /// ISO 8601 timestamp of the *scheduled* slot this execution covers,
+    /// distinct from `started_at` (which is the actual launch time). Allows
+    /// detecting "ran X minutes late" and is consumed by the missed-run
+    /// reconciler. Optional for backward compatibility with execution rows
+    /// written before this field existed.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "scheduled_for"
+    )]
+    pub scheduled_for: Option<String>,
+    /// Whether this execution record was created by the catch-up reconciler
+    /// (rather than the normal scheduling tick).
+    #[serde(default = "default_catch_up_run", alias = "catch_up_run")]
+    pub catch_up_run: bool,
 }
 
 // ============================================================================
@@ -370,6 +485,37 @@ pub struct ScheduledTask {
         alias = "condition_status"
     )]
     pub condition_status: Option<ConditionStatus>,
+    /// Catch-up policy applied when the runner restarts after missing one
+    /// or more scheduled slots.
+    #[serde(
+        default = "default_catch_up_policy",
+        alias = "catch_up_policy"
+    )]
+    pub catch_up_policy: CatchUpPolicy,
+    /// Slots within this number of seconds of "now" are not treated as
+    /// missed (the normal scheduler will pick them up). Default 300s.
+    #[serde(
+        default = "default_catch_up_grace_seconds",
+        alias = "catch_up_grace_seconds"
+    )]
+    pub catch_up_grace_seconds: u32,
+    /// Number of consecutive launch failures since the task last started
+    /// successfully. Drives exponential backoff. Reset to 0 on the next
+    /// successful launch.
+    #[serde(
+        default = "default_consecutive_launch_failures",
+        alias = "consecutive_launch_failures"
+    )]
+    pub consecutive_launch_failures: u32,
+    /// **Base** backoff in seconds for launch failures (not the current
+    /// accumulated backoff). The runner computes the effective delay as
+    /// `min(base * 2^(consecutive_launch_failures - 1), 86400)`.
+    /// Default 60s.
+    #[serde(
+        default = "default_launch_failure_backoff_seconds",
+        alias = "launch_failure_backoff_seconds"
+    )]
+    pub launch_failure_backoff_seconds: u32,
 }
 
 // ============================================================================
@@ -499,6 +645,30 @@ pub struct CreateScheduledTaskRequest {
     /// Optional conditions that must be met before execution.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "conditions")]
     pub conditions: Option<ScheduleConditions>,
+    /// Optional catch-up policy override. `None` = runner default
+    /// ([`CatchUpPolicy::RunOnce`]).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "catch_up_policy"
+    )]
+    pub catch_up_policy: Option<CatchUpPolicy>,
+    /// Optional catch-up grace window override (seconds). `None` =
+    /// runner default (300s).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "catch_up_grace_seconds"
+    )]
+    pub catch_up_grace_seconds: Option<u32>,
+    /// Optional override for the launch-failure backoff base (seconds).
+    /// `None` = runner default (60s).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "launch_failure_backoff_seconds"
+    )]
+    pub launch_failure_backoff_seconds: Option<u32>,
 }
 
 /// Request body for updating an existing scheduled task. All fields are
@@ -550,4 +720,25 @@ pub struct UpdateScheduledTaskRequest {
     /// Replace the conditions block (pass `null` to clear).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "conditions")]
     pub conditions: Option<ScheduleConditions>,
+    /// Update the catch-up policy.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "catch_up_policy"
+    )]
+    pub catch_up_policy: Option<CatchUpPolicy>,
+    /// Update the catch-up grace window (seconds).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "catch_up_grace_seconds"
+    )]
+    pub catch_up_grace_seconds: Option<u32>,
+    /// Update the launch-failure backoff base (seconds).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "launch_failure_backoff_seconds"
+    )]
+    pub launch_failure_backoff_seconds: Option<u32>,
 }

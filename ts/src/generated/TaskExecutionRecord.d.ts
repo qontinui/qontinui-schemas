@@ -16,6 +16,11 @@ export interface TaskExecutionRecord {
    */
   autoFixSessionId?: string | null;
   /**
+   * Whether this execution record was created by the catch-up reconciler
+   * (rather than the normal scheduling tick).
+   */
+  catchUpRun: boolean;
+  /**
    * ISO 8601 timestamp when execution ended.
    */
   endedAt?: string | null;
@@ -27,6 +32,14 @@ export interface TaskExecutionRecord {
    * Unique ID for this execution (UUID v4 string).
    */
   executionId: string;
+  /**
+   * ISO 8601 timestamp of the *scheduled* slot this execution covers,
+   * distinct from `started_at` (which is the actual launch time). Allows
+   * detecting "ran X minutes late" and is consumed by the missed-run
+   * reconciler. Optional for backward compatibility with execution rows
+   * written before this field existed.
+   */
+  scheduledFor?: string | null;
   /**
    * Session ID if this execution triggered an AI session, used for
    * downstream success tracking.

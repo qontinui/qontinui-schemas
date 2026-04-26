@@ -24,7 +24,8 @@
     "endedAt": "2026-04-13T03:14:22Z",
     "status": "completed",
     "success": true,
-    "triggeredAutoFix": false
+    "triggeredAutoFix": false,
+    "catchUpRun": false
   },
   "nextRun": "2026-04-15T03:00:00Z",
   "conditions": {
@@ -41,5 +42,9 @@
       ]
     },
     "timeoutMinutes": 60
-  }
+  },
+  "catchUpPolicy": "run_once",
+  "catchUpGraceSeconds": 300,
+  "consecutiveLaunchFailures": 0,
+  "launchFailureBackoffSeconds": 60
 }
