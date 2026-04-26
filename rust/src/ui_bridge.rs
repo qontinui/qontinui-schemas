@@ -411,10 +411,100 @@ pub struct WorkflowInfo {
     pub step_count: usize,
 }
 
+/// Modal/dialog entry in the active modal stack.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct UIBridgeModalInfo {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Modal kind. Web: dialog/alertdialog/modal/drawer/popover/sheet.
+    /// Native (RN): modal/sheet/drawer/popover/alertdialog/dialog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    /// Whether this modal blocks interaction with content behind it.
+    pub blocking: bool,
+    /// Whether the modal is dismissible (RN-specific). Optional so the
+    /// web shape (which doesn't carry this bit) round-trips cleanly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dismissible: Option<bool>,
+    /// Web-only: computed z-index of the modal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub z_index: Option<i64>,
+    /// Web-only: whether a backdrop/overlay is present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_backdrop: Option<bool>,
+    /// Timestamp when the modal was detected (epoch ms).
+    pub detected_at: i64,
+}
+
+/// Modal stack context attached to a snapshot when the SDK has a
+/// `ModalDetector` enricher configured.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct UIBridgeModalStack {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modals: Vec<UIBridgeModalInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_modal: Option<UIBridgeModalInfo>,
+    pub has_blocking_modal: bool,
+    pub count: usize,
+}
+
+/// A captured toast/notification entry.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct UIBridgeCapturedToast {
+    pub id: String,
+    pub message: String,
+    /// Severity level. One of: info|success|warning|error|loading|unknown.
+    pub level: String,
+    pub appeared_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dismissed_at: Option<i64>,
+    pub visible: bool,
+    pub duration_ms: i64,
+}
+
+/// Toast snapshot context.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct UIBridgeToastContext {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub active: Vec<UIBridgeCapturedToast>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent: Vec<UIBridgeCapturedToast>,
+    pub total_captured: usize,
+}
+
+/// Undo/redo availability snapshot context.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct UIBridgeUndoContext {
+    pub can_undo: bool,
+    pub can_redo: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redo_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_depth: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redo_depth: Option<usize>,
+    pub summary: String,
+}
+
 /// Full snapshot of the UI Bridge state.
 ///
 /// Captures all registered elements, components, and active workflows
-/// at a single point in time.
+/// at a single point in time. The optional `modalStack` / `toasts` /
+/// `undoRedo` fields are populated by the SDK's enricher slot when
+/// configured (see `setEnrichers` on web and native registries).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -430,4 +520,19 @@ pub struct UIBridgeSnapshot {
     /// Active workflows.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workflows: Vec<WorkflowInfo>,
+    /// Modal/sheet stack (populated when ModalDetector enricher is set).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modal_stack: Option<UIBridgeModalStack>,
+    /// Active and recently dismissed toasts (populated by ToastCapture).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toasts: Option<UIBridgeToastContext>,
+    /// Undo/redo availability (populated by UndoTracker).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_redo: Option<UIBridgeUndoContext>,
+    /// Native-only: current navigation route (Expo Router pathname).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_route: Option<String>,
+    /// Native-only: current route segments.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub segments: Vec<String>,
 }

@@ -8435,10 +8435,72 @@ fn ui_bridge_snapshot_roundtrips() {
         elements: vec![],
         components: vec![],
         workflows: vec![],
+        modal_stack: None,
+        toasts: None,
+        undo_redo: None,
+        current_route: None,
+        segments: vec![],
     };
     let json = serde_json::to_string(&snap).unwrap();
-    // Empty vecs should be skipped
+    // Empty vecs / None options should be skipped
     assert_eq!(json, r#"{"timestamp":1713200000000}"#);
+    let back: UIBridgeSnapshot = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn ui_bridge_snapshot_with_enrichers_roundtrips() {
+    use qontinui_types::ui_bridge::{
+        UIBridgeCapturedToast, UIBridgeModalInfo, UIBridgeModalStack, UIBridgeSnapshot,
+        UIBridgeToastContext, UIBridgeUndoContext,
+    };
+    let modal = UIBridgeModalInfo {
+        id: "settings-api-url".to_string(),
+        title: Some("API URL".to_string()),
+        r#type: Some("modal".to_string()),
+        blocking: true,
+        dismissible: Some(true),
+        z_index: None,
+        has_backdrop: None,
+        detected_at: 1713200000100,
+    };
+    let snap = UIBridgeSnapshot {
+        timestamp: 1713200000000,
+        elements: vec![],
+        components: vec![],
+        workflows: vec![],
+        modal_stack: Some(UIBridgeModalStack {
+            modals: vec![modal.clone()],
+            top_modal: Some(modal),
+            has_blocking_modal: true,
+            count: 1,
+        }),
+        toasts: Some(UIBridgeToastContext {
+            active: vec![UIBridgeCapturedToast {
+                id: "t1".to_string(),
+                message: "Saved".to_string(),
+                level: "success".to_string(),
+                appeared_at: 1713200000200,
+                dismissed_at: None,
+                visible: true,
+                duration_ms: 0,
+            }],
+            recent: vec![],
+            total_captured: 1,
+        }),
+        undo_redo: Some(UIBridgeUndoContext {
+            can_undo: true,
+            can_redo: false,
+            undo_description: Some("Undo type".to_string()),
+            redo_description: None,
+            undo_depth: Some(1),
+            redo_depth: None,
+            summary: "undo: 'Undo type'".to_string(),
+        }),
+        current_route: Some("/(tabs)/settings".to_string()),
+        segments: vec!["(tabs)".to_string(), "settings".to_string()],
+    };
+    let json = serde_json::to_string(&snap).unwrap();
     let back: UIBridgeSnapshot = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
