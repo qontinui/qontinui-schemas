@@ -906,6 +906,25 @@ pub struct UnifiedWorkflow {
     #[serde(default, alias = "use_worktree")]
     pub use_worktree: bool,
 
+    /// Auto-commit files touched by sub-agents on successful terminal state.
+    ///
+    /// Phase C of the Commit Progress feature. Commits the file-set recorded
+    /// in `session_touched_files` to the workflow's worktree branch when the
+    /// sub-agent reaches a successful terminal state, so the parent workflow
+    /// sees an atomic delta instead of a half-edited working tree.
+    ///
+    /// - `Some(true)` — commit after success regardless of worktree state.
+    /// - `Some(false)` — never commit, even with worktree.
+    /// - `None` (default) — commit if and only if the workflow uses a worktree.
+    ///
+    /// Failure to commit never fails the workflow — best-effort durability.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "auto_commit_subagents"
+    )]
+    pub auto_commit_subagents: Option<bool>,
+
     /// Workflow execution architecture override.
     ///
     /// When set, forces the workflow to use a specific execution architecture
