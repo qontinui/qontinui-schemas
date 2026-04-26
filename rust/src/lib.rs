@@ -34,6 +34,7 @@ pub mod orchestration_config;
 pub mod process_management;
 pub mod rag;
 pub mod scheduler;
+pub mod sdk_features;
 pub mod state_machine;
 pub mod targets;
 pub mod task_run;
