@@ -186,9 +186,10 @@ interface ConditionStatus {
  */
 
 /**
- * Status of a scheduled task execution.
+ * Catch-up policy applied when the runner restarts after missing one or
+ * more scheduled slots.
  */
-type ScheduledTaskStatus = "pending" | "running" | "completed" | "failed" | "skipped" | "cancelled";
+type CatchUpPolicy = "run" | "skip" | "run_once";
 
 /* eslint-disable */
 /**
@@ -196,6 +197,54 @@ type ScheduledTaskStatus = "pending" | "running" | "completed" | "failed" | "ski
  * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
+
+/**
+ * Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
+ *
+ * `name` is the MCP server name as registered in the runner's MCP config.
+ * `url` is an optional override; when omitted the runner resolves the URL
+ * from its existing MCP config at dispatch time.
+ */
+interface McpConnectionRef {
+  /**
+   * MCP server name as registered in the runner's MCP config.
+   */
+  name: string;
+  /**
+   * Optional URL override; falls back to the runner's MCP config when
+   * `None`.
+   */
+  url?: string | null;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Status of a scheduled task execution.
+ */
+type ScheduledTaskStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "launch_failed"
+  | "skipped"
+  | "cancelled"
+  | "missed_runner_down";
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
 
 /**
  * Type of task to schedule.
@@ -273,6 +322,46 @@ type ScheduledTaskType =
       monitor_index?: number | null;
       task_type: "BackgroundCapture";
       [k: string]: unknown;
+    }
+  | {
+      /**
+       * Allowed tool names (e.g. `["Bash", "Read", "Write", "Edit"]`).
+       * Empty = use the runner's default tool allow-list.
+       */
+      allowed_tools?: string[];
+      /**
+       * Hard cap on Claude turns per run (safety bound). `None` =
+       * runner's default cap (typically 50).
+       */
+      max_turns?: number | null;
+      /**
+       * Optional MCP connection references resolved at dispatch time
+       * against the runner's existing MCP config. Empty = inherit
+       * whatever the runner currently has configured.
+       */
+      mcp_connections?: McpConnectionRef[];
+      /**
+       * Optional model override. `None` = runner default
+       * (typically `claude-sonnet-4-6`).
+       */
+      model?: string | null;
+      /**
+       * The prompt content to send to the Claude session.
+       */
+      prompt: string;
+      task_type: "RemoteAgent";
+      /**
+       * Wall-clock timeout in seconds. `None` = runner default
+       * (typically 600s = 10 min).
+       */
+      timeout_seconds?: number | null;
+      /**
+       * Working directory for the spawned session. `None` means the
+       * runner's project root. Stored as a string (not `PathBuf`) to keep
+       * this crate JSON-Schema-friendly.
+       */
+      working_directory?: string | null;
+      [k: string]: unknown;
     };
 
 /* eslint-disable */
@@ -293,6 +382,11 @@ interface TaskExecutionRecord {
    */
   autoFixSessionId?: string | null;
   /**
+   * Whether this execution record was created by the catch-up reconciler
+   * (rather than the normal scheduling tick).
+   */
+  catchUpRun: boolean;
+  /**
    * ISO 8601 timestamp when execution ended.
    */
   endedAt?: string | null;
@@ -304,6 +398,14 @@ interface TaskExecutionRecord {
    * Unique ID for this execution (UUID v4 string).
    */
   executionId: string;
+  /**
+   * ISO 8601 timestamp of the *scheduled* slot this execution covers,
+   * distinct from `started_at` (which is the actual launch time). Allows
+   * detecting "ran X minutes late" and is consumed by the missed-run
+   * reconciler. Optional for backward compatibility with execution rows
+   * written before this field existed.
+   */
+  scheduledFor?: string | null;
   /**
    * Session ID if this execution triggered an AI session, used for
    * downstream success tracking.
@@ -344,6 +446,16 @@ interface ScheduledTask {
    */
   autoFixOnFailure: boolean;
   /**
+   * Slots within this number of seconds of "now" are not treated as
+   * missed (the normal scheduler will pick them up). Default 300s.
+   */
+  catchUpGraceSeconds: number;
+  /**
+   * Catch-up policy applied when the runner restarts after missing one
+   * or more scheduled slots.
+   */
+  catchUpPolicy?: CatchUpPolicy & string;
+  /**
    * Present while the task is waiting for its conditions to be met.
    */
   conditionStatus?: ConditionStatus | null;
@@ -351,6 +463,12 @@ interface ScheduledTask {
    * Optional conditions that must be met before execution.
    */
   conditions?: ScheduleConditions | null;
+  /**
+   * Number of consecutive launch failures since the task last started
+   * successfully. Drives exponential backoff. Reset to 0 on the next
+   * successful launch.
+   */
+  consecutiveLaunchFailures: number;
   /**
    * ISO 8601 timestamp of creation.
    */
@@ -371,6 +489,13 @@ interface ScheduledTask {
    * Record of the most recent execution.
    */
   lastRun?: TaskExecutionRecord | null;
+  /**
+   * **Base** backoff in seconds for launch failures (not the current
+   * accumulated backoff). The runner computes the effective delay as
+   * `min(base * 2^(consecutive_launch_failures - 1), 86400)`.
+   * Default 60s.
+   */
+  launchFailureBackoffSeconds: number;
   /**
    * ISO 8601 timestamp of last modification.
    */
@@ -499,6 +624,16 @@ interface CreateScheduledTaskRequest {
    */
   autoFixOnFailure?: boolean | null;
   /**
+   * Optional catch-up grace window override (seconds). `None` =
+   * runner default (300s).
+   */
+  catchUpGraceSeconds?: number | null;
+  /**
+   * Optional catch-up policy override. `None` = runner default
+   * ([`CatchUpPolicy::RunOnce`]).
+   */
+  catchUpPolicy?: CatchUpPolicy | null;
+  /**
    * Optional conditions that must be met before execution.
    */
   conditions?: ScheduleConditions | null;
@@ -506,6 +641,11 @@ interface CreateScheduledTaskRequest {
    * Optional description.
    */
   description?: string | null;
+  /**
+   * Optional override for the launch-failure backoff base (seconds).
+   * `None` = runner default (60s).
+   */
+  launchFailureBackoffSeconds?: number | null;
   /**
    * Display name.
    */
@@ -541,6 +681,14 @@ interface UpdateScheduledTaskRequest {
    */
   autoFixOnFailure?: boolean | null;
   /**
+   * Update the catch-up grace window (seconds).
+   */
+  catchUpGraceSeconds?: number | null;
+  /**
+   * Update the catch-up policy.
+   */
+  catchUpPolicy?: CatchUpPolicy | null;
+  /**
    * Replace the conditions block (pass `null` to clear).
    */
   conditions?: ScheduleConditions | null;
@@ -552,6 +700,10 @@ interface UpdateScheduledTaskRequest {
    * Enable/disable the task.
    */
   enabled?: boolean | null;
+  /**
+   * Update the launch-failure backoff base (seconds).
+   */
+  launchFailureBackoffSeconds?: number | null;
   /**
    * New display name.
    */
@@ -574,4 +726,4 @@ interface UpdateScheduledTaskRequest {
   task?: ScheduledTaskType | null;
 }
 
-export type { ConditionScheduleConfig, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, NextTaskInfo, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleExpression, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest };
+export type { CatchUpPolicy, ConditionScheduleConfig, ConditionStatus, CreateScheduledTaskRequest, IdleCondition, McpConnectionRef, NextTaskInfo, RepositoryInactiveCondition, RepositoryWatch, ScheduleConditions, ScheduleExpression, ScheduledTask, ScheduledTaskStatus, ScheduledTaskType, SchedulerSettings, SchedulerStatus, TaskExecutionRecord, UpdateScheduledTaskRequest };
