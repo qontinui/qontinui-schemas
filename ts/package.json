@@ -1,6 +1,6 @@
 {
   "name": "@qontinui/shared-types",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared TypeScript types for the Qontinui ecosystem",
   "type": "module",
   "main": "./dist/index.js",
@@ -31,6 +31,11 @@
       "types": "./dist/scheduler.d.ts",
       "import": "./dist/scheduler.js",
       "require": "./dist/scheduler.cjs"
+    },
+    "./runner": {
+      "types": "./dist/runner.d.ts",
+      "import": "./dist/runner.js",
+      "require": "./dist/runner.cjs"
     },
     "./library": {
       "types": "./dist/library.d.ts",

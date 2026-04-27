@@ -33,6 +33,7 @@ pub mod mcp_config;
 pub mod orchestration_config;
 pub mod process_management;
 pub mod rag;
+pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
 pub mod state_machine;

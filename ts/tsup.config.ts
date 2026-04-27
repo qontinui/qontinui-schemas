@@ -7,6 +7,7 @@ export default defineConfig({
     "task-run": "src/task-run/index.ts",
     execution: "src/execution/index.ts",
     scheduler: "src/scheduler/index.ts",
+    runner: "src/runner/index.ts",
     library: "src/library/index.ts",
     chat: "src/chat/index.ts",
     "state-machine": "src/state-machine/index.ts",

@@ -24,6 +24,9 @@ export * from "./execution/_api";
 // Scheduler types
 export * from "./scheduler/_api";
 
+// Runner types (canonical Runner entity)
+export * from "./runner/_api";
+
 // Library types
 export * from "./library/_api";
 

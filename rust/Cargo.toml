@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-types"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Canonical DTO types for Qontinui. Rust is the source of truth; TypeScript and Python are generated from JSON Schema emitted by schemars."
 license = "Apache-2.0"
