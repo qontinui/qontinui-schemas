@@ -257,7 +257,11 @@ from .per_type.run_prompt_response import RunPromptResponse
 from .per_type.run_prompt_response_data import RunPromptResponseData
 from .per_type.run_status import RunStatus
 from .per_type.run_type import RunType
+from .per_type.runner import Runner
+from .per_type.runner_crash import RunnerCrash
 from .per_type.runner_metadata import RunnerMetadata
+from .per_type.runner_status import RunnerStatus
+from .per_type.runner_ui_error import RunnerUiError
 from .per_type.runtime_data import RuntimeData
 from .per_type.save_workflow_artifact_step import SaveWorkflowArtifactStep
 from .per_type.schedule_conditions import ScheduleConditions
@@ -675,7 +679,11 @@ __all__ = [
     "RunPromptResponseData",
     "RunStatus",
     "RunType",
+    "Runner",
+    "RunnerCrash",
     "RunnerMetadata",
+    "RunnerStatus",
+    "RunnerUiError",
     "RuntimeData",
     "SaveWorkflowArtifactStep",
     "ScheduleConditions",
