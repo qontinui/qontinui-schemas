@@ -89,7 +89,7 @@
     "clean": "cd ts && npm run clean"
   },
   "author": "Joshua Spinak",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "json-schema-to-typescript": "^15.0.0"
   }
