@@ -180,7 +180,7 @@ This is an open-source project maintained by Joshua Spinak. Breaking changes are
 
 ## License
 
-MIT
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for full terms.
 
 ## Related Projects
 
