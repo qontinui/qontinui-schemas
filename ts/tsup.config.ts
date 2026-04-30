@@ -18,6 +18,7 @@ export default defineConfig({
     config: "src/config/index.ts",
     targets: "src/targets/index.ts",
     rag: "src/rag/index.ts",
+    "ui-bridge-ir": "src/ui-bridge-ir/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

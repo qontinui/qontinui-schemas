@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qontinui.io/schemas/ui-bridge-ir/1.0/ir.schema.json",
+  "title": "UI Bridge IR Document",
+  "description": "Authoring-time intermediate representation for the UI Bridge redesign. Build plugins emit instances of this shape; the IR -> WorkflowConfig adapter folds them into ui-bridge-auto's runtime shape.",
+  "type": "object",
+  "required": ["version", "id", "name", "states", "transitions"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "metadata": { "$ref": "#/$defs/IRMetadata" },
+    "provenance": { "$ref": "#/$defs/IRProvenance" },
+    "initialState": { "type": "string" },
+    "states": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/IRState" }
+    },
+    "transitions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/IRTransition" }
+    }
+  },
+  "$defs": {
+    "IRElementCriteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string" },
+        "text": { "type": "string" },
+        "textContains": { "type": "string" },
+        "ariaLabel": { "type": "string" },
+        "id": { "type": "string" },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "IRMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "purpose": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "relatedElements": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    },
+    "IRProvenance": {
+      "type": "object",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["hand-authored", "build-plugin", "ai-generated", "migrated"]
+        },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "pluginVersion": { "type": "string" }
+      }
+    },
+    "IRCrossRef": {
+      "type": "object",
+      "required": ["doc", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "doc": { "type": "string" },
+        "ref": { "type": "string" }
+      }
+    },
+    "IRVisualRef": {
+      "type": "object",
+      "required": ["asset"],
+      "additionalProperties": false,
+      "properties": {
+        "asset": { "type": "string" },
+        "region": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          }
+        },
+        "capturedAt": { "type": "integer" }
+      }
+    },
+    "IRStateCondition": {
+      "type": "object",
+      "required": ["element", "property", "expected"],
+      "additionalProperties": false,
+      "properties": {
+        "element": { "$ref": "#/$defs/IRElementCriteria" },
+        "property": {
+          "type": "string",
+          "enum": ["visible", "enabled", "checked", "expanded", "selected", "text", "value"]
+        },
+        "expected": {},
+        "comparator": {
+          "type": "string",
+          "enum": ["equals", "contains", "matches", "greaterThan", "lessThan"]
+        }
+      }
+    },
+    "IRState": {
+      "type": "object",
+      "required": ["id", "name", "requiredElements"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "requiredElements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRElementCriteria" }
+        },
+        "excludedElements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRElementCriteria" }
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRStateCondition" }
+        },
+        "isInitial": { "type": "boolean" },
+        "isTerminal": { "type": "boolean" },
+        "blocking": { "type": "boolean" },
+        "group": { "type": "string" },
+        "pathCost": { "type": "number" },
+        "elementIds": { "type": "array", "items": { "type": "string" } },
+        "incomingTransitions": { "type": "array", "items": { "type": "string" } },
+        "metadata": { "$ref": "#/$defs/IRMetadata" },
+        "provenance": { "$ref": "#/$defs/IRProvenance" },
+        "crossRefs": { "type": "array", "items": { "$ref": "#/$defs/IRCrossRef" } },
+        "visualRefs": { "type": "array", "items": { "$ref": "#/$defs/IRVisualRef" } }
+      }
+    },
+    "IRWaitSpec": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["idle", "element", "state", "time", "condition", "vanish", "change", "stable"]
+        },
+        "query": { "$ref": "#/$defs/IRElementCriteria" },
+        "stateId": { "type": "string" },
+        "ms": { "type": "number" },
+        "timeout": { "type": "number" },
+        "property": { "type": "string" },
+        "quietPeriodMs": { "type": "number" }
+      }
+    },
+    "IRTransitionAction": {
+      "type": "object",
+      "required": ["type", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "target": { "$ref": "#/$defs/IRElementCriteria" },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "waitAfter": { "$ref": "#/$defs/IRWaitSpec" }
+      }
+    },
+    "IRTransition": {
+      "type": "object",
+      "required": ["id", "name", "fromStates", "activateStates", "actions"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "fromStates": { "type": "array", "items": { "type": "string" } },
+        "activateStates": { "type": "array", "items": { "type": "string" } },
+        "exitStates": { "type": "array", "items": { "type": "string" } },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRTransitionAction" }
+        },
+        "pathCost": { "type": "number" },
+        "bidirectional": { "type": "boolean" },
+        "effect": {
+          "type": "string",
+          "enum": ["read", "write", "destructive"]
+        },
+        "metadata": { "$ref": "#/$defs/IRMetadata" },
+        "provenance": { "$ref": "#/$defs/IRProvenance" },
+        "crossRefs": { "type": "array", "items": { "$ref": "#/$defs/IRCrossRef" } }
+      }
+    }
+  }
+}
