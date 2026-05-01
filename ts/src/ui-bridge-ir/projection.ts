@@ -196,15 +196,16 @@ export const projectionVersion = "1.0";
  *
  * The differences from `IRElementCriteria`:
  *   - `text`        -> `textContent`
- *   - `ariaLabel`   -> `accessibleName`
+ *   - `ariaLabel`   -> `accessibleName` (when IR has no explicit `accessibleName`)
  *   - `attributes`  -> `dataAttributes`
  *
- * Other fields (`role`, `textContains`, `id`) pass through unchanged. Legacy
- * specs in the wild also carry occasional `tagName` / extra fields, so the
- * shape is intentionally open via index signature.
+ * Other fields (`role`, `tagName`, `textContains`, `accessibleName`, `id`)
+ * pass through unchanged. Index signature stays open for legacy fields the
+ * IR doesn't yet model.
  */
 export interface LegacyCriteria {
   role?: string;
+  tagName?: string;
   textContent?: string;
   textContains?: string;
   accessibleName?: string;
@@ -343,15 +344,23 @@ function sortKeys<T>(value: T): T {
 
 /**
  * Convert IR element criteria to legacy criteria. Renames `text` ->
- * `textContent`, `ariaLabel` -> `accessibleName`, `attributes` ->
- * `dataAttributes`. Other fields pass through unchanged.
+ * `textContent`, `attributes` -> `dataAttributes`. `accessibleName` (or
+ * `ariaLabel` as a fallback) maps to legacy `accessibleName`. `tagName`,
+ * `role`, `textContains`, `id` pass through unchanged.
  */
 function convertCriteria(criteria: IRElementCriteria): LegacyCriteria {
   const out: LegacyCriteria = {};
   if (criteria.role !== undefined) out.role = criteria.role;
+  if (criteria.tagName !== undefined) out.tagName = criteria.tagName;
   if (criteria.text !== undefined) out.textContent = criteria.text;
   if (criteria.textContains !== undefined) out.textContains = criteria.textContains;
-  if (criteria.ariaLabel !== undefined) out.accessibleName = criteria.ariaLabel;
+  // Prefer explicit `accessibleName` when present; fall back to `ariaLabel`
+  // for IR documents authored against the section-1 shape.
+  if (criteria.accessibleName !== undefined) {
+    out.accessibleName = criteria.accessibleName;
+  } else if (criteria.ariaLabel !== undefined) {
+    out.accessibleName = criteria.ariaLabel;
+  }
   if (criteria.id !== undefined) out.id = criteria.id;
   if (criteria.attributes !== undefined) out.dataAttributes = criteria.attributes;
   return out;
@@ -373,7 +382,7 @@ function buildAssertion(
     state.metadata?.description ?? `Required element ${index} for state ${state.name}`;
   const targetCriteria: LegacyCriteria =
     criteria === undefined ? {} : convertCriteria(criteria);
-  return {
+  const assertion: LegacyAssertion = {
     id: `${state.id}-elem-${index}`,
     description,
     category: "element-presence",
@@ -388,6 +397,10 @@ function buildAssertion(
     reviewed: false,
     enabled: true,
   };
+  if (state.precondition !== undefined) {
+    assertion.precondition = state.precondition;
+  }
+  return assertion;
 }
 
 /**
@@ -510,4 +523,331 @@ export function projectIRToBundledPage(doc: IRDocument, notes?: string): LegacyS
   };
 
   return sortKeys(spec);
+}
+
+// ---------------------------------------------------------------------------
+// Inverse projection — Legacy spec -> IR document
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for the inverse projection.
+ *
+ * - `docId`        — explicit IRDocument.id override. Falls back to
+ *                    `legacy.metadata.component` (or `fallbackName` if absent).
+ * - `fallbackName` — used when `legacy.metadata.component` is missing AND no
+ *                    `docId` was supplied.
+ */
+export interface ProjectLegacyToIROptions {
+  docId?: string;
+  fallbackName?: string;
+}
+
+/**
+ * Best-effort field-by-field invert of `LegacyCriteria` back into
+ * `IRElementCriteria`.
+ *
+ * Rename map (the structural inverse of `convertCriteria`):
+ *   textContent     -> text
+ *   accessibleName  -> accessibleName  (passes through; the forward direction
+ *                                       collapses ariaLabel into accessibleName,
+ *                                       so we cannot reliably distinguish them
+ *                                       on the inverse — pick accessibleName).
+ *   dataAttributes  -> attributes
+ *   role / tagName / textContains / id pass through unchanged.
+ *
+ * Unknown legacy keys are dropped (lossy, but documented). Document-level
+ * unknown criteria are rare; if they show up we'll surface them in Phase A4.
+ */
+function invertCriteria(criteria: LegacyCriteria | undefined): IRElementCriteria {
+  if (criteria === undefined || criteria === null) return {};
+  const out: IRElementCriteria = {};
+  if (criteria.role !== undefined) out.role = criteria.role;
+  if (criteria.tagName !== undefined) out.tagName = criteria.tagName;
+  if (criteria.textContent !== undefined) out.text = criteria.textContent;
+  if (criteria.textContains !== undefined) out.textContains = criteria.textContains;
+  if (criteria.accessibleName !== undefined) out.accessibleName = criteria.accessibleName;
+  if (criteria.id !== undefined) out.id = criteria.id;
+  if (criteria.dataAttributes !== undefined) out.attributes = criteria.dataAttributes;
+  return out;
+}
+
+/**
+ * Pick the first non-empty `precondition` across a group's assertions. Legacy
+ * groups carry preconditions on individual assertions; IR carries it on the
+ * state. If multiple distinct preconditions exist we keep the first
+ * (deterministic, mirrors input ordering) — Phase A4 review will surface
+ * conflicts for hand-fix.
+ */
+function firstPrecondition(group: LegacyGroup): string | undefined {
+  for (const a of group.assertions) {
+    if (a.precondition !== undefined && a.precondition.length > 0) {
+      return a.precondition;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Build an `IRState` from one legacy group + its corresponding state-machine
+ * state (when present).
+ *
+ * IMPORTANT: `requiredElements` is sourced from the GROUP's assertion criteria
+ * (one criteria per assertion, in input order), NOT from `smState.elements`.
+ * This preserves the round-trip identity for the assertion-count check —
+ * legacy specs sometimes carry an SM block whose `elements[]` is a coarse
+ * page-state fingerprint (1-2 entries) while the group has many assertions.
+ * Using `smState.elements` would silently collapse those into one
+ * requiredElement per state, then the forward direction would emit only one
+ * assertion per group.
+ *
+ * `smState` (when present and matched by id) contributes:
+ *   - `name` override (legacy `smState.name` is human-readable; group.name is
+ *     also human-readable but may differ — prefer smState's name since the
+ *     forward direction's `buildStateMachineState` echoes `state.name` to
+ *     `smState.name`).
+ *   - `description` fallback (when group.description is empty).
+ *   - `isInitial` (the only place this lives in legacy specs).
+ */
+function buildIRState(
+  group: LegacyGroup,
+  smState: LegacyStateMachineState | undefined,
+): IRState {
+  // Always one requiredElement per assertion so the forward projection emits
+  // the same number of assertions on the round-trip.
+  const requiredElements: IRElementCriteria[] = group.assertions.map((a) =>
+    invertCriteria(a.target?.criteria),
+  );
+
+  const description =
+    group.description !== undefined && group.description.length > 0
+      ? group.description
+      : smState?.description;
+  const precondition = firstPrecondition(group);
+
+  const state: IRState = {
+    id: group.id,
+    name: smState?.name ?? group.name,
+    requiredElements,
+  };
+  if (description !== undefined && description.length > 0) {
+    state.description = description;
+  }
+  if (smState?.isInitial === true) {
+    state.isInitial = true;
+  } else if (smState?.isInitial === false) {
+    state.isInitial = false;
+  }
+  if (precondition !== undefined) {
+    state.precondition = precondition;
+  }
+  state.provenance = { source: "migrated" };
+  return state;
+}
+
+/**
+ * Convert one legacy `process[]` step back into `IRTransitionAction`. Renames
+ * `action` -> `type`. Legacy specs occasionally omit a target on no-op steps;
+ * we coerce to an empty criteria object in that case.
+ */
+function invertProcessStep(step: LegacyProcessStep): IRTransitionAction {
+  const out: IRTransitionAction = {
+    type: step.action,
+    target: invertCriteria(step.target),
+  };
+  if (step.waitAfter !== undefined) out.waitAfter = step.waitAfter;
+  return out;
+}
+
+/**
+ * Collapse duplicate transitions across multiple originating states. The
+ * forward projection emits the same transition under EACH `fromState`'s
+ * `transitions[]` entry; the inverse must merge them back into ONE
+ * `IRTransition` whose `fromStates` lists every originator.
+ *
+ * Same-id transitions are assumed to be byte-identical except for the
+ * (implicit) originating state. If they differ in `process[]` /
+ * `activateStates` / `deactivateStates`, we keep the first occurrence and
+ * append the additional fromState. (Genuine divergence here is a defect to
+ * surface in Phase A4 review.)
+ */
+function buildIRTransitions(stateMachine: LegacyStateMachine | undefined): IRTransition[] {
+  if (stateMachine === undefined || !Array.isArray(stateMachine.states)) return [];
+  const byId = new Map<string, IRTransition>();
+  // Preserve insertion order — first state's transitions come first.
+  const order: string[] = [];
+
+  for (const smState of stateMachine.states) {
+    const transitions = Array.isArray(smState.transitions) ? smState.transitions : [];
+    for (const t of transitions) {
+      const existing = byId.get(t.id);
+      if (existing !== undefined) {
+        if (!existing.fromStates.includes(smState.id)) {
+          existing.fromStates.push(smState.id);
+        }
+        continue;
+      }
+      const ir: IRTransition = {
+        id: t.id,
+        name: t.name,
+        fromStates: [smState.id],
+        activateStates: Array.isArray(t.activateStates) ? [...t.activateStates] : [],
+        actions: Array.isArray(t.process) ? t.process.map(invertProcessStep) : [],
+      };
+      // The forward direction maps `exitStates` -> `deactivateStates`; preserve
+      // the field whenever it's present in legacy form (even if empty array)
+      // so modal-style transitions (staysVisible: true, deactivateStates: [])
+      // round-trip predictably.
+      if (Array.isArray(t.deactivateStates)) {
+        ir.exitStates = [...t.deactivateStates];
+      }
+      ir.provenance = { source: "migrated" };
+      byId.set(t.id, ir);
+      order.push(t.id);
+    }
+  }
+
+  return order.map((id) => byId.get(id)!);
+}
+
+/**
+ * Project a legacy bundled-page spec back into IR.
+ *
+ * Pure / deterministic: same input always produces structurally identical
+ * output. Collapses transition duplicates (forward emits one copy per
+ * `fromState`), preserves group/assertion ordering, and tags every node with
+ * `provenance.source = "migrated"` so downstream tooling can distinguish
+ * migrated content from hand-authored.
+ *
+ * The mapping is the structural inverse of `projectIRToBundledPage`:
+ *
+ *   LegacySpec                                IRDocument
+ *   ----------                                ----------
+ *   metadata.component                  ->   id (or opts.docId override)
+ *   metadata.tags                       ->   metadata.tags
+ *   description                         ->   description (kept verbatim;
+ *                                            authored notes appended via
+ *                                            forward `notes` arg are not
+ *                                            stripped — that round-trip is
+ *                                            best-effort and Phase A4 will
+ *                                            split them back out)
+ *
+ *   groups[]                            ->   states[] (one per group)
+ *     group.id / name / description     ->   state.id / name / description
+ *     assertion.target.criteria         ->   state.requiredElements[i] (or,
+ *                                            preferred, smState.elements when
+ *                                            the stateMachine block is present)
+ *     first-found assertion.precondition ->  state.precondition
+ *
+ *   stateMachine.states[]               ->   contributes isInitial + elements
+ *     smState.transitions[]             ->   transitions[] (deduped by id)
+ *       transition.activateStates       ->   transition.activateStates
+ *       transition.deactivateStates     ->   transition.exitStates
+ *       transition.process[]            ->   transition.actions[]
+ *         step.action                   ->   action.type
+ *         step.target                   ->   action.target (criteria inverted)
+ *         step.waitAfter                ->   action.waitAfter
+ *
+ * Documented losses (acceptable for Phase A2):
+ *   - Legacy assertion ids (`{stateId}-elem-{i}`) are NOT preserved across the
+ *     round-trip — the forward direction regenerates them from index, so any
+ *     hand-edited ids are lost. See Phase A4.
+ *   - Legacy `assertionType` / `severity` / `category` / `source` per
+ *     assertion are reduced to defaults on round-trip.
+ *   - Legacy `expected` / `assertionType: "count"` and `notExists` semantics
+ *     are not modeled in IR — the assertion's criteria still survive (as a
+ *     state requiredElement) but the assertion-flavor metadata is dropped.
+ *   - Legacy `testing` block + extra metadata keys outside `component` /
+ *     `tags` are ignored. Authors keep them via the legacy spec file directly
+ *     during Phase A2 — they will move into IR companion files in Phase A4.
+ *   - The forward `notes` argument's appended paragraph is currently kept
+ *     in `description`; Phase A4 will split it back out into a dedicated
+ *     companion file.
+ *
+ * @param legacy The legacy spec to invert.
+ * @param opts   Optional doc-level overrides.
+ */
+export function projectLegacyToIR(
+  legacy: LegacySpec,
+  opts?: ProjectLegacyToIROptions,
+): IRDocument {
+  const component =
+    opts?.docId ??
+    legacy.metadata?.component ??
+    opts?.fallbackName ??
+    "legacy-spec";
+  const name = legacy.metadata?.component ?? opts?.fallbackName ?? component;
+
+  // Index state-machine states by id for quick lookup when building IR states
+  // out of groups. Older specs may not have a stateMachine block.
+  const smByGroupId = new Map<string, LegacyStateMachineState>();
+  if (legacy.stateMachine !== undefined && Array.isArray(legacy.stateMachine.states)) {
+    for (const s of legacy.stateMachine.states) {
+      smByGroupId.set(s.id, s);
+    }
+  }
+
+  const groups = Array.isArray(legacy.groups) ? legacy.groups : [];
+  const states: IRState[] = groups.map((group) =>
+    buildIRState(group, smByGroupId.get(group.id)),
+  );
+
+  // NOTE: Some legacy specs declare `stateMachine.states[]` whose ids do NOT
+  // correspond to any `groups[]` entry (e.g., page-level states like
+  // `wrappers-installed-tab` vs assertion-category groups like
+  // `page-structure`). The IR's group-state mapping is 1:1 with groups by
+  // construction (the forward projection emits one group per IR state), so
+  // these orphan SM states cannot survive the round-trip cleanly. They are
+  // dropped here as a documented loss — Phase A4 will revisit by either
+  // (a) introducing a separate IR concept for "page state" vs
+  // "assertion group", or (b) hand-merging the legacy specs so groups and
+  // SM states share ids.
+  // Transitions originating from orphan SM states are likewise omitted from
+  // IR (their fromStates would dangle). We filter them below.
+  const groupIds = new Set(groups.map((g) => g.id));
+
+  // Build transitions only from SM states whose ids appear in groups[]. Any
+  // transition with a fromState that isn't a known group is dropped — the
+  // forward direction would have nowhere to emit it.
+  let filteredStateMachine: LegacyStateMachine | undefined = legacy.stateMachine;
+  if (
+    legacy.stateMachine !== undefined &&
+    Array.isArray(legacy.stateMachine.states) &&
+    legacy.stateMachine.states.some((s) => !groupIds.has(s.id))
+  ) {
+    filteredStateMachine = {
+      states: legacy.stateMachine.states.filter((s) => groupIds.has(s.id)),
+    };
+  }
+  const transitions = buildIRTransitions(filteredStateMachine);
+
+  // Initial state: first state with isInitial:true wins (mirrors how the
+  // forward direction picks the document's `initialState`). Only consider
+  // SM states that correspond to a group (so initialState references a real
+  // IR state).
+  let initialState: string | undefined;
+  if (legacy.stateMachine !== undefined && Array.isArray(legacy.stateMachine.states)) {
+    const initial = legacy.stateMachine.states.find(
+      (s) => s.isInitial === true && groupIds.has(s.id),
+    );
+    if (initial !== undefined) initialState = initial.id;
+  }
+
+  const doc: IRDocument = {
+    version: "1.0",
+    id: component,
+    name,
+    states,
+    transitions,
+    provenance: { source: "migrated" },
+  };
+  if (legacy.description !== undefined && legacy.description.length > 0) {
+    doc.description = legacy.description;
+  }
+  if (legacy.metadata !== undefined && legacy.metadata.tags !== undefined) {
+    doc.metadata = { tags: legacy.metadata.tags };
+  }
+  if (initialState !== undefined) {
+    doc.initialState = initialState;
+  }
+  return doc;
 }

@@ -23,12 +23,24 @@
 export interface IRElementCriteria {
   /** ARIA role or inferred role. */
   role?: string;
+  /** HTML tag name (e.g. "div", "button"). Heavily used in legacy specs. */
+  tagName?: string;
   /** Exact text content (trimmed). */
   text?: string;
   /** Substring match on text content (case-insensitive). */
   textContains?: string;
-  /** ARIA label (case-insensitive substring match). */
+  /**
+   * ARIA label (case-insensitive substring match). Synonym of `accessibleName`
+   * for the runtime SDK; the projection prefers `accessibleName` when both are
+   * present.
+   */
   ariaLabel?: string;
+  /**
+   * Computed accessible name (the same concept legacy specs serialize as
+   * `accessibleName`). Added section 3 so the inverse projection can
+   * round-trip without rewriting to `ariaLabel`.
+   */
+  accessibleName?: string;
   /** Element ID (exact string or pattern-source string). */
   id?: string;
   /** HTML attributes to check (exact string match). */

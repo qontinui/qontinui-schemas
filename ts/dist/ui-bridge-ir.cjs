@@ -25,6 +25,7 @@ __export(ui_bridge_ir_exports, {
   adaptIRTransition: () => adaptIRTransition,
   adaptIRTransitionAction: () => adaptIRTransitionAction,
   projectIRToBundledPage: () => projectIRToBundledPage,
+  projectLegacyToIR: () => projectLegacyToIR,
   projectionVersion: () => projectionVersion
 });
 module.exports = __toCommonJS(ui_bridge_ir_exports);
@@ -127,9 +128,14 @@ function sortKeys(value) {
 function convertCriteria(criteria) {
   const out = {};
   if (criteria.role !== void 0) out.role = criteria.role;
+  if (criteria.tagName !== void 0) out.tagName = criteria.tagName;
   if (criteria.text !== void 0) out.textContent = criteria.text;
   if (criteria.textContains !== void 0) out.textContains = criteria.textContains;
-  if (criteria.ariaLabel !== void 0) out.accessibleName = criteria.ariaLabel;
+  if (criteria.accessibleName !== void 0) {
+    out.accessibleName = criteria.accessibleName;
+  } else if (criteria.ariaLabel !== void 0) {
+    out.accessibleName = criteria.ariaLabel;
+  }
   if (criteria.id !== void 0) out.id = criteria.id;
   if (criteria.attributes !== void 0) out.dataAttributes = criteria.attributes;
   return out;
@@ -137,7 +143,7 @@ function convertCriteria(criteria) {
 function buildAssertion(state, index, criteria) {
   const description = state.metadata?.description ?? `Required element ${index} for state ${state.name}`;
   const targetCriteria = criteria === void 0 ? {} : convertCriteria(criteria);
-  return {
+  const assertion = {
     id: `${state.id}-elem-${index}`,
     description,
     category: "element-presence",
@@ -152,6 +158,10 @@ function buildAssertion(state, index, criteria) {
     reviewed: false,
     enabled: true
   };
+  if (state.precondition !== void 0) {
+    assertion.precondition = state.precondition;
+  }
+  return assertion;
 }
 function buildGroup(state) {
   const elems = state.requiredElements ?? [];
@@ -220,6 +230,137 @@ ${notes}` : baseDescription;
   };
   return sortKeys(spec);
 }
+function invertCriteria(criteria) {
+  if (criteria === void 0 || criteria === null) return {};
+  const out = {};
+  if (criteria.role !== void 0) out.role = criteria.role;
+  if (criteria.tagName !== void 0) out.tagName = criteria.tagName;
+  if (criteria.textContent !== void 0) out.text = criteria.textContent;
+  if (criteria.textContains !== void 0) out.textContains = criteria.textContains;
+  if (criteria.accessibleName !== void 0) out.accessibleName = criteria.accessibleName;
+  if (criteria.id !== void 0) out.id = criteria.id;
+  if (criteria.dataAttributes !== void 0) out.attributes = criteria.dataAttributes;
+  return out;
+}
+function firstPrecondition(group) {
+  for (const a of group.assertions) {
+    if (a.precondition !== void 0 && a.precondition.length > 0) {
+      return a.precondition;
+    }
+  }
+  return void 0;
+}
+function buildIRState(group, smState) {
+  const requiredElements = group.assertions.map(
+    (a) => invertCriteria(a.target?.criteria)
+  );
+  const description = group.description !== void 0 && group.description.length > 0 ? group.description : smState?.description;
+  const precondition = firstPrecondition(group);
+  const state = {
+    id: group.id,
+    name: smState?.name ?? group.name,
+    requiredElements
+  };
+  if (description !== void 0 && description.length > 0) {
+    state.description = description;
+  }
+  if (smState?.isInitial === true) {
+    state.isInitial = true;
+  } else if (smState?.isInitial === false) {
+    state.isInitial = false;
+  }
+  if (precondition !== void 0) {
+    state.precondition = precondition;
+  }
+  state.provenance = { source: "migrated" };
+  return state;
+}
+function invertProcessStep(step) {
+  const out = {
+    type: step.action,
+    target: invertCriteria(step.target)
+  };
+  if (step.waitAfter !== void 0) out.waitAfter = step.waitAfter;
+  return out;
+}
+function buildIRTransitions(stateMachine) {
+  if (stateMachine === void 0 || !Array.isArray(stateMachine.states)) return [];
+  const byId = /* @__PURE__ */ new Map();
+  const order = [];
+  for (const smState of stateMachine.states) {
+    const transitions = Array.isArray(smState.transitions) ? smState.transitions : [];
+    for (const t of transitions) {
+      const existing = byId.get(t.id);
+      if (existing !== void 0) {
+        if (!existing.fromStates.includes(smState.id)) {
+          existing.fromStates.push(smState.id);
+        }
+        continue;
+      }
+      const ir = {
+        id: t.id,
+        name: t.name,
+        fromStates: [smState.id],
+        activateStates: Array.isArray(t.activateStates) ? [...t.activateStates] : [],
+        actions: Array.isArray(t.process) ? t.process.map(invertProcessStep) : []
+      };
+      if (Array.isArray(t.deactivateStates)) {
+        ir.exitStates = [...t.deactivateStates];
+      }
+      ir.provenance = { source: "migrated" };
+      byId.set(t.id, ir);
+      order.push(t.id);
+    }
+  }
+  return order.map((id) => byId.get(id));
+}
+function projectLegacyToIR(legacy, opts) {
+  const component = opts?.docId ?? legacy.metadata?.component ?? opts?.fallbackName ?? "legacy-spec";
+  const name = legacy.metadata?.component ?? opts?.fallbackName ?? component;
+  const smByGroupId = /* @__PURE__ */ new Map();
+  if (legacy.stateMachine !== void 0 && Array.isArray(legacy.stateMachine.states)) {
+    for (const s of legacy.stateMachine.states) {
+      smByGroupId.set(s.id, s);
+    }
+  }
+  const groups = Array.isArray(legacy.groups) ? legacy.groups : [];
+  const states = groups.map(
+    (group) => buildIRState(group, smByGroupId.get(group.id))
+  );
+  const groupIds = new Set(groups.map((g) => g.id));
+  let filteredStateMachine = legacy.stateMachine;
+  if (legacy.stateMachine !== void 0 && Array.isArray(legacy.stateMachine.states) && legacy.stateMachine.states.some((s) => !groupIds.has(s.id))) {
+    filteredStateMachine = {
+      states: legacy.stateMachine.states.filter((s) => groupIds.has(s.id))
+    };
+  }
+  const transitions = buildIRTransitions(filteredStateMachine);
+  let initialState;
+  if (legacy.stateMachine !== void 0 && Array.isArray(legacy.stateMachine.states)) {
+    const initial = legacy.stateMachine.states.find(
+      (s) => s.isInitial === true && groupIds.has(s.id)
+    );
+    if (initial !== void 0) initialState = initial.id;
+  }
+  const doc = {
+    version: "1.0",
+    id: component,
+    name,
+    states,
+    transitions,
+    provenance: { source: "migrated" }
+  };
+  if (legacy.description !== void 0 && legacy.description.length > 0) {
+    doc.description = legacy.description;
+  }
+  if (legacy.metadata !== void 0 && legacy.metadata.tags !== void 0) {
+    doc.metadata = { tags: legacy.metadata.tags };
+  }
+  if (initialState !== void 0) {
+    doc.initialState = initialState;
+  }
+  return doc;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   adaptIRDocumentToWorkflowConfig,
@@ -227,6 +368,7 @@ ${notes}` : baseDescription;
   adaptIRTransition,
   adaptIRTransitionAction,
   projectIRToBundledPage,
+  projectLegacyToIR,
   projectionVersion
 });
 //# sourceMappingURL=ui-bridge-ir.cjs.map

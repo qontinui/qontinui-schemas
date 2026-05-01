@@ -31,9 +31,11 @@
       "additionalProperties": false,
       "properties": {
         "role": { "type": "string" },
+        "tagName": { "type": "string" },
         "text": { "type": "string" },
         "textContains": { "type": "string" },
         "ariaLabel": { "type": "string" },
+        "accessibleName": { "type": "string" },
         "id": { "type": "string" },
         "attributes": {
           "type": "object",
@@ -138,6 +140,7 @@
         "blocking": { "type": "boolean" },
         "group": { "type": "string" },
         "pathCost": { "type": "number" },
+        "precondition": { "type": "string" },
         "elementIds": { "type": "array", "items": { "type": "string" } },
         "incomingTransitions": { "type": "array", "items": { "type": "string" } },
         "metadata": { "$ref": "#/$defs/IRMetadata" },
