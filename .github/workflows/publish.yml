@@ -1,0 +1,38 @@
+name: Publish @qontinui/shared-types to npm
+
+# Tag-triggered publish for the TypeScript package only.
+# We use the `ts-v*` prefix so this workflow does not fire for any future
+# Rust crate tag scheme (this repo also hosts the Rust `qontinui-types` crate).
+#
+# To release: bump `ts/package.json` version, then:
+#   git tag ts-v0.2.2
+#   git push --tags
+on:
+  push:
+    tags:
+      - 'ts-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

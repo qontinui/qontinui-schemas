@@ -11,16 +11,55 @@ This package provides TypeScript type definitions shared across:
 ## Installation
 
 ```bash
-# From npm (when published)
+# From npm
 npm install @qontinui/shared-types
+```
 
-# For local development, use npm link
+## Releasing
+
+The package is published to npm by a tag-triggered GitHub Actions workflow
+(`.github/workflows/publish.yml`). Tags use the `ts-v*` prefix so the
+workflow only fires for TypeScript-package releases (this repo also hosts
+the Rust `qontinui-types` crate, which may eventually have its own tag
+scheme).
+
+```bash
+# 1. Bump the version in ts/package.json
+# 2. Commit the version bump
+# 3. Tag and push
+git tag ts-v0.2.2
+git push --tags
+```
+
+The workflow runs `npm ci && npm run build && npm publish --access public`
+from the `ts/` directory using the org-level `NPM_TOKEN` secret.
+
+## Local development (hot-reload via npm link)
+
+To work on `@qontinui/shared-types` and have a consumer pick up changes
+without publishing, use `npm link`:
+
+```bash
+# In this package
 cd qontinui-schemas/ts
 npm install
+npm run build
 npm link
 
-# In consuming project
+# In the consuming project (e.g. qontinui-runner, qontinui-web/frontend)
 npm link @qontinui/shared-types
+```
+
+To unlink when finished:
+
+```bash
+# In the consumer
+npm unlink --no-save @qontinui/shared-types
+npm install
+
+# In this package (optional, removes the global symlink)
+cd qontinui-schemas/ts
+npm unlink
 ```
 
 ## Usage
