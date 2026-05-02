@@ -485,9 +485,12 @@ declare function adaptIRDocumentToWorkflowConfig(doc: IRDocument): AdaptedWorkfl
  *         false                             ->   assertion.reviewed
  *         true                              ->   assertion.enabled
  *
- *     If state has zero requiredElements, emit a single placeholder assertion
- *     describing the state (legacy consumers expect at least one assertion per
- *     group). Same for criteria with empty-string text.
+ *     If state has zero requiredElements, the projected `group.assertions[]`
+ *     is the empty array — legacy specs ship architecture-only groups with
+ *     empty assertions, and the inverse projection's identity round-trip
+ *     depends on preserving that emptiness. (Earlier versions emitted a
+ *     placeholder assertion here, which silently grew the assertion count
+ *     during round-trip and tripped `check-spec-pairing`.)
  *
  *   Each IRState                            ->   one entry in stateMachine.states[]
  *     state.id                              ->   sm-state.id
