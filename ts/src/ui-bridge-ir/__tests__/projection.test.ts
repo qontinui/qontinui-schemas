@@ -373,7 +373,13 @@ describe("projectIRToBundledPage — empty cases", () => {
     expect(out.metadata.component).toBe("empty");
   });
 
-  it("emits one placeholder assertion when a state has zero requiredElements", () => {
+  it("projects a state with zero requiredElements to a group with empty assertions[]", () => {
+    // Legacy specs ship architecture-only / documentation-only groups with
+    // empty `assertions[]` (e.g. `graphql-resolver-inventory` in the runner's
+    // `graphql-infrastructure.spec.uibridge.json`). The forward projection
+    // must preserve that emptiness so the legacy<->IR round-trip is identity
+    // for assertion counts; emitting a placeholder here silently inflates the
+    // count and trips `check-spec-pairing` with an `assertionCount` mismatch.
     const doc: IRDocument = {
       version: "1.0",
       id: "p",
@@ -390,12 +396,98 @@ describe("projectIRToBundledPage — empty cases", () => {
     const out = projectIRToBundledPage(doc);
     expect(out.groups).toHaveLength(1);
     const group = out.groups[0]!;
-    expect(group.assertions).toHaveLength(1);
-    expect(group.assertions[0]!.id).toBe("no-req-elem-0");
-    expect(group.assertions[0]!.target.criteria).toEqual({});
-    expect(group.assertions[0]!.target.label).toBe(
-      "Required element for No Required Elements",
+    expect(group.assertions).toEqual([]);
+    // The state still appears in the state-machine block — emptiness is local
+    // to `groups[].assertions[]`, not state existence.
+    expect(out.stateMachine.states).toHaveLength(1);
+    expect(out.stateMachine.states[0]!.id).toBe("no-req");
+  });
+
+  it("preserves empty groups across a legacy -> IR -> legacy round-trip (regression: graphql-infrastructure)", () => {
+    // Reproduces the on-disk shape of the four runner specs that previously
+    // produced an `assertionCount` mismatch in `check-spec-pairing`: a group
+    // with empty `assertions[]` and a matching state-machine state with
+    // empty `elements[]`. Round-trip identity proves the placeholder
+    // re-emission bug stays fixed.
+    const legacy = {
+      version: "1.0.0",
+      description: "Architecture-only spec with empty groups",
+      metadata: { component: "regression" },
+      groups: [
+        {
+          id: "non-empty",
+          name: "Has assertions",
+          description: "",
+          category: "element-presence",
+          assertions: [
+            {
+              id: "a1",
+              description: "First assertion",
+              category: "element-presence",
+              severity: "critical",
+              assertionType: "exists",
+              target: {
+                type: "search",
+                criteria: { textContent: "Run" },
+                label: "Run button",
+              },
+              source: "ai-generated",
+              reviewed: false,
+              enabled: true,
+            },
+          ],
+          source: "ai-generated",
+        },
+        {
+          id: "empty",
+          name: "Empty architecture group",
+          description: "",
+          category: "element-presence",
+          assertions: [],
+          source: "ai-generated",
+        },
+      ],
+      stateMachine: {
+        states: [
+          {
+            id: "non-empty",
+            name: "Has assertions",
+            description: "",
+            elements: [{ textContent: "Run" }],
+            isInitial: true,
+            transitions: [],
+          },
+          {
+            id: "empty",
+            name: "Empty architecture group",
+            description: "",
+            elements: [],
+            isInitial: false,
+            transitions: [],
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof projectLegacyToIR>[0];
+
+    const ir = projectLegacyToIR(legacy, { docId: "regression" });
+    const projected = projectIRToBundledPage(ir);
+
+    expect(projected.groups).toHaveLength(2);
+    expect(projected.groups[0]!.id).toBe("non-empty");
+    expect(projected.groups[0]!.assertions).toHaveLength(1);
+    expect(projected.groups[1]!.id).toBe("empty");
+    expect(projected.groups[1]!.assertions).toEqual([]);
+
+    // Total assertion count is identity across the round-trip.
+    const legacyTotal = legacy.groups.reduce(
+      (s: number, g: { assertions: unknown[] }) => s + g.assertions.length,
+      0,
     );
+    const projectedTotal = projected.groups.reduce(
+      (s, g) => s + g.assertions.length,
+      0,
+    );
+    expect(projectedTotal).toBe(legacyTotal);
   });
 
   it("handles a state with empty-string text criteria (still emits an assertion)", () => {

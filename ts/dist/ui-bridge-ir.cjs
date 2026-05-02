@@ -142,7 +142,7 @@ function convertCriteria(criteria) {
 }
 function buildAssertion(state, index, criteria) {
   const description = state.metadata?.description ?? `Required element ${index} for state ${state.name}`;
-  const targetCriteria = criteria === void 0 ? {} : convertCriteria(criteria);
+  const targetCriteria = convertCriteria(criteria);
   const assertion = {
     id: `${state.id}-elem-${index}`,
     description,
@@ -165,7 +165,9 @@ function buildAssertion(state, index, criteria) {
 }
 function buildGroup(state) {
   const elems = state.requiredElements ?? [];
-  const assertions = elems.length === 0 ? [buildAssertion(state, 0, void 0)] : elems.map((c, i) => buildAssertion(state, i, c));
+  const assertions = elems.map(
+    (c, i) => buildAssertion(state, i, c)
+  );
   return {
     id: state.id,
     name: state.name,

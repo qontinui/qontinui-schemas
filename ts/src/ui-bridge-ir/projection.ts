@@ -51,9 +51,12 @@
  *         false                             ->   assertion.reviewed
  *         true                              ->   assertion.enabled
  *
- *     If state has zero requiredElements, emit a single placeholder assertion
- *     describing the state (legacy consumers expect at least one assertion per
- *     group). Same for criteria with empty-string text.
+ *     If state has zero requiredElements, the projected `group.assertions[]`
+ *     is the empty array — legacy specs ship architecture-only groups with
+ *     empty assertions, and the inverse projection's identity round-trip
+ *     depends on preserving that emptiness. (Earlier versions emitted a
+ *     placeholder assertion here, which silently grew the assertion count
+ *     during round-trip and tripped `check-spec-pairing`.)
  *
  *   Each IRState                            ->   one entry in stateMachine.states[]
  *     state.id                              ->   sm-state.id
@@ -367,21 +370,24 @@ function convertCriteria(criteria: IRElementCriteria): LegacyCriteria {
 }
 
 /**
- * Build a single legacy assertion from a state + index + (optional) criteria.
+ * Build a single legacy assertion from a state + index + criteria.
  *
- * Used both for normal `requiredElement` projection and for the placeholder
- * fallback when a state has no requiredElements (legacy consumers expect at
- * least one assertion per group).
+ * Always produces one assertion per requiredElement; the caller is responsible
+ * for iterating `state.requiredElements`. Empty `requiredElements` produces an
+ * empty `assertions[]` — legitimate legacy specs (e.g. architecture-only
+ * groups in `graphql-infrastructure`, `activity-timeline`, `opik-integration`,
+ * `watchers`) ship with empty `assertions[]`, and the inverse projection
+ * round-trip must preserve that emptiness or `check-spec-pairing` flags an
+ * assertion-count drift.
  */
 function buildAssertion(
   state: IRState,
   index: number,
-  criteria: IRElementCriteria | undefined,
+  criteria: IRElementCriteria,
 ): LegacyAssertion {
   const description =
     state.metadata?.description ?? `Required element ${index} for state ${state.name}`;
-  const targetCriteria: LegacyCriteria =
-    criteria === undefined ? {} : convertCriteria(criteria);
+  const targetCriteria: LegacyCriteria = convertCriteria(criteria);
   const assertion: LegacyAssertion = {
     id: `${state.id}-elem-${index}`,
     description,
@@ -404,14 +410,18 @@ function buildAssertion(
 }
 
 /**
- * Build the legacy `groups[]` entry for one IR state.
+ * Build the legacy `groups[]` entry for one IR state. Emits exactly one
+ * assertion per `requiredElement`; states with zero requiredElements project
+ * to a group with an empty `assertions[]` array. Legacy consumers (runner
+ * spec drift / verify, error monitor curator, AI session) tolerate empty
+ * groups — multiple shipping legacy specs already use them for
+ * architecture-only / documentation-only groups.
  */
 function buildGroup(state: IRState): LegacyGroup {
   const elems = state.requiredElements ?? [];
-  const assertions: LegacyAssertion[] =
-    elems.length === 0
-      ? [buildAssertion(state, 0, undefined)]
-      : elems.map((c, i) => buildAssertion(state, i, c));
+  const assertions: LegacyAssertion[] = elems.map((c, i) =>
+    buildAssertion(state, i, c),
+  );
   return {
     id: state.id,
     name: state.name,
