@@ -60,6 +60,12 @@ export interface IRState {
   group?: string;
   /** Navigation cost weight for pathfinding (default 1.0). */
   pathCost?: number;
+  /**
+   * Free-text precondition required for this state to be entered, mirroring
+   * legacy `assertion.precondition` strings (e.g., "A workflow is paused at a
+   * breakpoint"). Authoring-time documentation; not enforced at runtime.
+   */
+  precondition?: string;
 
   // IR-only fields (stripped by adapter) ---------------------------------
   /**

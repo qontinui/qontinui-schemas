@@ -105,12 +105,24 @@ interface IRVisualRef {
 interface IRElementCriteria {
     /** ARIA role or inferred role. */
     role?: string;
+    /** HTML tag name (e.g. "div", "button"). Heavily used in legacy specs. */
+    tagName?: string;
     /** Exact text content (trimmed). */
     text?: string;
     /** Substring match on text content (case-insensitive). */
     textContains?: string;
-    /** ARIA label (case-insensitive substring match). */
+    /**
+     * ARIA label (case-insensitive substring match). Synonym of `accessibleName`
+     * for the runtime SDK; the projection prefers `accessibleName` when both are
+     * present.
+     */
     ariaLabel?: string;
+    /**
+     * Computed accessible name (the same concept legacy specs serialize as
+     * `accessibleName`). Added section 3 so the inverse projection can
+     * round-trip without rewriting to `ariaLabel`.
+     */
+    accessibleName?: string;
     /** Element ID (exact string or pattern-source string). */
     id?: string;
     /** HTML attributes to check (exact string match). */
@@ -163,6 +175,12 @@ interface IRState {
     group?: string;
     /** Navigation cost weight for pathfinding (default 1.0). */
     pathCost?: number;
+    /**
+     * Free-text precondition required for this state to be entered, mirroring
+     * legacy `assertion.precondition` strings (e.g., "A workflow is paused at a
+     * breakpoint"). Authoring-time documentation; not enforced at runtime.
+     */
+    precondition?: string;
     /**
      * Optional companion list of element IDs that resolved at registration
      * time. The runtime SDK fills this in when criteria resolve to specific
@@ -601,15 +619,16 @@ declare const projectionVersion = "1.0";
  *
  * The differences from `IRElementCriteria`:
  *   - `text`        -> `textContent`
- *   - `ariaLabel`   -> `accessibleName`
+ *   - `ariaLabel`   -> `accessibleName` (when IR has no explicit `accessibleName`)
  *   - `attributes`  -> `dataAttributes`
  *
- * Other fields (`role`, `textContains`, `id`) pass through unchanged. Legacy
- * specs in the wild also carry occasional `tagName` / extra fields, so the
- * shape is intentionally open via index signature.
+ * Other fields (`role`, `tagName`, `textContains`, `accessibleName`, `id`)
+ * pass through unchanged. Index signature stays open for legacy fields the
+ * IR doesn't yet model.
  */
 interface LegacyCriteria {
     role?: string;
+    tagName?: string;
     textContent?: string;
     textContains?: string;
     accessibleName?: string;
@@ -724,5 +743,75 @@ interface LegacySpec {
  *              separate paragraph (separator: two newlines).
  */
 declare function projectIRToBundledPage(doc: IRDocument, notes?: string): LegacySpec;
+/**
+ * Options for the inverse projection.
+ *
+ * - `docId`        — explicit IRDocument.id override. Falls back to
+ *                    `legacy.metadata.component` (or `fallbackName` if absent).
+ * - `fallbackName` — used when `legacy.metadata.component` is missing AND no
+ *                    `docId` was supplied.
+ */
+interface ProjectLegacyToIROptions {
+    docId?: string;
+    fallbackName?: string;
+}
+/**
+ * Project a legacy bundled-page spec back into IR.
+ *
+ * Pure / deterministic: same input always produces structurally identical
+ * output. Collapses transition duplicates (forward emits one copy per
+ * `fromState`), preserves group/assertion ordering, and tags every node with
+ * `provenance.source = "migrated"` so downstream tooling can distinguish
+ * migrated content from hand-authored.
+ *
+ * The mapping is the structural inverse of `projectIRToBundledPage`:
+ *
+ *   LegacySpec                                IRDocument
+ *   ----------                                ----------
+ *   metadata.component                  ->   id (or opts.docId override)
+ *   metadata.tags                       ->   metadata.tags
+ *   description                         ->   description (kept verbatim;
+ *                                            authored notes appended via
+ *                                            forward `notes` arg are not
+ *                                            stripped — that round-trip is
+ *                                            best-effort and Phase A4 will
+ *                                            split them back out)
+ *
+ *   groups[]                            ->   states[] (one per group)
+ *     group.id / name / description     ->   state.id / name / description
+ *     assertion.target.criteria         ->   state.requiredElements[i] (or,
+ *                                            preferred, smState.elements when
+ *                                            the stateMachine block is present)
+ *     first-found assertion.precondition ->  state.precondition
+ *
+ *   stateMachine.states[]               ->   contributes isInitial + elements
+ *     smState.transitions[]             ->   transitions[] (deduped by id)
+ *       transition.activateStates       ->   transition.activateStates
+ *       transition.deactivateStates     ->   transition.exitStates
+ *       transition.process[]            ->   transition.actions[]
+ *         step.action                   ->   action.type
+ *         step.target                   ->   action.target (criteria inverted)
+ *         step.waitAfter                ->   action.waitAfter
+ *
+ * Documented losses (acceptable for Phase A2):
+ *   - Legacy assertion ids (`{stateId}-elem-{i}`) are NOT preserved across the
+ *     round-trip — the forward direction regenerates them from index, so any
+ *     hand-edited ids are lost. See Phase A4.
+ *   - Legacy `assertionType` / `severity` / `category` / `source` per
+ *     assertion are reduced to defaults on round-trip.
+ *   - Legacy `expected` / `assertionType: "count"` and `notExists` semantics
+ *     are not modeled in IR — the assertion's criteria still survive (as a
+ *     state requiredElement) but the assertion-flavor metadata is dropped.
+ *   - Legacy `testing` block + extra metadata keys outside `component` /
+ *     `tags` are ignored. Authors keep them via the legacy spec file directly
+ *     during Phase A2 — they will move into IR companion files in Phase A4.
+ *   - The forward `notes` argument's appended paragraph is currently kept
+ *     in `description`; Phase A4 will split it back out into a dedicated
+ *     companion file.
+ *
+ * @param legacy The legacy spec to invert.
+ * @param opts   Optional doc-level overrides.
+ */
+declare function projectLegacyToIR(legacy: LegacySpec, opts?: ProjectLegacyToIROptions): IRDocument;
 
-export { type AdaptedState, type AdaptedTransition, type AdaptedTransitionAction, type AdaptedWaitAfter, type AdaptedWorkflowConfig, type IRCrossRef, type IRDocument, type IREffect, type IRElementCriteria, type IRMetadata, type IRProvenance, type IRState, type IRStateCondition, type IRTransition, type IRTransitionAction, type IRVersion, type IRVisualRef, type IRWaitSpec, type LegacyAssertion, type LegacyAssertionTarget, type LegacyCriteria, type LegacyGroup, type LegacyMetadata, type LegacyProcessStep, type LegacySpec, type LegacyStateMachine, type LegacyStateMachineState, type LegacyTransition, adaptIRDocumentToWorkflowConfig, adaptIRState, adaptIRTransition, adaptIRTransitionAction, projectIRToBundledPage, projectionVersion };
+export { type AdaptedState, type AdaptedTransition, type AdaptedTransitionAction, type AdaptedWaitAfter, type AdaptedWorkflowConfig, type IRCrossRef, type IRDocument, type IREffect, type IRElementCriteria, type IRMetadata, type IRProvenance, type IRState, type IRStateCondition, type IRTransition, type IRTransitionAction, type IRVersion, type IRVisualRef, type IRWaitSpec, type LegacyAssertion, type LegacyAssertionTarget, type LegacyCriteria, type LegacyGroup, type LegacyMetadata, type LegacyProcessStep, type LegacySpec, type LegacyStateMachine, type LegacyStateMachineState, type LegacyTransition, type ProjectLegacyToIROptions, adaptIRDocumentToWorkflowConfig, adaptIRState, adaptIRTransition, adaptIRTransitionAction, projectIRToBundledPage, projectLegacyToIR, projectionVersion };

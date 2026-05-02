@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import type { IRDocument } from "../document";
 import {
   projectIRToBundledPage,
+  projectLegacyToIR,
   projectionVersion,
   type LegacySpec,
 } from "../projection";
@@ -580,5 +581,357 @@ describe("LegacySpec — structural witness", () => {
       stateMachine: { states: [] },
       metadata: { component: "m" },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inverse projection: legacy -> IR (Phase A2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand-authored minimal legacy fixture for the inverse direction. Mirrors a
+ * trimmed `settings-general.spec.uibridge.json`-style shape with two groups,
+ * a state-machine block, transitions with action sequences, and a
+ * precondition on one assertion.
+ */
+const LEGACY_FIXTURE: LegacySpec = {
+  version: "1.0.0",
+  description: "Hand-authored test fixture for inverse projection.",
+  groups: [
+    {
+      id: "alpha",
+      name: "Alpha Group",
+      description: "First group for the round-trip test.",
+      category: "element-presence",
+      assertions: [
+        {
+          id: "alpha-elem-0",
+          description: "Heading exists",
+          category: "element-presence",
+          severity: "critical",
+          assertionType: "exists",
+          target: {
+            type: "search",
+            criteria: { role: "heading", textContent: "Alpha" },
+            label: "Alpha heading",
+          },
+          source: "manual",
+          reviewed: true,
+          enabled: true,
+        },
+        {
+          id: "alpha-elem-1",
+          description: "Subtitle exists",
+          category: "element-presence",
+          severity: "warning",
+          assertionType: "exists",
+          target: {
+            type: "search",
+            criteria: { textContent: "Welcome" },
+            label: "Subtitle",
+          },
+          source: "manual",
+          reviewed: true,
+          enabled: true,
+          precondition: "Page is loaded.",
+        },
+      ],
+      source: "manual",
+    },
+    {
+      id: "beta",
+      name: "Beta Group",
+      description: "Second group, modal-style.",
+      category: "element-presence",
+      assertions: [
+        {
+          id: "beta-elem-0",
+          description: "Dialog exists",
+          category: "element-presence",
+          severity: "critical",
+          assertionType: "exists",
+          target: {
+            type: "search",
+            criteria: { role: "dialog", accessibleName: "Confirm" },
+            label: "Confirm dialog",
+          },
+          source: "manual",
+          reviewed: true,
+          enabled: true,
+        },
+      ],
+      source: "manual",
+    },
+  ],
+  stateMachine: {
+    states: [
+      {
+        id: "alpha",
+        name: "Alpha Group",
+        description: "First group for the round-trip test.",
+        elements: [
+          { role: "heading", textContent: "Alpha" },
+          { textContent: "Welcome" },
+        ],
+        isInitial: true,
+        transitions: [
+          {
+            id: "alpha-to-beta",
+            name: "Open Beta",
+            activateStates: ["beta"],
+            deactivateStates: [],
+            staysVisible: true,
+            process: [
+              {
+                action: "click",
+                target: { role: "button", textContent: "Open" },
+                waitAfter: { type: "idle", timeout: 1000 },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: "beta",
+        name: "Beta Group",
+        description: "Second group, modal-style.",
+        elements: [{ role: "dialog", accessibleName: "Confirm" }],
+        isInitial: false,
+        transitions: [
+          {
+            id: "beta-to-alpha",
+            name: "Close Beta",
+            activateStates: ["alpha"],
+            deactivateStates: ["beta"],
+            staysVisible: false,
+            process: [
+              {
+                action: "click",
+                target: { textContent: "Cancel" },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  metadata: {
+    component: "fixture-page",
+    tags: ["fixture", "round-trip"],
+  },
+};
+
+describe("projectLegacyToIR — basic shape", () => {
+  it("converts metadata.component to ir.id and propagates tags", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    expect(ir.id).toBe("fixture-page");
+    expect(ir.metadata?.tags).toEqual(["fixture", "round-trip"]);
+  });
+
+  it("uses opts.docId override when supplied", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE, { docId: "override" });
+    expect(ir.id).toBe("override");
+  });
+
+  it("emits one IR state per legacy group, preserving id + name + description", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    expect(ir.states).toHaveLength(2);
+    expect(ir.states.map((s) => s.id)).toEqual(["alpha", "beta"]);
+    const alpha = ir.states.find((s) => s.id === "alpha")!;
+    expect(alpha.name).toBe("Alpha Group");
+    expect(alpha.description).toBe("First group for the round-trip test.");
+  });
+
+  it("sources requiredElements from group.assertions[].target.criteria", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const alpha = ir.states.find((s) => s.id === "alpha")!;
+    expect(alpha.requiredElements).toHaveLength(2);
+    expect(alpha.requiredElements[0]).toEqual({
+      role: "heading",
+      text: "Alpha",
+    });
+    expect(alpha.requiredElements[1]).toEqual({ text: "Welcome" });
+  });
+
+  it("inverts dataAttributes -> attributes and accessibleName passthrough", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const beta = ir.states.find((s) => s.id === "beta")!;
+    expect(beta.requiredElements[0]).toEqual({
+      role: "dialog",
+      accessibleName: "Confirm",
+    });
+  });
+
+  it("lifts the first-found assertion.precondition to state.precondition", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const alpha = ir.states.find((s) => s.id === "alpha")!;
+    expect(alpha.precondition).toBe("Page is loaded.");
+  });
+
+  it("derives initialState from the first SM state with isInitial:true", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    expect(ir.initialState).toBe("alpha");
+  });
+
+  it("sets state.isInitial from the SM state", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    expect(ir.states.find((s) => s.id === "alpha")!.isInitial).toBe(true);
+    expect(ir.states.find((s) => s.id === "beta")!.isInitial).toBe(false);
+  });
+
+  it("tags every state and transition with provenance.source = 'migrated'", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    for (const s of ir.states) {
+      expect(s.provenance?.source).toBe("migrated");
+    }
+    for (const t of ir.transitions) {
+      expect(t.provenance?.source).toBe("migrated");
+    }
+    expect(ir.provenance?.source).toBe("migrated");
+  });
+
+  it("collapses transitions in stateMachine.states[].transitions[] into one IRTransition", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    expect(ir.transitions).toHaveLength(2);
+    const ids = ir.transitions.map((t) => t.id).sort();
+    expect(ids).toEqual(["alpha-to-beta", "beta-to-alpha"]);
+  });
+
+  it("inverts process[] back into transition.actions with type/target/waitAfter", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const t = ir.transitions.find((tt) => tt.id === "alpha-to-beta")!;
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0]!.type).toBe("click");
+    expect(t.actions[0]!.target).toEqual({ role: "button", text: "Open" });
+    expect(t.actions[0]!.waitAfter).toEqual({ type: "idle", timeout: 1000 });
+  });
+
+  it("preserves modal-style empty deactivateStates as exitStates: []", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const t = ir.transitions.find((tt) => tt.id === "alpha-to-beta")!;
+    expect(t.exitStates).toEqual([]);
+  });
+
+  it("handles a legacy spec with no stateMachine block (synthesizes states from groups only)", () => {
+    const noSM = {
+      ...LEGACY_FIXTURE,
+      stateMachine: { states: [] },
+    } as LegacySpec;
+    const ir = projectLegacyToIR(noSM);
+    expect(ir.transitions).toEqual([]);
+    expect(ir.states).toHaveLength(2);
+    // No isInitial set when SM block is empty.
+    expect(ir.initialState).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Round-trip tests
+// ---------------------------------------------------------------------------
+
+describe("round-trip — IR -> legacy -> IR (forward then inverse)", () => {
+  it("preserves the active-page IR fixture's group/state/transition counts", () => {
+    const legacy = projectIRToBundledPage(ACTIVE_PAGE_FIXTURE);
+    const ir = projectLegacyToIR(legacy);
+    expect(ir.states.length).toBe(ACTIVE_PAGE_FIXTURE.states.length);
+    expect(ir.states.map((s) => s.id).sort()).toEqual(
+      ACTIVE_PAGE_FIXTURE.states.map((s) => s.id).sort(),
+    );
+    expect(ir.transitions.length).toBe(ACTIVE_PAGE_FIXTURE.transitions.length);
+    expect(ir.transitions.map((t) => t.id).sort()).toEqual(
+      ACTIVE_PAGE_FIXTURE.transitions.map((t) => t.id).sort(),
+    );
+  });
+
+  it("preserves the active-page IR fixture's initialState", () => {
+    const legacy = projectIRToBundledPage(ACTIVE_PAGE_FIXTURE);
+    const ir = projectLegacyToIR(legacy);
+    expect(ir.initialState).toBe("idle");
+  });
+
+  it("preserves the active-page IR's tags", () => {
+    const legacy = projectIRToBundledPage(ACTIVE_PAGE_FIXTURE);
+    const ir = projectLegacyToIR(legacy);
+    expect(ir.metadata?.tags).toEqual(ACTIVE_PAGE_FIXTURE.metadata?.tags);
+  });
+
+  it("preserves transition fromStates merging when the same transition is emitted under multiple SM states", () => {
+    // Forward emits one copy of each transition under each fromState. The
+    // active-page fixture only has one fromState per transition, but check
+    // the dedup logic doesn't drop transitions when fromStates is single.
+    const legacy = projectIRToBundledPage(ACTIVE_PAGE_FIXTURE);
+    const ir = projectLegacyToIR(legacy);
+    const orig = ACTIVE_PAGE_FIXTURE.transitions.find(
+      (t) => t.id === "idle-to-running",
+    )!;
+    const round = ir.transitions.find((t) => t.id === "idle-to-running")!;
+    expect(round.fromStates).toEqual(orig.fromStates);
+    expect(round.activateStates).toEqual(orig.activateStates);
+  });
+});
+
+describe("round-trip — legacy -> IR -> legacy (inverse then forward)", () => {
+  it("preserves group count and group ids from a hand-authored legacy fixture", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    expect(back.groups.length).toBe(LEGACY_FIXTURE.groups.length);
+    expect(back.groups.map((g) => g.id)).toEqual(
+      LEGACY_FIXTURE.groups.map((g) => g.id),
+    );
+  });
+
+  it("preserves total assertion count", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    const orig = LEGACY_FIXTURE.groups.reduce(
+      (n, g) => n + g.assertions.length,
+      0,
+    );
+    const round = back.groups.reduce((n, g) => n + g.assertions.length, 0);
+    expect(round).toBe(orig);
+  });
+
+  it("preserves transition ids in the SM block", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    const allTids: string[] = [];
+    for (const s of back.stateMachine.states) {
+      for (const t of s.transitions) {
+        if (!allTids.includes(t.id)) allTids.push(t.id);
+      }
+    }
+    const origTids: string[] = [];
+    for (const s of LEGACY_FIXTURE.stateMachine.states) {
+      for (const t of s.transitions) {
+        if (!origTids.includes(t.id)) origTids.push(t.id);
+      }
+    }
+    expect(allTids.sort()).toEqual(origTids.sort());
+  });
+
+  it("preserves transition action types", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    const alphaSm = back.stateMachine.states.find((s) => s.id === "alpha")!;
+    const t = alphaSm.transitions.find((tt) => tt.id === "alpha-to-beta")!;
+    expect(t.process).toHaveLength(1);
+    expect(t.process[0]!.action).toBe("click");
+    expect(t.process[0]!.target).toEqual({ role: "button", textContent: "Open" });
+  });
+
+  it("preserves staysVisible on modal-style transitions (empty deactivateStates)", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    const alphaSm = back.stateMachine.states.find((s) => s.id === "alpha")!;
+    const t = alphaSm.transitions.find((tt) => tt.id === "alpha-to-beta")!;
+    expect(t.staysVisible).toBe(true);
+    expect(t.deactivateStates).toEqual([]);
+  });
+
+  it("preserves component + tags in metadata", () => {
+    const ir = projectLegacyToIR(LEGACY_FIXTURE);
+    const back = projectIRToBundledPage(ir);
+    expect(back.metadata.component).toBe("fixture-page");
+    expect(back.metadata.tags).toEqual(["fixture", "round-trip"]);
   });
 });
