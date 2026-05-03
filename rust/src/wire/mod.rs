@@ -12,5 +12,7 @@
 
 pub mod placement;
 pub mod runner_kind;
+pub mod webview2;
 
 pub use runner_kind::RunnerKind;
+pub use webview2::webview2_data_dir;
