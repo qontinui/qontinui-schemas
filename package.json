@@ -76,6 +76,11 @@
       "types": "./ts/dist/rag.d.ts",
       "import": "./ts/dist/rag.js",
       "require": "./ts/dist/rag.cjs"
+    },
+    "./tauri-events": {
+      "types": "./ts/dist/tauri-events.d.ts",
+      "import": "./ts/dist/tauri-events.js",
+      "require": "./ts/dist/tauri-events.cjs"
     }
   },
   "files": [
