@@ -58,6 +58,7 @@ poetry.lock
 
 # Rust
 rust/target/
+rust-runner-client/target/
 
 # TypeScript
 node_modules/
