@@ -7,7 +7,7 @@ export { AccentColor, AccentColorClasses, ActionColorClasses, ActionColorType, B
 export { AiMessage, AiSessionState } from './chat.cjs';
 export { ActiveStatesResult, AvailableTransitionsResult, DiscoveryStrategy, DomainKnowledge, InitialStateRef, InitialStatesSource, MouseButton, NavigationResult, PathfindingRequest, PathfindingResult, PathfindingStep, Point, ResolvedInitialStates, ResolvedInitialStatesResult, ScrollDirection, StandardActionType, StateMachineConfig, StateMachineConfigCreate, StateMachineConfigFull, StateMachineConfigUpdate, StateMachineExportFormat, StateMachineState, StateMachineStateCreate, StateMachineStateUpdate, StateMachineTransition, StateMachineTransitionCreate, StateMachineTransitionUpdate, StateNodeData, TransitionAction, TransitionActionValue, TransitionEdgeData, TransitionExecutionResult, TransitionInfo } from './state-machine.cjs';
 export { BuiltinOverrideProposal, Constraint, ConstraintCheck, ConstraintProposal, ConstraintResult, ConstraintSeverity, ConstraintViolation, NewConstraintProposal, ReadConfigResponse, ResourceLimits, ValidateConfigRequest, ValidateConfigResponse, WriteConfigRequest, WriteConfigResponse } from './constraints.cjs';
-export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-DtT3UphX.cjs';
+export { a as CoordinateSystem, C as Coordinates, R as Region } from './Region.d-BbpFAWF4.cjs';
 export { Monitor, MonitorPosition, VirtualDesktop } from './geometry.cjs';
 export { AccessibilityBackend, AccessibilityBounds, AccessibilityNode, AccessibilityRole, AccessibilitySelector, AccessibilitySnapshot, AccessibilityState } from './accessibility.cjs';
 
