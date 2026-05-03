@@ -19,6 +19,7 @@ export default defineConfig({
     targets: "src/targets/index.ts",
     rag: "src/rag/index.ts",
     "ui-bridge-ir": "src/ui-bridge-ir/index.ts",
+    "tauri-events": "src/tauri-events/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

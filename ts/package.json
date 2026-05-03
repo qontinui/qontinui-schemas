@@ -92,7 +92,12 @@
       "import": "./dist/ui-bridge-ir.js",
       "require": "./dist/ui-bridge-ir.cjs"
     },
-    "./ui-bridge-ir/schema": "./src/ui-bridge-ir/ir.schema.json"
+    "./ui-bridge-ir/schema": "./src/ui-bridge-ir/ir.schema.json",
+    "./tauri-events": {
+      "types": "./dist/tauri-events.d.ts",
+      "import": "./dist/tauri-events.js",
+      "require": "./dist/tauri-events.cjs"
+    }
   },
   "files": [
     "dist",
