@@ -69,6 +69,30 @@ pub enum FlowEvent {
         completed: usize,
         total: usize,
     },
+    /// Flow execution was paused via `pause_flow_execution`.
+    ///
+    /// Emitted on the `flow-event` Tauri channel by
+    /// `qontinui-runner/src-tauri/src/commands/flow.rs::pause_flow_execution`
+    /// and consumed by `useFlowExecutionData.ts`. `step_id` is intentionally
+    /// emitted as `null` when no current step (rather than skipped) to
+    /// preserve the legacy `serde_json::json!` wire shape.
+    FlowPaused {
+        instance_id: String,
+        flow_id: String,
+        /// Step the flow was paused at (`null` if no current step).
+        step_id: Option<String>,
+    },
+    /// Flow execution was resumed via `resume_flow_execution` after a pause.
+    ///
+    /// Emitted on the `flow-event` Tauri channel by
+    /// `qontinui-runner/src-tauri/src/commands/flow.rs::resume_flow_execution`.
+    /// `step_id` is intentionally emitted as `null` when no current step.
+    FlowResumed {
+        instance_id: String,
+        flow_id: String,
+        /// Step execution will resume from (`null` if no current step).
+        step_id: Option<String>,
+    },
 }
 
 // ============================================================================
@@ -307,11 +331,17 @@ pub enum AppEvent {
 
     // ── Canvas Events ──
     /// Canvas panel created, updated, or removed.
+    ///
+    /// Wraps a [`CanvasPanel`] when `action` is `"create"` / `"update"`;
+    /// `panel` is `None` for `"delete"` and `"clear"`. `panel.data` remains
+    /// a free-form `serde_json::Value` because the inner shape varies per
+    /// component type (Markdown, CodeDiff, Table, …) — the canonical map
+    /// is in `qontinui-schemas/ts/src/canvas/index.ts`.
     CanvasUpdate {
         action: String,
         panel_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        panel: Option<Value>,
+        panel: Option<CanvasPanel>,
         #[serde(skip_serializing_if = "Option::is_none")]
         task_run_id: Option<String>,
     },
@@ -446,4 +476,36 @@ pub enum AppEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         context: Option<String>,
     },
+}
+
+// ============================================================================
+// CanvasPanel — wire-format mirror of runner StoredPanel
+// ============================================================================
+
+/// A canvas panel rendered in the dashboard widget.
+///
+/// Wire-format mirror of the runner's `StoredPanel` struct
+/// (`qontinui-runner/src-tauri/src/mcp/canvas.rs`). The runner emits this
+/// inside [`AppEvent::CanvasUpdate`] via the `canvas-update` Tauri channel.
+/// Field names are snake_case to match the existing TS interface in
+/// `qontinui-schemas/ts/src/canvas/index.ts`.
+///
+/// `data` stays `serde_json::Value` because each `component` type has a
+/// different inner shape (Markdown, CodeDiff, Table, …); the per-component
+/// data schemas live in the TS module above and are intentionally not
+/// modeled as a Rust discriminated union (would balloon the schema for
+/// little gain on the Rust side).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CanvasPanel {
+    pub panel_id: String,
+    pub component: String,
+    pub title: String,
+    pub data: Value,
+    pub priority: i32,
+    pub size: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    pub task_run_id: String,
+    pub created_at: String,
+    pub updated_at: String,
 }

@@ -8,6 +8,42 @@ import { T as TaskRunFindingActionType, a as TaskRunFindingCategory, b as TaskRu
  */
 
 /**
+ * A canvas panel rendered in the dashboard widget.
+ *
+ * Wire-format mirror of the runner's `StoredPanel` struct
+ * (`qontinui-runner/src-tauri/src/mcp/canvas.rs`). The runner emits this
+ * inside [`AppEvent::CanvasUpdate`] via the `canvas-update` Tauri channel.
+ * Field names are snake_case to match the existing TS interface in
+ * `qontinui-schemas/ts/src/canvas/index.ts`.
+ *
+ * `data` stays `serde_json::Value` because each `component` type has a
+ * different inner shape (Markdown, CodeDiff, Table, …); the per-component
+ * data schemas live in the TS module above and are intentionally not
+ * modeled as a Rust discriminated union (would balloon the schema for
+ * little gain on the Rust side).
+ */
+interface CanvasPanel {
+  component: string;
+  created_at: string;
+  data: unknown;
+  group?: string | null;
+  panel_id: string;
+  priority: number;
+  size: string;
+  task_run_id: string;
+  title: string;
+  updated_at: string;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
  * Events emitted during flow execution for UI updates.
  *
  * Internally tagged with `"type"` and snake_case variant names.
@@ -64,6 +100,26 @@ type FlowEvent =
       step_id: string;
       total: number;
       type: "parallel_progress";
+      [k: string]: unknown;
+    }
+  | {
+      flow_id: string;
+      instance_id: string;
+      /**
+       * Step the flow was paused at (`null` if no current step).
+       */
+      step_id?: string | null;
+      type: "flow_paused";
+      [k: string]: unknown;
+    }
+  | {
+      flow_id: string;
+      instance_id: string;
+      /**
+       * Step execution will resume from (`null` if no current step).
+       */
+      step_id?: string | null;
+      type: "flow_resumed";
       [k: string]: unknown;
     };
 
@@ -435,7 +491,7 @@ type AppEvent =
   | {
       data: {
         action: string;
-        panel?: unknown;
+        panel?: CanvasPanel | null;
         panel_id: string;
         task_run_id?: string | null;
         [k: string]: unknown;
@@ -866,4 +922,239 @@ interface RunnerFinding {
   [k: string]: unknown;
 }
 
-export type { AppEvent, RunnerFinding, RunnerFindingCodeContext, RunnerFindingUserInput, TerminalExitEvent, TerminalInfo, TerminalOutputEvent };
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Discriminated union of every WS envelope `mcp/backend_relay.rs::handle_outbound`
+ * ships to the backend after rewrapping a Tauri-side `AppEvent`.
+ *
+ * Internally tagged on `"type"` with snake_case variant names because that's
+ * what the prior `serde_json::json!` literals emitted on the wire.
+ *
+ * Wire keys are snake_case (NOT camelCase) — verified against the literal
+ * strings in `handle_outbound` lines ~605-638. Consumers that expect
+ * camelCase (e.g. some web hooks) are wrong; the relay never emitted
+ * camelCase here.
+ */
+type RunnerRelayMessage =
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      type: "phase_completed";
+      [k: string]: unknown;
+    }
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      type: "ui_error";
+      [k: string]: unknown;
+    }
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      type: "recent_crash";
+      [k: string]: unknown;
+    }
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      type: "chat_response";
+      [k: string]: unknown;
+    }
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      type: "chat_session_state";
+      [k: string]: unknown;
+    }
+  | {
+      data: {
+        [k: string]: unknown;
+      };
+      terminal_id: {
+        [k: string]: unknown;
+      };
+      type: "terminal_output";
+      [k: string]: unknown;
+    }
+  | {
+      exit_code: {
+        [k: string]: unknown;
+      };
+      terminal_id: {
+        [k: string]: unknown;
+      };
+      type: "terminal_exit";
+      [k: string]: unknown;
+    };
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Wire-format runner shape carried inside `runner_connected.connection`.
+ *
+ * This is intentionally a partial Runner payload (snake_case, only the
+ * fields the Python emitter actually populates in
+ * `RunnerEventPublisher.publish_runner_connected`). It is NOT
+ * `qontinui_types::runner::Runner` — that shape requires `derived_status`,
+ * `capabilities`, `created_at` etc., which the connection payload doesn't
+ * include. Consumers reading this should refetch the canonical Runner row
+ * via REST after seeing `runner_connected`.
+ */
+interface RunnerConnectedConnection {
+  connected_at?: string | null;
+  /**
+   * Always present as `null` on the wire when the runner is still
+   * connected. Python ships this field unconditionally.
+   */
+  disconnected_at?: string | null;
+  duration_seconds?: number | null;
+  id: string;
+  ip_address?: string | null;
+  project_id?: string | null;
+  runner_name?: string | null;
+  runner_port?: number | null;
+  ws_connected: boolean;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+
+
+/**
+ * Discriminated union of every event the Python backend pushes to the web
+ * client over the `/api/v1/runners/status` WebSocket.
+ *
+ * Internally tagged on `"type"` matching the Python wire format. Variant
+ * renames (`runner.woke` keeps the dot rather than going to snake_case)
+ * preserve the literal strings the emitter sends.
+ *
+ * Source of truth: the `publish_*` methods in
+ * `qontinui-web/backend/app/services/runner/event_publisher.py` and the
+ * `initial_state` send in `runner_status_ws.py`.
+ */
+type RunnerStatusEvent =
+  | {
+      runners: unknown[];
+      type: "initial_state";
+      [k: string]: unknown;
+    }
+  | {
+      connection: RunnerConnectedConnection;
+      timestamp: string;
+      type: "runner_connected";
+      [k: string]: unknown;
+    }
+  | {
+      runner_id: string;
+      timestamp: string;
+      type: "runner_disconnected";
+      [k: string]: unknown;
+    }
+  | {
+      runner_id: string;
+      runner_name: string;
+      timestamp: string;
+      type: "runner_name_updated";
+      [k: string]: unknown;
+    }
+  | {
+      runner_id: string;
+      runner_port: number;
+      timestamp: string;
+      type: "runner_port_updated";
+      [k: string]: unknown;
+    }
+  | {
+      intent_id?: string | null;
+      reason?: string | null;
+      runner_id: string;
+      task_id?: string | null;
+      timestamp: string;
+      type: "runner.woke";
+      [k: string]: unknown;
+    }
+  | {
+      error: string;
+      type: "error";
+      [k: string]: unknown;
+    };
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Payload shape emitted on the `dev:seed-finding` Tauri event.
+ *
+ * Field names use camelCase so the TS listener (`TauriFindingsListener.ts`)
+ * can spread them directly into a `Finding` object without translation.
+ * The actual emit site is in `commands::dev_findings::dev_seed_finding`.
+ *
+ * Renamed in the schema registry to `DevSeedFindingPayload` to disambiguate
+ * from the various `Finding*` types in `qontinui_types::findings`.
+ */
+interface DevSeedFindingPayload {
+  actionType: string;
+  actionable: boolean;
+  categoryId: string;
+  description: string;
+  detectedAt: number;
+  id: string;
+  severity: string;
+  sourceSessionId?: string | null;
+  status: string;
+  title: string;
+  [k: string]: unknown;
+}
+
+/* eslint-disable */
+/**
+ * This file was automatically generated.
+ * DO NOT MODIFY IT BY HAND. Regenerate with `just generate-types` or
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+ */
+
+/**
+ * Payload shape for the `review-approved` and `review-rejected` Tauri events
+ * emitted by `commands::productivity::approve_recommendation` /
+ * `reject_recommendation` after a user resolves a medium-confidence
+ * recommendation card. Field names are explicit camelCase to match the
+ * `serde_json::json!()` literal previously used at the emit site.
+ *
+ * Single struct shared by both channels: only `user_decision` differs
+ * (`"approved"` vs `"rejected"`), so a tagged enum would inflate the wire
+ * format without payoff.
+ */
+interface RecommendationReviewDecisionPayload {
+  reviewId: string;
+  taskId: string;
+  userDecision: string;
+  [k: string]: unknown;
+}
+
+export type { AppEvent, CanvasPanel as CanvasUpdatePanel, DevSeedFindingPayload, RecommendationReviewDecisionPayload, RunnerConnectedConnection, RunnerFinding, RunnerFindingCodeContext, RunnerFindingUserInput, RunnerRelayMessage, RunnerStatusEvent, TerminalExitEvent, TerminalInfo, TerminalOutputEvent };

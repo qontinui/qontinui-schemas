@@ -49,3 +49,28 @@ export type { TerminalExitEvent } from "../generated/TerminalExitEvent";
 export type { RunnerFinding } from "../generated/RunnerFinding";
 export type { RunnerFindingCodeContext } from "../generated/RunnerFindingCodeContext";
 export type { RunnerFindingUserInput } from "../generated/RunnerFindingUserInput";
+
+// ── WS relay envelopes (runner→backend) and backend→client status events.
+//    Discriminated unions tagged on `type`. Source of truth lives in
+//    `qontinui-runner/src-tauri/src/relay_envelopes.rs`; backend-originated
+//    events mirror `qontinui-web/backend/app/services/runner/event_publisher.py`. ──
+export type { RunnerRelayMessage } from "../generated/RunnerRelayMessage";
+export type { RunnerStatusEvent } from "../generated/RunnerStatusEvent";
+export type { RunnerConnectedConnection } from "../generated/RunnerConnectedConnection";
+
+// ── Dev-only seed-finding payload (`dev:seed-finding` Tauri event from
+//    `commands/dev_findings.rs`). Sibling to the camelCase RunnerFinding
+//    fields so the TS listener can spread them straight into a Finding. ──
+export type { DevSeedFindingPayload } from "../generated/DevSeedFindingPayload";
+
+// ── Recommendation review decision payloads (`review-approved` /
+//    `review-rejected` from `commands/productivity.rs`). One struct
+//    covers both channels — only `userDecision` differs. ──
+export type { RecommendationReviewDecisionPayload } from "../generated/RecommendationReviewDecisionPayload";
+
+// ── Canvas panel payload carried inside AppEvent::CanvasUpdate's
+//    `data.panel` field. Wire-format mirror of the runner's `StoredPanel`
+//    (`mcp/canvas.rs`). The hand-written `CanvasPanel` in `../canvas/index.ts`
+//    pre-dates this generated re-export; both shapes are intentionally
+//    identical. New consumers should prefer this generated import. ──
+export type { CanvasPanel as CanvasUpdatePanel } from "../generated/CanvasPanel";

@@ -63,4 +63,24 @@ export type FlowEvent =
       total: number;
       type: "parallel_progress";
       [k: string]: unknown;
+    }
+  | {
+      flow_id: string;
+      instance_id: string;
+      /**
+       * Step the flow was paused at (`null` if no current step).
+       */
+      step_id?: string | null;
+      type: "flow_paused";
+      [k: string]: unknown;
+    }
+  | {
+      flow_id: string;
+      instance_id: string;
+      /**
+       * Step execution will resume from (`null` if no current step).
+       */
+      step_id?: string | null;
+      type: "flow_resumed";
+      [k: string]: unknown;
     };

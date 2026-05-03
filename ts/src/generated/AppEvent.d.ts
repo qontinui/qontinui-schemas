@@ -5,6 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+import type { CanvasPanel } from './CanvasPanel';
 import type { FlowEvent } from './FlowEvent';
 
 /**
@@ -366,7 +367,7 @@ export type AppEvent =
   | {
       data: {
         action: string;
-        panel?: unknown;
+        panel?: CanvasPanel | null;
         panel_id: string;
         task_run_id?: string | null;
         [k: string]: unknown;
