@@ -47,3 +47,10 @@ pub mod verification;
 pub mod worker_output;
 pub mod workflow;
 pub mod workflow_step;
+
+/// Rust-only cross-crate runner↔supervisor types.
+///
+/// See `wire/mod.rs` for the strictness convention. NOT generated to TS or
+/// Python — these types only ever flow between Rust crates inside this
+/// workspace.
+pub mod wire;
