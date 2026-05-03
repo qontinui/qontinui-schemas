@@ -11,3 +11,6 @@
 //! the Rust runner↔supervisor surface fails fast on shape drift.
 
 pub mod placement;
+pub mod runner_kind;
+
+pub use runner_kind::RunnerKind;
