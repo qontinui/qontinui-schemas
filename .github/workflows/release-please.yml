@@ -1,0 +1,35 @@
+name: release-please
+
+# Release-please monorepo mode for the polyglot schemas surface.
+#
+# On every push to main, release-please scans new conventional-commits
+# against components defined in release-please-config.json and either
+# opens/updates a release PR (with version bumps + CHANGELOG entries)
+# or — when an existing release PR is merged — creates per-component
+# tags like `rust-v0.1.2`, `rust-runner-client-v0.1.0`, `ts-v0.2.4`.
+#
+# Those tags are consumed by the per-language publish workflows:
+#   rust-v*, rust-runner-client-v*  → publish-rust.yml (cargo publish)
+#   ts-v*                            → publish.yml      (npm publish)
+#
+# The release PR MUST require explicit human merge — do not enable
+# auto-merge on release-please PRs (per qontinui-dev-notes/
+# rust-release-engineering/non-goals: "release-please's release PR IS
+# the human gate").
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: release-please-manifest.json
