@@ -1,0 +1,122 @@
+name: Publish Rust crates to crates.io
+
+# Tag-triggered + manual publish for the Rust crates in this repo.
+# We use the `rust-v*` prefix so this workflow does not fire for the TS
+# package's `ts-v*` tag scheme (handled by publish.yml).
+#
+# Crates published, in dependency order:
+#   1. qontinui-types          (rust/Cargo.toml)
+#   2. qontinui-runner-client  (rust-runner-client/Cargo.toml; depends on qontinui-types)
+#
+# To release via tag:
+#   git tag rust-v0.1.2
+#   git push --tags
+#
+# To release manually (workflow_dispatch):
+#   gh workflow run publish-rust.yml -f crate=both
+#   gh workflow run publish-rust.yml -f crate=qontinui-types
+#   gh workflow run publish-rust.yml -f crate=qontinui-runner-client
+#
+# Required secret: CRATES_IO_TOKEN (generate at https://crates.io/me).
+
+on:
+  push:
+    tags:
+      - 'rust-v*'
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: 'Which crate(s) to publish'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - qontinui-types
+          - qontinui-runner-client
+
+jobs:
+  publish-qontinui-types:
+    # Run for tag pushes always; for workflow_dispatch only when the chosen
+    # crate is 'both' or 'qontinui-types'.
+    if: |
+      github.event_name == 'push' ||
+      github.event.inputs.crate == 'both' ||
+      github.event.inputs.crate == 'qontinui-types'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Read crate version
+        id: version
+        run: |
+          version=$(cargo pkgid | sed -E 's/.*[@#]([0-9]+\.[0-9]+\.[0-9]+.*)/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "qontinui-types version: $version"
+
+      - name: Skip if version already on crates.io
+        id: check
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          published=$(cargo search qontinui-types --limit 1 | head -n1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+          echo "published version: $published"
+          if [ "$published" = "$version" ]; then
+            echo "qontinui-types $version is already published; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish qontinui-types
+        if: steps.check.outputs.skip != 'true'
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+
+  publish-qontinui-runner-client:
+    # Always runs after qontinui-types so the dependency is available on
+    # crates.io. `needs:` waits even when the upstream job is skipped, which
+    # is what we want for the `crate=qontinui-runner-client`-only case.
+    needs: publish-qontinui-types
+    if: |
+      always() &&
+      (needs.publish-qontinui-types.result == 'success' ||
+       needs.publish-qontinui-types.result == 'skipped') &&
+      (github.event_name == 'push' ||
+       github.event.inputs.crate == 'both' ||
+       github.event.inputs.crate == 'qontinui-runner-client')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust-runner-client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Read crate version
+        id: version
+        run: |
+          version=$(cargo pkgid | sed -E 's/.*[@#]([0-9]+\.[0-9]+\.[0-9]+.*)/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "qontinui-runner-client version: $version"
+
+      - name: Skip if version already on crates.io
+        id: check
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          published=$(cargo search qontinui-runner-client --limit 1 | head -n1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+          echo "published version: $published"
+          if [ "$published" = "$version" ]; then
+            echo "qontinui-runner-client $version is already published; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish qontinui-runner-client
+        if: steps.check.outputs.skip != 'true'
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
