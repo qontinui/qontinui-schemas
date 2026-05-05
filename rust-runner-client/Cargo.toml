@@ -1,0 +1,19 @@
+[package]
+name = "qontinui-runner-client"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Typed HTTP client for the qontinui-runner /spawn-placement endpoints. Layered on qontinui-types::wire."
+
+[dependencies]
+qontinui-types = { path = "../rust", version = "^0.1" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+url = "2"
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6"
