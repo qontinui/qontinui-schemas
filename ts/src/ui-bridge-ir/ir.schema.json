@@ -24,6 +24,10 @@
     "transitions": {
       "type": "array",
       "items": { "$ref": "#/$defs/IRTransition" }
+    },
+    "synthesizedGroups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/IRGroup" }
     }
   },
   "$defs": {
@@ -229,6 +233,60 @@
         "metadata": { "$ref": "#/$defs/IRMetadata" },
         "provenance": { "$ref": "#/$defs/IRProvenance" },
         "crossRefs": { "type": "array", "items": { "$ref": "#/$defs/IRCrossRef" } }
+      }
+    },
+    "IRAssertionTarget": {
+      "type": "object",
+      "required": ["type", "criteria", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "criteria": { "type": "object", "additionalProperties": true },
+        "label": { "type": "string" }
+      }
+    },
+    "IRAssertion": {
+      "type": "object",
+      "required": [
+        "id",
+        "description",
+        "category",
+        "severity",
+        "assertionType",
+        "target",
+        "source",
+        "reviewed",
+        "enabled"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "severity": { "type": "string" },
+        "assertionType": { "type": "string" },
+        "target": { "$ref": "#/$defs/IRAssertionTarget" },
+        "source": { "type": "string" },
+        "reviewed": { "type": "boolean" },
+        "enabled": { "type": "boolean" },
+        "precondition": { "type": "string" }
+      }
+    },
+    "IRGroup": {
+      "type": "object",
+      "required": ["id", "name", "description", "category", "assertions"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "assertions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRAssertion" }
+        },
+        "source": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

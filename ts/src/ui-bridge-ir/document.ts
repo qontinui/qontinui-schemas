@@ -6,6 +6,7 @@
  * adapter folds it into ui-bridge-auto's `WorkflowConfig`.
  */
 
+import type { IRGroup } from "./group";
 import type { IRMetadata, IRProvenance } from "./primitives";
 import type { IRState } from "./state";
 import type { IRTransition } from "./transition";
@@ -99,6 +100,14 @@ export interface IRDocument {
   states: IRState[];
   /** Transition declarations within this document. */
   transitions: IRTransition[];
+
+  /**
+   * Groups produced by workflow-criteria synthesis (not by IR state authoring).
+   * Synthesis appends to this list; the projection emits them after state-derived
+   * groups in legacy `groups[]` output. Authoring tools should treat this field
+   * as read-only.
+   */
+  synthesizedGroups?: IRGroup[];
 
   /** ID of the initial/starting state, if applicable. */
   initialState?: string;
