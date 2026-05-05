@@ -13,13 +13,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "qontinui-schemas/rust/src/**"
+      - "rust/src/**"
       - "qontinui-runner/src-tauri/src/schema_export.rs"
       - "qontinui-runner/src-tauri/scripts/generate_types.sh"
   pull_request:
     branches: [main]
     paths:
-      - "qontinui-schemas/rust/src/**"
+      - "rust/src/**"
       - "qontinui-runner/src-tauri/src/schema_export.rs"
       - "qontinui-runner/src-tauri/scripts/generate_types.sh"
 
