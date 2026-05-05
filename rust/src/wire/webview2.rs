@@ -95,7 +95,9 @@ mod tests {
     /// CI / test harnesses may run with a sanitized env. Use a guard helper
     /// so the asserts only fire when the env actually has a value.
     fn with_local_app_data<R>(f: impl FnOnce(PathBuf) -> R) -> Option<R> {
-        let lad = std::env::var("LOCALAPPDATA").ok().filter(|s| !s.is_empty())?;
+        let lad = std::env::var("LOCALAPPDATA")
+            .ok()
+            .filter(|s| !s.is_empty())?;
         Some(f(PathBuf::from(lad).join("com.qontinui.runner")))
     }
 
@@ -176,6 +178,12 @@ mod tests {
     #[test]
     fn returns_none_on_non_windows() {
         assert!(webview2_data_dir(&RunnerKind::Primary, "primary").is_none());
-        assert!(webview2_data_dir(&RunnerKind::Temp { id: "test-x".into() }, "test-x").is_none());
+        assert!(webview2_data_dir(
+            &RunnerKind::Temp {
+                id: "test-x".into()
+            },
+            "test-x"
+        )
+        .is_none());
     }
 }
