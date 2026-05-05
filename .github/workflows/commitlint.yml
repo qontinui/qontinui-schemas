@@ -1,0 +1,29 @@
+name: commitlint
+
+# Hard-enforces conventional-commits on every PR. Required so that
+# release-please (release-please.yml) can derive accurate version bumps
+# and CHANGELOG entries from commit messages alone.
+#
+# Rules: @commitlint/config-conventional defaults
+#   feat:      → minor bump
+#   fix:       → patch bump
+#   feat!:     → major bump (also `BREAKING CHANGE:` in footer)
+#   chore: / ci: / docs: / style: / refactor: / perf: / test: → no release
+#
+# This is a hard rule (per qontinui-dev-notes/rust-release-engineering/
+# decision 2). PRs that don't conform must rewrite their commit history
+# before merge.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: wagoid/commitlint-github-action@v6
