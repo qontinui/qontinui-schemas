@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-runner-client"
-version = "0.1.0"
+version = "0.2.0"
 description = "Typed HTTP client for the qontinui-runner /spawn-placement endpoints. Layered on qontinui-types::wire."
 edition.workspace = true
 license.workspace = true
