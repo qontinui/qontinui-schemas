@@ -179,6 +179,7 @@
 
 import type { IRElementCriteria } from "./element-criteria";
 import type { IRDocument } from "./document";
+import type { IRAssertion, IRGroup } from "./group";
 import type { IRState } from "./state";
 import type { IRTransition, IRTransitionAction, IRWaitSpec } from "./transition";
 
@@ -433,6 +434,55 @@ function buildGroup(state: IRState): LegacyGroup {
 }
 
 /**
+ * Convert an `IRAssertion` (IR-side, free-form criteria) into a `LegacyAssertion`.
+ * The shapes are near-identical; the only meaningful difference is that the
+ * IR-side `target.criteria` is `Record<string, unknown>` while the legacy
+ * shape is `LegacyCriteria` (a typed but extensible record). We pass the
+ * criteria object through verbatim — the open `[key: string]: unknown` index
+ * signature on `LegacyCriteria` accepts any record shape.
+ */
+function synthesizedAssertionToLegacy(assertion: IRAssertion): LegacyAssertion {
+  const target: LegacyAssertionTarget = {
+    type: "search",
+    criteria: assertion.target.criteria as LegacyCriteria,
+    label: assertion.target.label,
+  };
+  const out: LegacyAssertion = {
+    id: assertion.id,
+    description: assertion.description,
+    category: assertion.category,
+    severity: assertion.severity as LegacyAssertion["severity"],
+    assertionType: assertion.assertionType,
+    target,
+    source: assertion.source,
+    reviewed: assertion.reviewed,
+    enabled: assertion.enabled,
+  };
+  if (assertion.precondition !== undefined) {
+    out.precondition = assertion.precondition;
+  }
+  return out;
+}
+
+/**
+ * Convert a synthesized `IRGroup` into a `LegacyGroup`. Mirrors the legacy
+ * shape one-to-one (modulo the free-form criteria pass-through described in
+ * `synthesizedAssertionToLegacy`). The synthesized group always carries a
+ * `source` (synthesis emits `"ai-generated"`); fall back to `"ai-generated"`
+ * for hand-written IR documents that omit it.
+ */
+function synthesizedGroupToLegacy(group: IRGroup): LegacyGroup {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    category: group.category,
+    assertions: group.assertions.map(synthesizedAssertionToLegacy),
+    source: group.source ?? "ai-generated",
+  };
+}
+
+/**
  * Convert an IR transition action into the legacy `process[]` step shape.
  * Renames IR's `type` to legacy `action` (matches the runtime engine
  * convention — same as the IR -> WorkflowConfig adapter does for runtime).
@@ -520,6 +570,14 @@ export function projectIRToBundledPage(doc: IRDocument, notes?: string): LegacyS
   if (doc.metadata?.tags !== undefined) metadata.tags = doc.metadata.tags;
 
   const groups: LegacyGroup[] = doc.states.map(buildGroup);
+  if (doc.synthesizedGroups !== undefined) {
+    // Append synthesis-produced groups AFTER state-derived ones, in declared
+    // order. Byte-stable output (see file header) requires this exact ordering
+    // — anything else breaks `check-spec-pairing` style hashes.
+    for (const g of doc.synthesizedGroups) {
+      groups.push(synthesizedGroupToLegacy(g));
+    }
+  }
   const smStates: LegacyStateMachineState[] = doc.states.map((s) =>
     buildStateMachineState(s, doc.transitions, doc),
   );
