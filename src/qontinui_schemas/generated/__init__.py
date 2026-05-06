@@ -39,6 +39,7 @@ from .per_type.bounding_box import BoundingBox
 from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.canonical_step import CanonicalStep
+from .per_type.canvas_panel import CanvasPanel
 from .per_type.catch_up_policy import CatchUpPolicy
 from .per_type.category import Category
 from .per_type.check_issue_detail import CheckIssueDetail
@@ -81,6 +82,7 @@ from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
 from .per_type.decomposer_config import DecomposerConfig
+from .per_type.dev_seed_finding_payload import DevSeedFindingPayload
 from .per_type.diagnose_phase_config import DiagnosePhaseConfig
 from .per_type.diagnostic_result import DiagnosticResult
 from .per_type.discovered_element import DiscoveredElement
@@ -239,6 +241,7 @@ from .per_type.rag_completion_event import RagCompletionEvent
 from .per_type.rag_processing_status import RagProcessingStatus
 from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
+from .per_type.recommendation_review_decision_payload import RecommendationReviewDecisionPayload
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
@@ -258,9 +261,15 @@ from .per_type.run_prompt_response_data import RunPromptResponseData
 from .per_type.run_status import RunStatus
 from .per_type.run_type import RunType
 from .per_type.runner import Runner
+from .per_type.runner_connected_connection import RunnerConnectedConnection
 from .per_type.runner_crash import RunnerCrash
+from .per_type.runner_finding import RunnerFinding
+from .per_type.runner_finding_code_context import RunnerFindingCodeContext
+from .per_type.runner_finding_user_input import RunnerFindingUserInput
 from .per_type.runner_metadata import RunnerMetadata
+from .per_type.runner_relay_message import RunnerRelayMessage
 from .per_type.runner_status import RunnerStatus
+from .per_type.runner_status_event import RunnerStatusEvent
 from .per_type.runner_ui_error import RunnerUiError
 from .per_type.runtime_data import RuntimeData
 from .per_type.save_workflow_artifact_step import SaveWorkflowArtifactStep
@@ -461,6 +470,7 @@ __all__ = [
     "BuildPhaseConfig",
     "BuiltinOverrideProposal",
     "CanonicalStep",
+    "CanvasPanel",
     "CatchUpPolicy",
     "Category",
     "CheckIssueDetail",
@@ -503,6 +513,7 @@ __all__ = [
     "DagCancelStep",
     "DagLoopStep",
     "DecomposerConfig",
+    "DevSeedFindingPayload",
     "DiagnosePhaseConfig",
     "DiagnosticResult",
     "DiscoveredElement",
@@ -661,6 +672,7 @@ __all__ = [
     "RagProcessingStatus",
     "RagProgressEvent",
     "ReadConfigResponse",
+    "RecommendationReviewDecisionPayload",
     "ReflectionFixOutput",
     "Region",
     "RepositoryInactiveCondition",
@@ -680,9 +692,15 @@ __all__ = [
     "RunStatus",
     "RunType",
     "Runner",
+    "RunnerConnectedConnection",
     "RunnerCrash",
+    "RunnerFinding",
+    "RunnerFindingCodeContext",
+    "RunnerFindingUserInput",
     "RunnerMetadata",
+    "RunnerRelayMessage",
     "RunnerStatus",
+    "RunnerStatusEvent",
     "RunnerUiError",
     "RuntimeData",
     "SaveWorkflowArtifactStep",
