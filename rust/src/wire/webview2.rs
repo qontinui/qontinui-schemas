@@ -75,6 +75,12 @@ pub fn webview2_data_dir(_kind: &RunnerKind, _runner_id: &str) -> Option<PathBuf
 /// Mirrors the pre-`RunnerKind` supervisor behavior at
 /// `qontinui-supervisor/src/process/windows.rs::webview2_user_data_folder`
 /// so existing on-disk profiles continue to be addressable.
+///
+/// Gated to `target_os = "windows"` because the only caller is the
+/// Windows arm of `webview2_data_dir`. On Linux the function would be
+/// dead code; cfg keeps it from compiling rather than tagging
+/// `#[allow(dead_code)]`.
+#[cfg(target_os = "windows")]
 fn sanitize(s: &str) -> String {
     s.chars()
         .map(|c| {
@@ -95,7 +101,9 @@ mod tests {
     /// CI / test harnesses may run with a sanitized env. Use a guard helper
     /// so the asserts only fire when the env actually has a value.
     fn with_local_app_data<R>(f: impl FnOnce(PathBuf) -> R) -> Option<R> {
-        let lad = std::env::var("LOCALAPPDATA").ok().filter(|s| !s.is_empty())?;
+        let lad = std::env::var("LOCALAPPDATA")
+            .ok()
+            .filter(|s| !s.is_empty())?;
         Some(f(PathBuf::from(lad).join("com.qontinui.runner")))
     }
 
@@ -176,6 +184,12 @@ mod tests {
     #[test]
     fn returns_none_on_non_windows() {
         assert!(webview2_data_dir(&RunnerKind::Primary, "primary").is_none());
-        assert!(webview2_data_dir(&RunnerKind::Temp { id: "test-x".into() }, "test-x").is_none());
+        assert!(webview2_data_dir(
+            &RunnerKind::Temp {
+                id: "test-x".into()
+            },
+            "test-x"
+        )
+        .is_none());
     }
 }

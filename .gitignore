@@ -57,6 +57,7 @@ Thumbs.db
 poetry.lock
 
 # Rust
+/target/
 rust/target/
 rust-runner-client/target/
 

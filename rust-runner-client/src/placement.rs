@@ -140,10 +140,7 @@ impl SpawnPlacementClient {
 
     /// Shared GET / parse path for both endpoints. Mirrors the
     /// envelope-vs-bare unwrap the supervisor used to do inline.
-    async fn fetch(
-        &self,
-        url: Url,
-    ) -> Result<SpawnPlacementResponse, SpawnPlacementClientError> {
+    async fn fetch(&self, url: Url) -> Result<SpawnPlacementResponse, SpawnPlacementClientError> {
         let resp = self.http.get(url).send().await?;
         let status = resp.status();
         if !status.is_success() {
@@ -188,8 +185,7 @@ impl SpawnPlacementClient {
         }
 
         // Bare payload.
-        serde_json::from_value(value)
-            .map_err(|e| SpawnPlacementClientError::Parse(e.to_string()))
+        serde_json::from_value(value).map_err(|e| SpawnPlacementClientError::Parse(e.to_string()))
     }
 }
 
@@ -348,7 +344,10 @@ mod tests {
         match err {
             SpawnPlacementClientError::Status { status, body } => {
                 assert_eq!(status.as_u16(), 404);
-                assert!(body.contains("no temp placements configured"), "body: {body}");
+                assert!(
+                    body.contains("no temp placements configured"),
+                    "body: {body}"
+                );
             }
             other => panic!("expected Status, got {other:?}"),
         }

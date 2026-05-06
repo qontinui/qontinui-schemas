@@ -275,7 +275,7 @@ pub struct McpConnectionRef {
 
 /// Catch-up policy applied when the runner restarts after missing one or
 /// more scheduled slots.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CatchUpPolicy {
     /// Run the missed slot once for each occurrence that was skipped.
@@ -284,13 +284,8 @@ pub enum CatchUpPolicy {
     /// audit but do not execute.
     Skip,
     /// Collapse multiple missed slots into a single catch-up run.
+    #[default]
     RunOnce,
-}
-
-impl Default for CatchUpPolicy {
-    fn default() -> Self {
-        Self::RunOnce
-    }
 }
 
 fn default_catch_up_policy() -> CatchUpPolicy {
@@ -487,10 +482,7 @@ pub struct ScheduledTask {
     pub condition_status: Option<ConditionStatus>,
     /// Catch-up policy applied when the runner restarts after missing one
     /// or more scheduled slots.
-    #[serde(
-        default = "default_catch_up_policy",
-        alias = "catch_up_policy"
-    )]
+    #[serde(default = "default_catch_up_policy", alias = "catch_up_policy")]
     pub catch_up_policy: CatchUpPolicy,
     /// Slots within this number of seconds of "now" are not treated as
     /// missed (the normal scheduler will pick them up). Default 300s.

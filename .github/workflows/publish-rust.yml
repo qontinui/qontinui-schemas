@@ -1,15 +1,20 @@
 name: Publish Rust crates to crates.io
 
 # Tag-triggered + manual publish for the Rust crates in this repo.
-# We use the `rust-v*` prefix so this workflow does not fire for the TS
-# package's `ts-v*` tag scheme (handled by publish.yml).
 #
-# Crates published, in dependency order:
-#   1. qontinui-types          (rust/Cargo.toml)
-#   2. qontinui-runner-client  (rust-runner-client/Cargo.toml; depends on qontinui-types)
+# Component-specific tags (created by release-please monorepo mode):
+#   rust-v*                  → publish qontinui-types
+#   rust-runner-client-v*    → publish qontinui-runner-client
 #
-# To release via tag:
-#   git tag rust-v0.1.2
+# Both tag patterns trigger this workflow; per-job `if:` conditions below
+# select the matching crate. The TS package uses `ts-v*` (handled by
+# publish.yml) and is unaffected.
+#
+# To release via tag (manual override of release-please, e.g. for the
+# very-first-publish ceremony documented in the rust-release-engineering
+# plan):
+#   git tag rust-v0.1.2-rc.1                  # qontinui-types
+#   git tag rust-runner-client-v0.1.0-rc.1    # qontinui-runner-client
 #   git push --tags
 #
 # To release manually (workflow_dispatch):
@@ -17,12 +22,20 @@ name: Publish Rust crates to crates.io
 #   gh workflow run publish-rust.yml -f crate=qontinui-types
 #   gh workflow run publish-rust.yml -f crate=qontinui-runner-client
 #
-# Required secret: CRATES_IO_TOKEN (generate at https://crates.io/me).
+# Hardening (per qontinui-dev-notes/rust-release-engineering decision 6):
+#   F2 hard CI gate — `verify-ci` job calls rust-ci.yml on the tagged
+#                      SHA; publish jobs require it green
+#   F4 dry-run        — every real `cargo publish` is preceded by
+#                      `cargo publish --dry-run` to catch packaging
+#                      failures before the irreversible step
+#
+# Required secret: CRATES_IO_TOKEN (use a publish-only scoped token).
 
 on:
   push:
     tags:
       - 'rust-v*'
+      - 'rust-runner-client-v*'
   workflow_dispatch:
     inputs:
       crate:
@@ -36,13 +49,21 @@ on:
           - qontinui-runner-client
 
 jobs:
+  # F2 hard gate — re-runs full Rust CI (build + test + clippy + fmt)
+  # on the exact SHA being published. publish jobs `needs:` this and
+  # will not start if it fails.
+  verify-ci:
+    uses: ./.github/workflows/rust-ci.yml
+
   publish-qontinui-types:
-    # Run for tag pushes always; for workflow_dispatch only when the chosen
-    # crate is 'both' or 'qontinui-types'.
+    needs: verify-ci
+    # Run for matching tag pushes (`rust-v*` but not `rust-runner-client-v*`,
+    # which has a longer prefix and doesn't match `startsWith(.., 'rust-v')`),
+    # OR for workflow_dispatch with crate=both|qontinui-types.
     if: |
-      github.event_name == 'push' ||
-      github.event.inputs.crate == 'both' ||
-      github.event.inputs.crate == 'qontinui-types'
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/rust-v')) ||
+      (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.crate == 'both' || github.event.inputs.crate == 'qontinui-types'))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,6 +72,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Read crate version
         id: version
@@ -72,22 +95,28 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Dry-run publish
+        if: steps.check.outputs.skip != 'true'
+        run: cargo publish --dry-run --token ${{ secrets.CRATES_IO_TOKEN }}
+
       - name: Publish qontinui-types
         if: steps.check.outputs.skip != 'true'
         run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
 
   publish-qontinui-runner-client:
     # Always runs after qontinui-types so the dependency is available on
-    # crates.io. `needs:` waits even when the upstream job is skipped, which
-    # is what we want for the `crate=qontinui-runner-client`-only case.
-    needs: publish-qontinui-types
+    # crates.io when this job's dry-run tries to fetch it. `needs:` waits
+    # even when the upstream job is skipped, which is what we want for
+    # the `crate=qontinui-runner-client`-only case.
+    needs: [verify-ci, publish-qontinui-types]
     if: |
       always() &&
+      needs.verify-ci.result == 'success' &&
       (needs.publish-qontinui-types.result == 'success' ||
        needs.publish-qontinui-types.result == 'skipped') &&
-      (github.event_name == 'push' ||
-       github.event.inputs.crate == 'both' ||
-       github.event.inputs.crate == 'qontinui-runner-client')
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/rust-runner-client-v')) ||
+       (github.event_name == 'workflow_dispatch' &&
+         (github.event.inputs.crate == 'both' || github.event.inputs.crate == 'qontinui-runner-client')))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -96,6 +125,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Read crate version
         id: version
@@ -116,6 +147,10 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Dry-run publish
+        if: steps.check.outputs.skip != 'true'
+        run: cargo publish --dry-run --token ${{ secrets.CRATES_IO_TOKEN }}
 
       - name: Publish qontinui-runner-client
         if: steps.check.outputs.skip != 'true'
