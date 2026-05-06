@@ -110,6 +110,19 @@ git tag rust-v0.1.2 && git push origin rust-v0.1.2
 
 **Cross-crate RC dependency wrinkle.** When `qontinui-types` is at an RC version on crates.io but `qontinui-runner-client` needs to consume it (e.g. during the phase 8 first-publish of runner-client), Cargo's caret range `^0.1` does NOT match pre-release versions like `0.1.2-rc.1` — pre-releases require an explicit pre-release version specifier. Pin runner-client's `qontinui-types` dep to `=0.1.2-rc.1` for the duration of the RC, then change it back to `^0.1.2` after the types crate promotes to stable.
 
+### Bootstrapping a new release-please component
+
+Adding a new package to `release-please-config.json` and `release-please-manifest.json` does **not** by itself give release-please enough state to behave correctly. release-please's monorepo strategy needs an *anchor tag* per component (`<component>-v<manifest-version>`) — without one, it falls back to walking all of git history for that component's path and applies conventional-commit rules from the very beginning, which routinely produces wrong bumps (e.g. attributing the commit that *introduced* the package as a `feat:` and proposing a minor bump on its first appearance).
+
+The `bootstrap-sha` and `last-release-sha` per-package config keys are documented but are **not** honored on this code path once the manifest version is set; they only apply in narrower scenarios. In practice, the only reliable bootstrap is to do the new component's first release manually (the same direct-tag ceremony described above under "Manual override"):
+
+1. Bump the new component's `Cargo.toml` / `package.json` to the intended first-publish version, in lockstep with `release-please-manifest.json`.
+2. Open + merge a `chore:` PR with those bumps.
+3. Tag the merge SHA as `<component>-v<version>` and push the tag — this fires the publish workflow and creates the first GitHub release.
+4. From then on, release-please finds the anchor tag, walks only post-tag commits affecting the component's path, and proposes correct bumps.
+
+Until step 3 lands, expect release-please to open release PRs proposing wrong bumps on the new component. Force-close them; they'll be regenerated correctly once the anchor tag exists.
+
 ### When a publish fails
 
 `cargo publish` is irreversible. The recovery options:
