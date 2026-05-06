@@ -899,7 +899,7 @@ dependencies = [
 
 [[package]]
 name = "qontinui-runner-client"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "qontinui-types",
  "reqwest",
