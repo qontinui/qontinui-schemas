@@ -31,8 +31,15 @@
 use serde::{Deserialize, Serialize};
 
 /// Classification of a runner.
+///
+/// Serde uses `tag = "type"` (not `"kind"`) so that when this enum is
+/// embedded as a field named `kind: RunnerKind` (e.g. on `RunnerConfig` or
+/// `RunnerInstanceHealth`), the on-the-wire shape is the unambiguous
+/// `"kind": {"type": "primary"}` rather than the doubly-nested
+/// `"kind": {"kind": "primary"}` the field-name and tag would otherwise
+/// produce in collision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum RunnerKind {
     /// The user's primary runner. Supervisor observes only.
