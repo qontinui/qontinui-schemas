@@ -17,7 +17,8 @@
       "release-type": "rust",
       "package-name": "qontinui-runner-client",
       "component": "rust-runner-client",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "bootstrap-sha": "09e23448b6bf17ec8814324154b56009266dd592"
     },
     "ts": {
       "release-type": "node",
