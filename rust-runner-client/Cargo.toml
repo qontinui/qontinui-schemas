@@ -1,13 +1,13 @@
 [package]
 name = "qontinui-runner-client"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 description = "Typed HTTP client for the qontinui-runner /spawn-placement endpoints. Layered on qontinui-types::wire."
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-qontinui-types = { path = "../rust", version = "^0.1.2-rc.1" }
+qontinui-types = { path = "../rust", version = "=0.1.2-rc.1" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
