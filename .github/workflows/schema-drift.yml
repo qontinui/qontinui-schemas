@@ -5,9 +5,9 @@ name: schema-drift
 #
 # Trigger scope: only runs when Rust schema sources, the runner-side
 # schema-export entry point, or the code generator script itself change.
-# This assumes the repository is the qontinui-root mono-repo; the workflow
-# expects to find both qontinui-runner/ and qontinui-schemas/ at the
-# checkout root.
+# qontinui-schemas is a standalone repo; this workflow recreates the
+# sibling layout (qontinui-schemas/ + qontinui-runner/ at $GITHUB_WORKSPACE)
+# that generate_types.sh and the runner crate's path-deps expect.
 
 on:
   push:
@@ -29,6 +29,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: qontinui-schemas
+
+      - name: Checkout qontinui-runner (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: qontinui/qontinui-runner
+          path: qontinui-runner
+
+      # generate_types.sh runs `cargo build --bin export_schemas` which
+      # links the runner lib (Tauri-dependent). Tauri 2.x on Linux probes
+      # for libwebkit2gtk-4.1, libsoup, libgtk etc. via pkg-config in
+      # build scripts. Without these, cargo aborts at link/probe time.
+      # Mirrors the canonical list from qontinui-runner/.github/workflows/ci.yml.
+      - name: Install Tauri Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -38,8 +67,17 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install json-schema-to-typescript
-        run: npm install -g json-schema-to-typescript
+      # compile_typescript.mjs does `import { compile } from
+      # 'json-schema-to-typescript'` from qontinui-schemas/scripts/.
+      # Node ESM resolution walks up to qontinui-schemas/node_modules/,
+      # so the package must be installed locally (a global -g install
+      # is not in Node ESM's default resolution path). package-lock.json
+      # is .gitignore'd, so `npm install` (not `npm ci`) — fresh resolve
+      # from the registry each run. Acceptable here because the gate
+      # only cares whether codegen output diffs, not pinned dep versions.
+      - name: Install qontinui-schemas npm deps
+        working-directory: qontinui-schemas
+        run: npm install
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,14 +87,45 @@ jobs:
       - name: Install datamodel-code-generator
         run: pip install datamodel-code-generator
 
+      # tauri_build::build() in qontinui-runner/src-tauri/build.rs reads
+      # tauri.conf.json's `frontendDist: "../dist"` and panics if the path
+      # doesn't exist. We don't actually need a real frontend build for
+      # schema export — the export_schemas binary only touches Rust schemar
+      # registries — so stub an empty dist/ with a placeholder index.html.
+      # The build script's `tauri::generate_context!()` will embed the
+      # placeholder, which is fine: the binary that reads the embedded
+      # frontend (the actual runner) is never invoked here.
+      - name: Stub qontinui-runner frontend dist
+        run: |
+          mkdir -p qontinui-runner/dist
+          printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
+
+      # CARGO_TARGET_DIR override: qontinui-runner is a workspace (Cargo.toml
+      # at the runner root declares [workspace] members = ["src-tauri", ...]),
+      # so cargo's default target-dir is qontinui-runner/target/. But
+      # generate_types.sh:21 hardcodes
+      # SCHEMAS_JSON="$PROJECT_ROOT/target/schemas.json" where
+      # $PROJECT_ROOT = qontinui-runner/src-tauri/. Force cargo to write to
+      # the script-expected per-package target dir so the bash redirection
+      # on script line 73 finds an existing target/ parent.
       - name: Regenerate types
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
+      # `-I '^#   timestamp:'` ignores hunks whose only changed lines are the
+      # `# timestamp: <ISO-8601>` header that datamodel-codegen writes at
+      # the top of every generated Python file. Those timestamps update on
+      # every codegen run regardless of whether the schema content changed,
+      # so without this filter the workflow can never go green even on a
+      # repo with no real drift. Same trick `schema-pg-sql-fresh.yml` uses
+      # to ignore `-- Dumped by pg_dump version` header noise.
       - name: Check for drift
+        working-directory: qontinui-schemas
         run: |
-          if ! git diff --exit-code \
-              qontinui-schemas/ts/src/generated \
-              qontinui-schemas/src/qontinui_schemas/generated; then
+          if ! git diff --exit-code -I '^#   timestamp:' \
+              ts/src/generated \
+              src/qontinui_schemas/generated; then
             echo "::error::Generated types are out of date."
             echo "Run 'just generate-types' from the repo root and commit the updated files."
             exit 1
