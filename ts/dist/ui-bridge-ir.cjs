@@ -177,6 +177,38 @@ function buildGroup(state) {
     source: state.provenance?.source ?? "ai-generated"
   };
 }
+function synthesizedAssertionToLegacy(assertion) {
+  const target = {
+    type: "search",
+    criteria: assertion.target.criteria,
+    label: assertion.target.label
+  };
+  const out = {
+    id: assertion.id,
+    description: assertion.description,
+    category: assertion.category,
+    severity: assertion.severity,
+    assertionType: assertion.assertionType,
+    target,
+    source: assertion.source,
+    reviewed: assertion.reviewed,
+    enabled: assertion.enabled
+  };
+  if (assertion.precondition !== void 0) {
+    out.precondition = assertion.precondition;
+  }
+  return out;
+}
+function synthesizedGroupToLegacy(group) {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    category: group.category,
+    assertions: group.assertions.map(synthesizedAssertionToLegacy),
+    source: group.source ?? "ai-generated"
+  };
+}
 function buildProcessStep(action) {
   const out = {
     action: action.type,
@@ -220,6 +252,11 @@ ${notes}` : baseDescription;
   const metadata = { component };
   if (doc.metadata?.tags !== void 0) metadata.tags = doc.metadata.tags;
   const groups = doc.states.map(buildGroup);
+  if (doc.synthesizedGroups !== void 0) {
+    for (const g of doc.synthesizedGroups) {
+      groups.push(synthesizedGroupToLegacy(g));
+    }
+  }
   const smStates = doc.states.map(
     (s) => buildStateMachineState(s, doc.transitions, doc)
   );

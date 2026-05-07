@@ -18,6 +18,7 @@ export * from "./primitives";
 export * from "./element-criteria";
 export * from "./state";
 export * from "./transition";
+export * from "./group";
 export * from "./document";
 export * from "./adapter";
 export * from "./projection";
