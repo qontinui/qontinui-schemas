@@ -71,10 +71,13 @@ jobs:
       # 'json-schema-to-typescript'` from qontinui-schemas/scripts/.
       # Node ESM resolution walks up to qontinui-schemas/node_modules/,
       # so the package must be installed locally (a global -g install
-      # is not in Node ESM's default resolution path).
+      # is not in Node ESM's default resolution path). package-lock.json
+      # is .gitignore'd, so `npm install` (not `npm ci`) — fresh resolve
+      # from the registry each run. Acceptable here because the gate
+      # only cares whether codegen output diffs, not pinned dep versions.
       - name: Install qontinui-schemas npm deps
         working-directory: qontinui-schemas
-        run: npm ci
+        run: npm install
 
       - name: Set up Python
         uses: actions/setup-python@v5
