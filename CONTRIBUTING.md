@@ -128,6 +128,10 @@ When you legitimately need to merge a red PR — documented infrastructure block
 
 If a rule fires unexpectedly — e.g. a `.github/workflows/*.yml` job was renamed and the check context the ruleset pins no longer matches — update the ruleset, don't override repeatedly. Renaming a workflow job is a silent ruleset break: the ruleset references check contexts by name (`commitlint`, `rust-ci`, `check-drift`), and those names follow each workflow file's `jobs.<id>`. Sync the ruleset whenever those rename.
 
+#### release-please PRs always need admin-bypass
+
+`release-please.yml` opens its release PR (`chore: release main` on the `release-please--branches--main` branch) using the default `GITHUB_TOKEN`. GitHub's loop-prevention rule suppresses downstream workflows on bot-opened PRs using `GITHUB_TOKEN`, so **`commitlint` never fires on the release-please PR** — `gh api .../commits/<head>/check-runs` returns `total: 0`. With the required-checks rule live, the release PR can never go green naturally; merging it requires the admin "Bypass and merge" path every time. This is expected; it's exactly the kind of human-judgment escape valve the bypass exists for. If release frequency makes the bypass routine and the friction is real, switch `release-please.yml` to a PAT (workflow scope) or GitHub App `token:` so the PR is opened under a non-`GITHUB_TOKEN` identity and `commitlint` fires naturally.
+
 ### Quick checklist before clicking merge
 
 - [ ] Local `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` pass on whatever you're authoring on
