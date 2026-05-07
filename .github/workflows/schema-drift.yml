@@ -84,8 +84,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Pin datamodel-code-generator: each minor version tweaks Pydantic
+      # output (e.g. 0.56→0.57 adds `from pydantic import Field` imports
+      # to enum-only modules). Without a pin, every upstream release would
+      # surface as fresh "drift" until someone regen'd locally with the
+      # new version. Bump deliberately, not by accident.
       - name: Install datamodel-code-generator
-        run: pip install datamodel-code-generator
+        run: pip install 'datamodel-code-generator==0.57.0'
 
       # tauri_build::build() in qontinui-runner/src-tauri/build.rs reads
       # tauri.conf.json's `frontendDist: "../dist"` and panics if the path
