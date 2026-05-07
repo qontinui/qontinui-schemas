@@ -5,9 +5,9 @@ name: schema-drift
 #
 # Trigger scope: only runs when Rust schema sources, the runner-side
 # schema-export entry point, or the code generator script itself change.
-# This assumes the repository is the qontinui-root mono-repo; the workflow
-# expects to find both qontinui-runner/ and qontinui-schemas/ at the
-# checkout root.
+# qontinui-schemas is a standalone repo; this workflow recreates the
+# sibling layout (qontinui-schemas/ + qontinui-runner/ at $GITHUB_WORKSPACE)
+# that generate_types.sh and the runner crate's path-deps expect.
 
 on:
   push:
@@ -29,6 +29,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: qontinui-schemas
+
+      - name: Checkout qontinui-runner (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: qontinui/qontinui-runner
+          path: qontinui-runner
+
+      # generate_types.sh runs `cargo build --bin export_schemas` which
+      # links the runner lib (Tauri-dependent). Tauri 2.x on Linux probes
+      # for libwebkit2gtk-4.1, libsoup, libgtk etc. via pkg-config in
+      # build scripts. Without these, cargo aborts at link/probe time.
+      # Mirrors the canonical list from qontinui-runner/.github/workflows/ci.yml.
+      - name: Install Tauri Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -38,8 +67,14 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install json-schema-to-typescript
-        run: npm install -g json-schema-to-typescript
+      # compile_typescript.mjs does `import { compile } from
+      # 'json-schema-to-typescript'` from qontinui-schemas/scripts/.
+      # Node ESM resolution walks up to qontinui-schemas/node_modules/,
+      # so the package must be installed locally (a global -g install
+      # is not in Node ESM's default resolution path).
+      - name: Install qontinui-schemas npm deps
+        working-directory: qontinui-schemas
+        run: npm ci
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,10 +88,11 @@ jobs:
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
       - name: Check for drift
+        working-directory: qontinui-schemas
         run: |
           if ! git diff --exit-code \
-              qontinui-schemas/ts/src/generated \
-              qontinui-schemas/src/qontinui_schemas/generated; then
+              ts/src/generated \
+              src/qontinui_schemas/generated; then
             echo "::error::Generated types are out of date."
             echo "Run 'just generate-types' from the repo root and commit the updated files."
             exit 1
