@@ -384,6 +384,8 @@ from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
 from .per_type.ui_bridge_design_audit_step import UiBridgeDesignAuditStep
+from .per_type.ui_bridge_request_envelope import UiBridgeRequestEnvelope
+from .per_type.ui_bridge_response_envelope import UiBridgeResponseEnvelope
 from .per_type.ui_bridge_severity import UiBridgeSeverity
 from .per_type.ui_bridge_step import UiBridgeStep
 from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
@@ -815,6 +817,8 @@ __all__ = [
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
     "UiBridgeDesignAuditStep",
+    "UiBridgeRequestEnvelope",
+    "UiBridgeResponseEnvelope",
     "UiBridgeSeverity",
     "UiBridgeStep",
     "UiBridgeStepPhase",

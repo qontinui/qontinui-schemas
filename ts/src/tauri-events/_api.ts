@@ -74,3 +74,17 @@ export type { RecommendationReviewDecisionPayload } from "../generated/Recommend
 //    pre-dates this generated re-export; both shapes are intentionally
 //    identical. New consumers should prefer this generated import. ──
 export type { CanvasPanel as CanvasUpdatePanel } from "../generated/CanvasPanel";
+
+// ── UI Bridge IPC envelope payloads carried on the `ui-bridge-request` and
+//    `ui-bridge-response` Tauri channels. Stage 1 of the ui-bridge-request
+//    envelope concretization (deferral note in commit ea5d9a61f). The Rust
+//    sources live in `qontinui-schemas/rust/src/app_events.rs`; the runner's
+//    React handler in `src/hooks/ui-bridge-events/types.ts` should pick the
+//    `requestId | type` fields off these to keep the envelope head in sync
+//    while leaving its rich set of optional payload fields hand-written.
+//    Stage 2 (per-payload tagged union of all 171 request_types) is deferred
+//    indefinitely — the existing AssertEqual<AllHandledTypes,
+//    UIBridgeRequestType> + per-hook never checks already enforce dispatch
+//    exhaustiveness from the right end of the pipeline. ──
+export type { UiBridgeRequestEnvelope } from "../generated/UiBridgeRequestEnvelope";
+export type { UiBridgeResponseEnvelope } from "../generated/UiBridgeResponseEnvelope";

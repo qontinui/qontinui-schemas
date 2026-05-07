@@ -8704,6 +8704,173 @@ fn app_event_flow_event_wrapper_roundtrips() {
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 
+// ── ui-bridge IPC envelopes (request/response) ──────────────────────────────
+//
+// These tests pin the wire CONTRACT against the literal JSON the runner used
+// to build with `serde_json::json!({...})` plus a manual merge of
+// `additional_payload.as_object()`. The contract is asserted at the
+// `serde_json::Value` level (i.e. same set of key/value pairs) — NOT
+// byte-identity, because:
+//   - Old emit path: `Value::Object` is a `serde_json::Map` (BTreeMap-backed)
+//     so keys serialize in alphabetical order.
+//   - New emit path: a typed struct serializes fields in declaration order.
+// JSON object key order is unordered per RFC 8259; every consumer (React's
+// `JSON.parse`, the runner's `serde_json::from_value`) is order-insensitive.
+// The byte-level shift is a pure presentation change with no observable
+// effect on either side. If a *semantic* shape divergence is detected
+// (missing field, type change, leaking Rust field name), the test fails —
+// surface it (do not "fix" by adjusting the golden).
+
+#[test]
+fn ui_bridge_request_envelope_matches_legacy_json_literal_shape() {
+    use qontinui_types::app_events::UiBridgeRequestEnvelope;
+
+    // Construct the envelope the way the new emit sites in
+    // `mcp/ui_bridge/request.rs::ui_bridge_request_inner` and
+    // `mcp/ui_bridge/screenshots.rs::ui_bridge_capture_element_images_handler`
+    // will: a fixed request_id + request_type plus an additional payload
+    // (always Value::Object at the call sites today).
+    let envelope = UiBridgeRequestEnvelope {
+        request_id: "req-abc123".to_string(),
+        request_type: "capture_element_images".to_string(),
+        data: json!({
+            "params": { "elementId": "el-42" }
+        }),
+    };
+    let actual_str = serde_json::to_string(&envelope).unwrap();
+    let actual: Value = serde_json::from_str(&actual_str).unwrap();
+
+    // Golden: what the prior `json!({...})` literal + merge loop emitted,
+    // compared at the Value level (key order doesn't matter).
+    let golden = json!({
+        "requestId": "req-abc123",
+        "type": "capture_element_images",
+        "params": { "elementId": "el-42" }
+    });
+    assert_eq!(
+        actual, golden,
+        "UiBridgeRequestEnvelope wire shape must match the legacy json!() literal",
+    );
+
+    // Lock down the specific contract bits that, if they regressed, would
+    // silently corrupt the wire — Rust field names (`request_type`, `data`)
+    // must NOT leak; the discriminator must be `type`.
+    assert_eq!(actual["requestId"], "req-abc123");
+    assert_eq!(actual["type"], "capture_element_images");
+    assert!(
+        actual["params"].is_object(),
+        "flattened additional payload field must be present at the top level",
+    );
+    assert_eq!(actual["params"]["elementId"], "el-42");
+    assert!(
+        actual.get("data").is_none(),
+        "the `data` Rust field name must NOT leak to the wire (serde flatten)",
+    );
+    assert!(
+        actual.get("requestType").is_none(),
+        "the `request_type` Rust field name must NOT leak to the wire (serde rename = type)",
+    );
+
+    // Round-trip back to a struct.
+    let back: UiBridgeRequestEnvelope = serde_json::from_str(&actual_str).unwrap();
+    assert_eq!(back.request_id, "req-abc123");
+    assert_eq!(back.request_type, "capture_element_images");
+}
+
+#[test]
+fn ui_bridge_request_envelope_empty_data_roundtrips() {
+    use qontinui_types::app_events::UiBridgeRequestEnvelope;
+
+    // The most common shape: no extra payload (e.g. `get_snapshot`,
+    // `get_elements`, `get_components` — all called as
+    // `ui_bridge_request_sync(state, "<type>", json!({}))`).
+    let envelope = UiBridgeRequestEnvelope {
+        request_id: "req-empty".to_string(),
+        request_type: "get_snapshot".to_string(),
+        data: json!({}),
+    };
+    let actual: Value = serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
+    let golden = json!({
+        "requestId": "req-empty",
+        "type": "get_snapshot"
+    });
+    assert_eq!(actual, golden, "empty additional payload must round-trip");
+}
+
+#[test]
+fn ui_bridge_response_envelope_happy_path_matches_legacy_shape() {
+    use qontinui_types::app_events::UiBridgeResponseEnvelope;
+
+    // Healthy response with data payload.
+    let envelope = UiBridgeResponseEnvelope {
+        request_id: "req-abc123".to_string(),
+        request_type: "get_elements".to_string(),
+        success: true,
+        data: Some(json!({ "elements": [], "count": 0 })),
+        error: None,
+        hint: None,
+        timestamp: 1_713_200_000_000,
+    };
+    let actual_str = serde_json::to_string(&envelope).unwrap();
+    let actual: Value = serde_json::from_str(&actual_str).unwrap();
+    let golden = json!({
+        "requestId": "req-abc123",
+        "type": "get_elements",
+        "success": true,
+        "data": { "elements": [], "count": 0 },
+        "timestamp": 1_713_200_000_000_i64
+    });
+    assert_eq!(
+        actual, golden,
+        "UiBridgeResponseEnvelope happy-path wire shape must match the legacy literal",
+    );
+
+    assert_eq!(actual["requestId"], "req-abc123");
+    assert_eq!(actual["type"], "get_elements");
+    assert_eq!(actual["success"], true);
+    assert!(actual.get("error").is_none(), "None error must be skipped");
+    assert!(actual.get("hint").is_none(), "None hint must be skipped");
+
+    // Round-trip via struct deserialization.
+    let back: UiBridgeResponseEnvelope = serde_json::from_str(&actual_str).unwrap();
+    assert!(back.success);
+    assert!(back.data.is_some());
+    assert!(back.error.is_none());
+}
+
+#[test]
+fn ui_bridge_response_envelope_failure_with_hint_roundtrips() {
+    use qontinui_types::app_events::UiBridgeResponseEnvelope;
+
+    // Inner-failure envelope with a closest-match hint (mirrors the
+    // useControlEvents element-not-found path).
+    let envelope = UiBridgeResponseEnvelope {
+        request_id: "req-fail".to_string(),
+        request_type: "execute_action".to_string(),
+        success: false,
+        data: None,
+        error: Some("element 'foo' not found".to_string()),
+        hint: Some(json!({ "closestMatches": ["foo-button", "foo-input"] })),
+        timestamp: 1_713_200_000_000,
+    };
+    let actual_str = serde_json::to_string(&envelope).unwrap();
+    let actual: Value = serde_json::from_str(&actual_str).unwrap();
+    let golden = json!({
+        "requestId": "req-fail",
+        "type": "execute_action",
+        "success": false,
+        "error": "element 'foo' not found",
+        "hint": { "closestMatches": ["foo-button", "foo-input"] },
+        "timestamp": 1_713_200_000_000_i64
+    });
+    assert_eq!(actual, golden);
+
+    let back: UiBridgeResponseEnvelope = serde_json::from_str(&actual_str).unwrap();
+    assert!(back.data.is_none());
+    assert_eq!(back.error.as_deref(), Some("element 'foo' not found"));
+    assert!(back.hint.is_some());
+}
+
 // ── worker_output ───────────────────────────────────────────────────────────
 
 use qontinui_types::worker_output::*;

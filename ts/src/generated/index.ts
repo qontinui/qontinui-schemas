@@ -382,6 +382,8 @@ export type { UiBridgeAction } from './UiBridgeAction';
 export type { UiBridgeAssertType } from './UiBridgeAssertType';
 export type { UiBridgeComparisonMode } from './UiBridgeComparisonMode';
 export type { UiBridgeDesignAuditStep } from './UiBridgeDesignAuditStep';
+export type { UiBridgeRequestEnvelope } from './UiBridgeRequestEnvelope';
+export type { UiBridgeResponseEnvelope } from './UiBridgeResponseEnvelope';
 export type { UiBridgeSeverity } from './UiBridgeSeverity';
 export type { UiBridgeStep } from './UiBridgeStep';
 export type { UiBridgeStepPhase } from './UiBridgeStepPhase';
