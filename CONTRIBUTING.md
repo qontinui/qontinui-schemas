@@ -99,9 +99,34 @@ gh pr list --repo qontinui/qontinui-schemas --state open
 
 If there's a related open PR, coordinate (or rebase onto it) rather than opening a parallel attempt.
 
-### Branch protection — note for follow-up
+### Branch protection
 
-GitHub branch protection on `main` would mirror the merge-gate set above (`commitlint` + `rust-ci` when run + `check-drift` when run). Currently it doesn't — `main` is a discipline-only gate. Aligning protection rules with this policy is a follow-up; tracked in `_dev-notes-main/qontinui-schemas-branch-protection-design/SESSION_PROMPT.md`.
+The merge-gate set above is mechanically enforced by the `main-merge-gates` Repository Ruleset on `qontinui-schemas` `main` (ruleset id `16104588`, [admin UI](https://github.com/qontinui/qontinui-schemas/rules/16104588)). The rule blocks force-push, branch deletion, and any merge to `main` whose PR doesn't have these check contexts green:
+
+- `commitlint` — required on every PR.
+- `rust-ci` — required *when run*, i.e. only on PRs touching `Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, or the workflow file itself.
+- `check-drift` — required *when run*, i.e. only on PRs touching `rust/src/**`. (`schema-drift.yml` also lists two `qontinui-runner/...` paths in its `paths:` filter as belt-and-braces, but those paths live in the runner repo and can't appear in a `qontinui-schemas` PR.)
+
+Required-when-run is the rulesets default: checks that didn't trigger on a PR don't show as `pending` and don't block merge. PRs also have to go through a pull request — direct push to `main` is blocked.
+
+#### Admin bypass
+
+The ruleset has `OrganizationAdmin` as a `bypass_mode: always` actor. The org owner (currently jspinak) can override any rule — required checks, force-push block, deletion block — without going through the gate. This exists for two reasons:
+
+1. **Solo-maintainer rescue.** With one admin, getting locked out by a misconfigured rule has no recovery path short of GitHub Support.
+2. **Human-policy escape valve.** Some merge decisions are judgment calls the ruleset can't natively express (e.g. a release-please flow, a surprise GitHub Actions context rename, a documented hosted-runner pathology). An admin override is the mechanical answer for those cases.
+
+If you find yourself overriding routinely, the rule is wrong, not the override. Fix the rule.
+
+#### How to override (admin runbook)
+
+When you legitimately need to merge a red PR — documented infrastructure block, in-flight project-side fix, etc. — and the escape-valve criteria above are satisfied:
+
+1. Confirm the failure matches a tracked plan or open issue and link it in the PR description.
+2. Click `Merge` on the PR. GitHub surfaces a "Bypass branch protections" prompt for org admins. Select "Bypass and merge."
+3. Note in the merge commit message which rule was bypassed and why.
+
+If a rule fires unexpectedly — e.g. a `.github/workflows/*.yml` job was renamed and the check context the ruleset pins no longer matches — update the ruleset, don't override repeatedly. Renaming a workflow job is a silent ruleset break: the ruleset references check contexts by name (`commitlint`, `rust-ci`, `check-drift`), and those names follow each workflow file's `jobs.<id>`. Sync the ruleset whenever those rename.
 
 ### Quick checklist before clicking merge
 
