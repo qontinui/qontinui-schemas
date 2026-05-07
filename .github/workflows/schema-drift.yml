@@ -113,10 +113,17 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
+      # `-I '^#   timestamp:'` ignores hunks whose only changed lines are the
+      # `# timestamp: <ISO-8601>` header that datamodel-codegen writes at
+      # the top of every generated Python file. Those timestamps update on
+      # every codegen run regardless of whether the schema content changed,
+      # so without this filter the workflow can never go green even on a
+      # repo with no real drift. Same trick `schema-pg-sql-fresh.yml` uses
+      # to ignore `-- Dumped by pg_dump version` header noise.
       - name: Check for drift
         working-directory: qontinui-schemas
         run: |
-          if ! git diff --exit-code \
+          if ! git diff --exit-code -I '^#   timestamp:' \
               ts/src/generated \
               src/qontinui_schemas/generated; then
             echo "::error::Generated types are out of date."
