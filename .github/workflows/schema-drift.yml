@@ -100,7 +100,17 @@ jobs:
           mkdir -p qontinui-runner/dist
           printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
 
+      # CARGO_TARGET_DIR override: qontinui-runner is a workspace (Cargo.toml
+      # at the runner root declares [workspace] members = ["src-tauri", ...]),
+      # so cargo's default target-dir is qontinui-runner/target/. But
+      # generate_types.sh:21 hardcodes
+      # SCHEMAS_JSON="$PROJECT_ROOT/target/schemas.json" where
+      # $PROJECT_ROOT = qontinui-runner/src-tauri/. Force cargo to write to
+      # the script-expected per-package target dir so the bash redirection
+      # on script line 73 finds an existing target/ parent.
       - name: Regenerate types
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
       - name: Check for drift
