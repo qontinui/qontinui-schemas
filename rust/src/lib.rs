@@ -19,6 +19,11 @@
 //! - Polymorphic step arrays use `Vec<serde_json::Value>`. JSON Schema emits
 //!   `{ "type": "array", "items": {} }` → `unknown[]` in TS, `list[Any]` in
 //!   Python. Typed step discriminated unions are a future migration (Wave 4).
+//!
+//! Drift between these Rust sources and the checked-in TS/Python bindings is
+//! caught in CI by `.github/workflows/schema-drift.yml`, which regenerates
+//! the bindings on every PR touching `rust/src/**` and fails if `git diff`
+//! reports any change.
 
 pub mod accessibility;
 pub mod ai_workflows;
