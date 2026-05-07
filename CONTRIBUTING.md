@@ -43,6 +43,74 @@ This repository follows the conventions documented in `CLAUDE.md` (project root)
 5. Sign the CLA if the bot prompts you.
 6. A maintainer will review. Expect feedback; we keep the bar high because every change becomes part of the shipped product.
 
+## CI & Merge Readiness
+
+A PR is ready to merge when every required workflow is green on the PR's HEAD commit. This repo's CI is small — three real merge gates plus three release-time workflows. Don't conflate them.
+
+### Merge gates
+
+These must be green on your PR before merge:
+
+- `commitlint.yml` — runs on every PR (`commitlint`). Hard-enforces conventional-commits via `@commitlint/config-conventional`. PRs with non-conforming commit messages must rewrite history before merge. (The *why* — release-please derives version bumps from these — lives in [`## Releasing`](#releasing).)
+- `rust-ci.yml` — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` on `ubuntu-latest` (`rust-ci`). Path-filtered to `Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, and the workflow file itself — required *when it runs*.
+- `schema-drift.yml` — regenerates the TS + Python bindings via the qontinui-runner codegen script and fails on drift (`check-drift`). Path-filtered to `rust/src/**`, `qontinui-runner/src-tauri/src/schema_export.rs`, and `qontinui-runner/src-tauri/scripts/generate_types.sh`. The latter two are belt-and-braces — those paths live in the runner repo, not here, so in practice this gate fires whenever a PR touches `rust/src/**`. Required *when it runs*. If it goes red, regenerate locally via the qontinui-runner sibling checkout (or rely on the artifact uploaded by the failing run, once that's added) and commit the result.
+
+"Required when it runs" is the rulesets default — checks that didn't trigger on a PR don't show as `pending` and don't block merge.
+
+### Not merge gates
+
+These three are release-time, not PR-time. See [`## Releasing`](#releasing) for full mechanics; the one-liners below exist only so the merge-gate set above isn't conflated with them:
+
+- `release-please.yml` — runs on push to `main` to maintain the release PR.
+- `publish.yml` — `ts-v*` tag-triggered npm publish.
+- `publish-rust.yml` — `rust-v*` / `rust-runner-client-v*` tag-triggered crates.io publish.
+
+If any of the three goes red on a tag push, that's a release-time problem — file an issue but don't treat it as merge-blocking on unrelated PRs.
+
+### Test locally first
+
+For changes that touch Rust:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo build --workspace --all-targets
+cargo test --workspace
+```
+
+For changes that touch `rust/src/**`, the schema-drift check will fire in CI. To pre-flight it locally you need both `qontinui-schemas` and `qontinui-runner` checked out as siblings, plus the same `datamodel-code-generator` version CI uses:
+
+```bash
+pip install 'datamodel-code-generator==0.57.0'
+bash qontinui-runner/src-tauri/scripts/generate_types.sh
+git -C qontinui-schemas diff --exit-code -I '^#   timestamp:' \
+    ts/src/generated src/qontinui_schemas/generated
+```
+
+The version pin matters — unpinned upstream releases tweak Pydantic output and surface as spurious drift. If you don't have qontinui-runner cloned, the CI run is your check.
+
+### Active workstream awareness
+
+CI is a shared surface. Before opening a PR that touches `.github/workflows/` or anything CI-adjacent, check what's already in flight:
+
+```bash
+gh pr list --repo qontinui/qontinui-schemas --state open
+```
+
+If there's a related open PR, coordinate (or rebase onto it) rather than opening a parallel attempt.
+
+### Branch protection — note for follow-up
+
+GitHub branch protection on `main` would mirror the merge-gate set above (`commitlint` + `rust-ci` when run + `check-drift` when run). Currently it doesn't — `main` is a discipline-only gate. Aligning protection rules with this policy is a follow-up; tracked in `_dev-notes-main/qontinui-schemas-branch-protection-design/SESSION_PROMPT.md`.
+
+### Quick checklist before clicking merge
+
+- [ ] Local `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` pass on whatever you're authoring on
+- [ ] Commit messages conform to conventional-commits (`commitlint` will reject non-conforming ones)
+- [ ] `rust-ci` green if it ran (or didn't run because no Rust paths matched)
+- [ ] `check-drift` green if it ran (or didn't run because no schema paths matched)
+- [ ] No open PR is doing the same work
+
 ## Releasing
 
 This repo publishes three artifacts to two registries:
