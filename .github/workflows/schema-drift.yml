@@ -87,6 +87,19 @@ jobs:
       - name: Install datamodel-code-generator
         run: pip install datamodel-code-generator
 
+      # tauri_build::build() in qontinui-runner/src-tauri/build.rs reads
+      # tauri.conf.json's `frontendDist: "../dist"` and panics if the path
+      # doesn't exist. We don't actually need a real frontend build for
+      # schema export — the export_schemas binary only touches Rust schemar
+      # registries — so stub an empty dist/ with a placeholder index.html.
+      # The build script's `tauri::generate_context!()` will embed the
+      # placeholder, which is fine: the binary that reads the embedded
+      # frontend (the actual runner) is never invoked here.
+      - name: Stub qontinui-runner frontend dist
+        run: |
+          mkdir -p qontinui-runner/dist
+          printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
+
       - name: Regenerate types
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
