@@ -23,7 +23,9 @@
 //! Drift between these Rust sources and the checked-in TS/Python bindings is
 //! caught in CI by `.github/workflows/schema-drift.yml`, which regenerates
 //! the bindings on every PR touching `rust/src/**` and fails if `git diff`
-//! reports any change.
+//! reports any non-timestamp change. The codegen toolchain (Tauri Linux deps,
+//! datamodel-code-generator version) is pinned in that workflow — bump the
+//! pins deliberately when upstream output changes.
 
 pub mod accessibility;
 pub mod ai_workflows;
