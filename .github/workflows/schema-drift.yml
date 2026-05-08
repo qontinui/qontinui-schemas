@@ -3,8 +3,14 @@ name: schema-drift
 # Fails CI when the generated TypeScript or Python type bindings under
 # qontinui-schemas/ are out of sync with the Rust sources that drive them.
 #
-# Trigger scope: only runs when Rust schema sources, the runner-side
-# schema-export entry point, or the code generator script itself change.
+# Trigger scope: this side catches drift introduced by changes to
+# qontinui-schemas's own Rust sources. The mirror workflow in
+# qontinui-runner (`qontinui-types-drift.yml`) catches drift introduced
+# by changes to runner-side schema files (`src-tauri/src/schema_export.rs`,
+# `tauri_event_payloads.rs`, `relay_envelopes.rs`, `scripts/generate_types.sh`).
+# Together they form a two-sided gate around the cross-repo codegen
+# contract.
+#
 # qontinui-schemas is a standalone repo; this workflow recreates the
 # sibling layout (qontinui-schemas/ + qontinui-runner/ at $GITHUB_WORKSPACE)
 # that generate_types.sh and the runner crate's path-deps expect.
@@ -14,14 +20,10 @@ on:
     branches: [main]
     paths:
       - "rust/src/**"
-      - "qontinui-runner/src-tauri/src/schema_export.rs"
-      - "qontinui-runner/src-tauri/scripts/generate_types.sh"
   pull_request:
     branches: [main]
     paths:
       - "rust/src/**"
-      - "qontinui-runner/src-tauri/src/schema_export.rs"
-      - "qontinui-runner/src-tauri/scripts/generate_types.sh"
 
 jobs:
   check-drift:
