@@ -16,6 +16,14 @@ name: schema-drift
 # that generate_types.sh and the runner crate's path-deps expect.
 
 on:
+  # Manual trigger: useful when a cross-repo coordination fix lands on
+  # qontinui-runner main but nothing on qontinui-schemas main has
+  # touched rust/src/** since — the workflow's last main run can stay
+  # cosmetically red for a long stretch even though the underlying
+  # drift is fixed. `gh workflow run schema-drift.yml --ref main`
+  # refreshes the visible status without forcing a noop rust/src/**
+  # commit.
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
