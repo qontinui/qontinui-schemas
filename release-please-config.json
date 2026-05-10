@@ -22,7 +22,7 @@
       "package-name": "qontinui-runner-client",
       "component": "rust-runner-client",
       "changelog-path": "CHANGELOG.md",
-      "last-release-sha": "09e23448b6bf17ec8814324154b56009266dd592"
+      "last-release-sha": "1cec7923ffb78f5e1af3f41782cb4f1259d1651c"
     },
     "ts": {
       "release-type": "node",
