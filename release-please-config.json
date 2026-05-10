@@ -14,7 +14,8 @@
       "release-type": "rust",
       "package-name": "qontinui-types",
       "component": "rust",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "last-release-sha": "7cf1daf3e813d57c7fc9c9dddba08d9444311d65"
     },
     "rust-runner-client": {
       "release-type": "rust",
