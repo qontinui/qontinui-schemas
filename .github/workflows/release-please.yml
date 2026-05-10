@@ -16,6 +16,22 @@ name: release-please
 # auto-merge on release-please PRs (per qontinui-dev-notes/
 # rust-release-engineering/non-goals: "release-please's release PR IS
 # the human gate").
+#
+# Authentication: this workflow uses a GitHub App token rather than the
+# default GITHUB_TOKEN. Reason: GitHub's loop-prevention rule suppresses
+# downstream workflows on bot-opened PRs created by GITHUB_TOKEN, which
+# means commitlint never fires on the release PR — so it can never
+# satisfy the required-checks rule and merging it always needs admin
+# bypass. Opening the PR via a non-GITHUB_TOKEN identity (the
+# `qontinui-release-please` GitHub App) makes commitlint fire normally.
+# See CONTRIBUTING.md § "release-please PRs always need admin-bypass"
+# for the historical context.
+#
+# Required secrets:
+#   RELEASE_PLEASE_APP_ID       — numeric App ID from the App's
+#                                  General settings page
+#   RELEASE_PLEASE_PRIVATE_KEY  — full .pem contents from the App's
+#                                  Generated private key download
 
 on:
   push:
@@ -29,7 +45,15 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: release-please-manifest.json
+          token: ${{ steps.app-token.outputs.token }}
