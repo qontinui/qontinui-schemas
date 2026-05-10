@@ -7,6 +7,10 @@ name: Rust CI
 # same job and require it green for the tagged commit before publishing.
 
 on:
+  # Allow manual dispatch so future runs can be re-fired without
+  # touching trigger-path files (e.g. if branch-protection requires this
+  # check on a PR that does not auto-trigger it).
+  workflow_dispatch:
   pull_request:
     paths:
       - "Cargo.toml"
