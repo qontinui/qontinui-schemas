@@ -34,18 +34,19 @@ jobs:
       run:
         working-directory: ts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Upgrade npm to 11.5.1+ for trusted publishing
-        # actions/setup-node@v4 with node@20 ships npm@10.8.2, but npm
-        # Trusted Publishers requires 11.5.1+. Without this, the publish
-        # step sends an empty auth header and gets 404 even when the
-        # OIDC + provenance flow succeeds.
+        # setup-node with node-version: '20' ships npm@10.8.2 (the npm
+        # bundled with that Node release), but npm Trusted Publishers
+        # requires 11.5.1+. Without this upgrade the publish step sends
+        # an empty auth header and gets 404 even when the OIDC +
+        # provenance flow succeeds. Independent of the action version.
         run: npm install --global npm@latest
         working-directory: .
 
