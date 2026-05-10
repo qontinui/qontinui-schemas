@@ -1,23 +1,26 @@
 name: Rust CI
 
 # Workspace-wide build / test / lint / fmt for the Rust crates in this repo.
-# Triggered on PRs and on push to main; path-filtered so non-Rust changes
-# don't burn CI minutes. The `workflow_call` trigger lets publish-rust.yml
-# (F2 hard gate, per qontinui-dev-notes/rust-release-engineering) reuse the
-# same job and require it green for the tagged commit before publishing.
+#
+# Triggers:
+#   pull_request: every PR (no path filter). GitHub branch-protection
+#     'required check' rules look for check-runs created by the
+#     pull_request event; a path-filtered trigger that doesn't fire
+#     (e.g. workflow-only edits or the release-please bot's PR) leaves
+#     the required check 'missing' and the PR fails the rule with no
+#     way to satisfy it short of admin bypass. Running the full
+#     compile/test on every PR is the only mechanism that posts the
+#     required status reliably; the Swatinem rust-cache makes
+#     no-Rust-change PRs fast.
+#   push: only when Rust sources actually change — main pushes that
+#     don't touch Rust don't need to re-run.
+#   workflow_dispatch: manual escape hatch.
+#   workflow_call: lets publish-rust.yml (F2 hard gate, per
+#     qontinui-dev-notes/rust-release-engineering) reuse this job and
+#     require it green for the tagged commit before publishing.
 
 on:
-  # Allow manual dispatch so future runs can be re-fired without
-  # touching trigger-path files (e.g. if branch-protection requires this
-  # check on a PR that does not auto-trigger it).
-  workflow_dispatch:
   pull_request:
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust/**"
-      - "rust-runner-client/**"
-      - ".github/workflows/rust-ci.yml"
   push:
     branches: [main]
     paths:
@@ -26,11 +29,8 @@ on:
       - "rust/**"
       - "rust-runner-client/**"
       - ".github/workflows/rust-ci.yml"
-  workflow_call:
-  # Manual trigger so PRs that don't touch the path filter (e.g. workflow-
-  # only edits) can still fire rust-ci against the branch HEAD and post
-  # the required-check status. Mirrors schema-drift.yml (added in #30).
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   rust-ci:
