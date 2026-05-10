@@ -36,6 +36,11 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Manual trigger: useful for re-running after a secret/config change
+  # without forcing a noop commit to main, or for kicking the bot to
+  # re-evaluate its release PR after a manual cleanup. Mirrors the
+  # workflow_dispatch escape hatch on rust-ci.yml and schema-drift.yml.
+  workflow_dispatch:
 
 permissions:
   contents: write
