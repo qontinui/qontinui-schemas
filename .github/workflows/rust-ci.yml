@@ -27,6 +27,10 @@ on:
       - "rust-runner-client/**"
       - ".github/workflows/rust-ci.yml"
   workflow_call:
+  # Manual trigger so PRs that don't touch the path filter (e.g. workflow-
+  # only edits) can still fire rust-ci against the branch HEAD and post
+  # the required-check status. Mirrors schema-drift.yml (added in #30).
+  workflow_dispatch:
 
 jobs:
   rust-ci:

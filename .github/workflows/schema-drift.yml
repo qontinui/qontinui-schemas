@@ -30,8 +30,16 @@ on:
       - "rust/src/**"
   pull_request:
     branches: [main]
-    paths:
-      - "rust/src/**"
+    # No path filter on the PR trigger so the `check-drift` required-check
+    # status posts on every PR. Required-check rules look for check-runs
+    # created by the pull_request event; a path-filtered trigger that
+    # doesn't fire (e.g. the release-please bot's PR, which only touches
+    # rust/Cargo.toml + rust/CHANGELOG.md, not rust/src/**) leaves the
+    # required check in the "missing" state and the PR fails the rule
+    # with no way to satisfy it short of admin bypass. Running the full
+    # regen on every PR is ~2 min wasted on irrelevant PRs but is the
+    # only mechanism that posts the required status. PRs without
+    # rust/src/** changes will produce no diff and pass quickly.
 
 jobs:
   check-drift:
