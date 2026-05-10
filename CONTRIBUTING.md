@@ -167,16 +167,42 @@ The publish workflows: re-run full `rust-ci.yml` on the tagged SHA (F2 hard gate
 
 ### Manual override (emergency / first-publish ceremony)
 
-For situations where release-please isn't appropriate — emergency hotfix, the very-first-publish ceremony for a new crate, or a publish retry — bypass the release PR and tag directly:
+For situations where release-please isn't appropriate — emergency hotfix, the very-first-publish ceremony for a new crate, or a publish retry — bypass the release PR and tag directly. **Three files must move in lock-step:**
+
+1. `<crate>/Cargo.toml` (or `package.json`) — version bump.
+2. `release-please-manifest.json` — the component entry must match the new version.
+3. `release-please-config.json` — set the component's `last-release-sha` to the prep PR's squash-merge SHA so release-please anchors at this release going forward (see "Why `last-release-sha` matters" below).
+
+If you skip step 3, release-please's next "chore: release main" PR will re-propose every conventional commit since the previous `last-release-sha`, including the change you just shipped — see PRs #34 → #35 → #36 → #37 (2026-05-10) for the full thrash and recovery.
+
+Recommended flow — prep PR + tag from main, mirroring phases 10a/b/c of `qontinui-dev-notes/rust-release-engineering`:
 
 ```bash
-# Bump the version in Cargo.toml / package.json and the manifest
-# (release-please needs the manifest in sync going forward).
-git commit -am "chore: prepare rust-v0.1.2 manual publish"
-git push origin main
+git checkout -b chore/types-0.1.3 origin/main
 
-git tag rust-v0.1.2
-git push origin rust-v0.1.2
+# Bump the version in Cargo.toml + manifest, refresh Cargo.lock.
+# (last-release-sha can't be set yet — you don't know the squash-merge
+# SHA until after the PR merges — handle in step 4.)
+cargo update -p qontinui-types
+git commit -am "chore: release qontinui-types 0.1.3"
+git push -u origin chore/types-0.1.3
+gh pr create --title "chore: release qontinui-types 0.1.3"
+# review, merge — note the squash-merge SHA (e.g. 7cf1daf)
+
+# After merge, tag from main:
+git checkout main && git pull
+git tag rust-v0.1.3
+git push origin rust-v0.1.3
+# Tag fires publish-rust.yml → verify-ci → F4 dry-run → cargo publish
+
+# Step 4: bump last-release-sha in a tiny follow-up PR (or fold into a
+# bigger anchor-fix PR if you have one) so the next release-please run
+# starts scanning from this release, not from before:
+git checkout -b chore/release-please-anchor-types-0.1.3 origin/main
+# edit release-please-config.json: rust.last-release-sha = "<merge-sha>"
+git commit -am "chore(release-please): anchor rust at <merge-sha>"
+git push -u origin chore/release-please-anchor-types-0.1.3
+gh pr create
 ```
 
 Or use the `workflow_dispatch` escape hatch (skips the tag, fires the workflow directly):
@@ -188,6 +214,18 @@ gh workflow run publish-rust.yml -f crate=qontinui-runner-client
 ```
 
 Both paths still go through the F2 + F4 gates.
+
+#### Why `last-release-sha` matters
+
+release-please decides which version to propose by scanning conventional commits between `last-release-sha` (or a default origin-of-history if absent) and `HEAD` for each component's path. It does NOT consult git tags or compare against the manifest version directly — the manifest tells release-please "we're currently at vN" but `last-release-sha` tells release-please "we already know about every commit up to this point."
+
+So when a manual-override release is shipped without updating `last-release-sha`, the post-release run sees:
+
+- manifest: `0.1.3` ✓
+- last-release-sha: still pointing at the previous release (or absent)
+- conventional-commits in window: includes the same `feat:` that drove `0.1.3`
+
+…and proposes `0.1.3 → 0.2.0` again. The ergonomics of skipping the follow-up PR: every manual override generates one stale "chore: release main" PR that you close manually. The ergonomics of doing the follow-up PR: one extra ~3-line PR, but the release-please flow stays clean.
 
 ### Pre-release / RC channel
 
