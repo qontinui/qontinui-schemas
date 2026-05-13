@@ -164,7 +164,7 @@ pub struct IrState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    pub required_elements: Vec<IrElementCriteria>,
+    pub assertions: Vec<IrAssertion>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub excluded_elements: Option<Vec<IrElementCriteria>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

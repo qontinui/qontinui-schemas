@@ -146,15 +146,15 @@
     },
     "IRState": {
       "type": "object",
-      "required": ["id", "name", "requiredElements"],
+      "required": ["id", "name", "assertions"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
-        "requiredElements": {
+        "assertions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/IRElementCriteria" }
+          "items": { "$ref": "#/$defs/IRAssertion" }
         },
         "excludedElements": {
           "type": "array",

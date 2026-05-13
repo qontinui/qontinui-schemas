@@ -13,6 +13,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { IRDocument } from "../document";
+import type { IRElementCriteria } from "../element-criteria";
+import type { IRAssertion } from "../group";
 import {
   projectIRToBundledPage,
   projectLegacyToIR,
@@ -23,6 +25,74 @@ import {
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+/**
+ * Convert IR-shaped element criteria into the legacy criteria record stored on
+ * `IRAssertion.target.criteria`. Mirrors `projection.ts:convertCriteria`'s
+ * rename map (text -> textContent, ariaLabel -> accessibleName when no
+ * accessibleName is set, attributes -> dataAttributes). The forward projection
+ * passes `target.criteria` through verbatim into the legacy group output, so
+ * fixtures store criteria in their legacy on-disk shape.
+ */
+function toLegacyCriteria(c: IRElementCriteria): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (c.role !== undefined) out.role = c.role;
+  if (c.tagName !== undefined) out.tagName = c.tagName;
+  if (c.text !== undefined) out.textContent = c.text;
+  if (c.textContains !== undefined) out.textContains = c.textContains;
+  if (c.accessibleName !== undefined) {
+    out.accessibleName = c.accessibleName;
+  } else if (c.ariaLabel !== undefined) {
+    out.accessibleName = c.ariaLabel;
+  }
+  if (c.id !== undefined) out.id = c.id;
+  if (c.attributes !== undefined) out.dataAttributes = c.attributes;
+  return out;
+}
+
+/**
+ * Build the canonical IR-side assertion list for a state from a flat array of
+ * IR element criteria. Mirrors the shape the projection emits for state-derived
+ * groups so the fixtures stay terse — one criteria per assertion, with all the
+ * legacy required fields (id/category/severity/...) defaulted the same way the
+ * forward projection used to defaulted them when synthesizing assertions from
+ * `requiredElements`. Criteria are stored in legacy on-disk form (`textContent`,
+ * `accessibleName`, `dataAttributes`) because `IRAssertion.target.criteria` is
+ * already the legacy criteria record — the forward projection passes it through
+ * verbatim into `group.assertions[].target.criteria`.
+ */
+function assertionsFromCriteria(
+  stateId: string,
+  stateName: string,
+  criteria: IRElementCriteria[],
+): IRAssertion[] {
+  return criteria.map((c, index) => ({
+    id: `${stateId}-elem-${index}`,
+    description: `Required element ${index} for state ${stateName}`,
+    category: "element-presence",
+    severity: "critical",
+    assertionType: "exists",
+    target: {
+      type: "search",
+      criteria: toLegacyCriteria(c),
+      label: `Required element for ${stateName}`,
+    },
+    source: "ai-generated",
+    reviewed: false,
+    enabled: true,
+  }));
+}
+
+/**
+ * Pluck the legacy-criteria record off an assertion produced by the inverse
+ * projection. The IR side stores criteria in IR form post-inversion (the
+ * projection's `invertCriteria` renames `textContent -> text`,
+ * `dataAttributes -> attributes`), so the returned object is shaped like
+ * `IRElementCriteria`.
+ */
+function criteriaOf(assertion: IRAssertion): IRElementCriteria {
+  return assertion.target.criteria as unknown as IRElementCriteria;
+}
 
 /**
  * Slice of `qontinui-runner/src/specs/active.spec.uibridge.json` mapped back
@@ -44,21 +114,27 @@ const ACTIVE_PAGE_FIXTURE: IRDocument = {
       id: "idle",
       name: "Idle",
       description: "No workflow is running.",
-      requiredElements: [{ text: "No Active Workflow" }],
+      assertions: assertionsFromCriteria("idle", "Idle", [
+        { text: "No Active Workflow" },
+      ]),
       isInitial: true,
     },
     {
       id: "running",
       name: "Running",
       description: "A workflow is actively executing.",
-      requiredElements: [{ role: "button", text: "Stop" }],
+      assertions: assertionsFromCriteria("running", "Running", [
+        { role: "button", text: "Stop" },
+      ]),
       isInitial: false,
     },
     {
       id: "paused",
       name: "Paused",
       description: "The workflow is temporarily paused.",
-      requiredElements: [{ role: "button", ariaLabel: "Play" }],
+      assertions: assertionsFromCriteria("paused", "Paused", [
+        { role: "button", ariaLabel: "Play" },
+      ]),
       isInitial: false,
     },
     {
@@ -66,10 +142,10 @@ const ACTIVE_PAGE_FIXTURE: IRDocument = {
       name: "Breakpoint Paused",
       description:
         "A workflow step with breakpoint: true has completed; execution is suspended.",
-      requiredElements: [
+      assertions: assertionsFromCriteria("breakpoint-paused", "Breakpoint Paused", [
         { text: "Breakpoint" },
         { attributes: { "content-label": "breakpoint step" } },
-      ],
+      ]),
       isInitial: false,
     },
   ],
@@ -268,12 +344,12 @@ describe("projectIRToBundledPage — round-trip against active.spec", () => {
         {
           id: "first",
           name: "First",
-          requiredElements: [{ role: "heading" }],
+          assertions: assertionsFromCriteria("first", "First", [{ role: "heading" }]),
         },
         {
           id: "second",
           name: "Second",
-          requiredElements: [{ role: "button" }],
+          assertions: assertionsFromCriteria("second", "Second", [{ role: "button" }]),
         },
       ],
       transitions: [],
@@ -388,7 +464,7 @@ describe("projectIRToBundledPage — empty cases", () => {
         {
           id: "no-req",
           name: "No Required Elements",
-          requiredElements: [],
+          assertions: [],
         },
       ],
       transitions: [],
@@ -499,7 +575,7 @@ describe("projectIRToBundledPage — empty cases", () => {
         {
           id: "empty-text",
           name: "Empty Text",
-          requiredElements: [{ text: "" }],
+          assertions: assertionsFromCriteria("empty-text", "Empty Text", [{ text: "" }]),
         },
       ],
       transitions: [],
@@ -515,8 +591,16 @@ describe("projectIRToBundledPage — empty cases", () => {
       id: "p",
       name: "P",
       states: [
-        { id: "a", name: "A", requiredElements: [{ role: "heading" }] },
-        { id: "b", name: "B", requiredElements: [{ role: "heading" }] },
+        {
+          id: "a",
+          name: "A",
+          assertions: assertionsFromCriteria("a", "A", [{ role: "heading" }]),
+        },
+        {
+          id: "b",
+          name: "B",
+          assertions: assertionsFromCriteria("b", "B", [{ role: "heading" }]),
+        },
       ],
       transitions: [
         {
@@ -541,8 +625,16 @@ describe("projectIRToBundledPage — empty cases", () => {
       id: "p",
       name: "P",
       states: [
-        { id: "base", name: "Base", requiredElements: [{ role: "heading" }] },
-        { id: "modal", name: "Modal", requiredElements: [{ role: "dialog" }] },
+        {
+          id: "base",
+          name: "Base",
+          assertions: assertionsFromCriteria("base", "Base", [{ role: "heading" }]),
+        },
+        {
+          id: "modal",
+          name: "Modal",
+          assertions: assertionsFromCriteria("modal", "Modal", [{ role: "dialog" }]),
+        },
       ],
       transitions: [
         {
@@ -576,7 +668,7 @@ describe("projectIRToBundledPage — provenance + state metadata", () => {
         {
           id: "s",
           name: "S",
-          requiredElements: [{ role: "heading" }],
+          assertions: assertionsFromCriteria("s", "S", [{ role: "heading" }]),
           provenance: { source: "hand-authored", file: "p.tsx" },
         },
       ],
@@ -595,7 +687,7 @@ describe("projectIRToBundledPage — provenance + state metadata", () => {
         {
           id: "s",
           name: "S",
-          requiredElements: [{ role: "heading" }],
+          assertions: assertionsFromCriteria("s", "S", [{ role: "heading" }]),
         },
       ],
       transitions: [],
@@ -613,7 +705,7 @@ describe("projectIRToBundledPage — provenance + state metadata", () => {
         {
           id: "s",
           name: "S",
-          requiredElements: [{ role: "heading" }],
+          assertions: assertionsFromCriteria("s", "S", [{ role: "heading" }]),
           metadata: { description: "From metadata" },
         },
       ],
@@ -632,7 +724,7 @@ describe("projectIRToBundledPage — provenance + state metadata", () => {
         {
           id: "s",
           name: "S",
-          requiredElements: [{ role: "heading" }],
+          assertions: assertionsFromCriteria("s", "S", [{ role: "heading" }]),
         },
       ],
       transitions: [],
@@ -834,21 +926,21 @@ describe("projectLegacyToIR — basic shape", () => {
     expect(alpha.description).toBe("First group for the round-trip test.");
   });
 
-  it("sources requiredElements from group.assertions[].target.criteria", () => {
+  it("sources state.assertions[].target.criteria from group.assertions[].target.criteria (inverted)", () => {
     const ir = projectLegacyToIR(LEGACY_FIXTURE);
     const alpha = ir.states.find((s) => s.id === "alpha")!;
-    expect(alpha.requiredElements).toHaveLength(2);
-    expect(alpha.requiredElements[0]).toEqual({
+    expect(alpha.assertions).toHaveLength(2);
+    expect(criteriaOf(alpha.assertions[0]!)).toEqual({
       role: "heading",
       text: "Alpha",
     });
-    expect(alpha.requiredElements[1]).toEqual({ text: "Welcome" });
+    expect(criteriaOf(alpha.assertions[1]!)).toEqual({ text: "Welcome" });
   });
 
   it("inverts dataAttributes -> attributes and accessibleName passthrough", () => {
     const ir = projectLegacyToIR(LEGACY_FIXTURE);
     const beta = ir.states.find((s) => s.id === "beta")!;
-    expect(beta.requiredElements[0]).toEqual({
+    expect(criteriaOf(beta.assertions[0]!)).toEqual({
       role: "dialog",
       accessibleName: "Confirm",
     });

@@ -7,6 +7,7 @@
  */
 
 import type { IRElementCriteria } from "./element-criteria";
+import type { IRAssertion } from "./group";
 import type { IRCrossRef, IRMetadata, IRProvenance, IRVisualRef } from "./primitives";
 
 /**
@@ -42,8 +43,14 @@ export interface IRState {
   description?: string;
 
   // Predicates (canonical) -----------------------------------------------
-  /** Element criteria that must ALL be satisfied for this state to be active. */
-  requiredElements: IRElementCriteria[];
+  /**
+   * State-scoped assertions. Each carries its own assertion_id, description,
+   * severity, category, and an IrElementCriteria target via target.criteria.
+   * Spec-Check (Plan 02) evaluates these against UI Bridge snapshots; policy
+   * filtering via `severity`/`category` is meaningful because each assertion
+   * carries its own metadata (no synthesized stubs).
+   */
+  assertions: IRAssertion[];
   /** Element criteria where NONE may be satisfied (any match disqualifies). */
   excludedElements?: IRElementCriteria[];
   /** Additional property checks on matched elements. */

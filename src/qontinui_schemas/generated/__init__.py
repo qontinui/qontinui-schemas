@@ -29,11 +29,6 @@ from .per_type.api_assertion_type import ApiAssertionType
 from .per_type.api_content_type import ApiContentType
 from .per_type.api_variable_extraction import ApiVariableExtraction
 from .per_type.app_event import AppEvent
-from .per_type.assertion_miss import AssertionMiss
-from .per_type.assertion_outcome import AssertionOutcome
-from .per_type.assertion_result import AssertionResult
-from .per_type.assertion_scope import AssertionScope
-from .per_type.assertion_severity_counts import AssertionSeverityCounts
 from .per_type.available_transitions_result import AvailableTransitionsResult
 from .per_type.base_step_fields import BaseStepFields
 from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingRequest
@@ -41,10 +36,8 @@ from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResp
 from .per_type.batch_embedding_result import BatchEmbeddingResult
 from .per_type.between_iterations import BetweenIterations
 from .per_type.bounding_box import BoundingBox
-from .per_type.bridge_fingerprint import BridgeFingerprint
 from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
-from .per_type.candidate_miss import CandidateMiss
 from .per_type.canonical_step import CanonicalStep
 from .per_type.canvas_panel import CanvasPanel
 from .per_type.catch_up_policy import CatchUpPolicy
@@ -65,8 +58,6 @@ from .per_type.condition_schedule_config import ConditionScheduleConfig
 from .per_type.condition_status import ConditionStatus
 from .per_type.confidence import Confidence
 from .per_type.confidence_level import ConfidenceLevel
-from .per_type.conjunct_evaluation import ConjunctEvaluation
-from .per_type.conjunct_rule import ConjunctRule
 from .per_type.constraint import Constraint
 from .per_type.constraint_check import ConstraintCheck
 from .per_type.constraint_proposal import ConstraintProposal
@@ -148,7 +139,6 @@ from .per_type.exit_check_result import ExitCheckResult
 from .per_type.exit_strategy import ExitStrategy
 from .per_type.export_result import ExportResult
 from .per_type.extend_iterations_request import ExtendIterationsRequest
-from .per_type.field_diff import FieldDiff
 from .per_type.file_change import FileChange
 from .per_type.finding import Finding
 from .per_type.finding_action_type import FindingActionType
@@ -179,19 +169,6 @@ from .per_type.implement_fixes_config import ImplementFixesConfig
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
-from .per_type.ir_assertion import IrAssertion
-from .per_type.ir_assertion_target import IrAssertionTarget
-from .per_type.ir_cross_ref import IrCrossRef
-from .per_type.ir_element_criteria import IrElementCriteria
-from .per_type.ir_group import IrGroup
-from .per_type.ir_metadata import IrMetadata
-from .per_type.ir_page_spec import IrPageSpec
-from .per_type.ir_provenance import IrProvenance
-from .per_type.ir_state import IrState
-from .per_type.ir_state_condition import IrStateCondition
-from .per_type.ir_transition import IrTransition
-from .per_type.ir_transition_action import IrTransitionAction
-from .per_type.ir_wait_spec import IrWaitSpec
 from .per_type.issue_severity import IssueSeverity
 from .per_type.issue_source import IssueSource
 from .per_type.issue_status import IssueStatus
@@ -204,22 +181,12 @@ from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
-from .per_type.legacy_assertion import LegacyAssertion
-from .per_type.legacy_assertion_target import LegacyAssertionTarget
-from .per_type.legacy_group import LegacyGroup
-from .per_type.legacy_process_step import LegacyProcessStep
-from .per_type.legacy_spec import LegacySpec
-from .per_type.legacy_state_machine import LegacyStateMachine
-from .per_type.legacy_state_machine_state import LegacyStateMachineState
-from .per_type.legacy_transition import LegacyTransition
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.loop_instance_status import LoopInstanceStatus
 from .per_type.loop_phase import LoopPhase
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
-from .per_type.match_outcome import MatchOutcome
-from .per_type.matched_element import MatchedElement
 from .per_type.mcp_call_record import McpCallRecord
 from .per_type.mcp_calls_result import McpCallsResult
 from .per_type.mcp_connection_ref import McpConnectionRef
@@ -229,7 +196,6 @@ from .per_type.mcp_tool_call_result import McpToolCallResult
 from .per_type.mcp_tool_info import McpToolInfo
 from .per_type.mcp_tool_input_schema import McpToolInputSchema
 from .per_type.mcp_transport import McpTransport
-from .per_type.miss_reason import MissReason
 from .per_type.model_cost_breakdown import ModelCostBreakdown
 from .per_type.model_override_config import ModelOverrideConfig
 from .per_type.monitor import Monitor
@@ -264,9 +230,6 @@ from .per_type.pipeline_config import PipelineConfig
 from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
-from .per_type.policy_conjunct import PolicyConjunct
-from .per_type.policy_evaluation import PolicyEvaluation
-from .per_type.policy_status import PolicyStatus
 from .per_type.polling_config import PollingConfig
 from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
@@ -279,7 +242,6 @@ from .per_type.rag_processing_status import RagProcessingStatus
 from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommendation_review_decision_payload import RecommendationReviewDecisionPayload
-from .per_type.recommended_state import RecommendedState
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
@@ -327,12 +289,6 @@ from .per_type.search_result_item import SearchResultItem
 from .per_type.search_strategy import SearchStrategy
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
-from .per_type.spec_check_confidence import SpecCheckConfidence
-from .per_type.spec_check_policy import SpecCheckPolicy
-from .per_type.spec_check_result import SpecCheckResult
-from .per_type.spec_check_step_config import SpecCheckStepConfig
-from .per_type.spec_check_summary import SpecCheckSummary
-from .per_type.spec_validation import SpecValidation
 from .per_type.stage_condition import StageCondition
 from .per_type.stage_input import StageInput
 from .per_type.stage_output import StageOutput
@@ -359,7 +315,6 @@ from .per_type.state_machine_state_update import StateMachineStateUpdate
 from .per_type.state_machine_transition import StateMachineTransition
 from .per_type.state_machine_transition_create import StateMachineTransitionCreate
 from .per_type.state_machine_transition_update import StateMachineTransitionUpdate
-from .per_type.state_match_result import StateMatchResult
 from .per_type.state_node_data import StateNodeData
 from .per_type.states_response import StatesResponse
 from .per_type.stdio_config import StdioConfig
@@ -507,11 +462,6 @@ __all__ = [
     "ApiContentType",
     "ApiVariableExtraction",
     "AppEvent",
-    "AssertionMiss",
-    "AssertionOutcome",
-    "AssertionResult",
-    "AssertionScope",
-    "AssertionSeverityCounts",
     "AvailableTransitionsResult",
     "BaseStepFields",
     "BatchComputeEmbeddingRequest",
@@ -519,10 +469,8 @@ __all__ = [
     "BatchEmbeddingResult",
     "BetweenIterations",
     "BoundingBox",
-    "BridgeFingerprint",
     "BuildPhaseConfig",
     "BuiltinOverrideProposal",
-    "CandidateMiss",
     "CanonicalStep",
     "CanvasPanel",
     "CatchUpPolicy",
@@ -543,8 +491,6 @@ __all__ = [
     "ConditionStatus",
     "Confidence",
     "ConfidenceLevel",
-    "ConjunctEvaluation",
-    "ConjunctRule",
     "Constraint",
     "ConstraintCheck",
     "ConstraintProposal",
@@ -626,7 +572,6 @@ __all__ = [
     "ExitStrategy",
     "ExportResult",
     "ExtendIterationsRequest",
-    "FieldDiff",
     "FileChange",
     "Finding",
     "FindingActionType",
@@ -657,19 +602,6 @@ __all__ = [
     "IndividualCheckResult",
     "InitialStateRef",
     "InitialStatesSource",
-    "IrAssertion",
-    "IrAssertionTarget",
-    "IrCrossRef",
-    "IrElementCriteria",
-    "IrGroup",
-    "IrMetadata",
-    "IrPageSpec",
-    "IrProvenance",
-    "IrState",
-    "IrStateCondition",
-    "IrTransition",
-    "IrTransitionAction",
-    "IrWaitSpec",
     "IssueSeverity",
     "IssueSource",
     "IssueStatus",
@@ -682,22 +614,12 @@ __all__ = [
     "JobSummary",
     "LLMCostSummary",
     "LLMMetrics",
-    "LegacyAssertion",
-    "LegacyAssertionTarget",
-    "LegacyGroup",
-    "LegacyProcessStep",
-    "LegacySpec",
-    "LegacyStateMachine",
-    "LegacyStateMachineState",
-    "LegacyTransition",
     "LogSourceSelection",
     "LoopInstanceStatus",
     "LoopPhase",
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
-    "MatchOutcome",
-    "MatchedElement",
     "McpCallRecord",
     "McpCallsResult",
     "McpConnectionRef",
@@ -707,7 +629,6 @@ __all__ = [
     "McpToolInfo",
     "McpToolInputSchema",
     "McpTransport",
-    "MissReason",
     "ModelCostBreakdown",
     "ModelOverrideConfig",
     "Monitor",
@@ -742,9 +663,6 @@ __all__ = [
     "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
     "Point",
-    "PolicyConjunct",
-    "PolicyEvaluation",
-    "PolicyStatus",
     "PollingConfig",
     "ProcessConfig",
     "ProcessState",
@@ -757,7 +675,6 @@ __all__ = [
     "RagProgressEvent",
     "ReadConfigResponse",
     "RecommendationReviewDecisionPayload",
-    "RecommendedState",
     "ReflectionFixOutput",
     "Region",
     "RepositoryInactiveCondition",
@@ -805,12 +722,6 @@ __all__ = [
     "SearchStrategy",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
-    "SpecCheckConfidence",
-    "SpecCheckPolicy",
-    "SpecCheckResult",
-    "SpecCheckStepConfig",
-    "SpecCheckSummary",
-    "SpecValidation",
     "StageCondition",
     "StageInput",
     "StageOutput",
@@ -837,7 +748,6 @@ __all__ = [
     "StateMachineTransition",
     "StateMachineTransitionCreate",
     "StateMachineTransitionUpdate",
-    "StateMatchResult",
     "StateNodeData",
     "StatesResponse",
     "StdioConfig",

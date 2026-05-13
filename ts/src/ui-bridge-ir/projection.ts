@@ -371,58 +371,13 @@ function convertCriteria(criteria: IRElementCriteria): LegacyCriteria {
 }
 
 /**
- * Build a single legacy assertion from a state + index + criteria.
- *
- * Always produces one assertion per requiredElement; the caller is responsible
- * for iterating `state.requiredElements`. Empty `requiredElements` produces an
- * empty `assertions[]` — legitimate legacy specs (e.g. architecture-only
- * groups in `graphql-infrastructure`, `activity-timeline`, `opik-integration`,
- * `watchers`) ship with empty `assertions[]`, and the inverse projection
- * round-trip must preserve that emptiness or `check-spec-pairing` flags an
- * assertion-count drift.
- */
-function buildAssertion(
-  state: IRState,
-  index: number,
-  criteria: IRElementCriteria,
-): LegacyAssertion {
-  const description =
-    state.metadata?.description ?? `Required element ${index} for state ${state.name}`;
-  const targetCriteria: LegacyCriteria = convertCriteria(criteria);
-  const assertion: LegacyAssertion = {
-    id: `${state.id}-elem-${index}`,
-    description,
-    category: "element-presence",
-    severity: "critical",
-    assertionType: "exists",
-    target: {
-      type: "search",
-      criteria: targetCriteria,
-      label: `Required element for ${state.name}`,
-    },
-    source: "ai-generated",
-    reviewed: false,
-    enabled: true,
-  };
-  if (state.precondition !== undefined) {
-    assertion.precondition = state.precondition;
-  }
-  return assertion;
-}
-
-/**
- * Build the legacy `groups[]` entry for one IR state. Emits exactly one
- * assertion per `requiredElement`; states with zero requiredElements project
- * to a group with an empty `assertions[]` array. Legacy consumers (runner
- * spec drift / verify, error monitor curator, AI session) tolerate empty
- * groups — multiple shipping legacy specs already use them for
- * architecture-only / documentation-only groups.
+ * Build the legacy `groups[]` entry for one IR state. With IrState.assertions
+ * carrying first-class assertion metadata (id/description/severity/category/
+ * target), this is now a direct shape-conversion per assertion — no more
+ * synthesizing IDs or defaulting severity.
  */
 function buildGroup(state: IRState): LegacyGroup {
-  const elems = state.requiredElements ?? [];
-  const assertions: LegacyAssertion[] = elems.map((c, i) =>
-    buildAssertion(state, i, c),
-  );
+  const assertions: LegacyAssertion[] = state.assertions.map(synthesizedAssertionToLegacy);
   return {
     id: state.id,
     name: state.name,
@@ -535,7 +490,10 @@ function buildStateMachineState(
     id: state.id,
     name: state.name,
     description: state.description ?? "",
-    elements: (state.requiredElements ?? []).map(convertCriteria),
+    // Project legacy `elements[]` from each assertion's target.criteria.
+    elements: state.assertions.map((a) =>
+      convertCriteria(a.target.criteria as IRElementCriteria),
+    ),
     isInitial,
     transitions: outgoing,
   };
@@ -680,11 +638,30 @@ function buildIRState(
   group: LegacyGroup,
   smState: LegacyStateMachineState | undefined,
 ): IRState {
-  // Always one requiredElement per assertion so the forward projection emits
-  // the same number of assertions on the round-trip.
-  const requiredElements: IRElementCriteria[] = group.assertions.map((a) =>
-    invertCriteria(a.target?.criteria),
-  );
+  // Map each LegacyAssertion to an IRAssertion, preserving id/description/
+  // severity/category. target.criteria is normalized via invertCriteria so
+  // the criteria shape matches what the IR side stores.
+  const assertions: IRAssertion[] = group.assertions.map((a) => {
+    const ir: IRAssertion = {
+      id: a.id,
+      description: a.description,
+      category: a.category,
+      severity: a.severity,
+      assertionType: a.assertionType,
+      target: {
+        type: "search",
+        criteria: invertCriteria(a.target?.criteria) as unknown as Record<string, unknown>,
+        label: a.target?.label ?? a.description,
+      },
+      source: a.source,
+      reviewed: a.reviewed,
+      enabled: a.enabled,
+    };
+    if (a.precondition !== undefined) {
+      ir.precondition = a.precondition;
+    }
+    return ir;
+  });
 
   const description =
     group.description !== undefined && group.description.length > 0
@@ -695,7 +672,7 @@ function buildIRState(
   const state: IRState = {
     id: group.id,
     name: smState?.name ?? group.name,
-    requiredElements,
+    assertions,
   };
   if (description !== undefined && description.length > 0) {
     state.description = description;

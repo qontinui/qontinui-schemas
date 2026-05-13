@@ -187,6 +187,34 @@ pub struct UIBridgeElement {
     /// richer occlusion check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible: Option<bool>,
+
+    /// ARIA role of the element (explicit `role=` or implicit per W3C ARIA-in-HTML).
+    /// Populated by the SDK's element walker. Source of truth for IrElementCriteria.role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+
+    /// HTML tag name in lowercase. Source of truth for IrElementCriteria.tag_name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag_name: Option<String>,
+
+    /// Computed aria-label (explicit attribute, falling back to aria-labelledby
+    /// reference resolution). Source of truth for IrElementCriteria.aria_label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aria_label: Option<String>,
+
+    /// W3C "accessible name" per the accessible-name algorithm. Distinct from
+    /// aria_label because the algorithm may consult aria-labelledby, associated
+    /// label elements, title, or visible content. Source of truth for
+    /// IrElementCriteria.accessible_name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_name: Option<String>,
+
+    /// Visible text content with whitespace collapsed (DOM innerText-equivalent
+    /// on web; accessibilityLabel/text equivalent on native). Source of truth for
+    /// IrElementCriteria.text and text_contains. Distinct from state.text_content
+    /// which is a snapshot of the form-control value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
 
 /// Information about a single action exposed by a UI Bridge component.

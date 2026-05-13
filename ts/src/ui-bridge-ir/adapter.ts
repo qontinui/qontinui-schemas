@@ -114,10 +114,16 @@ const SUPPORTED_IR_VERSIONS = new Set<string>(["1.0"]);
  * incomingTransitions, crossRefs, visualRefs).
  */
 export function adaptIRState(state: IRState): AdaptedState {
+  // Project rich IR assertions down to the runtime's flat element-criteria
+  // list. The runtime engine (ui-bridge-auto's WorkflowConfig.StateConfig)
+  // doesn't carry per-element severity/category — those metadata fields stay
+  // IR-side, consumed by Spec-Check policies.
   const out: AdaptedState = {
     id: state.id,
     name: state.name,
-    requiredElements: state.requiredElements,
+    requiredElements: state.assertions.map(
+      (a) => a.target.criteria as unknown as IRElementCriteria,
+    ),
   };
   if (state.description !== undefined) out.description = state.description;
   if (state.excludedElements !== undefined) out.excludedElements = state.excludedElements;

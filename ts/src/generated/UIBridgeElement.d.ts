@@ -18,9 +18,21 @@ import type { ElementState } from './ElementState';
  */
 export interface UIBridgeElement {
   /**
+   * W3C "accessible name" per the accessible-name algorithm. Distinct from
+   * aria_label because the algorithm may consult aria-labelledby, associated
+   * label elements, title, or visible content. Source of truth for
+   * IrElementCriteria.accessible_name.
+   */
+  accessibleName?: string | null;
+  /**
    * Standard actions available on this element.
    */
   actions?: string[];
+  /**
+   * Computed aria-label (explicit attribute, falling back to aria-labelledby
+   * reference resolution). Source of truth for IrElementCriteria.aria_label.
+   */
+  ariaLabel?: string | null;
   /**
    * Viewport-relative bounding box in CSS pixels, when the SDK has a
    * live DOM ref. Absent for elements registered without a ref or when
@@ -48,7 +60,23 @@ export interface UIBridgeElement {
    * Unix-epoch millisecond timestamp when the element was registered.
    */
   registeredAt: number;
+  /**
+   * ARIA role of the element (explicit `role=` or implicit per W3C ARIA-in-HTML).
+   * Populated by the SDK's element walker. Source of truth for IrElementCriteria.role.
+   */
+  role?: string | null;
   state: ElementState;
+  /**
+   * HTML tag name in lowercase. Source of truth for IrElementCriteria.tag_name.
+   */
+  tagName?: string | null;
+  /**
+   * Visible text content with whitespace collapsed (DOM innerText-equivalent
+   * on web; accessibilityLabel/text equivalent on native). Source of truth for
+   * IrElementCriteria.text and text_contains. Distinct from state.text_content
+   * which is a snapshot of the form-control value.
+   */
+  text?: string | null;
   /**
    * Element type (e.g. `"button"`, `"input"`, `"select"`).
    */
