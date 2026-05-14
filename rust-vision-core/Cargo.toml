@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-vision-core"
-version = "0.1.1"
+version = "0.1.2"
 description = "Image pipeline + output contract for Qontinui's vision surface. Composable stages producing bytes that satisfy a declared model-vision contract (e.g., Claude vision)."
 edition.workspace = true
 license.workspace = true
