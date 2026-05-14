@@ -29,6 +29,7 @@
 
 pub mod accessibility;
 pub mod ai_workflows;
+pub mod canonical_hash;
 pub mod app_events;
 pub mod config;
 pub mod constraints;
