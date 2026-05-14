@@ -13,8 +13,10 @@
 #![warn(rust_2018_idioms)]
 
 pub mod analyzers;
+pub mod assertions;
 pub mod cache;
 pub mod contract;
+pub mod element_snapshot;
 pub mod encode;
 pub mod error;
 pub mod frame;
@@ -22,8 +24,16 @@ pub mod pipeline;
 pub mod stage;
 pub mod strip;
 
+pub use analyzers::{AnalyzeInput, Analyzer, Finding, Severity};
+pub use assertions::{
+    evaluate as evaluate_assertion, Assertion, AssertionResult, BaselineEntry, EvalContext,
+    OcrBlockRef, TextMatchKind, TextTarget, TypographyDimension, WcagLevel,
+};
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
+pub use element_snapshot::{
+    intersection, region_contains, regions_overlap, Element, ElementSnapshot, Rgb,
+};
 pub use error::VisionError;
 pub use frame::{Frame, FrameSource, FrameSourceKind, Region};
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
