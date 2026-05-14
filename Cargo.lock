@@ -1161,12 +1161,14 @@ dependencies = [
 
 [[package]]
 name = "qontinui-vision-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "image",
  "proptest",
  "serde",
+ "sha2",
+ "tempfile",
  "thiserror",
 ]
 

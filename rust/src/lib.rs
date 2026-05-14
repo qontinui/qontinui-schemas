@@ -29,8 +29,8 @@
 
 pub mod accessibility;
 pub mod ai_workflows;
-pub mod canonical_hash;
 pub mod app_events;
+pub mod canonical_hash;
 pub mod config;
 pub mod constraints;
 pub mod discovery;
@@ -49,8 +49,8 @@ pub mod spec_check;
 pub mod state_machine;
 pub mod targets;
 pub mod task_run;
-pub mod text_norm;
 pub mod terminal;
+pub mod text_norm;
 pub mod ticket_system;
 pub mod tree_events;
 pub mod ui_bridge;

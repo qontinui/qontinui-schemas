@@ -247,9 +247,6 @@ mod tests {
         //   3. Strip ZWSP:    "  & \u{00A0}HELLO  "
         //   4. Fold ws:       "& HELLO"
         //   5. Lowercase:     "& hello"
-        assert_eq!(
-            normalize_text("  &amp; \u{00A0}HELLO\u{200B}  "),
-            "& hello"
-        );
+        assert_eq!(normalize_text("  &amp; \u{00A0}HELLO\u{200B}  "), "& hello");
     }
 }

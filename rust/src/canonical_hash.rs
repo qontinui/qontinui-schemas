@@ -18,8 +18,8 @@ use thiserror::Error;
 
 /// Generic canonical content hash. Returns `"sha256-<hex>"`.
 pub fn canonical_hash<T: Serialize>(value: &T) -> Result<String, CanonicalHashError> {
-    let canonical = serde_jcs::to_string(value)
-        .map_err(|e| CanonicalHashError::Canonicalize(e.to_string()))?;
+    let canonical =
+        serde_jcs::to_string(value).map_err(|e| CanonicalHashError::Canonicalize(e.to_string()))?;
     let mut hasher = Sha256::new();
     hasher.update(canonical.as_bytes());
     Ok(format!("sha256-{}", hex::encode(hasher.finalize())))

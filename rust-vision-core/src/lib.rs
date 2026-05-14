@@ -13,6 +13,7 @@
 #![warn(rust_2018_idioms)]
 
 pub mod analyzers;
+pub mod cache;
 pub mod contract;
 pub mod encode;
 pub mod error;
@@ -21,8 +22,9 @@ pub mod pipeline;
 pub mod stage;
 pub mod strip;
 
+pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use error::VisionError;
 pub use frame::{Frame, FrameSource, FrameSourceKind, Region};
-pub use pipeline::Pipeline;
+pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};
