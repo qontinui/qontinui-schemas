@@ -36,4 +36,8 @@ pub enum VisionError {
         frame.1
     )]
     CropOutOfBounds { region: Region, frame: (u32, u32) },
+
+    /// I/O error in the disk cache layer.
+    #[error("cache I/O: {0}")]
+    CacheIo(String),
 }

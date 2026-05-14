@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-vision-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Image pipeline + output contract for Qontinui's vision surface. Composable stages producing bytes that satisfy a declared model-vision contract (e.g., Claude vision)."
 edition.workspace = true
 license.workspace = true
@@ -11,6 +11,8 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 proptest = "1"
+tempfile = "3"

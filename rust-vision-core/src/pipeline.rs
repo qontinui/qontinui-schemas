@@ -35,6 +35,26 @@ impl Pipeline {
         &self.stages
     }
 
+    /// Deterministic 32-byte hash of the stage list. Two pipelines built
+    /// from the same stages produce the same hash; any difference (order,
+    /// parameter, format choice) flips it. Suitable for keying a
+    /// content-addressed cache without re-running the pipeline.
+    ///
+    /// Implementation feeds each stage's `Debug` form into SHA-256. Rust's
+    /// `Debug` for enums and primitives is stable across compilations and
+    /// across `Send`-safe types; finite `f64` values format the same way
+    /// on every supported target.
+    pub fn hash(&self) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        for stage in &self.stages {
+            hasher.update(format!("{stage:?}").as_bytes());
+            // Length-prefix separator so `[A, BC]` doesn't collide with `[AB, C]`.
+            hasher.update(b"\x1f");
+        }
+        hasher.finalize().into()
+    }
+
     /// Execute the pipeline.
     ///
     /// Frame-to-Frame stages mutate the working frame in order.
@@ -557,6 +577,33 @@ fn verify(
 }
 
 // ---------------------------------------------------------------------------
+// Multi-output fan-out (Phase 3)
+// ---------------------------------------------------------------------------
+
+/// Per-pipeline result returned by [`multi_run`]: a name plus the bytes (or
+/// per-pipeline error). Errors are isolated — one bad pipeline does not
+/// poison the others.
+pub type MultiOutput = Vec<(String, Result<Vec<u8>, VisionError>)>;
+
+/// Run several pipelines on the same source frame. Each pipeline gets its
+/// own [`Frame::clone`] so frame stages don't interfere.
+///
+/// Sequential by design: vision-core stays runtime-free. Callers that want
+/// CPU parallelism fan out externally (`tokio::task::spawn_blocking` per
+/// pipeline, `rayon::scope`, etc.). The hot use case in the runner is a
+/// single `xcap` capture feeding `{ full-frame Claude-vision, element crop,
+/// OCR region }` — three pipelines on one frame.
+pub fn multi_run(frame: Frame, pipelines: Vec<(String, Pipeline)>) -> MultiOutput {
+    pipelines
+        .into_iter()
+        .map(|(name, pipe)| {
+            let frame = frame.clone();
+            (name, pipe.run(frame))
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Test-only conveniences. Kept here (rather than in tests/) so unit tests can
 // reach pipeline internals without making them public.
 // ---------------------------------------------------------------------------
@@ -568,4 +615,108 @@ pub fn _test_frame_from_color(w: u32, h: u32, color: [u8; 4]) -> Frame {
         *px = image::Rgba(color);
     }
     Frame::from_rgba(buf, FrameSource::synthetic_now())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contract::{EncodedFormat, OutputContract};
+    use crate::stage::{ResizeStrategy, Stage};
+
+    #[test]
+    fn hash_is_deterministic() {
+        let p1 = Pipeline::new()
+            .push(Stage::Resize(ResizeStrategy::LongEdge(1568)))
+            .push(Stage::FlattenAlpha([0xFF, 0xFF, 0xFF]))
+            .push(Stage::Encode(EncodedFormat::Jpeg { quality: 85 }));
+        let p2 = Pipeline::new()
+            .push(Stage::Resize(ResizeStrategy::LongEdge(1568)))
+            .push(Stage::FlattenAlpha([0xFF, 0xFF, 0xFF]))
+            .push(Stage::Encode(EncodedFormat::Jpeg { quality: 85 }));
+        assert_eq!(p1.hash(), p2.hash());
+    }
+
+    #[test]
+    fn hash_changes_with_stage_param() {
+        let p1 = Pipeline::new().push(Stage::Resize(ResizeStrategy::LongEdge(1568)));
+        let p2 = Pipeline::new().push(Stage::Resize(ResizeStrategy::LongEdge(1024)));
+        assert_ne!(p1.hash(), p2.hash());
+    }
+
+    #[test]
+    fn hash_changes_with_stage_order() {
+        let p1 = Pipeline::new()
+            .push(Stage::Resize(ResizeStrategy::LongEdge(1568)))
+            .push(Stage::FlattenAlpha([0xFF, 0xFF, 0xFF]));
+        let p2 = Pipeline::new()
+            .push(Stage::FlattenAlpha([0xFF, 0xFF, 0xFF]))
+            .push(Stage::Resize(ResizeStrategy::LongEdge(1568)));
+        assert_ne!(p1.hash(), p2.hash());
+    }
+
+    #[test]
+    fn empty_pipeline_has_a_stable_hash() {
+        assert_eq!(Pipeline::new().hash(), Pipeline::new().hash());
+    }
+
+    #[test]
+    fn multi_run_isolates_per_pipeline_errors() {
+        let frame = _test_frame_from_color(16, 16, [0xFF, 0x00, 0x00, 0xFF]);
+        // p_ok: PNG encode + Verify against PNG_STRICT.
+        let p_ok = Pipeline::new()
+            .push(Stage::StripMetadata)
+            .push(Stage::Encode(EncodedFormat::Png))
+            .push(Stage::Verify(OutputContract::PNG_STRICT));
+        // p_bad: Verify before Encode — pipeline shape error.
+        let p_bad = Pipeline::new()
+            .push(Stage::Verify(OutputContract::PNG_STRICT))
+            .push(Stage::FlattenAlpha([0xFF, 0xFF, 0xFF]));
+
+        let results = multi_run(
+            frame,
+            vec![("good".to_string(), p_ok), ("bad".to_string(), p_bad)],
+        );
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, "good");
+        assert!(
+            results[0].1.is_ok(),
+            "good pipeline should succeed: {:?}",
+            results[0].1
+        );
+        assert_eq!(results[1].0, "bad");
+        assert!(
+            matches!(&results[1].1, Err(VisionError::InvalidPipeline(_))),
+            "bad pipeline should error, got: {:?}",
+            results[1].1
+        );
+    }
+
+    #[test]
+    fn multi_run_each_pipeline_gets_independent_frame() {
+        // If frame were shared, the crops in pipeline_b would see the
+        // pipeline_a-cropped frame instead of the original 32x32. We verify
+        // both pipelines see the original.
+        let frame = _test_frame_from_color(32, 32, [0x80, 0x80, 0x80, 0xFF]);
+        let p_a = Pipeline::new()
+            .push(Stage::CropRegion(Region {
+                x: 0,
+                y: 0,
+                w: 8,
+                h: 8,
+            }))
+            .push(Stage::Encode(EncodedFormat::Png));
+        let p_b = Pipeline::new()
+            .push(Stage::CropRegion(Region {
+                x: 0,
+                y: 0,
+                w: 16,
+                h: 16,
+            }))
+            .push(Stage::Encode(EncodedFormat::Png));
+
+        let results = multi_run(frame, vec![("a".to_string(), p_a), ("b".to_string(), p_b)]);
+        for (name, r) in &results {
+            assert!(r.is_ok(), "{name} should succeed: {r:?}");
+        }
+    }
 }
