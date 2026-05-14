@@ -7,6 +7,11 @@
 // Render logging types
 export * from "./render-log";
 
+// Spec-check distinctness validation (Plan 04). Surfaced from the
+// auto-generated Rust mirror — see qontinui-schemas/rust/src/spec_check.rs.
+export type { SpecValidation } from "./generated/SpecValidation";
+export type { ProposalStatus } from "./generated/ProposalStatus";
+
 // State discovery types
 export * from "./discovery";
 
