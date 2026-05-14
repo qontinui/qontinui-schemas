@@ -587,8 +587,7 @@ mod tests {
             serde_json::json!({"kind": "match_outcome_at_least", "outcome": "partial_match"}),
         ];
         for input in cases {
-            let rule: ConjunctRule =
-                serde_json::from_value(input.clone()).expect("deserialize");
+            let rule: ConjunctRule = serde_json::from_value(input.clone()).expect("deserialize");
             let re_serialized = serde_json::to_value(&rule).expect("serialize");
             assert_eq!(re_serialized, input, "round-trip mismatch for {input}");
         }
