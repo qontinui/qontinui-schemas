@@ -12,6 +12,7 @@ import type { IrElementCriteria } from './IrElementCriteria';
 import type { IrMetadata } from './IrMetadata';
 import type { IrProvenance } from './IrProvenance';
 import type { IrStateCondition } from './IrStateCondition';
+import type { ProposalStatus } from './ProposalStatus';
 
 export interface IrState {
   assertions: IrAssertion[];

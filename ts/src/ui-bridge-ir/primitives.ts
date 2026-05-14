@@ -27,6 +27,14 @@ export interface IRProvenance {
   column?: number;
   /** Build-plugin version that produced this node, if applicable. */
   pluginVersion?: string;
+  /**
+   * Lifecycle status for the Stream E coverage-growth flywheel. Absent =
+   * implicitly `"promoted"` (legacy + on-disk specs that predate the field).
+   * Set to `"proposed"` by `spec_authoring`, `"pending"` when staged in
+   * `_pending/`, `"promoted"` after the 2-green sweep moves the file to
+   * `pages/<id>/`.
+   */
+  status?: "proposed" | "pending" | "promoted";
 }
 
 // ---------------------------------------------------------------------------

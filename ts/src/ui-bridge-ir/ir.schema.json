@@ -95,7 +95,11 @@
         "file": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },
         "column": { "type": "integer", "minimum": 1 },
-        "pluginVersion": { "type": "string" }
+        "pluginVersion": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["proposed", "pending", "promoted"]
+        }
       }
     },
     "IRCrossRef": {

@@ -17,6 +17,7 @@ import type { IrStateCondition } from './IrStateCondition';
 import type { IrTransition } from './IrTransition';
 import type { IrTransitionAction } from './IrTransitionAction';
 import type { IrWaitSpec } from './IrWaitSpec';
+import type { ProposalStatus } from './ProposalStatus';
 
 /**
  * Top-level IR page specification (formerly `IrDocument`).

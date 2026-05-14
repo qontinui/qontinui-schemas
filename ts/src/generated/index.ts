@@ -271,6 +271,7 @@ export type { ProcessState } from './ProcessState';
 export type { ProcessStatus } from './ProcessStatus';
 export type { PromptStep } from './PromptStep';
 export type { PromptStepPhase } from './PromptStepPhase';
+export type { ProposalStatus } from './ProposalStatus';
 export type { RAGDashboardStats } from './RAGDashboardStats';
 export type { RagCompletionEvent } from './RagCompletionEvent';
 export type { RagProcessingStatus } from './RagProcessingStatus';

@@ -78,6 +78,27 @@ pub struct IrProvenance {
     pub column: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plugin_version: Option<String>,
+    /// Lifecycle status for the flywheel coverage-growth loop. `None` =
+    /// implicitly `Promoted` (legacy + on-disk specs that predate the field).
+    /// Set to `Proposed` by `spec_authoring`, `Pending` when staged in
+    /// `_pending/`, `Promoted` after the 2-green sweep moves the file to
+    /// `pages/<id>/`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<ProposalStatus>,
+}
+
+/// Lifecycle status for spec proposals produced by the Stream E coverage-growth
+/// flywheel. `None` on an existing `IrProvenance` means the spec predates the
+/// flywheel and is implicitly `Promoted`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProposalStatus {
+    /// Candidate emitted by `spec_authoring` but not yet validated.
+    Proposed,
+    /// Candidate landed in `_pending/`; awaiting consecutive greens.
+    Pending,
+    /// Candidate has been promoted to `pages/<id>/`. Default for legacy specs.
+    Promoted,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -415,4 +436,44 @@ pub struct LegacySpec {
     pub groups: Vec<LegacyGroup>,
     pub state_machine: LegacyStateMachine,
     pub metadata: serde_json::Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provenance_without_status_round_trips_byte_identical() {
+        // Legacy spec on-disk shape: no `status` field. Must survive a
+        // from_str -> to_string round trip without gaining one.
+        let json = r#"{"source":"hand-authored","file":"a.tsx","line":12}"#;
+        let parsed: IrProvenance = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.status, None);
+        let reserialized = serde_json::to_string(&parsed).unwrap();
+        assert_eq!(reserialized, json);
+    }
+
+    #[test]
+    fn provenance_with_proposed_status_round_trips() {
+        let json = r#"{"source":"ai-generated","status":"proposed"}"#;
+        let parsed: IrProvenance = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.status, Some(ProposalStatus::Proposed));
+        let reserialized = serde_json::to_string(&parsed).unwrap();
+        assert_eq!(reserialized, json);
+    }
+
+    #[test]
+    fn proposal_status_kebab_case_variants() {
+        // Every variant deserializes from its kebab-case wire form and
+        // round-trips back to it. Catches accidental rename_all drift.
+        for (wire, variant) in [
+            ("\"proposed\"", ProposalStatus::Proposed),
+            ("\"pending\"", ProposalStatus::Pending),
+            ("\"promoted\"", ProposalStatus::Promoted),
+        ] {
+            let parsed: ProposalStatus = serde_json::from_str(wire).unwrap();
+            assert_eq!(parsed, variant);
+            assert_eq!(serde_json::to_string(&parsed).unwrap(), wire);
+        }
+    }
 }

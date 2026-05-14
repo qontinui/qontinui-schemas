@@ -11,6 +11,7 @@ import type { IrMetadata } from './IrMetadata';
 import type { IrProvenance } from './IrProvenance';
 import type { IrTransitionAction } from './IrTransitionAction';
 import type { IrWaitSpec } from './IrWaitSpec';
+import type { ProposalStatus } from './ProposalStatus';
 
 export interface IrTransition {
   actions: IrTransitionAction[];
