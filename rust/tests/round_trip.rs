@@ -8311,6 +8311,11 @@ fn ui_bridge_element_roundtrips() {
         mounted: true,
         bbox: None,
         visible: None,
+        role: None,
+        tag_name: None,
+        aria_label: None,
+        accessible_name: None,
+        text: None,
     };
     let json = serde_json::to_string(&elem).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
@@ -8364,6 +8369,11 @@ fn ui_bridge_element_with_bbox_roundtrips() {
             height: 32.0,
         }),
         visible: Some(true),
+        role: None,
+        tag_name: None,
+        aria_label: None,
+        accessible_name: None,
+        text: None,
     };
     let json = serde_json::to_string(&elem).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
