@@ -326,6 +326,7 @@ export type { SearchResultItem } from './SearchResultItem';
 export type { SearchStrategy } from './SearchStrategy';
 export type { SemanticSearchRequest } from './SemanticSearchRequest';
 export type { SemanticSearchResponse } from './SemanticSearchResponse';
+export type { SpecApiEvent } from './SpecApiEvent';
 export type { SpecCheckConfidence } from './SpecCheckConfidence';
 export type { SpecCheckPolicy } from './SpecCheckPolicy';
 export type { SpecCheckResult } from './SpecCheckResult';
