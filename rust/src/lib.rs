@@ -45,6 +45,7 @@ pub mod rag;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
+pub mod spec_api_events;
 pub mod spec_check;
 pub mod state_machine;
 pub mod targets;

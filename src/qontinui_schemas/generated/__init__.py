@@ -328,6 +328,7 @@ from .per_type.search_result_item import SearchResultItem
 from .per_type.search_strategy import SearchStrategy
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
+from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
 from .per_type.spec_check_result import SpecCheckResult
@@ -807,6 +808,7 @@ __all__ = [
     "SearchStrategy",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
+    "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
     "SpecCheckResult",
