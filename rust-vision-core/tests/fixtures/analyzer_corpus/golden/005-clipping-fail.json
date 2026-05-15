@@ -1,0 +1,9 @@
+{
+  "analyzers": {},
+  "assertions": [
+    {
+      "assertion": { "type": "no_clipping" },
+      "expect_passed": false
+    }
+  ]
+}

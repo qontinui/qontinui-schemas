@@ -1,0 +1,6 @@
+{
+  "analyzers": {
+    "elements": { "kinds": ["tiny_target"], "count_min": 1, "count_max": 4 }
+  },
+  "assertions": []
+}

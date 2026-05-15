@@ -1,0 +1,23 @@
+{
+  "analyzers": {
+    "layout":     { "kinds": ["overlap"], "count_min": 1, "count_max": 8 },
+    "elements":   { "kinds": [], "count_min": 0, "count_max": 4 },
+    "typography": { "kinds": [], "count_min": 0, "count_max": 2 }
+  },
+  "assertions": [
+    {
+      "assertion": {
+        "type": "no_overlap",
+        "elements": ["btn-terminal-1", "btn-terminal-2"]
+      },
+      "expect_passed": false
+    },
+    {
+      "assertion": {
+        "type": "no_overlap",
+        "elements": ["btn-terminal-1", "header"]
+      },
+      "expect_passed": true
+    }
+  ]
+}
