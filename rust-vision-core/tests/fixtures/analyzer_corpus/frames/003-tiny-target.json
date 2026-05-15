@@ -1,0 +1,16 @@
+{
+  "elements": [
+    {
+      "id": "btn-close",
+      "bbox": { "x": 1264, "y": 8, "w": 16, "h": 16 },
+      "text": "×",
+      "interactable": true
+    },
+    {
+      "id": "btn-save",
+      "bbox": { "x": 100, "y": 600, "w": 88, "h": 40 },
+      "text": "Save",
+      "interactable": true
+    }
+  ]
+}

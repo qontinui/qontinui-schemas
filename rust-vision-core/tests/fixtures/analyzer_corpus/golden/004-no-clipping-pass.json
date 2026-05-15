@@ -1,0 +1,12 @@
+{
+  "analyzers": {
+    "layout":   { "kinds": [], "count_min": 0, "count_max": 2 },
+    "elements": { "kinds": [], "count_min": 0, "count_max": 2 }
+  },
+  "assertions": [
+    {
+      "assertion": { "type": "no_clipping" },
+      "expect_passed": true
+    }
+  ]
+}
