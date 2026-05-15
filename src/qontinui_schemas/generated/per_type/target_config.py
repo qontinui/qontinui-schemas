@@ -422,6 +422,7 @@ class TargetConfig(
         | TargetConfig14,
         Field(
             description='The discriminated union over all 14 target configurations. Wire format is\na flat object tagged by the `type` field (`"image"`, `"stateImage"`, …).',
+            discriminator='type',
             title='TargetConfig',
         ),
     ]

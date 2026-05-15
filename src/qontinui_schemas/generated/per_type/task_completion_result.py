@@ -247,6 +247,7 @@ class TaskCompletionResult(
         | TaskCompletionResult4,
         Field(
             description='Task-completion result.\n\nInternally tagged by `status`: the variant fields are inlined alongside the\ndiscriminator rather than nested under a `data` key.',
+            discriminator='status',
             title='TaskCompletionResult',
         ),
     ]
