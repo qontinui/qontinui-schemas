@@ -6,9 +6,9 @@
  */
 
 import type { AssertionSeverityCounts } from './AssertionSeverityCounts';
-import type { Confidence } from './Confidence';
 import type { MatchOutcome } from './MatchOutcome';
 import type { RecommendedState } from './RecommendedState';
+import type { SpecCheckConfidence } from './SpecCheckConfidence';
 
 /**
  * Aggregate summary across all evaluated states.
