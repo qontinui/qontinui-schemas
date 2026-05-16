@@ -11,12 +11,12 @@ import type { AssertionResult } from './AssertionResult';
 import type { AssertionSeverityCounts } from './AssertionSeverityCounts';
 import type { BridgeFingerprint } from './BridgeFingerprint';
 import type { CandidateMiss } from './CandidateMiss';
-import type { Confidence } from './Confidence';
 import type { FieldDiff } from './FieldDiff';
 import type { MatchOutcome } from './MatchOutcome';
 import type { MatchedElement } from './MatchedElement';
 import type { MissReason } from './MissReason';
 import type { RecommendedState } from './RecommendedState';
+import type { SpecCheckConfidence } from './SpecCheckConfidence';
 import type { SpecCheckSummary } from './SpecCheckSummary';
 import type { StateMatchResult } from './StateMatchResult';
 

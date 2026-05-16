@@ -5,13 +5,13 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
+import type { SpecCheckConfidence } from './SpecCheckConfidence';
 
 /**
  * The single state the matcher recommends the caller treat as "current".
  */
 export interface RecommendedState {
-  confidence: Confidence;
+  confidence: SpecCheckConfidence;
   /**
    * Free-form explanation (e.g. "highest match rate among all states").
    */

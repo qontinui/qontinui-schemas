@@ -152,6 +152,7 @@ pub enum MatchOutcome {
 /// `schema_export.rs`. See module docs.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+#[schemars(title = "SpecCheckConfidence")]
 pub enum Confidence {
     /// High confidence — strong evidence.
     High,

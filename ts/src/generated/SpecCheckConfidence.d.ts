@@ -12,4 +12,4 @@
  * cross-repo schema registry; registered as `SpecCheckConfidence` in
  * `schema_export.rs`. See module docs.
  */
-export type Confidence = "high" | "medium" | "low";
+export type SpecCheckConfidence = "high" | "medium" | "low";
