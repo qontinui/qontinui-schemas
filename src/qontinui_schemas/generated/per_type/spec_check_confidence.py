@@ -9,7 +9,7 @@ from enum import StrEnum
 from pydantic import Field
 
 
-class Confidence(StrEnum):
+class SpecCheckConfidence(StrEnum):
     """
     Confidence level — high / medium / low.
 
