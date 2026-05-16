@@ -116,6 +116,15 @@ pub struct SpecCheckSummary {
     /// as "current". `None` when the matcher has no preference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recommended_state: Option<RecommendedState>,
+
+    /// Diagnostic explaining why `recommended_state` is `None`. Set when
+    /// the matcher *deliberately* withholds a recommendation (e.g. the
+    /// spec failed distinctness validation per §5.12); absent otherwise
+    /// (e.g. when every state simply scored below the confidence floor).
+    /// Free-form for forward-compat; current values:
+    /// `"spec_validation_failed"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommendation_reason: Option<String>,
 }
 
 /// The single state the matcher recommends the caller treat as "current".
