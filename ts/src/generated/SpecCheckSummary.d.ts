@@ -20,6 +20,15 @@ export interface SpecCheckSummary {
    */
   overallMatchRate: number;
   /**
+   * Diagnostic explaining why `recommended_state` is `None`. Set when
+   * the matcher *deliberately* withholds a recommendation (e.g. the
+   * spec failed distinctness validation per §5.12); absent otherwise
+   * (e.g. when every state simply scored below the confidence floor).
+   * Free-form for forward-compat; current values:
+   * `"spec_validation_failed"`.
+   */
+  recommendationReason?: string | null;
+  /**
    * The single state (if any) the matcher recommends the caller treat
    * as "current". `None` when the matcher has no preference.
    */
