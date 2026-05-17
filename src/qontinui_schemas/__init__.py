@@ -33,7 +33,7 @@ Usage:
     )
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Accessibility module - accessibility tree capture and interaction
 from qontinui_schemas.accessibility import (  # noqa: F401
@@ -112,6 +112,7 @@ from qontinui_schemas.config.models.workflow import (  # noqa: F401
 from qontinui_schemas.config.models.workflow import (  # noqa: F401
     WorkflowMetadata as ConfigWorkflowMetadata,
 )
+from qontinui_schemas.config.qontinui_properties import QontinuiProperties  # noqa: F401
 
 # Descriptions module - rich descriptions for AI verification agent
 from qontinui_schemas.descriptions import (  # noqa: F401
@@ -502,6 +503,8 @@ __all__ = [
     "ApplicationProfileListResponse",
     "TuningRequest",
     "TuningResult",
+    # Qontinui properties - configuration framework
+    "QontinuiProperties",
     # Test Specifications - declarative test specs
     "TestCategory",
     "TestSeverity",
