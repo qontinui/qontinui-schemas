@@ -9,6 +9,7 @@ Each submodule defines pydantic request/response/error models for a
 specific surface area:
 
 - ``state_machine``: state-machine discovery + UI bridge runtime calls.
+- ``recording_pipeline``: recording-pipeline async-with-progress runs.
 
 The pattern is hand-authored pydantic (NOT Rust-codegen), because the
 runner-side Python dispatcher imports these directly when it handles
