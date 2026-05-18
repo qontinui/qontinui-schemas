@@ -6,11 +6,17 @@
 //! `ui-bridge/scripts/gen-diagnostics.ts`. `FromStr` / `From<&str>` match
 //! the canonical `UB-` strings ONLY — there is intentionally no
 //! legacy-bare-string arm (single-user coordinated cutover, plan D1).
+//!
+//! Generated artifact: layout is owned by the generator, not `cargo fmt`.
+//! Each item carries `#[rustfmt::skip]` (stable; file-level `#![rustfmt::skip]`
+//! is nightly-only) so regen stays byte-stable and decoupled from rustfmt
+//! line-width drift across toolchain versions.
 #![allow(clippy::all)]
 
 use std::fmt;
 use std::str::FromStr;
 
+#[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UiBridgeErrorCode {
     /// `UB-ACTION-FAILED`
@@ -97,6 +103,7 @@ pub enum UiBridgeErrorCode {
     UbVlmStructuredParseFail,
 }
 
+#[rustfmt::skip]
 impl UiBridgeErrorCode {
     /// The canonical `UB-` wire string for this code.
     pub fn as_str(&self) -> &'static str {
@@ -211,6 +218,7 @@ impl fmt::Display for ParseUiBridgeErrorCodeError {
 
 impl std::error::Error for ParseUiBridgeErrorCodeError {}
 
+#[rustfmt::skip]
 impl FromStr for UiBridgeErrorCode {
     type Err = ParseUiBridgeErrorCodeError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
