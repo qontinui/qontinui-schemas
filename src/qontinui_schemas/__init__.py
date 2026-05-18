@@ -33,7 +33,7 @@ Usage:
     )
 """
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 # Accessibility module - accessibility tree capture and interaction
 from qontinui_schemas.accessibility import (  # noqa: F401
