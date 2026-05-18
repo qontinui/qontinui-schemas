@@ -12,6 +12,7 @@ specific surface area:
 - ``recording_pipeline``: recording-pipeline async-with-progress runs.
 - ``click_analysis``: click-analysis application-profile tuning.
 - ``vision``: visual-regression perceptual hash + screenshot comparison.
+- ``discovery``: background removal + other discovery-pipeline ops.
 
 The pattern is hand-authored pydantic (NOT Rust-codegen), because the
 runner-side Python dispatcher imports these directly when it handles
