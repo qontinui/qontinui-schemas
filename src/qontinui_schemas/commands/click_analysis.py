@@ -104,11 +104,14 @@ class TuneProfileRequest(BaseModel):
     request_id: UUID = Field(
         description="Correlation id; the response carries the same value.",
     )
-    project_id: UUID = Field(
+    project_id: UUID | None = Field(
+        default=None,
         description=(
             "Project that owns the application profile being tuned "
             "(downstream logging only; the runner is stateless w.r.t. the "
-            "profile row)."
+            "profile row). Optional — the existing tune_profile route does "
+            "not carry a project_id in its URL path or body, so this field "
+            "is permitted to be omitted by callers."
         ),
     )
     profile_name: str = Field(
