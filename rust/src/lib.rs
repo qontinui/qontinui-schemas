@@ -66,3 +66,32 @@ pub mod workflow_step;
 /// Python — these types only ever flow between Rust crates inside this
 /// workspace.
 pub mod wire;
+
+// =========================================================================
+// Forward-compat device-namespace aliases — unified-devices-registry rollout
+// =========================================================================
+//
+// The unified-devices plan renames `Runner` → `Device` across the qontinui
+// ecosystem. This 0.2.0 release ships **only the forward-compat aliases**:
+// the underlying Rust types remain named `Runner*`, with `Device*` aliases
+// added so new consumer code can write `qontinui_types::device::*` against
+// this release.
+//
+// The actual rename direction-flip (move struct defs from `runner` to
+// `device`, reverse the alias direction) is deferred to a coordinated
+// future PR after every consumer has migrated to `device::*` imports and
+// the runner-side `schema_export.rs` registers Device-named schemars
+// titles. Doing the flip prematurely would drift the codegen output
+// (schemars emits the Rust struct's actual name as the schema title)
+// against the runner's hardcoded `add!("Runner", qrn::Runner)` calls.
+//
+// Removed (along with the reverse `runner::*` aliases) once the flip
+// lands. The aliases are additive public API; semver-wise this is a
+// minor bump (0.1.x → 0.2.0).
+pub mod device {
+    pub use crate::runner::*;
+    pub type Device = crate::runner::Runner;
+    pub type DeviceStatus = crate::runner::RunnerStatus;
+    pub type DeviceCrash = crate::runner::RunnerCrash;
+    pub type DeviceUiError = crate::runner::RunnerUiError;
+}

@@ -16,3 +16,9 @@ pub mod webview2;
 
 pub use runner_kind::RunnerKind;
 pub use webview2::webview2_data_dir;
+
+// Forward-compat device-namespace alias — see `crate::device` doc-comment.
+// Added in 0.2.0; removed when the rename direction-flip lands.
+pub mod device_kind {
+    pub use crate::wire::runner_kind::RunnerKind as DeviceKind;
+}
