@@ -55,6 +55,11 @@ pub mod text_norm;
 pub mod ticket_system;
 pub mod tree_events;
 pub mod ui_bridge;
+/// Canonical UI Bridge diagnostic code enum. **Generated** from
+/// `ui-bridge/diagnostics/codes.json` by `ui-bridge/scripts/gen-diagnostics.ts`
+/// — not from a `schemars` Rust source like the rest of this crate. Hand-edits
+/// are overwritten; drift is gated by ui-bridge's `diagnostics:check`.
+pub mod ui_bridge_diagnostics;
 pub mod verification;
 pub mod worker_output;
 pub mod workflow;
