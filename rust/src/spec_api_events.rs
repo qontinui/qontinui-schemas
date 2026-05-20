@@ -32,6 +32,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SpecChanged {
+    /// Owning app id (multi-tenant Spec API). Subscribers filter on this
+    /// to receive only their app's events. `#[serde(default)]` allows
+    /// legacy emitters (pre-multi-app) to omit the field; downstream
+    /// per-app routing treats empty as `qontinui-runner` for back-compat.
+    #[serde(default)]
+    pub app_id: String,
     pub page_id: String,
     /// "ir-and-projection" today; future kinds may include
     /// "projection-only" if a regen runs without an IR write.
@@ -56,6 +62,8 @@ pub enum SpecApiEvent {
     /// `spec_api/spec_check.rs` HTTP handlers after `wrap_snapshot`
     /// returns and before the evaluator runs.
     SpecCheckInvoked {
+        #[serde(default)]
+        app_id: String,
         snapshot_id: String,
         page_ids: Vec<String>,
         /// "http" | "mcp" | "workflow-step"
@@ -66,6 +74,8 @@ pub enum SpecApiEvent {
     /// B — completion roll-up. Payload joins via `snapshot_id`; no fat
     /// result body in the broadcast.
     SpecCheckCompleted {
+        #[serde(default)]
+        app_id: String,
         snapshot_id: String,
         page_count: usize,
         overall_match_rate: f32,
@@ -80,6 +90,8 @@ pub enum SpecApiEvent {
     /// B — workflow-step policy conjunct failed. One emit per failed
     /// `ConjunctEvaluation`.
     SpecCheckPolicyViolation {
+        #[serde(default)]
+        app_id: String,
         snapshot_id: String,
         page_id: String,
         conjunct_name: String,
@@ -92,6 +104,8 @@ pub enum SpecApiEvent {
 
     /// Flywheel — proposal moved `_pending/<id>/` → `pages/<id>/`.
     FlywheelProposalPromoted {
+        #[serde(default)]
+        app_id: String,
         proposal_id: String,
         page_id: String,
         /// Expected 2 per design §6.4.
@@ -103,6 +117,8 @@ pub enum SpecApiEvent {
 
     /// Flywheel — proposal dropped back to the queue after a red B run.
     FlywheelProposalDemoted {
+        #[serde(default)]
+        app_id: String,
         proposal_id: String,
         page_id: String,
         failing_assertion_id: String,
@@ -110,4 +126,19 @@ pub enum SpecApiEvent {
         snapshot_id: String,
         at_ms: u64,
     },
+}
+
+impl SpecApiEvent {
+    /// Owning app id for this event. Used by the per-app broadcast
+    /// router (Stream C) to dispatch events to the right subscribers.
+    pub fn app_id(&self) -> &str {
+        match self {
+            SpecApiEvent::SpecChanged(inner) => &inner.app_id,
+            SpecApiEvent::SpecCheckInvoked { app_id, .. }
+            | SpecApiEvent::SpecCheckCompleted { app_id, .. }
+            | SpecApiEvent::SpecCheckPolicyViolation { app_id, .. }
+            | SpecApiEvent::FlywheelProposalPromoted { app_id, .. }
+            | SpecApiEvent::FlywheelProposalDemoted { app_id, .. } => app_id,
+        }
+    }
 }

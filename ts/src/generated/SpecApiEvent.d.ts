@@ -17,6 +17,7 @@ export type SpecApiEvent =
       type: "spec-changed";
     })
   | {
+      app_id: string;
       at_ms: number;
       /**
        * "http" | "mcp" | "workflow-step"
@@ -28,6 +29,7 @@ export type SpecApiEvent =
       [k: string]: unknown;
     }
   | {
+      app_id: string;
       at_ms: number;
       eval_error_count: number;
       no_match_count: number;
@@ -41,6 +43,7 @@ export type SpecApiEvent =
       [k: string]: unknown;
     }
   | {
+      app_id: string;
       at_ms: number;
       conjunct_name: string;
       /**
@@ -59,6 +62,7 @@ export type SpecApiEvent =
       [k: string]: unknown;
     }
   | {
+      app_id: string;
       at_ms: number;
       /**
        * Expected 2 per design §6.4.
@@ -74,6 +78,7 @@ export type SpecApiEvent =
       [k: string]: unknown;
     }
   | {
+      app_id: string;
       at_ms: number;
       failing_assertion_id: string;
       failing_state_id: string;

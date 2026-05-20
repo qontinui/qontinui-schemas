@@ -28,7 +28,10 @@ from .per_type.api_assertion_operator import ApiAssertionOperator
 from .per_type.api_assertion_type import ApiAssertionType
 from .per_type.api_content_type import ApiContentType
 from .per_type.api_variable_extraction import ApiVariableExtraction
+from .per_type.app import App
+from .per_type.app_error import AppError
 from .per_type.app_event import AppEvent
+from .per_type.app_list_response import AppListResponse
 from .per_type.assertion_miss import AssertionMiss
 from .per_type.assertion_outcome import AssertionOutcome
 from .per_type.assertion_result import AssertionResult
@@ -283,6 +286,7 @@ from .per_type.recommendation_review_decision_payload import RecommendationRevie
 from .per_type.recommended_state import RecommendedState
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
+from .per_type.register_app_request import RegisterAppRequest
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
 from .per_type.repository_watch import RepositoryWatch
 from .per_type.resolved_initial_states import ResolvedInitialStates
@@ -439,6 +443,7 @@ from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
 from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionStep
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
+from .per_type.update_app_request import UpdateAppRequest
 from .per_type.update_mcp_server_input import UpdateMcpServerInput
 from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
@@ -508,7 +513,10 @@ __all__ = [
     "ApiAssertionType",
     "ApiContentType",
     "ApiVariableExtraction",
+    "App",
+    "AppError",
     "AppEvent",
+    "AppListResponse",
     "AssertionMiss",
     "AssertionOutcome",
     "AssertionResult",
@@ -763,6 +771,7 @@ __all__ = [
     "RecommendedState",
     "ReflectionFixOutput",
     "Region",
+    "RegisterAppRequest",
     "RepositoryInactiveCondition",
     "RepositoryWatch",
     "ResolvedInitialStates",
@@ -919,6 +928,7 @@ __all__ = [
     "UiBridgeVisualAssertionStep",
     "UnifiedStep",
     "UnifiedWorkflow",
+    "UpdateAppRequest",
     "UpdateMcpServerInput",
     "UpdateOlConfigRequest",
     "UpdateScheduledTaskRequest",
