@@ -40,7 +40,7 @@ pub struct UpdateAppRequest {
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AppListResponse {
     pub ok: bool,
