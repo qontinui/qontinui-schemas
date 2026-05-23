@@ -32,6 +32,10 @@ export * from "./scheduler/_api";
 // Runner types (canonical Runner entity)
 export * from "./runner/_api";
 
+// Memory types — coord-mediated memory federation (plan
+// `2026-05-22-memories-on-coord-cross-machine.md` Phase 6).
+export * from "./memory/_api";
+
 // Library types
 export * from "./library/_api";
 
