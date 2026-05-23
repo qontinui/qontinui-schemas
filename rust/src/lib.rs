@@ -40,6 +40,7 @@ pub mod findings;
 pub mod geometry;
 pub mod ir;
 pub mod mcp_config;
+pub mod memory;
 pub mod orchestration_config;
 pub mod process_management;
 pub mod rag;
