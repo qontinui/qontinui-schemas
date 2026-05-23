@@ -72,6 +72,19 @@ pub struct SpecCheckResult {
     /// Caller-minted snapshot ID. Format: `"scs_" + ULID()`. See §5.8.
     pub snapshot_id: String,
 
+    /// JCS-canonicalized SHA-256 of the raw snapshot payload, as
+    /// `"sha256-<hex>"`. Available on adapter calls that went through
+    /// `wrap_snapshot` (HTTP / MCP fresh-fetch path); `None` for in-process
+    /// evaluator calls (validator, distinctness check, supplied-snapshot
+    /// path that doesn't precompute it) which either don't have raw bytes
+    /// to hash or chose to skip the JCS round-trip.
+    ///
+    /// Consumers that join spec-check results back to a stored snapshot
+    /// blob should prefer this over `bridge_fingerprint.snapshot_timestamp`
+    /// (timestamps collide; content hashes don't).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_sha256: Option<String>,
+
     /// Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.
     pub spec_content_hash: String,
 

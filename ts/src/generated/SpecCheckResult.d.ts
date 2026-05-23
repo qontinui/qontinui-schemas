@@ -47,6 +47,19 @@ export interface SpecCheckResult {
    */
   snapshotId: string;
   /**
+   * JCS-canonicalized SHA-256 of the raw snapshot payload, as
+   * `"sha256-<hex>"`. Available on adapter calls that went through
+   * `wrap_snapshot` (HTTP / MCP fresh-fetch path); `None` for in-process
+   * evaluator calls (validator, distinctness check, supplied-snapshot
+   * path that doesn't precompute it) which either don't have raw bytes
+   * to hash or chose to skip the JCS round-trip.
+   *
+   * Consumers that join spec-check results back to a stored snapshot
+   * blob should prefer this over `bridge_fingerprint.snapshot_timestamp`
+   * (timestamps collide; content hashes don't).
+   */
+  snapshotSha256?: string | null;
+  /**
    * Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.
    */
   specContentHash: string;
