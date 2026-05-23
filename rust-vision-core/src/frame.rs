@@ -52,6 +52,10 @@ pub enum FrameSourceKind {
     Window,
     Region,
     Synthetic,
+    /// A frame sourced from an external device or app (e.g. a phone serving
+    /// `control/screenshot`, or an adb framebuffer capture) rather than the
+    /// runner's own desktop window.
+    Device,
 }
 
 /// A pixel-space rectangle.
