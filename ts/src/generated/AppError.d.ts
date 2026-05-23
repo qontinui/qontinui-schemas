@@ -12,22 +12,22 @@
  */
 export type AppError =
   | {
-      app_id: string;
+      appId: string;
       reason: "not-registered";
       [k: string]: unknown;
     }
   | {
-      app_id: string;
+      appId: string;
       reason: "invalid-app-id";
       [k: string]: unknown;
     }
   | {
       reason: "invalid-repo-root";
-      repo_root: string;
+      repoRoot: string;
       [k: string]: unknown;
     }
   | {
-      app_id: string;
+      appId: string;
       reason: "already-registered";
       [k: string]: unknown;
     };
