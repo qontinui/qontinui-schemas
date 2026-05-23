@@ -12,7 +12,7 @@
  * disambiguate from `qontinui_types::findings::FindingUserInput`.
  */
 export interface RunnerFindingUserInput {
-  input_type: string;
+  inputType: string;
   options?: string[] | null;
   question: string;
   [k: string]: unknown;
