@@ -16,7 +16,7 @@ class AppError1(BaseModel):
     `qontinui-runner/src-tauri/src/spec_api/responses.rs`.
     """
 
-    app_id: str
+    appId: str
     reason: Literal['not-registered']
 
 
@@ -27,7 +27,7 @@ class AppError2(BaseModel):
     `qontinui-runner/src-tauri/src/spec_api/responses.rs`.
     """
 
-    app_id: str
+    appId: str
     reason: Literal['invalid-app-id']
 
 
@@ -39,7 +39,7 @@ class AppError3(BaseModel):
     """
 
     reason: Literal['invalid-repo-root']
-    repo_root: str
+    repoRoot: str
 
 
 class AppError4(BaseModel):
@@ -49,7 +49,7 @@ class AppError4(BaseModel):
     `qontinui-runner/src-tauri/src/spec_api/responses.rs`.
     """
 
-    app_id: str
+    appId: str
     reason: Literal['already-registered']
 
 

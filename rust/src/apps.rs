@@ -51,7 +51,11 @@ pub struct AppListResponse {
 /// `responses::SpecError` tagged-enum pattern in
 /// `qontinui-runner/src-tauri/src/spec_api/responses.rs`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, thiserror::Error)]
-#[serde(tag = "reason", rename_all = "kebab-case")]
+#[serde(
+    tag = "reason",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum AppError {
     #[error("app id '{app_id}' is not registered")]
     NotRegistered { app_id: String },
