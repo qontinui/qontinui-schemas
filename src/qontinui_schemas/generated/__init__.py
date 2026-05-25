@@ -95,6 +95,7 @@ from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
 from .per_type.decomposer_config import DecomposerConfig
 from .per_type.dev_seed_finding_payload import DevSeedFindingPayload
+from .per_type.device_branch_summary import DeviceBranchSummary
 from .per_type.diagnose_phase_config import DiagnosePhaseConfig
 from .per_type.diagnostic_result import DiagnosticResult
 from .per_type.discovered_element import DiscoveredElement
@@ -172,6 +173,8 @@ from .per_type.flow_event import FlowEvent
 from .per_type.full_runner_step import FullRunnerStep
 from .per_type.gui_element_chunk import GUIElementChunk
 from .per_type.gate_evaluation_result import GateEvaluationResult
+from .per_type.git_op_list_response import GitOpListResponse
+from .per_type.git_op_record import GitOpRecord
 from .per_type.health_check_url import HealthCheckUrl
 from .per_type.historical_action_query import HistoricalActionQuery
 from .per_type.historical_action_result import HistoricalActionResult
@@ -292,6 +295,7 @@ from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommendation_review_decision_payload import RecommendationReviewDecisionPayload
 from .per_type.recommended_state import RecommendedState
+from .per_type.record_git_op_request import RecordGitOpRequest
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
 from .per_type.register_app_request import RegisterAppRequest
@@ -588,6 +592,7 @@ __all__ = [
     "DagLoopStep",
     "DecomposerConfig",
     "DevSeedFindingPayload",
+    "DeviceBranchSummary",
     "DiagnosePhaseConfig",
     "DiagnosticResult",
     "DiscoveredElement",
@@ -665,6 +670,8 @@ __all__ = [
     "FullRunnerStep",
     "GUIElementChunk",
     "GateEvaluationResult",
+    "GitOpListResponse",
+    "GitOpRecord",
     "HealthCheckUrl",
     "HistoricalActionQuery",
     "HistoricalActionResult",
@@ -785,6 +792,7 @@ __all__ = [
     "ReadConfigResponse",
     "RecommendationReviewDecisionPayload",
     "RecommendedState",
+    "RecordGitOpRequest",
     "ReflectionFixOutput",
     "Region",
     "RegisterAppRequest",
