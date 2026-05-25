@@ -111,4 +111,39 @@ export interface IRDocument {
 
   /** ID of the initial/starting state, if applicable. */
   initialState?: string;
+
+  /** Per-page API-contract assertions evaluated by the Spec CI harness. */
+  apiAssertions?: IRApiCheck[];
 }
+
+// ---------------------------------------------------------------------------
+// API-contract checks (Spec CI harness)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single API-contract check: issue a request, validate the response.
+ */
+export interface IRApiCheck {
+  id: string;
+  description?: string;
+  request: {
+    method: string;
+    path: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+  };
+  effect?: "read" | "write" | "destructive";
+  assertions: IRApiAssertion[];
+}
+
+/**
+ * API assertion: either a value-level assertion (status_code, json_path, etc.)
+ * or a schema-conformance assertion (conforms_to -- Phase 2 placeholder).
+ */
+export type IRApiAssertion =
+  | { type: "status_code"; expected: unknown; operator?: string }
+  | { type: "json_path"; jsonPath: string; expected: unknown; operator?: string }
+  | { type: "header"; headerName: string; expected: unknown; operator?: string }
+  | { type: "body_contains"; expected: unknown }
+  | { type: "response_time"; expected: unknown; operator?: string }
+  | { type: "conforms_to"; schema: string };
