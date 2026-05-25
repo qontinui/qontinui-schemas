@@ -447,6 +447,10 @@ from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
 from .per_type.ui_bridge_design_audit_step import UiBridgeDesignAuditStep
+from .per_type.ui_bridge_http_error_envelope import UiBridgeHttpErrorEnvelope
+from .per_type.ui_bridge_http_health_app_info import UiBridgeHttpHealthAppInfo
+from .per_type.ui_bridge_http_health_data import UiBridgeHttpHealthData
+from .per_type.ui_bridge_http_health_envelope import UiBridgeHttpHealthEnvelope
 from .per_type.ui_bridge_request_envelope import UiBridgeRequestEnvelope
 from .per_type.ui_bridge_response_envelope import UiBridgeResponseEnvelope
 from .per_type.ui_bridge_severity import UiBridgeSeverity
@@ -944,6 +948,10 @@ __all__ = [
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
     "UiBridgeDesignAuditStep",
+    "UiBridgeHttpErrorEnvelope",
+    "UiBridgeHttpHealthAppInfo",
+    "UiBridgeHttpHealthData",
+    "UiBridgeHttpHealthEnvelope",
     "UiBridgeRequestEnvelope",
     "UiBridgeResponseEnvelope",
     "UiBridgeSeverity",
