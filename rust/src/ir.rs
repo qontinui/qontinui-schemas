@@ -29,7 +29,7 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 // ---------------------------------------------------------------------------
 // Element criteria
@@ -299,6 +299,86 @@ pub struct IrPageSpec {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_state: Option<String>,
+
+    /// Per-page API-contract assertions evaluated by the Spec CI harness.
+    /// Phase 1: value-level assertions (status_code, json_path, header,
+    /// body_contains, response_time). Phase 2 will add schema conformance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_assertions: Option<Vec<IrApiCheck>>,
+}
+
+// ---------------------------------------------------------------------------
+// API-contract checks (evaluated by the Spec CI harness, not in-browser).
+//
+// Each `IrApiCheck` describes an HTTP request to issue against the running
+// backend and a set of assertions to evaluate against the response. The
+// harness uses Playwright's `APIRequestContext` so auth cookies are shared.
+// ---------------------------------------------------------------------------
+
+/// A single API-contract check: issue a request, validate the response.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct IrApiCheck {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub request: IrApiRequest,
+    #[serde(default = "default_read_effect")]
+    pub effect: String,
+    pub assertions: Vec<IrApiAssertion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct IrApiRequest {
+    pub method: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<serde_json::Value>,
+}
+
+/// API assertion: either a value-level assertion (status_code, json_path, etc.)
+/// or a schema-conformance assertion (conforms_to — Phase 2 placeholder).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
+pub enum IrApiAssertion {
+    #[serde(rename = "status_code")]
+    StatusCode {
+        expected: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        operator: Option<String>,
+    },
+    #[serde(rename = "json_path")]
+    JsonPath {
+        json_path: String,
+        expected: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        operator: Option<String>,
+    },
+    #[serde(rename = "header")]
+    Header {
+        header_name: String,
+        expected: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        operator: Option<String>,
+    },
+    #[serde(rename = "body_contains")]
+    BodyContains { expected: serde_json::Value },
+    #[serde(rename = "response_time")]
+    ResponseTime {
+        expected: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        operator: Option<String>,
+    },
+    #[serde(rename = "conforms_to")]
+    ConformsTo { schema: String },
+}
+
+fn default_read_effect() -> String {
+    "read".to_string()
 }
 
 // ---------------------------------------------------------------------------
