@@ -27,6 +27,12 @@ import type { ProposalStatus } from './ProposalStatus';
  * surface — the projection layer derives the runtime `LegacySpec` from this.
  */
 export interface IrPageSpec {
+  /**
+   * Per-page API-contract assertions evaluated by the Spec CI harness.
+   * Phase 1: value-level assertions (status_code, json_path, header,
+   * body_contains, response_time). Phase 2 will add schema conformance.
+   */
+  apiAssertions?: IrApiCheck[] | null;
   description?: string | null;
   id: string;
   initialState?: string | null;
