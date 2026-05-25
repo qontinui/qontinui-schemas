@@ -6112,6 +6112,7 @@ fn process_state_snake_case() {
         (ProcessState::Healthy, "\"healthy\""),
         (ProcessState::Stopping, "\"stopping\""),
         (ProcessState::Failed, "\"failed\""),
+        (ProcessState::ExternallyOwned, "\"externally_owned\""),
     ];
     for (state, expected) in cases {
         let json = serde_json::to_string(&state).unwrap();

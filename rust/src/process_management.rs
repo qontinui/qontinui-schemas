@@ -59,6 +59,10 @@ pub enum ParserType {
 /// Ordering mirrors the lifecycle progression:
 /// `Stopped → Starting → (Building) → Running → Healthy → Stopping → Stopped`,
 /// or to `Failed` on any abnormal exit.
+/// `ExternallyOwned` is a special out-of-band state meaning "a process is
+/// running on our port, but this runner did not spawn it" — used by the
+/// process-reconcile feature to surface port squatters without touching the
+/// normal lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessState {
@@ -69,6 +73,9 @@ pub enum ProcessState {
     Healthy,
     Stopping,
     Failed,
+    /// A process is running on our configured port but was not spawned by this
+    /// runner. The runner will not attempt to stop or restart it.
+    ExternallyOwned,
 }
 
 // ============================================================================
