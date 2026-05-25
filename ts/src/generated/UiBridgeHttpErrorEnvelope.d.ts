@@ -23,12 +23,12 @@
  * Modeled as a *generic* error envelope rather than a one-off
  * `NoBrowserConnected` type: the `{success:false, code, message}` shape is
  * the canonical structured-error contract for the whole proxy surface (not
- * just the no-browser path), so a single reusable type is the more scalable
- * + cleaner home. `code` stays a free-form `String` — the discriminator set
- * (currently just `NO_BROWSER_CONNECTED`) is expected to grow, and pinning
- * it to an enum here would force a schemas release on every new proxy error
- * code. `success` is always `false` on this envelope (the success path uses
- * [`UiBridgeHttpHealthEnvelope`] / the SDK's own envelopes).
+ * just the no-browser path), so a single reusable type is the more
+ * scalable and cleaner home. `code` stays a free-form `String` — the
+ * discriminator set (currently just `NO_BROWSER_CONNECTED`) is expected to
+ * grow, and pinning it to an enum here would force a schemas release on every
+ * new proxy error code. `success` is always `false` on this envelope (the
+ * success path uses [`UiBridgeHttpHealthEnvelope`] / the SDK's own envelopes).
  */
 export interface UiBridgeHttpErrorEnvelope {
   /**
