@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.5.0...ts-v0.6.0) (2026-05-25)
+
+
+### Features
+
+* **process-state:** add ExternallyOwned variant + regenerate bindings ([#65](https://github.com/qontinui/qontinui-schemas/issues/65)) ([89058f6](https://github.com/qontinui/qontinui-schemas/commit/89058f673fb0adfda8716c0b4ed9198805a11f88))
+* **spec-check:** add snapshot_sha256 field to SpecCheckResult ([#60](https://github.com/qontinui/qontinui-schemas/issues/60)) ([95af1aa](https://github.com/qontinui/qontinui-schemas/commit/95af1aa8b3d0090fadb46f2f160dc81d8e738644))
+
+
+### Bug Fixes
+
+* **apps:** serialize AppError fields as camelCase ([#61](https://github.com/qontinui/qontinui-schemas/issues/61)) ([6c0cf31](https://github.com/qontinui/qontinui-schemas/commit/6c0cf311ef2ac1dc2c05081f0bc5a07fce18429a))
+
 ## [0.5.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.4.0...ts-v0.5.0) (2026-05-23)
 
 
