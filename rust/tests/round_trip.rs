@@ -8882,6 +8882,98 @@ fn ui_bridge_response_envelope_failure_with_hint_roundtrips() {
     assert!(back.hint.is_some());
 }
 
+#[test]
+fn ui_bridge_http_error_envelope_matches_proxy_no_browser_shape() {
+    use qontinui_types::app_events::UiBridgeHttpErrorEnvelope;
+
+    // Mirrors `qontinui-web/frontend/src/app/api/ui-bridge/[...path]/route.ts`
+    // `noBrowserResponse()` — the canonical NO_BROWSER_CONNECTED 503 body.
+    let envelope = UiBridgeHttpErrorEnvelope {
+        success: false,
+        code: "NO_BROWSER_CONNECTED".to_string(),
+        message: "/control/discover requires a browser SDK client".to_string(),
+    };
+    let actual: Value = serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
+    let golden = json!({
+        "success": false,
+        "code": "NO_BROWSER_CONNECTED",
+        "message": "/control/discover requires a browser SDK client"
+    });
+    assert_eq!(
+        actual, golden,
+        "UiBridgeHttpErrorEnvelope wire shape must match the proxy 503 body",
+    );
+
+    let back: UiBridgeHttpErrorEnvelope =
+        serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
+    assert!(!back.success);
+    assert_eq!(back.code, "NO_BROWSER_CONNECTED");
+}
+
+#[test]
+fn ui_bridge_http_health_envelope_matches_sdk_health_shape() {
+    use qontinui_types::app_events::{
+        UiBridgeHttpHealthAppInfo, UiBridgeHttpHealthData, UiBridgeHttpHealthEnvelope,
+    };
+
+    // Mirrors `@qontinui/ui-bridge/server` `handleRelayRoute` GET /health
+    // (`nextjs.ts`): success + typed data + timestamp + uiBridge metadata.
+    let envelope = UiBridgeHttpHealthEnvelope {
+        success: true,
+        data: UiBridgeHttpHealthData {
+            responsive: false,
+            last_heartbeat: 0,
+        },
+        timestamp: 1_713_200_000_000,
+        ui_bridge: Some(UiBridgeHttpHealthAppInfo {
+            app_id: "qontinui-web".to_string(),
+            app_name: "Qontinui Web".to_string(),
+            app_type: "web".to_string(),
+            framework: "nextjs".to_string(),
+            capabilities: vec![
+                "control".to_string(),
+                "renderLog".to_string(),
+                "debug".to_string(),
+            ],
+        }),
+    };
+    let actual: Value = serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
+    let golden = json!({
+        "success": true,
+        "data": { "responsive": false, "lastHeartbeat": 0 },
+        "timestamp": 1_713_200_000_000_i64,
+        "uiBridge": {
+            "appId": "qontinui-web",
+            "appName": "Qontinui Web",
+            "appType": "web",
+            "framework": "nextjs",
+            "capabilities": ["control", "renderLog", "debug"]
+        }
+    });
+    assert_eq!(
+        actual, golden,
+        "UiBridgeHttpHealthEnvelope wire shape must match the SDK /health body",
+    );
+
+    // `uiBridge` is optional — omitted when the server has no appInfo.
+    let no_app = UiBridgeHttpHealthEnvelope {
+        success: true,
+        data: UiBridgeHttpHealthData {
+            responsive: true,
+            last_heartbeat: 42,
+        },
+        timestamp: 1,
+        ui_bridge: None,
+    };
+    let actual_no_app: Value =
+        serde_json::from_str(&serde_json::to_string(&no_app).unwrap()).unwrap();
+    assert!(
+        actual_no_app.get("uiBridge").is_none(),
+        "None uiBridge must be skipped",
+    );
+    assert_eq!(actual_no_app["data"]["lastHeartbeat"], 42);
+}
+
 // ── worker_output ───────────────────────────────────────────────────────────
 
 use qontinui_types::worker_output::*;

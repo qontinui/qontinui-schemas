@@ -599,3 +599,119 @@ pub struct CanvasPanel {
     pub created_at: String,
     pub updated_at: String,
 }
+
+// ============================================================================
+// UI Bridge HTTP envelopes — the Next.js `/api/ui-bridge/*` HTTP surface
+// ============================================================================
+//
+// These model the JSON bodies the *HTTP* UI-Bridge surface returns, as
+// distinct from [`UiBridgeResponseEnvelope`] above (which is the runner's
+// WS/relay IPC envelope and always carries `requestId` / `type` / `timestamp`).
+// The HTTP envelopes below lack those fields, so they need their own canonical
+// types — `conforms_to: "UiBridgeResponseEnvelope"` correctly rejects them.
+//
+// They are the source-of-truth for the Spec-CI `conforms_to` C1 contract
+// checks on `frontend/specs/pages/ui-bridge-states/state-machine.derived.json`
+// in qontinui-web, which validate the live `/api/ui-bridge/*` responses
+// against these schemas via ajv.
+
+/// Canonical error envelope for the qontinui-web Next.js UI-Bridge proxy.
+///
+/// The catch-all route at
+/// `qontinui-web/frontend/src/app/api/ui-bridge/[...path]/route.ts`
+/// short-circuits requests the SDK would otherwise 404 on — and the
+/// browser-required routes that can't respond without a live SDK client —
+/// to a structured HTTP 503 with this body
+/// (`route.ts::noBrowserResponse`):
+///
+/// ```json
+/// { "success": false, "code": "NO_BROWSER_CONNECTED",
+///   "message": "<path> requires a browser SDK client" }
+/// ```
+///
+/// Modeled as a *generic* error envelope rather than a one-off
+/// `NoBrowserConnected` type: the `{success:false, code, message}` shape is
+/// the canonical structured-error contract for the whole proxy surface (not
+/// just the no-browser path), so a single reusable type is the more
+/// scalable and cleaner home. `code` stays a free-form `String` — the
+/// discriminator set (currently just `NO_BROWSER_CONNECTED`) is expected to
+/// grow, and pinning it to an enum here would force a schemas release on every
+/// new proxy error code. `success` is always `false` on this envelope (the
+/// success path uses [`UiBridgeHttpHealthEnvelope`] / the SDK's own envelopes).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct UiBridgeHttpErrorEnvelope {
+    /// Always `false` — this envelope is only emitted on the error path.
+    pub success: bool,
+    /// Machine-readable error discriminator (e.g. `"NO_BROWSER_CONNECTED"`).
+    pub code: String,
+    /// Human-readable explanation (e.g. `"<path> requires a browser SDK client"`).
+    pub message: String,
+}
+
+/// Inner `data` payload of the UI-Bridge SDK HTTP health envelope.
+///
+/// Emitted by the SDK's relay-transport handler for `GET /health`
+/// (`@qontinui/ui-bridge/server` `handleRelayRoute`, `nextjs.ts`): the
+/// `responsive` + `lastHeartbeat` fields plus a spread of the relay's
+/// `TransportDiagnostics`. Only `responsive` and `lastHeartbeat` are modeled
+/// explicitly here — the diagnostics spread (pendingCommandCount, connectedTabs,
+/// buildId, …) is intentionally left open (no `additionalProperties: false`,
+/// which schemars omits by default) so the diagnostics surface can evolve
+/// without a schemas release while the two stable health signals stay typed.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UiBridgeHttpHealthData {
+    /// True when at least one connected tab has a fresh heartbeat.
+    pub responsive: bool,
+    /// Max heartbeat timestamp (ms since epoch) across all tabs; `0` when none.
+    pub last_heartbeat: i64,
+}
+
+/// UI-Bridge metadata block included in the health envelope for the app
+/// discovery scanner. Spread of `config.appInfo` plus a fixed `capabilities`
+/// list. Present only when the server is configured with `appInfo` (the
+/// qontinui-web proxy always is — `route.ts` sets `appId: "qontinui-web"`).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UiBridgeHttpHealthAppInfo {
+    /// Stable app identifier (e.g. `"qontinui-web"`).
+    pub app_id: String,
+    /// Human-readable app name.
+    pub app_name: String,
+    /// App surface type (e.g. `"web"`).
+    pub app_type: String,
+    /// UI framework (e.g. `"nextjs"`).
+    pub framework: String,
+    /// Advertised UI-Bridge capabilities (e.g. `["control","renderLog","debug"]`).
+    pub capabilities: Vec<String>,
+}
+
+/// Canonical success envelope for `GET /api/ui-bridge/health`.
+///
+/// Distinct from [`UiBridgeResponseEnvelope`]: the HTTP health envelope has
+/// no `requestId` / `type`, and carries an app-discovery `uiBridge` block.
+/// Wire shape (`nextjs.ts::handleRelayRoute`):
+///
+/// ```json
+/// { "success": true,
+///   "data": { "responsive": false, "lastHeartbeat": 0, ...diagnostics },
+///   "timestamp": 1713200000000,
+///   "uiBridge": { "appId": "qontinui-web", ..., "capabilities": [...] } }
+/// ```
+///
+/// `uiBridge` is optional (omitted when the server has no `appInfo`); the
+/// other three fields are always present.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UiBridgeHttpHealthEnvelope {
+    /// Always `true` on the health path.
+    pub success: bool,
+    /// Transport-diagnostics payload (typed signals + open diagnostics spread).
+    pub data: UiBridgeHttpHealthData,
+    /// Server-side timestamp (ms since epoch) of when the response was produced.
+    pub timestamp: i64,
+    /// App-discovery metadata; present only when the server is configured
+    /// with `appInfo`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_bridge: Option<UiBridgeHttpHealthAppInfo>,
+}
