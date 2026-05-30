@@ -14,15 +14,16 @@ What this means for you as a contributor:
 
 If your employer has policies about contributing to AGPL projects, please confirm with them before you submit a PR.
 
-## Contributor License Agreement (CLA)
+## Developer Certificate of Origin (DCO)
 
-All non-trivial contributions require signing the qontinui CLA before they can be merged. The CLA grants Joshua Spinak (the project author) the right to relicense your contribution under any future license — this is the standard open-core pattern (Apache, Google, MongoDB, GitLab all use a similar CLA) and exists so the project can adapt its license posture in the future without re-litigating contributor consent.
+Contributions are accepted under the **Developer Certificate of Origin (DCO) 1.1** — *not* a CLA. The DCO text is kept in [`DCO.txt`](DCO.txt) for reference. Certify that you wrote (or otherwise have the right to submit) your contribution by adding a `Signed-off-by` trailer to every commit:
 
-The CLA does **not** transfer copyright. You retain copyright in your contributions; you grant a relicensing right.
+    git commit -s -m "your message"
 
-**How to sign:** the project uses [cla-assistant.io](https://cla-assistant.io/) — when you open a pull request, the CLA bot will comment with a one-click link. Sign once and the bot remembers you across all qontinui repositories. The CLA text is also kept in [`CLA.md`](CLA.md) for reference.
+This appends `Signed-off-by: Your Name <your@email>` from your `git config user.name` / `user.email`. The DCO bot verifies the trailer on every PR commit. Your contributions are licensed inbound under the same `AGPL-3.0-or-later` as the project (inbound = outbound); you retain copyright in your contributions. No relicensing rights are granted — the dual-/commercial-license lever is retained only on the embeddable `ui-bridge` library (via its CLA), not on the apps/libraries in this repository.
 
-Trivial changes (typo fixes, single-line documentation tweaks) do not require a CLA, at the maintainer's discretion.
+Trivial changes (typo fixes, single-line documentation tweaks) still benefit from a sign-off but the maintainer may waive it at their discretion.
+
 
 ## Code style
 
@@ -40,7 +41,7 @@ This repository follows the conventions documented in `CLAUDE.md` (project root)
 2. Make your change. Add tests where appropriate.
 3. Run the local checks (lint, format, tests) — the per-repo `README` documents the exact commands.
 4. Open a pull request against `main`. Describe the *why* in the PR body, not the *what* — the diff already shows the *what*.
-5. Sign the CLA if the bot prompts you.
+5. Ensure every commit carries a `Signed-off-by` trailer (`git commit -s`) — the DCO bot checks this.
 6. A maintainer will review. Expect feedback; we keep the bar high because every change becomes part of the shipped product.
 
 ## CI & Merge Readiness
