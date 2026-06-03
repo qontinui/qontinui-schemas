@@ -39,8 +39,16 @@ pub struct Element {
     /// Stable identifier. Matches the SDK's element registry id where one
     /// exists; otherwise an opaque token.
     pub id: String,
-    /// Pixel-space bounding box.
-    pub bbox: Region,
+    /// Pixel-space bounding box. `None` when the snapshot source could not
+    /// measure geometry (e.g. a mobile `discover` snapshot that includes
+    /// hidden/unmeasured elements). Geometry-based analyzers/assertions
+    /// SKIP bbox-less elements (they surface no spurious findings); the
+    /// element is still counted for non-geometry checks (interactivity,
+    /// text presence, typography). Web snapshots always populate this, so
+    /// `Option` is a strict superset — existing payloads round-trip
+    /// byte-identically (`skip_serializing_if` omits `None`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bbox: Option<Region>,
     /// Visible text content (innerText / accessibilityLabel equivalent).
     /// `None` when the element has no text or the snapshot source didn't
     /// populate it.

@@ -75,12 +75,12 @@ mod tests {
     fn text_el(id: &str, family: &str, size: f32) -> Element {
         Element {
             id: id.to_string(),
-            bbox: Region {
+            bbox: Some(Region {
                 x: 0,
                 y: 0,
                 w: 10,
                 h: 10,
-            },
+            }),
             text: Some("x".into()),
             role: None,
             interactable: false,
