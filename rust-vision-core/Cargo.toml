@@ -11,9 +11,17 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.10"
 
 [dev-dependencies]
 proptest = "1"
 tempfile = "3"
-serde_json = "1"
+
+# Standalone analyzer CLI — a hermetic, version-pinned wrapper over this
+# crate's analyzer + assertion API, runnable in CI WITHOUT a qontinui-runner
+# process. The runner's `/vision/*` HTTP endpoints remain a parallel consumer
+# of the same library code.
+[[bin]]
+name = "vision-audit"
+path = "src/bin/vision_audit.rs"
