@@ -8409,6 +8409,7 @@ fn action_response_roundtrips() {
         stack: None,
         duration_ms: 42,
         timestamp: 1713200000000,
+        effect_verification: None,
     };
     let json = serde_json::to_string(&resp).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
@@ -8417,6 +8418,10 @@ fn action_response_roundtrips() {
         "None element_state skipped"
     );
     assert!(v.get("error").is_none(), "None error skipped");
+    assert!(
+        v.get("effectVerification").is_none(),
+        "None effect_verification skipped"
+    );
     let back: ActionResponse = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
