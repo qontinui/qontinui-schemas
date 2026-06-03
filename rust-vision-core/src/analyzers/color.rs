@@ -22,14 +22,13 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
         // Otherwise approximate from the rendered pixels.
         let (fg, bg) = match (el.fg_color, el.bg_color) {
             (Some(f), Some(b)) => (f, b),
-            _ => {
-                let sampled = sample_dominant_two(frame, el.bbox);
-                if let Some(pair) = sampled {
-                    pair
-                } else {
-                    continue;
-                }
-            }
+            // No declared colors: fall back to sampling the frame under the
+            // element's bbox. Requires geometry — bbox-less elements can't be
+            // sampled, so they're skipped (no contrast finding).
+            _ => match el.bbox.and_then(|bbox| sample_dominant_two(frame, bbox)) {
+                Some(pair) => pair,
+                None => continue,
+            },
         };
         checked += 1;
         let ratio = wcag_contrast(fg, bg);

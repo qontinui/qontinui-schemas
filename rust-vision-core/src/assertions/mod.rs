@@ -200,7 +200,11 @@ impl BaselineEntry {
     pub fn from_snapshot(snapshot: &ElementSnapshot) -> Self {
         let mut element_bboxes = HashMap::with_capacity(snapshot.elements.len());
         for el in &snapshot.elements {
-            element_bboxes.insert(el.id.clone(), el.bbox);
+            // Only positioned elements can be baselined for layout-shift; a
+            // bbox-less element has no geometry to compare against later.
+            if let Some(bbox) = el.bbox {
+                element_bboxes.insert(el.id.clone(), bbox);
+            }
         }
         Self { element_bboxes }
     }
@@ -320,10 +324,28 @@ fn eval_no_overlap(
             )
         }
     };
+    let a_bbox = match a.bbox {
+        Some(bb) => bb,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{}' has no geometry (bbox)", elements[0]),
+            )
+        }
+    };
+    let b_bbox = match b.bbox {
+        Some(bb) => bb,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{}' has no geometry (bbox)", elements[1]),
+            )
+        }
+    };
     let tol = tolerance_px.unwrap_or(0);
-    let inset = inset_region(a.bbox, tol);
-    if regions_overlap(inset, b.bbox) {
-        let pixels = intersection(a.bbox, b.bbox).map(|i| i.w * i.h).unwrap_or(0);
+    let inset = inset_region(a_bbox, tol);
+    if regions_overlap(inset, b_bbox) {
+        let pixels = intersection(a_bbox, b_bbox).map(|i| i.w * i.h).unwrap_or(0);
         return AssertionResult::fail(
             assertion,
             format!(
@@ -361,7 +383,10 @@ fn eval_contains_text(
     // back to OCR blocks supplied by the caller.
     let bbox = match &target {
         TextTarget::Element(t) => match ctx.snapshot.and_then(|s| s.get(&t.element)) {
-            Some(e) => Some(e.bbox),
+            // `e.bbox` is itself Option — a bbox-less element yields `None`
+            // here, which simply disables the OCR-region fallback below (the
+            // snapshot-text path still works).
+            Some(e) => e.bbox,
             None => {
                 return AssertionResult::fail(
                     assertion,
@@ -480,15 +505,24 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     if el.text.is_none() {
         return AssertionResult::pass_with(assertion, "element has no text — vacuously fits");
     }
+    let bbox = match el.bbox {
+        Some(bb) => bb,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{element}' has no geometry (bbox) — cannot check text fit"),
+            )
+        }
+    };
     if let Some(size) = el.font_size_px {
         // Reasonable upper bound: text line height is ~font_size * 1.5.
         let needed = (size * 1.5).ceil() as u32;
-        if el.bbox.h < needed {
+        if bbox.h < needed {
             return AssertionResult::fail(
                 assertion,
                 format!(
                     "element height {} px is less than ~1.5×{}px font ({needed} px expected) — text likely clipped",
-                    el.bbox.h, size
+                    bbox.h, size
                 ),
             );
         }
@@ -532,9 +566,18 @@ fn eval_aligned(
             Some(e) => e,
             None => return AssertionResult::fail(assertion, format!("element '{id}' not found")),
         };
+        let bbox = match el.bbox {
+            Some(bb) => bb,
+            None => {
+                return AssertionResult::fail(
+                    assertion,
+                    format!("element '{id}' has no geometry (bbox) — cannot check alignment"),
+                )
+            }
+        };
         let v = match axis {
-            AlignAxis::Horizontal => el.bbox.y,
-            AlignAxis::Vertical => el.bbox.x,
+            AlignAxis::Horizontal => bbox.y,
+            AlignAxis::Vertical => bbox.x,
         };
         values.push((id.clone(), v));
     }
@@ -750,11 +793,13 @@ fn eval_layout_shift(
     let tol = tolerance_px.unwrap_or(2);
     let mut worst: Option<(String, u32)> = None;
     for el in &snap.elements {
+        // Skip bbox-less elements: no current geometry to compare to baseline.
+        let Some(cur) = el.bbox else { continue };
         if let Some(prev) = entry.element_bboxes.get(&el.id) {
-            let dx = prev.x.abs_diff(el.bbox.x);
-            let dy = prev.y.abs_diff(el.bbox.y);
-            let dw = prev.w.abs_diff(el.bbox.w);
-            let dh = prev.h.abs_diff(el.bbox.h);
+            let dx = prev.x.abs_diff(cur.x);
+            let dy = prev.y.abs_diff(cur.y);
+            let dw = prev.w.abs_diff(cur.w);
+            let dh = prev.h.abs_diff(cur.h);
             let drift = dx.max(dy).max(dw).max(dh);
             if drift > tol {
                 let candidate = (el.id.clone(), drift);
@@ -780,21 +825,27 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         Ok(s) => s,
         Err(r) => return r,
     };
-    // Build a parent → bbox map for O(1) lookup.
+    // Build a parent → bbox map for O(1) lookup. Only positioned elements
+    // are clip candidates / clip ancestors.
     let mut bbox_by_id: HashMap<&str, Region> = HashMap::with_capacity(snap.elements.len());
     for el in &snap.elements {
-        bbox_by_id.insert(el.id.as_str(), el.bbox);
+        if let Some(bbox) = el.bbox {
+            bbox_by_id.insert(el.id.as_str(), bbox);
+        }
     }
     let mut offender: Option<(String, String)> = None;
     for el in &snap.elements {
+        // A bbox-less child has no geometry to clip — skip it.
+        let Some(el_bbox) = el.bbox else { continue };
         if let Some(parent_id) = &el.parent_id {
+            // Parent must also be positioned to be a clip ancestor.
             if let Some(parent_bbox) = bbox_by_id.get(parent_id.as_str()) {
                 if let Some(r) = scope {
-                    if !regions_overlap(r, el.bbox) {
+                    if !regions_overlap(r, el_bbox) {
                         continue;
                     }
                 }
-                if !region_contains(*parent_bbox, el.bbox) {
+                if !region_contains(*parent_bbox, el_bbox) {
                     offender = Some((el.id.clone(), parent_id.clone()));
                     break;
                 }
@@ -856,7 +907,7 @@ mod tests {
     fn el(id: &str, x: u32, y: u32, w: u32, h: u32) -> Element {
         Element {
             id: id.into(),
-            bbox: Region { x, y, w, h },
+            bbox: Some(Region { x, y, w, h }),
             text: None,
             role: None,
             interactable: false,
@@ -1060,6 +1111,66 @@ mod tests {
             &ctx,
         );
         assert!(res.passed);
+    }
+
+    #[test]
+    fn no_overlap_fails_clearly_when_element_has_no_geometry() {
+        // An assertion targeting a bbox-less element fails with a clear
+        // "no geometry" reason, NOT a panic.
+        let mut a = el("a", 0, 0, 50, 50);
+        a.bbox = None;
+        let snap = snap_of(vec![a, el("b", 100, 100, 50, 50)]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            },
+            &ctx,
+        );
+        assert!(!res.passed);
+        assert!(
+            res.detail.as_deref().unwrap_or("").contains("no geometry"),
+            "expected a 'no geometry' detail, got {:?}",
+            res.detail
+        );
+    }
+
+    #[test]
+    fn mixed_bbox_snapshot_deserializes_and_evaluates() {
+        // The canonical mobile-discover shape: one element omits `bbox`
+        // entirely. It must deserialize (bbox = None) and a geometry-free
+        // assertion path (contains_text via snapshot text) must work.
+        let json = r#"{
+            "elements": [
+                {"id": "title", "bbox": {"x": 0, "y": 0, "w": 200, "h": 30}, "text": "Runs"},
+                {"id": "hidden", "text": "offscreen", "interactable": true}
+            ]
+        }"#;
+        let snap: ElementSnapshot = serde_json::from_str(json).expect("must deserialize");
+        assert_eq!(snap.elements.len(), 2);
+        assert!(snap.get("title").unwrap().bbox.is_some());
+        assert!(snap.get("hidden").unwrap().bbox.is_none());
+
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        // contains_text on the bbox-less element via its snapshot text works.
+        let res = evaluate(
+            &Assertion::ContainsText {
+                target: TextTarget::Element(ElementTextTarget {
+                    element: "hidden".into(),
+                }),
+                text: "offscreen".into(),
+                kind: TextMatchKind::Contains,
+            },
+            &ctx,
+        );
+        assert!(res.passed, "{:?}", res.detail);
     }
 
     #[test]

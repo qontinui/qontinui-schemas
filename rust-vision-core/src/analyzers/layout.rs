@@ -7,10 +7,15 @@ use crate::element_snapshot::{intersection, ElementSnapshot};
 pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
 
-    let interactive: Vec<&_> = snapshot
+    // Only positioned (bbox-bearing) interactive elements participate in the
+    // geometry checks; bbox-less elements (e.g. unmeasured mobile-discover
+    // nodes) are silently skipped here — they carry no geometry to reason
+    // about and must not produce spurious findings.
+    let interactive: Vec<(&_, crate::frame::Region)> = snapshot
         .elements
         .iter()
         .filter(|e| e.interactable)
+        .filter_map(|e| e.bbox.map(|b| (e, b)))
         .collect();
 
     // 1. Pairwise overlap among interactive elements (the high-leverage check
@@ -18,12 +23,12 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     // the whole Phase 6 design).
     for i in 0..interactive.len() {
         for j in (i + 1)..interactive.len() {
-            let a = interactive[i];
-            let b = interactive[j];
-            if let Some(inter) = intersection(a.bbox, b.bbox) {
+            let (a, a_bbox) = interactive[i];
+            let (b, b_bbox) = interactive[j];
+            if let Some(inter) = intersection(a_bbox, b_bbox) {
                 // Skip cases where one is fully nested in the other — that's
                 // intentional layout (button inside container), not a bug.
-                let nested = inter == a.bbox || inter == b.bbox;
+                let nested = inter == a_bbox || inter == b_bbox;
                 if nested {
                     continue;
                 }
@@ -46,42 +51,48 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     }
 
     // 2. Zero-area elements — usually layout regressions ("display:none on a
-    // visible-by-spec element" or "width: 0").
+    // visible-by-spec element" or "width: 0"). bbox-less elements are NOT
+    // zero-area; they simply have no measured geometry, so we skip them
+    // rather than fabricate a `zero_area` finding.
     for el in &snapshot.elements {
-        if el.bbox.w == 0 || el.bbox.h == 0 {
-            findings.push(
-                Finding::new(
-                    "zero_area",
-                    Severity::Warning,
-                    format!(
-                        "element {} has zero area ({}x{})",
-                        el.id, el.bbox.w, el.bbox.h
-                    ),
-                )
-                .with_elements(vec![el.id.clone()]),
-            );
+        if let Some(bbox) = el.bbox {
+            if bbox.w == 0 || bbox.h == 0 {
+                findings.push(
+                    Finding::new(
+                        "zero_area",
+                        Severity::Warning,
+                        format!("element {} has zero area ({}x{})", el.id, bbox.w, bbox.h),
+                    )
+                    .with_elements(vec![el.id.clone()]),
+                );
+            }
         }
     }
 
     // 3. Alignment groups: when 3+ elements share a near-horizontal y but
-    // differ by 1-2 px, the +/- jitter is usually a layout bug.
-    let mut sorted_y: Vec<&_> = snapshot.elements.iter().collect();
-    sorted_y.sort_by_key(|e| e.bbox.y);
+    // differ by 1-2 px, the +/- jitter is usually a layout bug. Only
+    // positioned elements participate.
+    let mut sorted_y: Vec<(&_, u32)> = snapshot
+        .elements
+        .iter()
+        .filter_map(|e| e.bbox.map(|b| (e, b.y)))
+        .collect();
+    sorted_y.sort_by_key(|(_, y)| *y);
     let tol_px = 3u32;
     let mut i = 0;
     while i < sorted_y.len() {
-        let group_y = sorted_y[i].bbox.y;
+        let group_y = sorted_y[i].1;
         let mut j = i + 1;
-        while j < sorted_y.len() && sorted_y[j].bbox.y.abs_diff(group_y) <= tol_px {
+        while j < sorted_y.len() && sorted_y[j].1.abs_diff(group_y) <= tol_px {
             j += 1;
         }
         let group = &sorted_y[i..j];
         if group.len() >= 3 {
             // Drift = max - min within the group.
-            let min = group.iter().map(|e| e.bbox.y).min().unwrap();
-            let max = group.iter().map(|e| e.bbox.y).max().unwrap();
+            let min = group.iter().map(|(_, y)| *y).min().unwrap();
+            let max = group.iter().map(|(_, y)| *y).max().unwrap();
             if max - min > 0 {
-                let ids: Vec<String> = group.iter().map(|e| e.id.clone()).collect();
+                let ids: Vec<String> = group.iter().map(|(e, _)| e.id.clone()).collect();
                 findings.push(
                     Finding::new(
                         "alignment_jitter",
@@ -111,7 +122,7 @@ mod tests {
     fn el(id: &str, x: u32, y: u32, w: u32, h: u32, interactable: bool) -> Element {
         Element {
             id: id.to_string(),
-            bbox: Region { x, y, w, h },
+            bbox: Some(Region { x, y, w, h }),
             text: None,
             role: None,
             interactable,
@@ -166,5 +177,41 @@ mod tests {
         };
         let findings = run(&snap);
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
+    }
+
+    fn el_no_bbox(id: &str, interactable: bool) -> Element {
+        let mut e = el(id, 0, 0, 0, 0, interactable);
+        e.bbox = None;
+        e
+    }
+
+    #[test]
+    fn bbox_none_elements_skipped_no_spurious_findings() {
+        // A mix of positioned and bbox-less elements: the positioned pair
+        // overlaps (1 finding); the bbox-less elements must NOT yield
+        // overlap/zero_area/alignment findings and must not panic.
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("btn-a", 0, 0, 100, 50, true),
+                el("btn-b", 50, 25, 100, 50, true),
+                el_no_bbox("hidden-1", true),
+                el_no_bbox("hidden-2", false),
+                el_no_bbox("hidden-3", true),
+            ],
+        };
+        let findings = run(&snap);
+        assert!(findings.iter().any(|f| f.kind == "overlap"));
+        // None of the bbox-less ids appear in any finding.
+        for f in &findings {
+            for id in &f.elements {
+                assert!(
+                    !id.starts_with("hidden-"),
+                    "bbox-less element {id} leaked into finding {:?}",
+                    f.kind
+                );
+            }
+        }
+        // No zero_area fabricated for the bbox-less elements.
+        assert!(!findings.iter().any(|f| f.kind == "zero_area"));
     }
 }
