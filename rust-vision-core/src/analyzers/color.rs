@@ -11,8 +11,11 @@ use crate::frame::{Frame, Region};
 pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
 
-    let mut low_contrast = 0usize;
-    let mut checked = 0usize;
+    // Only DECLARED-color elements feed the density roll-up. Pixel-sampled
+    // ratios are approximate (see below) so they must never inflate the
+    // density warning or emit Warning/Critical findings.
+    let mut declared_low_contrast = 0usize;
+    let mut declared_checked = 0usize;
     for el in &snapshot.elements {
         if el.text.is_none() {
             continue;
@@ -20,30 +23,63 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
         // Prefer the snapshot's declared colors if present (cheaper, more
         // accurate than re-sampling pixels under text antialiasing).
         // Otherwise approximate from the rendered pixels.
-        let (fg, bg) = match (el.fg_color, el.bg_color) {
-            (Some(f), Some(b)) => (f, b),
-            // No declared colors: fall back to sampling the frame under the
-            // element's bbox. Requires geometry — bbox-less elements can't be
-            // sampled, so they're skipped (no contrast finding).
+        //
+        // `declared` distinguishes the two contrast regimes:
+        //   - declared == true  → both fg_color AND bg_color came from the
+        //     snapshot's computed style. Trustworthy → full WCAG AA gating
+        //     (Critical < 3.0, Warning < 4.5) and counts toward density.
+        //   - declared == false → at least one color was missing, so we
+        //     sampled the rendered pixels under the bbox via a two-mode
+        //     histogram. For sparse-text elements both modes collapse to
+        //     ~background (ratio ≈ 1.0), producing false-positive
+        //     "low_contrast" findings. We therefore cap these at Info and
+        //     exclude them from the density roll-up. This covers the
+        //     fully-undeclared arm AND the partial-declaration arms
+        //     (Some/None, None/Some): any element whose contrast required
+        //     pixel sampling is informational only.
+        let (fg, bg, declared) = match (el.fg_color, el.bg_color) {
+            (Some(f), Some(b)) => (f, b, true),
+            // At least one color undeclared: fall back to sampling the frame
+            // under the element's bbox. Requires geometry — bbox-less
+            // elements can't be sampled, so they're skipped (no finding).
             _ => match el.bbox.and_then(|bbox| sample_dominant_two(frame, bbox)) {
-                Some(pair) => pair,
+                Some((f, b)) => (f, b, false),
                 None => continue,
             },
         };
-        checked += 1;
         let ratio = wcag_contrast(fg, bg);
-        if ratio < 4.5 {
-            low_contrast += 1;
+
+        if declared {
+            declared_checked += 1;
+            if ratio < 4.5 {
+                declared_low_contrast += 1;
+                findings.push(
+                    Finding::new(
+                        "low_contrast",
+                        if ratio < 3.0 {
+                            Severity::Critical
+                        } else {
+                            Severity::Warning
+                        },
+                        format!(
+                            "element {} text contrast ratio {:.2}:1 (WCAG AA requires ≥4.5)",
+                            el.id, ratio
+                        ),
+                    )
+                    .with_elements(vec![el.id.clone()]),
+                );
+            }
+        } else if ratio < 4.5 {
+            // Pixel-sampled, no declared colors: informational only. Never
+            // Warning/Critical and never counted toward density — the
+            // two-mode histogram is unreliable for sparse text.
             findings.push(
                 Finding::new(
                     "low_contrast",
-                    if ratio < 3.0 {
-                        Severity::Critical
-                    } else {
-                        Severity::Warning
-                    },
+                    Severity::Info,
                     format!(
-                        "element {} text contrast ratio {:.2}:1 (WCAG AA requires ≥4.5)",
+                        "element {} text contrast sampled (no declared colors): \
+                         ratio≈{:.2}:1 — informational, WCAG AA wants ≥4.5",
                         el.id, ratio
                     ),
                 )
@@ -52,15 +88,17 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
         }
     }
 
-    if checked > 0 && low_contrast as f64 / checked as f64 >= 0.25 {
+    // Density warning is gated on declared-color elements only (sampled/Info
+    // findings deliberately do not contribute — see the `declared` comment).
+    if declared_checked > 0 && declared_low_contrast as f64 / declared_checked as f64 >= 0.25 {
         findings.push(Finding::new(
             "contrast_density",
             Severity::Warning,
             format!(
                 "{}/{} text elements ({:.0}%) below WCAG AA contrast",
-                low_contrast,
-                checked,
-                100.0 * low_contrast as f64 / checked as f64
+                declared_low_contrast,
+                declared_checked,
+                100.0 * declared_low_contrast as f64 / declared_checked as f64
             ),
         ));
     }
@@ -146,6 +184,7 @@ fn clamp_region(r: Region, fw: u32, fh: u32) -> Option<Region> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::element_snapshot::Element;
     use crate::frame::{FrameSource, FrameSourceKind};
 
     fn solid_frame(w: u32, h: u32, color: [u8; 4]) -> Frame {
@@ -202,5 +241,121 @@ mod tests {
             },
         )
         .is_none());
+    }
+
+    /// Build a text element with optional declared colors and a 10x10 bbox.
+    fn text_el(id: &str, fg: Option<Rgb>, bg: Option<Rgb>) -> Element {
+        Element {
+            id: id.to_string(),
+            bbox: Some(Region {
+                x: 0,
+                y: 0,
+                w: 10,
+                h: 10,
+            }),
+            text: Some("hello".to_string()),
+            role: Some("link".to_string()),
+            interactable: true,
+            fg_color: fg,
+            bg_color: bg,
+            font_size_px: None,
+            font_family: None,
+            line_height_px: None,
+            parent_id: None,
+            children_ids: vec![],
+        }
+    }
+
+    #[test]
+    fn sampled_low_contrast_is_info_not_critical() {
+        // Regression for the false-positive class: an element with NO declared
+        // colors over a solid frame samples ~1.0:1 (both histogram modes are
+        // the same background). It must surface at most Info — never
+        // Warning/Critical — and must not feed the density roll-up.
+        let f = solid_frame(10, 10, [0x20, 0x20, 0x20, 0xff]);
+        let snap = ElementSnapshot {
+            elements: vec![text_el("footer-link", None, None)],
+        };
+        let findings = run(&f, &snap);
+        let lc: Vec<_> = findings
+            .iter()
+            .filter(|x| x.kind == "low_contrast")
+            .collect();
+        assert_eq!(lc.len(), 1, "expected exactly one sampled finding");
+        assert_eq!(lc[0].severity, Severity::Info);
+        // Sampled findings never count toward the density warning.
+        assert!(!findings.iter().any(|x| x.kind == "contrast_density"));
+    }
+
+    #[test]
+    fn declared_below_3_is_critical() {
+        // Declared colors with ratio < 3.0 stay Critical (path untouched).
+        let f = solid_frame(10, 10, [0xff, 0xff, 0xff, 0xff]);
+        // light-gray on white ~1.6:1
+        let snap = ElementSnapshot {
+            elements: vec![text_el(
+                "btn",
+                Some(Rgb::new(200, 200, 200)),
+                Some(Rgb::new(255, 255, 255)),
+            )],
+        };
+        let findings = run(&f, &snap);
+        let lc = findings
+            .iter()
+            .find(|x| x.kind == "low_contrast")
+            .expect("declared low_contrast finding");
+        assert_eq!(lc.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn declared_below_4_5_is_warning() {
+        // Declared colors with 3.0 <= ratio < 4.5 stay Warning.
+        // mid-gray (#808080) on white is ~3.95:1.
+        let f = solid_frame(10, 10, [0xff, 0xff, 0xff, 0xff]);
+        let snap = ElementSnapshot {
+            elements: vec![text_el(
+                "btn",
+                Some(Rgb::new(0x80, 0x80, 0x80)),
+                Some(Rgb::new(255, 255, 255)),
+            )],
+        };
+        let r = wcag_contrast(Rgb::new(0x80, 0x80, 0x80), Rgb::new(255, 255, 255));
+        assert!(
+            (3.0..4.5).contains(&r),
+            "fixture ratio {r} not in [3.0,4.5)"
+        );
+        let findings = run(&f, &snap);
+        let lc = findings
+            .iter()
+            .find(|x| x.kind == "low_contrast")
+            .expect("declared low_contrast finding");
+        assert_eq!(lc.severity, Severity::Warning);
+    }
+
+    #[test]
+    fn density_warning_unaffected_by_sampled_info() {
+        // One declared good-contrast element plus many sampled (undeclared)
+        // low-contrast elements: density must NOT fire, because sampled/Info
+        // elements don't count toward the roll-up.
+        let f = solid_frame(10, 10, [0x20, 0x20, 0x20, 0xff]);
+        let mut elements = vec![text_el(
+            "good",
+            Some(Rgb::new(255, 255, 255)),
+            Some(Rgb::new(0, 0, 0)),
+        )];
+        for i in 0..5 {
+            elements.push(text_el(&format!("sampled-{i}"), None, None));
+        }
+        let snap = ElementSnapshot { elements };
+        let findings = run(&f, &snap);
+        // 5 sampled Info findings, 1 declared (good contrast, no finding).
+        assert!(!findings.iter().any(|x| x.kind == "contrast_density"));
+        assert_eq!(
+            findings
+                .iter()
+                .filter(|x| x.kind == "low_contrast" && x.severity == Severity::Info)
+                .count(),
+            5
+        );
     }
 }
