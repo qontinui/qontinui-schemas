@@ -195,6 +195,7 @@ mod tests {
                 kind: FrameSourceKind::Synthetic,
                 scale_factor: 1.0,
                 captured_at: chrono::Utc::now(),
+                capture_backend: None,
             },
         )
     }

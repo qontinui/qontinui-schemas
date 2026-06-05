@@ -33,6 +33,10 @@ pub struct FrameSource {
     /// Device pixel ratio. 1.0 for unscaled captures, 2.0 for Retina, etc.
     pub scale_factor: f64,
     pub captured_at: DateTime<Utc>,
+    /// Which capture backend produced this frame, when the source is the
+    /// runner's own desktop window. `None` for `Device`/`Synthetic` kinds,
+    /// where no runner-window backend applies.
+    pub capture_backend: Option<CaptureBackend>,
 }
 
 impl FrameSource {
@@ -43,8 +47,19 @@ impl FrameSource {
             kind: FrameSourceKind::Synthetic,
             scale_factor: 1.0,
             captured_at: Utc::now(),
+            capture_backend: None,
         }
     }
+}
+
+/// The capture backend that produced a runner-window [`Frame`]. Distinguishes
+/// the WebView2 `CapturePreview` path from the monitor-crop fallback — both of
+/// which produce a [`FrameSourceKind::Window`] frame, so this is genuinely new
+/// provenance, not a `kind` refinement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CaptureBackend {
+    Webview2CapturePreview,
+    MonitorCrop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
