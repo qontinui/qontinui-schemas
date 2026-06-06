@@ -35,6 +35,6 @@ pub use element_snapshot::{
     intersection, region_contains, regions_overlap, Element, ElementSnapshot, Rgb,
 };
 pub use error::VisionError;
-pub use frame::{Frame, FrameSource, FrameSourceKind, Region};
+pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};

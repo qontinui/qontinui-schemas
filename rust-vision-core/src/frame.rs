@@ -33,6 +33,12 @@ pub struct FrameSource {
     /// Device pixel ratio. 1.0 for unscaled captures, 2.0 for Retina, etc.
     pub scale_factor: f64,
     pub captured_at: DateTime<Utc>,
+    /// Which capture backend produced this frame, when the frame originated
+    /// from the runner's own desktop window. `None` for device / synthetic
+    /// frames (and for window frames captured by paths that don't track a
+    /// backend). Surfaced as response-echo + health telemetry by consumers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_backend: Option<CaptureBackend>,
 }
 
 impl FrameSource {
@@ -43,8 +49,27 @@ impl FrameSource {
             kind: FrameSourceKind::Synthetic,
             scale_factor: 1.0,
             captured_at: Utc::now(),
+            capture_backend: None,
         }
     }
+}
+
+/// The concrete mechanism used to capture a runner-window [`Frame`].
+///
+/// On Windows the runner prefers the occlusion-immune WebView2
+/// `CapturePreview` backend and falls back to a monitor-region crop when
+/// CapturePreview is unavailable or fails. The variant is recorded on
+/// [`FrameSource::capture_backend`] so it can be echoed in vision responses
+/// and counted in `vision/health` telemetry. Serializes to its variant name
+/// (e.g. `"Webview2CapturePreview"`, `"MonitorCrop"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CaptureBackend {
+    /// WebView2 `CapturePreview` — captures the webview contents directly, so
+    /// the frame is unaffected by windows occluding the runner on screen.
+    Webview2CapturePreview,
+    /// Monitor-region crop fallback — grabs the screen region the runner
+    /// window occupies. Subject to occlusion by overlapping windows.
+    MonitorCrop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
