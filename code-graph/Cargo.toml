@@ -1,0 +1,17 @@
+[package]
+name = "qontinui-code-graph"
+version = "0.1.0"
+description = "Pure tree-sitter codebase knowledge graph (functions, classes, imports, exports) + deterministic import resolution and blast-radius analysis. No filesystem persistence — computation only."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tree-sitter = "0.24"
+tree-sitter-python = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-rust = "0.23"
+tracing = "0.1"
+sha2 = "0.10"
