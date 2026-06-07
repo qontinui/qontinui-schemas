@@ -34,6 +34,14 @@ pub mod apps;
 pub mod canonical_hash;
 pub mod config;
 pub mod constraints;
+/// Canonical `DEV-*` dev-event outcome signatures (effect-side classification).
+/// Companion to [`dev_states`]; same `UB-*`-style plain-enum template.
+pub mod dev_signatures;
+/// Canonical dev-environment state vocabulary (cause-side context) for the
+/// dev-event cause-effect ledger. Plain Rust enum mirroring the
+/// [`ui_bridge_diagnostics`] `UB-*` pattern — intentionally no DB, not codegen'd
+/// to TS/Python. See `plans/2026-06-07-twin-dev-event-cause-effect-ledger.md`.
+pub mod dev_states;
 pub mod discovery;
 pub mod execution;
 pub mod federation;
