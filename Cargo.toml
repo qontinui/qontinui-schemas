@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["rust", "rust-runner-client", "rust-vision-core"]
+members = ["rust", "rust-runner-client", "rust-vision-core", "code-graph"]
 
 [workspace.package]
 edition = "2021"
