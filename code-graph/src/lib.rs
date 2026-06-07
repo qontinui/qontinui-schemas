@@ -15,6 +15,7 @@
 
 pub mod code_graph;
 pub mod import_resolver;
+pub mod layering;
 
 pub use code_graph::{
     compute_fingerprints, fingerprint_content, repo_hash, BlastRadius, CachedCodeGraph, ClassNode,
@@ -22,3 +23,6 @@ pub use code_graph::{
     ResolutionKind, RiskLevel,
 };
 pub use import_resolver::{ImportResolver, Resolution};
+pub use layering::{
+    compute_gate_verdict, cross_module_edges, module_dir, GateRec, LayerGateVerdict, LayerManifest,
+};
