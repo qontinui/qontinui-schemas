@@ -88,31 +88,31 @@ pub struct FunctionalSpec {
     /// What was observed and when.
     pub target: SpecTarget,
 
-    /// 1. DOMAIN — entities + relationships inferred from rendered data shapes.
+    /// Section (1) DOMAIN — entities + relationships inferred from rendered data shapes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entities: Vec<Entity>,
 
-    /// 2. CAPABILITIES — operations the frontend exposes. Existence is
+    /// Section (2) CAPABILITIES — operations the frontend exposes. Existence is
     /// high-confidence; server-side effect is low-confidence by construction.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub operations: Vec<Operation>,
 
-    /// 3a. UI STATES — a literal superset of the UI Bridge IR. These are the
+    /// Section (3a) UI STATES — a literal superset of the UI Bridge IR. These are the
     /// exact `crate::ir::IrState` values `IrPageSpec.states` carries.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ui_states: Vec<IrState>,
 
-    /// 3b. NAVIGATION — the exact `crate::ir::IrTransition` values
+    /// Section (3b) NAVIGATION — the exact `crate::ir::IrTransition` values
     /// `IrPageSpec.transitions` carries. Reused (not re-declared) so app-gen's
     /// emitted IR re-parses to the identical spec subset.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub navigation: Vec<IrTransition>,
 
-    /// 4. AUTH / PERMISSION MODEL — from login flows + gated routes.
+    /// Section (4) AUTH / PERMISSION MODEL — from login flows + gated routes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<AuthModel>,
 
-    /// 5. ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so
+    /// Section (5) ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so
     /// the operator can review/override the generator's best-practice fills. For
     /// v0 the override surface is a direct edit of this ledger (`overridable`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
