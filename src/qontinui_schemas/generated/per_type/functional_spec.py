@@ -438,31 +438,31 @@ class FunctionalSpec(BaseModel):
     assumptions: Annotated[
         list[AssumptionEntry] | None,
         Field(
-            description="5. ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so\nthe operator can review/override the generator's best-practice fills. For\nv0 the override surface is a direct edit of this ledger (`overridable`)."
+            description="Section (5) ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so\nthe operator can review/override the generator's best-practice fills. For\nv0 the override surface is a direct edit of this ledger (`overridable`)."
         ),
     ] = None
     auth: Annotated[
         AuthModel | None,
         Field(
-            description='4. AUTH / PERMISSION MODEL — from login flows + gated routes.'
+            description='Section (4) AUTH / PERMISSION MODEL — from login flows + gated routes.'
         ),
     ] = None
     entities: Annotated[
         list[Entity] | None,
         Field(
-            description='1. DOMAIN — entities + relationships inferred from rendered data shapes.'
+            description='Section (1) DOMAIN — entities + relationships inferred from rendered data shapes.'
         ),
     ] = None
     navigation: Annotated[
         list[IrTransition] | None,
         Field(
-            description="3b. NAVIGATION — the exact `crate::ir::IrTransition` values\n`IrPageSpec.transitions` carries. Reused (not re-declared) so app-gen's\nemitted IR re-parses to the identical spec subset."
+            description="Section (3b) NAVIGATION — the exact `crate::ir::IrTransition` values\n`IrPageSpec.transitions` carries. Reused (not re-declared) so app-gen's\nemitted IR re-parses to the identical spec subset."
         ),
     ] = None
     operations: Annotated[
         list[Operation] | None,
         Field(
-            description='2. CAPABILITIES — operations the frontend exposes. Existence is\nhigh-confidence; server-side effect is low-confidence by construction.'
+            description='Section (2) CAPABILITIES — operations the frontend exposes. Existence is\nhigh-confidence; server-side effect is low-confidence by construction.'
         ),
     ] = None
     specVersion: Annotated[
@@ -475,6 +475,6 @@ class FunctionalSpec(BaseModel):
     uiStates: Annotated[
         list[IrState] | None,
         Field(
-            description='3a. UI STATES — a literal superset of the UI Bridge IR. These are the\nexact `crate::ir::IrState` values `IrPageSpec.states` carries.'
+            description='Section (3a) UI STATES — a literal superset of the UI Bridge IR. These are the\nexact `crate::ir::IrState` values `IrPageSpec.states` carries.'
         ),
     ] = None

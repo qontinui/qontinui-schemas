@@ -38,27 +38,27 @@ import type { ValidationRule } from './ValidationRule';
  */
 export interface FunctionalSpec {
   /**
-   * 5. ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so
+   * Section (5) ASSUMPTIONS LEDGER — every node with provenance `Assumed`, collated so
    * the operator can review/override the generator's best-practice fills. For
    * v0 the override surface is a direct edit of this ledger (`overridable`).
    */
   assumptions?: AssumptionEntry[];
   /**
-   * 4. AUTH / PERMISSION MODEL — from login flows + gated routes.
+   * Section (4) AUTH / PERMISSION MODEL — from login flows + gated routes.
    */
   auth?: AuthModel | null;
   /**
-   * 1. DOMAIN — entities + relationships inferred from rendered data shapes.
+   * Section (1) DOMAIN — entities + relationships inferred from rendered data shapes.
    */
   entities?: Entity[];
   /**
-   * 3b. NAVIGATION — the exact `crate::ir::IrTransition` values
+   * Section (3b) NAVIGATION — the exact `crate::ir::IrTransition` values
    * `IrPageSpec.transitions` carries. Reused (not re-declared) so app-gen's
    * emitted IR re-parses to the identical spec subset.
    */
   navigation?: IrTransition[];
   /**
-   * 2. CAPABILITIES — operations the frontend exposes. Existence is
+   * Section (2) CAPABILITIES — operations the frontend exposes. Existence is
    * high-confidence; server-side effect is low-confidence by construction.
    */
   operations?: Operation[];
@@ -68,7 +68,7 @@ export interface FunctionalSpec {
   specVersion: string;
   target: SpecTarget;
   /**
-   * 3a. UI STATES — a literal superset of the UI Bridge IR. These are the
+   * Section (3a) UI STATES — a literal superset of the UI Bridge IR. These are the
    * exact `crate::ir::IrState` values `IrPageSpec.states` carries.
    */
   uiStates?: IrState[];
