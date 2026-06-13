@@ -104,7 +104,10 @@ mod tests {
 
     #[test]
     fn api_style_snake_case_round_trip() {
-        for (wire, variant) in [("\"rest\"", ApiStyle::Rest), ("\"graphql\"", ApiStyle::Graphql)] {
+        for (wire, variant) in [
+            ("\"rest\"", ApiStyle::Rest),
+            ("\"graphql\"", ApiStyle::Graphql),
+        ] {
             let parsed: ApiStyle = serde_json::from_str(wire).unwrap();
             assert_eq!(parsed, variant);
             assert_eq!(serde_json::to_string(&parsed).unwrap(), wire);
@@ -140,7 +143,10 @@ mod tests {
         // BTreeMap orders keys: "entityToTable" < "naming".
         let etbl = json.find("entityToTable").unwrap();
         let naming = json.find("naming").unwrap();
-        assert!(etbl < naming, "conventions must serialize in deterministic key order");
+        assert!(
+            etbl < naming,
+            "conventions must serialize in deterministic key order"
+        );
         let round: Profile = serde_json::from_str(&json).unwrap();
         assert_eq!(round, p);
     }

@@ -295,7 +295,11 @@ mod tests {
     #[test]
     fn coverage_denominator_excludes_assumed() {
         // 6 observed + 2 inferred + 4 assumed; 2 observed/inferred gaps.
-        let mix = ProvenanceMix { observed: 6, inferred: 2, assumed: 4 };
+        let mix = ProvenanceMix {
+            observed: 6,
+            inferred: 2,
+            assumed: 4,
+        };
         assert_eq!(mix.denominator(), 8);
         // numerator = 8 - 2 = 6; coverage = 6/8 = 0.75.
         assert!((CompletenessVerdict::coverage_from(&mix, 2) - 0.75).abs() < 1e-12);
@@ -303,24 +307,39 @@ mod tests {
 
     #[test]
     fn assumed_nodes_never_count_against_coverage() {
-        let mix = ProvenanceMix { observed: 4, inferred: 0, assumed: 10 };
+        let mix = ProvenanceMix {
+            observed: 4,
+            inferred: 0,
+            assumed: 10,
+        };
         // Even with an (incorrectly supplied) assumed gap, counted_gaps drops it.
         let v = verdict(mix, vec![gap(SpecProvenance::Assumed)]);
         assert_eq!(v.counted_gaps(), 0);
-        assert!((v.coverage - 1.0).abs() < 1e-12, "all observed covered → 1.0");
+        assert!(
+            (v.coverage - 1.0).abs() < 1e-12,
+            "all observed covered → 1.0"
+        );
         assert!(v.coverage_is_consistent());
     }
 
     #[test]
     fn empty_observable_spec_is_vacuously_complete() {
-        let mix = ProvenanceMix { observed: 0, inferred: 0, assumed: 3 };
+        let mix = ProvenanceMix {
+            observed: 0,
+            inferred: 0,
+            assumed: 3,
+        };
         assert_eq!(CompletenessVerdict::coverage_from(&mix, 0), 1.0);
     }
 
     #[test]
     fn consistency_check_catches_wrong_coverage() {
         let mut v = verdict(
-            ProvenanceMix { observed: 4, inferred: 0, assumed: 0 },
+            ProvenanceMix {
+                observed: 4,
+                inferred: 0,
+                assumed: 0,
+            },
             vec![gap(SpecProvenance::Observed)],
         );
         assert!(v.coverage_is_consistent());
@@ -330,9 +349,19 @@ mod tests {
 
     #[test]
     fn verdict_round_trips_with_embedded_spec_check_absent() {
-        let v = verdict(ProvenanceMix { observed: 1, inferred: 1, assumed: 0 }, vec![]);
+        let v = verdict(
+            ProvenanceMix {
+                observed: 1,
+                inferred: 1,
+                assumed: 0,
+            },
+            vec![],
+        );
         let json = serde_json::to_string(&v).unwrap();
-        assert!(!json.contains("uiStatesSpecCheck"), "absent embed must skip-serialize");
+        assert!(
+            !json.contains("uiStatesSpecCheck"),
+            "absent embed must skip-serialize"
+        );
         let round: CompletenessVerdict = serde_json::from_str(&json).unwrap();
         // CompletenessVerdict has no PartialEq (embedded SpecCheckResult lacks it);
         // compare by re-serialized JSON.
@@ -344,7 +373,13 @@ mod tests {
 
     #[test]
     fn section_enum_camel_case() {
-        assert_eq!(serde_json::to_string(&SpecSection::UiStates).unwrap(), "\"uiStates\"");
-        assert_eq!(serde_json::to_string(&SpecSection::Entities).unwrap(), "\"entities\"");
+        assert_eq!(
+            serde_json::to_string(&SpecSection::UiStates).unwrap(),
+            "\"uiStates\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SpecSection::Entities).unwrap(),
+            "\"entities\""
+        );
     }
 }

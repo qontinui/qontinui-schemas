@@ -338,7 +338,8 @@ mod tests {
 
     #[test]
     fn assumption_overridable_defaults_true_when_absent() {
-        let json = r#"{"ref":"operations.createInvoice.effect","defaultApplied":"REST 201 persist"}"#;
+        let json =
+            r#"{"ref":"operations.createInvoice.effect","defaultApplied":"REST 201 persist"}"#;
         let parsed: AssumptionEntry = serde_json::from_str(json).unwrap();
         assert!(parsed.overridable);
         assert_eq!(parsed.r#ref, "operations.createInvoice.effect");
@@ -356,7 +357,10 @@ mod tests {
         };
         let v = serde_json::to_value(&f).unwrap();
         assert_eq!(v["type"], "money");
-        assert!(v.get("credibility").is_none(), "absent credibility must not serialize");
+        assert!(
+            v.get("credibility").is_none(),
+            "absent credibility must not serialize"
+        );
     }
 
     #[test]

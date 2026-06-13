@@ -113,7 +113,10 @@ fn section_mixes_sum_to_overall() {
         summed.inferred += s.provenance_mix.inferred;
         summed.assumed += s.provenance_mix.assumed;
     }
-    assert_eq!(summed, verdict.provenance_mix, "per-section mixes must sum to the overall mix");
+    assert_eq!(
+        summed, verdict.provenance_mix,
+        "per-section mixes must sum to the overall mix"
+    );
 }
 
 #[test]
