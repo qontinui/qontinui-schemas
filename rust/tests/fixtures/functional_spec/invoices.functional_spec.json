@@ -1,0 +1,112 @@
+{
+  "specVersion": "0",
+  "target": {
+    "sourceUrl": "https://example.test/invoices",
+    "observedAt": "2026-06-13T00:00:00Z"
+  },
+  "entities": [
+    {
+      "name": "Invoice",
+      "fields": [
+        {
+          "name": "amount",
+          "type": "money",
+          "confidence": "observed",
+          "provenance": "form#invoice input[name=amount]"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "values": ["draft", "sent", "paid"],
+          "confidence": "inferred",
+          "provenance": "badge text across list view",
+          "credibility": 0.7
+        }
+      ],
+      "relationships": [
+        {
+          "to": "Customer",
+          "kind": "many-to-one",
+          "confidence": "inferred",
+          "provenance": "detail view renders customer name + link",
+          "credibility": 0.6
+        }
+      ],
+      "confidence": "observed",
+      "provenance": "rendered in both list and detail views"
+    }
+  ],
+  "operations": [
+    {
+      "name": "createInvoice",
+      "verb": "create",
+      "entity": "Invoice",
+      "inputs": [
+        {
+          "field": "amount",
+          "required": true,
+          "validation": {
+            "rule": "> 0",
+            "confidence": "observed",
+            "provenance": "client-side error 'must be positive'"
+          }
+        }
+      ],
+      "effect": {
+        "confidence": "assumed",
+        "assumption": "persists + returns created row (REST 201 best-practice default)"
+      },
+      "confidence": "observed",
+      "provenance": "New Invoice button + submit handler"
+    }
+  ],
+  "uiStates": [
+    {
+      "id": "invoice-list",
+      "name": "Invoice List",
+      "description": "Paginated list of invoices with status badges.",
+      "assertions": [],
+      "isInitial": true,
+      "provenance": { "source": "discovery", "file": "discovery/strategies/fingerprint.py" }
+    },
+    {
+      "id": "invoice-detail",
+      "name": "Invoice Detail",
+      "description": "Single invoice with customer and line items.",
+      "assertions": [],
+      "provenance": { "source": "discovery", "file": "discovery/strategies/fingerprint.py" }
+    }
+  ],
+  "navigation": [
+    {
+      "id": "open-invoice-detail",
+      "name": "Open Invoice Detail",
+      "fromStates": ["invoice-list"],
+      "activateStates": ["invoice-detail"],
+      "actions": [
+        { "type": "click", "target": { "role": "row", "textContains": "INV-" } }
+      ]
+    }
+  ],
+  "auth": {
+    "model": "session",
+    "confidence": "inferred",
+    "roles": [
+      {
+        "name": "admin",
+        "confidence": "inferred",
+        "provenance": "settings nav item only on some sessions",
+        "credibility": 0.4
+      }
+    ],
+    "provenance": "login form sets a session cookie; gated routes redirect",
+    "credibility": 0.5
+  },
+  "assumptions": [
+    {
+      "ref": "operations.createInvoice.effect",
+      "defaultApplied": "REST 201 persist",
+      "overridable": true
+    }
+  ]
+}

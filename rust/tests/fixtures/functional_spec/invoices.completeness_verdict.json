@@ -1,0 +1,61 @@
+{
+  "specVersion": "0",
+  "coverage": 0.8181818181818182,
+  "assumedFillRate": 1.0,
+  "provenanceMix": { "observed": 7, "inferred": 4, "assumed": 1 },
+  "credibility": 0.55,
+  "sections": [
+    {
+      "section": "entities",
+      "coverage": 0.75,
+      "assumedFillRate": 0.0,
+      "provenanceMix": { "observed": 2, "inferred": 2, "assumed": 0 },
+      "credibility": 0.65
+    },
+    {
+      "section": "operations",
+      "coverage": 1.0,
+      "assumedFillRate": 1.0,
+      "provenanceMix": { "observed": 2, "inferred": 0, "assumed": 1 },
+      "credibility": 0.0
+    },
+    {
+      "section": "uiStates",
+      "coverage": 1.0,
+      "assumedFillRate": 0.0,
+      "provenanceMix": { "observed": 2, "inferred": 0, "assumed": 0 },
+      "credibility": 0.0
+    },
+    {
+      "section": "navigation",
+      "coverage": 1.0,
+      "assumedFillRate": 0.0,
+      "provenanceMix": { "observed": 1, "inferred": 0, "assumed": 0 },
+      "credibility": 0.0
+    },
+    {
+      "section": "auth",
+      "coverage": 0.5,
+      "assumedFillRate": 0.0,
+      "provenanceMix": { "observed": 0, "inferred": 2, "assumed": 0 },
+      "credibility": 0.45
+    }
+  ],
+  "gaps": [
+    {
+      "ref": "entities.Invoice.fields.status",
+      "section": "entities",
+      "nodeProvenance": "inferred",
+      "reason": "not_generated",
+      "detail": "generated model has no status enum column"
+    },
+    {
+      "ref": "auth.roles.admin",
+      "section": "auth",
+      "nodeProvenance": "inferred",
+      "reason": "behavior_mismatch",
+      "detail": "admin-only route renders for all roles in the generated app"
+    }
+  ],
+  "evaluatedAt": "2026-06-13T00:00:00Z"
+}
