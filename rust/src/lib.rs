@@ -59,6 +59,11 @@ pub mod canonical_hash;
 /// `DriftVerdict` field vocabulary. See
 /// `2026-06-13-functional-spec-contract.md`.
 pub mod completeness_verdict;
+/// Completeness **evaluation** — the deterministic rubric walk that turns a
+/// [`functional_spec::FunctionalSpec`] + coverage evidence into a
+/// [`completeness_verdict::CompletenessVerdict`] (node enumeration + gap diff +
+/// per-section breakdown). The verify-phase rubric the website→mobile slice proves.
+pub mod completeness_eval;
 pub mod config;
 pub mod constraints;
 /// Canonical `DEV-*` dev-event outcome signatures (effect-side classification).
