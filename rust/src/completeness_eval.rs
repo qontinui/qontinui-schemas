@@ -350,7 +350,11 @@ mod tests {
         assert!((v.coverage - 0.0).abs() < 1e-12);
         assert!(v.coverage_is_consistent());
         // Covering it flips coverage to 1.0 with no gaps.
-        let v2 = evaluate_completeness(&spec, &ev(&["entities.Widget"], &[]), "2026-06-14T00:00:00Z");
+        let v2 = evaluate_completeness(
+            &spec,
+            &ev(&["entities.Widget"], &[]),
+            "2026-06-14T00:00:00Z",
+        );
         assert!(v2.gaps.is_empty());
         assert!((v2.coverage - 1.0).abs() < 1e-12);
     }

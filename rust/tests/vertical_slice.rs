@@ -125,7 +125,11 @@ fn evaluate_completeness_reproduces_invoices_golden_verdict() {
             "section {:?} mix",
             g.section
         );
-        assert!(approx(g.coverage, e.coverage), "section {:?} coverage", g.section);
+        assert!(
+            approx(g.coverage, e.coverage),
+            "section {:?} coverage",
+            g.section
+        );
         assert!(approx(g.assumed_fill_rate, e.assumed_fill_rate));
         assert!(
             approx(g.credibility, e.credibility),
@@ -202,11 +206,11 @@ fn coverage_evidence_from(
 
 #[test]
 fn connect_runner_fixtures_parse_against_v0_types() {
-    let spec: FunctionalSpec =
-        serde_json::from_str(CONNECT_SPEC).expect("connect-runner spec parses against FunctionalSpec");
+    let spec: FunctionalSpec = serde_json::from_str(CONNECT_SPEC)
+        .expect("connect-runner spec parses against FunctionalSpec");
     assert_eq!(spec.spec_version, "0");
-    let _profile: Profile =
-        serde_json::from_str(CONNECT_PROFILE).expect("connect-runner profile parses against Profile");
+    let _profile: Profile = serde_json::from_str(CONNECT_PROFILE)
+        .expect("connect-runner profile parses against Profile");
     // The page must be minimal-but-complete: a real entity, an operation, ui states,
     // and a navigation edge, so the slice exercises every section.
     assert!(!spec.entities.is_empty(), "needs ≥1 entity");
@@ -233,7 +237,11 @@ fn complete_stub_generation_round_trips_to_full_coverage() {
         "complete stub gen must cover everything; got {}",
         verdict.coverage
     );
-    assert!(verdict.gaps.is_empty(), "no gaps expected: {:?}", verdict.gaps);
+    assert!(
+        verdict.gaps.is_empty(),
+        "no gaps expected: {:?}",
+        verdict.gaps
+    );
     assert!(approx(verdict.assumed_fill_rate, 1.0));
     assert!(verdict.coverage_is_consistent());
     // Every section the spec populates appears in the breakdown.
@@ -277,7 +285,10 @@ fn dropped_ui_state_is_caught_as_a_gap() {
         .expect("the dropped ui_state must appear in the gap work-list");
     assert_eq!(gap.section, SpecSection::UiStates);
     assert_eq!(gap.reason, GapReason::NotGenerated);
-    assert_eq!(gap.node_provenance, qontinui_types::functional_spec::SpecProvenance::Observed);
+    assert_eq!(
+        gap.node_provenance,
+        qontinui_types::functional_spec::SpecProvenance::Observed
+    );
     assert!(verdict.coverage_is_consistent());
 }
 
@@ -301,7 +312,10 @@ fn dropped_entity_field_is_caught_as_a_gap_in_entities() {
 
     let verdict = evaluate_completeness(&spec, &evidence, "2026-06-14T00:00:00Z");
 
-    assert!(verdict.coverage < 1.0, "dropping a field must drop coverage");
+    assert!(
+        verdict.coverage < 1.0,
+        "dropping a field must drop coverage"
+    );
     let gap = verdict
         .gaps
         .iter()

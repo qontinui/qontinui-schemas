@@ -53,17 +53,17 @@ pub mod ai_workflows;
 pub mod app_events;
 pub mod apps;
 pub mod canonical_hash;
+/// Completeness **evaluation** — the deterministic rubric walk that turns a
+/// [`functional_spec::FunctionalSpec`] + coverage evidence into a
+/// [`completeness_verdict::CompletenessVerdict`] (node enumeration + gap diff +
+/// per-section breakdown). The verify-phase rubric the website→mobile slice proves.
+pub mod completeness_eval;
 /// Completeness Rubric + Verdict — Artifact 2 of the functional-spec-contract
 /// keystone. Scores a generated app against the [`functional_spec`] in spec
 /// units; embeds [`spec_check`] for the UI dimension and borrows the
 /// `DriftVerdict` field vocabulary. See
 /// `2026-06-13-functional-spec-contract.md`.
 pub mod completeness_verdict;
-/// Completeness **evaluation** — the deterministic rubric walk that turns a
-/// [`functional_spec::FunctionalSpec`] + coverage evidence into a
-/// [`completeness_verdict::CompletenessVerdict`] (node enumeration + gap diff +
-/// per-section breakdown). The verify-phase rubric the website→mobile slice proves.
-pub mod completeness_eval;
 pub mod config;
 pub mod constraints;
 /// Canonical `DEV-*` dev-event outcome signatures (effect-side classification).
