@@ -27,17 +27,23 @@ from .per_type.api_assertion import ApiAssertion
 from .per_type.api_assertion_operator import ApiAssertionOperator
 from .per_type.api_assertion_type import ApiAssertionType
 from .per_type.api_content_type import ApiContentType
+from .per_type.api_style import ApiStyle
 from .per_type.api_variable_extraction import ApiVariableExtraction
 from .per_type.app import App
 from .per_type.app_error import AppError
 from .per_type.app_event import AppEvent
 from .per_type.app_list_response import AppListResponse
+from .per_type.architecture_profile import ArchitectureProfile
 from .per_type.assertion_miss import AssertionMiss
 from .per_type.assertion_outcome import AssertionOutcome
 from .per_type.assertion_result import AssertionResult
 from .per_type.assertion_scope import AssertionScope
 from .per_type.assertion_severity_counts import AssertionSeverityCounts
+from .per_type.assumption_entry import AssumptionEntry
+from .per_type.auth_model import AuthModel
+from .per_type.auth_role import AuthRole
 from .per_type.available_transitions_result import AvailableTransitionsResult
+from .per_type.backend_profile import BackendProfile
 from .per_type.base_step_fields import BaseStepFields
 from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingRequest
 from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
@@ -58,6 +64,7 @@ from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
 from .per_type.command_step import CommandStep
 from .per_type.command_step_phase import CommandStepPhase
+from .per_type.completeness_verdict import CompletenessVerdict
 from .per_type.component_action_info import ComponentActionInfo
 from .per_type.component_action_request import ComponentActionRequest
 from .per_type.compute_embedding_request import ComputeEmbeddingRequest
@@ -83,6 +90,7 @@ from .per_type.coordinates import Coordinates
 from .per_type.cost_trend_data_point import CostTrendDataPoint
 from .per_type.cost_trend_response import CostTrendResponse
 from .per_type.coverage_data import CoverageData
+from .per_type.coverage_gap import CoverageGap
 from .per_type.create_mcp_call_input import CreateMcpCallInput
 from .per_type.create_mcp_server_input import CreateMcpServerInput
 from .per_type.create_ol_config_request import CreateOlConfigRequest
@@ -124,6 +132,9 @@ from .per_type.embedding_list_response import EmbeddingListResponse
 from .per_type.embedding_result_item import EmbeddingResultItem
 from .per_type.embedding_results_request import EmbeddingResultsRequest
 from .per_type.embedding_results_response import EmbeddingResultsResponse
+from .per_type.enforcement_profile import EnforcementProfile
+from .per_type.entity import Entity
+from .per_type.entity_field import EntityField
 from .per_type.error_type import ErrorType
 from .per_type.execute_playbook_step import ExecutePlaybookStep
 from .per_type.execution_action_type import ExecutionActionType
@@ -171,7 +182,9 @@ from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
 from .per_type.full_runner_step import FullRunnerStep
+from .per_type.functional_spec import FunctionalSpec
 from .per_type.gui_element_chunk import GUIElementChunk
+from .per_type.gap_reason import GapReason
 from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.git_op_list_response import GitOpListResponse
 from .per_type.git_op_record import GitOpRecord
@@ -261,6 +274,9 @@ from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
 from .per_type.ocr_engine import OcrEngine
 from .per_type.ol_config import OlConfig
+from .per_type.operation import Operation
+from .per_type.operation_effect import OperationEffect
+from .per_type.operation_input import OperationInput
 from .per_type.orchestration_loop_config import OrchestrationLoopConfig
 from .per_type.orchestration_loop_status import OrchestrationLoopStatus
 from .per_type.outcome import Outcome
@@ -285,9 +301,11 @@ from .per_type.polling_config import PollingConfig
 from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
+from .per_type.profile import Profile
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.proposal_status import ProposalStatus
+from .per_type.provenance_mix import ProvenanceMix
 from .per_type.rag_dashboard_stats import RAGDashboardStats
 from .per_type.rag_completion_event import RagCompletionEvent
 from .per_type.rag_processing_status import RagProcessingStatus
@@ -299,6 +317,7 @@ from .per_type.record_git_op_request import RecordGitOpRequest
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.region import Region
 from .per_type.register_app_request import RegisterAppRequest
+from .per_type.relationship import Relationship
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
 from .per_type.repository_watch import RepositoryWatch
 from .per_type.resolved_initial_states import ResolvedInitialStates
@@ -342,6 +361,7 @@ from .per_type.scroll_direction import ScrollDirection
 from .per_type.search_options import SearchOptions
 from .per_type.search_result_item import SearchResultItem
 from .per_type.search_strategy import SearchStrategy
+from .per_type.section_verdict import SectionVerdict
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.spec_api_event import SpecApiEvent
@@ -350,6 +370,9 @@ from .per_type.spec_check_policy import SpecCheckPolicy
 from .per_type.spec_check_result import SpecCheckResult
 from .per_type.spec_check_step_config import SpecCheckStepConfig
 from .per_type.spec_check_summary import SpecCheckSummary
+from .per_type.spec_provenance import SpecProvenance
+from .per_type.spec_section import SpecSection
+from .per_type.spec_target import SpecTarget
 from .per_type.spec_validation import SpecValidation
 from .per_type.stage_condition import StageCondition
 from .per_type.stage_input import StageInput
@@ -465,6 +488,7 @@ from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
 from .per_type.validate_config_request import ValidateConfigRequest
 from .per_type.validate_config_response import ValidateConfigResponse
+from .per_type.validation_rule import ValidationRule
 from .per_type.vector_search_result import VectorSearchResult
 from .per_type.verification_agent_context import VerificationAgentContext
 from .per_type.verification_category_kind import VerificationCategoryKind
@@ -528,17 +552,23 @@ __all__ = [
     "ApiAssertionOperator",
     "ApiAssertionType",
     "ApiContentType",
+    "ApiStyle",
     "ApiVariableExtraction",
     "App",
     "AppError",
     "AppEvent",
     "AppListResponse",
+    "ArchitectureProfile",
     "AssertionMiss",
     "AssertionOutcome",
     "AssertionResult",
     "AssertionScope",
     "AssertionSeverityCounts",
+    "AssumptionEntry",
+    "AuthModel",
+    "AuthRole",
     "AvailableTransitionsResult",
+    "BackendProfile",
     "BaseStepFields",
     "BatchComputeEmbeddingRequest",
     "BatchComputeEmbeddingResponse",
@@ -559,6 +589,7 @@ __all__ = [
     "CommandMode",
     "CommandStep",
     "CommandStepPhase",
+    "CompletenessVerdict",
     "ComponentActionInfo",
     "ComponentActionRequest",
     "ComputeEmbeddingRequest",
@@ -584,6 +615,7 @@ __all__ = [
     "CostTrendDataPoint",
     "CostTrendResponse",
     "CoverageData",
+    "CoverageGap",
     "CreateMcpCallInput",
     "CreateMcpServerInput",
     "CreateOlConfigRequest",
@@ -625,6 +657,9 @@ __all__ = [
     "EmbeddingResultItem",
     "EmbeddingResultsRequest",
     "EmbeddingResultsResponse",
+    "EnforcementProfile",
+    "Entity",
+    "EntityField",
     "ErrorType",
     "ExecutePlaybookStep",
     "ExecutionActionType",
@@ -672,7 +707,9 @@ __all__ = [
     "FindingsSummary",
     "FlowEvent",
     "FullRunnerStep",
+    "FunctionalSpec",
     "GUIElementChunk",
+    "GapReason",
     "GateEvaluationResult",
     "GitOpListResponse",
     "GitOpRecord",
@@ -762,6 +799,9 @@ __all__ = [
     "NodeType",
     "OcrEngine",
     "OlConfig",
+    "Operation",
+    "OperationEffect",
+    "OperationInput",
     "OrchestrationLoopConfig",
     "OrchestrationLoopStatus",
     "Outcome",
@@ -786,9 +826,11 @@ __all__ = [
     "ProcessConfig",
     "ProcessState",
     "ProcessStatus",
+    "Profile",
     "PromptStep",
     "PromptStepPhase",
     "ProposalStatus",
+    "ProvenanceMix",
     "RAGDashboardStats",
     "RagCompletionEvent",
     "RagProcessingStatus",
@@ -800,6 +842,7 @@ __all__ = [
     "ReflectionFixOutput",
     "Region",
     "RegisterAppRequest",
+    "Relationship",
     "RepositoryInactiveCondition",
     "RepositoryWatch",
     "ResolvedInitialStates",
@@ -843,6 +886,7 @@ __all__ = [
     "SearchOptions",
     "SearchResultItem",
     "SearchStrategy",
+    "SectionVerdict",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
     "SpecApiEvent",
@@ -851,6 +895,9 @@ __all__ = [
     "SpecCheckResult",
     "SpecCheckStepConfig",
     "SpecCheckSummary",
+    "SpecProvenance",
+    "SpecSection",
+    "SpecTarget",
     "SpecValidation",
     "StageCondition",
     "StageInput",
@@ -966,6 +1013,7 @@ __all__ = [
     "UpdateScheduledTaskRequest",
     "ValidateConfigRequest",
     "ValidateConfigResponse",
+    "ValidationRule",
     "VectorSearchResult",
     "VerificationAgentContext",
     "VerificationCategoryKind",

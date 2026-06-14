@@ -26,12 +26,39 @@
 //! reports any non-timestamp change. The codegen toolchain (Tauri Linux deps,
 //! datamodel-code-generator version) is pinned in that workflow — bump the
 //! pins deliberately when upstream output changes.
+//!
+//! ## The functional-spec-contract v0 artifact set (frozen 2026-06-13)
+//!
+//! Three modules form the keystone contract for the website → mobile
+//! regeneration program (`2026-06-13-functional-spec-contract.md`):
+//!
+//! - [`functional_spec`] — **Artifact 1**, the backend-agnostic [`functional_spec::FunctionalSpec`]
+//!   that comprehension writes and generation reads. Its `ui_states` / `navigation`
+//!   reuse [`ir`]`::{IrState, IrTransition}` (a literal type-level superset of the IR).
+//! - [`completeness_verdict`] — **Artifact 2**, the Completeness Rubric +
+//!   [`completeness_verdict::CompletenessVerdict`]. Borrows the `DriftVerdict` field
+//!   vocabulary and embeds [`spec_check::SpecCheckResult`] for the UI dimension.
+//! - [`priorities_profile`] — **Artifact 3**, the [`priorities_profile::Profile`] that
+//!   parameterizes the generators.
+//!
+//! **v0 stability contract:** the `specVersion` / `profileVersion` fields are `"0"`.
+//! Until they bump to `"1"`, changes are **additive-only** — new optional fields and
+//! new enum variants only, never a rename, removal, or type change of an existing
+//! field. (`deny_unknown_fields` is deliberately omitted on these three so a reader
+//! tolerates a forward document.) Downstream plans #1 (app-gen), #2 (backend-gen),
+//! and #3 (comprehension) build against this frozen interface in parallel.
 
 pub mod accessibility;
 pub mod ai_workflows;
 pub mod app_events;
 pub mod apps;
 pub mod canonical_hash;
+/// Completeness Rubric + Verdict — Artifact 2 of the functional-spec-contract
+/// keystone. Scores a generated app against the [`functional_spec`] in spec
+/// units; embeds [`spec_check`] for the UI dimension and borrows the
+/// `DriftVerdict` field vocabulary. See
+/// `2026-06-13-functional-spec-contract.md`.
+pub mod completeness_verdict;
 pub mod config;
 pub mod constraints;
 /// Canonical `DEV-*` dev-event outcome signatures (effect-side classification).
@@ -46,12 +73,21 @@ pub mod discovery;
 pub mod execution;
 pub mod federation;
 pub mod findings;
+/// Functional Spec — Artifact 1 of the functional-spec-contract keystone: the
+/// backend-agnostic contract between comprehension and generation. Reuses
+/// [`ir`]`::{IrState, IrTransition}` for the `ui_states`/`navigation` section.
+/// See `2026-06-13-functional-spec-contract.md`.
+pub mod functional_spec;
 pub mod geometry;
 pub mod git_ops;
 pub mod ir;
 pub mod mcp_config;
 pub mod memory;
 pub mod orchestration_config;
+/// Priorities Profile — Artifact 3 of the functional-spec-contract keystone:
+/// the declarative, gate-checkable generator parameterization. See
+/// `2026-06-13-functional-spec-contract.md`.
+pub mod priorities_profile;
 pub mod process_management;
 pub mod rag;
 pub mod runner;
