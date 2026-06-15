@@ -75,6 +75,12 @@ pub mod dev_signatures;
 /// to TS/Python. See `plans/2026-06-07-twin-dev-event-cause-effect-ledger.md`.
 pub mod dev_states;
 pub mod discovery;
+/// Shared operation→endpoint derivation for the website→mobile regeneration program.
+/// The single deterministic rule the app-generator (#1) and backend-generator (#2)
+/// both call so the generated app's data layer and the generated backend's routes
+/// agree without a runtime handoff. See `2026-06-14-app-generator-ir-inversion.md` /
+/// `2026-06-14-backend-generator-from-spec.md` (the reconciliation block).
+pub mod endpoint_for;
 pub mod execution;
 pub mod federation;
 pub mod findings;
