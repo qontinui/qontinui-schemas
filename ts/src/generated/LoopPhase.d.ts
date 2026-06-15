@@ -21,6 +21,9 @@ export type LoopPhase =
   | "waiting_for_runner"
   | "stall_detecting"
   | "planning"
+  | "dispatching_worker"
+  | "reconciling"
+  | "elaborating"
   | "complete"
   | "stopped"
   | "error";
