@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.7.0...ts-v0.8.0) (2026-06-15)
+
+
+### Features
+
+* **functional-spec:** freeze functional-spec-contract v0 (spec + rubric + profile) ([#79](https://github.com/qontinui/qontinui-schemas/issues/79)) ([6b86061](https://github.com/qontinui/qontinui-schemas/commit/6b860617e543a35a4ea06613c4251e0ceac48bd0))
+* **orchestration:** conductor LoopPhase variants (Approach-D Phase 3) ([#83](https://github.com/qontinui/qontinui-schemas/issues/83)) ([a68b1c3](https://github.com/qontinui/qontinui-schemas/commit/a68b1c369eee71093949ec93344b19acd0e2edf0))
+
 ## [0.7.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.6.0...ts-v0.7.0) (2026-06-07)
 
 
