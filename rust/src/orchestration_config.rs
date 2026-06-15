@@ -598,7 +598,23 @@ pub enum LoopPhase {
     /// Stall-detection check in progress.
     StallDetecting,
     /// Planning / decomposition in progress.
+    ///
+    /// In the Approach-D conductor this is also the DESIGN step's phase (the
+    /// step that emits the org-chart) — there is no separate `Design` variant;
+    /// `Planning` covers it (contract §3).
     Planning,
+    /// Approach-D conductor: dispatching a ready subtask to a worker
+    /// AI-session (the side-effecting spawn portion of a reconciler tick).
+    DispatchingWorker,
+    /// Approach-D conductor: re-deriving readiness from the durable ledger and
+    /// reconciling worker signals against subtask state (the observe/decide
+    /// portion of a reconciler tick). This is the conductor's resting phase
+    /// between dispatches.
+    Reconciling,
+    /// Approach-D conductor: harvesting an elaborator's emitted child subtasks
+    /// and splicing them into the DAG. RESERVED for Phase 4 — the Phase-3
+    /// reconciler sets this only around the (currently no-op) harvest hook.
+    Elaborating,
     /// Loop finished successfully.
     Complete,
     /// Loop stopped by the user.
