@@ -86,7 +86,7 @@
           "category": "text-content",
           "severity": "warning",
           "assertionType": "exists",
-          "target": { "type": "search", "criteria": { "text_contains": "authorize" }, "label": "authorization explanation text" },
+          "target": { "type": "search", "criteria": { "textContains": "authorize" }, "label": "authorization explanation text" },
           "source": "discovery",
           "reviewed": false,
           "enabled": true
@@ -117,7 +117,7 @@
           "category": "text-content",
           "severity": "warning",
           "assertionType": "exists",
-          "target": { "type": "search", "criteria": { "text_contains": "invalid" }, "label": "validation error text" },
+          "target": { "type": "search", "criteria": { "textContains": "invalid" }, "label": "validation error text" },
           "source": "discovery",
           "reviewed": false,
           "enabled": true
