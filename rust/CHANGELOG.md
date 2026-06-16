@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.5.0...rust-v0.6.0) (2026-06-15)
+
+
+### Features
+
+* **completeness:** website→mobile vertical-slice rubric walk + anti-drift gate ([#81](https://github.com/qontinui/qontinui-schemas/issues/81)) ([1b873bd](https://github.com/qontinui/qontinui-schemas/commit/1b873bd109f34693cf83f71cb4a1d51ca1e0387c))
+* **functional-spec:** freeze functional-spec-contract v0 (spec + rubric + profile) ([#79](https://github.com/qontinui/qontinui-schemas/issues/79)) ([6b86061](https://github.com/qontinui/qontinui-schemas/commit/6b860617e543a35a4ea06613c4251e0ceac48bd0))
+* **orchestration:** conductor LoopPhase variants (Approach-D Phase 3) ([#83](https://github.com/qontinui/qontinui-schemas/issues/83)) ([a68b1c3](https://github.com/qontinui/qontinui-schemas/commit/a68b1c369eee71093949ec93344b19acd0e2edf0))
+* **regen:** shared endpoint_for derivation + connect-runner state assertions ([#82](https://github.com/qontinui/qontinui-schemas/issues/82)) ([f8c91d3](https://github.com/qontinui/qontinui-schemas/commit/f8c91d3f0889afbe43f60e6e0c2ccde7c1097ddc))
+
+
+### Bug Fixes
+
+* **regen:** connect-runner assertion criteria to camelCase (textContains) ([1e35258](https://github.com/qontinui/qontinui-schemas/commit/1e3525801091c2c0526bb56f909d04a2a247821d))
+
 ## [0.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.4.0...rust-v0.5.0) (2026-06-07)
 
 
