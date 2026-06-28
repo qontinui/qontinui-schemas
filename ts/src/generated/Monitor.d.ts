@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MonitorPosition } from './MonitorPosition';
+import type { MonitorPosition } from "./MonitorPosition";
 
 /**
  * Standardized monitor information — a physical display with its position

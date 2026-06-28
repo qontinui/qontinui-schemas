@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { BatchEmbeddingResult } from './BatchEmbeddingResult';
+import type { BatchEmbeddingResult } from "./BatchEmbeddingResult";
 
 /**
  * Response with batch-computed embeddings.

@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunFinding } from './TaskRunFinding';
-import type { TaskRunFindingActionType } from './TaskRunFindingActionType';
-import type { TaskRunFindingCategory } from './TaskRunFindingCategory';
-import type { TaskRunFindingSeverity } from './TaskRunFindingSeverity';
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
-import type { TaskRunFindingSummary } from './TaskRunFindingSummary';
+import type { TaskRunFinding } from "./TaskRunFinding";
+import type { TaskRunFindingActionType } from "./TaskRunFindingActionType";
+import type { TaskRunFindingCategory } from "./TaskRunFindingCategory";
+import type { TaskRunFindingSeverity } from "./TaskRunFindingSeverity";
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
+import type { TaskRunFindingSummary } from "./TaskRunFindingSummary";
 
 /**
  * Response for `GET /task-runs/{id}/findings`.

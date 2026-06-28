@@ -5,19 +5,19 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ComponentActionInfo } from './ComponentActionInfo';
-import type { ElementBbox } from './ElementBbox';
-import type { ElementIdentifier } from './ElementIdentifier';
-import type { ElementRect } from './ElementRect';
-import type { ElementState } from './ElementState';
-import type { UIBridgeCapturedToast } from './UIBridgeCapturedToast';
-import type { UIBridgeComponent } from './UIBridgeComponent';
-import type { UIBridgeElement } from './UIBridgeElement';
-import type { UIBridgeModalInfo } from './UIBridgeModalInfo';
-import type { UIBridgeModalStack } from './UIBridgeModalStack';
-import type { UIBridgeToastContext } from './UIBridgeToastContext';
-import type { UIBridgeUndoContext } from './UIBridgeUndoContext';
-import type { WorkflowInfo } from './WorkflowInfo';
+import type { ComponentActionInfo } from "./ComponentActionInfo";
+import type { ElementBbox } from "./ElementBbox";
+import type { ElementIdentifier } from "./ElementIdentifier";
+import type { ElementRect } from "./ElementRect";
+import type { ElementState } from "./ElementState";
+import type { UIBridgeCapturedToast } from "./UIBridgeCapturedToast";
+import type { UIBridgeComponent } from "./UIBridgeComponent";
+import type { UIBridgeElement } from "./UIBridgeElement";
+import type { UIBridgeModalInfo } from "./UIBridgeModalInfo";
+import type { UIBridgeModalStack } from "./UIBridgeModalStack";
+import type { UIBridgeToastContext } from "./UIBridgeToastContext";
+import type { UIBridgeUndoContext } from "./UIBridgeUndoContext";
+import type { WorkflowInfo } from "./WorkflowInfo";
 
 /**
  * Full snapshot of the UI Bridge state.

@@ -5,30 +5,30 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssumptionEntry } from './AssumptionEntry';
-import type { AuthModel } from './AuthModel';
-import type { AuthRole } from './AuthRole';
-import type { Entity } from './Entity';
-import type { EntityField } from './EntityField';
-import type { IrAssertion } from './IrAssertion';
-import type { IrAssertionTarget } from './IrAssertionTarget';
-import type { IrCrossRef } from './IrCrossRef';
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrMetadata } from './IrMetadata';
-import type { IrProvenance } from './IrProvenance';
-import type { IrState } from './IrState';
-import type { IrStateCondition } from './IrStateCondition';
-import type { IrTransition } from './IrTransition';
-import type { IrTransitionAction } from './IrTransitionAction';
-import type { IrWaitSpec } from './IrWaitSpec';
-import type { Operation } from './Operation';
-import type { OperationEffect } from './OperationEffect';
-import type { OperationInput } from './OperationInput';
-import type { ProposalStatus } from './ProposalStatus';
-import type { Relationship } from './Relationship';
-import type { SpecProvenance } from './SpecProvenance';
-import type { SpecTarget } from './SpecTarget';
-import type { ValidationRule } from './ValidationRule';
+import type { AssumptionEntry } from "./AssumptionEntry";
+import type { AuthModel } from "./AuthModel";
+import type { AuthRole } from "./AuthRole";
+import type { Entity } from "./Entity";
+import type { EntityField } from "./EntityField";
+import type { IrAssertion } from "./IrAssertion";
+import type { IrAssertionTarget } from "./IrAssertionTarget";
+import type { IrCrossRef } from "./IrCrossRef";
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrMetadata } from "./IrMetadata";
+import type { IrProvenance } from "./IrProvenance";
+import type { IrState } from "./IrState";
+import type { IrStateCondition } from "./IrStateCondition";
+import type { IrTransition } from "./IrTransition";
+import type { IrTransitionAction } from "./IrTransitionAction";
+import type { IrWaitSpec } from "./IrWaitSpec";
+import type { Operation } from "./Operation";
+import type { OperationEffect } from "./OperationEffect";
+import type { OperationInput } from "./OperationInput";
+import type { ProposalStatus } from "./ProposalStatus";
+import type { Relationship } from "./Relationship";
+import type { SpecProvenance } from "./SpecProvenance";
+import type { SpecTarget } from "./SpecTarget";
+import type { ValidationRule } from "./ValidationRule";
 
 /**
  * The v0 Functional Spec. Five sections, each node confidence- and

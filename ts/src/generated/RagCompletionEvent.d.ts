@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { EmbeddingResultItem } from './EmbeddingResultItem';
+import type { EmbeddingResultItem } from "./EmbeddingResultItem";
 
 /**
  * Completion event emitted when RAG processing finishes.

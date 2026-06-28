@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ProposalStatus } from './ProposalStatus';
+import type { ProposalStatus } from "./ProposalStatus";
 
 export interface IrProvenance {
   /**

@@ -5,14 +5,14 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CoordinateSystem } from './CoordinateSystem';
-import type { Coordinates } from './Coordinates';
-import type { MatchAdjustment } from './MatchAdjustment';
-import type { MatchMethod } from './MatchMethod';
-import type { PatternOptions } from './PatternOptions';
-import type { PollingConfig } from './PollingConfig';
-import type { Region } from './Region';
-import type { SearchStrategy } from './SearchStrategy';
+import type { CoordinateSystem } from "./CoordinateSystem";
+import type { Coordinates } from "./Coordinates";
+import type { MatchAdjustment } from "./MatchAdjustment";
+import type { MatchMethod } from "./MatchMethod";
+import type { PatternOptions } from "./PatternOptions";
+import type { PollingConfig } from "./PollingConfig";
+import type { Region } from "./Region";
+import type { SearchStrategy } from "./SearchStrategy";
 
 /**
  * Search options for target finding.

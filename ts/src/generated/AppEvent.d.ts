@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CanvasPanel } from './CanvasPanel';
-import type { FlowEvent } from './FlowEvent';
+import type { CanvasPanel } from "./CanvasPanel";
+import type { FlowEvent } from "./FlowEvent";
 
 /**
  * Unified application events for frontend communication.

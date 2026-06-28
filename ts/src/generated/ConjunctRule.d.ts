@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MatchOutcome } from './MatchOutcome';
+import type { MatchOutcome } from "./MatchOutcome";
 
 /**
  * Internally-tagged on `kind`. AND-conjuncts only per §5.7 — no OR.

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { UIBridgeModalInfo } from './UIBridgeModalInfo';
+import type { UIBridgeModalInfo } from "./UIBridgeModalInfo";
 
 /**
  * Modal stack context attached to a snapshot when the SDK has a

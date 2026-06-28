@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { UiBridgeHttpHealthAppInfo } from './UiBridgeHttpHealthAppInfo';
-import type { UiBridgeHttpHealthData } from './UiBridgeHttpHealthData';
+import type { UiBridgeHttpHealthAppInfo } from "./UiBridgeHttpHealthAppInfo";
+import type { UiBridgeHttpHealthData } from "./UiBridgeHttpHealthData";
 
 /**
  * Canonical success envelope for `GET /api/ui-bridge/health`.

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { NextTaskInfo } from './NextTaskInfo';
+import type { NextTaskInfo } from "./NextTaskInfo";
 
 /**
  * Summary of the scheduler's current runtime state, returned from the status

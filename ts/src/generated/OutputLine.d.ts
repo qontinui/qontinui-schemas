@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { OutputStream } from './OutputStream';
+import type { OutputStream } from "./OutputStream";
 
 /**
  * A single line of output from a managed process.

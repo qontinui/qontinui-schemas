@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Monitor } from './Monitor';
-import type { MonitorPosition } from './MonitorPosition';
+import type { Monitor } from "./Monitor";
+import type { MonitorPosition } from "./MonitorPosition";
 
 /**
  * The combined coordinate space of all monitors.

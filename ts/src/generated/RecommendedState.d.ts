@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { SpecCheckConfidence } from './SpecCheckConfidence';
+import type { SpecCheckConfidence } from "./SpecCheckConfidence";
 
 /**
  * The single state the matcher recommends the caller treat as "current".

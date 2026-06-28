@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ApiAssertionOperator } from './ApiAssertionOperator';
-import type { ApiAssertionType } from './ApiAssertionType';
+import type { ApiAssertionOperator } from "./ApiAssertionOperator";
+import type { ApiAssertionType } from "./ApiAssertionType";
 
 /**
  * A single assertion evaluated against an API response.

@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ActionExecutionResponse } from './ActionExecutionResponse';
-import type { Pagination } from './Pagination';
+import type { ActionExecutionResponse } from "./ActionExecutionResponse";
+import type { Pagination } from "./Pagination";
 
 /**
  * Paginated list of action executions.

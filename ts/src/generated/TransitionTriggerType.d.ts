@@ -10,4 +10,5 @@
  *
  * Mirrors Python `TransitionTriggerType(str, Enum)`.
  */
-export type TransitionTriggerType = "click" | "type" | "scroll" | "hover" | "custom";
+export type TransitionTriggerType =
+  "click" | "type" | "scroll" | "hover" | "custom";

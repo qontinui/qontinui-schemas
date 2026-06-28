@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ModelCostBreakdown } from './ModelCostBreakdown';
+import type { ModelCostBreakdown } from "./ModelCostBreakdown";
 
 /**
  * Aggregate LLM cost summary for an execution run.

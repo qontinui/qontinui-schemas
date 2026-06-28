@@ -5,36 +5,36 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CanonicalStep } from './CanonicalStep';
-import type { CheckType } from './CheckType';
-import type { CommandMode } from './CommandMode';
-import type { CommandStep } from './CommandStep';
-import type { CommandStepPhase } from './CommandStepPhase';
-import type { HealthCheckUrl } from './HealthCheckUrl';
-import type { LogSourceSelection } from './LogSourceSelection';
-import type { ModelOverrideConfig } from './ModelOverrideConfig';
-import type { PlaywrightExecutionMode } from './PlaywrightExecutionMode';
-import type { PromptStep } from './PromptStep';
-import type { PromptStepPhase } from './PromptStepPhase';
-import type { RetryPolicy } from './RetryPolicy';
-import type { RetrySpec } from './RetrySpec';
-import type { RoutingRule } from './RoutingRule';
-import type { StageCondition } from './StageCondition';
-import type { StageInput } from './StageInput';
-import type { StageOutput } from './StageOutput';
-import type { TestType } from './TestType';
-import type { UiBridgeAction } from './UiBridgeAction';
-import type { UiBridgeAssertType } from './UiBridgeAssertType';
-import type { UiBridgeComparisonMode } from './UiBridgeComparisonMode';
-import type { UiBridgeSeverity } from './UiBridgeSeverity';
-import type { UiBridgeStep } from './UiBridgeStep';
-import type { UiBridgeStepPhase } from './UiBridgeStepPhase';
-import type { UnifiedStep } from './UnifiedStep';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { WorkflowArchitecture } from './WorkflowArchitecture';
-import type { WorkflowStage } from './WorkflowStage';
-import type { WorkflowStep } from './WorkflowStep';
-import type { WorkflowStepPhase } from './WorkflowStepPhase';
+import type { CanonicalStep } from "./CanonicalStep";
+import type { CheckType } from "./CheckType";
+import type { CommandMode } from "./CommandMode";
+import type { CommandStep } from "./CommandStep";
+import type { CommandStepPhase } from "./CommandStepPhase";
+import type { HealthCheckUrl } from "./HealthCheckUrl";
+import type { LogSourceSelection } from "./LogSourceSelection";
+import type { ModelOverrideConfig } from "./ModelOverrideConfig";
+import type { PlaywrightExecutionMode } from "./PlaywrightExecutionMode";
+import type { PromptStep } from "./PromptStep";
+import type { PromptStepPhase } from "./PromptStepPhase";
+import type { RetryPolicy } from "./RetryPolicy";
+import type { RetrySpec } from "./RetrySpec";
+import type { RoutingRule } from "./RoutingRule";
+import type { StageCondition } from "./StageCondition";
+import type { StageInput } from "./StageInput";
+import type { StageOutput } from "./StageOutput";
+import type { TestType } from "./TestType";
+import type { UiBridgeAction } from "./UiBridgeAction";
+import type { UiBridgeAssertType } from "./UiBridgeAssertType";
+import type { UiBridgeComparisonMode } from "./UiBridgeComparisonMode";
+import type { UiBridgeSeverity } from "./UiBridgeSeverity";
+import type { UiBridgeStep } from "./UiBridgeStep";
+import type { UiBridgeStepPhase } from "./UiBridgeStepPhase";
+import type { UnifiedStep } from "./UnifiedStep";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { WorkflowArchitecture } from "./WorkflowArchitecture";
+import type { WorkflowStage } from "./WorkflowStage";
+import type { WorkflowStep } from "./WorkflowStep";
+import type { WorkflowStepPhase } from "./WorkflowStepPhase";
 
 /**
  * A unified workflow with steps organized by phase.

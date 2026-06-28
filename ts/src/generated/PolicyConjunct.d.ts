@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionScope } from './AssertionScope';
-import type { ConjunctRule } from './ConjunctRule';
-import type { MatchOutcome } from './MatchOutcome';
+import type { AssertionScope } from "./AssertionScope";
+import type { ConjunctRule } from "./ConjunctRule";
+import type { MatchOutcome } from "./MatchOutcome";
 
 /**
  * One AND-conjunct: a named rule applied within a scope.

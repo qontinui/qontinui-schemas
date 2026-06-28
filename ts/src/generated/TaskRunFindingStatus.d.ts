@@ -8,4 +8,10 @@
 /**
  * Lifecycle status of a finding.
  */
-export type TaskRunFindingStatus = "detected" | "in_progress" | "needs_input" | "resolved" | "wont_fix" | "deferred";
+export type TaskRunFindingStatus =
+  | "detected"
+  | "in_progress"
+  | "needs_input"
+  | "resolved"
+  | "wont_fix"
+  | "deferred";

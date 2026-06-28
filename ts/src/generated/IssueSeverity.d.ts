@@ -8,4 +8,5 @@
 /**
  * Severity of an issue reported against a run.
  */
-export type IssueSeverity = "critical" | "high" | "medium" | "low" | "informational";
+export type IssueSeverity =
+  "critical" | "high" | "medium" | "low" | "informational";

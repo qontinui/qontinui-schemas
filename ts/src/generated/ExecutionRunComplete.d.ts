@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CoverageData } from './CoverageData';
-import type { ExecutionStats } from './ExecutionStats';
-import type { RunStatus } from './RunStatus';
+import type { CoverageData } from "./CoverageData";
+import type { ExecutionStats } from "./ExecutionStats";
+import type { RunStatus } from "./RunStatus";
 
 /**
  * Request payload for marking a run complete.

@@ -5,13 +5,13 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { UiBridgeAction } from './UiBridgeAction';
-import type { UiBridgeAssertType } from './UiBridgeAssertType';
-import type { UiBridgeComparisonMode } from './UiBridgeComparisonMode';
-import type { UiBridgeSeverity } from './UiBridgeSeverity';
-import type { UiBridgeStepPhase } from './UiBridgeStepPhase';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { RetrySpec } from "./RetrySpec";
+import type { UiBridgeAction } from "./UiBridgeAction";
+import type { UiBridgeAssertType } from "./UiBridgeAssertType";
+import type { UiBridgeComparisonMode } from "./UiBridgeComparisonMode";
+import type { UiBridgeSeverity } from "./UiBridgeSeverity";
+import type { UiBridgeStepPhase } from "./UiBridgeStepPhase";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 
 /**
  * UI Bridge SDK interaction — navigate, execute, assert, snapshot, compare.

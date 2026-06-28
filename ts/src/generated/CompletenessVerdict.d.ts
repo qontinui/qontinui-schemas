@@ -5,27 +5,27 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionMiss } from './AssertionMiss';
-import type { AssertionOutcome } from './AssertionOutcome';
-import type { AssertionResult } from './AssertionResult';
-import type { AssertionSeverityCounts } from './AssertionSeverityCounts';
-import type { BridgeFingerprint } from './BridgeFingerprint';
-import type { CandidateMiss } from './CandidateMiss';
-import type { CoverageGap } from './CoverageGap';
-import type { FieldDiff } from './FieldDiff';
-import type { GapReason } from './GapReason';
-import type { MatchOutcome } from './MatchOutcome';
-import type { MatchedElement } from './MatchedElement';
-import type { MissReason } from './MissReason';
-import type { ProvenanceMix } from './ProvenanceMix';
-import type { RecommendedState } from './RecommendedState';
-import type { SectionVerdict } from './SectionVerdict';
-import type { SpecCheckConfidence } from './SpecCheckConfidence';
-import type { SpecCheckResult } from './SpecCheckResult';
-import type { SpecCheckSummary } from './SpecCheckSummary';
-import type { SpecProvenance } from './SpecProvenance';
-import type { SpecSection } from './SpecSection';
-import type { StateMatchResult } from './StateMatchResult';
+import type { AssertionMiss } from "./AssertionMiss";
+import type { AssertionOutcome } from "./AssertionOutcome";
+import type { AssertionResult } from "./AssertionResult";
+import type { AssertionSeverityCounts } from "./AssertionSeverityCounts";
+import type { BridgeFingerprint } from "./BridgeFingerprint";
+import type { CandidateMiss } from "./CandidateMiss";
+import type { CoverageGap } from "./CoverageGap";
+import type { FieldDiff } from "./FieldDiff";
+import type { GapReason } from "./GapReason";
+import type { MatchOutcome } from "./MatchOutcome";
+import type { MatchedElement } from "./MatchedElement";
+import type { MissReason } from "./MissReason";
+import type { ProvenanceMix } from "./ProvenanceMix";
+import type { RecommendedState } from "./RecommendedState";
+import type { SectionVerdict } from "./SectionVerdict";
+import type { SpecCheckConfidence } from "./SpecCheckConfidence";
+import type { SpecCheckResult } from "./SpecCheckResult";
+import type { SpecCheckSummary } from "./SpecCheckSummary";
+import type { SpecProvenance } from "./SpecProvenance";
+import type { SpecSection } from "./SpecSection";
+import type { StateMatchResult } from "./StateMatchResult";
 
 /**
  * The output of the test-phase verify subtask: how completely a generated

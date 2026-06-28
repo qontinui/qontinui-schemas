@@ -8,4 +8,10 @@
 /**
  * Current state of an individual worker.
  */
-export type WorkerStatus = "idle" | "active" | "awaiting_verification" | "paused" | "completed" | "error";
+export type WorkerStatus =
+  | "idle"
+  | "active"
+  | "awaiting_verification"
+  | "paused"
+  | "completed"
+  | "error";

@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { OperationEffect } from './OperationEffect';
-import type { OperationInput } from './OperationInput';
-import type { SpecProvenance } from './SpecProvenance';
-import type { ValidationRule } from './ValidationRule';
+import type { OperationEffect } from "./OperationEffect";
+import type { OperationInput } from "./OperationInput";
+import type { SpecProvenance } from "./SpecProvenance";
+import type { ValidationRule } from "./ValidationRule";
 
 /**
  * An operation the frontend exposes. Existence (`confidence`) is typically

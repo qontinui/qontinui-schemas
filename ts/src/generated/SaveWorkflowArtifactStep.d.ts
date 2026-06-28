@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 
 /**
  * Read a generated workflow JSON file and save it to the database.

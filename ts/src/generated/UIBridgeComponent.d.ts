@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ComponentActionInfo } from './ComponentActionInfo';
+import type { ComponentActionInfo } from "./ComponentActionInfo";
 
 /**
  * A registered component in the UI Bridge registry.

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ContextAutoInclude } from './ContextAutoInclude';
+import type { ContextAutoInclude } from "./ContextAutoInclude";
 
 /**
  * AI context — a markdown document injected into AI task prompts to

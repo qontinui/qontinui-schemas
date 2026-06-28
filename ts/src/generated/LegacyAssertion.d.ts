@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { LegacyAssertionTarget } from './LegacyAssertionTarget';
+import type { LegacyAssertionTarget } from "./LegacyAssertionTarget";
 
 export interface LegacyAssertion {
   assertionType: string;

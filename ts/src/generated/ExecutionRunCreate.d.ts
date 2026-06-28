@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunType } from './RunType';
-import type { RunnerMetadata } from './RunnerMetadata';
-import type { WorkflowMetadata } from './WorkflowMetadata';
+import type { RunType } from "./RunType";
+import type { RunnerMetadata } from "./RunnerMetadata";
+import type { WorkflowMetadata } from "./WorkflowMetadata";
 
 /**
  * Request payload for creating a new execution run.

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunPromptResponseData } from './RunPromptResponseData';
+import type { RunPromptResponseData } from "./RunPromptResponseData";
 
 /**
  * Response from the runner's `run_prompt` endpoint.

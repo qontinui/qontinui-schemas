@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MemoryRow } from './MemoryRow';
+import type { MemoryRow } from "./MemoryRow";
 
 /**
  * `GET /coord/memory/:name` response — latest row + the 10

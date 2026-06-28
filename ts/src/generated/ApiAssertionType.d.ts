@@ -8,4 +8,5 @@
 /**
  * Assertion kinds supported on API responses.
  */
-export type ApiAssertionType = "status_code" | "json_path" | "header" | "body_contains" | "response_time";
+export type ApiAssertionType =
+  "status_code" | "json_path" | "header" | "body_contains" | "response_time";

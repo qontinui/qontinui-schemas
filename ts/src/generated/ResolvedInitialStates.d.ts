@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { InitialStateRef } from './InitialStateRef';
-import type { InitialStatesSource } from './InitialStatesSource';
+import type { InitialStateRef } from "./InitialStateRef";
+import type { InitialStatesSource } from "./InitialStatesSource";
 
 /**
  * The resolved set of initial states for a run, along with the source the

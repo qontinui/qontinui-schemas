@@ -8,4 +8,5 @@
 /**
  * Severity of a finding.
  */
-export type TaskRunFindingSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type TaskRunFindingSeverity =
+  "critical" | "high" | "medium" | "low" | "info";

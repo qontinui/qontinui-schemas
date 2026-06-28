@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
+import type { Confidence } from "./Confidence";
 
 /**
  * A finding recorded by a worker agent.

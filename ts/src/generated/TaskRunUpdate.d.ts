@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunStatus } from './TaskRunStatus';
+import type { TaskRunStatus } from "./TaskRunStatus";
 
 /**
  * Request payload for updating an existing task run. All fields are optional;

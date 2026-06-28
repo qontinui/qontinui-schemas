@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrWaitSpec } from './IrWaitSpec';
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrWaitSpec } from "./IrWaitSpec";
 
 export interface LegacyProcessStep {
   action: string;

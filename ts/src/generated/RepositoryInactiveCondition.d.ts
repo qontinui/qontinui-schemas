@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RepositoryWatch } from './RepositoryWatch';
+import type { RepositoryWatch } from "./RepositoryWatch";
 
 /**
  * Condition that requires repositories to have no file modifications for a

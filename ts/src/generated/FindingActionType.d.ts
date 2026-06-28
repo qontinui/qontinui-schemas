@@ -10,4 +10,5 @@
  *
  * Mirrors Python `FindingActionType(str, Enum)`.
  */
-export type FindingActionType = "auto_fix" | "needs_user_input" | "manual" | "informational";
+export type FindingActionType =
+  "auto_fix" | "needs_user_input" | "manual" | "informational";

@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { PromptStepPhase } from './PromptStepPhase';
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { PromptStepPhase } from "./PromptStepPhase";
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 
 /**
  * AI task instructions (prompt).

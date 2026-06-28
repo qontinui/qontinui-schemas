@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CriterionOverride } from './CriterionOverride';
+import type { CriterionOverride } from "./CriterionOverride";
 
 /**
  * Collection of overrides for a task run.

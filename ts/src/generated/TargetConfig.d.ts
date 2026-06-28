@@ -5,19 +5,19 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AccessibilityRoleCriterion } from './AccessibilityRoleCriterion';
-import type { CoordinateSystem } from './CoordinateSystem';
-import type { Coordinates } from './Coordinates';
-import type { MatchAdjustment } from './MatchAdjustment';
-import type { MatchMethod } from './MatchMethod';
-import type { OcrEngine } from './OcrEngine';
-import type { PatternOptions } from './PatternOptions';
-import type { PollingConfig } from './PollingConfig';
-import type { Region } from './Region';
-import type { SearchOptions } from './SearchOptions';
-import type { SearchStrategy } from './SearchStrategy';
-import type { TextMatchType } from './TextMatchType';
-import type { TextSearchOptions } from './TextSearchOptions';
+import type { AccessibilityRoleCriterion } from "./AccessibilityRoleCriterion";
+import type { CoordinateSystem } from "./CoordinateSystem";
+import type { Coordinates } from "./Coordinates";
+import type { MatchAdjustment } from "./MatchAdjustment";
+import type { MatchMethod } from "./MatchMethod";
+import type { OcrEngine } from "./OcrEngine";
+import type { PatternOptions } from "./PatternOptions";
+import type { PollingConfig } from "./PollingConfig";
+import type { Region } from "./Region";
+import type { SearchOptions } from "./SearchOptions";
+import type { SearchStrategy } from "./SearchStrategy";
+import type { TextMatchType } from "./TextMatchType";
+import type { TextSearchOptions } from "./TextSearchOptions";
 
 /**
  * The discriminated union over all 14 target configurations. Wire format is

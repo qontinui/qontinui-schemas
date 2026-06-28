@@ -96,6 +96,7 @@
   "author": "Joshua Spinak",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
-    "json-schema-to-typescript": "^15.0.0"
+    "json-schema-to-typescript": "^15.0.0",
+    "prettier": "^3.2.5"
   }
 }

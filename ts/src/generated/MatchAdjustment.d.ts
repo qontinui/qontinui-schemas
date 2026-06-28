@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CoordinateSystem } from './CoordinateSystem';
-import type { Coordinates } from './Coordinates';
+import type { CoordinateSystem } from "./CoordinateSystem";
+import type { Coordinates } from "./Coordinates";
 
 /**
  * Match adjustment — modify the matched region before acting.

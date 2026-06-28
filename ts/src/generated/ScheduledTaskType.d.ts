@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { McpConnectionRef } from './McpConnectionRef';
+import type { McpConnectionRef } from "./McpConnectionRef";
 
 /**
  * Type of task to schedule.

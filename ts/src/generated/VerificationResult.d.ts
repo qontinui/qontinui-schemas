@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { CriterionType } from './CriterionType';
+import type { Confidence } from "./Confidence";
+import type { CriterionType } from "./CriterionType";
 
 /**
  * Result of a single verification check.

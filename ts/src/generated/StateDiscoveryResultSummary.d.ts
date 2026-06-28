@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiscoverySourceType } from './DiscoverySourceType';
+import type { DiscoverySourceType } from "./DiscoverySourceType";
 
 /**
  * Summary of a state-discovery result (for listings).

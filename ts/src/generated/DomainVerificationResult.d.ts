@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { CriterionType } from './CriterionType';
-import type { VerificationResult } from './VerificationResult';
+import type { Confidence } from "./Confidence";
+import type { CriterionType } from "./CriterionType";
+import type { VerificationResult } from "./VerificationResult";
 
 /**
  * Result of domain-scoped verification.

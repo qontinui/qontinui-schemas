@@ -8,4 +8,11 @@
 /**
  * Lifecycle status of an execution run.
  */
-export type RunStatus = "pending" | "running" | "completed" | "failed" | "timeout" | "cancelled" | "paused";
+export type RunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "timeout"
+  | "cancelled"
+  | "paused";

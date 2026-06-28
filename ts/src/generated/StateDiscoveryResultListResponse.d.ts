@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiscoverySourceType } from './DiscoverySourceType';
-import type { StateDiscoveryResultSummary } from './StateDiscoveryResultSummary';
+import type { DiscoverySourceType } from "./DiscoverySourceType";
+import type { StateDiscoveryResultSummary } from "./StateDiscoveryResultSummary";
 
 /**
  * API response for listing discovery results.

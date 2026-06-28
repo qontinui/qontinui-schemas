@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { JobStatus } from './JobStatus';
+import type { JobStatus } from "./JobStatus";
 
 /**
  * Single job record for display.

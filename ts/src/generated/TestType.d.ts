@@ -8,4 +8,5 @@
 /**
  * Test-runner kinds surfaced by `CommandStep` when `mode = "test"`.
  */
-export type TestType = "playwright" | "qontinui_vision" | "python" | "repository" | "custom_command";
+export type TestType =
+  "playwright" | "qontinui_vision" | "python" | "repository" | "custom_command";

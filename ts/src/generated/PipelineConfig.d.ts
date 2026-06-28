@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { BuildPhaseConfig } from './BuildPhaseConfig';
-import type { DiagnosePhaseConfig } from './DiagnosePhaseConfig';
-import type { ImplementFixesConfig } from './ImplementFixesConfig';
+import type { BuildPhaseConfig } from "./BuildPhaseConfig";
+import type { DiagnosePhaseConfig } from "./DiagnosePhaseConfig";
+import type { ImplementFixesConfig } from "./ImplementFixesConfig";
 
 /**
  * Pipeline-mode configuration for the build → execute → diagnose → reflect →

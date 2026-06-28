@@ -8,4 +8,5 @@
 /**
  * Outcome of a single action within a run.
  */
-export type ActionStatus = "success" | "failed" | "timeout" | "skipped" | "error" | "pending";
+export type ActionStatus =
+  "success" | "failed" | "timeout" | "skipped" | "error" | "pending";

@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CoverageData } from './CoverageData';
-import type { ExecutionStats } from './ExecutionStats';
-import type { RunStatus } from './RunStatus';
-import type { RunType } from './RunType';
-import type { RunnerMetadata } from './RunnerMetadata';
-import type { WorkflowMetadata } from './WorkflowMetadata';
+import type { CoverageData } from "./CoverageData";
+import type { ExecutionStats } from "./ExecutionStats";
+import type { RunStatus } from "./RunStatus";
+import type { RunType } from "./RunType";
+import type { RunnerMetadata } from "./RunnerMetadata";
+import type { WorkflowMetadata } from "./WorkflowMetadata";
 
 /**
  * Detailed execution run information (superset of [`ExecutionRunResponse`]).

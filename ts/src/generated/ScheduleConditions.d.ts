@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IdleCondition } from './IdleCondition';
-import type { RepositoryInactiveCondition } from './RepositoryInactiveCondition';
-import type { RepositoryWatch } from './RepositoryWatch';
+import type { IdleCondition } from "./IdleCondition";
+import type { RepositoryInactiveCondition } from "./RepositoryInactiveCondition";
+import type { RepositoryWatch } from "./RepositoryWatch";
 
 /**
  * Conditions that must ALL be met before task execution.

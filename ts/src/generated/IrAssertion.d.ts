@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrAssertionTarget } from './IrAssertionTarget';
+import type { IrAssertionTarget } from "./IrAssertionTarget";
 
 /**
  * Mirror of TS `IRAssertion`. Field shape matches `LegacyAssertion` one-to-one

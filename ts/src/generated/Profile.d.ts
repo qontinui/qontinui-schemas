@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ApiStyle } from './ApiStyle';
-import type { ArchitectureProfile } from './ArchitectureProfile';
-import type { BackendProfile } from './BackendProfile';
-import type { EnforcementProfile } from './EnforcementProfile';
+import type { ApiStyle } from "./ApiStyle";
+import type { ArchitectureProfile } from "./ArchitectureProfile";
+import type { BackendProfile } from "./BackendProfile";
+import type { EnforcementProfile } from "./EnforcementProfile";
 
 /**
  * The top-level Priorities Profile.

@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CheckIssueDetail } from './CheckIssueDetail';
-import type { GateEvaluationResult } from './GateEvaluationResult';
-import type { IndividualCheckResult } from './IndividualCheckResult';
-import type { StepExecutionConfig } from './StepExecutionConfig';
-import type { VerificationStepDetails } from './VerificationStepDetails';
-import type { VerificationStepResult } from './VerificationStepResult';
+import type { CheckIssueDetail } from "./CheckIssueDetail";
+import type { GateEvaluationResult } from "./GateEvaluationResult";
+import type { IndividualCheckResult } from "./IndividualCheckResult";
+import type { StepExecutionConfig } from "./StepExecutionConfig";
+import type { VerificationStepDetails } from "./VerificationStepDetails";
+import type { VerificationStepResult } from "./VerificationStepResult";
 
 /**
  * Result of a single iteration of the verification phase.

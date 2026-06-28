@@ -8,4 +8,8 @@
 /**
  * Content-Type values for an API request body.
  */
-export type ApiContentType = "application/json" | "application/x-www-form-urlencoded" | "text/plain" | "none";
+export type ApiContentType =
+  | "application/json"
+  | "application/x-www-form-urlencoded"
+  | "text/plain"
+  | "none";

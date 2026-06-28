@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CriterionType } from './CriterionType';
-import type { SuccessCriterion } from './SuccessCriterion';
-import type { VerificationMethod } from './VerificationMethod';
-import type { WorkerDomain } from './WorkerDomain';
+import type { CriterionType } from "./CriterionType";
+import type { SuccessCriterion } from "./SuccessCriterion";
+import type { VerificationMethod } from "./VerificationMethod";
+import type { WorkerDomain } from "./WorkerDomain";
 
 /**
  * The verification plan created by the planning agent.

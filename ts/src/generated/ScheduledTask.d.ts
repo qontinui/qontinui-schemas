@@ -5,18 +5,18 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CatchUpPolicy } from './CatchUpPolicy';
-import type { ConditionScheduleConfig } from './ConditionScheduleConfig';
-import type { ConditionStatus } from './ConditionStatus';
-import type { IdleCondition } from './IdleCondition';
-import type { McpConnectionRef } from './McpConnectionRef';
-import type { RepositoryInactiveCondition } from './RepositoryInactiveCondition';
-import type { RepositoryWatch } from './RepositoryWatch';
-import type { ScheduleConditions } from './ScheduleConditions';
-import type { ScheduleExpression } from './ScheduleExpression';
-import type { ScheduledTaskStatus } from './ScheduledTaskStatus';
-import type { ScheduledTaskType } from './ScheduledTaskType';
-import type { TaskExecutionRecord } from './TaskExecutionRecord';
+import type { CatchUpPolicy } from "./CatchUpPolicy";
+import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
+import type { ConditionStatus } from "./ConditionStatus";
+import type { IdleCondition } from "./IdleCondition";
+import type { McpConnectionRef } from "./McpConnectionRef";
+import type { RepositoryInactiveCondition } from "./RepositoryInactiveCondition";
+import type { RepositoryWatch } from "./RepositoryWatch";
+import type { ScheduleConditions } from "./ScheduleConditions";
+import type { ScheduleExpression } from "./ScheduleExpression";
+import type { ScheduledTaskStatus } from "./ScheduledTaskStatus";
+import type { ScheduledTaskType } from "./ScheduledTaskType";
+import type { TaskExecutionRecord } from "./TaskExecutionRecord";
 
 /**
  * A scheduled task definition — the full persisted frame, including computed

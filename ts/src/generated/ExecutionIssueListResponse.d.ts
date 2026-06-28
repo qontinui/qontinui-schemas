@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionIssueResponse } from './ExecutionIssueResponse';
-import type { Pagination } from './Pagination';
+import type { ExecutionIssueResponse } from "./ExecutionIssueResponse";
+import type { Pagination } from "./Pagination";
 
 /**
  * Paginated list of issues with a severity/status summary.

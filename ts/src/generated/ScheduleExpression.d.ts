@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ConditionScheduleConfig } from './ConditionScheduleConfig';
+import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
 
 /**
  * How a task should be scheduled.

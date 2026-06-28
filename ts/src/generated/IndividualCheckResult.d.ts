@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CheckIssueDetail } from './CheckIssueDetail';
+import type { CheckIssueDetail } from "./CheckIssueDetail";
 
 /**
  * Result of a single named verification check (e.g., `"eslint"`, `"mypy"`).

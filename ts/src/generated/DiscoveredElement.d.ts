@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ElementRect } from './ElementRect';
-import type { ElementState } from './ElementState';
+import type { ElementRect } from "./ElementRect";
+import type { ElementState } from "./ElementState";
 
 /**
  * An element found during a discovery scan.

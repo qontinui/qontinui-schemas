@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionActionType } from './ExecutionActionType';
+import type { ExecutionActionType } from "./ExecutionActionType";
 
 /**
  * Reliability statistics aggregated for a single action type.

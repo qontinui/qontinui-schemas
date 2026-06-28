@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 
 /**
  * Shared fields common to every canonical step variant.

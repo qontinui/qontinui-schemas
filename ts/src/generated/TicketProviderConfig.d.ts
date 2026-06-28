@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TicketSource } from './TicketSource';
+import type { TicketSource } from "./TicketSource";
 
 /**
  * Configuration for a ticket provider watcher.

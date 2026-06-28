@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IssueSeverity } from './IssueSeverity';
-import type { IssueStatus } from './IssueStatus';
+import type { IssueSeverity } from "./IssueSeverity";
+import type { IssueStatus } from "./IssueStatus";
 
 /**
  * Request payload for updating an existing issue.

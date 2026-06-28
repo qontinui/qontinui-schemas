@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MemorySummary } from './MemorySummary';
+import type { MemorySummary } from "./MemorySummary";
 
 /**
  * `GET /coord/memory/list` response envelope. Wrapped in a struct

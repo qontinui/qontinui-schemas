@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CheckIssueDetail } from './CheckIssueDetail';
-import type { IndividualCheckResult } from './IndividualCheckResult';
+import type { CheckIssueDetail } from "./CheckIssueDetail";
+import type { IndividualCheckResult } from "./IndividualCheckResult";
 
 /**
  * Detailed output captured for a single verification step.

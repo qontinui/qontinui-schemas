@@ -5,11 +5,11 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionScope } from './AssertionScope';
-import type { ConjunctRule } from './ConjunctRule';
-import type { MatchOutcome } from './MatchOutcome';
-import type { PolicyConjunct } from './PolicyConjunct';
-import type { SpecCheckPolicy } from './SpecCheckPolicy';
+import type { AssertionScope } from "./AssertionScope";
+import type { ConjunctRule } from "./ConjunctRule";
+import type { MatchOutcome } from "./MatchOutcome";
+import type { PolicyConjunct } from "./PolicyConjunct";
+import type { SpecCheckPolicy } from "./SpecCheckPolicy";
 
 /**
  * Workflow-step variant payload — the persisted shape of a

@@ -5,41 +5,41 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { A11yAction } from './A11yAction';
-import type { CheckType } from './CheckType';
-import type { CodeExecutionStep } from './CodeExecutionStep';
-import type { CommandMode } from './CommandMode';
-import type { CommandStep } from './CommandStep';
-import type { CommandStepPhase } from './CommandStepPhase';
-import type { DagApprovalStep } from './DagApprovalStep';
-import type { DagCancelStep } from './DagCancelStep';
-import type { DagLoopStep } from './DagLoopStep';
-import type { ExecutePlaybookStep } from './ExecutePlaybookStep';
-import type { NativeAccessibilityStep } from './NativeAccessibilityStep';
-import type { PlaywrightExecutionMode } from './PlaywrightExecutionMode';
-import type { PromptStep } from './PromptStep';
-import type { PromptStepPhase } from './PromptStepPhase';
-import type { RestartProcessStep } from './RestartProcessStep';
-import type { RetrySpec } from './RetrySpec';
-import type { SaveWorkflowArtifactStep } from './SaveWorkflowArtifactStep';
-import type { TestType } from './TestType';
-import type { UiBridgeAction } from './UiBridgeAction';
-import type { UiBridgeAssertType } from './UiBridgeAssertType';
-import type { UiBridgeComparisonMode } from './UiBridgeComparisonMode';
-import type { UiBridgeDesignAuditStep } from './UiBridgeDesignAuditStep';
-import type { UiBridgeSeverity } from './UiBridgeSeverity';
-import type { UiBridgeStep } from './UiBridgeStep';
-import type { UiBridgeStepPhase } from './UiBridgeStepPhase';
-import type { UiBridgeVisualAssertionStep } from './UiBridgeVisualAssertionStep';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { VgaAction } from './VgaAction';
-import type { VgaAutomateStep } from './VgaAutomateStep';
-import type { VisualAssertionType } from './VisualAssertionType';
-import type { WorkflowFixupMode } from './WorkflowFixupMode';
-import type { WorkflowFixupStep } from './WorkflowFixupStep';
-import type { WorkflowRefStep } from './WorkflowRefStep';
-import type { WorkflowStep } from './WorkflowStep';
-import type { WorkflowStepPhase } from './WorkflowStepPhase';
+import type { A11yAction } from "./A11yAction";
+import type { CheckType } from "./CheckType";
+import type { CodeExecutionStep } from "./CodeExecutionStep";
+import type { CommandMode } from "./CommandMode";
+import type { CommandStep } from "./CommandStep";
+import type { CommandStepPhase } from "./CommandStepPhase";
+import type { DagApprovalStep } from "./DagApprovalStep";
+import type { DagCancelStep } from "./DagCancelStep";
+import type { DagLoopStep } from "./DagLoopStep";
+import type { ExecutePlaybookStep } from "./ExecutePlaybookStep";
+import type { NativeAccessibilityStep } from "./NativeAccessibilityStep";
+import type { PlaywrightExecutionMode } from "./PlaywrightExecutionMode";
+import type { PromptStep } from "./PromptStep";
+import type { PromptStepPhase } from "./PromptStepPhase";
+import type { RestartProcessStep } from "./RestartProcessStep";
+import type { RetrySpec } from "./RetrySpec";
+import type { SaveWorkflowArtifactStep } from "./SaveWorkflowArtifactStep";
+import type { TestType } from "./TestType";
+import type { UiBridgeAction } from "./UiBridgeAction";
+import type { UiBridgeAssertType } from "./UiBridgeAssertType";
+import type { UiBridgeComparisonMode } from "./UiBridgeComparisonMode";
+import type { UiBridgeDesignAuditStep } from "./UiBridgeDesignAuditStep";
+import type { UiBridgeSeverity } from "./UiBridgeSeverity";
+import type { UiBridgeStep } from "./UiBridgeStep";
+import type { UiBridgeStepPhase } from "./UiBridgeStepPhase";
+import type { UiBridgeVisualAssertionStep } from "./UiBridgeVisualAssertionStep";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { VgaAction } from "./VgaAction";
+import type { VgaAutomateStep } from "./VgaAutomateStep";
+import type { VisualAssertionType } from "./VisualAssertionType";
+import type { WorkflowFixupMode } from "./WorkflowFixupMode";
+import type { WorkflowFixupStep } from "./WorkflowFixupStep";
+import type { WorkflowRefStep } from "./WorkflowRefStep";
+import type { WorkflowStep } from "./WorkflowStep";
+import type { WorkflowStepPhase } from "./WorkflowStepPhase";
 
 /**
  * Fully typed discriminated union over **all** step variants registered in

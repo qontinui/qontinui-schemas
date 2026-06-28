@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiscoveredState } from './DiscoveredState';
-import type { DiscoveredStateImage } from './DiscoveredStateImage';
-import type { DiscoveredTransition } from './DiscoveredTransition';
-import type { DiscoveryBoundingBox } from './DiscoveryBoundingBox';
-import type { DiscoveryTransitionTrigger } from './DiscoveryTransitionTrigger';
-import type { TransitionTriggerType } from './TransitionTriggerType';
+import type { DiscoveredState } from "./DiscoveredState";
+import type { DiscoveredStateImage } from "./DiscoveredStateImage";
+import type { DiscoveredTransition } from "./DiscoveredTransition";
+import type { DiscoveryBoundingBox } from "./DiscoveryBoundingBox";
+import type { DiscoveryTransitionTrigger } from "./DiscoveryTransitionTrigger";
+import type { TransitionTriggerType } from "./TransitionTriggerType";
 
 /**
  * Request payload to update a state-discovery result.

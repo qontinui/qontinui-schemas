@@ -8,4 +8,5 @@
 /**
  * Status of RAG processing in the runner.
  */
-export type RagProcessingStatus = "not_started" | "in_progress" | "completed" | "failed";
+export type RagProcessingStatus =
+  "not_started" | "in_progress" | "completed" | "failed";

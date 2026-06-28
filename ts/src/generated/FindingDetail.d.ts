@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { FindingActionType } from './FindingActionType';
-import type { FindingCategory } from './FindingCategory';
-import type { FindingCodeContext } from './FindingCodeContext';
-import type { FindingSeverity } from './FindingSeverity';
-import type { FindingStatus } from './FindingStatus';
-import type { FindingUserInput } from './FindingUserInput';
+import type { FindingActionType } from "./FindingActionType";
+import type { FindingCategory } from "./FindingCategory";
+import type { FindingCodeContext } from "./FindingCodeContext";
+import type { FindingSeverity } from "./FindingSeverity";
+import type { FindingStatus } from "./FindingStatus";
+import type { FindingUserInput } from "./FindingUserInput";
 
 /**
  * Detailed finding information (Backend → Frontend).

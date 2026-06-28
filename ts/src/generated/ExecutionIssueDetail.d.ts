@@ -5,11 +5,11 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionScreenshotResponse } from './ExecutionScreenshotResponse';
-import type { IssueSeverity } from './IssueSeverity';
-import type { IssueSource } from './IssueSource';
-import type { IssueStatus } from './IssueStatus';
-import type { IssueType } from './IssueType';
+import type { ExecutionScreenshotResponse } from "./ExecutionScreenshotResponse";
+import type { IssueSeverity } from "./IssueSeverity";
+import type { IssueSource } from "./IssueSource";
+import type { IssueStatus } from "./IssueStatus";
+import type { IssueType } from "./IssueType";
 
 /**
  * Detailed issue information (superset of [`ExecutionIssueResponse`]).

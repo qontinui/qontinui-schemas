@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ScheduledTaskStatus } from './ScheduledTaskStatus';
+import type { ScheduledTaskStatus } from "./ScheduledTaskStatus";
 
 /**
  * Record of a single task execution.

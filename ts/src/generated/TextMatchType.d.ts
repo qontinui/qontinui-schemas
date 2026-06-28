@@ -8,4 +8,5 @@
 /**
  * Text-match comparison mode.
  */
-export type TextMatchType = "EXACT" | "CONTAINS" | "STARTS_WITH" | "ENDS_WITH" | "REGEX" | "FUZZY";
+export type TextMatchType =
+  "EXACT" | "CONTAINS" | "STARTS_WITH" | "ENDS_WITH" | "REGEX" | "FUZZY";

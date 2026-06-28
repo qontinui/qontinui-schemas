@@ -12,4 +12,10 @@
  * `DEFERRED`). `NEEDS_INPUT` is a special state requiring user decision.
  * Mirrors Python `FindingStatus(str, Enum)`.
  */
-export type FindingStatus = "detected" | "in_progress" | "needs_input" | "resolved" | "wont_fix" | "deferred";
+export type FindingStatus =
+  | "detected"
+  | "in_progress"
+  | "needs_input"
+  | "resolved"
+  | "wont_fix"
+  | "deferred";

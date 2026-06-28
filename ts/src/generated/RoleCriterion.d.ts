@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AccessibilityRole } from './AccessibilityRole';
+import type { AccessibilityRole } from "./AccessibilityRole";
 
 /**
  * Role criterion for [`AccessibilitySelector`] — either a single role or a

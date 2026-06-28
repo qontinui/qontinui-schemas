@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { EntityField } from './EntityField';
-import type { Relationship } from './Relationship';
-import type { SpecProvenance } from './SpecProvenance';
+import type { EntityField } from "./EntityField";
+import type { Relationship } from "./Relationship";
+import type { SpecProvenance } from "./SpecProvenance";
 
 /**
  * A domain entity inferred from rendered data shapes.

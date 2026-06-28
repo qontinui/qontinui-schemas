@@ -8,4 +8,5 @@
 /**
  * The five scorable sections of a [`crate::functional_spec::FunctionalSpec`].
  */
-export type SpecSection = "entities" | "operations" | "uiStates" | "navigation" | "auth";
+export type SpecSection =
+  "entities" | "operations" | "uiStates" | "navigation" | "auth";

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { FindingStatus } from './FindingStatus';
+import type { FindingStatus } from "./FindingStatus";
 
 /**
  * Schema for updating a finding.

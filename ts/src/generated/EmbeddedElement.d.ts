@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { BoundingBox } from './BoundingBox';
-import type { ElementType } from './ElementType';
-import type { GUIElementChunk } from './GUIElementChunk';
+import type { BoundingBox } from "./BoundingBox";
+import type { ElementType } from "./ElementType";
+import type { GUIElementChunk } from "./GUIElementChunk";
 
 /**
  * Result of embedding a GUI element.

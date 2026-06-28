@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MatchLocation } from './MatchLocation';
+import type { MatchLocation } from "./MatchLocation";
 
 /**
  * A single match result with confidence and location.

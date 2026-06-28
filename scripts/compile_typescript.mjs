@@ -35,6 +35,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node
 import { join, resolve, dirname } from 'node:path';
 import { compile } from 'json-schema-to-typescript';
 import { toSafeString } from 'json-schema-to-typescript/dist/src/utils.js';
+import { format as prettierFormat } from 'prettier';
 
 // ─── CLI ────────────────────────────────────────────────────────────────────
 
@@ -308,6 +309,17 @@ const compileOpts = {
   // inject the matching import statements.
   declareExternallyReferenced: false,
   bannerComment: '',
+  // Disable json2ts's *internal* Prettier pass and run our own pinned pass at
+  // the end of each file instead (see PRETTIER_OPTS below). json2ts loads
+  // Prettier lazily and silently no-ops the format step when its bundled
+  // `typescript` parser fails to resolve in some environments — which is
+  // exactly what happened in the `schema-drift` CI job: locally the union
+  // members wrapped one-per-line (Prettier ran), but in CI json2ts emitted the
+  // raw single-line `A | B | C` union (Prettier did NOT run), so the committed
+  // multi-line files looked "drifted" on every PR even though no schema value
+  // changed. Owning the format pass here makes codegen output byte-identical
+  // across machines and CI.
+  format: false,
   // Keep object shapes open (emit `[k: string]: unknown` catch-all index
   // signature when schemars does not specify `additionalProperties: false`).
   // This matches the Rust wire semantics (serde tolerates unknown keys by
@@ -329,6 +341,25 @@ const compileOpts = {
   },
   // unreachableDefinitions keeps helper types that aren't reachable via refs;
   // default is fine.
+};
+
+// Pinned Prettier options for the explicit format pass. These are Prettier's
+// own defaults written out longhand so the generated `.d.ts` formatting is
+// reproducible regardless of which `^3.x` Prettier `npm install` happens to
+// resolve (the lockfile is .gitignore'd). `parser: 'typescript'` is required
+// because we format raw strings, not files with a `.ts` extension.
+const PRETTIER_OPTS = {
+  parser: 'typescript',
+  printWidth: 80,
+  tabWidth: 2,
+  useTabs: false,
+  semi: true,
+  singleQuote: false,
+  quoteProps: 'as-needed',
+  trailingComma: 'all',
+  bracketSpacing: true,
+  arrowParens: 'always',
+  endOfLine: 'lf',
 };
 
 /**
@@ -474,7 +505,13 @@ for (const [name, { imports }] of processed) {
       '\n\n' +
       (importLines ? importLines + '\n\n' : '') +
       ts.trimStart();
-    writeFileSync(join(outDir, `${name}.d.ts`), out);
+    // Explicit, pinned Prettier pass — the single source of truth for output
+    // formatting now that json2ts's internal pass is disabled (`format: false`
+    // above). PRETTIER_OPTS hard-codes the defaults so the output can't shift
+    // when the transitive Prettier version floats (the lockfile is .gitignore'd,
+    // so each `npm install` may resolve a different `^3.x`).
+    const formatted = await prettierFormat(out, PRETTIER_OPTS);
+    writeFileSync(join(outDir, `${name}.d.ts`), formatted);
     emitted++;
   } catch (err) {
     console.error(`  FAILED ${name}: ${err.message}`);

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { StateFilterItem } from './StateFilterItem';
+import type { StateFilterItem } from "./StateFilterItem";
 
 /**
  * Response with list of states for filtering.

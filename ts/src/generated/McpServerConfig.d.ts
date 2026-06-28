@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { HttpConfig } from './HttpConfig';
-import type { McpTransport } from './McpTransport';
-import type { StdioConfig } from './StdioConfig';
+import type { HttpConfig } from "./HttpConfig";
+import type { McpTransport } from "./McpTransport";
+import type { StdioConfig } from "./StdioConfig";
 
 /**
  * Full configuration for a registered MCP server.

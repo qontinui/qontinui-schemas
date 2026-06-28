@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { McpToolInfo } from './McpToolInfo';
-import type { McpToolInputSchema } from './McpToolInputSchema';
+import type { McpToolInfo } from "./McpToolInfo";
+import type { McpToolInputSchema } from "./McpToolInputSchema";
 
 /**
  * Status of a single MCP server, as reported by the client manager.

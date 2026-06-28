@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Pagination } from './Pagination';
-import type { TaskRunBackend } from './TaskRunBackend';
-import type { TaskRunStatus } from './TaskRunStatus';
+import type { Pagination } from "./Pagination";
+import type { TaskRunBackend } from "./TaskRunBackend";
+import type { TaskRunStatus } from "./TaskRunStatus";
 
 /**
  * Response for `GET /task-runs`.

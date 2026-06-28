@@ -17,5 +17,13 @@
  * normal lifecycle.
  */
 export type ProcessState =
-  | ("stopped" | "starting" | "building" | "running" | "healthy" | "stopping" | "failed")
+  | (
+      | "stopped"
+      | "starting"
+      | "building"
+      | "running"
+      | "healthy"
+      | "stopping"
+      | "failed"
+    )
   | "externally_owned";

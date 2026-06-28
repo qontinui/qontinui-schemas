@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { NodeType } from './NodeType';
+import type { NodeType } from "./NodeType";
 
 /**
  * Element in a tree path (for breadcrumb navigation).

@@ -5,11 +5,11 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiagnosticResult } from './DiagnosticResult';
-import type { ExitCheckResult } from './ExitCheckResult';
-import type { IterationResult } from './IterationResult';
-import type { LoopPhase } from './LoopPhase';
-import type { RootCauseCategory } from './RootCauseCategory';
+import type { DiagnosticResult } from "./DiagnosticResult";
+import type { ExitCheckResult } from "./ExitCheckResult";
+import type { IterationResult } from "./IterationResult";
+import type { LoopPhase } from "./LoopPhase";
+import type { RootCauseCategory } from "./RootCauseCategory";
 
 /**
  * Runtime state of an orchestration loop.

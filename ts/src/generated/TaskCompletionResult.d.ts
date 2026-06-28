@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { CriterionOverride } from './CriterionOverride';
-import type { CriterionType } from './CriterionType';
-import type { Finding } from './Finding';
-import type { IterationVerificationResults } from './IterationVerificationResults';
-import type { VerificationResult } from './VerificationResult';
+import type { Confidence } from "./Confidence";
+import type { CriterionOverride } from "./CriterionOverride";
+import type { CriterionType } from "./CriterionType";
+import type { Finding } from "./Finding";
+import type { IterationVerificationResults } from "./IterationVerificationResults";
+import type { VerificationResult } from "./VerificationResult";
 
 /**
  * Task-completion result.

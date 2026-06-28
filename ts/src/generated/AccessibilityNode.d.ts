@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AccessibilityBounds } from './AccessibilityBounds';
-import type { AccessibilityRole } from './AccessibilityRole';
-import type { AccessibilityState } from './AccessibilityState';
+import type { AccessibilityBounds } from "./AccessibilityBounds";
+import type { AccessibilityRole } from "./AccessibilityRole";
+import type { AccessibilityState } from "./AccessibilityState";
 
 /**
  * A node in the accessibility tree.

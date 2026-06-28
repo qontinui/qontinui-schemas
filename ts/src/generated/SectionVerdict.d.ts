@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ProvenanceMix } from './ProvenanceMix';
-import type { SpecSection } from './SpecSection';
+import type { ProvenanceMix } from "./ProvenanceMix";
+import type { SpecSection } from "./SpecSection";
 
 /**
  * Per-section coverage breakdown. Mirrors the overall-verdict shape so a consumer

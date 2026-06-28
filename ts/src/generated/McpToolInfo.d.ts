@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { McpToolInputSchema } from './McpToolInputSchema';
+import type { McpToolInputSchema } from "./McpToolInputSchema";
 
 /**
  * Single tool exposed by an MCP server, as returned by `tools/list`.

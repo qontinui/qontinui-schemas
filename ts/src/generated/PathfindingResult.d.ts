@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { PathfindingStep } from './PathfindingStep';
+import type { PathfindingStep } from "./PathfindingStep";
 
 /**
  * Result of a pathfinding search.

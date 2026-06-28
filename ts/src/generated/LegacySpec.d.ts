@@ -5,15 +5,15 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrWaitSpec } from './IrWaitSpec';
-import type { LegacyAssertion } from './LegacyAssertion';
-import type { LegacyAssertionTarget } from './LegacyAssertionTarget';
-import type { LegacyGroup } from './LegacyGroup';
-import type { LegacyProcessStep } from './LegacyProcessStep';
-import type { LegacyStateMachine } from './LegacyStateMachine';
-import type { LegacyStateMachineState } from './LegacyStateMachineState';
-import type { LegacyTransition } from './LegacyTransition';
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrWaitSpec } from "./IrWaitSpec";
+import type { LegacyAssertion } from "./LegacyAssertion";
+import type { LegacyAssertionTarget } from "./LegacyAssertionTarget";
+import type { LegacyGroup } from "./LegacyGroup";
+import type { LegacyProcessStep } from "./LegacyProcessStep";
+import type { LegacyStateMachine } from "./LegacyStateMachine";
+import type { LegacyStateMachineState } from "./LegacyStateMachineState";
+import type { LegacyTransition } from "./LegacyTransition";
 
 /**
  * Top-level legacy spec output. Serialized via a `serde_json::Value` step

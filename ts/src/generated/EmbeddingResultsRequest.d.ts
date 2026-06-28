@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { EmbeddingResultItem } from './EmbeddingResultItem';
+import type { EmbeddingResultItem } from "./EmbeddingResultItem";
 
 /**
  * Request containing embedding results from the runner.

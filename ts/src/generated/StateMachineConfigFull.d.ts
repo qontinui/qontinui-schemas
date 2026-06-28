@@ -5,15 +5,15 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DomainKnowledge } from './DomainKnowledge';
-import type { MouseButton } from './MouseButton';
-import type { Point } from './Point';
-import type { ScrollDirection } from './ScrollDirection';
-import type { StandardActionType } from './StandardActionType';
-import type { StateMachineState } from './StateMachineState';
-import type { StateMachineTransition } from './StateMachineTransition';
-import type { TransitionAction } from './TransitionAction';
-import type { TransitionActionValue } from './TransitionActionValue';
+import type { DomainKnowledge } from "./DomainKnowledge";
+import type { MouseButton } from "./MouseButton";
+import type { Point } from "./Point";
+import type { ScrollDirection } from "./ScrollDirection";
+import type { StandardActionType } from "./StandardActionType";
+import type { StateMachineState } from "./StateMachineState";
+import type { StateMachineTransition } from "./StateMachineTransition";
+import type { TransitionAction } from "./TransitionAction";
+import type { TransitionActionValue } from "./TransitionActionValue";
 
 /**
  * A config with all its states and transitions loaded.

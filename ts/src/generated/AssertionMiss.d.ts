@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CandidateMiss } from './CandidateMiss';
-import type { FieldDiff } from './FieldDiff';
-import type { MissReason } from './MissReason';
+import type { CandidateMiss } from "./CandidateMiss";
+import type { FieldDiff } from "./FieldDiff";
+import type { MissReason } from "./MissReason";
 
 /**
  * Top-level miss diagnostic for a failed assertion.

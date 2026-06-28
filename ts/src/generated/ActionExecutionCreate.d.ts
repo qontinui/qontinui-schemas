@@ -5,11 +5,11 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ActionStatus } from './ActionStatus';
-import type { ErrorType } from './ErrorType';
-import type { ExecutionActionType } from './ExecutionActionType';
-import type { ExecutionMatchLocation } from './ExecutionMatchLocation';
-import type { LLMMetrics } from './LLMMetrics';
+import type { ActionStatus } from "./ActionStatus";
+import type { ErrorType } from "./ErrorType";
+import type { ExecutionActionType } from "./ExecutionActionType";
+import type { ExecutionMatchLocation } from "./ExecutionMatchLocation";
+import type { LLMMetrics } from "./LLMMetrics";
 
 /**
  * Request payload for reporting a single action execution.

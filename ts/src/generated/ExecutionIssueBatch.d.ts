@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionIssueCreate } from './ExecutionIssueCreate';
-import type { IssueSeverity } from './IssueSeverity';
+import type { ExecutionIssueCreate } from "./ExecutionIssueCreate";
+import type { IssueSeverity } from "./IssueSeverity";
 
 /**
  * Batch wrapper for reporting multiple issues in one request.

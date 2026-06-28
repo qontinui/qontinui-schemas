@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ScreenshotAnnotationShape } from './ScreenshotAnnotationShape';
+import type { ScreenshotAnnotationShape } from "./ScreenshotAnnotationShape";
 
 /**
  * Annotation overlaid on a screenshot (box, circle, arrow, or text).

@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MatchLocation } from './MatchLocation';
-import type { Outcome } from './Outcome';
-import type { RuntimeData } from './RuntimeData';
-import type { StateContext } from './StateContext';
-import type { TimingInfo } from './TimingInfo';
-import type { TopMatch } from './TopMatch';
+import type { MatchLocation } from "./MatchLocation";
+import type { Outcome } from "./Outcome";
+import type { RuntimeData } from "./RuntimeData";
+import type { StateContext } from "./StateContext";
+import type { TimingInfo } from "./TimingInfo";
+import type { TopMatch } from "./TopMatch";
 
 /**
  * Metadata for a tree node — action configuration, runtime data, state

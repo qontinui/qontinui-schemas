@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { UIBridgeCapturedToast } from './UIBridgeCapturedToast';
+import type { UIBridgeCapturedToast } from "./UIBridgeCapturedToast";
 
 /**
  * Toast snapshot context.

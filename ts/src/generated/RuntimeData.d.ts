@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MatchLocation } from './MatchLocation';
-import type { TopMatch } from './TopMatch';
+import type { MatchLocation } from "./MatchLocation";
+import type { TopMatch } from "./TopMatch";
 
 /**
  * Runtime execution data captured during action execution.

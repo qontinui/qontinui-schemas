@@ -8,4 +8,5 @@
 /**
  * Lifecycle status of an issue reported against a run.
  */
-export type IssueStatus = "new" | "open" | "in_progress" | "resolved" | "closed" | "wont_fix";
+export type IssueStatus =
+  "new" | "open" | "in_progress" | "resolved" | "closed" | "wont_fix";

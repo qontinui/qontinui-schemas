@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ConstraintCheck } from './ConstraintCheck';
-import type { ConstraintSeverity } from './ConstraintSeverity';
+import type { ConstraintCheck } from "./ConstraintCheck";
+import type { ConstraintSeverity } from "./ConstraintSeverity";
 
 /**
  * A constraint definition.

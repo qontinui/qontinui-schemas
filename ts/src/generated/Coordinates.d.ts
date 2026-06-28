@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CoordinateSystem } from './CoordinateSystem';
+import type { CoordinateSystem } from "./CoordinateSystem";
 
 /**
  * X,Y coordinates with optional coordinate system specification.

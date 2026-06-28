@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RootCauseCategory } from './RootCauseCategory';
+import type { RootCauseCategory } from "./RootCauseCategory";
 
 /**
  * Result of a single diagnostic evaluation.

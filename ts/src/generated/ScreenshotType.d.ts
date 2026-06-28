@@ -8,4 +8,10 @@
 /**
  * Kind of screenshot captured.
  */
-export type ScreenshotType = "error" | "success" | "manual" | "periodic" | "action_result" | "state_verification";
+export type ScreenshotType =
+  | "error"
+  | "success"
+  | "manual"
+  | "periodic"
+  | "action_result"
+  | "state_verification";

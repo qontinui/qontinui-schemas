@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ConjunctEvaluation } from './ConjunctEvaluation';
-import type { PolicyStatus } from './PolicyStatus';
+import type { ConjunctEvaluation } from "./ConjunctEvaluation";
+import type { PolicyStatus } from "./PolicyStatus";
 
 /**
  * Top-level wrapper for evaluating a `SpecCheckPolicy` against a

@@ -8,4 +8,5 @@
 /**
  * Accessibility action kinds.
  */
-export type A11yAction = "capture" | "click" | "type" | "focus" | "query" | "ai_context";
+export type A11yAction =
+  "capture" | "click" | "type" | "focus" | "query" | "ai_context";

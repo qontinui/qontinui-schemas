@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { WorkflowStepPhase } from './WorkflowStepPhase';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { WorkflowStepPhase } from "./WorkflowStepPhase";
 
 /**
  * Run a saved workflow inline (composition).

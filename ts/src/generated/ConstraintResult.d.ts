@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ConstraintSeverity } from './ConstraintSeverity';
-import type { ConstraintViolation } from './ConstraintViolation';
+import type { ConstraintSeverity } from "./ConstraintSeverity";
+import type { ConstraintViolation } from "./ConstraintViolation";
 
 /**
  * Result of evaluating a single constraint.

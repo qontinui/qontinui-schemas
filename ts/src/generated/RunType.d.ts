@@ -8,4 +8,5 @@
 /**
  * Kind of execution run being reported.
  */
-export type RunType = "qa_test" | "integration_test" | "live_automation" | "recording" | "debug";
+export type RunType =
+  "qa_test" | "integration_test" | "live_automation" | "recording" | "debug";

@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CriterionType } from './CriterionType';
-import type { VerificationMethod } from './VerificationMethod';
+import type { CriterionType } from "./CriterionType";
+import type { VerificationMethod } from "./VerificationMethod";
 
 /**
  * A success criterion that must be met for task completion.

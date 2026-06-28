@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { MatchMethod } from './MatchMethod';
+import type { MatchMethod } from "./MatchMethod";
 
 /**
  * Advanced pattern-matching options.

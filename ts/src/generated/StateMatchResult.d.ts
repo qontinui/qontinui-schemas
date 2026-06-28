@@ -5,13 +5,13 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionMiss } from './AssertionMiss';
-import type { AssertionOutcome } from './AssertionOutcome';
-import type { AssertionResult } from './AssertionResult';
-import type { CandidateMiss } from './CandidateMiss';
-import type { FieldDiff } from './FieldDiff';
-import type { MatchedElement } from './MatchedElement';
-import type { MissReason } from './MissReason';
+import type { AssertionMiss } from "./AssertionMiss";
+import type { AssertionOutcome } from "./AssertionOutcome";
+import type { AssertionResult } from "./AssertionResult";
+import type { CandidateMiss } from "./CandidateMiss";
+import type { FieldDiff } from "./FieldDiff";
+import type { MatchedElement } from "./MatchedElement";
+import type { MissReason } from "./MissReason";
 
 /**
  * Per-state evaluation result.

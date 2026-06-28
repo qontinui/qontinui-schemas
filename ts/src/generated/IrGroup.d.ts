@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrAssertion } from './IrAssertion';
-import type { IrAssertionTarget } from './IrAssertionTarget';
+import type { IrAssertion } from "./IrAssertion";
+import type { IrAssertionTarget } from "./IrAssertionTarget";
 
 /**
  * Mirror of TS `IRGroup`. Synthesis-produced groups (NOT derived from IR

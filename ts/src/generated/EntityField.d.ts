@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { SpecProvenance } from './SpecProvenance';
+import type { SpecProvenance } from "./SpecProvenance";
 
 /**
  * A field of an [`Entity`].

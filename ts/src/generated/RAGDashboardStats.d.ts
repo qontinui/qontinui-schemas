@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { JobStatus } from './JobStatus';
-import type { JobSummary } from './JobSummary';
+import type { JobStatus } from "./JobStatus";
+import type { JobSummary } from "./JobSummary";
 
 /**
  * Summary statistics for the RAG dashboard.

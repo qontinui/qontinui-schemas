@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiagnosticResult } from './DiagnosticResult';
-import type { ExitCheckResult } from './ExitCheckResult';
-import type { RootCauseCategory } from './RootCauseCategory';
+import type { DiagnosticResult } from "./DiagnosticResult";
+import type { ExitCheckResult } from "./ExitCheckResult";
+import type { RootCauseCategory } from "./RootCauseCategory";
 
 /**
  * Result of a single iteration.

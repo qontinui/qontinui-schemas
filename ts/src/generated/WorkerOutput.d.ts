@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ConfidenceLevel } from './ConfidenceLevel';
-import type { StructuredFinding } from './StructuredFinding';
-import type { StructuredOverride } from './StructuredOverride';
-import type { StructuredSignal } from './StructuredSignal';
+import type { ConfidenceLevel } from "./ConfidenceLevel";
+import type { StructuredFinding } from "./StructuredFinding";
+import type { StructuredOverride } from "./StructuredOverride";
+import type { StructuredSignal } from "./StructuredSignal";
 
 /**
  * Structured output from an AI worker agent.

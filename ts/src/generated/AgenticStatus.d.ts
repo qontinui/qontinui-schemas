@@ -8,4 +8,5 @@
 /**
  * Status of the agentic phase execution.
  */
-export type AgenticStatus = "success" | "partial_success" | "failed" | "unfixable";
+export type AgenticStatus =
+  "success" | "partial_success" | "failed" | "unfixable";

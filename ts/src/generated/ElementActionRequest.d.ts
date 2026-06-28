@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { WaitOptions } from './WaitOptions';
+import type { WaitOptions } from "./WaitOptions";
 
 /**
  * Request to execute an action on a UI Bridge element.

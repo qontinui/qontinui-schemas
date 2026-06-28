@@ -13,4 +13,5 @@
  * verification approaches. Mirrors the runner-side enum in
  * `crate::agentic_verification`.
  */
-export type WorkflowArchitecture = "traditional" | "agentic_verification" | "multi_agent_pipeline";
+export type WorkflowArchitecture =
+  "traditional" | "agentic_verification" | "multi_agent_pipeline";

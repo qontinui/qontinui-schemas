@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ActionStatus } from './ActionStatus';
-import type { ExecutionActionType } from './ExecutionActionType';
+import type { ActionStatus } from "./ActionStatus";
+import type { ExecutionActionType } from "./ExecutionActionType";
 
 /**
  * A historical action execution, shaped for playback.

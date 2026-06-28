@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TransitionInfo } from './TransitionInfo';
+import type { TransitionInfo } from "./TransitionInfo";
 
 /**
  * Result of querying available transitions from the current state.

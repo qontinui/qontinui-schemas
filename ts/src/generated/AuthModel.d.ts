@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AuthRole } from './AuthRole';
-import type { SpecProvenance } from './SpecProvenance';
+import type { AuthRole } from "./AuthRole";
+import type { SpecProvenance } from "./SpecProvenance";
 
 /**
  * The auth / permission model inferred from login flows + gated routes.

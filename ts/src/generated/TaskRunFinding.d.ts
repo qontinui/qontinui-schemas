@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunFindingActionType } from './TaskRunFindingActionType';
-import type { TaskRunFindingCategory } from './TaskRunFindingCategory';
-import type { TaskRunFindingSeverity } from './TaskRunFindingSeverity';
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
+import type { TaskRunFindingActionType } from "./TaskRunFindingActionType";
+import type { TaskRunFindingCategory } from "./TaskRunFindingCategory";
+import type { TaskRunFindingSeverity } from "./TaskRunFindingSeverity";
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
 
 /**
  * A finding surfaced during a task run (bug, enhancement, TODO, etc.).

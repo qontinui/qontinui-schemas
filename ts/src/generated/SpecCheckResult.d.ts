@@ -5,20 +5,20 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionMiss } from './AssertionMiss';
-import type { AssertionOutcome } from './AssertionOutcome';
-import type { AssertionResult } from './AssertionResult';
-import type { AssertionSeverityCounts } from './AssertionSeverityCounts';
-import type { BridgeFingerprint } from './BridgeFingerprint';
-import type { CandidateMiss } from './CandidateMiss';
-import type { FieldDiff } from './FieldDiff';
-import type { MatchOutcome } from './MatchOutcome';
-import type { MatchedElement } from './MatchedElement';
-import type { MissReason } from './MissReason';
-import type { RecommendedState } from './RecommendedState';
-import type { SpecCheckConfidence } from './SpecCheckConfidence';
-import type { SpecCheckSummary } from './SpecCheckSummary';
-import type { StateMatchResult } from './StateMatchResult';
+import type { AssertionMiss } from "./AssertionMiss";
+import type { AssertionOutcome } from "./AssertionOutcome";
+import type { AssertionResult } from "./AssertionResult";
+import type { AssertionSeverityCounts } from "./AssertionSeverityCounts";
+import type { BridgeFingerprint } from "./BridgeFingerprint";
+import type { CandidateMiss } from "./CandidateMiss";
+import type { FieldDiff } from "./FieldDiff";
+import type { MatchOutcome } from "./MatchOutcome";
+import type { MatchedElement } from "./MatchedElement";
+import type { MissReason } from "./MissReason";
+import type { RecommendedState } from "./RecommendedState";
+import type { SpecCheckConfidence } from "./SpecCheckConfidence";
+import type { SpecCheckSummary } from "./SpecCheckSummary";
+import type { StateMatchResult } from "./StateMatchResult";
 
 /**
  * Result of evaluating one or more page specs against a bridge snapshot.

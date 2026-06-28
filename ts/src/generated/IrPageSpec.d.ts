@@ -5,19 +5,19 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrAssertion } from './IrAssertion';
-import type { IrAssertionTarget } from './IrAssertionTarget';
-import type { IrCrossRef } from './IrCrossRef';
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrGroup } from './IrGroup';
-import type { IrMetadata } from './IrMetadata';
-import type { IrProvenance } from './IrProvenance';
-import type { IrState } from './IrState';
-import type { IrStateCondition } from './IrStateCondition';
-import type { IrTransition } from './IrTransition';
-import type { IrTransitionAction } from './IrTransitionAction';
-import type { IrWaitSpec } from './IrWaitSpec';
-import type { ProposalStatus } from './ProposalStatus';
+import type { IrAssertion } from "./IrAssertion";
+import type { IrAssertionTarget } from "./IrAssertionTarget";
+import type { IrCrossRef } from "./IrCrossRef";
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrGroup } from "./IrGroup";
+import type { IrMetadata } from "./IrMetadata";
+import type { IrProvenance } from "./IrProvenance";
+import type { IrState } from "./IrState";
+import type { IrStateCondition } from "./IrStateCondition";
+import type { IrTransition } from "./IrTransition";
+import type { IrTransitionAction } from "./IrTransitionAction";
+import type { IrWaitSpec } from "./IrWaitSpec";
+import type { ProposalStatus } from "./ProposalStatus";
 
 /**
  * Top-level IR page specification (formerly `IrDocument`).

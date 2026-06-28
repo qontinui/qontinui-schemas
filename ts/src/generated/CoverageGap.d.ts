@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { GapReason } from './GapReason';
-import type { SpecProvenance } from './SpecProvenance';
-import type { SpecSection } from './SpecSection';
+import type { GapReason } from "./GapReason";
+import type { SpecProvenance } from "./SpecProvenance";
+import type { SpecSection } from "./SpecSection";
 
 /**
  * One uncovered `Observed`/`Inferred` node — a work-list item the orchestration

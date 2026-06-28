@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Constraint } from './Constraint';
-import type { ConstraintCheck } from './ConstraintCheck';
-import type { ConstraintSeverity } from './ConstraintSeverity';
+import type { Constraint } from "./Constraint";
+import type { ConstraintCheck } from "./ConstraintCheck";
+import type { ConstraintSeverity } from "./ConstraintSeverity";
 
 /**
  * Response for `POST /constraints/validate`.

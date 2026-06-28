@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunFindingCategory } from './TaskRunFindingCategory';
-import type { TaskRunFindingSeverity } from './TaskRunFindingSeverity';
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
+import type { TaskRunFindingCategory } from "./TaskRunFindingCategory";
+import type { TaskRunFindingSeverity } from "./TaskRunFindingSeverity";
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
 
 /**
  * Filter parameters for listing findings.

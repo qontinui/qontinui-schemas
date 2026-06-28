@@ -8,4 +8,5 @@
 /**
  * How a finding should be acted upon.
  */
-export type TaskRunFindingActionType = "auto_fix" | "needs_user_input" | "manual" | "informational";
+export type TaskRunFindingActionType =
+  "auto_fix" | "needs_user_input" | "manual" | "informational";

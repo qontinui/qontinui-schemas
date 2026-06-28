@@ -5,12 +5,12 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunnerFindingCodeContext } from './RunnerFindingCodeContext';
-import type { RunnerFindingUserInput } from './RunnerFindingUserInput';
-import type { TaskRunFindingActionType } from './TaskRunFindingActionType';
-import type { TaskRunFindingCategory } from './TaskRunFindingCategory';
-import type { TaskRunFindingSeverity } from './TaskRunFindingSeverity';
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
+import type { RunnerFindingCodeContext } from "./RunnerFindingCodeContext";
+import type { RunnerFindingUserInput } from "./RunnerFindingUserInput";
+import type { TaskRunFindingActionType } from "./TaskRunFindingActionType";
+import type { TaskRunFindingCategory } from "./TaskRunFindingCategory";
+import type { TaskRunFindingSeverity } from "./TaskRunFindingSeverity";
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
 
 /**
  * A finding detected by AI analysis (runner-local wire shape).

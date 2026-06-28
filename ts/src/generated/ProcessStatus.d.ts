@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ProcessState } from './ProcessState';
+import type { ProcessState } from "./ProcessState";
 
 /**
  * Status summary of a managed process.

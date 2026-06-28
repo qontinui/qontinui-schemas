@@ -5,13 +5,13 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrCrossRef } from './IrCrossRef';
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrMetadata } from './IrMetadata';
-import type { IrProvenance } from './IrProvenance';
-import type { IrTransitionAction } from './IrTransitionAction';
-import type { IrWaitSpec } from './IrWaitSpec';
-import type { ProposalStatus } from './ProposalStatus';
+import type { IrCrossRef } from "./IrCrossRef";
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrMetadata } from "./IrMetadata";
+import type { IrProvenance } from "./IrProvenance";
+import type { IrTransitionAction } from "./IrTransitionAction";
+import type { IrWaitSpec } from "./IrWaitSpec";
+import type { ProposalStatus } from "./ProposalStatus";
 
 export interface IrTransition {
   actions: IrTransitionAction[];

@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { VgaAction } from './VgaAction';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { VgaAction } from "./VgaAction";
 
 /**
  * Run a Visual GUI Automation (VGA) action sequence against a target process.

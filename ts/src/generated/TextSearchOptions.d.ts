@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { OcrEngine } from './OcrEngine';
-import type { TextMatchType } from './TextMatchType';
+import type { OcrEngine } from "./OcrEngine";
+import type { TextMatchType } from "./TextMatchType";
 
 /**
  * Text search options for OCR-based finding.

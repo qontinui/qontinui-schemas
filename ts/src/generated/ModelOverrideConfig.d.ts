@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RoutingRule } from './RoutingRule';
+import type { RoutingRule } from "./RoutingRule";
 
 /**
  * Per-phase model override configuration.

@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { BoundingBox } from './BoundingBox';
-import type { ElementType } from './ElementType';
+import type { BoundingBox } from "./BoundingBox";
+import type { ElementType } from "./ElementType";
 
 /**
  * Complete representation of a GUI element chunk for RAG retrieval.

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { GitOpRecord } from './GitOpRecord';
+import type { GitOpRecord } from "./GitOpRecord";
 
 /**
  * `GET /coord/git-ops/list` + `GET /coord/git-ops/by-session/:id`

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { App } from './App';
+import type { App } from "./App";
 
 export interface AppListResponse {
   apps: App[];

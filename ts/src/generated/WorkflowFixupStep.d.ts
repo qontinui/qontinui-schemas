@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { WorkflowFixupMode } from './WorkflowFixupMode';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { WorkflowFixupMode } from "./WorkflowFixupMode";
 
 /**
  * Run deterministic Rust fixups on a workflow JSON file.

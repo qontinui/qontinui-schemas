@@ -8,4 +8,5 @@
 /**
  * Kinds of assertion supported by `assert` actions.
  */
-export type UiBridgeAssertType = "exists" | "text_equals" | "contains" | "visible" | "enabled";
+export type UiBridgeAssertType =
+  "exists" | "text_equals" | "contains" | "visible" | "enabled";

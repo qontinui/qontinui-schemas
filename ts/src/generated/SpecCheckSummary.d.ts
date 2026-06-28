@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionSeverityCounts } from './AssertionSeverityCounts';
-import type { MatchOutcome } from './MatchOutcome';
-import type { RecommendedState } from './RecommendedState';
-import type { SpecCheckConfidence } from './SpecCheckConfidence';
+import type { AssertionSeverityCounts } from "./AssertionSeverityCounts";
+import type { MatchOutcome } from "./MatchOutcome";
+import type { RecommendedState } from "./RecommendedState";
+import type { SpecCheckConfidence } from "./SpecCheckConfidence";
 
 /**
  * Aggregate summary across all evaluated states.

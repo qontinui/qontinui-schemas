@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DomainKnowledge } from './DomainKnowledge';
+import type { DomainKnowledge } from "./DomainKnowledge";
 
 /**
  * A UI state, defined by which elements are present on screen.

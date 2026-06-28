@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionStep } from './ExecutionStep';
+import type { ExecutionStep } from "./ExecutionStep";
 
 /**
  * A saved AI Builder workflow template.

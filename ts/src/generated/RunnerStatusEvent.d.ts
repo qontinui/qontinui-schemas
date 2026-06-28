@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunnerConnectedConnection } from './RunnerConnectedConnection';
+import type { RunnerConnectedConnection } from "./RunnerConnectedConnection";
 
 /**
  * Discriminated union of every event the Python backend pushes to the web

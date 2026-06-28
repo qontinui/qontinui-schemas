@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ElementRect } from './ElementRect';
+import type { ElementRect } from "./ElementRect";
 
 /**
  * Observable state of a UI Bridge element as returned from the React

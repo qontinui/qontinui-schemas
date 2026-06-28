@@ -8,4 +8,8 @@
 /**
  * Template matching method used by OpenCV-style correlation search.
  */
-export type MatchMethod = "CORRELATION" | "CORRELATION_NORMED" | "SQUARED_DIFFERENCE" | "SQUARED_DIFFERENCE_NORMED";
+export type MatchMethod =
+  | "CORRELATION"
+  | "CORRELATION_NORMED"
+  | "SQUARED_DIFFERENCE"
+  | "SQUARED_DIFFERENCE_NORMED";

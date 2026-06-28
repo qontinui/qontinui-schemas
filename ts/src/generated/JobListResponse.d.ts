@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { JobItem } from './JobItem';
-import type { JobStatus } from './JobStatus';
+import type { JobItem } from "./JobItem";
+import type { JobStatus } from "./JobStatus";
 
 /**
  * Paginated list of jobs.

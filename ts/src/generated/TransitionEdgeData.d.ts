@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { StandardActionType } from './StandardActionType';
+import type { StandardActionType } from "./StandardActionType";
 
 /**
  * Data passed to a transition edge in the ReactFlow graph editor.

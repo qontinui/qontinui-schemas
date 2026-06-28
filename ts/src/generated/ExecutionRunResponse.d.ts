@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunStatus } from './RunStatus';
-import type { RunType } from './RunType';
+import type { RunStatus } from "./RunStatus";
+import type { RunType } from "./RunType";
 
 /**
  * Response envelope returned when a run is created or fetched.

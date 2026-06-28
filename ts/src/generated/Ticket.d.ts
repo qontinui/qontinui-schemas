@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TicketSource } from './TicketSource';
-import type { TicketState } from './TicketState';
+import type { TicketSource } from "./TicketSource";
+import type { TicketState } from "./TicketState";
 
 /**
  * A ticket fetched from an external provider.

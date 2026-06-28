@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ElementBbox } from './ElementBbox';
-import type { ElementIdentifier } from './ElementIdentifier';
-import type { ElementRect } from './ElementRect';
-import type { ElementState } from './ElementState';
+import type { ElementBbox } from "./ElementBbox";
+import type { ElementIdentifier } from "./ElementIdentifier";
+import type { ElementRect } from "./ElementRect";
+import type { ElementState } from "./ElementState";
 
 /**
  * A registered element in the UI Bridge registry.

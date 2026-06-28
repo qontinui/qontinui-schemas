@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DomainKnowledge } from './DomainKnowledge';
+import type { DomainKnowledge } from "./DomainKnowledge";
 
 /**
  * Payload for creating a new state within a config.

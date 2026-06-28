@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AgenticStatus } from './AgenticStatus';
-import type { FileChange } from './FileChange';
-import type { FindingOutput } from './FindingOutput';
-import type { ReflectionFixOutput } from './ReflectionFixOutput';
+import type { AgenticStatus } from "./AgenticStatus";
+import type { FileChange } from "./FileChange";
+import type { FindingOutput } from "./FindingOutput";
+import type { ReflectionFixOutput } from "./ReflectionFixOutput";
 
 /**
  * Canonical structured output from the agentic phase.

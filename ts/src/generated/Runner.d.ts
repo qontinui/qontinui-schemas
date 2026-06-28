@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RunnerCrash } from './RunnerCrash';
-import type { RunnerStatus } from './RunnerStatus';
-import type { RunnerUiError } from './RunnerUiError';
+import type { RunnerCrash } from "./RunnerCrash";
+import type { RunnerStatus } from "./RunnerStatus";
+import type { RunnerUiError } from "./RunnerUiError";
 
 /**
  * Canonical runner entity. One row per registered runner; the same shape is

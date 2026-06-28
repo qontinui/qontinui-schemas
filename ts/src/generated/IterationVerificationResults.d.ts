@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { CriterionOverride } from './CriterionOverride';
-import type { CriterionType } from './CriterionType';
-import type { VerificationResult } from './VerificationResult';
+import type { Confidence } from "./Confidence";
+import type { CriterionOverride } from "./CriterionOverride";
+import type { CriterionType } from "./CriterionType";
+import type { VerificationResult } from "./VerificationResult";
 
 /**
  * Aggregated verification results for a single iteration.

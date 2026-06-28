@@ -9,4 +9,5 @@
  * Health/availability state of a runner, computed server-side from the
  * WebSocket-presence and heartbeat-freshness signals.
  */
-export type RunnerStatus = "healthy" | "degraded" | "offline" | "starting" | "errored";
+export type RunnerStatus =
+  "healthy" | "degraded" | "offline" | "starting" | "errored";

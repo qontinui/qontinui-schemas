@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionScope } from './AssertionScope';
-import type { ConjunctRule } from './ConjunctRule';
-import type { MatchOutcome } from './MatchOutcome';
-import type { PolicyConjunct } from './PolicyConjunct';
+import type { AssertionScope } from "./AssertionScope";
+import type { ConjunctRule } from "./ConjunctRule";
+import type { MatchOutcome } from "./MatchOutcome";
+import type { PolicyConjunct } from "./PolicyConjunct";
 
 /**
  * AND-only policy — all conjuncts must hold for the policy to pass.

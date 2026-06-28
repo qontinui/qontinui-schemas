@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ParserType } from './ParserType';
+import type { ParserType } from "./ParserType";
 
 /**
  * Configuration for a managed process.

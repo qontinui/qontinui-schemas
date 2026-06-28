@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { Finding } from './Finding';
+import type { Confidence } from "./Confidence";
+import type { Finding } from "./Finding";
 
 /**
  * Coordination message between workers.

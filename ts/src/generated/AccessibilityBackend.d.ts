@@ -9,4 +9,5 @@
  * Accessibility capture backend. Each variant corresponds to a platform
  * accessibility API implementation.
  */
-export type AccessibilityBackend = "auto" | "cdp" | "uia" | "atspi" | "ax" | "none";
+export type AccessibilityBackend =
+  "auto" | "cdp" | "uia" | "atspi" | "ax" | "none";

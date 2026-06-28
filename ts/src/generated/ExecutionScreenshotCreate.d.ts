@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ScreenshotAnnotation } from './ScreenshotAnnotation';
-import type { ScreenshotAnnotationShape } from './ScreenshotAnnotationShape';
-import type { ScreenshotType } from './ScreenshotType';
+import type { ScreenshotAnnotation } from "./ScreenshotAnnotation";
+import type { ScreenshotAnnotationShape } from "./ScreenshotAnnotationShape";
+import type { ScreenshotType } from "./ScreenshotType";
 
 /**
  * Request payload describing a screenshot being uploaded.

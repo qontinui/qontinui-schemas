@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CostTrendDataPoint } from './CostTrendDataPoint';
+import type { CostTrendDataPoint } from "./CostTrendDataPoint";
 
 /**
  * Response envelope for the cost-trend analytics endpoint.

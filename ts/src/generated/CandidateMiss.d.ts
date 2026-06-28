@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { FieldDiff } from './FieldDiff';
+import type { FieldDiff } from "./FieldDiff";
 
 /**
  * A near-match candidate — an element that scored above the cut-off but

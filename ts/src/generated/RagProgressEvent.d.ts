@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RagProcessingStatus } from './RagProcessingStatus';
+import type { RagProcessingStatus } from "./RagProcessingStatus";
 
 /**
  * Progress event emitted during RAG processing.

@@ -8,4 +8,5 @@
 /**
  * Status of an embedding-generation job.
  */
-export type JobStatus = "pending" | "in_progress" | "completed" | "failed" | "cancelled";
+export type JobStatus =
+  "pending" | "in_progress" | "completed" | "failed" | "cancelled";

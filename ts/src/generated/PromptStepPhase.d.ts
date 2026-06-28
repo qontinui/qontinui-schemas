@@ -10,4 +10,5 @@
  *
  * Prompt steps are the only variant that may appear in the agentic phase.
  */
-export type PromptStepPhase = "setup" | "verification" | "agentic" | "completion";
+export type PromptStepPhase =
+  "setup" | "verification" | "agentic" | "completion";

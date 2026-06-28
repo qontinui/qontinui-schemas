@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiscoveryBoundingBox } from './DiscoveryBoundingBox';
+import type { DiscoveryBoundingBox } from "./DiscoveryBoundingBox";
 
 /**
  * Visual element within a discovered state.

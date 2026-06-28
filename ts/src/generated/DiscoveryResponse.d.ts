@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { DiscoveredElement } from './DiscoveredElement';
-import type { ElementRect } from './ElementRect';
-import type { ElementState } from './ElementState';
+import type { DiscoveredElement } from "./DiscoveredElement";
+import type { ElementRect } from "./ElementRect";
+import type { ElementState } from "./ElementState";
 
 /**
  * Response from a UI Bridge discovery scan.

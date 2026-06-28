@@ -5,9 +5,9 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { RetrySpec } from './RetrySpec';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
-import type { VisualAssertionType } from './VisualAssertionType';
+import type { RetrySpec } from "./RetrySpec";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
+import type { VisualAssertionType } from "./VisualAssertionType";
 
 /**
  * Assert visual properties of UI elements via the UI Bridge.

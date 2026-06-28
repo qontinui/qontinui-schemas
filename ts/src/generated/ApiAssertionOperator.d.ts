@@ -8,4 +8,5 @@
 /**
  * Comparison operators supported by API assertions.
  */
-export type ApiAssertionOperator = "equals" | "contains" | "matches" | "greater_than" | "less_than";
+export type ApiAssertionOperator =
+  "equals" | "contains" | "matches" | "greater_than" | "less_than";

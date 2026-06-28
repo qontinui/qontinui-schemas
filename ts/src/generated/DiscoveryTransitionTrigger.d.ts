@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TransitionTriggerType } from './TransitionTriggerType';
+import type { TransitionTriggerType } from "./TransitionTriggerType";
 
 /**
  * Trigger for a discovered state transition.

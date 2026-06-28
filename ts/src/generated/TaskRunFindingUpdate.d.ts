@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
 
 /**
  * Request payload for updating a finding. All fields are optional.

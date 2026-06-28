@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionTrendDataPoint } from './ExecutionTrendDataPoint';
-import type { RunType } from './RunType';
+import type { ExecutionTrendDataPoint } from "./ExecutionTrendDataPoint";
+import type { RunType } from "./RunType";
 
 /**
  * Response envelope for the execution-trend analytics endpoint.

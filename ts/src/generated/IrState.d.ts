@@ -5,14 +5,14 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrAssertion } from './IrAssertion';
-import type { IrAssertionTarget } from './IrAssertionTarget';
-import type { IrCrossRef } from './IrCrossRef';
-import type { IrElementCriteria } from './IrElementCriteria';
-import type { IrMetadata } from './IrMetadata';
-import type { IrProvenance } from './IrProvenance';
-import type { IrStateCondition } from './IrStateCondition';
-import type { ProposalStatus } from './ProposalStatus';
+import type { IrAssertion } from "./IrAssertion";
+import type { IrAssertionTarget } from "./IrAssertionTarget";
+import type { IrCrossRef } from "./IrCrossRef";
+import type { IrElementCriteria } from "./IrElementCriteria";
+import type { IrMetadata } from "./IrMetadata";
+import type { IrProvenance } from "./IrProvenance";
+import type { IrStateCondition } from "./IrStateCondition";
+import type { ProposalStatus } from "./ProposalStatus";
 
 export interface IrState {
   assertions: IrAssertion[];

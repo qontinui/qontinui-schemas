@@ -5,14 +5,14 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunFinding } from './TaskRunFinding';
-import type { TaskRunFindingActionType } from './TaskRunFindingActionType';
-import type { TaskRunFindingCategory } from './TaskRunFindingCategory';
-import type { TaskRunFindingSeverity } from './TaskRunFindingSeverity';
-import type { TaskRunFindingStatus } from './TaskRunFindingStatus';
-import type { TaskRunFindingSummary } from './TaskRunFindingSummary';
-import type { TaskRunSession } from './TaskRunSession';
-import type { TaskRunStatus } from './TaskRunStatus';
+import type { TaskRunFinding } from "./TaskRunFinding";
+import type { TaskRunFindingActionType } from "./TaskRunFindingActionType";
+import type { TaskRunFindingCategory } from "./TaskRunFindingCategory";
+import type { TaskRunFindingSeverity } from "./TaskRunFindingSeverity";
+import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
+import type { TaskRunFindingSummary } from "./TaskRunFindingSummary";
+import type { TaskRunSession } from "./TaskRunSession";
+import type { TaskRunStatus } from "./TaskRunStatus";
 
 /**
  * Detailed view of a backend task run, including its sessions and findings.

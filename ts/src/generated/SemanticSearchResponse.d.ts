@@ -5,8 +5,8 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { EmbeddingItem } from './EmbeddingItem';
-import type { SearchResultItem } from './SearchResultItem';
+import type { EmbeddingItem } from "./EmbeddingItem";
+import type { SearchResultItem } from "./SearchResultItem";
 
 /**
  * Response from semantic search.

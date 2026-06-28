@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ApiStyle } from './ApiStyle';
+import type { ApiStyle } from "./ApiStyle";
 
 /**
  * Target backend stack.

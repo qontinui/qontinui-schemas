@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { McpCallRecord } from './McpCallRecord';
+import type { McpCallRecord } from "./McpCallRecord";
 
 /**
  * Result envelope for an `mcp_calls` query scoped to a single task run.

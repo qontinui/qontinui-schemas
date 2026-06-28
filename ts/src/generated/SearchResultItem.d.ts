@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { EmbeddingItem } from './EmbeddingItem';
+import type { EmbeddingItem } from "./EmbeddingItem";
 
 /**
  * Single search result.

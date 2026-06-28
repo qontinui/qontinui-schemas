@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskType } from './TaskType';
+import type { TaskType } from "./TaskType";
 
 /**
  * Request payload for creating a task run.

@@ -8,4 +8,5 @@
 /**
  * Source that detected an issue.
  */
-export type IssueSource = "automation" | "ai_analysis" | "visual_regression" | "user_reported";
+export type IssueSource =
+  "automation" | "ai_analysis" | "visual_regression" | "user_reported";

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { TaskRunStatus } from './TaskRunStatus';
+import type { TaskRunStatus } from "./TaskRunStatus";
 
 /**
  * Filter parameters for listing task runs.

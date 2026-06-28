@@ -5,13 +5,13 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { CheckType } from './CheckType';
-import type { CommandMode } from './CommandMode';
-import type { CommandStepPhase } from './CommandStepPhase';
-import type { PlaywrightExecutionMode } from './PlaywrightExecutionMode';
-import type { RetrySpec } from './RetrySpec';
-import type { TestType } from './TestType';
-import type { VerificationCategoryKind } from './VerificationCategoryKind';
+import type { CheckType } from "./CheckType";
+import type { CommandMode } from "./CommandMode";
+import type { CommandStepPhase } from "./CommandStepPhase";
+import type { PlaywrightExecutionMode } from "./PlaywrightExecutionMode";
+import type { RetrySpec } from "./RetrySpec";
+import type { TestType } from "./TestType";
+import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 
 /**
  * Shell commands, checks, check groups, and tests.

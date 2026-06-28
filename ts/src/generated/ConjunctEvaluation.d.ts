@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { PolicyStatus } from './PolicyStatus';
+import type { PolicyStatus } from "./PolicyStatus";
 
 /**
  * Per-conjunct evaluation result.

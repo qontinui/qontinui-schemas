@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { Confidence } from './Confidence';
-import type { Finding } from './Finding';
-import type { WorkerSignal } from './WorkerSignal';
-import type { WorkerStatus } from './WorkerStatus';
+import type { Confidence } from "./Confidence";
+import type { Finding } from "./Finding";
+import type { WorkerSignal } from "./WorkerSignal";
+import type { WorkerStatus } from "./WorkerStatus";
 
 /**
  * Instance tracking for an individual worker.

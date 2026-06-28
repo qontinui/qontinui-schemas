@@ -5,10 +5,10 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { ExecutionRunResponse } from './ExecutionRunResponse';
-import type { Pagination } from './Pagination';
-import type { RunStatus } from './RunStatus';
-import type { RunType } from './RunType';
+import type { ExecutionRunResponse } from "./ExecutionRunResponse";
+import type { Pagination } from "./Pagination";
+import type { RunStatus } from "./RunStatus";
+import type { RunType } from "./RunType";
 
 /**
  * Paginated list of execution runs.

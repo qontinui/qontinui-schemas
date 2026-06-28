@@ -11,4 +11,5 @@
  * Identifies which discovery pathway produced the state machine. Mirrors
  * Python `DiscoverySourceType(str, Enum)`.
  */
-export type DiscoverySourceType = "playwright" | "ui_bridge" | "recording" | "vision" | "manual";
+export type DiscoverySourceType =
+  "playwright" | "ui_bridge" | "recording" | "vision" | "manual";

@@ -5,7 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { IrElementCriteria } from './IrElementCriteria';
+import type { IrElementCriteria } from "./IrElementCriteria";
 
 export interface IrWaitSpec {
   ms?: number | null;
