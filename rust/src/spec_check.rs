@@ -52,6 +52,96 @@ fn default_result_schema_version() -> u32 {
 }
 
 // ============================================================================
+// Classification types (per-app threshold configuration)
+// ============================================================================
+
+/// Per-app Red/Yellow/Green thresholds for spec match rates.
+///
+/// `red` and `yellow` define the boundary points:
+/// - Match rate < `red` → Red (fail)
+/// - Match rate >= `red` and < `yellow` → Yellow (warn)
+/// - Match rate >= `yellow` → Green (pass)
+///
+/// Immutable snapshot of the thresholds that were active at evaluation time.
+/// Persists with results in JSONB so historical evaluations can be
+/// cross-checked against their contemporaneous threshold configuration.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct ThresholdConfig {
+    /// Red threshold (0.0–1.0). Match rate < this → Red.
+    pub red_threshold: f64,
+    /// Yellow threshold (0.0–1.0). Match rate >= this → Green.
+    /// Must be > `red_threshold`.
+    pub yellow_threshold: f64,
+}
+
+impl ThresholdConfig {
+    /// Construct a new threshold config with validation.
+    ///
+    /// Returns `Err(String)` if thresholds are invalid:
+    /// - Either threshold is outside [0.0, 1.0]
+    /// - `red >= yellow`
+    pub fn new(red: f64, yellow: f64) -> Result<Self, String> {
+        if !(0.0..=1.0).contains(&red) || !(0.0..=1.0).contains(&yellow) {
+            return Err("thresholds must be in [0.0, 1.0]".into());
+        }
+        if red >= yellow {
+            return Err("red_threshold must be < yellow_threshold".into());
+        }
+        Ok(ThresholdConfig {
+            red_threshold: red,
+            yellow_threshold: yellow,
+        })
+    }
+
+    /// Return the canonical default thresholds (0.5 / 0.8).
+    pub fn default() -> Self {
+        ThresholdConfig {
+            red_threshold: 0.5,
+            yellow_threshold: 0.8,
+        }
+    }
+
+    /// Classify a match rate into Red, Yellow, or Green status.
+    pub fn classify_match_rate(&self, rate: f32) -> ClassificationStatus {
+        let rate = rate as f64;
+        if rate < self.red_threshold {
+            ClassificationStatus::Red
+        } else if rate < self.yellow_threshold {
+            ClassificationStatus::Yellow
+        } else {
+            ClassificationStatus::Green
+        }
+    }
+}
+
+/// Classification of a spec match rate into a user-visible status.
+///
+/// Derived from a match rate and the app's configured thresholds.
+/// Serializes as `snake_case` per the module's enum convention.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationStatus {
+    /// Match rate below red threshold (fail).
+    Red,
+    /// Match rate between red and yellow thresholds (warning).
+    Yellow,
+    /// Match rate at or above yellow threshold (pass).
+    Green,
+}
+
+impl std::fmt::Display for ClassificationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ClassificationStatus::Red => write!(f, "red"),
+            ClassificationStatus::Yellow => write!(f, "yellow"),
+            ClassificationStatus::Green => write!(f, "green"),
+        }
+    }
+}
+
+// ============================================================================
 // Step 1 — Result + fingerprint + validation types
 // ============================================================================
 
@@ -109,6 +199,16 @@ pub struct SpecCheckResult {
     /// Soft signals — currently used for `Stale` from `SnapshotFetchError`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+
+    /// Red/Yellow/Green classification of the overall match rate.
+    /// Derived from `summary.overall_match_rate` and the app's configured
+    /// thresholds at evaluation time (see `thresholds_used`).
+    pub classification: ClassificationStatus,
+
+    /// The threshold configuration that was active at evaluation time.
+    /// Immutable snapshot for audit purposes — allows historical results
+    /// to be cross-checked against their contemporaneous thresholds.
+    pub thresholds_used: ThresholdConfig,
 }
 
 /// Aggregate summary across all evaluated states.
@@ -197,6 +297,10 @@ pub struct StateMatchResult {
 
     /// Fraction of assertions that passed (0.0..=1.0).
     pub match_rate: f32,
+
+    /// Red/Yellow/Green classification of this state's match rate.
+    /// Derived from `match_rate` and the app's configured thresholds.
+    pub classification: ClassificationStatus,
 
     /// One entry per IR assertion in the state.
     pub assertions: Vec<AssertionResult>,
@@ -594,6 +698,111 @@ pub enum PolicyStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    // Threshold & Classification tests
+    // ========================================================================
+
+    #[test]
+    fn test_threshold_config_construction() {
+        let cfg = ThresholdConfig::new(0.5, 0.8).unwrap();
+        assert_eq!(cfg.red_threshold, 0.5);
+        assert_eq!(cfg.yellow_threshold, 0.8);
+    }
+
+    #[test]
+    fn test_classify_below_red() {
+        let cfg = ThresholdConfig::new(0.5, 0.8).unwrap();
+        assert_eq!(cfg.classify_match_rate(0.0), ClassificationStatus::Red);
+        assert_eq!(cfg.classify_match_rate(0.3), ClassificationStatus::Red);
+        assert_eq!(cfg.classify_match_rate(0.49999), ClassificationStatus::Red);
+    }
+
+    #[test]
+    fn test_classify_between_red_yellow() {
+        let cfg = ThresholdConfig::new(0.5, 0.8).unwrap();
+        assert_eq!(cfg.classify_match_rate(0.5), ClassificationStatus::Yellow);
+        assert_eq!(cfg.classify_match_rate(0.6), ClassificationStatus::Yellow);
+        assert_eq!(cfg.classify_match_rate(0.79999), ClassificationStatus::Yellow);
+    }
+
+    #[test]
+    fn test_classify_at_or_above_yellow() {
+        let cfg = ThresholdConfig::new(0.5, 0.8).unwrap();
+        assert_eq!(cfg.classify_match_rate(0.8), ClassificationStatus::Green);
+        assert_eq!(cfg.classify_match_rate(0.9), ClassificationStatus::Green);
+        assert_eq!(cfg.classify_match_rate(1.0), ClassificationStatus::Green);
+    }
+
+    #[test]
+    fn test_invalid_threshold_red_outside_range() {
+        assert!(ThresholdConfig::new(-0.1, 0.8).is_err());
+        assert!(ThresholdConfig::new(1.1, 0.9).is_err());
+    }
+
+    #[test]
+    fn test_invalid_threshold_yellow_outside_range() {
+        assert!(ThresholdConfig::new(0.5, -0.1).is_err());
+        assert!(ThresholdConfig::new(0.5, 1.1).is_err());
+    }
+
+    #[test]
+    fn test_invalid_threshold_red_gte_yellow() {
+        assert!(ThresholdConfig::new(0.5, 0.3).is_err()); // red > yellow
+        assert!(ThresholdConfig::new(0.8, 0.8).is_err()); // red == yellow
+    }
+
+    #[test]
+    fn test_default_thresholds() {
+        let cfg = ThresholdConfig::default();
+        assert_eq!(cfg.red_threshold, 0.5);
+        assert_eq!(cfg.yellow_threshold, 0.8);
+    }
+
+    #[test]
+    fn test_custom_thresholds() {
+        let cfg = ThresholdConfig::new(0.55, 0.85).unwrap();
+        assert_eq!(cfg.classify_match_rate(0.54), ClassificationStatus::Red);
+        assert_eq!(cfg.classify_match_rate(0.56), ClassificationStatus::Yellow);
+        assert_eq!(cfg.classify_match_rate(0.85), ClassificationStatus::Green);
+    }
+
+    #[test]
+    fn test_classification_status_display() {
+        assert_eq!(ClassificationStatus::Red.to_string(), "red");
+        assert_eq!(ClassificationStatus::Yellow.to_string(), "yellow");
+        assert_eq!(ClassificationStatus::Green.to_string(), "green");
+    }
+
+    #[test]
+    fn test_threshold_config_serialization() {
+        let cfg = ThresholdConfig::new(0.55, 0.85).unwrap();
+        let json = serde_json::to_value(&cfg).expect("serialize");
+        assert_eq!(json["redThreshold"], 0.55);
+        assert_eq!(json["yellowThreshold"], 0.85);
+
+        let cfg2: ThresholdConfig = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(cfg, cfg2);
+    }
+
+    #[test]
+    fn test_classification_status_serialization() {
+        let statuses = vec![
+            (ClassificationStatus::Red, "red"),
+            (ClassificationStatus::Yellow, "yellow"),
+            (ClassificationStatus::Green, "green"),
+        ];
+        for (status, expected) in statuses {
+            let json = serde_json::to_value(&status).expect("serialize");
+            assert_eq!(json.as_str().unwrap(), expected);
+            let status2: ClassificationStatus = serde_json::from_value(json).expect("deserialize");
+            assert_eq!(status2, status);
+        }
+    }
+
+    // ========================================================================
+    // Existing tests
+    // ========================================================================
 
     #[test]
     fn conjunct_rule_round_trip_all_variants() {
