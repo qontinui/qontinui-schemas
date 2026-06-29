@@ -91,6 +91,10 @@ pub mod findings;
 pub mod functional_spec;
 pub mod geometry;
 pub mod git_ops;
+/// Helper-task queue — human-judgment micro-tasks a runner emits for a
+/// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
+/// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
+pub mod helper_task;
 pub mod ir;
 pub mod mcp_config;
 pub mod memory;
