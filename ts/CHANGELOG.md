@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.8.0...ts-v0.8.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **codegen:** make TS codegen formatting deterministic to unjam schema-drift CI ([bc2d903](https://github.com/qontinui/qontinui-schemas/commit/bc2d90372c446861c8ced46879234e79e063813b))
+
 ## [0.8.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.7.0...ts-v0.8.0) (2026-06-15)
 
 

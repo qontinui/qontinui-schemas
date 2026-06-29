@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.6.0...rust-v0.7.0) (2026-06-29)
+
+
+### Features
+
+* add HelperTask/HelperAnswer schema types for helper task queue ([0ed6889](https://github.com/qontinui/qontinui-schemas/commit/0ed68896d425bc4eae5c6a13cca64b14be5daf1c))
+
 ## [0.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.5.0...rust-v0.6.0) (2026-06-15)
 
 
