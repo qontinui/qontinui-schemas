@@ -32,6 +32,22 @@ pub struct App {
     /// below are Yellow (warn). Must be greater than `red_threshold`. Defaults to 0.8.
     #[serde(default = "default_yellow_threshold")]
     pub yellow_threshold: f64,
+    /// Auto-fresh update strategy: "pull_only" (pull code, no restart) or
+    /// "pull_build" (pull, run build_command, run start_command). Used by the
+    /// runner's P3 auto-fresh engine to decide what actions to take when
+    /// pulling updated source code. Defaults to "pull_only".
+    #[serde(default = "default_update_strategy")]
+    pub update_strategy: String,
+    /// Build command to run after pulling updated source (P3 auto-fresh).
+    /// Ignored if `update_strategy` is "pull_only". Optional; if None,
+    /// the auto-fresh engine skips build and goes straight to start_command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_command: Option<String>,
+    /// Start command to run after a successful build (P3 auto-fresh).
+    /// Restarts the deployed instance and updates app_deploy_state.
+    /// Ignored if `update_strategy` is "pull_only". Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_command: Option<String>,
 }
 
 fn default_red_threshold() -> f64 {
@@ -40,6 +56,10 @@ fn default_red_threshold() -> f64 {
 
 fn default_yellow_threshold() -> f64 {
     0.8
+}
+
+fn default_update_strategy() -> String {
+    "pull_only".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -58,6 +78,15 @@ pub struct RegisterAppRequest {
     /// Yellow threshold for spec match rates. Defaults to 0.8.
     #[serde(default = "default_yellow_threshold")]
     pub yellow_threshold: f64,
+    /// Auto-fresh update strategy (P3 fleet-fresh engine). Defaults to "pull_only".
+    #[serde(default = "default_update_strategy")]
+    pub update_strategy: String,
+    /// Build command for "pull_build" strategy. Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_command: Option<String>,
+    /// Start command to restart after build. Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -76,6 +105,15 @@ pub struct UpdateAppRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Yellow threshold for spec match rates (0.0–1.0). Must be > red_threshold.
     pub yellow_threshold: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Auto-fresh update strategy: "pull_only" or "pull_build".
+    pub update_strategy: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Build command for "pull_build" strategy.
+    pub build_command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Start command to restart after build.
+    pub start_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
