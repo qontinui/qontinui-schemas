@@ -89,6 +89,32 @@ pub struct RegisterAppRequest {
     pub start_command: Option<String>,
 }
 
+impl RegisterAppRequest {
+    /// Construct a request from the four required identity fields; every
+    /// config field takes its registration default (mirrors the `#[serde(default)]`
+    /// values used on the wire). Call sites that need a non-default config
+    /// mutate the returned value — fields are public.
+    pub fn new(
+        app_id: impl Into<String>,
+        repo_root: impl Into<String>,
+        ui_bridge_url: impl Into<String>,
+        display_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            app_id: app_id.into(),
+            repo_root: repo_root.into(),
+            ui_bridge_url: ui_bridge_url.into(),
+            display_name: display_name.into(),
+            auth_required: false,
+            red_threshold: default_red_threshold(),
+            yellow_threshold: default_yellow_threshold(),
+            update_strategy: default_update_strategy(),
+            build_command: None,
+            start_command: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAppRequest {
@@ -218,18 +244,18 @@ mod tests {
 
     #[test]
     fn app_defaults_have_correct_thresholds() {
-        let req = RegisterAppRequest {
-            app_id: "test-app".into(),
-            repo_root: "/path".into(),
-            ui_bridge_url: "http://localhost:3000".into(),
-            display_name: "Test".into(),
-            auth_required: false,
-            red_threshold: 0.5,
-            yellow_threshold: 0.8,
-        };
+        let req = RegisterAppRequest::new(
+            "test-app",
+            "/path",
+            "http://localhost:3000",
+            "Test",
+        );
         assert_eq!(req.red_threshold, 0.5);
         assert_eq!(req.yellow_threshold, 0.8);
         assert!(!req.auth_required);
+        assert_eq!(req.update_strategy, "pull_only");
+        assert!(req.build_command.is_none());
+        assert!(req.start_command.is_none());
     }
 
     #[test]
