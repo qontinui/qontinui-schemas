@@ -20,6 +20,26 @@ pub struct App {
     pub display_name: String,
     pub created_at_ms: i64,
     pub last_seen_at_ms: i64,
+    /// Whether this app requires authentication before spec checks.
+    /// If true, workflows will auto-inject an auth setup step.
+    #[serde(default)]
+    pub auth_required: bool,
+    /// Red threshold for spec match rates (0.0–1.0). Match rates below this are Red (fail).
+    /// Must be less than `yellow_threshold`. Defaults to 0.5.
+    #[serde(default = "default_red_threshold")]
+    pub red_threshold: f64,
+    /// Yellow threshold for spec match rates (0.0–1.0). Match rates >= this are Green (pass),
+    /// below are Yellow (warn). Must be greater than `red_threshold`. Defaults to 0.8.
+    #[serde(default = "default_yellow_threshold")]
+    pub yellow_threshold: f64,
+}
+
+fn default_red_threshold() -> f64 {
+    0.5
+}
+
+fn default_yellow_threshold() -> f64 {
+    0.8
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -29,6 +49,15 @@ pub struct RegisterAppRequest {
     pub repo_root: String,
     pub ui_bridge_url: String,
     pub display_name: String,
+    /// Whether this app requires authentication before spec checks.
+    #[serde(default)]
+    pub auth_required: bool,
+    /// Red threshold for spec match rates. Defaults to 0.5.
+    #[serde(default = "default_red_threshold")]
+    pub red_threshold: f64,
+    /// Yellow threshold for spec match rates. Defaults to 0.8.
+    #[serde(default = "default_yellow_threshold")]
+    pub yellow_threshold: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -38,6 +67,15 @@ pub struct UpdateAppRequest {
     pub ui_bridge_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Whether this app requires authentication before spec checks.
+    pub auth_required: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Red threshold for spec match rates (0.0–1.0). Must be < yellow_threshold.
+    pub red_threshold: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Yellow threshold for spec match rates (0.0–1.0). Must be > red_threshold.
+    pub yellow_threshold: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -138,5 +176,30 @@ mod tests {
         let s = serde_json::to_string(&err).unwrap();
         assert!(s.contains(r#""reason":"not-registered""#));
         assert!(s.contains(r#""appId":"ghost""#));
+    }
+
+    #[test]
+    fn app_defaults_have_correct_thresholds() {
+        let req = RegisterAppRequest {
+            app_id: "test-app".into(),
+            repo_root: "/path".into(),
+            ui_bridge_url: "http://localhost:3000".into(),
+            display_name: "Test".into(),
+            auth_required: false,
+            red_threshold: 0.5,
+            yellow_threshold: 0.8,
+        };
+        assert_eq!(req.red_threshold, 0.5);
+        assert_eq!(req.yellow_threshold, 0.8);
+        assert!(!req.auth_required);
+    }
+
+    #[test]
+    fn app_register_request_deserializes_with_defaults() {
+        let json = r#"{"appId":"test","repoRoot":"/path","uiBridgeUrl":"http://localhost","displayName":"Test"}"#;
+        let req: RegisterAppRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.red_threshold, 0.5);
+        assert_eq!(req.yellow_threshold, 0.8);
+        assert!(!req.auth_required);
     }
 }
