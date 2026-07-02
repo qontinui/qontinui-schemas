@@ -175,11 +175,6 @@ pub enum AppError {
     InvalidUpdateStrategy { update_strategy: String },
 }
 
-/// Validate an `app_id` slug. Returns `Ok(())` for valid ids, or
-/// `Err(AppError::InvalidAppId)` for anything else.
-///
-/// Rules: 1–64 chars, lowercase ASCII letters / digits / hyphens, first
-/// char must be `[a-z0-9]` (no leading hyphen).
 /// Validate an `update_strategy` value. The auto-fresh engine string-matches
 /// `"pull_build"`, so an unvalidated typo (`"pull-build"`) would silently
 /// degrade to pull-only — reject at the write boundary instead.
@@ -192,6 +187,11 @@ pub fn validate_update_strategy(s: &str) -> Result<(), AppError> {
     }
 }
 
+/// Validate an `app_id` slug. Returns `Ok(())` for valid ids, or
+/// `Err(AppError::InvalidAppId)` for anything else.
+///
+/// Rules: 1–64 chars, lowercase ASCII letters / digits / hyphens, first
+/// char must be `[a-z0-9]` (no leading hyphen).
 pub fn validate_app_id(s: &str) -> Result<(), AppError> {
     let len_ok = (1..=64).contains(&s.len());
     let first_ok = s
@@ -259,12 +259,7 @@ mod tests {
 
     #[test]
     fn app_defaults_have_correct_thresholds() {
-        let req = RegisterAppRequest::new(
-            "test-app",
-            "/path",
-            "http://localhost:3000",
-            "Test",
-        );
+        let req = RegisterAppRequest::new("test-app", "/path", "http://localhost:3000", "Test");
         assert_eq!(req.red_threshold, 0.5);
         assert_eq!(req.yellow_threshold, 0.8);
         assert!(!req.auth_required);
