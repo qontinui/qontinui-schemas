@@ -170,6 +170,9 @@ pub enum AppError {
 
     #[error("app id '{app_id}' is already registered")]
     AlreadyRegistered { app_id: String },
+
+    #[error("update strategy '{update_strategy}' is not one of: pull_only, pull_build")]
+    InvalidUpdateStrategy { update_strategy: String },
 }
 
 /// Validate an `app_id` slug. Returns `Ok(())` for valid ids, or
@@ -177,6 +180,18 @@ pub enum AppError {
 ///
 /// Rules: 1–64 chars, lowercase ASCII letters / digits / hyphens, first
 /// char must be `[a-z0-9]` (no leading hyphen).
+/// Validate an `update_strategy` value. The auto-fresh engine string-matches
+/// `"pull_build"`, so an unvalidated typo (`"pull-build"`) would silently
+/// degrade to pull-only — reject at the write boundary instead.
+pub fn validate_update_strategy(s: &str) -> Result<(), AppError> {
+    match s {
+        "pull_only" | "pull_build" => Ok(()),
+        other => Err(AppError::InvalidUpdateStrategy {
+            update_strategy: other.into(),
+        }),
+    }
+}
+
 pub fn validate_app_id(s: &str) -> Result<(), AppError> {
     let len_ok = (1..=64).contains(&s.len());
     let first_ok = s
