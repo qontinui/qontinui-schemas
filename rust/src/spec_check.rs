@@ -95,14 +95,6 @@ impl ThresholdConfig {
         })
     }
 
-    /// Return the canonical default thresholds (0.5 / 0.8).
-    pub fn default() -> Self {
-        ThresholdConfig {
-            red_threshold: 0.5,
-            yellow_threshold: 0.8,
-        }
-    }
-
     /// Classify a match rate into Red, Yellow, or Green status.
     pub fn classify_match_rate(&self, rate: f32) -> ClassificationStatus {
         let rate = rate as f64;
@@ -112,6 +104,16 @@ impl ThresholdConfig {
             ClassificationStatus::Yellow
         } else {
             ClassificationStatus::Green
+        }
+    }
+}
+
+impl Default for ThresholdConfig {
+    /// The canonical default thresholds (0.5 / 0.8).
+    fn default() -> Self {
+        ThresholdConfig {
+            red_threshold: 0.5,
+            yellow_threshold: 0.8,
         }
     }
 }
@@ -780,7 +782,7 @@ mod tests {
     #[test]
     fn test_threshold_config_serialization() {
         let cfg = ThresholdConfig::new(0.55, 0.85).unwrap();
-        let json = serde_json::to_value(&cfg).expect("serialize");
+        let json = serde_json::to_value(cfg).expect("serialize");
         assert_eq!(json["redThreshold"], 0.55);
         assert_eq!(json["yellowThreshold"], 0.85);
 
@@ -796,7 +798,7 @@ mod tests {
             (ClassificationStatus::Green, "green"),
         ];
         for (status, expected) in statuses {
-            let json = serde_json::to_value(&status).expect("serialize");
+            let json = serde_json::to_value(status).expect("serialize");
             assert_eq!(json.as_str().unwrap(), expected);
             let status2: ClassificationStatus = serde_json::from_value(json).expect("deserialize");
             assert_eq!(status2, status);

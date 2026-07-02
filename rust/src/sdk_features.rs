@@ -67,7 +67,8 @@ mod tests {
 
     #[test]
     fn sdk_features_non_empty_and_contains_known_anchors() {
-        assert!(!SDK_FEATURES.is_empty(), "SDK_FEATURES must not be empty");
+        // Non-emptiness is implied by the required-anchor checks below (a
+        // bare `!is_empty()` on a const array trips clippy::const_is_empty).
         for required in [
             "softNavigate",
             "snapshotRegistration",
