@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.7.0...rust-v0.8.0) (2026-07-02)
+
+
+### Features
+
+* **schemas:** Add classification thresholds for spec evaluation ([e72c478](https://github.com/qontinui/qontinui-schemas/commit/e72c47894ab2e4ca9d4a8c4e7fb2fc7291e8a2b0))
+* **schemas:** Classification thresholds for spec evaluation ([8973f27](https://github.com/qontinui/qontinui-schemas/commit/8973f27edf6a93a4897a1e650f7ff9533fe19e3d))
+
+
+### Bug Fixes
+
+* **clippy:** unbreak rust-ci clippy on main ([569f371](https://github.com/qontinui/qontinui-schemas/commit/569f3717db1672dffdfd8ec1fdee84103a69c3c7))
+
 ## [0.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.6.0...rust-v0.7.0) (2026-06-29)
 
 

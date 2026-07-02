@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.8.1...ts-v0.9.0) (2026-07-02)
+
+
+### Features
+
+* **schemas:** Classification thresholds for spec evaluation ([8973f27](https://github.com/qontinui/qontinui-schemas/commit/8973f27edf6a93a4897a1e650f7ff9533fe19e3d))
+
 ## [0.8.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.8.0...ts-v0.8.1) (2026-06-29)
 
 
