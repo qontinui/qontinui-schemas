@@ -32,6 +32,22 @@ pub struct App {
     /// below are Yellow (warn). Must be greater than `red_threshold`. Defaults to 0.8.
     #[serde(default = "default_yellow_threshold")]
     pub yellow_threshold: f64,
+    /// Auto-fresh update strategy: "pull_only" (pull code, no restart) or
+    /// "pull_build" (pull, run build_command, run start_command). Used by the
+    /// runner's P3 auto-fresh engine to decide what actions to take when
+    /// pulling updated source code. Defaults to "pull_only".
+    #[serde(default = "default_update_strategy")]
+    pub update_strategy: String,
+    /// Build command to run after pulling updated source (P3 auto-fresh).
+    /// Ignored if `update_strategy` is "pull_only". Optional; if None,
+    /// the auto-fresh engine skips build and goes straight to start_command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_command: Option<String>,
+    /// Start command to run after a successful build (P3 auto-fresh).
+    /// Restarts the deployed instance and updates app_deploy_state.
+    /// Ignored if `update_strategy` is "pull_only". Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_command: Option<String>,
 }
 
 fn default_red_threshold() -> f64 {
@@ -40,6 +56,10 @@ fn default_red_threshold() -> f64 {
 
 fn default_yellow_threshold() -> f64 {
     0.8
+}
+
+fn default_update_strategy() -> String {
+    "pull_only".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -58,6 +78,41 @@ pub struct RegisterAppRequest {
     /// Yellow threshold for spec match rates. Defaults to 0.8.
     #[serde(default = "default_yellow_threshold")]
     pub yellow_threshold: f64,
+    /// Auto-fresh update strategy (P3 fleet-fresh engine). Defaults to "pull_only".
+    #[serde(default = "default_update_strategy")]
+    pub update_strategy: String,
+    /// Build command for "pull_build" strategy. Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_command: Option<String>,
+    /// Start command to restart after build. Optional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_command: Option<String>,
+}
+
+impl RegisterAppRequest {
+    /// Construct a request from the four required identity fields; every
+    /// config field takes its registration default (mirrors the `#[serde(default)]`
+    /// values used on the wire). Call sites that need a non-default config
+    /// mutate the returned value — fields are public.
+    pub fn new(
+        app_id: impl Into<String>,
+        repo_root: impl Into<String>,
+        ui_bridge_url: impl Into<String>,
+        display_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            app_id: app_id.into(),
+            repo_root: repo_root.into(),
+            ui_bridge_url: ui_bridge_url.into(),
+            display_name: display_name.into(),
+            auth_required: false,
+            red_threshold: default_red_threshold(),
+            yellow_threshold: default_yellow_threshold(),
+            update_strategy: default_update_strategy(),
+            build_command: None,
+            start_command: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -76,6 +131,15 @@ pub struct UpdateAppRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Yellow threshold for spec match rates (0.0–1.0). Must be > red_threshold.
     pub yellow_threshold: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Auto-fresh update strategy: "pull_only" or "pull_build".
+    pub update_strategy: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Build command for "pull_build" strategy.
+    pub build_command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Start command to restart after build.
+    pub start_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -106,6 +170,21 @@ pub enum AppError {
 
     #[error("app id '{app_id}' is already registered")]
     AlreadyRegistered { app_id: String },
+
+    #[error("update strategy '{update_strategy}' is not one of: pull_only, pull_build")]
+    InvalidUpdateStrategy { update_strategy: String },
+}
+
+/// Validate an `update_strategy` value. The auto-fresh engine string-matches
+/// `"pull_build"`, so an unvalidated typo (`"pull-build"`) would silently
+/// degrade to pull-only — reject at the write boundary instead.
+pub fn validate_update_strategy(s: &str) -> Result<(), AppError> {
+    match s {
+        "pull_only" | "pull_build" => Ok(()),
+        other => Err(AppError::InvalidUpdateStrategy {
+            update_strategy: other.into(),
+        }),
+    }
 }
 
 /// Validate an `app_id` slug. Returns `Ok(())` for valid ids, or
@@ -180,18 +259,13 @@ mod tests {
 
     #[test]
     fn app_defaults_have_correct_thresholds() {
-        let req = RegisterAppRequest {
-            app_id: "test-app".into(),
-            repo_root: "/path".into(),
-            ui_bridge_url: "http://localhost:3000".into(),
-            display_name: "Test".into(),
-            auth_required: false,
-            red_threshold: 0.5,
-            yellow_threshold: 0.8,
-        };
+        let req = RegisterAppRequest::new("test-app", "/path", "http://localhost:3000", "Test");
         assert_eq!(req.red_threshold, 0.5);
         assert_eq!(req.yellow_threshold, 0.8);
         assert!(!req.auth_required);
+        assert_eq!(req.update_strategy, "pull_only");
+        assert!(req.build_command.is_none());
+        assert!(req.start_command.is_none());
     }
 
     #[test]
