@@ -189,6 +189,14 @@ from .per_type.gate_evaluation_result import GateEvaluationResult
 from .per_type.git_op_list_response import GitOpListResponse
 from .per_type.git_op_record import GitOpRecord
 from .per_type.health_check_url import HealthCheckUrl
+from .per_type.helper_answer import HelperAnswer
+from .per_type.helper_answer_schema import HelperAnswerSchema
+from .per_type.helper_task import HelperTask
+from .per_type.helper_task_kind import HelperTaskKind
+from .per_type.helper_task_payload import HelperTaskPayload
+from .per_type.helper_task_source import HelperTaskSource
+from .per_type.helper_task_status import HelperTaskStatus
+from .per_type.helper_verdict import HelperVerdict
 from .per_type.historical_action_query import HistoricalActionQuery
 from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_config import HttpConfig
@@ -714,6 +722,14 @@ __all__ = [
     "GitOpListResponse",
     "GitOpRecord",
     "HealthCheckUrl",
+    "HelperAnswer",
+    "HelperAnswerSchema",
+    "HelperTask",
+    "HelperTaskKind",
+    "HelperTaskPayload",
+    "HelperTaskSource",
+    "HelperTaskStatus",
+    "HelperVerdict",
     "HistoricalActionQuery",
     "HistoricalActionResult",
     "HttpConfig",
