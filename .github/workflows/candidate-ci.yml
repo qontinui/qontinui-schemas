@@ -1,0 +1,38 @@
+name: candidate-ci
+
+# Speculative CI for coord's PR-merge orchestrator.
+#
+# coord lands a green PR by pushing a `merge-candidate/<uuid>` ref (the PR's
+# content rebased onto main) and waiting for check runs to appear on it. This
+# repo's other workflows trigger only on `pull_request` + `push` to `main`, so
+# a candidate ref produced ZERO check runs — coord's liveness classifier read
+# the silence as `Absent`, mis-labelled it an `actions_outage`, and its bypass
+# never completed the land (schemas#97 sat ready-but-unlanded for 35h+ this
+# way while every other repo's lane drained).
+#
+# This mirrors qontinui-coord's own `candidate-ci.yml`: on a candidate ref,
+# re-run the repo's real gates (Rust CI + schema-drift) via `workflow_call` so
+# coord sees live workflow runs, then evaluates their conclusion exactly as it
+# does for a normal PR.
+
+on:
+  push:
+    branches:
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+
+# One group per candidate ref (each proposal pushes a unique ref) so parallel
+# proposals never cancel each other; cancel-in-progress OFF so a rare candidate
+# re-push mid-run doesn't half-report the check set.
+concurrency:
+  group: candidate-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rust-ci:
+    uses: ./.github/workflows/rust-ci.yml
+    secrets: inherit
+  schema-drift:
+    uses: ./.github/workflows/schema-drift.yml
+    secrets: inherit
