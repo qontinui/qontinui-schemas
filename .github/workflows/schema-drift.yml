@@ -24,6 +24,11 @@ on:
   # refreshes the visible status without forcing a noop rust/src/**
   # commit.
   workflow_dispatch:
+  # Lets candidate-ci.yml reuse this job so coord's speculative merge-candidate
+  # refs get a `check-drift` check run (without it, schemas candidate refs
+  # produce ZERO check runs and coord mis-classifies the silence as an
+  # `actions_outage`, then its bypass fails to land — the schemas-lane stall).
+  workflow_call:
   push:
     branches: [main]
     paths:
