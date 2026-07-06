@@ -316,6 +316,24 @@ jobs:
           mkdir -p qontinui-runner/dist
           printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
 
+      # OOM guard — copied from qontinui-runner/.github/workflows/ci.yml
+      # ("Add swapfile" + CARGO_BUILD_JOBS notes there): hosted ubuntu
+      # runners ship 16 GB RAM and this workspace's peak compile memory
+      # exceeds it; the Linux OOM-killer then takes the runner AGENT down
+      # and the job dies with exit code 143 and no rustc error. The first
+      # forced run of this job (28772691807, 2026-07-06) failed exactly
+      # that way ~25 min in. Same two mitigations as runner CI: pre-
+      # allocate paging space AND single-threaded compile (JOBS=1 — the
+      # runner CI found JOBS=2 still trips the OOM-killer even with swap).
+      - name: Add swapfile (guard against compile OOM, exit 143)
+        if: steps.gate.outputs.run_gate == 'true'
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
       # The actual gate. --all-targets is load-bearing (see the job
       # header comment): a lib-only check rebuilds the exact blind spot
       # that let the 2026-07-05 apps.rs break through — the runner's
@@ -327,4 +345,7 @@ jobs:
         working-directory: qontinui-runner
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/target-consumer-check
+          # See the swapfile step above — JOBS=1 matches runner CI's
+          # empirically-derived OOM mitigation for this workspace.
+          CARGO_BUILD_JOBS: "1"
         run: cargo check --workspace --all-targets
