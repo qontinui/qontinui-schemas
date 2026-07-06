@@ -24,6 +24,20 @@ on:
   # refreshes the visible status without forcing a noop rust/src/**
   # commit.
   workflow_dispatch:
+    inputs:
+      # Manual dispatch already runs check-consumers fully (see the
+      # early-exit step: dispatch is treated as an explicit ask), so
+      # today this input is a belt-and-braces override. It exists so
+      # the consumer gate can always be exercised post-merge without a
+      # rust/src/** commit even if the dispatch path is ever tightened,
+      # e.g. `gh workflow run schema-drift.yml --ref main -f force_consumers=true`.
+      # On push/pull_request events the input is absent (empty string)
+      # and the gate logic treats it as false — behavior unchanged.
+      force_consumers:
+        description: "Force the check-consumers compile gate to run fully"
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [main]
     paths:
@@ -153,3 +167,164 @@ jobs:
             echo "Run 'just generate-types' from the repo root and commit the updated files."
             exit 1
           fi
+
+  # ------------------------------------------------------------------
+  # check-consumers: downstream path-dep consumer compile gate.
+  #
+  # CONTRACT: a red check-consumers means this schema change breaks a
+  # path-dep consumer's compile. Land the consumer catch-up PR together
+  # with this change (schema lands -> catch-up lands immediately), or
+  # fix the change. Do NOT merge over a red gate and leave the consumer
+  # to discover the break on its own main.
+  #
+  # Why this exists: on 2026-07-05 a schemas change (v0.8.0 apps.rs —
+  # new fields `update_strategy`/`build_command`/`start_command` plus
+  # `AppError::InvalidUpdateStrategy`) landed with no runner catch-up.
+  # qontinui-runner consumes qontinui-types via a path dependency
+  # (src-tauri/Cargo.toml -> ../../qontinui-schemas/rust), so every
+  # runner build immediately broke (E0063 x3, E0004), runner main went
+  # red, and the runner merge train froze for ~60 hours with 8 green
+  # PRs stuck. Plan: 2026-07-06-runner-ci-cross-repo-schema-drift-guard
+  # (Phase 2 / design decision D1).
+  #
+  # Why `cargo check --workspace --all-targets` (load-bearing): the
+  # check-drift job above builds only `--bin export_schemas`, which
+  # links the runner *lib* only. The 2026-07-05 break lived in
+  # bin-target code — the runner's `commands/` module is declared in
+  # main.rs, not lib.rs — so a lib-only build stayed green while every
+  # real runner build was red. `--all-targets` compiles bin + test
+  # targets and closes exactly that blind spot.
+  #
+  # Consumer list is EXPLICIT: qontinui-runner is the only Rust
+  # path-dep consumer today. When another repo gains a path dep on
+  # qontinui-schemas/rust, add a sibling checkout + gated
+  # `cargo check --workspace --all-targets` step pair for it here.
+  #
+  # Trigger/required-check convention (same as check-drift and
+  # rust-ci.yml): the pull_request trigger carries NO paths: filter —
+  # a path-filtered trigger that doesn't fire leaves a required check
+  # "missing" and unsatisfiable. Instead the first step below computes
+  # whether the PR touches rust/src/** and every heavy step is gated on
+  # it, so irrelevant PRs go green in seconds. After this job's first
+  # green run, register `check-consumers` in the schemas ruleset's
+  # required checks (post-merge step — only require a context that has
+  # a producer).
+  # ------------------------------------------------------------------
+  check-consumers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          path: qontinui-schemas
+          # Full history so the early-exit step can diff the PR's
+          # base...head range directly by sha.
+          fetch-depth: 0
+
+      # Early exit: only schema Rust source changes (rust/src/**) can
+      # break a consumer's compile. Per event:
+      #   pull_request      -> diff base..head; run only if rust/src/** changed
+      #   push              -> run fully (trigger is already path-filtered)
+      #   workflow_dispatch -> run fully (a manual dispatch is an
+      #                        explicit ask; force_consumers=true keeps
+      #                        that guaranteed even if this ever changes)
+      # When run_gate=false every subsequent step is skipped and the
+      # job completes green in seconds — that is what keeps the
+      # unfiltered pull_request trigger cheap on irrelevant PRs.
+      - name: Decide whether consumer compile gate must run
+        id: gate
+        working-directory: qontinui-schemas
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # Boolean workflow_dispatch input; empty string on push/PR
+          # events — the :-false default below keeps those unchanged.
+          FORCE_CONSUMERS: ${{ inputs.force_consumers }}
+        run: |
+          set -euo pipefail
+          run_gate=false
+          case "$EVENT_NAME" in
+            pull_request)
+              changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+              if printf '%s\n' "$changed" | grep -q '^rust/src/'; then
+                run_gate=true
+              fi
+              ;;
+            push|workflow_dispatch)
+              run_gate=true
+              ;;
+          esac
+          if [ "${FORCE_CONSUMERS:-false}" = "true" ]; then
+            run_gate=true
+          fi
+          echo "run_gate=$run_gate" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT_NAME run_gate=$run_gate"
+
+      - name: Checkout qontinui-runner (sibling)
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: qontinui/qontinui-runner
+          path: qontinui-runner
+
+      # Same dep list as check-drift above: Tauri 2.x on Linux probes
+      # for libwebkit2gtk-4.1, libsoup, libgtk etc. via pkg-config in
+      # build scripts. Without these, cargo aborts at link/probe time.
+      # Mirrors the canonical list from qontinui-runner/.github/workflows/ci.yml.
+      - name: Install Tauri Linux system deps
+        if: steps.gate.outputs.run_gate == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
+
+      - name: Set up Rust toolchain
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      # Cache keyed on the RUNNER workspace (that is what we compile);
+      # target dir is relative to the workspace root and must match the
+      # CARGO_TARGET_DIR used by the check step below.
+      - name: Rust cache (runner workspace)
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: qontinui-runner -> target-consumer-check
+
+      # tauri_build::build() in qontinui-runner/src-tauri/build.rs reads
+      # tauri.conf.json's `frontendDist: "../dist"` and panics if the path
+      # doesn't exist. We don't actually need a real frontend build for
+      # schema export — the export_schemas binary only touches Rust schemar
+      # registries — so stub an empty dist/ with a placeholder index.html.
+      # The build script's `tauri::generate_context!()` will embed the
+      # placeholder, which is fine: the binary that reads the embedded
+      # frontend (the actual runner) is never invoked here.
+      - name: Stub qontinui-runner frontend dist
+        if: steps.gate.outputs.run_gate == 'true'
+        run: |
+          mkdir -p qontinui-runner/dist
+          printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
+
+      # The actual gate. --all-targets is load-bearing (see the job
+      # header comment): a lib-only check rebuilds the exact blind spot
+      # that let the 2026-07-05 apps.rs break through — the runner's
+      # commands/ module lives under the bin target (main.rs), not the
+      # lib. The sibling layout above resolves the runner's
+      # `../../qontinui-schemas/rust` path dep to THIS PR's schema.
+      - name: cargo check qontinui-runner (all targets) against proposed schema
+        if: steps.gate.outputs.run_gate == 'true'
+        working-directory: qontinui-runner
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/target-consumer-check
+        run: cargo check --workspace --all-targets
