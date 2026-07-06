@@ -94,6 +94,32 @@ jobs:
             libatspi2.0-dev \
             at-spi2-core
 
+      # The runner workspace's peak compile memory exceeds the hosted
+      # runner's 16 GB — without paging headroom the OOM-killer takes the
+      # runner agent down ("shutdown signal … exit code 143"), which is
+      # exactly how this gate's first self-test died. Both steps copied
+      # verbatim from qontinui-runner's own ci.yml, which needs them to
+      # build this same workspace.
+      - name: Free disk space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: false
+
+      - name: Add swapfile (guard against link-time OOM)
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
