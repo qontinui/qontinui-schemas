@@ -1,0 +1,132 @@
+name: runner-consumer-check
+
+# Cross-repo consumer-compile gate: `cargo check` the sibling qontinui-runner
+# against THIS PR's schemas.
+#
+# WHY THIS EXISTS (fleet-fresh incident, 2026-07-05): qontinui-runner builds
+# qontinui-types via a path dependency on this repo. A schemas PR that adds a
+# struct field or enum variant passes every schemas-side check (rust-ci
+# compiles only this crate; schema-drift compiles only the runner's
+# export_schemas binary, which doesn't include the consumer modules) — and
+# then reds qontinui-runner main the moment it lands, because the runner's
+# HAND-WRITTEN consumers (exhaustive struct literals in database/pg/apps.rs,
+# exhaustive AppError matches in spec_api/) no longer compile. schemas v0.8.0
+# landed exactly this way and wedged the entire runner merge train (8 green
+# PRs) for 60 hours behind coord's unconditional MainRed gate.
+#
+# WHAT IT CHECKS: the full runner workspace (`--workspace --all-targets`,
+# including test targets — test-code breaks red runner CI just the same)
+# compiled against the PR's checkout of this repo via the existing path dep.
+#
+# SIBLING-BRANCH FALLBACK: a types change that NEEDS a runner catch-up can't
+# compile against runner main by definition. So the gate first looks for a
+# qontinui-runner branch with the SAME NAME as this PR's head branch and
+# checks against that when it exists — a coordinated pair (schemas feat/x +
+# runner feat/x) goes green together, and coord's downstream-of ordering
+# lands the runner catch-up right after the schemas change, shrinking the
+# red-main window to one CI cycle. No same-named branch → checked against
+# runner main → a breaking change fails HERE, before it can wedge the fleet,
+# with instructions to create the catch-up branch.
+#
+# Setup steps (Tauri deps, dist stub, sibling layout) mirror
+# schema-drift.yml — the runner's build.rs needs them even for `cargo check`.
+
+on:
+  pull_request:
+    paths:
+      - "rust/**"
+      - "rust-vision-core/**"
+      - "code-graph/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/runner-consumer-check.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: runner-consumer-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  consumer-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qontinui-schemas (PR head)
+        uses: actions/checkout@v5
+        with:
+          path: qontinui-schemas
+
+      # Prefer a runner branch named like this PR's head branch (coordinated
+      # catch-up); fall back to main. `github.head_ref` is empty on
+      # workflow_dispatch — falls back to main there too.
+      - name: Resolve sibling qontinui-runner ref
+        id: runner-ref
+        run: |
+          REF="main"
+          if [ -n "${{ github.head_ref }}" ] && \
+             git ls-remote --exit-code --heads \
+               https://github.com/qontinui/qontinui-runner.git \
+               "refs/heads/${{ github.head_ref }}" >/dev/null 2>&1; then
+            REF="${{ github.head_ref }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Checking qontinui-runner @ $REF against this PR's schemas"
+
+      - name: Checkout qontinui-runner (sibling)
+        uses: actions/checkout@v5
+        with:
+          repository: qontinui/qontinui-runner
+          ref: ${{ steps.runner-ref.outputs.ref }}
+          path: qontinui-runner
+
+      - name: Install Tauri Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: qontinui-runner
+          # Keyed per sibling ref so a main-fallback cache isn't poisoned by
+          # a feature-branch build and vice versa.
+          key: consumer-${{ steps.runner-ref.outputs.ref }}
+
+      # tauri_build::build() panics if frontendDist ("../dist") is missing.
+      # We never run the app — an empty stub satisfies the build script.
+      - name: Stub qontinui-runner frontend dist
+        run: |
+          mkdir -p qontinui-runner/dist
+          printf '<!DOCTYPE html><html><head></head><body>consumer-check CI stub</body></html>\n' > qontinui-runner/dist/index.html
+
+      - name: cargo check runner workspace against PR schemas
+        working-directory: qontinui-runner
+        run: cargo check --workspace --all-targets
+
+      - name: Explain failure
+        if: failure()
+        run: |
+          echo "::error::qontinui-runner (@ ${{ steps.runner-ref.outputs.ref }}) does not compile against this PR's schemas."
+          echo ""
+          echo "This schemas change breaks qontinui-runner's hand-written consumers"
+          echo "(struct literals / exhaustive matches). If it landed as-is, runner main"
+          echo "would go red and wedge the runner merge train (see the 2026-07-05"
+          echo "fleet-fresh incident: 60h, 8 PRs blocked)."
+          echo ""
+          echo "Fix: push the runner-side catch-up to a qontinui-runner branch named"
+          echo "'${{ github.head_ref }}' — this gate will then check against that branch"
+          echo "and the pair goes green together. Order the landings with"
+          echo "coord:downstream-of so the catch-up lands immediately after this PR."
