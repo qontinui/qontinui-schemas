@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.8.0...rust-v0.9.0) (2026-07-06)
+
+
+### Features
+
+* **fleet-fresh:** P1a fields — add auto-fresh config to App schema ([aa38216](https://github.com/qontinui/qontinui-schemas/commit/aa382168e2d27be9a50b64f7b3ac153339f6a97e))
+* **fleet-fresh:** RegisterAppRequest::new() constructor + fix test literal ([32edc97](https://github.com/qontinui/qontinui-schemas/commit/32edc97030a42d0b411c963615aca594a0b04345))
+* **fleet-fresh:** validate_update_strategy + InvalidUpdateStrategy variant ([9482f81](https://github.com/qontinui/qontinui-schemas/commit/9482f8174a769f2cc31e15c27ee0d9ffd39dc80c))
+
 ## [0.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.7.0...rust-v0.8.0) (2026-07-02)
 
 
