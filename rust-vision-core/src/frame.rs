@@ -74,25 +74,69 @@ pub enum FrameSourceKind {
 }
 
 /// A pixel-space rectangle.
+///
+/// The ORIGIN (`x`, `y`) is **signed**: a UI element can legitimately sit
+/// left of / above the viewport origin — `getBoundingClientRect()` returns
+/// negative coordinates for anything scrolled or positioned off-screen, and
+/// a multi-monitor virtual desktop places secondary displays at negative
+/// coordinates. Storing the origin unsigned forced every producer to clamp
+/// at 0, which silently reported every off-screen element as sitting flush
+/// against the viewport edge and destroyed the information an analyzer needs
+/// to reason about clipping, overflow, and off-screen placement.
+///
+/// The EXTENT (`w`, `h`) stays **unsigned**: a negative width or height is
+/// meaningless, so `u32` makes it unrepresentable rather than merely invalid
+/// — no producer can construct one and no consumer has to defend against it.
+///
+/// A region whose origin is negative therefore describes real geometry that
+/// lies (partly or wholly) outside the frame. Pixel-sampling consumers must
+/// intersect with the frame before indexing — see [`Region::clamp_to_frame`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Region {
-    pub x: u32,
-    pub y: u32,
+    pub x: i32,
+    pub y: i32,
     pub w: u32,
     pub h: u32,
 }
 
 impl Region {
+    /// Exclusive right edge. Widened to `i64` so `x + w` can never overflow
+    /// for any representable `Region`.
+    pub fn right(&self) -> i64 {
+        self.x as i64 + self.w as i64
+    }
+
+    /// Exclusive bottom edge. Widened to `i64` — see [`Region::right`].
+    pub fn bottom(&self) -> i64 {
+        self.y as i64 + self.h as i64
+    }
+
     /// True iff this region lies entirely within a `width × height` frame.
+    /// A negative origin is out of bounds by definition.
     pub fn fits_in(&self, width: u32, height: u32) -> bool {
-        self.x
-            .checked_add(self.w)
-            .map(|right| right <= width)
-            .unwrap_or(false)
-            && self
-                .y
-                .checked_add(self.h)
-                .map(|bottom| bottom <= height)
-                .unwrap_or(false)
+        self.x >= 0 && self.y >= 0 && self.right() <= width as i64 && self.bottom() <= height as i64
+    }
+
+    /// The portion of this region that lies inside a `width × height` frame,
+    /// as unsigned pixel indices ready for buffer access. `None` when the
+    /// region is entirely outside the frame (including the wholly-negative
+    /// case) or has zero area after clamping.
+    ///
+    /// This is the ONE place a signed region is narrowed to buffer indices;
+    /// pixel-sampling code should call it rather than casting by hand.
+    pub fn clamp_to_frame(&self, width: u32, height: u32) -> Option<(u32, u32, u32, u32)> {
+        let left = self.x.max(0) as i64;
+        let top = self.y.max(0) as i64;
+        let right = self.right().min(width as i64);
+        let bottom = self.bottom().min(height as i64);
+        if right <= left || bottom <= top {
+            return None;
+        }
+        Some((
+            left as u32,
+            top as u32,
+            (right - left) as u32,
+            (bottom - top) as u32,
+        ))
     }
 }

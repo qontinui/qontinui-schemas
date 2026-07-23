@@ -121,41 +121,35 @@ impl Rgb {
 /// [`Region::fits_in`] which checks against frame dimensions — this is
 /// "does element B fully nest inside element A".
 pub fn region_contains(outer: Region, inner: Region) -> bool {
-    let inner_right = inner.x.saturating_add(inner.w);
-    let inner_bottom = inner.y.saturating_add(inner.h);
-    let outer_right = outer.x.saturating_add(outer.w);
-    let outer_bottom = outer.y.saturating_add(outer.h);
     inner.x >= outer.x
         && inner.y >= outer.y
-        && inner_right <= outer_right
-        && inner_bottom <= outer_bottom
+        && inner.right() <= outer.right()
+        && inner.bottom() <= outer.bottom()
 }
 
 /// Whether two regions intersect at all (any pixel overlap).
 pub fn regions_overlap(a: Region, b: Region) -> bool {
-    let a_right = a.x.saturating_add(a.w);
-    let a_bottom = a.y.saturating_add(a.h);
-    let b_right = b.x.saturating_add(b.w);
-    let b_bottom = b.y.saturating_add(b.h);
-    a.x < b_right && b.x < a_right && a.y < b_bottom && b.y < a_bottom
+    (a.x as i64) < b.right()
+        && (b.x as i64) < a.right()
+        && (a.y as i64) < b.bottom()
+        && (b.y as i64) < a.bottom()
 }
 
 /// Compute the intersection of two regions, if any.
 pub fn intersection(a: Region, b: Region) -> Option<Region> {
-    let a_right = a.x.saturating_add(a.w);
-    let a_bottom = a.y.saturating_add(a.h);
-    let b_right = b.x.saturating_add(b.w);
-    let b_bottom = b.y.saturating_add(b.h);
-    let x = a.x.max(b.x);
-    let y = a.y.max(b.y);
-    let right = a_right.min(b_right);
-    let bottom = a_bottom.min(b_bottom);
+    let x = a.x.max(b.x) as i64;
+    let y = a.y.max(b.y) as i64;
+    let right = a.right().min(b.right());
+    let bottom = a.bottom().min(b.bottom());
     if x < right && y < bottom {
         Some(Region {
-            x,
-            y,
-            w: right - x,
-            h: bottom - y,
+            // `x`/`y` are the max of two `i32`s, so they fit back in `i32`;
+            // `right - x` / `bottom - y` are positive and bounded by the
+            // smaller of the two extents, so they fit in `u32`.
+            x: x as i32,
+            y: y as i32,
+            w: (right - x) as u32,
+            h: (bottom - y) as u32,
         })
     } else {
         None
@@ -166,7 +160,7 @@ pub fn intersection(a: Region, b: Region) -> Option<Region> {
 mod tests {
     use super::*;
 
-    fn region(x: u32, y: u32, w: u32, h: u32) -> Region {
+    fn region(x: i32, y: i32, w: u32, h: u32) -> Region {
         Region { x, y, w, h }
     }
 
@@ -216,6 +210,96 @@ mod tests {
     #[test]
     fn intersection_disjoint() {
         assert!(intersection(region(0, 0, 5, 5), region(10, 10, 5, 5)).is_none());
+    }
+
+    // ---------------------------------------------------------------
+    // Signed origin. `getBoundingClientRect()` returns negative x/y for any
+    // element scrolled or positioned off the top/left of the viewport. Before
+    // the origin was widened to i32, producers had to clamp those to 0, which
+    // reported every off-screen element as flush against the viewport edge.
+    // These tests pin the TRUE coordinate surviving the wire round-trip and
+    // the geometry helpers behaving correctly across the origin.
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn negative_origin_survives_json_round_trip() {
+        // Exactly what a `left: -9999px` a11y-hidden node measures as.
+        let json = r#"{"id":"offscreen","bbox":{"x":-9999,"y":-48,"w":120,"h":32}}"#;
+        let el: Element = serde_json::from_str(json).expect("negative origin must deserialize");
+        let bbox = el.bbox.expect("bbox present");
+        assert_eq!(
+            bbox.x, -9999,
+            "true negative x must survive, not clamp to 0"
+        );
+        assert_eq!(bbox.y, -48, "true negative y must survive, not clamp to 0");
+        assert_eq!(bbox.w, 120);
+        assert_eq!(bbox.h, 32);
+
+        // ...and re-serializes verbatim, so a snapshot can be persisted and
+        // re-read without drifting toward the origin.
+        let re = serde_json::to_string(&bbox).unwrap();
+        let back: Region = serde_json::from_str(&re).unwrap();
+        assert_eq!(back, bbox);
+    }
+
+    #[test]
+    fn negative_extent_is_unrepresentable() {
+        // `w`/`h` stay unsigned on purpose: a negative extent is meaningless,
+        // so the type rejects it rather than a consumer having to defend.
+        let json = r#"{"x":0,"y":0,"w":-5,"h":10}"#;
+        assert!(serde_json::from_str::<Region>(json).is_err());
+    }
+
+    #[test]
+    fn geometry_helpers_work_across_the_origin() {
+        // A sticky header scrolled half off the top: y = -20, h = 40.
+        let partly_offscreen = region(-20, -20, 40, 40);
+        let viewport_corner = region(0, 0, 100, 100);
+        assert!(regions_overlap(partly_offscreen, viewport_corner));
+        let i = intersection(partly_offscreen, viewport_corner).unwrap();
+        assert_eq!(i, region(0, 0, 20, 20));
+
+        // Wholly off-screen: no overlap with the viewport at all. Under the
+        // old clamped encoding this collapsed to (0,0) and produced a
+        // spurious overlap against every top-left element.
+        let wholly_offscreen = region(-9999, -9999, 120, 32);
+        assert!(!regions_overlap(wholly_offscreen, viewport_corner));
+        assert!(intersection(wholly_offscreen, viewport_corner).is_none());
+
+        // Containment across the origin: an off-canvas drawer contains its
+        // own child even though both sit at negative coordinates.
+        assert!(region_contains(
+            region(-200, -100, 300, 200),
+            region(-150, -50, 50, 50)
+        ));
+        assert!(!region_contains(
+            region(-200, -100, 300, 200),
+            region(-250, -50, 50, 50)
+        ));
+    }
+
+    #[test]
+    fn fits_in_rejects_negative_origin() {
+        assert!(region(0, 0, 10, 10).fits_in(100, 100));
+        assert!(!region(-1, 0, 10, 10).fits_in(100, 100));
+        assert!(!region(0, -1, 10, 10).fits_in(100, 100));
+    }
+
+    #[test]
+    fn clamp_to_frame_narrows_signed_origin_to_buffer_indices() {
+        // Straddling the origin -> the in-frame part only.
+        assert_eq!(
+            region(-20, -10, 40, 40).clamp_to_frame(100, 100),
+            Some((0, 0, 20, 30))
+        );
+        // Wholly outside -> nothing to sample.
+        assert_eq!(region(-9999, -9999, 120, 32).clamp_to_frame(100, 100), None);
+        assert_eq!(region(200, 0, 10, 10).clamp_to_frame(100, 100), None);
+        // Fully inside -> unchanged.
+        assert_eq!(
+            region(10, 10, 5, 5).clamp_to_frame(100, 100),
+            Some((10, 10, 5, 5))
+        );
     }
 
     #[test]

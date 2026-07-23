@@ -201,14 +201,23 @@ fn crop_region(frame: Frame, region: Region) -> Result<Frame, VisionError> {
             frame: (frame.width, frame.height),
         });
     }
+    // `fits_in` also rejects a negative origin — a crop must name a rectangle
+    // wholly inside the frame, so the clamp below is a pure narrowing.
     if !region.fits_in(frame.width, frame.height) {
         return Err(VisionError::CropOutOfBounds {
             region,
             frame: (frame.width, frame.height),
         });
     }
+    let (cx, cy, cw, ch) =
+        region
+            .clamp_to_frame(frame.width, frame.height)
+            .ok_or(VisionError::CropOutOfBounds {
+                region,
+                frame: (frame.width, frame.height),
+            })?;
     let dyn_img = DynamicImage::ImageRgba8(frame.buffer);
-    let cropped = dyn_img.crop_imm(region.x, region.y, region.w, region.h);
+    let cropped = dyn_img.crop_imm(cx, cy, cw, ch);
     let rgba = cropped.to_rgba8();
     Ok(Frame::from_rgba(rgba, frame.source))
 }
@@ -303,13 +312,16 @@ fn annotate(mut frame: Frame, annotations: Vec<Annotation>) -> Result<Frame, Vis
 
 fn draw_rect_outline(buf: &mut RgbaImage, region: Region, color: [u8; 4], thickness: u32) {
     let (w, h) = buf.dimensions();
-    if region.w == 0 || region.h == 0 || thickness == 0 {
+    if thickness == 0 {
         return;
     }
-    let x0 = region.x.min(w);
-    let y0 = region.y.min(h);
-    let x1 = region.x.saturating_add(region.w).min(w);
-    let y1 = region.y.saturating_add(region.h).min(h);
+    // Signed origin -> in-buffer indices. `None` = nothing visible to draw
+    // (zero-area or wholly outside the buffer).
+    let Some((x0, y0, cw, ch)) = region.clamp_to_frame(w, h) else {
+        return;
+    };
+    let x1 = x0 + cw;
+    let y1 = y0 + ch;
     let px = image::Rgba(color);
     let t = thickness;
     // Top + bottom edges
@@ -338,10 +350,11 @@ fn draw_rect_outline(buf: &mut RgbaImage, region: Region, color: [u8; 4], thickn
 
 fn fill_rect(buf: &mut RgbaImage, region: Region, color: [u8; 4]) {
     let (w, h) = buf.dimensions();
-    let x0 = region.x.min(w);
-    let y0 = region.y.min(h);
-    let x1 = region.x.saturating_add(region.w).min(w);
-    let y1 = region.y.saturating_add(region.h).min(h);
+    let Some((x0, y0, cw, ch)) = region.clamp_to_frame(w, h) else {
+        return;
+    };
+    let x1 = x0 + cw;
+    let y1 = y0 + ch;
     let px = image::Rgba(color);
     for y in y0..y1 {
         for x in x0..x1 {
@@ -352,10 +365,14 @@ fn fill_rect(buf: &mut RgbaImage, region: Region, color: [u8; 4]) {
 
 fn redact(mut frame: Frame, regions: Vec<RedactRegion>) -> Result<Frame, VisionError> {
     for r in regions {
-        if !r.region.fits_in(frame.width, frame.height) {
-            // Clamp to bounds rather than error: redact is best-effort.
-            continue;
-        }
+        // Redact is best-effort and CLAMPS rather than erroring — each op
+        // below narrows the (signed) region to the in-frame part via
+        // `Region::clamp_to_frame` and no-ops when nothing is in frame.
+        //
+        // This used to `continue` on `!fits_in(..)`, which meant a redact
+        // region straddling a frame edge — exactly what a partially
+        // off-viewport element produces — redacted NOTHING and leaked the
+        // in-frame pixels it was asked to hide.
         match r.kind {
             RedactKind::Fill(color) => {
                 fill_rect(&mut frame.buffer, r.region, color);
@@ -372,31 +389,35 @@ fn redact(mut frame: Frame, regions: Vec<RedactRegion>) -> Result<Frame, VisionE
 }
 
 fn blur_region(buf: &mut RgbaImage, region: Region, sigma: f32) {
-    if region.w == 0 || region.h == 0 {
+    let (bw, bh) = buf.dimensions();
+    let Some((rx, ry, rw, rh)) = region.clamp_to_frame(bw, bh) else {
         return;
-    }
-    let dyn_img =
-        DynamicImage::ImageRgba8(buf.view(region.x, region.y, region.w, region.h).to_image());
+    };
+    let dyn_img = DynamicImage::ImageRgba8(buf.view(rx, ry, rw, rh).to_image());
     let blurred = dyn_img.blur(sigma.max(0.5));
     let blurred_rgba = blurred.to_rgba8();
     for (sx, sy, px) in blurred_rgba.enumerate_pixels() {
-        buf.put_pixel(region.x + sx, region.y + sy, *px);
+        buf.put_pixel(rx + sx, ry + sy, *px);
     }
 }
 
 fn pixelate_region(buf: &mut RgbaImage, region: Region, block_size: u32) {
-    if region.w == 0 || region.h == 0 || block_size == 0 {
+    if block_size == 0 {
         return;
     }
-    let sub = buf.view(region.x, region.y, region.w, region.h).to_image();
-    let small_w = (region.w / block_size).max(1);
-    let small_h = (region.h / block_size).max(1);
+    let (bw, bh) = buf.dimensions();
+    let Some((rx, ry, rw, rh)) = region.clamp_to_frame(bw, bh) else {
+        return;
+    };
+    let sub = buf.view(rx, ry, rw, rh).to_image();
+    let small_w = (rw / block_size).max(1);
+    let small_h = (rh / block_size).max(1);
     let dyn_img = DynamicImage::ImageRgba8(sub);
     let small = dyn_img.resize_exact(small_w, small_h, image::imageops::FilterType::Triangle);
-    let large = small.resize_exact(region.w, region.h, image::imageops::FilterType::Nearest);
+    let large = small.resize_exact(rw, rh, image::imageops::FilterType::Nearest);
     let large_rgba = large.to_rgba8();
     for (sx, sy, px) in large_rgba.enumerate_pixels() {
-        buf.put_pixel(region.x + sx, region.y + sy, *px);
+        buf.put_pixel(rx + sx, ry + sy, *px);
     }
 }
 
@@ -717,6 +738,79 @@ mod tests {
         let results = multi_run(frame, vec![("a".to_string(), p_a), ("b".to_string(), p_b)]);
         for (name, r) in &results {
             assert!(r.is_ok(), "{name} should succeed: {r:?}");
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Signed `Region` origin (i32). A region may straddle or sit entirely
+    // outside the frame; crop REJECTS such a region, redact/annotate CLAMP
+    // to the in-frame part.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn crop_rejects_a_negative_origin() {
+        let frame = _test_frame_from_color(16, 16, [0xFF, 0x00, 0x00, 0xFF]);
+        let err = crop_region(
+            frame,
+            Region {
+                x: -4,
+                y: 0,
+                w: 8,
+                h: 8,
+            },
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, VisionError::CropOutOfBounds { .. }),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn redact_fill_clamps_a_straddling_region_instead_of_skipping_it() {
+        // Regression: this used to `continue` on `!fits_in(..)`, so a redact
+        // region hanging off the frame edge redacted NOTHING and leaked the
+        // in-frame pixels it was asked to hide.
+        let frame = _test_frame_from_color(16, 16, [0xFF, 0x00, 0x00, 0xFF]);
+        let out = redact(
+            frame,
+            vec![RedactRegion {
+                region: Region {
+                    x: -8,
+                    y: -8,
+                    w: 16,
+                    h: 16,
+                },
+                kind: RedactKind::Fill([0x00, 0x00, 0x00, 0xFF]),
+            }],
+        )
+        .unwrap();
+        // The in-frame quadrant (0,0)-(8,8) is blacked out...
+        assert_eq!(out.buffer.get_pixel(0, 0).0, [0x00, 0x00, 0x00, 0xFF]);
+        assert_eq!(out.buffer.get_pixel(7, 7).0, [0x00, 0x00, 0x00, 0xFF]);
+        // ...and nothing outside it was touched.
+        assert_eq!(out.buffer.get_pixel(8, 8).0, [0xFF, 0x00, 0x00, 0xFF]);
+        assert_eq!(out.buffer.get_pixel(15, 15).0, [0xFF, 0x00, 0x00, 0xFF]);
+    }
+
+    #[test]
+    fn redact_fill_on_a_wholly_offscreen_region_is_a_no_op() {
+        let frame = _test_frame_from_color(8, 8, [0xFF, 0x00, 0x00, 0xFF]);
+        let out = redact(
+            frame,
+            vec![RedactRegion {
+                region: Region {
+                    x: -100,
+                    y: -100,
+                    w: 16,
+                    h: 16,
+                },
+                kind: RedactKind::Fill([0x00, 0x00, 0x00, 0xFF]),
+            }],
+        )
+        .unwrap();
+        for px in out.buffer.pixels() {
+            assert_eq!(px.0, [0xFF, 0x00, 0x00, 0xFF]);
         }
     }
 }
