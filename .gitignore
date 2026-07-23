@@ -35,6 +35,14 @@ env/
 *.swo
 *~
 
+# Runner-provisioned agent scaffolding. On every agent spawn the runner copies
+# qontinui-claude-config/.claude/agents/*.md into each worktree's .claude/agents/
+# so named subagents resolve. It is machine state, never source — but because it
+# is untracked it makes `git status` report every agent worktree dirty, which
+# trips the worktree-reclaim G1 "never remove a dirty worktree" gate and blocks
+# reclaim. Matches qontinui-runner and qontinui-web, which already ignore it.
+.claude/
+
 # Testing
 .pytest_cache/
 .coverage
