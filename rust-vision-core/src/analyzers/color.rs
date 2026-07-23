@@ -124,11 +124,13 @@ pub fn sample_dominant_two(frame: &Frame, region: Region) -> Option<(Rgb, Rgb)> 
     if region.w == 0 || region.h == 0 {
         return None;
     }
-    let region = clamp_region(region, frame.width, frame.height)?;
+    // The region's origin is signed and may sit outside the frame; narrow to
+    // in-frame buffer indices before sampling. `None` = nothing to sample.
+    let (rx, ry, rw, rh) = region.clamp_to_frame(frame.width, frame.height)?;
 
     let mut hist: BTreeMap<u16, u32> = BTreeMap::new();
-    for y in region.y..(region.y + region.h) {
-        for x in region.x..(region.x + region.w) {
+    for y in ry..(ry + rh) {
+        for x in rx..(rx + rw) {
             let p = frame.buffer.get_pixel(x, y).0;
             let key = quantize_rgb(p[0], p[1], p[2]);
             *hist.entry(key).or_default() += 1;
@@ -164,21 +166,6 @@ fn dequantize_rgb(q: u16) -> Rgb {
         (g << 3) | (g >> 2),
         (b << 3) | (b >> 2),
     )
-}
-
-fn clamp_region(r: Region, fw: u32, fh: u32) -> Option<Region> {
-    if r.x >= fw || r.y >= fh {
-        return None;
-    }
-    let x = r.x;
-    let y = r.y;
-    let w = r.w.min(fw - x);
-    let h = r.h.min(fh - y);
-    if w == 0 || h == 0 {
-        None
-    } else {
-        Some(Region { x, y, w, h })
-    }
 }
 
 #[cfg(test)]
@@ -227,6 +214,39 @@ mod tests {
         )
         .unwrap();
         assert!(p.r >= 0x78 && p.r <= 0x88);
+    }
+
+    #[test]
+    fn sample_wholly_offscreen_region_returns_none() {
+        // A negative-origin region no longer aliases onto (0,0) — it samples
+        // nothing, because none of it is inside the frame.
+        let f = solid_frame(10, 10, [0xff, 0, 0, 0xff]);
+        assert!(sample_dominant_two(
+            &f,
+            Region {
+                x: -100,
+                y: -100,
+                w: 20,
+                h: 20,
+            },
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn sample_partly_offscreen_region_samples_the_visible_part() {
+        let f = solid_frame(10, 10, [0x40, 0x80, 0xc0, 0xff]);
+        let (p, _) = sample_dominant_two(
+            &f,
+            Region {
+                x: -5,
+                y: -5,
+                w: 10,
+                h: 10,
+            },
+        )
+        .unwrap();
+        assert!(p.r >= 0x38 && p.r <= 0x48);
     }
 
     #[test]

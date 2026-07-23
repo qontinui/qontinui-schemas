@@ -32,6 +32,7 @@ analyzer_corpus/
 │   ├── 003-tiny-target.json
 │   ├── 004-no-clipping-pass.json
 │   ├── 005-clipping-fail.json
+│   ├── 006-offscreen-negative-origin.json
 │   └── …
 └── golden/                      Expected analyzer outputs, paired by stem
     ├── 001-overlap.json

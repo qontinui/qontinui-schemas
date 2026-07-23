@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "Off-viewport elements with TRUE negative origins, exactly as a web",
+    "`getBoundingClientRect()` capture measures them. `Region.x`/`Region.y`",
+    "are i32, so this snapshot deserializes with its real coordinates.",
+    "",
+    "Before the origin was widened to i32, producers had to clamp x/y to 0.",
+    "That collapsed every off-screen node onto the viewport origin, where it",
+    "then fabricated `overlap` findings against whatever genuinely lives at",
+    "the top-left — the exact regression this fixture pins.",
+    "",
+    "`skip-link` and `sr-only` are `left:-9999px` a11y nodes; `drawer` is an",
+    "off-canvas panel; `sticky-header` is scrolled half off the top so it",
+    "straddles the origin and DOES really overlap `page-title`."
+  ],
+  "elements": [
+    {
+      "id": "skip-link",
+      "bbox": { "x": -9999, "y": 0, "w": 120, "h": 32 },
+      "text": "Skip to content",
+      "role": "link",
+      "interactable": true
+    },
+    {
+      "id": "sr-only",
+      "bbox": { "x": -9999, "y": 40, "w": 120, "h": 32 },
+      "text": "Navigation landmark",
+      "role": "link",
+      "interactable": true
+    },
+    {
+      "id": "drawer",
+      "bbox": { "x": -320, "y": 0, "w": 320, "h": 800 },
+      "text": "Menu",
+      "role": "navigation",
+      "interactable": true
+    },
+    {
+      "id": "sticky-header",
+      "bbox": { "x": 0, "y": -24, "w": 1280, "h": 60 },
+      "text": "Qontinui",
+      "role": "banner",
+      "interactable": true
+    },
+    {
+      "id": "page-title",
+      "bbox": { "x": 24, "y": 20, "w": 400, "h": 40 },
+      "text": "Dashboard",
+      "interactable": true
+    }
+  ]
+}

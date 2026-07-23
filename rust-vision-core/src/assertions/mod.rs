@@ -360,8 +360,10 @@ fn eval_no_overlap(
 fn inset_region(r: Region, inset: u32) -> Region {
     let inset = inset.min(r.w / 2).min(r.h / 2);
     Region {
-        x: r.x + inset,
-        y: r.y + inset,
+        // `inset` is bounded by half the extent, so it always fits in i32 and
+        // the shifted origin stays within i32 for any real bbox.
+        x: r.x.saturating_add(inset as i32),
+        y: r.y.saturating_add(inset as i32),
         w: r.w.saturating_sub(2 * inset),
         h: r.h.saturating_sub(2 * inset),
     }
@@ -560,7 +562,7 @@ fn eval_aligned(
         return AssertionResult::pass_with(assertion, "fewer than 2 elements — vacuously aligned");
     }
     let tol = tolerance_px.unwrap_or(2);
-    let mut values: Vec<(String, u32)> = Vec::with_capacity(elements.len());
+    let mut values: Vec<(String, i32)> = Vec::with_capacity(elements.len());
     for id in &elements {
         let el = match snap.get(id) {
             Some(e) => e,
@@ -583,7 +585,9 @@ fn eval_aligned(
     }
     let min = values.iter().map(|(_, v)| *v).min().unwrap();
     let max = values.iter().map(|(_, v)| *v).max().unwrap();
-    let drift = max - min;
+    // `abs_diff` rather than `max - min`: the axis values are signed now, and
+    // a spread across the origin would overflow a plain i32 subtraction.
+    let drift = max.abs_diff(min);
     if drift > tol {
         let worst = values.iter().max_by_key(|(_, v)| v.abs_diff(min)).unwrap();
         AssertionResult::fail(
@@ -904,7 +908,7 @@ mod tests {
     use super::*;
     use crate::element_snapshot::Element;
 
-    fn el(id: &str, x: u32, y: u32, w: u32, h: u32) -> Element {
+    fn el(id: &str, x: i32, y: i32, w: u32, h: u32) -> Element {
         Element {
             id: id.into(),
             bbox: Some(Region { x, y, w, h }),

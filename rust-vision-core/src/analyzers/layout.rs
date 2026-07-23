@@ -72,7 +72,7 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     // 3. Alignment groups: when 3+ elements share a near-horizontal y but
     // differ by 1-2 px, the +/- jitter is usually a layout bug. Only
     // positioned elements participate.
-    let mut sorted_y: Vec<(&_, u32)> = snapshot
+    let mut sorted_y: Vec<(&_, i32)> = snapshot
         .elements
         .iter()
         .filter_map(|e| e.bbox.map(|b| (e, b.y)))
@@ -88,19 +88,21 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         }
         let group = &sorted_y[i..j];
         if group.len() >= 3 {
-            // Drift = max - min within the group.
+            // Drift = spread within the group. `abs_diff` on the signed
+            // baselines yields the u32 pixel jitter and can't overflow even
+            // for a group that straddles the (now-signed) origin.
             let min = group.iter().map(|(_, y)| *y).min().unwrap();
             let max = group.iter().map(|(_, y)| *y).max().unwrap();
-            if max - min > 0 {
+            let jitter = max.abs_diff(min);
+            if jitter > 0 {
                 let ids: Vec<String> = group.iter().map(|(e, _)| e.id.clone()).collect();
                 findings.push(
                     Finding::new(
                         "alignment_jitter",
                         Severity::Info,
                         format!(
-                            "{} elements share a near-y baseline with {}px jitter",
+                            "{} elements share a near-y baseline with {jitter}px jitter",
                             group.len(),
-                            max - min
                         ),
                     )
                     .with_elements(ids),
@@ -119,7 +121,7 @@ mod tests {
     use crate::element_snapshot::Element;
     use crate::frame::Region;
 
-    fn el(id: &str, x: u32, y: u32, w: u32, h: u32, interactable: bool) -> Element {
+    fn el(id: &str, x: i32, y: i32, w: u32, h: u32, interactable: bool) -> Element {
         Element {
             id: id.to_string(),
             bbox: Some(Region { x, y, w, h }),
@@ -177,6 +179,26 @@ mod tests {
         };
         let findings = run(&snap);
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
+    }
+
+    #[test]
+    fn offscreen_elements_do_not_fabricate_overlaps() {
+        // Two a11y-hidden nodes parked at `left: -9999px`, plus a real
+        // on-screen button. Under the old clamped-to-0 encoding all three
+        // collapsed onto the viewport origin and reported as mutually
+        // overlapping; with a signed origin they are correctly disjoint.
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("skip-link", -9999, 0, 120, 32, true),
+                el("sr-only", -9999, 40, 120, 32, true),
+                el("real-button", 10, 10, 100, 40, true),
+            ],
+        };
+        let findings = run(&snap);
+        assert!(
+            !findings.iter().any(|f| f.kind == "overlap"),
+            "off-screen elements must not overlap each other or on-screen ones: {findings:?}"
+        );
     }
 
     fn el_no_bbox(id: &str, interactable: bool) -> Element {
