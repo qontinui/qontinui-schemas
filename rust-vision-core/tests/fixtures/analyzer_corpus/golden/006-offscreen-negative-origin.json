@@ -1,0 +1,55 @@
+{
+  "_comment": [
+    "Pins the SIGNED-ORIGIN contract end-to-end: the frame JSON on disk holds",
+    "true negative x/y, the analyzer deserializes them into `Region`'s i32",
+    "origin, and every expectation below flips if those coordinates are",
+    "clamped to 0 the way the old u32 origin forced producers to do.",
+    "",
+    "With a clamped origin the layout analyzer emits FIVE overlaps here (every",
+    "off-screen node collapses onto the viewport top-left); with the true",
+    "signed origin it emits exactly ONE — the sticky header that genuinely",
+    "straddles y=0 and covers the page title. Hence count_max: 1.",
+    "",
+    "Assertion discriminators (clamped verdict -> signed verdict):",
+    "  no_overlap[skip-link, drawer]        fail -> pass  (a11y node is really off-canvas)",
+    "  no_overlap[skip-link, page-title]    fail -> pass",
+    "  no_overlap[sticky-header, page-title] fail -> fail (a REAL overlap across y=0,",
+    "                                        proving negative y is used, not just tolerated)",
+    "  aligned_vertically[drawer, sticky-header] pass -> fail (x=-320 vs x=0 is a",
+    "                                        320px drift, invisible under clamping)"
+  ],
+  "analyzers": {
+    "layout": { "kinds": ["overlap"], "count_min": 1, "count_max": 1 },
+    "elements": { "kinds": [], "count_min": 0, "count_max": 1 }
+  },
+  "assertions": [
+    {
+      "assertion": {
+        "type": "no_overlap",
+        "elements": ["skip-link", "drawer"]
+      },
+      "expect_passed": true
+    },
+    {
+      "assertion": {
+        "type": "no_overlap",
+        "elements": ["skip-link", "page-title"]
+      },
+      "expect_passed": true
+    },
+    {
+      "assertion": {
+        "type": "no_overlap",
+        "elements": ["sticky-header", "page-title"]
+      },
+      "expect_passed": false
+    },
+    {
+      "assertion": {
+        "type": "aligned_vertically",
+        "elements": ["drawer", "sticky-header"]
+      },
+      "expect_passed": false
+    }
+  ]
+}

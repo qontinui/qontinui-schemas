@@ -724,7 +724,7 @@ mod tests {
     fn snap_with_overlap() -> ElementSnapshot {
         // interactable: true — the layout analyzer only flags overlaps among
         // interactive elements.
-        let mk = |id: &str, x: u32| Element {
+        let mk = |id: &str, x: i32| Element {
             id: id.into(),
             bbox: Some(Region {
                 x,
@@ -771,7 +771,7 @@ mod tests {
     #[test]
     fn analyze_clean_snapshot_passes_fail_on() {
         // Two disjoint elements -> no overlap finding.
-        let mk = |id: &str, x: u32| Element {
+        let mk = |id: &str, x: i32| Element {
             id: id.into(),
             bbox: Some(Region {
                 x,
