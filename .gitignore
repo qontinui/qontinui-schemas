@@ -79,3 +79,19 @@ package-lock.json
 # `prepublishOnly` in ts/package.json also rebuilds for local publishes)
 ts/dist/
 *.tsbuildinfo
+
+# DO NOT add ts/src/generated or src/qontinui_schemas/generated here.
+#
+# They look like build artifacts and are not. Nothing regenerates them during
+# a build: publish.yml runs `npm ci && npm run build` with no codegen step,
+# and tracked sources throughout ts/src import from ./generated/. They are
+# build INPUTS, produced out-of-band by
+# qontinui-runner/src-tauri/scripts/generate_types.sh and committed.
+#
+# They are also the baseline that schema-drift.yml diffs a fresh regeneration
+# against. Untracked, that gate silently verifies nothing — which is exactly
+# what happened between 34709ada (2026-06-25) and this comment: the whole of
+# ts/src/generated was swept out of the index as collateral in an unrelated
+# commit, the TypeScript arm of the gate went vacuously green, and the
+# ts-v0.9.0 npm publish broke with TS2307 for three weeks before anyone
+# noticed.

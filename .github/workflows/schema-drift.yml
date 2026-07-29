@@ -110,8 +110,18 @@ jobs:
       # so the package must be installed locally (a global -g install
       # is not in Node ESM's default resolution path). package-lock.json
       # is .gitignore'd, so `npm install` (not `npm ci`) — fresh resolve
-      # from the registry each run. Acceptable here because the gate
-      # only cares whether codegen output diffs, not pinned dep versions.
+      # from the registry each run.
+      #
+      # That is only safe because both codegen deps are pinned EXACTLY (no
+      # caret) in qontinui-schemas/package.json: `json-schema-to-typescript`
+      # emits the .d.ts and `prettier` formats it, so either floating would
+      # surface every upstream release as fresh "drift" on PRs that changed
+      # nothing — the same reason datamodel-code-generator is pinned below.
+      # Until this change the TS side had no pin and it did not matter,
+      # because the TS arm of this gate was vacuously green. Now that it has
+      # signal, an unpinned generator would red every PR in both repos and
+      # read as "the new gate is broken" — which is how anti-vacuity guards
+      # get reverted. Bump deliberately, and regenerate in the same commit.
       - name: Install qontinui-schemas npm deps
         working-directory: qontinui-schemas
         run: npm install
@@ -142,6 +152,15 @@ jobs:
           mkdir -p qontinui-runner/dist
           printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
 
+      # generate_types.sh warns-and-skips instead of failing when node or
+      # datamodel-codegen is missing, leaving the working tree pristine — which
+      # would make every arm of the check below report a green it never
+      # verified. The arms verify the BASELINE; this verifies that the
+      # REGENERATION will actually happen. See the script for detail.
+      - name: Preflight — codegen toolchain present
+        working-directory: qontinui-schemas
+        run: bash scripts/check-generated-drift.sh --preflight
+
       # CARGO_TARGET_DIR override: qontinui-runner is a workspace (Cargo.toml
       # at the runner root declares [workspace] members = ["src-tauri", ...]),
       # so cargo's default target-dir is qontinui-runner/target/. But
@@ -155,14 +174,20 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
         run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
 
-      # Uploaded unconditionally so a red drift check hands the developer the
-      # exact bytes CI expected, instead of only a diff to reverse-engineer.
+      # Uploaded on failed runs too, so a red drift check hands the developer
+      # the exact bytes CI expected instead of only a diff to reverse-engineer.
       # Reproducing this output locally needs the full sibling-runner Rust
       # toolchain plus the pinned datamodel-codegen; downloading the artifact
-      # and committing it is the cheap path. `if: always()` matters — the
-      # artifact is most useful precisely on the runs that fail.
+      # and committing it is the cheap path.
+      #
+      # `!cancelled()` rather than `always()`: `always()` also runs during
+      # cancellation, and `continue-on-error` keeps a transient upload blip
+      # from reddening an otherwise-green gate. This artifact is purely
+      # diagnostic — it must never be the reason the gate fails, in either
+      # direction.
       - name: Upload regenerated bindings
-        if: always()
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: regenerated-bindings
@@ -174,105 +199,26 @@ jobs:
           # failure it is, not as a second, misleading upload failure.
           if-no-files-found: warn
 
-      # ── Anti-vacuity guard ─────────────────────────────────────────────
+      # The anti-vacuity guard. Implementation lives in this repo's
+      # scripts/check-generated-drift.sh, and qontinui-runner's mirror
+      # workflow (qontinui-types-drift.yml) invokes THE SAME FILE from the
+      # checkout it already makes of this repo.
       #
-      # `git diff` compares the working tree against the INDEX. It is blind
-      # to files git does not track. So if the checked-in bindings are ever
-      # swept out of the index, the regen step above recreates them as
-      # UNTRACKED files, the diff below reports nothing, and this job goes
-      # green having verified nothing at all.
+      # That is deliberate. The two workflows are one cross-repo contract, and
+      # a comment asking humans to keep them in step is not a mechanism — they
+      # diverged once inside a single change. Sharing the script makes the
+      # check travel on the same branch as the bindings it guards.
       #
-      # That is not hypothetical. `ts/src/generated` lost all 523 `.d.ts`
-      # files in 34709ada ("ci: add secret-scan caller") and its barrel
-      # `index.ts` in a95d51da ("Add auth_required and threshold config"),
-      # both as collateral in commits about something else — generate_types.sh
-      # `rm -f`s the directory before regenerating, so a partial local regen
-      # followed by a broad `git add`/`git commit -a` stages the deletions.
-      # Nothing in .gitignore covers the path; it was never a decision. From
-      # 2026-06-25 until this guard landed, the TypeScript arm of BOTH this
-      # workflow and qontinui-runner's `qontinui-types-drift.yml` was
-      # vacuously green. Only the Python arm (533 tracked files) carried
-      # signal.
-      #
-      # A gate that cannot go red is worse than no gate: it manufactures
-      # confidence. So arm 0 below asserts the baseline exists before the
-      # diff is trusted.
-      #
-      # All three arms live in ONE step on purpose. Split across steps they
-      # would each need `if: always()` to report independently, and that also
-      # makes them run after a FAILED regeneration, where every arm reports
-      # garbage that buries the real error. One step reports all three and
-      # still short-circuits correctly when the regen dies.
-      #
-      # `-I '^#   timestamp:'` ignores hunks whose only changed lines are the
-      # `# timestamp: <ISO-8601>` header that datamodel-codegen writes at
-      # the top of every generated Python file. Those timestamps update on
-      # every codegen run regardless of whether the schema content changed,
-      # so without this filter the workflow can never go green even on a
-      # repo with no real drift. Same trick `schema-pg-sql-fresh.yml` uses
-      # to ignore `-- Dumped by pg_dump version` header noise.
-      #
-      # Three arms, because `git diff` alone covers only one of the ways
-      # codegen output can move:
-      #   arm 0 (baseline)  — the checked-in copy exists at all. Without it
-      #                       arms 1 and 2 are both meaningless.
-      #   arm 1 (untracked) — a NEW type appears, so the regen writes a file
-      #                       git does not track and `git diff` cannot see.
-      #                       This arm also catches a repeat of the index
-      #                       sweep, one file at a time.
-      #   arm 2 (diff)      — an EXISTING file changed, or was deleted because
-      #                       its type was removed.
+      # Short version of what it does: `git diff` is blind to untracked files,
+      # so a gate that only diffs can be silenced by untracking its own
+      # baseline. That is exactly what happened — ts/src/generated was swept
+      # out of the index in 34709ada and this workflow's TypeScript arm was
+      # vacuously green from then until the change that added this script. So
+      # the script also asserts the baseline exists (arm 0) and looks for
+      # untracked regenerated output (arm 1), not just a diff (arm 2).
       - name: Check for drift
         working-directory: qontinui-schemas
-        run: |
-          set -uo pipefail
-          status=0
-
-          # arm 0 — baseline present?
-          for dir in ts/src/generated src/qontinui_schemas/generated; do
-            n="$(git ls-files -- "$dir" | wc -l)"
-            echo "baseline $dir: $n tracked file(s)"
-            if [ "$n" -eq 0 ]; then
-              echo "::error::$dir has ZERO tracked files, so the drift diff is vacuous."
-              echo "The generated bindings must be committed for this gate to have a baseline."
-              status=1
-            fi
-          done
-
-          # arm 1 — regenerated files that git is not tracking.
-          #
-          # Deliberately NOT `--exclude-standard`. A .gitignore rule covering
-          # only PART of a generated tree (say `*.d.ts`, leaving index.ts
-          # tracked) would defeat arm 0 and arm 1 simultaneously: arm 0 sees a
-          # non-zero tracked count and passes, and an ignore-respecting arm 1
-          # would skip exactly the ignored files. Listing ignored files too
-          # closes that hole. `__pycache__` is the one thing that can
-          # legitimately appear under these paths without being codegen output.
-          new_files="$(git ls-files --others -- \
-              ts/src/generated \
-              src/qontinui_schemas/generated \
-            | grep -v '/__pycache__/' || true)"
-          if [ -n "$new_files" ]; then
-            echo "::error::Regeneration produced generated files that are not checked in:"
-            printf '%s\n' "$new_files"
-            status=1
-          fi
-
-          # arm 2 — tracked files that changed or were deleted
-          if ! git diff --exit-code -I '^#   timestamp:' -- \
-              ts/src/generated \
-              src/qontinui_schemas/generated; then
-            echo "::error::Checked-in generated types differ from a fresh regeneration."
-            status=1
-          fi
-
-          if [ "$status" -ne 0 ]; then
-            echo "To fix: from a checkout with qontinui-runner as a sibling, run"
-            echo "  bash ../qontinui-runner/src-tauri/scripts/generate_types.sh"
-            echo "and commit the updated files. Or download this run's"
-            echo "'regenerated-bindings' artifact and commit its contents."
-          fi
-          exit "$status"
+        run: bash scripts/check-generated-drift.sh --verify
 
   # ------------------------------------------------------------------
   # check-consumers: downstream path-dep consumer compile gate.
