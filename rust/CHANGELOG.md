@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.0.0...rust-v1.1.0) (2026-07-29)
+
+
+### Features
+
+* add projects module — SavedProject registry and ProjectSnapshot view ([6ba7a07](https://github.com/qontinui/qontinui-schemas/commit/6ba7a077bc1c2121cfc7efe90a6798c0809ee3fb))
+
 ## [1.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v0.9.0...rust-v1.0.0) (2026-07-12)
 
 

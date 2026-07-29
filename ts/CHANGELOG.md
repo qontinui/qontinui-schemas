@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.9.0...ts-v0.10.0) (2026-07-29)
+
+
+### Features
+
+* add projects module — SavedProject registry and ProjectSnapshot view ([6ba7a07](https://github.com/qontinui/qontinui-schemas/commit/6ba7a077bc1c2121cfc7efe90a6798c0809ee3fb))
+
 ## [0.9.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.8.1...ts-v0.9.0) (2026-07-02)
 
 
