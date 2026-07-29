@@ -104,6 +104,12 @@ pub mod orchestration_config;
 /// `2026-06-13-functional-spec-contract.md`.
 pub mod priorities_profile;
 pub mod process_management;
+/// Project registry (`SavedProject`) + the joined Runner Projects Dashboard
+/// view (`ProjectSnapshot` and its `*Lite` members). Moved here from
+/// `qontinui-runner/src-tauri/src/settings.rs` when the 4-field runner-local
+/// struct grew to 16 and its hand-mirrored TS interface became a drift
+/// hazard. See `2026-07-24-runner-projects-dashboard.md` §4/§6.
+pub mod projects;
 pub mod rag;
 pub mod runner;
 pub mod scheduler;

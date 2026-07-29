@@ -12,6 +12,20 @@ export * from "./render-log";
 export type { SpecValidation } from "./generated/SpecValidation";
 export type { ProposalStatus } from "./generated/ProposalStatus";
 
+// Projects dashboard — the saved-project registry and its joined snapshot
+// view. Generated from `rust/src/projects.rs`; `SavedProject` replaces the
+// hand-written interface the runner carried in `hooks/useSavedProjects.ts`.
+export type { SavedProject } from "./generated/SavedProject";
+export type { ProjectSnapshot } from "./generated/ProjectSnapshot";
+export type { ProcessStatusLite } from "./generated/ProcessStatusLite";
+export type { SessionLite } from "./generated/SessionLite";
+export type { SessionSource } from "./generated/SessionSource";
+export type { GitLite } from "./generated/GitLite";
+export type { GitCommitLite } from "./generated/GitCommitLite";
+export type { PendingQuestion } from "./generated/PendingQuestion";
+export type { HealthLite } from "./generated/HealthLite";
+export type { HealthLevel } from "./generated/HealthLevel";
+
 // State discovery types
 export * from "./discovery";
 
