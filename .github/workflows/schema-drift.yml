@@ -42,6 +42,11 @@ on:
     branches: [main]
     paths:
       - "rust/src/**"
+      # The gate must re-run when the gate itself changes. The pull_request
+      # trigger below is unfiltered so it always does; this makes the
+      # post-merge main run match, rather than leaving main's visible status
+      # frozen at whatever the last rust/src/** push produced.
+      - ".github/workflows/schema-drift.yml"
   pull_request:
     branches: [main]
     # No path filter on the PR trigger so the `check-drift` required-check
@@ -234,10 +239,19 @@ jobs:
             fi
           done
 
-          # arm 1 — regenerated files that git is not tracking
-          new_files="$(git ls-files --others --exclude-standard -- \
+          # arm 1 — regenerated files that git is not tracking.
+          #
+          # Deliberately NOT `--exclude-standard`. A .gitignore rule covering
+          # only PART of a generated tree (say `*.d.ts`, leaving index.ts
+          # tracked) would defeat arm 0 and arm 1 simultaneously: arm 0 sees a
+          # non-zero tracked count and passes, and an ignore-respecting arm 1
+          # would skip exactly the ignored files. Listing ignored files too
+          # closes that hole. `__pycache__` is the one thing that can
+          # legitimately appear under these paths without being codegen output.
+          new_files="$(git ls-files --others -- \
               ts/src/generated \
-              src/qontinui_schemas/generated)"
+              src/qontinui_schemas/generated \
+            | grep -v '/__pycache__/' || true)"
           if [ -n "$new_files" ]; then
             echo "::error::Regeneration produced generated files that are not checked in:"
             printf '%s\n' "$new_files"
