@@ -63,6 +63,17 @@ on:
 jobs:
   check-drift:
     runs-on: ubuntu-latest
+    # ONE value for the generator's path, used by every step that touches it:
+    # the two check-generated-drift.sh invocations PARSE this script (to prove
+    # its output dirs are the ones they inspect), and the regen step EXECUTES
+    # it. Before this was hoisted, those were two independently-written path
+    # strings that merely happened to agree — so the script being cross-checked
+    # was not provably the script being run, which is the same
+    # "coupled-by-convention" defect the cross-check itself exists to close.
+    # Absolute, because the gate runs with working-directory: qontinui-schemas
+    # while the regen step runs from $GITHUB_WORKSPACE.
+    env:
+      GENERATE_TYPES_SH: ${{ github.workspace }}/qontinui-runner/src-tauri/scripts/generate_types.sh
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -172,7 +183,7 @@ jobs:
       - name: Regenerate types
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
-        run: bash qontinui-runner/src-tauri/scripts/generate_types.sh
+        run: bash "$GENERATE_TYPES_SH"
 
       # Uploaded on failed runs too, so a red drift check hands the developer
       # the exact bytes CI expected instead of only a diff to reverse-engineer.

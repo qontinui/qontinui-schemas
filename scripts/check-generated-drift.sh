@@ -8,12 +8,13 @@
 #   - qontinui-runner/.github/workflows/qontinui-types-drift.yml
 #
 # It lives here, in qontinui-schemas, deliberately. The runner-side workflow
-# already checks this repo out (at the coordinated ref) in order to regenerate
-# into it, so `bash qontinui-schemas/scripts/check-generated-drift.sh` works
-# verbatim there. That coupling is the point: the check then travels on the
-# same branch as the bindings it guards, and the two workflows cannot silently
-# diverge on the property they exist to enforce. They did diverge once already,
-# within a single change, which is what motivated extracting this.
+# already checks this repo out (at the ref its resolve-schemas-ref action
+# picks) in order to regenerate into it, so
+# `bash qontinui-schemas/scripts/check-generated-drift.sh` works verbatim
+# there. That coupling is the point: the check then travels on the same branch
+# as the bindings it guards, and the two workflows cannot silently diverge on
+# the property they exist to enforce. They did diverge once already, within a
+# single change, which is what motivated extracting this.
 #
 # ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
 #
@@ -40,10 +41,21 @@
 #   check-generated-drift.sh --preflight   # before regenerating
 #   check-generated-drift.sh --verify      # after regenerating
 #
-# Run from the root of a qontinui-schemas checkout. Both entry points assert
-# that: the relative paths below and arm 1's path-prefix filter are only
-# meaningful there, and `git ls-files` silently matches nothing when a
-# repo-relative pathspec is resolved from a subdirectory.
+# Run from the ROOT of a qontinui-schemas checkout whose DIRECTORY IS NAMED
+# `qontinui-schemas`, with a `qontinui-runner` checkout as its sibling. Both
+# requirements are real, and both entry points assert them:
+#
+#   * repo root — every pathspec and path-prefix below is repo-root-relative,
+#     and `git ls-files` silently matches nothing when such a pathspec is
+#     resolved from a subdirectory.
+#   * directory name — generate_types.sh hardcodes `../../qontinui-schemas/`,
+#     so from a checkout named anything else a regeneration writes into
+#     whichever sibling it DOES resolve, and this checkout would report a green
+#     it never regenerated. Both CI callers lay the repos out that way. An
+#     ad-hoc worktree (`wt-foo/`) does not, and correctly fails.
+#
+# Set GENERATE_TYPES_SH to point at the generator explicitly; it defaults to
+# the sibling layout above.
 
 set -euo pipefail
 
@@ -61,13 +73,77 @@ GENERATED_DIRS=(
 # It lives in qontinui-runner, NOT here. Both workflows that run this gate lay
 # the two repos out as siblings under $GITHUB_WORKSPACE and invoke the gate
 # with the qontinui-schemas checkout as cwd, so the sibling-relative default
-# resolves in CI. Override it for a local layout that is not sibling-shaped.
+# resolves in CI. Both also set this variable explicitly to the same absolute
+# path they then execute, so the script this gate PARSES is provably the script
+# the workflow RUNS, rather than two independently-written strings that merely
+# happen to agree.
 GENERATE_TYPES_SH="${GENERATE_TYPES_SH:-../qontinui-runner/src-tauri/scripts/generate_types.sh}"
 
-# The exact assignments in generate_types.sh that this gate knows how to
-# evaluate. See cross_check_output_dirs() for why these are matched verbatim.
-EXPECT_SCRIPT_DIR='SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
-EXPECT_PROJECT_ROOT='PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"'
+# ── what the generator is allowed to look like ──────────────────────────────
+#
+# These are REGEXES, and a SET of them per variable, rather than byte-exact
+# strings. Both properties are load-bearing.
+#
+# `check-drift` is a REQUIRED status check on this repo's main-merge-gates
+# ruleset, and schema-drift.yml checks qontinui-runner out with no `ref:` —
+# i.e. at runner's DEFAULT BRANCH. So a byte-exact assertion would mean: a
+# cosmetic edit to the generator (a trailing space, an inline comment,
+# `dirname --`, `pwd -P`) reds only an advisory check on the runner side, lands
+# there, and from that moment EVERY PR in this repo fails a required check —
+# including release-please's. A whole-repo train freeze, of the same class as
+# the 2026-07-05 incident, newly created by the gate meant to prevent one.
+#
+# Hence: tolerate everything cosmetic, and keep the accepted forms a SET, so a
+# catch-up here can teach the gate a new form BEFORE the runner change lands.
+# (The reverse direction is already coordinated: the runner-side workflow
+# resolves a matching qontinui-schemas ref through its resolve-schemas-ref
+# action, so a runner PR can point at a schemas branch that already knows the
+# new shape.)
+#
+# What is asserted is the PROPERTY that licenses computing the generator's
+# project root as `dirname(script)/..` — SCRIPT_DIR is the script's own
+# directory via BASH_SOURCE, PROJECT_ROOT is its parent — not a byte sequence.
+# Matched against the assignment's right-hand side, with trailing comment and
+# whitespace already stripped.
+EXPECT_SCRIPT_DIR_RHS_FORMS=(
+    '^"\$\(cd "\$\(dirname (--[[:space:]]+)*"\$\{BASH_SOURCE\[0\]\}"\)"[[:space:]]*&&[[:space:]]*pwd([[:space:]]+-P)?\)"$'
+)
+EXPECT_PROJECT_ROOT_RHS_FORMS=(
+    '^"\$\(cd "\$\{?SCRIPT_DIR\}?/\.\."[[:space:]]*&&[[:space:]]*pwd([[:space:]]+-P)?\)"$'
+)
+
+# The right-hand side of an output-dir assignment: a literal path under
+# $PROJECT_ROOT, with no further expansion in it.
+EXPECT_OUT_DIR_RHS_FORM='^"\$\{?PROJECT_ROOT\}?/([A-Za-z0-9._/-]+)"$'
+
+# Every path in generate_types.sh that reaches into THIS repo, keyed by the
+# suffix after this checkout's own directory name (`qontinui-schemas/` in CI —
+# see schemas_dir_name below for why it is derived rather than hardcoded).
+#
+# Anchored on the repo name rather than on variable names, because the
+# `*_OUT_DIR` naming convention is NOT one the generator follows — it already
+# carries PER_TYPE_DIR, DISCR_SCRIPT and COMPILE_SCRIPT. A check that only
+# enumerated `*_OUT_DIR` variables would wave through a brand-new output tree
+# called RUST_GEN_DIR, which is exactly the vacuity being closed. Keyed this
+# way, a new path into this repo is caught under ANY variable name, and so is
+# either generated tree moving.
+EXPECT_SCHEMAS_PATHS=(
+    "$TS_GENERATED_DIR"
+    "$PY_GENERATED_DIR"
+    "scripts/add_discriminators.py"
+    "scripts/compile_typescript.mjs"
+)
+
+# Any binding of a tracked name, in ANY form.
+#
+# NOT `^NAME=`. `export NAME=`, `declare -g NAME=`, `readonly NAME=` and
+# `NAME+=` are ordinary refactors that a prefix-anchored match does not see at
+# all — so a later `export TS_OUT_DIR="$PROJECT_ROOT/elsewhere"` would move the
+# output tree while the first, still-matching assignment kept this check
+# happily reporting agreement. Captures: [2] keyword prefix (empty for a plain
+# assignment), [5] name, [6] `+` for the append form, [7] RHS.
+TRACKED_NAMES_RE='SCRIPT_DIR|PROJECT_ROOT|[A-Za-z_][A-Za-z0-9_]*_OUT_DIR'
+TRACKED_BIND_RE="^((export|declare|typeset|readonly|local)[[:space:]]+((-[A-Za-z-]+)[[:space:]]+)*)?(${TRACKED_NAMES_RE})(\\+)?=(.*)\$"
 
 usage() {
     echo "usage: $0 --preflight | --verify" >&2
@@ -76,10 +152,10 @@ usage() {
 
 [ "$#" -eq 1 ] || usage
 
-# Every pathspec and path-prefix in this file is repo-root-relative. Running
-# from a subdirectory does not error — `git ls-files -- ts/src/generated` from
-# `ts/` simply matches nothing — so it would turn arm 1 into a no-op and make
-# arm 1's `__pycache__` prefix filter meaningless. Assert instead of assuming.
+# Running from a subdirectory does not error — `git ls-files -- ts/src/generated`
+# from `ts/` simply matches nothing — so it would turn arm 1 into a no-op and
+# make arm 1's `__pycache__` path-prefix filter meaningless. Assert instead of
+# assuming.
 #
 # `--show-prefix` (empty at the root) rather than comparing `--show-toplevel`
 # to `pwd`: on Windows/MSYS git prints `D:/...` while `pwd` prints `/d/...`,
@@ -111,9 +187,9 @@ assert_repo_root() {
 # `..` collapse would be one inside the generator's own relative suffix.
 lexical_normalize() {
     local path="$1" out="" part
-    local -a parts
+    local -a parts=()
     IFS='/' read -r -a parts <<< "$path"
-    for part in "${parts[@]}"; do
+    for part in ${parts[@]+"${parts[@]}"}; do
         case "$part" in
             ''|.) ;;
             ..)   out="${out%/*}" ;;
@@ -123,38 +199,69 @@ lexical_normalize() {
     printf '%s' "${out:-/}"
 }
 
+# Strip a CR (CRLF checkout), then leading and trailing whitespace.
+#
+# The CR strip matters because the shape compare below would otherwise fail on
+# a generator checked out with CRLF endings. qontinui-runner pins
+# `* text=auto eol=lf` in .gitattributes today, but this gate's correctness
+# must not depend on a file in another repo.
+#
+# Result goes in the global $_T rather than stdout, and the same for
+# _strip_trailing_comment below. `x="$(f "$line")"` forks a subshell per call,
+# and these run once or twice for every line of the generator — ~500 forks,
+# which costs milliseconds on a Linux runner but tens of seconds under MSYS,
+# where this gate is also run by hand.
+_trim_line() {
+    _T="${1%$'\r'}"
+    _T="${_T#"${_T%%[![:space:]]*}"}"
+    _T="${_T%"${_T##*[![:space:]]}"}"
+}
+
+# Strip a trailing ` # comment`, and any whitespace it leaves behind.
+#
+# Requires whitespace before the `#`, which is what makes this safe to apply to
+# a right-hand side: the path charset accepted by EXPECT_OUT_DIR_RHS_FORM has
+# no spaces, so this cannot eat part of a real path.
+_strip_trailing_comment() {
+    _C="${1%%[[:space:]]#*}"
+    _C="${_C%"${_C##*[![:space:]]}"}"
+}
+
+matches_any() { # matches_any <string> <regex>...
+    local s="$1" re
+    shift
+    for re in "$@"; do
+        [[ "$s" =~ $re ]] && return 0
+    done
+    return 1
+}
+
 # ── output-directory cross-check ────────────────────────────────────────────
 #
-# This gate inspects GENERATED_DIRS. generate_types.sh derives its own
-# TS_OUT_DIR/PY_OUT_DIR from its own location. Nothing but convention links
-# the two, and asserting merely that the committed dirs EXIST does not test
-# the link at all: if the generator's paths move, the committed dirs still
-# exist, preflight still passes, codegen writes somewhere unreviewed, and all
-# three verify arms then pass vacuously — files still tracked (arm 0), nothing
-# new untracked (arm 1), nothing changed (arm 2). That is precisely the
-# failure class this file exists to eliminate.
+# This gate inspects GENERATED_DIRS. generate_types.sh derives its own output
+# dirs from its own location. Nothing but convention links the two, and
+# asserting merely that the committed dirs EXIST does not test the link at all:
+# if the generator's paths move, the committed dirs still exist, the existence
+# test still passes, codegen writes somewhere unreviewed, and all three verify
+# arms then pass vacuously — files still tracked (arm 0), nothing new untracked
+# (arm 1), nothing changed (arm 2). That is precisely the failure class this
+# file exists to eliminate.
 #
 # So resolve what the generator will ACTUALLY write and require it to equal
-# what we inspect.
+# what we inspect. Two independent assertions, because either alone has a gap:
 #
-# We do not run the generator (it costs a full cargo release build) and we do
+#   1. Every path the generator aims INTO THIS REPO, by suffix, must be on
+#      EXPECT_SCHEMAS_PATHS. Catches a new output tree under any variable name,
+#      and either generated tree moving.
+#   2. TS_OUT_DIR and PY_OUT_DIR must RESOLVE to the two dirs this gate
+#      inspects. Catches the same tree being reached by a different route.
+#
+# We do not run the generator (that is a full cargo release build) and we do
 # not source it (everything from its `cargo build` line down has side effects).
-# We parse the four assignments that produce the paths — and we assert their
-# SHAPE before evaluating them:
-#
-#   * SCRIPT_DIR and PROJECT_ROOT must match, character for character, the
-#     forms this function knows how to reproduce. That exact match is what
-#     licenses computing the generator's project root as `dirname(script)/..`.
-#   * TS_OUT_DIR / PY_OUT_DIR must be a literal suffix under `$PROJECT_ROOT`,
-#     with no further expansion in it.
-#   * The set of `*_OUT_DIR` variables must be exactly {TS_OUT_DIR,
-#     PY_OUT_DIR}, so a generator that grows a THIRD output tree fails here
-#     instead of writing it somewhere no arm inspects.
-#
-# Any deviation is a hard failure with an explicit "teach this check the new
-# shape" message. A cross-check that can degrade to "assume it's fine" would
-# reintroduce the vacuity it is supposed to close, so this one cannot: it
-# either proves agreement or reds.
+# We parse it, asserting SHAPE before evaluating anything, and every deviation
+# is a hard failure carrying a "teach this check the new shape" message. There
+# is deliberately no fallback path: a cross-check that can degrade to "assume
+# it's fine" would reintroduce the vacuity it is supposed to close.
 cross_check_output_dirs() {
     if [ ! -f "$GENERATE_TYPES_SH" ]; then
         echo "::error::generate_types.sh not found at '$GENERATE_TYPES_SH'."
@@ -180,90 +287,192 @@ cross_check_output_dirs() {
         return 1
     fi
 
-    local out_re='^(TS|PY)_OUT_DIR="\$PROJECT_ROOT/([A-Za-z0-9._/-]+)"$'
-    local any_out_re='^([A-Za-z_][A-Za-z0-9_]*_OUT_DIR)='
+    # Resolve both roots up front: the schemas-path scan below needs to know
+    # what THIS checkout is called.
+    local gen_root repo_root rc_path=0
+    gen_root="$(cd "$(dirname "$GENERATE_TYPES_SH")/.." && pwd -P)" || rc_path=$?
+    repo_root="$(pwd -P)" || rc_path=$?
+    if [ "$rc_path" -ne 0 ] || [ -z "$gen_root" ] || [ -z "$repo_root" ]; then
+        echo "::error::could not resolve the generator's project root or this repo's root."
+        echo "  gen_root='$gen_root' repo_root='$repo_root' (exit $rc_path)"
+        return 1
+    fi
 
-    local line t
-    local script_dir_n=0 project_root_n=0
-    local script_dir_line="" project_root_line=""
+    # The directory name the generator must reach into to land in THIS
+    # checkout. Derived, not hardcoded to `qontinui-schemas` — and the two
+    # assertions below stay consistent because of it: assertion 2 can only pass
+    # if the generator's paths resolve into this checkout, which is the same
+    # thing as them naming this directory. In CI that name IS
+    # `qontinui-schemas` (both workflows check out to that path), which is what
+    # the generator hardcodes.
+    local schemas_dir_name="${repo_root##*/}"
+
+    local line t name rhs rest seg
+    local -a script_dir_rhs=() project_root_rhs=()
+    local -a out_dir_names=() bad_bind_lines=() bad_out_dir_lines=() eval_lines=()
+    local -a found_schemas_paths=()
     local ts_suffix="" py_suffix=""
-    local -a out_dir_names=()
-    local -a bad_out_dir_lines=()
 
     while IFS= read -r line; do
-        # Strip leading whitespace so an indented assignment is still SEEN
-        # (and then judged on its shape) rather than skipped.
-        t="${line#"${line%%[![:space:]]*}"}"
-        case "$t" in
-            SCRIPT_DIR=*)
-                script_dir_n=$((script_dir_n + 1)); script_dir_line="$t" ;;
-            PROJECT_ROOT=*)
-                project_root_n=$((project_root_n + 1)); project_root_line="$t" ;;
-        esac
-        if [[ "$t" =~ $any_out_re ]]; then
-            out_dir_names+=("${BASH_REMATCH[1]}")
-            if [[ "$t" =~ $out_re ]]; then
-                case "${BASH_REMATCH[1]}" in
-                    TS) ts_suffix="${BASH_REMATCH[2]}" ;;
-                    PY) py_suffix="${BASH_REMATCH[2]}" ;;
-                esac
+        _trim_line "$line"; t="$_T"
+        [ -n "$t" ] || continue
+
+        # A whole-line comment is inert. Skipping it also keeps the
+        # schemas-path scan below from tripping over prose mentioning a path.
+        case "$t" in \#*) continue ;; esac
+
+        # `eval` can bind a tracked name in a form no static pattern will ever
+        # see. Refuse to reason about it rather than guessing.
+        if [[ "$t" =~ ^eval([[:space:]]|$) ]] \
+           && [[ "$t" =~ (SCRIPT_DIR|PROJECT_ROOT|_OUT_DIR) ]]; then
+            eval_lines+=("$t")
+        fi
+
+        if [[ "$t" =~ $TRACKED_BIND_RE ]]; then
+            name="${BASH_REMATCH[5]}"
+            _strip_trailing_comment "${BASH_REMATCH[7]}"; rhs="$_C"
+            if [ -n "${BASH_REMATCH[2]}" ] || [ -n "${BASH_REMATCH[6]}" ]; then
+                # An `export`/`declare`/... prefix, or the `+=` append form.
+                bad_bind_lines+=("$t")
             else
-                bad_out_dir_lines+=("$t")
+                case "$name" in
+                    SCRIPT_DIR)   script_dir_rhs+=("$rhs") ;;
+                    PROJECT_ROOT) project_root_rhs+=("$rhs") ;;
+                    *_OUT_DIR)
+                        out_dir_names+=("$name")
+                        if [[ "$rhs" =~ $EXPECT_OUT_DIR_RHS_FORM ]]; then
+                            case "$name" in
+                                TS_OUT_DIR) ts_suffix="${BASH_REMATCH[1]}" ;;
+                                PY_OUT_DIR) py_suffix="${BASH_REMATCH[1]}" ;;
+                            esac
+                        else
+                            bad_out_dir_lines+=("$t")
+                        fi
+                        ;;
+                esac
             fi
+        fi
+
+        # Every reference into THIS repo, whatever variable carries it.
+        if [[ "$t" == *"$schemas_dir_name"/* ]]; then
+            rest="$t"
+            while [[ "$rest" == *"$schemas_dir_name"/* ]]; do
+                rest="${rest#*"$schemas_dir_name"/}"
+                seg="$rest"
+                seg="${seg%%\"*}"
+                seg="${seg%%\'*}"
+                seg="${seg%%[[:space:]]*}"
+                seg="${seg%/}"
+                [ -n "$seg" ] && found_schemas_paths+=("$seg")
+            done
         fi
     done <<< "$src"
 
     local rc=0
-    local shape_hint="  Teach this cross-check the new shape (scripts/check-generated-drift.sh,"
-    shape_hint="$shape_hint"$'\n'"  cross_check_output_dirs) in the same change. Do NOT delete the check:"
-    shape_hint="$shape_hint"$'\n'"  without it a moved output dir makes every arm below pass vacuously."
+    local shape_hint
+    shape_hint="  Teach this cross-check the new shape in scripts/check-generated-drift.sh"
+    shape_hint="$shape_hint"$'\n'"  — the EXPECT_* arrays near the top accept a SET of forms, so add the new"
+    shape_hint="$shape_hint"$'\n'"  one and land it HERE FIRST: schema-drift.yml reads qontinui-runner at its"
+    shape_hint="$shape_hint"$'\n'"  default branch, so a single change cannot be green on both sides at once."
+    shape_hint="$shape_hint"$'\n'"  Do NOT delete the check: without it a moved output dir makes every arm"
+    shape_hint="$shape_hint"$'\n'"  of --verify pass vacuously."
 
-    if [ "$script_dir_n" -ne 1 ] || [ "$script_dir_line" != "$EXPECT_SCRIPT_DIR" ]; then
+    if [ "${#eval_lines[@]}" -gt 0 ]; then
+        echo "::error::generate_types.sh uses \`eval\` on a path variable this gate tracks:"
+        printf '  %s\n' "${eval_lines[@]}"
+        echo "  A tracked name bound through eval cannot be resolved statically, so"
+        echo "  agreement cannot be proven. Use a plain assignment instead."
+        rc=1
+    fi
+
+    if [ "${#bad_bind_lines[@]}" -gt 0 ]; then
+        echo "::error::generate_types.sh binds a tracked path variable in an unsupported form:"
+        printf '  %s\n' "${bad_bind_lines[@]}"
+        echo "  \`export NAME=\`, \`declare NAME=\`, \`readonly NAME=\` and \`NAME+=\` can"
+        echo "  REBIND a path after the assignment this gate resolved, moving codegen"
+        echo "  output while the check still reports agreement. Use a single plain"
+        echo "  assignment per variable."
+        rc=1
+    fi
+
+    if [ "${#script_dir_rhs[@]}" -ne 1 ] \
+       || ! matches_any "${script_dir_rhs[0]}" "${EXPECT_SCRIPT_DIR_RHS_FORMS[@]}"; then
         echo "::error::generate_types.sh derives SCRIPT_DIR in an unrecognized way."
-        echo "  expected exactly one: $EXPECT_SCRIPT_DIR"
-        echo "  found ($script_dir_n): ${script_dir_line:-<none>}"
+        echo "  need exactly one plain assignment whose RHS matches an accepted form;"
+        echo "  found ${#script_dir_rhs[@]}:"
+        printf '    %s\n' ${script_dir_rhs[@]+"${script_dir_rhs[@]}"}
         echo "$shape_hint"
         rc=1
     fi
 
-    if [ "$project_root_n" -ne 1 ] || [ "$project_root_line" != "$EXPECT_PROJECT_ROOT" ]; then
+    if [ "${#project_root_rhs[@]}" -ne 1 ] \
+       || ! matches_any "${project_root_rhs[0]}" "${EXPECT_PROJECT_ROOT_RHS_FORMS[@]}"; then
         echo "::error::generate_types.sh derives PROJECT_ROOT in an unrecognized way."
-        echo "  expected exactly one: $EXPECT_PROJECT_ROOT"
-        echo "  found ($project_root_n): ${project_root_line:-<none>}"
+        echo "  need exactly one plain assignment whose RHS matches an accepted form;"
+        echo "  found ${#project_root_rhs[@]}:"
+        printf '    %s\n' ${project_root_rhs[@]+"${project_root_rhs[@]}"}
         echo "$shape_hint"
-        rc=1
-    fi
-
-    # Exactly the two output trees this gate inspects — no more, no fewer.
-    local names_seen
-    names_seen="$(printf '%s\n' ${out_dir_names[@]+"${out_dir_names[@]}"} | LC_ALL=C sort | tr '\n' ' ')"
-    names_seen="${names_seen% }"
-    if [ "$names_seen" != "PY_OUT_DIR TS_OUT_DIR" ]; then
-        echo "::error::generate_types.sh's set of *_OUT_DIR variables is not the set this gate inspects."
-        echo "  expected: PY_OUT_DIR TS_OUT_DIR"
-        echo "  found:    ${names_seen:-<none>}"
-        echo "  A new output tree that no arm of --verify inspects is drift this"
-        echo "  gate would never see. Add it to GENERATED_DIRS and commit its"
-        echo "  baseline, or remove it from the generator."
         rc=1
     fi
 
     if [ "${#bad_out_dir_lines[@]}" -gt 0 ]; then
         echo "::error::generate_types.sh assigns an output dir in an unrecognized way."
         printf '  %s\n' "${bad_out_dir_lines[@]}"
-        echo "  expected form: <TS|PY>_OUT_DIR=\"\$PROJECT_ROOT/<literal path>\""
+        echo "  expected form: <NAME>_OUT_DIR=\"\$PROJECT_ROOT/<literal path>\""
+        echo "$shape_hint"
+        rc=1
+    fi
+
+    # Exactly the two output-dir variables this gate resolves — no more, no
+    # fewer. (The stronger "no NEW tree under any variable name" property is
+    # the schemas-path assertion below; this one keeps the resolve step total.)
+    local names_seen rc_names=0
+    names_seen="$(printf '%s\n' ${out_dir_names[@]+"${out_dir_names[@]}"} \
+        | LC_ALL=C sort -u | tr '\n' ' ')" || rc_names=$?
+    if [ "$rc_names" -ne 0 ]; then
+        echo "::error::could not collate generate_types.sh's *_OUT_DIR names (exit $rc_names)."
+        rc=1
+    fi
+    names_seen="${names_seen% }"
+    if [ "$names_seen" != "PY_OUT_DIR TS_OUT_DIR" ]; then
+        echo "::error::generate_types.sh's set of *_OUT_DIR variables is not the set this gate resolves."
+        echo "  expected: PY_OUT_DIR TS_OUT_DIR"
+        echo "  found:    ${names_seen:-<none>}"
+        echo "  An output tree this gate never resolves is drift it would never see."
+        echo "  Add it to GENERATED_DIRS and commit its baseline, or remove it."
+        rc=1
+    fi
+
+    # Assertion 1 — every path the generator aims into this repo is known.
+    local want got p rc_sets=0
+    want="$(printf '%s\n' "${EXPECT_SCHEMAS_PATHS[@]}" | LC_ALL=C sort -u)" || rc_sets=$?
+    got="$(printf '%s\n' ${found_schemas_paths[@]+"${found_schemas_paths[@]}"} \
+        | LC_ALL=C sort -u)" || rc_sets=$?
+    if [ "$rc_sets" -ne 0 ]; then
+        echo "::error::could not collate generate_types.sh's qontinui-schemas paths (exit $rc_sets)."
+        rc=1
+    elif [ "$want" != "$got" ]; then
+        echo "::error::generate_types.sh's set of paths into $schemas_dir_name/ changed."
+        echo "  expected:"
+        printf '    %s\n' "${EXPECT_SCHEMAS_PATHS[@]}"
+        echo "  found:"
+        while IFS= read -r p; do
+            [ -n "$p" ] && echo "    $p"
+        done <<< "$got"
+        echo "  A path into this repo that this gate does not know about is either a"
+        echo "  new generated tree no arm inspects, or an existing tree that moved."
+        echo "  Update EXPECT_SCHEMAS_PATHS (and GENERATED_DIRS if it is an output"
+        echo "  tree, committing its baseline)."
         echo "$shape_hint"
         rc=1
     fi
 
     [ "$rc" -eq 0 ] || return "$rc"
 
-    # Shape proven; now evaluate. SCRIPT_DIR/PROJECT_ROOT matched verbatim
-    # above, so the generator's PROJECT_ROOT is exactly dirname(script)/..
-    local gen_root repo_root
-    gen_root="$(cd "$(dirname "$GENERATE_TYPES_SH")/.." && pwd -P)"
-    repo_root="$(pwd -P)"
-
+    # Assertion 2 — shape proven; now evaluate. SCRIPT_DIR/PROJECT_ROOT matched
+    # an accepted form above, so the generator's PROJECT_ROOT is exactly
+    # dirname(script)/.. — which is what licenses resolving the suffixes
+    # against gen_root.
     local var suffix gate_dir writes inspects
     for var in TS PY; do
         if [ "$var" = TS ]; then
@@ -274,7 +483,7 @@ cross_check_output_dirs() {
         writes="$(lexical_normalize "$gen_root/$suffix")"
         inspects="$(lexical_normalize "$repo_root/$gate_dir")"
         if [ "$writes" = "$inspects" ]; then
-            echo "preflight: ${var}_OUT_DIR agrees -> $inspects"
+            echo "cross-check: ${var}_OUT_DIR agrees -> $inspects"
         else
             echo "::error::${var}_OUT_DIR disagrees with the tree this gate inspects."
             echo "  generate_types.sh writes to: $writes"
@@ -361,12 +570,22 @@ preflight() {
 #   arm 2 (diff)      — an EXISTING file changed, or was deleted because its
 #                       type was removed, or was added AND staged.
 #
-# All three run before the function returns, so one invocation reports every
+# It ALSO re-runs the output-dir cross-check. That is not redundant with
+# --preflight: the arms are what post the required check status, and a gate
+# whose anti-vacuity property lives in a SEPARATE workflow step is exactly the
+# "a comment asking humans to keep them in step is not a mechanism" problem
+# this file was extracted to solve — one caller could simply omit the preflight
+# step and every arm below would go vacuous with nothing to notice. Run alone,
+# `--verify` would otherwise exit 0 with the generator's output location
+# entirely unknown. It costs one `cat`.
+#
+# Everything runs before the function returns, so one invocation reports every
 # problem rather than making you fix them one CI round-trip at a time.
 verify() {
     local rc=0
 
     assert_repo_root || rc=1
+    cross_check_output_dirs || rc=1
 
     # arm 0 — baseline present?
     local dir n
@@ -395,23 +614,42 @@ verify() {
     # uncommitted generated file is invisible here — arm 2 covers that, which
     # is why it diffs against HEAD rather than the index.
     #
-    # Split across two statements on purpose. Written as one pipeline with a
-    # trailing `|| true`, a FAILURE of `git ls-files` would be swallowed along
-    # with grep's no-match exit, leaving `new_files` empty and this arm
-    # silently reporting clean — arm 1 no-oping is precisely the bug class this
-    # file exists to prevent. Here `git ls-files` runs unguarded (so `set -e`
-    # aborts on a real failure) and only grep's exit is tolerated.
-    local raw new_files pycache_re
+    # Both substitutions below have their exit status checked EXPLICITLY rather
+    # than left to `set -e`. Arm 1 silently reporting clean is precisely the bug
+    # class this file exists to prevent, and a swallowed failure here is
+    # indistinguishable from "no untracked files".
+    local raw new_files pycache_re rc_ls=0 rc_grep=0
+    set +e
     raw="$(git ls-files --others -- "${GENERATED_DIRS[@]}")"
+    rc_ls=$?
+    set -e
+    if [ "$rc_ls" -ne 0 ]; then
+        echo "::error::arm 1 could not list untracked files (git ls-files exit $rc_ls)."
+        echo "  Arm 1 cannot be trusted, so this fails rather than reporting clean."
+        rc=1
+    fi
     # SCOPED to the Python tree. An unanchored `/__pycache__/` filter drops the
     # segment wherever it appears, so `ts/src/generated/__pycache__/Hidden.d.ts`
     # — a path with no legitimate reason to exist — would be silently excused.
-    # `$PY_GENERATED_DIR` contains no ERE metacharacters, so it is safe inline.
     pycache_re="^${PY_GENERATED_DIR}/(.*/)?__pycache__/"
-    # `|| true` is LOAD-BEARING, not redundant: `grep -v` exits 1 when it
-    # prints nothing, which is the normal healthy case, and this script runs
-    # under `set -e`. Removing it aborts the job on every clean run.
-    new_files="$(printf '%s' "$raw" | grep -Ev "$pycache_re" || true)"
+    # grep exits 1 on no-match (the normal healthy case) and 2 on a real error
+    # such as an invalid regex. A bare `|| true` would swallow BOTH, leaving
+    # new_files empty and this arm reporting clean while drift exists. The
+    # comment justifying `|| true` here used to cite only the no-match exit,
+    # which is the narrower half of what it actually suppressed.
+    #
+    # `printf '%s'` without a trailing newline is load-bearing: with `\n`, an
+    # empty `raw` becomes one blank line, which `grep -Ev` happily prints, so
+    # new_files would be non-empty and every clean run would red.
+    set +e
+    new_files="$(printf '%s' "$raw" | grep -Ev "$pycache_re")"
+    rc_grep=$?
+    set -e
+    if [ "$rc_grep" -gt 1 ]; then
+        echo "::error::arm 1's __pycache__ filter failed (grep exit $rc_grep)."
+        echo "  Arm 1 cannot be trusted, so this fails rather than reporting clean."
+        rc=1
+    fi
     if [ -n "$new_files" ]; then
         echo "::error::Regeneration produced generated files that are not checked in:"
         printf '%s\n' "$new_files"
@@ -434,7 +672,8 @@ verify() {
     # every generated Python file. Those update on every run regardless of
     # schema content, so without the filter this could never go green even on
     # a repo with no real drift. Same trick schema-pg-sql-fresh.yml uses for
-    # `-- Dumped by pg_dump version` header noise.
+    # `-- Dumped by pg_dump version` header noise. Verified still to suppress
+    # exactly that, and nothing more, under `HEAD`.
     if ! git diff HEAD --exit-code -I '^#   timestamp:' -- "${GENERATED_DIRS[@]}"; then
         echo "::error::Checked-in generated types differ from a fresh regeneration."
         rc=1
