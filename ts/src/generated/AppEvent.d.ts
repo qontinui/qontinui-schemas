@@ -15,6 +15,7 @@ import type { FlowEvent } from "./FlowEvent";
  * `{"event_type": "<VariantName>", "data": {..}}`.
  * The React frontend dispatches on `event_type` and reads `data`.
  */
+// INJECTED DRIFT MARKER — this line is not produced by codegen
 export type AppEvent =
   | {
       data: {
