@@ -47,7 +47,23 @@ jobs:
         # requires 11.5.1+. Without this upgrade the publish step sends
         # an empty auth header and gets 404 even when the OIDC +
         # provenance flow succeeds. Independent of the action version.
-        run: npm install --global npm@latest
+        #
+        # PINNED TO THE 11 LINE, deliberately — this was `npm@latest`, which
+        # became a time bomb the moment npm cut 12.x. npm 12 requires
+        # node ^22.22.2 || ^24.15.0 || >=26.0.0, so on the node 20 pinned
+        # above it fails the install outright:
+        #
+        #   npm error notsup Required: {"node":"^22.22.2 || ^24.15.0 || >=26.0.0"}
+        #   npm error notsup Actual:   {"npm":"10.8.2","node":"v20.20.2"}
+        #
+        # That took down every `ts-v*` publish (runs 2026-07-29T18:33Z and
+        # 2026-07-30T04:18Z both died here), leaving the published
+        # `@qontinui/shared-types` stuck at 0.8.1 while ts/package.json had
+        # already moved on. `@latest` in a step whose own
+        # stated requirement is a FLOOR ("11.5.1+") buys nothing and silently
+        # couples this job to npm's release cadence. Bump the major here
+        # deliberately, together with node-version, or not at all.
+        run: npm install --global 'npm@^11.5.1'
         working-directory: .
 
       - name: Install dependencies
