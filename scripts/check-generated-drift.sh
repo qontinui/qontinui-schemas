@@ -48,14 +48,22 @@
 #   * repo root — every pathspec and path-prefix below is repo-root-relative,
 #     and `git ls-files` silently matches nothing when such a pathspec is
 #     resolved from a subdirectory.
-#   * directory name — generate_types.sh hardcodes `../../qontinui-schemas/`,
-#     so from a checkout named anything else a regeneration writes into
-#     whichever sibling it DOES resolve, and this checkout would report a green
-#     it never regenerated. Both CI callers lay the repos out that way. An
-#     ad-hoc worktree (`wt-foo/`) does not, and correctly fails.
+#   * directory name — generate_types.sh DEFAULTS to
+#     `$PROJECT_ROOT/../../qontinui-schemas`, so from a checkout named anything
+#     else a regeneration writes into whichever sibling it DOES resolve, and
+#     this checkout would report a green it never regenerated. Both CI callers
+#     lay the repos out that way. An ad-hoc worktree (`wt-foo/`) does not, and
+#     correctly fails — unless you set QONTINUI_SCHEMAS_DIR (below), which
+#     makes the name irrelevant.
 #
-# Set GENERATE_TYPES_SH to point at the generator explicitly; it defaults to
-# the sibling layout above.
+# Environment:
+#   GENERATE_TYPES_SH      the generator to cross-check. Defaults to the
+#                          sibling layout above.
+#   QONTINUI_SCHEMAS_DIR   \
+#   QONTINUI_TS_OUT_DIR     > the generator's own overrides. This gate reads
+#   QONTINUI_PY_OUT_DIR    /  them and resolves exactly as the generator will,
+#                          so a pinned output location is checked against the
+#                          tree actually inspected rather than assumed away.
 
 set -euo pipefail
 
@@ -112,21 +120,33 @@ EXPECT_PROJECT_ROOT_RHS_FORMS=(
     '^"\$\(cd "\$\{?SCRIPT_DIR\}?/\.\."[[:space:]]*&&[[:space:]]*pwd([[:space:]]+-P)?\)"$'
 )
 
-# The right-hand side of an output-dir assignment: a literal path under
-# $PROJECT_ROOT, with no further expansion in it.
-EXPECT_OUT_DIR_RHS_FORM='^"\$\{?PROJECT_ROOT\}?/([A-Za-z0-9._/-]+)"$'
+# The root of this repo as the generator computes it: an env override, falling
+# back to a literal path under $PROJECT_ROOT. Capture 1 is that fallback suffix.
+EXPECT_SCHEMAS_DIR_RHS_FORMS=(
+    '^"\$\{QONTINUI_SCHEMAS_DIR:-\$\{?PROJECT_ROOT\}?/([A-Za-z0-9._/-]+)\}"$'
+)
+
+# The right-hand side of an output-dir assignment: an env override, falling
+# back to a literal path under $SCHEMAS_DIR. Capture 1 is the override's
+# TS/PY discriminator (checked against the variable being assigned, so
+# `TS_OUT_DIR="${QONTINUI_PY_OUT_DIR:-...}"` cannot slip through), capture 2 is
+# the fallback suffix.
+EXPECT_OUT_DIR_RHS_FORM='^"\$\{QONTINUI_(TS|PY)_OUT_DIR:-\$\{?SCHEMAS_DIR\}?/([A-Za-z0-9._/-]+)\}"$'
 
 # Every path in generate_types.sh that reaches into THIS repo, keyed by the
-# suffix after this checkout's own directory name (`qontinui-schemas/` in CI —
-# see schemas_dir_name below for why it is derived rather than hardcoded).
+# suffix after `$SCHEMAS_DIR/`.
 #
-# Anchored on the repo name rather than on variable names, because the
-# `*_OUT_DIR` naming convention is NOT one the generator follows — it already
-# carries PER_TYPE_DIR, DISCR_SCRIPT and COMPILE_SCRIPT. A check that only
-# enumerated `*_OUT_DIR` variables would wave through a brand-new output tree
-# called RUST_GEN_DIR, which is exactly the vacuity being closed. Keyed this
-# way, a new path into this repo is caught under ANY variable name, and so is
-# either generated tree moving.
+# Anchored on that variable rather than on the `*_OUT_DIR` naming convention,
+# because the convention is NOT one the generator follows — it also carries
+# PER_TYPE_DIR, DISCR_SCRIPT and COMPILE_SCRIPT. A check that only enumerated
+# `*_OUT_DIR` variables would wave through a brand-new output tree called
+# RUST_GEN_DIR, which is exactly the vacuity being closed. Keyed this way, a
+# new path into this repo is caught under ANY variable name, and so is either
+# generated tree moving.
+#
+# Anchoring on `$SCHEMAS_DIR/` rather than on the literal directory name also
+# means this keeps working when the generator is pointed at a checkout that is
+# not called `qontinui-schemas` via QONTINUI_SCHEMAS_DIR.
 EXPECT_SCHEMAS_PATHS=(
     "$TS_GENERATED_DIR"
     "$PY_GENERATED_DIR"
@@ -142,7 +162,7 @@ EXPECT_SCHEMAS_PATHS=(
 # output tree while the first, still-matching assignment kept this check
 # happily reporting agreement. Captures: [2] keyword prefix (empty for a plain
 # assignment), [5] name, [6] `+` for the append form, [7] RHS.
-TRACKED_NAMES_RE='SCRIPT_DIR|PROJECT_ROOT|[A-Za-z_][A-Za-z0-9_]*_OUT_DIR'
+TRACKED_NAMES_RE='SCRIPT_DIR|PROJECT_ROOT|SCHEMAS_DIR|[A-Za-z_][A-Za-z0-9_]*_OUT_DIR'
 TRACKED_BIND_RE="^((export|declare|typeset|readonly|local)[[:space:]]+((-[A-Za-z-]+)[[:space:]]+)*)?(${TRACKED_NAMES_RE})(\\+)?=(.*)\$"
 
 usage() {
@@ -298,20 +318,11 @@ cross_check_output_dirs() {
         return 1
     fi
 
-    # The directory name the generator must reach into to land in THIS
-    # checkout. Derived, not hardcoded to `qontinui-schemas` — and the two
-    # assertions below stay consistent because of it: assertion 2 can only pass
-    # if the generator's paths resolve into this checkout, which is the same
-    # thing as them naming this directory. In CI that name IS
-    # `qontinui-schemas` (both workflows check out to that path), which is what
-    # the generator hardcodes.
-    local schemas_dir_name="${repo_root##*/}"
-
     local line t name rhs rest seg
-    local -a script_dir_rhs=() project_root_rhs=()
+    local -a script_dir_rhs=() project_root_rhs=() schemas_dir_rhs=()
     local -a out_dir_names=() bad_bind_lines=() bad_out_dir_lines=() eval_lines=()
     local -a found_schemas_paths=()
-    local ts_suffix="" py_suffix=""
+    local ts_suffix="" py_suffix="" schemas_suffix=""
 
     while IFS= read -r line; do
         _trim_line "$line"; t="$_T"
@@ -338,12 +349,17 @@ cross_check_output_dirs() {
                 case "$name" in
                     SCRIPT_DIR)   script_dir_rhs+=("$rhs") ;;
                     PROJECT_ROOT) project_root_rhs+=("$rhs") ;;
+                    SCHEMAS_DIR)  schemas_dir_rhs+=("$rhs") ;;
                     *_OUT_DIR)
                         out_dir_names+=("$name")
-                        if [[ "$rhs" =~ $EXPECT_OUT_DIR_RHS_FORM ]]; then
+                        # The override's TS/PY discriminator must match the
+                        # variable it is assigned to, so a copy-paste that
+                        # crosses them is caught rather than resolved.
+                        if [[ "$rhs" =~ $EXPECT_OUT_DIR_RHS_FORM ]] \
+                           && [ "${BASH_REMATCH[1]}_OUT_DIR" = "$name" ]; then
                             case "$name" in
-                                TS_OUT_DIR) ts_suffix="${BASH_REMATCH[1]}" ;;
-                                PY_OUT_DIR) py_suffix="${BASH_REMATCH[1]}" ;;
+                                TS_OUT_DIR) ts_suffix="${BASH_REMATCH[2]}" ;;
+                                PY_OUT_DIR) py_suffix="${BASH_REMATCH[2]}" ;;
                             esac
                         else
                             bad_out_dir_lines+=("$t")
@@ -354,18 +370,21 @@ cross_check_output_dirs() {
         fi
 
         # Every reference into THIS repo, whatever variable carries it.
-        if [[ "$t" == *"$schemas_dir_name"/* ]]; then
-            rest="$t"
-            while [[ "$rest" == *"$schemas_dir_name"/* ]]; do
-                rest="${rest#*"$schemas_dir_name"/}"
-                seg="$rest"
-                seg="${seg%%\"*}"
-                seg="${seg%%\'*}"
-                seg="${seg%%[[:space:]]*}"
-                seg="${seg%/}"
-                [ -n "$seg" ] && found_schemas_paths+=("$seg")
-            done
-        fi
+        #
+        # `${SCHEMAS_DIR}` is folded to `$SCHEMAS_DIR` first so one marker
+        # covers both spellings. The SCHEMAS_DIR assignment line itself never
+        # matches, because its own RHS is expressed in terms of PROJECT_ROOT.
+        rest="${t//\$\{SCHEMAS_DIR\}/\$SCHEMAS_DIR}"
+        while [[ "$rest" == *'$SCHEMAS_DIR/'* ]]; do
+            rest="${rest#*'$SCHEMAS_DIR/'}"
+            seg="$rest"
+            seg="${seg%%\"*}"
+            seg="${seg%%\'*}"
+            seg="${seg%%\}*}"
+            seg="${seg%%[[:space:]]*}"
+            seg="${seg%/}"
+            [ -n "$seg" ] && found_schemas_paths+=("$seg")
+        done
     done <<< "$src"
 
     local rc=0
@@ -415,6 +434,19 @@ cross_check_output_dirs() {
         rc=1
     fi
 
+    if [ "${#schemas_dir_rhs[@]}" -ne 1 ] \
+       || ! matches_any "${schemas_dir_rhs[0]}" "${EXPECT_SCHEMAS_DIR_RHS_FORMS[@]}"; then
+        echo "::error::generate_types.sh derives SCHEMAS_DIR in an unrecognized way."
+        echo "  need exactly one plain assignment whose RHS matches an accepted form;"
+        echo "  found ${#schemas_dir_rhs[@]}:"
+        printf '    %s\n' ${schemas_dir_rhs[@]+"${schemas_dir_rhs[@]}"}
+        echo "$shape_hint"
+        rc=1
+    else
+        [[ "${schemas_dir_rhs[0]}" =~ ${EXPECT_SCHEMAS_DIR_RHS_FORMS[0]} ]] \
+            && schemas_suffix="${BASH_REMATCH[1]}"
+    fi
+
     if [ "${#bad_out_dir_lines[@]}" -gt 0 ]; then
         echo "::error::generate_types.sh assigns an output dir in an unrecognized way."
         printf '  %s\n' "${bad_out_dir_lines[@]}"
@@ -444,15 +476,45 @@ cross_check_output_dirs() {
     fi
 
     # Assertion 1 — every path the generator aims into this repo is known.
+    #
+    # Guard the EXTRACTOR before comparing its output. An extraction that
+    # understands nothing yields the empty set, and the empty set compares
+    # equal to an empty expectation — so a parser that silently stops matching
+    # would pass vacuously. That is the "absence reads as OK" family this whole
+    # file exists to eliminate, and it is not hypothetical: the first cut of
+    # this check keyed on the literal repo directory name, the generator moved
+    # to `$SCHEMAS_DIR/`, and the extractor went to zero matches. It failed
+    # closed then only because the expectation happened to be non-empty.
+    # The generator unavoidably references this repo, so zero is always a bug
+    # in the extractor, never a true observation about the generator.
+    if [ "${#found_schemas_paths[@]}" -eq 0 ]; then
+        echo "::error::found NO references into this repo in generate_types.sh."
+        echo "  It must have some — it writes the bindings this gate inspects — so"
+        echo "  this is the EXTRACTOR failing to understand the script's shape, not"
+        echo "  the generator having none. Reported separately from a set mismatch"
+        echo "  because an empty extraction would otherwise compare equal to an"
+        echo "  empty expectation and pass vacuously."
+        echo "  The extractor keys on \`\$SCHEMAS_DIR/\` and \`\${SCHEMAS_DIR}/\`."
+        echo "$shape_hint"
+        rc=1
+    fi
+
     local want got p rc_sets=0
     want="$(printf '%s\n' "${EXPECT_SCHEMAS_PATHS[@]}" | LC_ALL=C sort -u)" || rc_sets=$?
     got="$(printf '%s\n' ${found_schemas_paths[@]+"${found_schemas_paths[@]}"} \
         | LC_ALL=C sort -u)" || rc_sets=$?
     if [ "$rc_sets" -ne 0 ]; then
-        echo "::error::could not collate generate_types.sh's qontinui-schemas paths (exit $rc_sets)."
+        echo "::error::could not collate generate_types.sh's paths into this repo (exit $rc_sets)."
         rc=1
-    elif [ "$want" != "$got" ]; then
-        echo "::error::generate_types.sh's set of paths into $schemas_dir_name/ changed."
+    elif [ "$want" = "$got" ]; then
+        # Echo the extraction on success too. A silent pass cannot be
+        # distinguished from a pass over nothing when reading a CI log.
+        echo "cross-check: ${#found_schemas_paths[@]} reference(s) into this repo, all known:"
+        while IFS= read -r p; do
+            [ -n "$p" ] && echo "cross-check:   $p"
+        done <<< "$got"
+    else
+        echo "::error::generate_types.sh's set of paths into this repo changed."
         echo "  expected:"
         printf '    %s\n' "${EXPECT_SCHEMAS_PATHS[@]}"
         echo "  found:"
@@ -473,14 +535,40 @@ cross_check_output_dirs() {
     # an accepted form above, so the generator's PROJECT_ROOT is exactly
     # dirname(script)/.. — which is what licenses resolving the suffixes
     # against gen_root.
-    local var suffix gate_dir writes inspects
+    # The generator's three QONTINUI_* overrides are part of its contract, so
+    # resolve the SAME way it will: override if set, documented default if not.
+    # Reading them here is not merely cosmetic — if a workflow ever sets one at
+    # job level, the static default is NOT what codegen would use, and a
+    # cross-check that ignored them would prove the wrong thing.
+    #
+    # Residual gap, stated plainly: an override set only on the regen STEP is
+    # invisible to this step, so what is proven is "the paths that apply in
+    # THIS environment", not "in every environment".
+    local schemas_root
+    if [ -n "${QONTINUI_SCHEMAS_DIR:-}" ]; then
+        schemas_root="$QONTINUI_SCHEMAS_DIR"
+        echo "cross-check: QONTINUI_SCHEMAS_DIR override in effect -> $schemas_root"
+    else
+        schemas_root="$gen_root/$schemas_suffix"
+    fi
+    case "$schemas_root" in /*) ;; *) schemas_root="$repo_root/$schemas_root" ;; esac
+
+    local var suffix gate_dir writes inspects override
     for var in TS PY; do
         if [ "$var" = TS ]; then
             suffix="$ts_suffix"; gate_dir="$TS_GENERATED_DIR"
+            override="${QONTINUI_TS_OUT_DIR:-}"
         else
             suffix="$py_suffix"; gate_dir="$PY_GENERATED_DIR"
+            override="${QONTINUI_PY_OUT_DIR:-}"
         fi
-        writes="$(lexical_normalize "$gen_root/$suffix")"
+        if [ -n "$override" ]; then
+            echo "cross-check: QONTINUI_${var}_OUT_DIR override in effect"
+            case "$override" in /*) ;; *) override="$repo_root/$override" ;; esac
+            writes="$(lexical_normalize "$override")"
+        else
+            writes="$(lexical_normalize "$schemas_root/$suffix")"
+        fi
         inspects="$(lexical_normalize "$repo_root/$gate_dir")"
         if [ "$writes" = "$inspects" ]; then
             echo "cross-check: ${var}_OUT_DIR agrees -> $inspects"
