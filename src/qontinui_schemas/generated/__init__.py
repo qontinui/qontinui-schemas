@@ -186,9 +186,13 @@ from .per_type.functional_spec import FunctionalSpec
 from .per_type.gui_element_chunk import GUIElementChunk
 from .per_type.gap_reason import GapReason
 from .per_type.gate_evaluation_result import GateEvaluationResult
+from .per_type.git_commit_lite import GitCommitLite
+from .per_type.git_lite import GitLite
 from .per_type.git_op_list_response import GitOpListResponse
 from .per_type.git_op_record import GitOpRecord
 from .per_type.health_check_url import HealthCheckUrl
+from .per_type.health_level import HealthLevel
+from .per_type.health_lite import HealthLite
 from .per_type.helper_answer import HelperAnswer
 from .per_type.helper_answer_schema import HelperAnswerSchema
 from .per_type.helper_task import HelperTask
@@ -298,6 +302,7 @@ from .per_type.pathfinding_request import PathfindingRequest
 from .per_type.pathfinding_result import PathfindingResult
 from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
+from .per_type.pending_question import PendingQuestion
 from .per_type.pipeline_config import PipelineConfig
 from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
@@ -309,7 +314,9 @@ from .per_type.polling_config import PollingConfig
 from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
+from .per_type.process_status_lite import ProcessStatusLite
 from .per_type.profile import Profile
+from .per_type.project_snapshot import ProjectSnapshot
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.proposal_status import ProposalStatus
@@ -355,6 +362,7 @@ from .per_type.runner_status_event import RunnerStatusEvent
 from .per_type.runner_ui_error import RunnerUiError
 from .per_type.runtime_data import RuntimeData
 from .per_type.save_workflow_artifact_step import SaveWorkflowArtifactStep
+from .per_type.saved_project import SavedProject
 from .per_type.schedule_conditions import ScheduleConditions
 from .per_type.schedule_expression import ScheduleExpression
 from .per_type.scheduled_task import ScheduledTask
@@ -372,6 +380,8 @@ from .per_type.search_strategy import SearchStrategy
 from .per_type.section_verdict import SectionVerdict
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
+from .per_type.session_lite import SessionLite
+from .per_type.session_source import SessionSource
 from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
@@ -719,9 +729,13 @@ __all__ = [
     "GUIElementChunk",
     "GapReason",
     "GateEvaluationResult",
+    "GitCommitLite",
+    "GitLite",
     "GitOpListResponse",
     "GitOpRecord",
     "HealthCheckUrl",
+    "HealthLevel",
+    "HealthLite",
     "HelperAnswer",
     "HelperAnswerSchema",
     "HelperTask",
@@ -831,6 +845,7 @@ __all__ = [
     "PathfindingResult",
     "PathfindingStep",
     "PatternOptions",
+    "PendingQuestion",
     "PipelineConfig",
     "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
@@ -842,7 +857,9 @@ __all__ = [
     "ProcessConfig",
     "ProcessState",
     "ProcessStatus",
+    "ProcessStatusLite",
     "Profile",
+    "ProjectSnapshot",
     "PromptStep",
     "PromptStepPhase",
     "ProposalStatus",
@@ -888,6 +905,7 @@ __all__ = [
     "RunnerUiError",
     "RuntimeData",
     "SaveWorkflowArtifactStep",
+    "SavedProject",
     "ScheduleConditions",
     "ScheduleExpression",
     "ScheduledTask",
@@ -905,6 +923,8 @@ __all__ = [
     "SectionVerdict",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
+    "SessionLite",
+    "SessionSource",
     "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
