@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.10.0...ts-v0.10.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* restore the checked-in TypeScript bindings ([e8b9102](https://github.com/qontinui/qontinui-schemas/commit/e8b9102015a2962ac738beb88c6e1da17e8682c6))
+
 ## [0.10.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.9.0...ts-v0.10.0) (2026-07-29)
 
 
