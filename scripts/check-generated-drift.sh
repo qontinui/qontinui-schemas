@@ -133,6 +133,35 @@ EXPECT_SCHEMAS_DIR_RHS_FORMS=(
 # the fallback suffix.
 EXPECT_OUT_DIR_RHS_FORM='^"\$\{QONTINUI_(TS|PY)_OUT_DIR:-\$\{?SCHEMAS_DIR\}?/([A-Za-z0-9._/-]+)\}"$'
 
+# `*_OUT_DIR` variables that deliberately point OUTSIDE this repo.
+#
+# The `*_OUT_DIR` suffix is a naming convention, not a declaration of intent,
+# and the generator does not reserve it for the trees this gate inspects: it
+# also needs somewhere to put cargo's build output (`schemas.json`), which is
+# in qontinui-runner's OWN tree and is no business of this gate. Before this
+# list existed, any such variable landed in bad_out_dir_lines AND broke the
+# name-set compare, so `CARGO_OUT_DIR` — added by qontinui-runner 64686867 to
+# honour CARGO_TARGET_DIR — turned check-drift red on BOTH sides at once.
+# Because check-drift is a REQUIRED check here and schema-drift.yml reads
+# qontinui-runner at its DEFAULT BRANCH, that froze this repo's entire merge
+# train: the exact incident this file's header warns about, caused by the gate
+# meant to prevent it.
+#
+# Entries are `<NAME>=<regex>`, matched against that variable's RHS only. This
+# is an allowlist of PROVEN-FOREIGN shapes, not an exemption:
+#
+#   * the regex cannot mention SCHEMAS_DIR, so the day one of these is
+#     repointed into this repo its RHS stops matching and it falls through to
+#     bad_out_dir_lines — red, as before;
+#   * assertion 1 below is anchored on `$SCHEMAS_DIR/` and is INDEPENDENT of
+#     this list, so a foreign variable that grows a path into this repo is
+#     caught there too, under any name;
+#   * a `*_OUT_DIR` on NEITHER list still hard-fails. The default stays
+#     fail-closed; only these exact name+shape pairs are known-foreign.
+EXPECT_FOREIGN_OUT_DIR_FORMS=(
+    'CARGO_OUT_DIR=^"\$\{CARGO_TARGET_DIR:-\$\{CARGO_BUILD_TARGET_DIR:-\$\{?PROJECT_ROOT\}?/[A-Za-z0-9._/-]+\}\}"$'
+)
+
 # Every path in generate_types.sh that reaches into THIS repo, keyed by the
 # suffix after `$SCHEMAS_DIR/`.
 #
@@ -256,6 +285,23 @@ matches_any() { # matches_any <string> <regex>...
     return 1
 }
 
+# Is this <name>=<rhs> pair a known-foreign output dir?
+#
+# Entries in EXPECT_FOREIGN_OUT_DIR_FORMS are `<NAME>=<regex>`. The name must
+# match EXACTLY and the regex is then matched against the RHS alone, so a
+# familiar name carrying an unfamiliar shape is NOT waved through — it falls
+# back to the fail-closed path and reds. `${entry#*=}` strips only up to the
+# first `=`, which is the separator; the accepted RHS forms are anchored path
+# expressions, so the name half is unambiguous.
+is_foreign_out_dir() { # is_foreign_out_dir <name> <rhs>
+    local name="$1" rhs="$2" entry
+    for entry in ${EXPECT_FOREIGN_OUT_DIR_FORMS[@]+"${EXPECT_FOREIGN_OUT_DIR_FORMS[@]}"}; do
+        [ "${entry%%=*}" = "$name" ] || continue
+        [[ "$rhs" =~ ${entry#*=} ]] && return 0
+    done
+    return 1
+}
+
 # ── output-directory cross-check ────────────────────────────────────────────
 #
 # This gate inspects GENERATED_DIRS. generate_types.sh derives its own output
@@ -321,6 +367,7 @@ cross_check_output_dirs() {
     local line t name rhs rest seg
     local -a script_dir_rhs=() project_root_rhs=() schemas_dir_rhs=()
     local -a out_dir_names=() bad_bind_lines=() bad_out_dir_lines=() eval_lines=()
+    local -a foreign_out_dir_names=()
     local -a found_schemas_paths=()
     local ts_suffix="" py_suffix="" schemas_suffix=""
 
@@ -351,18 +398,36 @@ cross_check_output_dirs() {
                     PROJECT_ROOT) project_root_rhs+=("$rhs") ;;
                     SCHEMAS_DIR)  schemas_dir_rhs+=("$rhs") ;;
                     *_OUT_DIR)
-                        out_dir_names+=("$name")
-                        # The override's TS/PY discriminator must match the
-                        # variable it is assigned to, so a copy-paste that
-                        # crosses them is caught rather than resolved.
-                        if [[ "$rhs" =~ $EXPECT_OUT_DIR_RHS_FORM ]] \
-                           && [ "${BASH_REMATCH[1]}_OUT_DIR" = "$name" ]; then
-                            case "$name" in
-                                TS_OUT_DIR) ts_suffix="${BASH_REMATCH[2]}" ;;
-                                PY_OUT_DIR) py_suffix="${BASH_REMATCH[2]}" ;;
-                            esac
+                        # A proven-foreign name+shape pair (see
+                        # EXPECT_FOREIGN_OUT_DIR_FORMS) names a tree outside
+                        # this repo, so it is recorded separately and kept OUT
+                        # of the name-set compare below — which stays exactly
+                        # the set this gate resolves. Checked FIRST so that
+                        # anything not proven foreign keeps the old,
+                        # fail-closed path.
+                        #
+                        # NOT `continue`: the `$SCHEMAS_DIR/` scan for this
+                        # same line lives further down this loop body, and
+                        # skipping it would hide a path into this repo that
+                        # happened to sit on a foreign variable's line — a
+                        # fresh vacuity hole in the assertion specifically
+                        # built to be independent of this list.
+                        if is_foreign_out_dir "$name" "$rhs"; then
+                            foreign_out_dir_names+=("$name")
                         else
-                            bad_out_dir_lines+=("$t")
+                            out_dir_names+=("$name")
+                            # The override's TS/PY discriminator must match the
+                            # variable it is assigned to, so a copy-paste that
+                            # crosses them is caught rather than resolved.
+                            if [[ "$rhs" =~ $EXPECT_OUT_DIR_RHS_FORM ]] \
+                               && [ "${BASH_REMATCH[1]}_OUT_DIR" = "$name" ]; then
+                                case "$name" in
+                                    TS_OUT_DIR) ts_suffix="${BASH_REMATCH[2]}" ;;
+                                    PY_OUT_DIR) py_suffix="${BASH_REMATCH[2]}" ;;
+                                esac
+                            else
+                                bad_out_dir_lines+=("$t")
+                            fi
                         fi
                         ;;
                 esac
@@ -472,7 +537,17 @@ cross_check_output_dirs() {
         echo "  found:    ${names_seen:-<none>}"
         echo "  An output tree this gate never resolves is drift it would never see."
         echo "  Add it to GENERATED_DIRS and commit its baseline, or remove it."
+        echo "  If it names a tree OUTSIDE this repo (a cargo target dir, say), add"
+        echo "  its name and RHS shape to EXPECT_FOREIGN_OUT_DIR_FORMS instead."
         rc=1
+    fi
+
+    # Name the foreign ones too. Silence here would read identically whether
+    # the allowlist matched nothing or was never consulted, and this list is
+    # the one place a reviewer can see what the gate has agreed to ignore.
+    if [ "${#foreign_out_dir_names[@]}" -gt 0 ]; then
+        echo "cross-check: ${#foreign_out_dir_names[@]} *_OUT_DIR variable(s) outside this repo, all known:"
+        printf 'cross-check:   %s\n' "${foreign_out_dir_names[@]}"
     fi
 
     # Assertion 1 — every path the generator aims into this repo is known.
