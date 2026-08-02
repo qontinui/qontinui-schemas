@@ -55,69 +55,6 @@ from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.candidate_miss import CandidateMiss
 from .per_type.canonical_step import CanonicalStep
-from .per_type.canvas_panel import CanvasPanel
-from .per_type.catch_up_policy import CatchUpPolicy
-from .per_type.category import Category
-from .per_type.check_issue_detail import CheckIssueDetail
-from .per_type.check_type import CheckType
-from .per_type.code_execution_step import CodeExecutionStep
-from .per_type.command_mode import CommandMode
-from .per_type.command_step import CommandStep
-from .per_type.command_step_phase import CommandStepPhase
-from .per_type.completeness_verdict import CompletenessVerdict
-from .per_type.component_action_info import ComponentActionInfo
-from .per_type.component_action_request import ComponentActionRequest
-from .per_type.compute_embedding_request import ComputeEmbeddingRequest
-from .per_type.compute_embedding_response import ComputeEmbeddingResponse
-from .per_type.compute_text_embedding_request import ComputeTextEmbeddingRequest
-from .per_type.compute_text_embedding_response import ComputeTextEmbeddingResponse
-from .per_type.condition_schedule_config import ConditionScheduleConfig
-from .per_type.condition_status import ConditionStatus
-from .per_type.confidence import Confidence
-from .per_type.confidence_level import ConfidenceLevel
-from .per_type.conjunct_evaluation import ConjunctEvaluation
-from .per_type.conjunct_rule import ConjunctRule
-from .per_type.constraint import Constraint
-from .per_type.constraint_check import ConstraintCheck
-from .per_type.constraint_proposal import ConstraintProposal
-from .per_type.constraint_result import ConstraintResult
-from .per_type.constraint_severity import ConstraintSeverity
-from .per_type.constraint_violation import ConstraintViolation
-from .per_type.context import Context
-from .per_type.context_auto_include import ContextAutoInclude
-from .per_type.coordinate_system import CoordinateSystem
-from .per_type.coordinates import Coordinates
-from .per_type.cost_trend_data_point import CostTrendDataPoint
-from .per_type.cost_trend_response import CostTrendResponse
-from .per_type.coverage_data import CoverageData
-from .per_type.coverage_gap import CoverageGap
-from .per_type.create_mcp_call_input import CreateMcpCallInput
-from .per_type.create_mcp_server_input import CreateMcpServerInput
-from .per_type.create_ol_config_request import CreateOlConfigRequest
-from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
-from .per_type.create_task_run_request import CreateTaskRunRequest
-from .per_type.criterion_override import CriterionOverride
-from .per_type.criterion_type import CriterionType
-from .per_type.dag_approval_step import DagApprovalStep
-from .per_type.dag_cancel_step import DagCancelStep
-from .per_type.dag_loop_step import DagLoopStep
-from .per_type.decomposer_config import DecomposerConfig
-from .per_type.dev_seed_finding_payload import DevSeedFindingPayload
-from .per_type.device_branch_summary import DeviceBranchSummary
-from .per_type.diagnose_phase_config import DiagnosePhaseConfig
-from .per_type.diagnostic_result import DiagnosticResult
-from .per_type.discovered_element import DiscoveredElement
-from .per_type.discovered_state import DiscoveredState
-from .per_type.discovered_state_image import DiscoveredStateImage
-from .per_type.discovered_transition import DiscoveredTransition
-from .per_type.discovery_bounding_box import DiscoveryBoundingBox
-from .per_type.discovery_request import DiscoveryRequest
-from .per_type.discovery_response import DiscoveryResponse
-from .per_type.discovery_source_type import DiscoverySourceType
-from .per_type.discovery_strategy import DiscoveryStrategy
-from .per_type.discovery_transition_trigger import DiscoveryTransitionTrigger
-from .per_type.display_node import DisplayNode
-from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
 from .per_type.element_action_request import ElementActionRequest
@@ -186,9 +123,13 @@ from .per_type.functional_spec import FunctionalSpec
 from .per_type.gui_element_chunk import GUIElementChunk
 from .per_type.gap_reason import GapReason
 from .per_type.gate_evaluation_result import GateEvaluationResult
+from .per_type.git_commit_lite import GitCommitLite
+from .per_type.git_lite import GitLite
 from .per_type.git_op_list_response import GitOpListResponse
 from .per_type.git_op_record import GitOpRecord
 from .per_type.health_check_url import HealthCheckUrl
+from .per_type.health_level import HealthLevel
+from .per_type.health_lite import HealthLite
 from .per_type.helper_answer import HelperAnswer
 from .per_type.helper_answer_schema import HelperAnswerSchema
 from .per_type.helper_task import HelperTask
@@ -298,6 +239,7 @@ from .per_type.pathfinding_request import PathfindingRequest
 from .per_type.pathfinding_result import PathfindingResult
 from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
+from .per_type.pending_question import PendingQuestion
 from .per_type.pipeline_config import PipelineConfig
 from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
@@ -309,7 +251,9 @@ from .per_type.polling_config import PollingConfig
 from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
+from .per_type.process_status_lite import ProcessStatusLite
 from .per_type.profile import Profile
+from .per_type.project_snapshot import ProjectSnapshot
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.proposal_status import ProposalStatus
@@ -355,6 +299,7 @@ from .per_type.runner_status_event import RunnerStatusEvent
 from .per_type.runner_ui_error import RunnerUiError
 from .per_type.runtime_data import RuntimeData
 from .per_type.save_workflow_artifact_step import SaveWorkflowArtifactStep
+from .per_type.saved_project import SavedProject
 from .per_type.schedule_conditions import ScheduleConditions
 from .per_type.schedule_expression import ScheduleExpression
 from .per_type.scheduled_task import ScheduledTask
@@ -372,6 +317,8 @@ from .per_type.search_strategy import SearchStrategy
 from .per_type.section_verdict import SectionVerdict
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
+from .per_type.session_lite import SessionLite
+from .per_type.session_source import SessionSource
 from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
@@ -588,69 +535,6 @@ __all__ = [
     "BuiltinOverrideProposal",
     "CandidateMiss",
     "CanonicalStep",
-    "CanvasPanel",
-    "CatchUpPolicy",
-    "Category",
-    "CheckIssueDetail",
-    "CheckType",
-    "CodeExecutionStep",
-    "CommandMode",
-    "CommandStep",
-    "CommandStepPhase",
-    "CompletenessVerdict",
-    "ComponentActionInfo",
-    "ComponentActionRequest",
-    "ComputeEmbeddingRequest",
-    "ComputeEmbeddingResponse",
-    "ComputeTextEmbeddingRequest",
-    "ComputeTextEmbeddingResponse",
-    "ConditionScheduleConfig",
-    "ConditionStatus",
-    "Confidence",
-    "ConfidenceLevel",
-    "ConjunctEvaluation",
-    "ConjunctRule",
-    "Constraint",
-    "ConstraintCheck",
-    "ConstraintProposal",
-    "ConstraintResult",
-    "ConstraintSeverity",
-    "ConstraintViolation",
-    "Context",
-    "ContextAutoInclude",
-    "CoordinateSystem",
-    "Coordinates",
-    "CostTrendDataPoint",
-    "CostTrendResponse",
-    "CoverageData",
-    "CoverageGap",
-    "CreateMcpCallInput",
-    "CreateMcpServerInput",
-    "CreateOlConfigRequest",
-    "CreateScheduledTaskRequest",
-    "CreateTaskRunRequest",
-    "CriterionOverride",
-    "CriterionType",
-    "DagApprovalStep",
-    "DagCancelStep",
-    "DagLoopStep",
-    "DecomposerConfig",
-    "DevSeedFindingPayload",
-    "DeviceBranchSummary",
-    "DiagnosePhaseConfig",
-    "DiagnosticResult",
-    "DiscoveredElement",
-    "DiscoveredState",
-    "DiscoveredStateImage",
-    "DiscoveredTransition",
-    "DiscoveryBoundingBox",
-    "DiscoveryRequest",
-    "DiscoveryResponse",
-    "DiscoverySourceType",
-    "DiscoveryStrategy",
-    "DiscoveryTransitionTrigger",
-    "DisplayNode",
-    "DomainAssignment",
     "DomainKnowledge",
     "DomainVerificationResult",
     "ElementActionRequest",
@@ -719,9 +603,13 @@ __all__ = [
     "GUIElementChunk",
     "GapReason",
     "GateEvaluationResult",
+    "GitCommitLite",
+    "GitLite",
     "GitOpListResponse",
     "GitOpRecord",
     "HealthCheckUrl",
+    "HealthLevel",
+    "HealthLite",
     "HelperAnswer",
     "HelperAnswerSchema",
     "HelperTask",
@@ -831,6 +719,7 @@ __all__ = [
     "PathfindingResult",
     "PathfindingStep",
     "PatternOptions",
+    "PendingQuestion",
     "PipelineConfig",
     "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
@@ -842,7 +731,9 @@ __all__ = [
     "ProcessConfig",
     "ProcessState",
     "ProcessStatus",
+    "ProcessStatusLite",
     "Profile",
+    "ProjectSnapshot",
     "PromptStep",
     "PromptStepPhase",
     "ProposalStatus",
@@ -888,6 +779,7 @@ __all__ = [
     "RunnerUiError",
     "RuntimeData",
     "SaveWorkflowArtifactStep",
+    "SavedProject",
     "ScheduleConditions",
     "ScheduleExpression",
     "ScheduledTask",
@@ -905,6 +797,8 @@ __all__ = [
     "SectionVerdict",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
+    "SessionLite",
+    "SessionSource",
     "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
