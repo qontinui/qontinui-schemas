@@ -23,11 +23,23 @@ on:
   pull_request:
   push:
     branches: [main]
+    # This list is the WORKSPACE, not a subset of it. Cargo.toml declares
+    # members = ["rust", "rust-runner-client", "rust-vision-core",
+    # "code-graph"]; omitting two of the four meant a landed change to
+    # rust-vision-core/** or code-graph/** compiled NOTHING on main —
+    # which is what happened when f8ee21db (schemas#104) was pushed on
+    # 2026-07-28T00:08:39Z: it triggered release-please and nothing else,
+    # so main's own CI never observed the break that reddened
+    # qontinui-runner sixteen minutes later. Keep this in step with
+    # runner-consumer-check.yml's `paths:` and check-consumers' in-job
+    # predicate — all three describe the same path-dep surface.
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust/**"
       - "rust-runner-client/**"
+      - "rust-vision-core/**"
+      - "code-graph/**"
       - ".github/workflows/rust-ci.yml"
   workflow_dispatch:
   workflow_call:

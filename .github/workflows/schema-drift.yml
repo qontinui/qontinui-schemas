@@ -258,10 +258,26 @@ jobs:
   # real runner build was red. `--all-targets` compiles bin + test
   # targets and closes exactly that blind spot.
   #
-  # Consumer list is EXPLICIT: qontinui-runner is the only Rust
-  # path-dep consumer today. When another repo gains a path dep on
-  # qontinui-schemas/rust, add a sibling checkout + gated
-  # `cargo check --workspace --all-targets` step pair for it here.
+  # Consumer list — READ THIS BEFORE TRUSTING IT. This job compiles
+  # qontinui-runner ONLY. That is NOT the full consumer set, and the
+  # comment that used to claim "qontinui-runner is the only Rust
+  # path-dep consumer today" was false by the time anyone read it:
+  #
+  #   qontinui-runner     src-tauri/Cargo.toml:125-127 — qontinui-types,
+  #                       qontinui-code-graph, qontinui-vision-core
+  #   qontinui-coord      Cargo.toml:91,97 — qontinui-types,
+  #                       qontinui-code-graph            (NOT gated here)
+  #   qontinui-supervisor Cargo.toml:57,58 — qontinui-types,
+  #                       qontinui-runner-client         (see below)
+  #
+  # A hand-maintained consumer list decays silently — this one decayed
+  # twice before anyone noticed. The durable coverage lives in
+  # runner-consumer-check.yml, whose `consumer-check` job is a MATRIX
+  # over consumers; add new consumers there, not here. coord is private,
+  # so a schemas workflow cannot check it out with the default
+  # GITHUB_TOKEN; the fleet has declined a cross-repo PAT for exactly
+  # this shape (qontinui-supervisor/.github/workflows/ci.yml:87-95), so
+  # coord is covered from its own side instead.
   #
   # Trigger/required-check convention (same as check-drift and
   # rust-ci.yml): the pull_request trigger carries NO paths: filter —
@@ -284,9 +300,10 @@ jobs:
           # base...head range directly by sha.
           fetch-depth: 0
 
-      # Early exit: only schema Rust source changes (rust/src/**) can
-      # break a consumer's compile. Per event:
-      #   pull_request      -> diff base..head; run only if rust/src/** changed
+      # Early exit: only changes to a PATH-CONSUMED crate can break a
+      # consumer's compile. Per event:
+      #   pull_request      -> diff base..head; run only if a path-dep
+      #                        surface path changed
       #   push              -> run fully (trigger is already path-filtered)
       #   workflow_dispatch -> run fully (a manual dispatch is an
       #                        explicit ask; force_consumers=true keeps
@@ -294,6 +311,32 @@ jobs:
       # When run_gate=false every subsequent step is skipped and the
       # job completes green in seconds — that is what keeps the
       # unfiltered pull_request trigger cheap on irrelevant PRs.
+      #
+      # THE PREDICATE SURFACE (do not narrow without re-deriving it).
+      # This predicate used to read `^rust/src/` alone. That is the crate
+      # `qontinui-types` and NOTHING ELSE, but this repo is a FOUR-crate
+      # workspace (Cargo.toml: members = ["rust", "rust-runner-client",
+      # "rust-vision-core", "code-graph"]) and three of the four are
+      # path-consumed by somebody. So a change confined to any of the
+      # other three self-skipped this job, which then reported SUCCESS
+      # having compiled nothing.
+      #
+      # That is not hypothetical. schemas#104 ("widen vision-core Region
+      # origin to signed i32") touched ONLY rust-vision-core/**. This job
+      # logged `event=pull_request run_gate=false` and went green in SIX
+      # SECONDS (run 29975577008, 2026-07-23T02:54:24Z -> 02:54:30Z) while
+      # being the only consumer-compile context in the ruleset's required
+      # list. Sixteen minutes after it landed, qontinui-runner main went
+      # red with 11 x E0308 and stayed red 4h38m behind 16 open PRs.
+      #
+      # A vacuous self-skip on a compile gate renders as a green check,
+      # which is why nobody noticed for 22 days. The surface below is the
+      # same list runner-consumer-check.yml's `paths:` trigger already
+      # uses — the two predicates now agree by construction rather than
+      # by coincidence. Cargo.toml/Cargo.lock are load-bearing too:
+      # consumers pin version RANGES (qontinui-supervisor/Cargo.toml:57
+      # `version = ">=0.1.2, <2.0.0"`), so a manifest-only bump can break
+      # a consumer's resolution.
       - name: Decide whether consumer compile gate must run
         id: gate
         working-directory: qontinui-schemas
@@ -307,10 +350,19 @@ jobs:
         run: |
           set -euo pipefail
           run_gate=false
+          # Initialised before the case so the diagnostic echo below is
+          # safe under `set -u` on push/dispatch events, where no diff is
+          # computed at all.
+          changed=""
           case "$EVENT_NAME" in
             pull_request)
               changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
-              if printf '%s\n' "$changed" | grep -q '^rust/src/'; then
+              # Anchored alternation over the full path-dep surface.
+              # `-E` + `^(...)` keeps every branch anchored at the start
+              # of the path; an unanchored `Cargo.toml` would also match
+              # `rust/Cargo.toml` (harmless here, but the anchor is what
+              # makes the list auditable against the trigger it mirrors).
+              if printf '%s\n' "$changed" | grep -qE '^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$)'; then
                 run_gate=true
               fi
               ;;
@@ -323,6 +375,19 @@ jobs:
           fi
           echo "run_gate=$run_gate" >> "$GITHUB_OUTPUT"
           echo "event=$EVENT_NAME run_gate=$run_gate"
+          if [ -n "$changed" ]; then
+            printf '%s\n' "$changed" | sed 's/^/  changed: /'
+          fi
+
+      # Anti-vacuity assertion (plan 6.2). The failure this whole job
+      # exists to prevent rendered as a GREEN CHECK, so "the gate decided
+      # to run" and "the gate actually compiled" must be separately
+      # observable. If run_gate is true, the compile step below is
+      # REQUIRED to have executed; the guard at the end of this job
+      # asserts exactly that and fails loudly if it did not.
+      - name: Record gate decision for the anti-vacuity guard
+        if: steps.gate.outputs.run_gate == 'true'
+        run: echo "COMPILE_EXPECTED=1" >> "$GITHUB_ENV"
 
       - name: Checkout qontinui-runner (sibling)
         if: steps.gate.outputs.run_gate == 'true'
@@ -404,6 +469,7 @@ jobs:
       # lib. The sibling layout above resolves the runner's
       # `../../qontinui-schemas/rust` path dep to THIS PR's schema.
       - name: cargo check qontinui-runner (all targets) against proposed schema
+        id: compile
         if: steps.gate.outputs.run_gate == 'true'
         working-directory: qontinui-runner
         env:
@@ -411,4 +477,43 @@ jobs:
           # See the swapfile step above — JOBS=1 matches runner CI's
           # empirically-derived OOM mitigation for this workspace.
           CARGO_BUILD_JOBS: "1"
-        run: cargo check --workspace --all-targets
+        run: |
+          cargo check --workspace --all-targets
+          echo "ran=1" >> "$GITHUB_OUTPUT"
+
+      # ANTI-VACUITY GUARD. The defect that motivated widening the
+      # predicate above was not a red that should have been green — it
+      # was a job that compiled NOTHING and reported success, which is
+      # indistinguishable from a real pass at the badge level. So assert
+      # the two facts against each other: if the gate decided to run,
+      # the compile step MUST have run. Without this, any future edit
+      # that re-breaks the predicate (or mis-gates a step's `if:`)
+      # silently restores the six-second green.
+      #
+      # `always()` so this cannot itself be skipped by an upstream
+      # failure. It deliberately does NOT fail when run_gate=false —
+      # a genuine cheap-exit on an irrelevant PR is the designed path.
+      - name: Assert the gate was not vacuous
+        if: always()
+        env:
+          RUN_GATE: ${{ steps.gate.outputs.run_gate }}
+          COMPILE_RAN: ${{ steps.compile.outputs.ran }}
+          COMPILE_OUTCOME: ${{ steps.compile.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_GATE" != "true" ]; then
+            echo "run_gate=false — cheap exit, nothing to assert."
+            exit 0
+          fi
+          if [ "$COMPILE_RAN" = "1" ]; then
+            echo "run_gate=true and the consumer compile executed (outcome=$COMPILE_OUTCOME). Gate is real."
+            exit 0
+          fi
+          if [ "$COMPILE_OUTCOME" = "failure" ]; then
+            echo "run_gate=true and the consumer compile ran and FAILED — that is a real red, not a vacuous one."
+            exit 0
+          fi
+          echo "::error::VACUOUS GATE: run_gate=true but the consumer compile step did not execute (outcome=${COMPILE_OUTCOME:-<none>})."
+          echo "This job is a REQUIRED check. A green here would assert 'consumers still compile' while having compiled nothing —"
+          echo "exactly the failure of run 29975577008 that let schemas#104 red qontinui-runner main for 4h38m."
+          exit 1
