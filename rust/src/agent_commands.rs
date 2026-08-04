@@ -60,9 +60,20 @@
 //!   FastAPI layer, whose sibling skills API (`SkillResponse`) already speaks
 //!   `created_by_user_id` / `organization_id` / `is_shared` / `created_at`.
 //!   Renaming would fork the wire against its closest prior art for no gain.
+//!
+//! ## Two write-boundary primitives live here, not in the consumers
+//!
+//! [`validate_agent_command_name`] and [`agent_command_checksum`] are the
+//! canonical definitions of "is this `name` writable?" and "what exactly does
+//! `checksum` contain?". They sit in this crate for the same reason
+//! [`crate::apps::validate_app_id`] does: three surfaces write these rows (the
+//! qontinui-web FastAPI layer, the runner's override registry, and any future
+//! coord-mediated sync), and a rule that each re-derives is a rule they will
+//! disagree about. See each function's own docs for the failure it prevents.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
 // AgentCommand
@@ -98,6 +109,9 @@ pub struct AgentCommand {
     /// The command slug, e.g. `vet-plan` or `implement-plan`. This is the
     /// override key: it must equal the name of the embedded default it
     /// replaces, and it is the filename stem under `.claude/commands/`.
+    ///
+    /// Because it becomes a path component, it is a write-boundary value —
+    /// validate it with [`validate_agent_command_name`] before persisting.
     pub name: String,
 
     /// The full markdown body of the command.
@@ -106,6 +120,10 @@ pub struct AgentCommand {
     /// Content hash of [`body`](Self::body), for cheap change detection
     /// (cache invalidation, diff-against-default). `None` on rows written
     /// before a checksum was computed.
+    ///
+    /// Computed by [`agent_command_checksum`] — `"sha256-<hex>"` over the
+    /// LF-normalized body. Do not hand-roll it; a producer that hashes raw
+    /// bytes disagrees with one that hashes a CRLF round-trip.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
 
@@ -156,7 +174,10 @@ pub struct AgentCommandVersion {
     /// The full markdown body as of this version.
     pub body: String,
 
-    /// Content hash of [`body`](Self::body) at this version.
+    /// Content hash of [`body`](Self::body) at this version, from
+    /// [`agent_command_checksum`]. Equal checksums on two versions mean the
+    /// bodies are identical — which is what lets the UI show a revert as
+    /// "back to v2's content" without refetching either body.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
 
@@ -179,6 +200,116 @@ pub struct AgentCommandVersion {
     /// ISO 8601 (RFC 3339) creation timestamp. Versions are immutable, so
     /// there is deliberately no `updated_at`.
     pub created_at: String,
+}
+
+// ---------------------------------------------------------------------------
+// Write-boundary primitives
+// ---------------------------------------------------------------------------
+
+/// Failure modes for agent-command overrides. Mirrors the tagged-enum shape of
+/// [`crate::apps::AppError`], so the qontinui-web layer can surface a rejected
+/// override the same way it surfaces a rejected app registration.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, thiserror::Error)]
+#[serde(
+    tag = "reason",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
+pub enum AgentCommandError {
+    #[error("agent command name '{name}' is not a valid slug")]
+    InvalidName { name: String },
+
+    #[error("agent command name '{name}' is a reserved device name on Windows")]
+    ReservedName { name: String },
+}
+
+/// Filename stems Windows resolves to a character device no matter what
+/// extension follows, so `nul.md` IS the null device, not a file called
+/// "nul.md". Matched case-insensitively because the device namespace is.
+const WINDOWS_RESERVED_STEMS: &[&str] = &[
+    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
+    "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+];
+
+/// Validate an [`AgentCommand::name`] before it is persisted or turned into a
+/// path. Returns `Ok(())` for valid slugs.
+///
+/// Rules — deliberately the same shape as [`crate::apps::validate_app_id`]:
+/// 1–64 chars, lowercase ASCII letters / digits / hyphens, first char
+/// `[a-z0-9]`. Plus a rejection of the Windows reserved device stems.
+///
+/// ## The two failures this prevents
+///
+/// The name is not just a database key. The runner's
+/// `provision_fleet_commands_into` writes each command by joining its
+/// `<name>.md` filename onto `<workdir>/.claude/commands/` — a literal today,
+/// since only the embedded defaults exist. The moment an override supplies
+/// that stem, this stored string becomes a path component on a fleet device.
+///
+/// - **Escape.** `..`, `/` and `\` are all excluded by the charset, so an
+///   override cannot address a file outside `.claude/commands/`. That path
+///   never had a hostile author in mind — the module header already flags a
+///   body as untrusted remote content, and the name arrives by the same route.
+/// - **Silent discard (Windows).** The fleet runs on Windows, where a reserved
+///   device stem (`con`, `nul`, `com1`, …) opens a device rather than a file.
+///   `std::fs::write` on `nul.md` SUCCEEDS and writes nothing, so the
+///   provisioning path — which is fail-soft and only warns on `Err` — would
+///   log a clean success for a command that does not exist. A no-op that
+///   reports success is worse than an error, which is why this is a rejection
+///   at the write boundary rather than a runtime check.
+///
+/// Shape is all this checks. Whether the name matches an embedded default it
+/// may replace is the runner's call — this crate deliberately does not know
+/// the default list (the module header notes nothing here may assume two).
+pub fn validate_agent_command_name(name: &str) -> Result<(), AgentCommandError> {
+    let len_ok = (1..=64).contains(&name.len());
+    let first_ok = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit());
+    let rest_ok = name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if !(len_ok && first_ok && rest_ok) {
+        return Err(AgentCommandError::InvalidName { name: name.into() });
+    }
+    if WINDOWS_RESERVED_STEMS
+        .iter()
+        .any(|r| r.eq_ignore_ascii_case(name))
+    {
+        return Err(AgentCommandError::ReservedName { name: name.into() });
+    }
+    Ok(())
+}
+
+/// Canonical checksum for an agent-command body. Returns `"sha256-<hex>"`.
+///
+/// **CR bytes are stripped before hashing.** That is the load-bearing part.
+/// The same body is round-tripped through Postgres, JSON, and a Windows
+/// filesystem before anyone compares two of these, and a CRLF-normalizing hop
+/// anywhere on that path would otherwise flip the checksum and report an
+/// unchanged command as changed — defeating the only thing the field is for.
+/// The runner already learned this for the bundled defaults, whose
+/// `STAGED_COMMAND_HASHES` pin is likewise taken over CR-stripped content.
+///
+/// The `"sha256-"` prefix follows this crate's existing output convention
+/// ([`crate::canonical_hash`], [`crate::spec_check`]) — note that the runner's
+/// `STAGED_COMMAND_HASHES` constant stores BARE hex over those same
+/// LF-normalized bytes, so comparing an override against an embedded default
+/// means comparing the hex tails, not the whole strings.
+///
+/// This is not [`crate::canonical_hash::canonical_hash`]: that one runs its
+/// input through RFC 8785 JCS, which for a bare string adds JSON quoting and
+/// escaping that every non-Rust producer would then have to reproduce
+/// byte-exactly. There is no key order to canonicalize in a markdown
+/// document, so the JCS pass would buy nothing and cost interoperability.
+/// A Python producer matches this with
+/// `"sha256-" + sha256(body.replace("\r", "").encode("utf-8")).hexdigest()`.
+pub fn agent_command_checksum(body: &str) -> String {
+    let normalized = body.replace('\r', "");
+    let mut hasher = Sha256::new();
+    hasher.update(normalized.as_bytes());
+    format!("sha256-{}", hex::encode(hasher.finalize()))
 }
 
 #[cfg(test)]
@@ -265,5 +396,157 @@ mod tests {
         assert!(json.get("change_description").is_none());
         assert!(json.get("restored_from").is_none());
         assert_eq!(json["version_number"], 1);
+    }
+
+    // -- validate_agent_command_name ---------------------------------------
+
+    #[test]
+    fn name_accepts_the_embedded_default_slugs() {
+        // The two commands the runner bundles today must both be overridable;
+        // a validator that rejected either would make the feature unusable.
+        assert!(validate_agent_command_name("vet-plan").is_ok());
+        assert!(validate_agent_command_name("implement-plan").is_ok());
+        assert!(validate_agent_command_name("a").is_ok());
+        assert!(validate_agent_command_name("plan2").is_ok());
+        assert!(validate_agent_command_name(&"a".repeat(64)).is_ok());
+    }
+
+    #[test]
+    fn name_rejects_path_escapes() {
+        for bad in [
+            "..",
+            "../vet-plan",
+            "../../.claude/settings",
+            "sub/vet-plan",
+            "sub\\vet-plan",
+            "/etc/passwd",
+            "C:\\windows\\system32",
+            ".hidden",
+        ] {
+            assert_eq!(
+                validate_agent_command_name(bad),
+                Err(AgentCommandError::InvalidName { name: bad.into() }),
+                "{bad:?} must not be writable as a path component"
+            );
+        }
+    }
+
+    #[test]
+    fn name_rejects_shape_violations() {
+        for bad in [
+            "",                // empty
+            &"a".repeat(65),   // over the 64-char ceiling
+            "-leading-hyphen", // first char must be [a-z0-9]
+            "Vet-Plan",        // uppercase
+            "vet plan",        // whitespace
+            "vet.plan",        // dot would split the stem
+            "vet_plan",        // underscore is not in the charset
+        ] {
+            assert!(
+                validate_agent_command_name(bad).is_err(),
+                "{bad:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn name_rejects_windows_device_stems_case_insensitively() {
+        // `nul.md` is the null device on Windows: fs::write succeeds and
+        // discards, so this must fail here or it fails silently there.
+        assert_eq!(
+            validate_agent_command_name("nul"),
+            Err(AgentCommandError::ReservedName { name: "nul".into() })
+        );
+        for reserved in ["con", "prn", "aux", "com1", "lpt9"] {
+            assert_eq!(
+                validate_agent_command_name(reserved),
+                Err(AgentCommandError::ReservedName {
+                    name: reserved.into()
+                }),
+                "{reserved:?} is a Windows device stem"
+            );
+        }
+        // Uppercase is caught by the charset rule first — the point is only
+        // that it never reaches the filesystem, not which arm rejects it.
+        assert!(validate_agent_command_name("NUL").is_err());
+        // A reserved stem is only reserved bare; extending it is a real name.
+        assert!(validate_agent_command_name("console").is_ok());
+        assert!(validate_agent_command_name("nul-plan").is_ok());
+    }
+
+    #[test]
+    fn error_serializes_with_the_apps_tagged_shape() {
+        let json = serde_json::to_value(AgentCommandError::InvalidName {
+            name: "../x".to_string(),
+        })
+        .unwrap();
+        assert_eq!(json["reason"], "invalid-name");
+        assert_eq!(json["name"], "../x");
+    }
+
+    // -- agent_command_checksum --------------------------------------------
+
+    #[test]
+    fn checksum_has_the_crate_prefix_and_64_hex_chars() {
+        let h = agent_command_checksum("# /vet-plan\n");
+        assert!(h.starts_with("sha256-"), "got {h}");
+        let hex_part = &h["sha256-".len()..];
+        assert_eq!(hex_part.len(), 64);
+        assert!(hex_part.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn checksum_is_line_ending_invariant() {
+        // The whole point: a CRLF round-trip through Postgres/JSON/Windows
+        // must not read as a content change.
+        assert_eq!(
+            agent_command_checksum("# /vet-plan\nstep one\n"),
+            agent_command_checksum("# /vet-plan\r\nstep one\r\n")
+        );
+    }
+
+    #[test]
+    fn checksum_distinguishes_real_edits() {
+        assert_ne!(
+            agent_command_checksum("# /vet-plan\n"),
+            agent_command_checksum("# /vet-plan\nstep one\n")
+        );
+    }
+
+    #[test]
+    fn checksum_matches_bare_lf_normalized_sha256_of_the_body() {
+        // Pins the algorithm against an independently computed digest rather
+        // than against itself, so a future refactor cannot quietly redefine
+        // the wire value. The hex tail is exactly what the runner's
+        // STAGED_COMMAND_HASHES stores for the embedded defaults.
+        let expected = {
+            let mut h = Sha256::new();
+            h.update(b"# /vet-plan\nstep one\n");
+            hex::encode(h.finalize())
+        };
+        assert_eq!(
+            agent_command_checksum("# /vet-plan\r\nstep one\r\n"),
+            format!("sha256-{expected}")
+        );
+    }
+
+    #[test]
+    fn checksum_round_trips_onto_the_record() {
+        let body = "# /implement-plan\n";
+        let cmd = AgentCommand {
+            id: "11111111-1111-4111-8111-111111111111".to_string(),
+            organization_id: None,
+            created_by_user_id: None,
+            name: "implement-plan".to_string(),
+            body: body.to_string(),
+            checksum: Some(agent_command_checksum(body)),
+            is_shared: false,
+            current_version: 1,
+            created_at: "2026-08-04T00:00:00Z".to_string(),
+            updated_at: "2026-08-04T00:00:00Z".to_string(),
+        };
+        let back: AgentCommand =
+            serde_json::from_str(&serde_json::to_string(&cmd).unwrap()).unwrap();
+        assert_eq!(back.checksum, Some(agent_command_checksum(&back.body)));
     }
 }
