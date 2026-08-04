@@ -31,7 +31,10 @@ export interface AgentCommandVersion {
    */
   change_description?: string | null;
   /**
-   * Content hash of [`body`](Self::body) at this version.
+   * Content hash of [`body`](Self::body) at this version, from
+   * [`agent_command_checksum`]. Equal checksums on two versions mean the
+   * bodies are identical — which is what lets the UI show a revert as
+   * "back to v2's content" without refetching either body.
    */
   checksum?: string | null;
   /**

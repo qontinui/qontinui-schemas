@@ -27,6 +27,10 @@ export interface AgentCommand {
    * Content hash of [`body`](Self::body), for cheap change detection
    * (cache invalidation, diff-against-default). `None` on rows written
    * before a checksum was computed.
+   *
+   * Computed by [`agent_command_checksum`] — `"sha256-<hex>"` over the
+   * LF-normalized body. Do not hand-roll it; a producer that hashes raw
+   * bytes disagrees with one that hashes a CRLF round-trip.
    */
   checksum?: string | null;
   /**
@@ -58,6 +62,9 @@ export interface AgentCommand {
    * The command slug, e.g. `vet-plan` or `implement-plan`. This is the
    * override key: it must equal the name of the embedded default it
    * replaces, and it is the filename stem under `.claude/commands/`.
+   *
+   * Because it becomes a path component, it is a write-boundary value —
+   * validate it with [`validate_agent_command_name`] before persisting.
    */
   name: string;
   /**
