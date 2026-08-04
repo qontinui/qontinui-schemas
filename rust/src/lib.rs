@@ -49,6 +49,12 @@
 //! and #3 (comprehension) build against this frozen interface in parallel.
 
 pub mod accessibility;
+/// Account-scoped **overrides** of the runner-embedded default agent commands
+/// (`/vet-plan`, `/implement-plan`, …), plus their append-only version chain.
+/// Resolution is user override → embedded default; a revert appends a new
+/// version rather than mutating history. See
+/// `2026-07-29-account-versioned-agent-commands.md`.
+pub mod agent_commands;
 pub mod ai_workflows;
 pub mod app_events;
 pub mod apps;
