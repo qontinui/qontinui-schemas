@@ -85,6 +85,22 @@ name: runner-consumer-check
 
 on:
   pull_request:
+    # NO `paths:` FILTER — deliberately, and it must stay that way.
+    #
+    # `consumer-gate` is intended to be a REQUIRED status check. GitHub's
+    # required-check rules look for a check-run created by the
+    # pull_request event; a path-filtered trigger that does not fire
+    # creates no check-run at all, so the required context sits at
+    # "Expected — waiting for status to be reported" forever and the PR
+    # becomes unmergeable with no way to satisfy it short of an admin
+    # bypass this fleet does not grant. A README-only PR would wedge.
+    #
+    # This is the same convention `check-drift` and `rust-ci` already
+    # follow for exactly this reason (schema-drift.yml, rust-ci.yml — both
+    # document it at length). The path test still happens, but INSIDE the
+    # job, as the `gate` step below: irrelevant PRs post a green
+    # consumer-gate in seconds without checking out or compiling anything.
+    #
     # `labeled`/`unlabeled` are LOAD-BEARING, not decoration. The escape
     # hatch is a label, so the gate must re-evaluate when one is applied.
     # The default activity types are [opened, synchronize, reopened], under
@@ -92,17 +108,8 @@ on:
     # at all — the author would apply the declaration and watch nothing
     # happen. `unlabeled` is equally deliberate: removing the declaration
     # must re-red the PR, or the gate can be satisfied and then quietly
-    # un-satisfied. Path filters are evaluated against the PR diff and
-    # still apply on a `labeled` event.
+    # un-satisfied.
     types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths:
-      - "rust/**"
-      - "rust-vision-core/**"
-      - "code-graph/**"
-      - "rust-runner-client/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/runner-consumer-check.yml"
   workflow_dispatch:
 
 concurrency:
@@ -161,9 +168,60 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: qontinui-schemas
+          # Full history so the gate step below can diff base..head by sha.
+          fetch-depth: 0
 
       # ----------------------------------------------------------------
-      # LEG 1 — ALWAYS. Compile the consumer at `main`.
+      # THE IN-JOB PATH PREDICATE (replaces the trigger's `paths:` filter).
+      #
+      # This is what makes `consumer-gate` safe to REQUIRE: the workflow
+      # fires on every PR so the context always has a producer, and this
+      # step decides whether the expensive cross-repo compile is warranted.
+      # Irrelevant PRs fall straight through to a green verdict in seconds.
+      #
+      # The surface is the same one check-consumers uses and the same one
+      # the trigger used to filter on — all three must agree. It is the set
+      # of paths a consumer can path-depend on: the four workspace crates
+      # plus both manifests (consumers pin version RANGES, so a
+      # manifest-only bump can break resolution).
+      #
+      # Note this is a two-dot `base..head` diff, so when `main` moves under
+      # an open PR the range includes commits the PR did not author. That
+      # OVER-triggers, never under-triggers. That is the safe direction and
+      # is deliberate: the incident this gate exists to prevent was a gate
+      # that ran too LITTLE. Do not "optimise" it to a merge-base diff.
+      - name: Decide whether the consumer gate must run
+        id: gate
+        working-directory: qontinui-schemas
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run_gate=false
+          changed=""
+          case "$EVENT_NAME" in
+            pull_request)
+              changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+              if printf '%s\n' "$changed" | grep -qE '^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$|\.github/workflows/runner-consumer-check\.yml$)'; then
+                run_gate=true
+              fi
+              ;;
+            *)
+              # workflow_dispatch is an explicit ask — always run fully.
+              run_gate=true
+              ;;
+          esac
+          echo "run_gate=$run_gate" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT_NAME run_gate=$run_gate"
+          if [ -n "$changed" ]; then
+            printf '%s\n' "$changed" | sed 's/^/  changed: /'
+          fi
+
+      # ----------------------------------------------------------------
+      # LEG 1 — ALWAYS (when the gate runs at all). Compile the consumer
+      # at `main`.
       #
       # No `ref:`, deliberately — actions/checkout defaults to the
       # repository's default branch, which is the property this gate
@@ -171,6 +229,7 @@ jobs:
       # or redirected by anything the PR author controls.
       # ----------------------------------------------------------------
       - name: Checkout ${{ matrix.consumer }} (main)
+        if: steps.gate.outputs.run_gate == 'true'
         uses: actions/checkout@v5
         with:
           repository: ${{ matrix.repo }}
@@ -183,6 +242,7 @@ jobs:
       # equality check would prove nothing.
       - name: Record resolved ${{ matrix.consumer }} main SHA
         id: mainsha
+        if: steps.gate.outputs.run_gate == 'true'
         working-directory: ${{ matrix.workdir }}
         run: |
           set -euo pipefail
@@ -191,7 +251,7 @@ jobs:
           echo "Leg 1: compiling ${{ matrix.consumer }} main @ $sha against this PR's schemas"
 
       - name: Install Tauri Linux system deps
-        if: matrix.heavy == 'true'
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -214,7 +274,7 @@ jobs:
       # 2026-07-06). Both steps copied verbatim from qontinui-runner's own
       # ci.yml, which needs them to build this same workspace.
       - name: Free disk space (Ubuntu)
-        if: matrix.heavy == 'true'
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
@@ -226,7 +286,7 @@ jobs:
           swap-storage: false
 
       - name: Add swapfile (guard against link-time OOM)
-        if: matrix.heavy == 'true'
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
         run: |
           sudo swapoff -a || true
           sudo fallocate -l 12G /swapfile
@@ -236,19 +296,21 @@ jobs:
           free -h
 
       - name: Set up Rust toolchain
+        if: steps.gate.outputs.run_gate == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       # Keyed per (consumer, leg). A main cache must not be poisoned by an
       # adaptation build or vice versa — they compile different trees
       # against the same schemas.
       - name: Rust cache (${{ matrix.consumer }}, main leg)
+        if: steps.gate.outputs.run_gate == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ matrix.workdir }}
           key: consumer-${{ matrix.consumer }}-main
 
       - name: Stub ${{ matrix.consumer }} frontend dist
-        if: matrix.needs_dist_stub == 'true'
+        if: steps.gate.outputs.run_gate == 'true' && matrix.needs_dist_stub == 'true'
         run: |
           mkdir -p ${{ matrix.workdir }}/dist
           printf '<!DOCTYPE html><html><head></head><body>consumer-check CI stub</body></html>\n' > ${{ matrix.workdir }}/dist/index.html
@@ -258,6 +320,7 @@ jobs:
       # job's verdict is computed explicitly at the end.
       - name: "Leg 1: cargo check ${{ matrix.consumer }} main against PR schemas"
         id: leg1
+        if: steps.gate.outputs.run_gate == 'true'
         continue-on-error: true
         working-directory: ${{ matrix.workdir }}
         env:
@@ -446,9 +509,11 @@ jobs:
       # a green compile of a declared, open, main-based adaptation.
       # ----------------------------------------------------------------
       - name: Verdict for ${{ matrix.consumer }}
+        if: always()
         env:
           CONSUMER: ${{ matrix.consumer }}
           CONSUMER_REPO: ${{ matrix.repo }}
+          RUN_GATE: ${{ steps.gate.outputs.run_gate }}
           MAIN_SHA: ${{ steps.mainsha.outputs.sha }}
           LEG1: ${{ steps.leg1.outcome }}
           DECLARED: ${{ steps.declare.outputs.found }}
@@ -458,6 +523,26 @@ jobs:
           LEG2: ${{ steps.leg2.outcome }}
         run: |
           set -euo pipefail
+
+          # Cheap exit: this PR touches nothing a consumer can path-depend
+          # on. The context still posts (that is what makes it safe to
+          # require); it simply has nothing to check.
+          if [ "${RUN_GATE:-false}" != "true" ]; then
+            echo "PASS: this PR changes no path-dep surface, so ${CONSUMER} cannot be affected."
+            echo "No checkout, no compile. This is the designed cheap-exit path."
+            exit 0
+          fi
+
+          # ANTI-VACUITY. run_gate=true means the compile was REQUIRED to
+          # run. If leg 1 did not execute, this job must NOT report success:
+          # a green here would assert "consumer main still compiles" while
+          # having compiled nothing — the exact 6-second vacuous green that
+          # let schemas#104 through on the sibling gate.
+          if [ "$LEG1" != "success" ] && [ "$LEG1" != "failure" ]; then
+            echo "::error::VACUOUS GATE: run_gate=true but leg 1 did not execute (outcome=${LEG1:-<none>})."
+            echo "Refusing to report a green that proves nothing."
+            exit 1
+          fi
 
           if [ "$LEG1" = "success" ]; then
             echo "PASS: ${CONSUMER} main (${MAIN_SHA}) compiles against this PR. Non-breaking change."
@@ -515,10 +600,15 @@ jobs:
   #
   # A matrix job's `result` aggregates correctly across entries (failure
   # if any entry failed), which is why the verdict lives here. `always()`
-  # guarantees this context always posts — a required check must always
-  # have a producer, or a trigger that does not fire leaves the check
-  # permanently "missing" and unsatisfiable, with no way to clear it short
-  # of an admin bypass this fleet does not grant.
+  # guarantees this context always posts even when consumer-check fails or
+  # is cancelled.
+  #
+  # `always()` is necessary but NOT sufficient for required-check safety:
+  # a job can only post if its WORKFLOW fires at all. That is why the
+  # `pull_request` trigger above carries no `paths:` filter — see the long
+  # note there. Both halves are required, and removing either one turns
+  # this context into a permanently-unsatisfiable "Expected" on any PR the
+  # filter would have excluded.
   # ------------------------------------------------------------------
   consumer-gate:
     needs: [consumer-check]
