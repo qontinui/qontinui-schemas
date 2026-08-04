@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.1.0...rust-v1.2.0) (2026-08-04)
+
+
+### Features
+
+* add AgentCommand + AgentCommandVersion canonical types ([f8acb40](https://github.com/qontinui/qontinui-schemas/commit/f8acb40f4bf71b3b96ca6e12079d3f26a2e6b271))
+* define the agent-command write boundary (name validation + checksum) ([b6c471e](https://github.com/qontinui/qontinui-schemas/commit/b6c471ea846509da839a8ece6b274d929305cb17))
+
 ## [1.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.0.0...rust-v1.1.0) (2026-07-29)
 
 
