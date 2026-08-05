@@ -105,6 +105,11 @@ pub mod ir;
 pub mod mcp_config;
 pub mod memory;
 pub mod orchestration_config;
+/// Workspace-root resolution — the single answer to "where do the Qontinui repo
+/// checkouts live on this box?", shared by qontinui-runner and qontinui-coord so
+/// no product binary carries a build machine's layout. See
+/// `2026-08-04-remove-hardcoded-machine-paths-from-product-code.md`.
+pub mod paths;
 /// Priorities Profile — Artifact 3 of the functional-spec-contract keystone:
 /// the declarative, gate-checkable generator parameterization. See
 /// `2026-06-13-functional-spec-contract.md`.
