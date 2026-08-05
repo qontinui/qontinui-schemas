@@ -8230,6 +8230,8 @@ fn element_state_roundtrips() {
     let state = ElementState {
         visible: true,
         enabled: true,
+        disabled: false,
+        aria_disabled: false,
         focused: false,
         rect: ElementRect {
             x: 0.0,
@@ -8292,6 +8294,8 @@ fn ui_bridge_element_roundtrips() {
         state: ElementState {
             visible: true,
             enabled: true,
+            disabled: false,
+            aria_disabled: false,
             focused: false,
             rect: ElementRect {
                 x: 0.0,
@@ -8345,6 +8349,8 @@ fn ui_bridge_element_with_bbox_roundtrips() {
         state: ElementState {
             visible: true,
             enabled: true,
+            disabled: false,
+            aria_disabled: false,
             focused: false,
             rect: ElementRect {
                 x: 120.0,
