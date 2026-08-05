@@ -8256,6 +8256,36 @@ fn element_state_roundtrips() {
 }
 
 #[test]
+fn element_state_deserializes_pre_split_payload_without_disabled_fields() {
+    // A snapshot from an SDK build predating the `disabled`/`ariaDisabled`
+    // split (ui-bridge #144) carries only `enabled`. `#[serde(default)]` on
+    // both new fields must let it still validate, with the absent fields
+    // reading as `false` per the documented "absent is not observed enabled"
+    // caveat on `ElementState::disabled`.
+    use qontinui_types::ui_bridge::ElementState;
+    let json = r#"{
+        "visible": true,
+        "enabled": true,
+        "focused": false,
+        "rect": {
+            "x": 0.0, "y": 0.0, "width": 200.0, "height": 40.0,
+            "top": 0.0, "right": 200.0, "bottom": 40.0, "left": 0.0
+        }
+    }"#;
+    let state: ElementState = serde_json::from_str(json).expect("deserialize pre-split payload");
+    assert!(state.enabled, "enabled must still hydrate from the wire");
+    assert!(!state.disabled, "absent disabled must default to false");
+    assert!(
+        !state.aria_disabled,
+        "absent ariaDisabled must default to false"
+    );
+    assert_eq!(
+        state.rect.width, 200.0,
+        "rect must still deserialize normally"
+    );
+}
+
+#[test]
 fn element_identifier_roundtrips() {
     use qontinui_types::ui_bridge::ElementIdentifier;
     let id = ElementIdentifier {
