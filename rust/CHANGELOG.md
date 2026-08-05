@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.2.0...rust-v1.3.0) (2026-08-05)
+
+
+### Features
+
+* **paths:** add qontinui_workspace_root, one shared workspace-root resolver ([5dedef7](https://github.com/qontinui/qontinui-schemas/commit/5dedef7ad1ad67f29679fce4f40b0d4a1e072f28))
+
 ## [1.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.1.0...rust-v1.2.0) (2026-08-04)
 
 
