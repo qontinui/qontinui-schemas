@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.3.0...rust-v1.4.0) (2026-08-05)
+
+
+### Features
+
+* **spawn-authorization:** the one declaration of the spawn config surface ([a4faca1](https://github.com/qontinui/qontinui-schemas/commit/a4faca1e3fb4ca8290be26285886adcbdc794709))
+
+
+### Bug Fixes
+
+* **spawn-authorization:** close the validate() gaps PR [#125](https://github.com/qontinui/qontinui-schemas/issues/125) left open ([e53d062](https://github.com/qontinui/qontinui-schemas/commit/e53d0624f1e4f32608ca9098d2946c39fe3508ac))
+
 ## [1.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.2.0...rust-v1.3.0) (2026-08-05)
 
 
