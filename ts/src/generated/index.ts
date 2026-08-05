@@ -18,6 +18,8 @@ export type { ActionResponse } from './ActionResponse';
 export type { ActionStatus } from './ActionStatus';
 export type { ActionType } from './ActionType';
 export type { ActiveStatesResult } from './ActiveStatesResult';
+export type { AgentCommand } from './AgentCommand';
+export type { AgentCommandVersion } from './AgentCommandVersion';
 export type { AgenticPhaseOutput } from './AgenticPhaseOutput';
 export type { AgenticStatus } from './AgenticStatus';
 export type { AiWorkflow } from './AiWorkflow';
