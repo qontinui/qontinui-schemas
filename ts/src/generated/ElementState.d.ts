@@ -16,11 +16,37 @@ import type { ElementRect } from "./ElementRect";
  */
 export interface ElementState {
   /**
+   * Whether the element carries `aria-disabled="true"`.
+   *
+   * See `disabled` for why this is tracked separately, and for the
+   * absent-reads-as-`false` caveat that applies identically here.
+   */
+  ariaDisabled: boolean;
+  /**
    * Current checked state for checkbox/radio elements.
    */
   checked?: boolean | null;
   /**
-   * Whether the element is enabled (not disabled).
+   * Whether the element carries the native `disabled` attribute/property.
+   *
+   * Distinguished from `aria_disabled` because the two differ in effect:
+   * a natively disabled control cannot receive events at all, whereas an
+   * `aria-disabled` one is still focusable and clickable and merely
+   * announces itself as disabled.
+   *
+   * `#[serde(default)]`: absent in snapshots from SDK builds predating
+   * the split, where `enabled` is the only trustworthy signal. Absent
+   * therefore reads as `false`, which is NOT the same as "observed
+   * enabled": cross-check `enabled` before trusting it.
+   */
+  disabled: boolean;
+  /**
+   * Whether the element is enabled: the derived fold
+   * `!disabled && !ariaDisabled`.
+   *
+   * Kept as the single-signal convenience view of the two fields below.
+   * It is the ONLY interactivity signal an SDK build predating the
+   * `disabled`/`ariaDisabled` split emits, so it stays required.
    */
   enabled: boolean;
   /**
