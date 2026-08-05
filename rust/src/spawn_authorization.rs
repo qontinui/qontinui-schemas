@@ -38,6 +38,12 @@
 //! - A class row that is deliberately NOT seeded records `seeded: false` **and
 //!   a `reason`** ([`ClassSeed`]). An omission expressed as an absent literal
 //!   is invisible; expressed as data, a test can assert on it.
+//! - **Every key is declared.** All three types are `deny_unknown_fields`, so
+//!   a key this module does not know fails the PARSE rather than being
+//!   silently dropped. A hopeful `"disposition"` on a row type that has none
+//!   would otherwise read as set and behave as absent — the 2026-08-03 shape,
+//!   one level down. Adding a field to the JSON therefore means adding it here
+//!   in the same change; that coupling is deliberate.
 //! - Adding a spawn path or disposition is a vocabulary change: the DB columns
 //!   are deliberately `CHECK`-free (`agent_registry.rs`'s
 //!   "Vocabulary lives in Rust, not the DB", citing coord's
@@ -64,7 +70,15 @@ use serde::{Deserialize, Serialize};
 pub const CONTRACT_JSON: &str = include_str!("spawn_authorization.json");
 
 /// One coord-initiated spawn KIND: a concrete reason coord starts an agent.
+///
+/// `deny_unknown_fields`, here and on the two types below, because serde's
+/// default is to DROP a key it does not recognize. In an artifact whose whole
+/// premise is that nothing silently disagrees, a mistyped or hopeful key
+/// (`"dispostion"`, or a `"disposition"` on a row type that has none) would
+/// read to a reviewer as set and behave as absent — the 2026-08-03 shape
+/// exactly, one level down.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct KindSeed {
     pub agent_name: String,
     pub spawn_path: String,
@@ -78,6 +92,7 @@ pub struct KindSeed {
 /// the 2026-08-03 outage was an omission nobody could see, because "we do not
 /// seed this class" was expressed by a literal simply not being in a list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClassSeed {
     pub spawn_path: String,
     pub seeded: bool,
@@ -88,7 +103,20 @@ pub struct ClassSeed {
 
 /// The whole contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpawnAuthorizationContract {
+    /// The file's own header — the line that routes whoever opens the JSON to
+    /// the editing rules in this module.
+    ///
+    /// Declared rather than tolerated: `deny_unknown_fields` admits no key it
+    /// does not know, and waving `$comment` through with a catch-all would
+    /// re-open the hole for every OTHER stray top-level key. [`validate`]
+    /// requires it non-empty, so it stays a routing device rather than
+    /// decoration.
+    ///
+    /// [`validate`]: SpawnAuthorizationContract::validate
+    #[serde(rename = "$comment")]
+    pub comment: String,
     /// Every legal `spawn_path` wire value.
     pub spawn_paths: Vec<String>,
     /// Every legal `disposition` wire value.
@@ -125,6 +153,28 @@ impl SpawnAuthorizationContract {
         self.class_seeds.iter().filter(|c| c.seeded)
     }
 
+    /// Is `value` a declared `spawn_path` wire value?
+    ///
+    /// The membership test [`validate`] itself uses, exposed because the
+    /// consumers that must agree with this file — coord's authoring
+    /// validators, per this module's editing rules — need exactly it, and a
+    /// consumer that re-derives membership from its own copy of the list is
+    /// the drift the contract exists to prevent.
+    ///
+    /// [`validate`]: SpawnAuthorizationContract::validate
+    pub fn is_spawn_path(&self, value: &str) -> bool {
+        self.spawn_paths.iter().any(|p| p == value)
+    }
+
+    /// Is `value` a declared `disposition` wire value?
+    ///
+    /// `dispositions` has no other reader in this crate — it is a vocabulary
+    /// the DB deliberately does not `CHECK` (see this module's editing rules),
+    /// so this accessor is where that vocabulary is enforceable at all.
+    pub fn is_disposition(&self, value: &str) -> bool {
+        self.dispositions.iter().any(|d| d == value)
+    }
+
     /// Every `(agent_name, spawn_path)` key a seeder writes — the KIND rows
     /// plus the seeded CLASS rows, whose `agent_name` IS the class.
     ///
@@ -149,11 +199,32 @@ impl SpawnAuthorizationContract {
     /// a malformed contract is a panic at first use rather than a subtly wrong
     /// authorization decision later.
     pub fn validate(&self) -> Result<(), String> {
-        if self.spawn_paths.is_empty() {
-            return Err("spawn_paths must not be empty".into());
+        if self.comment.trim().is_empty() {
+            return Err("`$comment` must carry the file's header — it is what \
+                        routes an editor to the rules in spawn_authorization.rs"
+                .into());
         }
-        if self.dispositions.is_empty() {
-            return Err("dispositions must not be empty".into());
+        // Both vocabularies, checked identically. A blank entry is not a wire
+        // value (it would key a registry row nothing can look up), and a
+        // REPEATED entry makes the contract disagree with itself one level
+        // above the duplicate-class-row check below: the per-path loop would
+        // resolve the same path twice while `seen_classes` still saw one row.
+        for (label, values) in [
+            ("spawn_paths", &self.spawn_paths),
+            ("dispositions", &self.dispositions),
+        ] {
+            if values.is_empty() {
+                return Err(format!("{label} must not be empty"));
+            }
+            let mut seen = std::collections::HashSet::new();
+            for v in values {
+                if v.trim().is_empty() {
+                    return Err(format!("{label} contains a blank entry"));
+                }
+                if !seen.insert(v.as_str()) {
+                    return Err(format!("{label} declares `{v}` twice"));
+                }
+            }
         }
         if self.default_fanout_bound < 1 || self.default_fanout_bound > self.max_fanout_bound {
             return Err(format!(
@@ -161,11 +232,38 @@ impl SpawnAuthorizationContract {
                 self.default_fanout_bound, self.max_fanout_bound
             ));
         }
+        // One kind is one row, so `agent_name` must resolve to exactly one
+        // path. `seeded_keys` dedupes on the (name, path) PAIR and so cannot
+        // see this: two rows for one kind on different paths both survive it,
+        // leaving two answers to "which class governs this kind?".
+        let mut seen_kinds = std::collections::HashSet::new();
         for k in &self.kind_seeds {
-            if !self.spawn_paths.contains(&k.spawn_path) {
+            if !self.is_spawn_path(&k.spawn_path) {
                 return Err(format!(
                     "kind seed `{}` declares unknown spawn_path `{}`",
                     k.agent_name, k.spawn_path
+                ));
+            }
+            if k.agent_name.trim().is_empty() {
+                return Err("a kind seed has a blank agent_name".into());
+            }
+            // Class rows key as (spawn_path, spawn_path) in `seeded_keys`, so
+            // a kind NAMED after a path shares that key space and is
+            // indistinguishable from that path's class row.
+            if self.is_spawn_path(&k.agent_name) {
+                return Err(format!(
+                    "kind seed `{}` is named after a declared spawn_path; class \
+                     rows key as (spawn_path, spawn_path), so the two would be \
+                     indistinguishable",
+                    k.agent_name
+                ));
+            }
+            if !seen_kinds.insert(k.agent_name.as_str()) {
+                return Err(format!(
+                    "kind `{}` is declared twice — one kind resolves to exactly \
+                     one spawn_path, and `seeded_keys` dedupes on the (name, \
+                     path) pair so it cannot catch a second path for one kind",
+                    k.agent_name
                 ));
             }
             if k.purpose.trim().is_empty() {
@@ -178,7 +276,7 @@ impl SpawnAuthorizationContract {
         // inside the artifact whose entire purpose is that nothing disagrees.
         let mut seen_classes = std::collections::HashSet::new();
         for c in &self.class_seeds {
-            if !self.spawn_paths.contains(&c.spawn_path) {
+            if !self.is_spawn_path(&c.spawn_path) {
                 return Err(format!(
                     "class_seeds entry `{}` names no declared spawn_path",
                     c.spawn_path
@@ -186,7 +284,9 @@ impl SpawnAuthorizationContract {
             }
             if !seen_classes.insert(c.spawn_path.as_str()) {
                 return Err(format!(
-                    "duplicate class_seeds entry for `{}` — `validate` takes the                      first and `seeded_classes` yields both, so the contract would                      disagree with itself",
+                    "duplicate class_seeds entry for `{}` — `validate` takes the \
+                     first and `seeded_classes` yields both, so the contract \
+                     would disagree with itself",
                     c.spawn_path
                 ));
             }
@@ -271,6 +371,31 @@ mod tests {
         let c = contract();
         assert_eq!(c.default_fanout_bound, 15);
         assert_eq!(c.max_fanout_bound, 100);
+        // Pinned for the same reason as the two above: a freshly seeded row's
+        // enabled state is a value the seeder reads, and it is the one field
+        // of the contract that nothing else in this crate touches — so without
+        // this assertion it could be flipped with no test going red.
+        assert!(c.default_enabled);
+    }
+
+    /// The vocabularies are queryable, and the accessors actually discriminate.
+    ///
+    /// The negative half is the load-bearing one: an `is_*` that returned
+    /// `true` unconditionally would satisfy every positive assertion.
+    #[test]
+    fn the_vocabularies_are_queryable() {
+        let c = contract();
+        for p in &c.spawn_paths {
+            assert!(c.is_spawn_path(p));
+        }
+        for d in &c.dispositions {
+            assert!(c.is_disposition(d));
+        }
+        assert!(!c.is_spawn_path("not_a_path"));
+        assert!(!c.is_disposition("not_a_disposition"));
+        // The two vocabularies are separate namespaces, not one pool.
+        assert!(!c.is_spawn_path("block"));
+        assert!(!c.is_disposition("parallel_fanout"));
     }
 
     /// `parallel_fanout` IS seeded now, and the reason it could not be is gone.
@@ -377,7 +502,8 @@ mod tests {
             .reason = Some("   ".to_string());
         assert!(
             c.validate().is_err(),
-            "`   ` is not a reason; it would satisfy every `omission is              recorded` assertion in both repos while explaining nothing"
+            "`   ` is not a reason; it would satisfy every `omission is \
+             recorded` assertion in both repos while explaining nothing"
         );
     }
 
@@ -394,7 +520,8 @@ mod tests {
         c.class_seeds.push(dup);
         assert!(
             c.validate().is_err(),
-            "`validate` takes the FIRST row and `seeded_classes` yields BOTH,              so a duplicate makes the contract disagree with itself"
+            "`validate` takes the FIRST row and `seeded_classes` yields BOTH, \
+             so a duplicate makes the contract disagree with itself"
         );
     }
 
@@ -408,10 +535,116 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_a_duplicate_spawn_path() {
+        let mut c = valid();
+        c.spawn_paths.push(c.spawn_paths[0].clone());
+        assert!(
+            c.validate().is_err(),
+            "a repeated vocabulary entry makes the contract disagree with itself \
+             one level ABOVE the duplicate-class-row check: the class loop resolves \
+             the same path twice while `seen_classes` still sees one row"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_a_duplicate_disposition() {
+        let mut c = valid();
+        c.dispositions.push(c.dispositions[0].clone());
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_a_blank_vocabulary_entry() {
+        let mut c = valid();
+        c.spawn_paths.push("   ".to_string());
+        assert!(
+            c.validate().is_err(),
+            "a blank wire value is not a path; it would key a registry row \
+             nothing can ever look up"
+        );
+
+        let mut c = valid();
+        c.dispositions.push(String::new());
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_one_kind_declared_on_two_paths() {
+        let mut c = valid();
+        let mut twin = c.kind_seeds[0].clone();
+        twin.spawn_path = c
+            .spawn_paths
+            .iter()
+            .find(|p| *p != &c.kind_seeds[0].spawn_path)
+            .expect("fixture declares more than one path")
+            .clone();
+        c.kind_seeds.push(twin);
+        assert!(
+            c.validate().is_err(),
+            "`seeded_keys` dedupes on the (name, path) PAIR, so one kind on two \
+             paths survives it — and the contract then gives two answers to \
+             `which class governs this kind?`"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_a_kind_named_after_a_spawn_path() {
+        let mut c = valid();
+        let path = c.spawn_paths[0].clone();
+        c.kind_seeds.push(KindSeed {
+            agent_name: path,
+            // A path DIFFERENT from its name, so the (name, path) pair is
+            // unique and the existing duplicate-key check waves it through.
+            spawn_path: c.spawn_paths[1].clone(),
+            purpose: "injected".into(),
+        });
+        assert!(
+            c.validate().is_err(),
+            "class rows key as (spawn_path, spawn_path), so a kind named after a \
+             path is indistinguishable from that path's class row"
+        );
+    }
+
+    #[test]
+    fn an_unknown_field_in_the_contract_is_refused() {
+        // Silently dropping a key is the failure mode this whole artifact
+        // exists to end: a `disposition` a reviewer believes they set, on a row
+        // whose type has no such field, reads as set and behaves as absent.
+        //
+        // The injected key must be a PURE ADDITION. Renaming an existing one
+        // (`"seeded"` -> `"seeded_typo"`) also fails the parse today, but on
+        // the REQUIRED FIELD MISSING arm — a green that says nothing about
+        // whether unknown keys are refused. That is the vacuity this repo's
+        // own `check-generated-drift.sh` header was written about.
+        let anchor = "\"spawn_path\": \"parallel_fanout\"";
+        assert!(
+            CONTRACT_JSON.contains(anchor),
+            "anchor must exist to inject at"
+        );
+        let broken = CONTRACT_JSON.replacen(
+            anchor,
+            "\"disposition\": \"block\", \"spawn_path\": \"parallel_fanout\"",
+            1,
+        );
+        assert_ne!(
+            broken, CONTRACT_JSON,
+            "the fixture must actually be altered"
+        );
+        assert!(
+            serde_json::from_str::<SpawnAuthorizationContract>(&broken).is_err(),
+            "an unrecognized key must fail the parse, not vanish — every \
+             required field is still present here, so this can only go green \
+             on `deny_unknown_fields`"
+        );
+    }
+
+    #[test]
     fn validate_accepts_the_shipped_contract() {
-        // The companion to the five rejections above: proves they are refusing
-        // the INJECTED fault, not failing for some unrelated reason that would
-        // make every fixture red regardless.
+        // The companion to EVERY rejection above: proves they are refusing the
+        // INJECTED fault, not failing for some unrelated reason that would make
+        // every fixture red regardless. (Deliberately not a count — the "five"
+        // this said originally was already stale by the time it landed, and a
+        // number here rots on every added arm.)
         assert!(valid().validate().is_ok());
     }
 }
