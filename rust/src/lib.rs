@@ -125,6 +125,11 @@ pub mod rag;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
+/// Agent-spawn authorization — the ONE declaration of the spawn
+/// configuration surface (spawn paths, dispositions, the fan-out default and
+/// its ceiling, the coord seed tables). Carried as embedded DATA rather than
+/// schemars types, because JSON Schema cannot express constant values.
+pub mod spawn_authorization;
 pub mod spec_api_events;
 pub mod spec_check;
 pub mod state_machine;

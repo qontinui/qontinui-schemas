@@ -1,0 +1,83 @@
+{
+  "$comment": "CANONICAL. The one declaration of agent-spawn authorization configuration. See spawn_authorization.rs for why this is a data file rather than Rust constants, and for the rules on editing it.",
+  "spawn_paths": [
+    "in_session_subagent",
+    "parallel_fanout",
+    "standing_continuation"
+  ],
+  "dispositions": [
+    "block",
+    "degrade",
+    "warn_proceed"
+  ],
+  "default_fanout_bound": 15,
+  "max_fanout_bound": 100,
+  "default_enabled": true,
+  "kind_seeds": [
+    {
+      "agent_name": "operator_spawn",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Operator-initiated agent spawn via POST /agents/spawn."
+    },
+    {
+      "agent_name": "gate_continuation",
+      "spawn_path": "standing_continuation",
+      "purpose": "Resume a session when its coord gate clears (incl. stall re-dispatch and re-target)."
+    },
+    {
+      "agent_name": "unit_continuation",
+      "spawn_path": "standing_continuation",
+      "purpose": "Dispatch a work unit to a device as a fresh session."
+    },
+    {
+      "agent_name": "next_step_dispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Autonomously continue a stale session from its resolved next step."
+    },
+    {
+      "agent_name": "pr_fix_dispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Spawn a fixer for a PR diagnosed as needing author rework."
+    },
+    {
+      "agent_name": "red_main_fix_dispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Spawn a fixer for a repo whose main branch is red."
+    },
+    {
+      "agent_name": "merge_shepherd",
+      "spawn_path": "standing_continuation",
+      "purpose": "Unlandable-PR shepherd escalation (Tiers 1-3)."
+    },
+    {
+      "agent_name": "condition_autodispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Run a condition group's audit on its schedule or trigger."
+    },
+    {
+      "agent_name": "onboarding_audit",
+      "spawn_path": "standing_continuation",
+      "purpose": "Audit a newly connected repo to propose a starter merge profile."
+    }
+  ],
+  "class_seeds": [
+    {
+      "spawn_path": "in_session_subagent",
+      "seeded": false,
+      "reason": "The runner's no-row branch for this class already ALLOWS, so a row would change no behaviour while adding a lever nobody asked for. Recorded here rather than left as an absent literal so a test can assert the omission is deliberate.",
+      "purpose": ""
+    },
+    {
+      "spawn_path": "parallel_fanout",
+      "seeded": true,
+      "reason": null,
+      "purpose": "Class-level opt-in for parallel fan-out spawns, and the row that exposes the fan-out bound the served policy promises is user-declared (`bound declared up front (registry default 15)`). Disabling it degrades ALL parallel fan-out to inline for every agent without its own parallel_fanout row."
+    },
+    {
+      "spawn_path": "standing_continuation",
+      "seeded": true,
+      "reason": null,
+      "purpose": "Class-level opt-in for every coord-initiated spawn that outlives the request. Resolved by runner funnel sites that carry no agent name (a gate continuation carries a gate_id, not an agent); disabling it stops ALL standing spawns on devices that reach this door."
+    }
+  ]
+}
