@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.4.0...rust-v1.5.0) (2026-08-06)
+
+
+### Features
+
+* **schemas:** add ElementState.disabled + ariaDisabled ([2c4fd12](https://github.com/qontinui/qontinui-schemas/commit/2c4fd129c4ec81a43146a117a829fe29f081c1da))
+
 ## [1.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.3.0...rust-v1.4.0) (2026-08-05)
 
 

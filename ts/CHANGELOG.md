@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.10.1...ts-v0.11.0) (2026-08-06)
+
+
+### Features
+
+* **schemas:** add ElementState.disabled + ariaDisabled ([2c4fd12](https://github.com/qontinui/qontinui-schemas/commit/2c4fd129c4ec81a43146a117a829fe29f081c1da))
+
 ## [0.10.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.10.0...ts-v0.10.1) (2026-07-30)
 
 
