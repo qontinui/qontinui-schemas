@@ -185,3 +185,9 @@ pub mod device {
     pub type DeviceCrash = crate::runner::RunnerCrash;
     pub type DeviceUiError = crate::runner::RunnerUiError;
 }
+
+// THROWAWAY — §6.1 compile-matrix fixture. DO NOT MERGE.
+// A symbol that exists ONLY on this branch, so a qontinui-runner PR
+// referencing it fails to compile against qontinui-schemas `main` and
+// compiles against this branch. Deleted with the fixture PR.
+pub const ZZ_61_COMPILE_MATRIX_PROBE: &str = "zz-61-compile-matrix";
