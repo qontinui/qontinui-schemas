@@ -1,0 +1,2 @@
+THROWAWAY fixture for qontinui-runner plan 2026-08-05 §6.1 case N4.
+Delete with the fixture PRs.
