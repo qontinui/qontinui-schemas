@@ -21,6 +21,7 @@ from .per_type.action_status import ActionStatus
 from .per_type.action_type import ActionType
 from .per_type.active_states_result import ActiveStatesResult
 from .per_type.agent_command import AgentCommand
+from .per_type.agent_command_error import AgentCommandError
 from .per_type.agent_command_version import AgentCommandVersion
 from .per_type.agentic_phase_output import AgenticPhaseOutput
 from .per_type.agentic_status import AgenticStatus
@@ -566,6 +567,7 @@ __all__ = [
     "ActionType",
     "ActiveStatesResult",
     "AgentCommand",
+    "AgentCommandError",
     "AgentCommandVersion",
     "AgenticPhaseOutput",
     "AgenticStatus",
