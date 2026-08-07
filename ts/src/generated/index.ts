@@ -19,6 +19,7 @@ export type { ActionStatus } from './ActionStatus';
 export type { ActionType } from './ActionType';
 export type { ActiveStatesResult } from './ActiveStatesResult';
 export type { AgentCommand } from './AgentCommand';
+export type { AgentCommandError } from './AgentCommandError';
 export type { AgentCommandVersion } from './AgentCommandVersion';
 export type { AgenticPhaseOutput } from './AgenticPhaseOutput';
 export type { AgenticStatus } from './AgenticStatus';
