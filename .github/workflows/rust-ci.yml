@@ -46,6 +46,20 @@ on:
 
 jobs:
   rust-ci:
+    # MIRRORED BY .qontinui/ci.toml — CHANGE BOTH IN THE SAME PR.
+    #
+    # This job's four gate commands (cargo fmt / clippy / build / test) are
+    # reproduced as argv arrays in .qontinui/ci.toml, the manifest the
+    # runner-as-CI-node lane executes. That lane is how a dispatch validates a
+    # SHA without GitHub Actions, and candidate-ci.yml calls THIS workflow and
+    # nothing else — so the two lanes are supposed to agree on what a green head
+    # means. Editing a command below without editing the manifest silently
+    # breaks that agreement, and nothing in CI will tell you: the manifest is
+    # read by the runner at dispatch time, never by this workflow.
+    #
+    # The manifest's header explains what it deliberately cannot mirror (the
+    # check-drift / consumer-gate / commitlint / gitleaks jobs) and why, so a
+    # reviewer can tell an intended gap from an oversight.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

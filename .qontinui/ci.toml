@@ -10,8 +10,18 @@
 # citation makes the invariant unauditable.
 #
 # Commands are argv arrays (never shell strings); env is limited to the runner's
-# allowlist (qontinui-runner/src-tauri/src/ci_node/manifest.rs::ENV_ALLOWLIST);
-# `[limits]` values are ceilings the executor caps against host-derived sizing.
+# allowlist (qontinui-runner/src-tauri/src/ci_node/manifest.rs::ENV_ALLOWLIST).
+#
+# THIS FILE DESCRIBES THE *LANDED* EXECUTOR (qontinui-runner main). The schema it
+# is validated against is exactly `version`, `steps`, `limits` — and `limits`
+# holds exactly one key, `cargo_build_jobs`. `deny_unknown_fields` is set on all
+# three structs, so any other key is a HARD PARSE ERROR that takes this repo off
+# the lane entirely, not a soft warning. Verified by running the runner's own
+# `parse_and_validate` against this file rather than a transcription of it.
+#
+# qontinui-runner#1017 (OPEN, not merged) is what adds sibling provisioning, a
+# tool registry and host-derived sizing. Do not write this file against that PR:
+# until it lands, the manifest a dispatch actually validates against is main's.
 #
 # WHY rust-ci AND NOT SOMETHING BROADER: candidate-ci.yml — the workflow that
 # keeps coord's merge scheduler from mistaking a zero-check candidate ref for a
@@ -30,27 +40,32 @@
 #
 # 1. schema-drift.yml's `check-drift` job — A REQUIRED CHECK THIS LANE CANNOT
 #    HOLD, blocked four separate ways, any one of which is fatal:
-#      a. Its "Regenerate types" step sets CARGO_TARGET_DIR. That variable is
-#         EXECUTOR-OWNED on this lane (EXECUTOR_OWNED_ENV in manifest.rs): a
-#         step that sets it is REJECTED at validation, with a message pointing
-#         at the executor's per-repo CI target dir. The override is not
+#      a. Its "Regenerate types" step sets CARGO_TARGET_DIR. A step that sets it
+#         is REJECTED at validation — not by a dedicated executor-owned list
+#         (there is no EXECUTOR_OWNED_ENV in manifest.rs), but because
+#         CARGO_TARGET_DIR is simply absent from ENV_ALLOWLIST; the rejection
+#         reads `env var "CARGO_TARGET_DIR" is not allowlisted`. The executor
+#         then sets CARGO_TARGET_DIR itself, per-repo, and its value WINS over
+#         any step env — so the variable is executor-owned in effect even though
+#         the enforcement is the plain allowlist. The override is not
 #         cosmetic there — generate_types.sh hardcodes
 #         `$PROJECT_ROOT/target/schemas.json` against the runner's *package*
 #         dir while the runner repo is a cargo workspace, so without the
 #         override the regen writes nowhere the check then reads.
 #      b. "Install Tauri Linux system deps" is `sudo apt-get install` of
-#         libwebkit2gtk-4.1-dev and friends. This lane provisions sibling repos
-#         and registry tools; it provisions no system packages, and it runs on
-#         users' own machines where a sudo apt-get is not something a manifest
-#         may do.
+#         libwebkit2gtk-4.1-dev and friends. The landed lane provisions nothing
+#         at all — not siblings, not tools, and certainly not system packages —
+#         and it runs on users' own machines, where a sudo apt-get is not
+#         something a manifest may do even once provisioning exists.
 #      c. "Stub qontinui-runner frontend dist" is `mkdir -p` plus a `printf`
 #         REDIRECTED into a file. The argv contract has no shell, deliberately.
 #      d. "Install datamodel-code-generator" is a global `pip install` of a
 #         pinned generator. On an ephemeral Actions runner that is free; on a
 #         user's machine it mutates their interpreter permanently.
-#    The sibling half alone WOULD have been expressible — "Checkout
-#    qontinui-runner (sibling)" maps cleanly onto a `[[siblings]]` entry — which
-#    is why it is worth saying that the sibling is not the blocker here.
+#    The sibling half is not the blocker here either — but note it is not
+#    expressible today for a second reason: `[[siblings]]` is not in the landed
+#    schema at all (`unknown field 'siblings', expected one of 'version',
+#    'steps', 'limits'`). It becomes expressible only when runner#1017 lands.
 #
 # 2. runner-consumer-check.yml's `consumer-gate` — the required context that
 #    replaced `check-consumers` in ruleset 16104588. Not expressible and not
@@ -79,22 +94,38 @@
 # 6. THIS LANE EMITS NO JUnit FOR THIS REPO, and that has a downstream cost
 #    worth stating rather than discovering. rust-ci.yml's test step is plain
 #    `cargo test`, and this repo has no `.config/nextest.toml` at all — so there
-#    is no junit profile to select and declaring `[[tools]] cargo-nextest` would
-#    buy nothing but a download. Consequence: for a qontinui-schemas head
-#    validated ONLY on this lane, coord's `test_run_effects::score_for_head`
-#    finds no `test_results` row and the Tier-7 credibility-weighted-pass merge
-#    gate fails CLOSED. Closing that means adding a nextest ci profile to the
-#    repo AND switching rust-ci.yml's "cargo test" step to nextest in the same
-#    PR — a change to the Actions lane, so it is not smuggled in here.
+#    is no junit profile to select. And `[[tools]] cargo-nextest` could not be
+#    declared even as a gesture: `tools` is not in the landed schema, so adding
+#    it is a HARD PARSE ERROR (`unknown field 'tools', expected one of
+#    'version', 'steps', 'limits'`) that would take this repo off the lane
+#    outright. Consequence: for a qontinui-schemas head validated ONLY on this
+#    lane, coord's `test_run_effects::score_for_head` finds no `test_results`
+#    row and the Tier-7 credibility-weighted-pass merge gate fails CLOSED.
 #
-# 7. NO [[tools]] ARE DECLARED, AND THAT IS NOT THE SAME AS "NEEDS NOTHING".
-#    The runner's tool registry (ci_node/tools.rs) provisions exactly one tool,
-#    cargo-nextest, and none of the steps below want it. Every step assumes a
-#    stable Rust toolchain WITH the `clippy` and `rustfmt` components already on
-#    PATH — the Actions lane gets those from `dtolnay/rust-toolchain@stable`,
-#    which is an Action, not a command, and rustup is not in the registry.
-#    Declaring a tool the registry does not know is a validation ERROR, so the
-#    honest move is to say so here rather than to declare a lie.
+#    Closing it takes THREE things, not the two originally recorded here:
+#      i.   a `.config/nextest.toml` with a JUnit profile (coord's `ci-pr` is
+#           the model — JUnit only, no coverage);
+#      ii.  rust-ci.yml's "cargo test" step switched to
+#           `cargo nextest run --workspace --profile ci-pr`, plus a
+#           taiki-e/install-action step, since nextest is not preinstalled;
+#      iii. an ingest step POSTing the JUnit to /coord/test-results/ingest —
+#           which needs the COORD_INGEST_TOKEN repo secret. **qontinui-schemas
+#           does not have that secret** (`gh secret list` shows only
+#           CRATES_IO_TOKEN and the two RELEASE_PLEASE_* keys; coord has it).
+#           Emitting JUnit that nothing ingests would leave Tier-7 exactly as
+#           closed as it is now, so (iii) is the load-bearing step and it is
+#           gated on an operator-held credential, not on code.
+#    All three touch the Actions lane, so none is smuggled in here.
+#
+# 7. NO [[tools]] ARE DECLARED — AND ON THE LANDED RUNNER THAT IS NOT A CHOICE.
+#    There is no tool registry on main at all (no ci_node/tools.rs, no `tools`
+#    key); tool provisioning is what runner#1017 adds. So this lane provisions
+#    NOTHING, and "needs nothing" is emphatically not what that means: every
+#    step below assumes a stable Rust toolchain WITH the `clippy` and `rustfmt`
+#    components already on PATH. The Actions lane gets those from
+#    `dtolnay/rust-toolchain@stable`, which is an Action, not a command. On a
+#    machine without them the fmt and clippy steps fail on a missing binary,
+#    which is a HOST problem this manifest cannot fix and must not pretend to.
 #
 # 8. NO Swatinem/rust-cache EQUIVALENT. The Actions lane restores a warm cargo
 #    cache; a cold CI node compiles the workspace from scratch, which is why the
@@ -103,8 +134,11 @@
 
 version = 1
 
-# NO [[siblings]], deliberately — and this repo is the one place in the fleet
-# where that is a positive statement rather than an absence. Cargo.toml declares
+# NO [[siblings]]. On the landed runner the key does not exist, so this is not
+# yet a declarable choice (see gap 1) — but it is worth recording that when
+# runner#1017 makes it declarable, the answer for THIS repo is still "none", and
+# this repo is the one place in the fleet where that is a positive statement
+# rather than an absence. Cargo.toml declares
 # members = ["rust", "rust-runner-client", "rust-vision-core", "code-graph"],
 # all four in-tree, and the workspace's only `path =` dependency is
 # rust-runner-client's `qontinui-types = { path = "../rust" }` — INTRA-repo.
@@ -116,19 +150,33 @@ version = 1
 # here would provision a multi-gigabyte Tauri workspace that no step below
 # touches.
 
-# NO [limits] TABLE, deliberately.
+# [limits] — STATED EXPLICITLY, because omitting it does NOT mean what it looks
+# like it means.
 #
-# Both knobs (`cargo_build_jobs`, `test_threads`) DO bind for a Rust repo, so
-# unlike the Node/Python manifests in this fleet the omission here is a real
-# choice. Per manifest.rs: "Omitting a key means 'size me from the host', which
-# is what a manifest should do unless it has a measurement." coord declares
-# `cargo_build_jobs = 1` because an uncapped build killed the Actions agent
-# outright on a ~577k-LOC crate; this workspace is four small library crates
-# (tree-sitter bindings, an image pipeline, serde types) with no such incident
-# and no measured peak-RSS profile. Inventing a ceiling from coord's number
-# would be borrowing someone else's measurement, which is exactly the lie the
-# min(manifest, host) contract is designed to make unnecessary. Add a value here
-# when — and only when — a dispatch on a real host produces one.
+# There is exactly ONE knob on the landed runner: `cargo_build_jobs`. There is
+# no `test_threads` (`unknown field 'test_threads', expected 'cargo_build_jobs'`
+# — it is a parse error, not an ignored key), and there is no host-derived
+# sizing anywhere in the executor.
+#
+# The trap: `effective_cargo_build_jobs()` is `cargo_build_jobs.unwrap_or(1)`,
+# and the executor exports that result as CARGO_BUILD_JOBS to every step. So an
+# ABSENT [limits] table does not mean "size me from the host" — it silently
+# means `1`, which is precisely coord's number. Omitting the table to avoid
+# borrowing coord's measurement borrows it anyway, just invisibly.
+#
+# Given the choice is between an implicit 1 and an explicit one, state it, for
+# the same reason coord's manifest states its own: "so the value is a decision
+# on the record rather than an accident of the default." The value is NOT
+# changed here — a serial build is the behaviour this repo already gets on every
+# dispatch, and raising it without a measurement would be the invention the
+# original omission was right to refuse. It is affordable: an unconstrained
+# `cargo build --workspace --all-targets` from cold on a dev box takes ~2.5min
+# for these four small crates, so the serialized build stays far inside the
+# 7200s per-step ceiling. Revisit with a real measurement, or when runner#1017
+# lands host-derived sizing and absence finally means what this file once
+# claimed it meant.
+[limits]
+cargo_build_jobs = 1
 
 [[steps]]
 name = "rust-fmt"
@@ -160,8 +208,20 @@ name = "rust-test"
 # rust-ci.yml "cargo test". Plain libtest, matching the workflow — see gap 6 for
 # what that costs downstream and what changing it would require.
 #
-# No `-- --test-threads N`: the executor owns that cap (it exports
-# RUST_TEST_THREADS from host sizing) and the manifest is REJECTED if a step
-# tries to set it.
+# NOTHING CAPS TEST PARALLELISM ON THIS LANE, and that is a deliberate accept,
+# not an oversight. On top of a step's own allowlisted env the executor adds
+# exactly three vars of its own — CARGO_BUILD_JOBS, CARGO_TARGET_DIR, CI (these
+# win over the step) — so there is no RUST_TEST_THREADS from anywhere, and a
+# step cannot supply one either (RUST_TEST_THREADS is not in ENV_ALLOWLIST;
+# declaring it is a validation rejection). The remaining route would be argv,
+# `-- --test-threads=N`, which IS expressible.
+#
+# It is not used, for two reasons. It would diverge from the Actions command
+# this file exists to mirror; and the risk it would buy down is small here,
+# because plain `cargo test` is libtest — tests run as THREADS IN ONE PROCESS,
+# not nextest's process-per-test. coord caps its own run at 4 because each of
+# its tests stands up a tokio runtime in its own process at ~1 GiB; these four
+# crates are serde types, tree-sitter bindings and an image pipeline sharing a
+# single test process. Revisit if a dispatch on a real host says otherwise.
 command = ["cargo", "test", "--workspace"]
 timeout_secs = 7200
