@@ -53,10 +53,10 @@ A PR is ready to merge when every required workflow is green on the PR's HEAD co
 These must be green on your PR before merge:
 
 - `commitlint.yml` — runs on every PR (`commitlint`). Hard-enforces conventional-commits via `@commitlint/config-conventional`. PRs with non-conforming commit messages must rewrite history before merge. (The *why* — release-please derives version bumps from these — lives in [`## Releasing`](#releasing).)
-- `rust-ci.yml` — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` on `ubuntu-latest` (`rust-ci`). Path-filtered to `Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, and the workflow file itself — required *when it runs*.
-- `schema-drift.yml` — regenerates the TS + Python bindings via the qontinui-runner codegen script and fails on drift (`check-drift`). Path-filtered to `rust/src/**`, `qontinui-runner/src-tauri/src/schema_export.rs`, and `qontinui-runner/src-tauri/scripts/generate_types.sh`. The latter two are belt-and-braces — those paths live in the runner repo, not here, so in practice this gate fires whenever a PR touches `rust/src/**`. Required *when it runs*. If it goes red, regenerate locally via the qontinui-runner sibling checkout (or rely on the artifact uploaded by the failing run, once that's added) and commit the result.
+- `rust-ci.yml` — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` on `ubuntu-latest` (`rust-ci`). **Runs on every PR.** Its `pull_request:` trigger carries no path filter, deliberately: branch protection matches check-runs created by the `pull_request` event, so a path-filtered trigger that doesn't fire leaves the required check permanently "missing" and unsatisfiable short of admin bypass. The `paths:` list in that file (`Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, `rust-vision-core/**`, `code-graph/**`, and the workflow file) filters the **push-to-`main`** trigger only — and it enumerates the whole cargo workspace, because a version that omitted two members once let a break land on `main` uncompiled.
+- `schema-drift.yml` — regenerates the TS + Python bindings via the qontinui-runner codegen script and fails on drift (`check-drift`). **Also runs on every PR** — same no-path-filter reasoning. Its `paths:` list (`rust/src/**` plus the workflow file) likewise filters only the push-to-`main` trigger. If it goes red, regenerate locally via the qontinui-runner sibling checkout (or rely on the artifact uploaded by the failing run, once that's added) and commit the result.
 
-"Required when it runs" is the rulesets default — checks that didn't trigger on a PR don't show as `pending` and don't block merge.
+Both are therefore green-or-blocking on *every* PR, not just Rust-touching ones. "Required when it runs" is still the rulesets default in general — checks that didn't trigger don't show as `pending` and don't block merge — but for these two the antecedent is always satisfied. Don't reach for an admin bypass on the theory that one of them "shouldn't have fired".
 
 ### Not merge gates
 
@@ -78,6 +78,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo build --workspace --all-targets
 cargo test --workspace
 ```
+
+Those four commands are not just a convenience list — they are duplicated, as argv arrays, in [`.qontinui/ci.toml`](.qontinui/ci.toml), the manifest the runner-as-CI-node lane executes when a build is dispatched to a machine instead of to GitHub Actions. **If you change a gate command in `rust-ci.yml`, change it there too, in the same PR.** Nothing enforces this: the manifest is read by the runner at dispatch time and never by CI, so drift between the two lanes is silent. That file's header also records which gates the lane deliberately cannot mirror, and why.
 
 For changes that touch `rust/src/**`, the schema-drift check will fire in CI. To pre-flight it locally you need both `qontinui-schemas` and `qontinui-runner` checked out as siblings, plus the same `datamodel-code-generator` version CI uses:
 
@@ -105,10 +107,10 @@ If there's a related open PR, coordinate (or rebase onto it) rather than opening
 The merge-gate set above is mechanically enforced by the `main-merge-gates` Repository Ruleset on `qontinui-schemas` `main` (ruleset id `16104588`, [admin UI](https://github.com/qontinui/qontinui-schemas/rules/16104588)). The rule blocks force-push, branch deletion, and any merge to `main` whose PR doesn't have these check contexts green:
 
 - `commitlint` — required on every PR.
-- `rust-ci` — required *when run*, i.e. only on PRs touching `Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, or the workflow file itself.
-- `check-drift` — required *when run*, i.e. only on PRs touching `rust/src/**`. (`schema-drift.yml` also lists two `qontinui-runner/...` paths in its `paths:` filter as belt-and-braces, but those paths live in the runner repo and can't appear in a `qontinui-schemas` PR.)
+- `rust-ci` — required on every PR. Its `pull_request:` trigger has no path filter (see [`### Merge gates`](#merge-gates)); the `paths:` list in `rust-ci.yml` scopes the push-to-`main` trigger, not this one.
+- `check-drift` — required on every PR, for the same reason. `schema-drift.yml`'s `paths:` list (`rust/src/**` plus the workflow file) likewise scopes only its push trigger.
 
-Required-when-run is the rulesets default: checks that didn't trigger on a PR don't show as `pending` and don't block merge. PRs also have to go through a pull request — direct push to `main` is blocked.
+Required-when-run is the rulesets default: checks that didn't trigger on a PR don't show as `pending` and don't block merge. For these three the trigger always fires, so in practice all three are always required. PRs also have to go through a pull request — direct push to `main` is blocked.
 
 #### Admin bypass
 
