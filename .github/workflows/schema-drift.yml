@@ -83,14 +83,43 @@ name: schema-drift
 # that have no such dependency (rust-ci, commitlint, secret-scan) — for those
 # the objection stands and the answer would be different.
 #
-# DIRECTION SAFETY. `accept-trailing-sibling` is deliberately NOT set, so it
-# keeps its default of false and only a LEADING sibling is followed — one
-# whose PR merges BEFORE this one, whose tree therefore predicts what runner
-# main will be when this PR lands. A declaration that orders the runner PR
-# AFTER this one is declined and the resolver says so in its log rather than
-# following it silently. That is the direction schemas#136 and every other
-# instance above needs; see the LIMITATION note on the resolver step for the
-# direction that is still open.
+# DIRECTION SAFETY — and be precise about WHERE it comes from, because the
+# mechanism is not the one it will eventually be. Only a LEADING runner
+# sibling is followed: one whose PR merges BEFORE this one, whose tree
+# therefore predicts what runner main will be when this PR lands. That is the
+# direction schemas#136 and every other instance above needs.
+#
+# TODAY that property holds BY CONSTRUCTION, not by an opt-out. The action at
+# `@main` reads exactly two label forms and both of them encode "the sibling
+# leads" (`coord:downstream-of=<runner>#<n>` on this PR;
+# `coord:upstream-of=<schemas>#<this>` on a runner PR). A declaration pointing
+# the other way matches neither, so it falls through the no-declaration path
+# and is INDISTINGUISHABLE from having no label at all — the resolver does not
+# announce a declination, because it never saw a declaration. The behaviour is
+# safe; the diagnostics are not yet good.
+#
+# qontinui-runner#1028 is what adds the other two forms plus an
+# `accept-trailing-sibling` input defaulting to false, at which point a
+# trailing declaration becomes `trailing-declined` and SAYS SO. This call site
+# is written to inherit that improvement without a further change: it does not
+# pass the input, so it takes the safe default, and the reporting step below
+# already handles the `trailing-declined` value it cannot yet receive. Do not
+# add the input before #1028 lands — an unknown input to a composite action is
+# a warning on every run.
+#
+# See the LIMITATION note on the resolver step for the direction that stays
+# open even after #1028.
+#
+# WHAT THIS DOES ADD TO THE TRUST SURFACE, stated because the paragraph above
+# deliberately narrows the claim. Reusing runner main's ACTION is less trust
+# than this job already extends. Following a DECLARED PR is not the same
+# question: the tree whose `generate_types.sh` gets executed and whose
+# `build.rs` gets compiled is then an unlanded, unreviewed runner head rather
+# than landed main. It is bounded — the action rejects a head that is not on
+# qontinui-runner itself, so a fork PR cannot aim this at arbitrary code, and
+# the token here is read-only — but the bound is "anyone with push access to
+# qontinui-runner", not "anything that passed runner review". Opting in is per
+# PR and visible as a label, which is the mitigation.
 
 on:
   # Manual trigger: useful when a cross-repo coordination fix lands on
@@ -110,6 +139,27 @@ on:
       # post-merge main run match, rather than leaving main's visible status
       # frozen at whatever the last rust/src/** push produced.
       - ".github/workflows/schema-drift.yml"
+      # THE GENERATED OUTPUT ITSELF — newly load-bearing as of the declared-
+      # sibling resolution below, and this list was wrong without it.
+      #
+      # A bindings-only PR (the whole class this resolver exists to unblock —
+      # #95, #112, #119, #136) touches NEITHER of the two entries above: it
+      # changes only ts/src/generated/** and src/qontinui_schemas/generated/**.
+      # So no push run ever fired for it.
+      #
+      # That was harmless while the PR verdict was always taken against runner
+      # main, because the pre-merge verdict WAS the verdict main would give.
+      # It is not harmless now: with a declared sibling the pre-merge green is
+      # a claim about a tree that has not landed, so re-measuring after the
+      # land is the only thing that closes the loop. If the paired runner PR is
+      # squashed, amended, reordered or abandoned between the two lands, these
+      # bindings are drifted on main and nothing would say so until some
+      # unrelated PR reds and blames an innocent author.
+      #
+      # candidate-ci.yml deliberately excludes check-drift from candidate refs,
+      # so this push trigger is the ONLY post-merge measurement there is.
+      - "ts/src/generated/**"
+      - "src/qontinui_schemas/generated/**"
   pull_request:
     branches: [main]
     # No path filter on the PR trigger so the `check-drift` required-check
@@ -144,6 +194,32 @@ on:
     # or re-run manually". This trigger is unfiltered already, so adding the
     # two types costs nothing.
     types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Paired with the `labeled`/`unlabeled` types above, on the precedent of
+# runner-consumer-check.yml — which added the identical types list for the
+# identical label-hatch reason and this block with it.
+#
+# The POINT of re-firing on a label is to SUPERSEDE a verdict computed against
+# the wrong runner tree, so the superseded run should die rather than run to
+# completion. Without this, applying a declaration leaves two same-named
+# check-runs racing to report on one head SHA — not something to leave to luck
+# on a required context — and each loser still burns a full Tauri workspace
+# compile (this file budgets ~33 min of runner-minutes for two of them; see
+# the note at the top). coord applies and strips dep labels programmatically,
+# so that multiplies this repo's most expensive required check per label
+# event.
+# Cancellation is scoped to PR runs ON PURPOSE. `github.ref` already separates
+# them (`refs/pull/<n>/merge` vs `refs/heads/main`), so a blanket
+# `cancel-in-progress: true` would not cross the streams — but it WOULD let one
+# push to main cancel another's run, and the push trigger above is now the only
+# post-merge drift measurement this repo takes (candidate-ci.yml excludes
+# check-drift). Superseding it is defensible in theory, since the newer run
+# measures a newer tree; it is not worth the risk to the one measurement that
+# closes the declared-sibling loop, and main pushes matching these paths are
+# rare enough that the saved minutes are noise.
+concurrency:
+  group: schema-drift-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least-privilege, stated explicitly rather than inherited.
 #
@@ -238,6 +314,12 @@ jobs:
           SIB_SHA: ${{ steps.sibling.outputs.sha }}
         run: |
           set -euo pipefail
+          # A refname may legally contain `|`, which would break out of the
+          # markdown table cell below. Values arrive via env: and are never
+          # re-parsed by the shell, so this is a rendering fix, not a security
+          # one — but a mangled provenance row is exactly the thing this step
+          # exists to make unambiguous.
+          SIB_REF="${SIB_REF//|/\\|}"
           {
             echo "### qontinui-runner tree used for regeneration"
             echo ""
@@ -249,9 +331,18 @@ jobs:
             echo ""
             case "${SIB_SOURCE:-none}" in
               none)
-                echo "No coord dep-edge label named a qontinui-runner PR, so this"
+                echo "No LEADING qontinui-runner sibling was resolved, so this"
                 echo "regenerated against runner's default branch — the correct"
                 echo "baseline for a schemas-only change."
+                echo ""
+                echo "This says nothing about whether a label EXISTS. Until"
+                echo "qontinui-runner#1028 lands, the resolver reads only the two"
+                echo "label forms meaning 'the runner PR merges first', so a"
+                echo "declaration pointing the other way (this PR leads, the runner"
+                echo "PR adapts after) reaches this same outcome and cannot be"
+                echo "distinguished from having no label. If you declared a pair and"
+                echo "expected it to be followed, check the direction of the label"
+                echo "before concluding the resolver missed it."
                 ;;
               trailing-declined)
                 echo "A declaration was found but it orders the runner PR AFTER this"
@@ -260,9 +351,15 @@ jobs:
                 echo "runner PR, the drift red below is expected until it lands."
                 ;;
               *)
-                echo "Regenerated against the DECLARED runner PR above. A green here"
-                echo "means the bindings match the paired tree, which is what will be"
-                echo "on runner main by the time this PR lands."
+                echo "Regenerated against the DECLARED runner PR above, NOT runner"
+                echo "main. A green here means the bindings match the PAIRED tree."
+                echo ""
+                echo "It does not by itself prove they will match runner main: that"
+                echo "holds only if the declared PR lands, unaltered, before this one."
+                echo "The push-triggered run on main re-measures against real runner"
+                echo "main after the land — that is the check that closes the loop,"
+                echo "and it is why the generated dirs are in this workflow's push"
+                echo "paths. If the pair's landing order slips, expect it to red."
                 ;;
             esac
           } >> "$GITHUB_STEP_SUMMARY"

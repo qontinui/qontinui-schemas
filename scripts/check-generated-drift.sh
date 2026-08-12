@@ -93,8 +93,9 @@ GENERATE_TYPES_SH="${GENERATE_TYPES_SH:-../qontinui-runner/src-tauri/scripts/gen
 # strings. Both properties are load-bearing.
 #
 # `check-drift` is a REQUIRED status check on this repo's main-merge-gates
-# ruleset, and schema-drift.yml checks qontinui-runner out with no `ref:` —
-# i.e. at runner's DEFAULT BRANCH. So a byte-exact assertion would mean: a
+# ruleset, and schema-drift.yml reads qontinui-runner at its DEFAULT BRANCH
+# unless the PR declares a leading runner sibling (which the overwhelming
+# majority do not). So a byte-exact assertion would mean: a
 # cosmetic edit to the generator (a trailing space, an inline comment,
 # `dirname --`, `pwd -P`) reds only an advisory check on the runner side, lands
 # there, and from that moment EVERY PR in this repo fails a required check —
@@ -143,9 +144,12 @@ EXPECT_OUT_DIR_RHS_FORM='^"\$\{QONTINUI_(TS|PY)_OUT_DIR:-\$\{?SCHEMAS_DIR\}?/([A
 # name-set compare, so `CARGO_OUT_DIR` — added by qontinui-runner 64686867 to
 # honour CARGO_TARGET_DIR — turned check-drift red on BOTH sides at once.
 # Because check-drift is a REQUIRED check here and schema-drift.yml reads
-# qontinui-runner at its DEFAULT BRANCH, that froze this repo's entire merge
-# train: the exact incident this file's header warns about, caused by the gate
-# meant to prevent it.
+# qontinui-runner at its DEFAULT BRANCH on any PR that has not declared a
+# leading runner sibling, that froze this repo's entire merge train: the exact
+# incident this file's header warns about, caused by the gate meant to prevent
+# it. Note the declaration hatch does NOT retire that hazard — it is opt-in per
+# PR, so an unrelated PR (release-please's included) still meets whatever shape
+# landed on runner main.
 #
 # Entries are `<NAME>=<regex>`, matched against that variable's RHS only. This
 # is an allowlist of PROVEN-FOREIGN shapes, not an exemption:
@@ -456,8 +460,11 @@ cross_check_output_dirs() {
     local shape_hint
     shape_hint="  Teach this cross-check the new shape in scripts/check-generated-drift.sh"
     shape_hint="$shape_hint"$'\n'"  — the EXPECT_* arrays near the top accept a SET of forms, so add the new"
-    shape_hint="$shape_hint"$'\n'"  one and land it HERE FIRST: schema-drift.yml reads qontinui-runner at its"
-    shape_hint="$shape_hint"$'\n'"  default branch, so a single change cannot be green on both sides at once."
+    shape_hint="$shape_hint"$'\n'"  one. Either land it HERE FIRST (schema-drift.yml reads qontinui-runner at"
+    shape_hint="$shape_hint"$'\n'"  its default branch by default, so a lone change reds one side), or declare"
+    shape_hint="$shape_hint"$'\n'"  the pair: label the schemas PR coord:downstream-of=qontinui-runner#<n> and"
+    shape_hint="$shape_hint"$'\n'"  check-drift regenerates against that runner PR, so both sides go green at"
+    shape_hint="$shape_hint"$'\n'"  once. Declaring also fixes the landing order; land-here-first does not."
     shape_hint="$shape_hint"$'\n'"  Do NOT delete the check: without it a moved output dir makes every arm"
     shape_hint="$shape_hint"$'\n'"  of --verify pass vacuously."
 
