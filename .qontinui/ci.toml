@@ -66,6 +66,17 @@
 #    expressible today for a second reason: `[[siblings]]` is not in the landed
 #    schema at all (`unknown field 'siblings', expected one of 'version',
 #    'steps', 'limits'`). It becomes expressible only when runner#1017 lands.
+#      e. AND, since 2026-08-12, the sibling checkout is itself an ACTION —
+#         `qontinui/qontinui-runner/.github/actions/checkout-sibling@main`,
+#         a composite that resolves a DECLARED qontinui-runner PR through the
+#         GitHub API and materialises it SHA-pinned. The argv contract has no
+#         Action runtime, exactly as gap 3 records for commitlint. Worth
+#         stating because it changes the SHAPE of the gap rather than its size:
+#         runner#1017's `[[siblings]]` would let this lane declare a STATIC
+#         sibling to provision, and that is now strictly weaker than what this
+#         job does. A static declaration cannot express "whichever runner PR
+#         this pair declared", so even after #1017 lands, parity for this job
+#         needs a resolver on the lane and not just a provisioner.
 #
 # 2. runner-consumer-check.yml's `consumer-gate` — the required context that
 #    replaced `check-consumers` in ruleset 16104588. Not expressible and not
@@ -144,11 +155,19 @@ version = 1
 # rust-runner-client's `qontinui-types = { path = "../rust" }` — INTRA-repo.
 # rust-ci.yml checks out nothing but this repo, and neither does this manifest.
 #
-# schema-drift.yml's "Checkout qontinui-runner (sibling)" is the one sibling
-# checkout in this repo's CI, and it belongs to a job this manifest cannot run
-# for reasons that are not about the sibling (see gap 1). Declaring the sibling
-# here would provision a multi-gigabyte Tauri workspace that no step below
-# touches.
+# schema-drift.yml's "Check out sibling qontinui-runner (declared PR, else
+# default branch)" is the one sibling checkout in this repo's CI, and it belongs
+# to a job this manifest cannot run for reasons that are not about the sibling
+# (see gap 1). Declaring the sibling here would provision a multi-gigabyte Tauri
+# workspace that no step below touches.
+#
+# That step was called "Checkout qontinui-runner (sibling)" until 2026-08-12 and
+# was a plain `actions/checkout` of runner's default branch; it now resolves a
+# declared runner PR (gap 1e). The name is restated here rather than left stale
+# because this file's header makes the by-NAME citation the auditable link
+# between the two lanes — a citation that no longer matches any step in the
+# workflow cannot be checked, which is the failure mode the by-name rule exists
+# to prevent.
 
 # [limits] — STATED EXPLICITLY, because omitting it does NOT mean what it looks
 # like it means.

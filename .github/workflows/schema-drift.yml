@@ -31,6 +31,66 @@ name: schema-drift
 # Keeping both meant compiling the runner workspace TWICE per PR (~33 min
 # of runner-minutes). `check-drift` stays here because it is a genuinely
 # different check: codegen freshness, not consumer compilation.
+#
+# ---------------------------------------------------------------------------
+# WHICH qontinui-runner TREE THIS REGENERATES AGAINST (added 2026-08-12)
+# ---------------------------------------------------------------------------
+#
+# Until now this workflow checked qontinui-runner out with NO `ref:` at all,
+# so it ALWAYS took runner's default branch. That is the right answer for a
+# solo schemas PR and the WRONG answer for a coordinated pair, because
+# codegen freshness is a property of BOTH trees at once:
+#
+#     output(runner Rust, schemas Rust) == schemas' checked-in bindings
+#
+# The standing pattern that breaks on it: a Rust type is authored in
+# qontinui-runner (`src-tauri/src/schema_export.rs`), and a schemas PR carries
+# nothing but the REGENERATED BINDINGS. Regenerating those bindings against
+# runner MAIN — which does not have the type yet — DELETES the very files the
+# schemas PR adds, so `check-drift` reds. It is a REQUIRED context
+# (ruleset 16104588), so the PR is unmergeable, and no push to the schemas PR
+# can fix it: the missing input is in the other repo.
+#
+# That is not hypothetical and it is not rare. Four instances in six weeks,
+# each a "regenerate bindings for <runner-authored types>" PR red on
+# check-drift: #95 (HelperTask), #112 (Projects dashboard, paired with
+# runner#905), #119 (agent-command, closed), and #136 (AgentCommandError,
+# paired with runner#1019 — open and blocked on exactly this since
+# 2026-08-07). The runner half of that last deadlock is described at length in
+# qontinui-runner/.github/actions/checkout-sibling/action.yml (PHASE C).
+#
+# So the sibling checkout now resolves a DECLARED runner PR — the coord
+# dep-edge label the pair already has to apply for merge ordering — and falls
+# back to runner's default branch when nothing is declared.
+#
+# WHY IT REUSES qontinui-runner's ACTION RATHER THAN PORTING IT HERE.
+#
+# This repo already carries one hand-written copy of that resolver, inline in
+# runner-consumer-check.yml's leg 2. Two copies of a cross-repo contract have
+# ALREADY drifted: the runner action's header calls out this repo's copy for
+# comparing the label's repo part with an EXACT string match, which silently
+# misses every bare-form `coord:*=<repo>#<n>` label (the owner is optional in
+# coord's grammar — qontinui-coord src/pr_merge/dep_graph.rs:136-137). Writing
+# a THIRD copy to fix a problem caused by having two is not a fix.
+#
+# The usual objection to a cross-repo action — it couples this repo's CI to
+# another repo at bootstrap time — does not bind HERE, and it is worth being
+# precise about why rather than waving it away. This job ALREADY cannot run
+# without qontinui-runner: it checks the repo out and EXECUTES
+# `generate_types.sh` from it. Referencing an action from the same ref is
+# strictly LESS trust than this workflow already extends, and adds no failure
+# domain it did not already have. Do not generalise this to schemas workflows
+# that have no such dependency (rust-ci, commitlint, secret-scan) — for those
+# the objection stands and the answer would be different.
+#
+# DIRECTION SAFETY. `accept-trailing-sibling` is deliberately NOT set, so it
+# keeps its default of false and only a LEADING sibling is followed — one
+# whose PR merges BEFORE this one, whose tree therefore predicts what runner
+# main will be when this PR lands. A declaration that orders the runner PR
+# AFTER this one is declined and the resolver says so in its log rather than
+# following it silently. That is the direction schemas#136 and every other
+# instance above needs; see the LIMITATION note on the resolver step for the
+# direction that is still open.
 
 on:
   # Manual trigger: useful when a cross-repo coordination fix lands on
@@ -62,6 +122,45 @@ on:
     # regen on every PR is ~2 min wasted on irrelevant PRs but is the
     # only mechanism that posts the required status. PRs without
     # rust/src/** changes will produce no diff and pass quickly.
+    #
+    # `labeled`/`unlabeled` are LOAD-BEARING, not decoration, and listing
+    # `types:` at all means the three defaults must be listed too — naming
+    # any type REPLACES the default [opened, synchronize, reopened] rather
+    # than adding to it, so omitting them would stop this required check from
+    # posting on a plain PR open.
+    #
+    # The sibling escape hatch is a coord dep-edge LABEL, so this gate has to
+    # re-evaluate when one is applied. Under the defaults alone, applying
+    # `coord:downstream-of=qontinui-runner#<n>` fires no workflow at all: the
+    # author would declare the pair and watch nothing happen, which is exactly
+    # the failure mode runner-consumer-check.yml documents for its own label
+    # hatch. `unlabeled` is equally deliberate — removing the declaration must
+    # re-evaluate too, or the gate can be satisfied and then quietly
+    # un-satisfied.
+    #
+    # This is also the one thing this side can do that the runner side cannot:
+    # qontinui-types-drift.yml is path-filtered, so its resolver's error text
+    # has to tell authors "the runner has no 'labeled' trigger — push a commit
+    # or re-run manually". This trigger is unfiltered already, so adding the
+    # two types costs nothing.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Least-privilege, stated explicitly rather than inherited.
+#
+# The sibling resolver below reads this PR's labels and qontinui-runner's open
+# PRs through the API, so `pull-requests: read` is a real requirement here,
+# not boilerplate. (With no declaration to find it still makes those two
+# reads; on a non-pull_request event it short-circuits to the default branch
+# with no API call at all.)
+#
+# Stated here rather than inherited from the repo-level
+# `default_workflow_permissions`, which is an operator-flippable setting that
+# is INVISIBLE in this file: flipping it to `restricted` would break sibling
+# resolution with nothing in any diff to explain it. No job here needs a write
+# scope — `contents: read` covers the checkouts.
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   check-drift:
@@ -83,11 +182,91 @@ jobs:
         with:
           path: qontinui-schemas
 
-      - name: Checkout qontinui-runner (sibling)
-        uses: actions/checkout@v5
+      # Resolve WHICH qontinui-runner tree to regenerate against — the
+      # DECLARED sibling PR when the pair declared one, runner's default
+      # branch otherwise — and materialise it SHA-pinned. See the long note in
+      # the header for why this replaced a bare `actions/checkout` of runner
+      # and why it reuses the runner's action instead of porting it.
+      #
+      # `repo:` is stated even though the action defaults to
+      # qontinui-schemas: from HERE the sibling is the runner. Getting that
+      # backwards would make the action resolve this repo against itself.
+      #
+      # `path:` is explicit because this job checks schemas out under
+      # `path: qontinui-schemas`, so the sibling belongs beside it at the
+      # workspace ROOT — not at the action's default
+      # `$GITHUB_WORKSPACE/../<name>`. `GENERATE_TYPES_SH` above is written
+      # against exactly this location.
+      #
+      # `accept-trailing-sibling` is NOT passed — see DIRECTION SAFETY in the
+      # header. It is left at its safe default rather than set to 'false'
+      # explicitly, because that input only exists once qontinui-runner#1028
+      # lands and passing an unknown input to a composite action is a warning
+      # this workflow should not carry.
+      #
+      # LIMITATION, stated rather than discovered later. Only a LEADING runner
+      # sibling is followed. The mirror case — a schemas PR that leads, whose
+      # runner adaptation TRAILS, where runner main cannot even build against
+      # this PR's `rust/src/**` so the regen step dies before drift is
+      # measured — is still without a hatch here. It needs the trailing opt-in
+      # from qontinui-runner#1028, which is open and not yet landed, and it is
+      # a genuinely different judgement call: for a drift check the question is
+      # about the PAIR, so following a trailing sibling is defensible, but it
+      # must be an opt-in decision made in daylight, not a side effect of this
+      # change. Note the compile half of that case is already measured by
+      # `consumer-gate` (runner-consumer-check.yml leg 2), which does resolve a
+      # trailing runner PR — so the gap is narrower than it looks: what is
+      # missing is the drift verdict, not the knowledge that the pair compiles.
+      - name: Check out sibling qontinui-runner (declared PR, else default branch)
+        id: sibling
+        uses: qontinui/qontinui-runner/.github/actions/checkout-sibling@main
         with:
-          repository: qontinui/qontinui-runner
-          path: qontinui-runner
+          repo: qontinui/qontinui-runner
+          path: ${{ github.workspace }}/qontinui-runner
+
+      # Make the resolution legible in the run itself, not only inside the
+      # action's step log. A drift verdict means something different depending
+      # on which tree produced it, and a reader who does not know which tree
+      # was used cannot act on either colour: green against the wrong tree is
+      # the vacuous green this file's other guards exist to prevent, and red
+      # against the wrong tree sends the author to regenerate bindings that
+      # were already correct.
+      - name: Report which qontinui-runner tree this regenerated against
+        env:
+          SIB_SOURCE: ${{ steps.sibling.outputs.source }}
+          SIB_REF: ${{ steps.sibling.outputs.ref }}
+          SIB_SHA: ${{ steps.sibling.outputs.sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### qontinui-runner tree used for regeneration"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| declaration | \`${SIB_SOURCE:-none}\` |"
+            echo "| ref | \`${SIB_REF:-main}\` |"
+            echo "| pinned sha | \`${SIB_SHA:-n/a - default branch tip}\` |"
+            echo ""
+            case "${SIB_SOURCE:-none}" in
+              none)
+                echo "No coord dep-edge label named a qontinui-runner PR, so this"
+                echo "regenerated against runner's default branch — the correct"
+                echo "baseline for a schemas-only change."
+                ;;
+              trailing-declined)
+                echo "A declaration was found but it orders the runner PR AFTER this"
+                echo "one, so it was DECLINED and the default branch used instead."
+                echo "If this PR carries bindings for a type that only exists on that"
+                echo "runner PR, the drift red below is expected until it lands."
+                ;;
+              *)
+                echo "Regenerated against the DECLARED runner PR above. A green here"
+                echo "means the bindings match the paired tree, which is what will be"
+                echo "on runner main by the time this PR lands."
+                ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "sibling declaration=${SIB_SOURCE:-none} ref=${SIB_REF:-main} sha=${SIB_SHA:-}"
 
       # generate_types.sh runs `cargo build --bin export_schemas` which
       # links the runner lib (Tauri-dependent). Tauri 2.x on Linux probes
