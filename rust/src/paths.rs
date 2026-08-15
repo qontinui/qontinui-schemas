@@ -182,10 +182,59 @@ impl RejectedRoot {
     }
 }
 
-/// A resolved (or unresolved) workspace root, plus the reason any
-/// higher-priority candidate was skipped.
+/// WHICH KIND of resolution produced a workspace root.
 ///
-/// Same shape and field names as `env_agent/collectors.rs`'s `ProbeScope`.
+/// The counterpart of `env_agent/collectors.rs`'s `ProbeScopeKind`, and it
+/// exists for the same reason: the PATH is not comparable across boxes — a
+/// Windows `D:\qontinui-root` and a Linux `/home/dev/src` differ while meaning
+/// exactly the same thing, and the path is operator-local — but the KIND is.
+///
+/// [`RejectedRoot`] is the *failure* story (which input was unusable and why);
+/// this is the *success* story (which rung actually answered). A caller that
+/// publishes a workspace-root-relative observation needs the latter to say
+/// whether two boxes' observations are comparable at all: a box that honoured
+/// an explicit declaration and a box that fell through to `<home>/qontinui-root`
+/// did not measure the same concept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkspaceRootKind {
+    /// An explicit value was honoured — `$QONTINUI_ROOT`, its alias, or the
+    /// host application's own setting. The operator said where the checkouts
+    /// live and the resolver agreed.
+    Declared,
+    /// The ancestor walk found the caller's own repo (see
+    /// [`is_workspace_root`]) — inferred from where this binary actually sits,
+    /// which is a fact about the install rather than a declaration.
+    Discovered,
+    /// `<home>/qontinui-root`, the portable last-resort convention. Nothing was
+    /// declared and nothing was discovered; this is the default layout, not an
+    /// observation about this box.
+    HomeDefault,
+    /// Nothing resolved. Carried so an unresolved root is a *stated* kind
+    /// rather than an absent one — the same absence-is-not-a-value rule the
+    /// rest of this module follows.
+    Unresolved,
+}
+
+impl WorkspaceRootKind {
+    /// The stable wire string, for callers that publish this provenance
+    /// (e.g. the devenv envelope's `repos.repos_scope_kind`). Mirrors
+    /// `ProbeScopeKind::wire`.
+    #[must_use]
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Declared => "declared",
+            Self::Discovered => "discovered",
+            Self::HomeDefault => "home_default",
+            Self::Unresolved => "unresolved",
+        }
+    }
+}
+
+/// A resolved (or unresolved) workspace root, plus which rung answered and the
+/// reason any higher-priority candidate was skipped.
+///
+/// Same shape and field names as `env_agent/collectors.rs`'s `ProbeScope`,
+/// including its `kind`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use = "a dropped WorkspaceRoot is exactly the silent miss this type exists to prevent"]
 pub struct WorkspaceRoot {
@@ -196,6 +245,9 @@ pub struct WorkspaceRoot {
     /// [`root`](Self::root) is `None`**, so a caller that fails closed always
     /// has something to name.
     pub rejected: Option<RejectedRoot>,
+    /// Which KIND of resolution answered — the part that is comparable across
+    /// boxes. `Unresolved` exactly when [`root`](Self::root) is `None`.
+    pub kind: WorkspaceRootKind,
 }
 
 impl WorkspaceRoot {
@@ -439,6 +491,7 @@ pub fn resolve_workspace_root(
                 return WorkspaceRoot {
                     root: Some(path),
                     rejected: first_rejection,
+                    kind: WorkspaceRootKind::Declared,
                 }
             }
             Err(reason) => {
@@ -456,6 +509,7 @@ pub fn resolve_workspace_root(
                     return WorkspaceRoot {
                         root: Some(dir.to_path_buf()),
                         rejected: first_rejection,
+                        kind: WorkspaceRootKind::Discovered,
                     }
                 }
                 Some(CheckoutKind::Worktree) => {
@@ -467,10 +521,17 @@ pub fn resolve_workspace_root(
         }
         // No canonical checkout anywhere up the chain: an install that genuinely
         // IS a worktree still resolves.
+        //
+        // Still `Discovered`: the KIND names which RUNG answered, and both arms
+        // are the same rung — the ancestor walk. The canonical-over-worktree
+        // preference is about picking the right PATH, not about how confident
+        // the resolution is, so splitting it into a second kind would publish a
+        // distinction that means nothing to a comparing peer.
         if let Some(root) = worktree_fallback {
             return WorkspaceRoot {
                 root: Some(root),
                 rejected: first_rejection,
+                kind: WorkspaceRootKind::Discovered,
             };
         }
     }
@@ -481,6 +542,7 @@ pub fn resolve_workspace_root(
             return WorkspaceRoot {
                 root: Some(candidate),
                 rejected: first_rejection,
+                kind: WorkspaceRootKind::HomeDefault,
             };
         }
     }
@@ -496,6 +558,7 @@ pub fn resolve_workspace_root(
     WorkspaceRoot {
         root: None,
         rejected: Some(rejected),
+        kind: WorkspaceRootKind::Unresolved,
     }
 }
 
@@ -680,6 +743,124 @@ mod tests {
             got.root.as_deref(),
             Some(home.join(HOME_WORKSPACE_DIR).as_path())
         );
+    }
+
+    // ---------------------------------------------------------------------
+    // Success-side provenance (`kind`). The PATH is not comparable across
+    // boxes but the KIND is, so a consumer publishing a workspace-root-relative
+    // observation can say whether two readings describe the same concept.
+    // ---------------------------------------------------------------------
+
+    /// Each of the three explicit rungs is `Declared` — the operator said where
+    /// the checkouts live, regardless of WHICH spelling they used.
+    #[test]
+    fn every_explicit_rung_reports_declared() {
+        let f = Fixture::new("kind_declared");
+        for (env, alias, cfg) in [
+            (Some(f.s()), None, None),
+            (None, Some(f.s()), None),
+            (None, None, Some(f.s())),
+        ] {
+            let got = resolve_workspace_root(
+                env.as_deref(),
+                alias.as_deref(),
+                cfg.as_deref(),
+                None,
+                None,
+            );
+            assert_eq!(got.root.as_deref(), Some(f.root.as_path()));
+            assert_eq!(got.kind, WorkspaceRootKind::Declared);
+        }
+    }
+
+    /// The ancestor walk is an inference about where this binary sits, not a
+    /// declaration — and BOTH walk arms report the same rung, because the
+    /// canonical-over-worktree preference picks a path, not a confidence.
+    #[test]
+    fn both_ancestor_walk_arms_report_discovered() {
+        // Canonical arm: `.git` is a directory.
+        let canonical = Fixture::new("kind_walk_canonical");
+        let deep = canonical.root.join("qontinui-runner").join("src-tauri");
+        let got = resolve_workspace_root(
+            None,
+            None,
+            None,
+            Some(WorkspaceAnchor::new(&deep, "qontinui-runner")),
+            None,
+        );
+        assert_eq!(got.root.as_deref(), Some(canonical.root.as_path()));
+        assert_eq!(got.kind, WorkspaceRootKind::Discovered);
+
+        // Worktree-fallback arm: `.git` is a file and no canonical checkout
+        // exists anywhere above it.
+        let base = temp_path("kind_walk_worktree");
+        let repo = base.join("qontinui-runner");
+        std::fs::create_dir_all(repo.join("src-tauri")).unwrap();
+        std::fs::write(repo.join(".git"), "gitdir: /elsewhere").unwrap();
+        let got = resolve_workspace_root(
+            None,
+            None,
+            None,
+            Some(WorkspaceAnchor::new(
+                &repo.join("src-tauri"),
+                "qontinui-runner",
+            )),
+            None,
+        );
+        assert_eq!(got.root.as_deref(), Some(base.as_path()));
+        assert_eq!(got.kind, WorkspaceRootKind::Discovered);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn home_fallback_reports_home_default() {
+        let f = Fixture::new("kind_home");
+        let home = f.root.join("home");
+        std::fs::create_dir_all(home.join(HOME_WORKSPACE_DIR)).unwrap();
+        let got = resolve_workspace_root(None, None, None, None, Some(&home));
+        assert_eq!(got.kind, WorkspaceRootKind::HomeDefault);
+    }
+
+    /// `Unresolved` is a STATED kind, not an absent one — and it holds exactly
+    /// when `root` is `None`, which is the invariant every consumer branches on.
+    #[test]
+    fn unresolved_is_a_stated_kind_and_tracks_root_none() {
+        let got = resolve_workspace_root(None, None, None, None, None);
+        assert!(got.root.is_none());
+        assert_eq!(got.kind, WorkspaceRootKind::Unresolved);
+        assert!(got.rejected.is_some());
+    }
+
+    /// A REJECTED explicit value that falls through to a lower rung must report
+    /// the rung that actually answered — not the one the operator intended.
+    /// Reporting `Declared` here would make the provenance lie about the
+    /// measurement in order to preserve intent, the same conflation
+    /// `resolve_probe_scope` refuses.
+    #[test]
+    fn a_rejected_explicit_value_does_not_claim_declared() {
+        let f = Fixture::new("kind_rejected_falls_through");
+        let deep = f.root.join("qontinui-runner").join("src-tauri");
+        let got = resolve_workspace_root(
+            Some("   "),
+            None,
+            None,
+            Some(WorkspaceAnchor::new(&deep, "qontinui-runner")),
+            None,
+        );
+        assert_eq!(got.root.as_deref(), Some(f.root.as_path()));
+        assert_eq!(got.kind, WorkspaceRootKind::Discovered);
+        assert!(got.rejected.is_some(), "the fall-through must stay visible");
+    }
+
+    /// The wire strings are a published contract (the devenv envelope's
+    /// `repos.repos_scope_kind`) — a rename silently breaks cross-box
+    /// comparison, so pin them.
+    #[test]
+    fn workspace_root_kind_wire_strings_are_stable() {
+        assert_eq!(WorkspaceRootKind::Declared.wire(), "declared");
+        assert_eq!(WorkspaceRootKind::Discovered.wire(), "discovered");
+        assert_eq!(WorkspaceRootKind::HomeDefault.wire(), "home_default");
+        assert_eq!(WorkspaceRootKind::Unresolved.wire(), "unresolved");
     }
 
     // ---------------------------------------------------------------------
