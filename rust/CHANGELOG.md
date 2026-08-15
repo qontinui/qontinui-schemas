@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.5.0...rust-v1.6.0) (2026-08-15)
+
+
+### Features
+
+* **paths:** give WorkspaceRoot a success-side resolution kind ([e8018d2](https://github.com/qontinui/qontinui-schemas/commit/e8018d2cd1ef986fdc891cefb552326d9f2be4e5))
+
 ## [1.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.4.0...rust-v1.5.0) (2026-08-06)
 
 
