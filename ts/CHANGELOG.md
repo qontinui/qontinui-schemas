@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.11.0...ts-v0.12.0) (2026-08-22)
+
+
+### Features
+
+* declare paramSchema, path, actionInvocationPath and effect on the canonical types ([bcfb344](https://github.com/qontinui/qontinui-schemas/commit/bcfb34490e36350c07093d33f2031706568c0e47))
+
 ## [0.11.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.10.1...ts-v0.11.0) (2026-08-06)
 
 

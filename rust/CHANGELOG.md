@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.6.0...rust-v1.7.0) (2026-08-22)
+
+
+### Features
+
+* declare paramSchema, path, actionInvocationPath and effect on the canonical types ([bcfb344](https://github.com/qontinui/qontinui-schemas/commit/bcfb34490e36350c07093d33f2031706568c0e47))
+
 ## [1.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.5.0...rust-v1.6.0) (2026-08-15)
 
 
