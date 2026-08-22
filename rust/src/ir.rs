@@ -65,6 +65,55 @@ pub struct IrElementCriteria {
 // Primitives — IR-only fields (provenance, metadata, effect, cross-refs)
 // ---------------------------------------------------------------------------
 
+/// How much damage running a transition or an action can do.
+///
+/// **This is a safety annotation, not a hint.** Its one job is to gate
+/// *automatic* walks: `Destructive` entries are EXCLUDED from auto-regression
+/// generation, so an autonomous explorer never fires them. It also drives
+/// counterfactual analysis. Anything that walks the graph without a human in
+/// the loop is required to honour it.
+///
+/// Absence is **unclassified, not safe.** An unannotated entry has not been
+/// judged, so a walker must treat it as unknown rather than as `Read` — the
+/// dangerous failure here is failing *open*.
+///
+/// Values on the wire are lowercase: `read`, `write`, `destructive`.
+
+// KEEP IN SYNC with the hand-authored TypeScript twin `IREffect`
+// (`ts/src/ui-bridge-ir/primitives.ts`), its inline re-declaration on
+// `IRApiCheck.effect` (`ts/src/ui-bridge-ir/document.ts`), and the SDK's
+// deliberate local mirror in `ui-bridge`'s `react/ir-types.ts` — that mirror
+// exists so `@qontinui/ui-bridge` need not take a runtime dependency on
+// `@qontinui/shared-types`, and is not accidental duplication.
+//
+// `IrTransition::effect` and `IrApiCheck::effect` still carry this same
+// vocabulary as a loose `String`. They are deliberately NOT retyped — doing so
+// narrows the published schema for documents other tools already author on
+// disk, which is a migration rather than a declaration.
+//
+// `#[schemars(inline)]` is load-bearing, not cosmetic. Without it schemars
+// emits `$ref: #/$defs/IrEffect` at every use site, and the TypeScript
+// generator then renders a bare `IrEffect` reference that it never declares or
+// imports — because `IrEffect` is not one of the top-level schemas the RUNNER's
+// `schema_export.rs` registers (contrast `ProposalStatus`, which is). That
+// ships a `.d.ts` failing with `TS2304: Cannot find name 'IrEffect'` for every
+// consumer, and `ts/tsconfig.json` sets `skipLibCheck: true`, so
+// `npm run typecheck` does NOT catch it. Inlining keeps the closed set in the
+// published schema with no paired qontinui-runner change. If a future use site
+// wants a NAMED TS type, register the enum in the runner's `schema_export.rs`
+// and drop this attribute — in that order, or the bindings PR is unmergeable.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(inline)]
+#[serde(rename_all = "lowercase")]
+pub enum IrEffect {
+    /// Query or navigate; no persistent state change.
+    Read,
+    /// Modifies persistent state, but is reversible (or has an undo).
+    Write,
+    /// Irreversible state change — delete, send, charge, deploy.
+    Destructive,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct IrProvenance {

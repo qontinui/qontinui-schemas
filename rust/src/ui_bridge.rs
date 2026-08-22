@@ -22,6 +22,7 @@
 //! - Dates/times are ISO 8601 strings or Unix-epoch millisecond `i64`s
 //!   (see crate-level docs).
 
+use crate::ir::IrEffect;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -254,6 +255,34 @@ pub struct ComponentActionInfo {
     /// Longer description of what the action does.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Free-form declaration of the action's parameters, author-supplied on the
+    /// SDK side as `ComponentAction.paramSchema` and surfaced verbatim on
+    /// `/control/components`. Conventionally a small JSON Schema subset, but the
+    /// SDK does not constrain the shape, so it is carried through untyped — the
+    /// same treatment `ElementActionRequest::params` gets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param_schema: Option<serde_json::Value>,
+    /// Safety class of this action: `read`, `write` or `destructive`.
+    ///
+    /// **A safety annotation, not a hint.** An autonomous walk MUST NOT fire an
+    /// action annotated `destructive`; that is the same exclusion the IR already
+    /// applies to `destructive` transitions when generating auto-regressions.
+    /// Author-declared, because only the app author knows that a particular
+    /// `click` is a delete button.
+    ///
+    /// Absent means **unclassified, not safe** — an action nobody has judged
+    /// must be treated as unknown rather than as `read`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<IrEffect>,
+    /// Fully-resolved invocation path for this action:
+    /// `/control/component/<componentId>/action/<actionId>`.
+    ///
+    /// **Server-annotated, not author-declared**: the SDK's
+    /// `annotateComponentWithInvocationPaths` computes it when serving the
+    /// component listing, so it is present on the wire but absent from anything
+    /// an app author writes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// A registered component in the UI Bridge registry.
@@ -274,6 +303,15 @@ pub struct UIBridgeComponent {
     /// Actions exposed by this component.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<ComponentActionInfo>,
+    /// Invocation-path template for this component's actions, emitted with a
+    /// literal `{actionId}` placeholder:
+    /// `/control/component/<componentId>/action/{actionId}`.
+    ///
+    /// **Server-annotated, not author-declared**: emitted by the SDK's
+    /// `annotateComponentWithInvocationPaths` alongside the per-action
+    /// [`ComponentActionInfo::path`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_invocation_path: Option<String>,
     /// IDs of elements that belong to this component.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_ids: Option<Vec<String>>,
@@ -603,4 +641,141 @@ pub struct UIBridgeSnapshot {
     /// Native-only: current route segments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub segments: Vec<String>,
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The SDK's `/control/components` payload carries `paramSchema` and a
+    /// server-annotated per-action `path`. Before those fields existed here the
+    /// published JSON Schema (`deny_unknown_fields`) rejected the payload the
+    /// SDK actually sends, so this pins BOTH directions against literal JSON.
+    #[test]
+    fn component_action_info_round_trips_param_schema_and_path() {
+        // Literal wire bytes, as emitted by
+        // `annotateComponentWithInvocationPaths` in the UI Bridge SDK.
+        let wire = r#"{"id":"search","label":"Search","description":"Run a search","paramSchema":{"properties":{"query":{"type":"string"}},"type":"object"},"path":"/control/component/search-box/action/search"}"#;
+
+        let action: ComponentActionInfo = serde_json::from_str(wire).expect("deserializes");
+
+        assert_eq!(action.id, "search");
+        assert_eq!(action.label.as_deref(), Some("Search"));
+        assert_eq!(action.description.as_deref(), Some("Run a search"));
+        assert_eq!(
+            action.path.as_deref(),
+            Some("/control/component/search-box/action/search")
+        );
+        // The schema is carried through untyped and unmodified.
+        let param_schema = action.param_schema.as_ref().expect("paramSchema present");
+        assert_eq!(param_schema["type"], "object");
+        assert_eq!(param_schema["properties"]["query"]["type"], "string");
+
+        // Re-serializing reproduces the same literal bytes: field order is
+        // declaration order, and serde_json orders map keys lexicographically.
+        let reserialized = serde_json::to_string(&action).expect("serializes");
+        assert_eq!(reserialized, wire);
+    }
+
+    /// `skip_serializing_if = "Option::is_none"` must OMIT the keys entirely
+    /// rather than emit `null` — a `null` would be a different wire shape and
+    /// consumers reading `action.paramSchema` truthily would see it change.
+    #[test]
+    fn component_action_info_omits_absent_param_schema_and_path() {
+        let action = ComponentActionInfo {
+            id: "reset".to_string(),
+            label: None,
+            description: None,
+            param_schema: None,
+            effect: None,
+            path: None,
+        };
+
+        let json = serde_json::to_string(&action).expect("serializes");
+        assert_eq!(json, r#"{"id":"reset"}"#);
+        assert!(!json.contains("paramSchema"));
+        assert!(!json.contains("\"path\""));
+        assert!(!json.contains("effect"));
+    }
+
+    /// The effect annotation gates automatic walks, so it has to survive the
+    /// wire intact — pinned against literal JSON in both directions.
+    #[test]
+    fn component_action_info_round_trips_destructive_effect() {
+        let wire = r#"{"id":"delete","label":"Delete row","effect":"destructive","path":"/control/component/row/action/delete"}"#;
+
+        let action: ComponentActionInfo = serde_json::from_str(wire).expect("deserializes");
+
+        assert_eq!(action.effect, Some(IrEffect::Destructive));
+        assert_eq!(serde_json::to_string(&action).expect("serializes"), wire);
+    }
+
+    /// All three vocabulary members are accepted, and each renders lowercase.
+    #[test]
+    fn component_action_info_effect_accepts_the_whole_vocabulary() {
+        for (wire, expected) in [
+            (r#"{"id":"a","effect":"read"}"#, IrEffect::Read),
+            (r#"{"id":"a","effect":"write"}"#, IrEffect::Write),
+            (
+                r#"{"id":"a","effect":"destructive"}"#,
+                IrEffect::Destructive,
+            ),
+        ] {
+            let action: ComponentActionInfo = serde_json::from_str(wire).expect("deserializes");
+            assert_eq!(action.effect, Some(expected));
+            assert_eq!(serde_json::to_string(&action).expect("serializes"), wire);
+        }
+    }
+
+    /// `effect` is a CLOSED set. A plausible-but-wrong verb must be REJECTED,
+    /// not silently carried — an unrecognised value accepted as data would let
+    /// a destructive action masquerade as unclassified and get walked.
+    #[test]
+    fn component_action_info_rejects_an_out_of_vocabulary_effect() {
+        let wire = r#"{"id":"delete","effect":"delete"}"#;
+
+        let err = serde_json::from_str::<ComponentActionInfo>(wire)
+            .expect_err("an out-of-vocabulary effect must not deserialize");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown variant") && msg.contains("delete"),
+            "expected an unknown-variant error naming the bad value, got: {msg}"
+        );
+
+        // Capitalisation is not a synonym either — the wire form is lowercase.
+        assert!(serde_json::from_str::<ComponentActionInfo>(
+            r#"{"id":"a","effect":"Destructive"}"#
+        )
+        .is_err());
+    }
+
+    /// The component-level `actionInvocationPath` is a TEMPLATE carrying a
+    /// literal `{actionId}` placeholder — not a resolved path.
+    #[test]
+    fn ui_bridge_component_round_trips_action_invocation_path() {
+        let wire = r#"{"id":"search-box","name":"SearchBox","actions":[{"id":"search","paramSchema":{"type":"object"},"path":"/control/component/search-box/action/search"}],"actionInvocationPath":"/control/component/search-box/action/{actionId}","registeredAt":1755800000000,"mounted":true}"#;
+
+        let component: UIBridgeComponent = serde_json::from_str(wire).expect("deserializes");
+
+        assert_eq!(component.id, "search-box");
+        assert_eq!(
+            component.action_invocation_path.as_deref(),
+            Some("/control/component/search-box/action/{actionId}")
+        );
+        assert_eq!(component.actions.len(), 1);
+        assert_eq!(
+            component.actions[0]
+                .param_schema
+                .as_ref()
+                .expect("paramSchema present")["type"],
+            "object"
+        );
+
+        let reserialized = serde_json::to_string(&component).expect("serializes");
+        assert_eq!(reserialized, wire);
+    }
 }

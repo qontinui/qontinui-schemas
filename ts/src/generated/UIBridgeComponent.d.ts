@@ -15,6 +15,16 @@ import type { ComponentActionInfo } from "./ComponentActionInfo";
  */
 export interface UIBridgeComponent {
   /**
+   * Invocation-path template for this component's actions, emitted with a
+   * literal `{actionId}` placeholder:
+   * `/control/component/<componentId>/action/{actionId}`.
+   *
+   * **Server-annotated, not author-declared**: emitted by the SDK's
+   * `annotateComponentWithInvocationPaths` alongside the per-action
+   * [`ComponentActionInfo::path`].
+   */
+  actionInvocationPath?: string | null;
+  /**
    * Actions exposed by this component.
    */
   actions?: ComponentActionInfo[];
