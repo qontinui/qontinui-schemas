@@ -55,6 +55,12 @@ pub mod accessibility;
 /// version rather than mutating history. See
 /// `2026-07-29-account-versioned-agent-commands.md`.
 pub mod agent_commands;
+/// The unified **agent text corpus** — one `kind`-discriminated text unit
+/// (slash command, agent skill, agent definition, …) whose versions carry a
+/// `relative path → text` file map. Supersedes [`agent_commands`], which stays
+/// in place until the runner cuts over. See
+/// `2026-08-20-fleet-served-agent-skills.md` Design decision 1.
+pub mod agent_text_units;
 pub mod ai_workflows;
 pub mod app_events;
 pub mod apps;
