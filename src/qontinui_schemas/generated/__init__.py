@@ -23,6 +23,10 @@ from .per_type.active_states_result import ActiveStatesResult
 from .per_type.agent_command import AgentCommand
 from .per_type.agent_command_error import AgentCommandError
 from .per_type.agent_command_version import AgentCommandVersion
+from .per_type.agent_text_unit import AgentTextUnit
+from .per_type.agent_text_unit_error import AgentTextUnitError
+from .per_type.agent_text_unit_file import AgentTextUnitFile
+from .per_type.agent_text_unit_version import AgentTextUnitVersion
 from .per_type.agentic_phase_output import AgenticPhaseOutput
 from .per_type.agentic_status import AgenticStatus
 from .per_type.ai_workflow import AiWorkflow
@@ -569,6 +573,10 @@ __all__ = [
     "AgentCommand",
     "AgentCommandError",
     "AgentCommandVersion",
+    "AgentTextUnit",
+    "AgentTextUnitError",
+    "AgentTextUnitFile",
+    "AgentTextUnitVersion",
     "AgenticPhaseOutput",
     "AgenticStatus",
     "AiWorkflow",
