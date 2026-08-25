@@ -294,9 +294,7 @@ mod tests {
         // the same background). It must surface at most Info — never
         // Warning/Critical — and must not feed the density roll-up.
         let f = solid_frame(10, 10, [0x20, 0x20, 0x20, 0xff]);
-        let snap = ElementSnapshot {
-            elements: vec![text_el("footer-link", None, None)],
-        };
+        let snap = ElementSnapshot::new(vec![text_el("footer-link", None, None)]);
         let findings = run(&f, &snap);
         let lc: Vec<_> = findings
             .iter()
@@ -313,13 +311,11 @@ mod tests {
         // Declared colors with ratio < 3.0 stay Critical (path untouched).
         let f = solid_frame(10, 10, [0xff, 0xff, 0xff, 0xff]);
         // light-gray on white ~1.6:1
-        let snap = ElementSnapshot {
-            elements: vec![text_el(
-                "btn",
-                Some(Rgb::new(200, 200, 200)),
-                Some(Rgb::new(255, 255, 255)),
-            )],
-        };
+        let snap = ElementSnapshot::new(vec![text_el(
+            "btn",
+            Some(Rgb::new(200, 200, 200)),
+            Some(Rgb::new(255, 255, 255)),
+        )]);
         let findings = run(&f, &snap);
         let lc = findings
             .iter()
@@ -333,13 +329,11 @@ mod tests {
         // Declared colors with 3.0 <= ratio < 4.5 stay Warning.
         // mid-gray (#808080) on white is ~3.95:1.
         let f = solid_frame(10, 10, [0xff, 0xff, 0xff, 0xff]);
-        let snap = ElementSnapshot {
-            elements: vec![text_el(
-                "btn",
-                Some(Rgb::new(0x80, 0x80, 0x80)),
-                Some(Rgb::new(255, 255, 255)),
-            )],
-        };
+        let snap = ElementSnapshot::new(vec![text_el(
+            "btn",
+            Some(Rgb::new(0x80, 0x80, 0x80)),
+            Some(Rgb::new(255, 255, 255)),
+        )]);
         let r = wcag_contrast(Rgb::new(0x80, 0x80, 0x80), Rgb::new(255, 255, 255));
         assert!(
             (3.0..4.5).contains(&r),
@@ -367,7 +361,7 @@ mod tests {
         for i in 0..5 {
             elements.push(text_el(&format!("sampled-{i}"), None, None));
         }
-        let snap = ElementSnapshot { elements };
+        let snap = ElementSnapshot::new(elements);
         let findings = run(&f, &snap);
         // 5 sampled Info findings, 1 declared (good contrast, no finding).
         assert!(!findings.iter().any(|x| x.kind == "contrast_density"));

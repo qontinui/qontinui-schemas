@@ -2,9 +2,29 @@
 //! over a captured [`Frame`] + [`ElementSnapshot`].
 //!
 //! Each [`Assertion`] is a tagged enum variant that the wire serializes
-//! as `{ "type": "no_overlap", … }`. The DSL is **append-only** within a
-//! given vision contract — adding a new assertion variant is non-breaking,
-//! removing/changing one requires bumping `OutputContract`.
+//! as `{ "type": "no_overlap", … }`. The DSL is **append-only**: adding a
+//! variant — or an optional `#[serde(default)]` field to an existing type,
+//! including [`ElementSnapshot`] on the input side and [`AssertionResult`] on
+//! the output side — is non-breaking, because serde tolerates unknown input
+//! fields and `skip_serializing_if` keeps absent ones off the wire entirely.
+//! Removing or renaming one is breaking.
+//!
+//! **A breaking change costs a consumer RE-PIN, not an in-band version bump.**
+//! This crate is unpublished (it is absent from `release-please-config.json`
+//! and from `publish-rust.yml`), so every consumer pins a commit instead:
+//! qontinui-runner by Rust path dependency, qontinui-web's CI style gate by
+//! the `qontinui_schemas_sha` in its root `style-gate.lock`. There is no DSL
+//! version field anywhere in this crate to bump.
+//!
+//! [`crate::OutputContract`] does **not** version this DSL — an earlier
+//! revision of this comment said it did, and that was wrong. It is a set of
+//! IMAGE-ENCODING constraints (`allowed_formats`, `max_long_edge`,
+//! `max_bytes`, `alpha_policy`, `metadata_policy`, `color_space`) read only by
+//! [`crate::encode::safe_image`] and [`crate::Stage::Verify`]. Neither
+//! [`evaluate`], [`AssertionResult`] nor [`ElementSnapshot`] ever takes one,
+//! and it has no version field: its "versions" are three named constants
+//! describing three different image formats. Bumping it would change emitted
+//! image bytes and tell an assert consumer nothing.
 //!
 //! See [`evaluate`] for the entrypoint and individual variant docs for
 //! what each one checks.
@@ -926,7 +946,7 @@ mod tests {
     }
 
     fn snap_of(els: Vec<Element>) -> ElementSnapshot {
-        ElementSnapshot { elements: els }
+        ElementSnapshot::new(els)
     }
 
     #[test]

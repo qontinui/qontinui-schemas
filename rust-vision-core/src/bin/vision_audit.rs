@@ -474,6 +474,13 @@ pub struct AssertReport {
     passed: usize,
     failed: usize,
     results: Vec<AssertionResult>,
+    /// Which snapshot this verdict judged — echoed verbatim from
+    /// [`ElementSnapshot::snapshot_id`]. `None` when the snapshot carried no
+    /// id, which is the honest answer: the verdict is real but unattributable,
+    /// not attributable to "some default snapshot". Omitted from the JSON in
+    /// that case so a consumer cannot read `null` as an id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snapshot_id: Option<String>,
     notes: Vec<String>,
 }
 
@@ -501,6 +508,7 @@ pub fn assert_all(
         passed,
         failed,
         results,
+        snapshot_id: snapshot.snapshot_id.clone(),
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
                      contains_text uses snapshot text"
             .to_string()],
@@ -519,6 +527,12 @@ fn assert_summary(report: &AssertReport) -> String {
             "FAIL (exit 2)"
         }
     )];
+    // Name the snapshot judged, when the producer supplied one — a CI reader
+    // looking at a red gate needs to know WHICH capture failed, not merely
+    // that one did.
+    if let Some(id) = &report.snapshot_id {
+        lines.push(format!("  snapshot: {id}"));
+    }
     for r in &report.results {
         if !r.passed {
             lines.push(format!(
@@ -683,6 +697,26 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_id_survives_the_bridge_envelope() {
+        // `curl .../discover | jq .data` piped straight in: the id lives on
+        // the inner object under the producer's camelCase spelling, and must
+        // reach the report rather than being dropped with the wrapper.
+        let json = br#"{"data":{"elements":[{"id":"a"}],"snapshotId":"ubs1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb"}}"#;
+        let snap = parse_snapshot(json).unwrap();
+        assert_eq!(
+            snap.snapshot_id.as_deref(),
+            Some("ubs1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb")
+        );
+
+        // A bare element array carries no envelope and therefore no id — the
+        // unattributed case stays unattributed rather than inventing one.
+        assert!(parse_snapshot(br#"[{"id":"a"}]"#)
+            .unwrap()
+            .snapshot_id
+            .is_none());
+    }
+
+    #[test]
     fn snapshot_bad_json_errors() {
         assert!(parse_snapshot(b"not json").is_err());
     }
@@ -743,9 +777,7 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        ElementSnapshot {
-            elements: vec![mk("a", 0), mk("b", 50)],
-        }
+        ElementSnapshot::new(vec![mk("a", 0), mk("b", 50)])
     }
 
     #[test]
@@ -790,9 +822,7 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        let snap = ElementSnapshot {
-            elements: vec![mk("a", 0), mk("b", 500)],
-        };
+        let snap = ElementSnapshot::new(vec![mk("a", 0), mk("b", 500)]);
         let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
         assert_eq!(
             analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
@@ -829,6 +859,56 @@ mod tests {
         assert_eq!(fail.failed, 1);
     }
 
+    // ---- assert attribution ----
+
+    #[test]
+    fn assert_report_names_the_snapshot_it_judged() {
+        let mut snap = snap_with_overlap();
+        let id = "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        snap.snapshot_id = Some(id.to_string());
+        let bl = HashMap::new();
+
+        let report = assert_all(
+            &snap,
+            &frame_1x1(),
+            &[Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            }],
+            &bl,
+        );
+        assert!(!report.all_passed, "a and b overlap");
+        assert_eq!(report.snapshot_id.as_deref(), Some(id));
+
+        // Reachable by a caller, not merely stored: it is on the machine-JSON
+        // stdout contract CI keys off...
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire.get("snapshotId").and_then(|v| v.as_str()), Some(id));
+
+        // ...and on the human summary, so a red gate says WHICH capture failed.
+        assert!(
+            assert_summary(&report).contains(id),
+            "summary must name the snapshot"
+        );
+    }
+
+    #[test]
+    fn assert_report_omits_attribution_for_an_unattributed_snapshot() {
+        let report = assert_all(
+            &snap_with_overlap(),
+            &frame_1x1(),
+            &[Assertion::NoClipping { region: None }],
+            &HashMap::new(),
+        );
+        assert!(report.all_passed);
+        assert!(report.snapshot_id.is_none());
+        let wire = serde_json::to_value(&report).unwrap();
+        assert!(
+            wire.get("snapshotId").is_none(),
+            "an unattributed verdict must omit the key, not emit null"
+        );
+    }
+
     // ---- baseline path safety + round-trip ----
 
     #[test]
@@ -863,7 +943,7 @@ mod tests {
             children_ids: vec![],
         };
         e.fg_color = Some(Rgb::new(0, 0, 0));
-        let snap = ElementSnapshot { elements: vec![e] };
+        let snap = ElementSnapshot::new(vec![e]);
         let entry = BaselineEntry::from_snapshot(&snap);
         let path = baseline_path(dir.path(), "v1").unwrap();
         std::fs::write(&path, serde_json::to_string(&entry).unwrap()).unwrap();
@@ -896,9 +976,7 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        let base_snap = ElementSnapshot {
-            elements: vec![base_el],
-        };
+        let base_snap = ElementSnapshot::new(vec![base_el]);
         let entry = BaselineEntry::from_snapshot(&base_snap);
         let path = baseline_path(dir.path(), "v1").unwrap();
         std::fs::write(&path, serde_json::to_string(&entry).unwrap()).unwrap();

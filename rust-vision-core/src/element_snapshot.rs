@@ -24,9 +24,46 @@ use crate::frame::Region;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ElementSnapshot {
     pub elements: Vec<Element>,
+    /// Identity of the capture these elements came from, as minted by the
+    /// PRODUCER (the UI Bridge SDK or the runner). Format is the normative
+    /// snapshot-signature spec v1:
+    /// `ubs1_{count in base36}_{content as 16 lowercase hex}_{generation as
+    /// 16 lowercase hex}` — two independent FNV-1a-64 folds, `content` over
+    /// the observable element state and `generation` over each element's
+    /// `registeredAt`.
+    ///
+    /// This crate is a CONSUMER of that id and never a producer: it carries
+    /// the value through so an assert verdict can name the snapshot it
+    /// judged. It deliberately does not recompute the fold — a third
+    /// implementation beside the SDK's and the runner's is exactly the
+    /// silent drift the one normative spec exists to prevent — so the value
+    /// is an opaque token here, neither parsed nor validated.
+    ///
+    /// `None` is valid and is the default. A source that mints no id (a
+    /// hand-written fixture, a native a11y tree, a bare element array piped
+    /// into `vision-audit`) still yields a legitimate analysis; it simply
+    /// cannot be attributed. Accepts the producer's `snapshotId` spelling as
+    /// an alias so a raw bridge payload carries its id through unedited.
+    ///
+    /// Residual inherited from the producer, carried forward explicitly
+    /// rather than silently: `generation` folds millisecond-resolution
+    /// `registeredAt` values, so a remount completing inside one millisecond
+    /// leaves the id unchanged. Two equal ids mean "nothing observable
+    /// changed" only to that resolution.
+    #[serde(default, alias = "snapshotId", skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<String>,
 }
 
 impl ElementSnapshot {
+    /// An UNATTRIBUTED snapshot — elements with no producer id. The shape
+    /// every caller that mints no id projects into.
+    pub fn new(elements: Vec<Element>) -> Self {
+        Self {
+            elements,
+            snapshot_id: None,
+        }
+    }
+
     /// Find an element by id. O(n) — snapshots are small (typically <500
     /// elements) and assertions look up only a handful per call.
     pub fn get(&self, id: &str) -> Option<&Element> {
@@ -300,6 +337,96 @@ mod tests {
             region(10, 10, 5, 5).clamp_to_frame(100, 100),
             Some((10, 10, 5, 5))
         );
+    }
+
+    // ---------------------------------------------------------------
+    // Snapshot identity. The id is minted by the PRODUCER (SDK/runner) to
+    // the normative `ubs1_…` signature spec; this crate only carries it, so
+    // what is pinned here is that it survives the wire in both directions
+    // and that its ABSENCE stays a first-class, valid state.
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn snapshot_id_round_trips_through_serde() {
+        let id = "ubs1_2s_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        let snap = ElementSnapshot {
+            elements: vec![Element {
+                id: "btn".to_string(),
+                bbox: Some(region(0, 0, 40, 20)),
+                text: None,
+                role: None,
+                interactable: true,
+                fg_color: None,
+                bg_color: None,
+                font_size_px: None,
+                font_family: None,
+                line_height_px: None,
+                parent_id: None,
+                children_ids: vec![],
+            }],
+            snapshot_id: Some(id.to_string()),
+        };
+
+        let wire = serde_json::to_string(&snap).unwrap();
+        assert!(
+            wire.contains(r#""snapshot_id":"ubs1_2s_9f1c0a4b7e3d2610_00000191a4c3f2d8""#),
+            "id must reach the wire verbatim, got {wire}"
+        );
+
+        let back: ElementSnapshot = serde_json::from_str(&wire).unwrap();
+        assert_eq!(back.snapshot_id.as_deref(), Some(id));
+        assert_eq!(back.elements.len(), 1);
+    }
+
+    #[test]
+    fn snapshot_id_is_opaque_not_validated() {
+        // This crate is a consumer of the id, never a producer: it does not
+        // recompute the fold, so it must not reject a token it cannot parse.
+        // A snapshot from a future spec revision still analyzes.
+        let json = r#"{"elements":[],"snapshot_id":"ubs2_whatever-comes-next"}"#;
+        let snap: ElementSnapshot = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            snap.snapshot_id.as_deref(),
+            Some("ubs2_whatever-comes-next")
+        );
+    }
+
+    #[test]
+    fn producer_camel_case_spelling_is_accepted() {
+        // A raw bridge/discover payload spells it `snapshotId`; piping one
+        // straight into `vision-audit` must carry the attribution through.
+        let json = r#"{"elements":[],"snapshotId":"ubs1_0_0000000000000000_0000000000000000"}"#;
+        let snap: ElementSnapshot = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            snap.snapshot_id.as_deref(),
+            Some("ubs1_0_0000000000000000_0000000000000000")
+        );
+    }
+
+    #[test]
+    fn snapshot_without_id_is_still_valid() {
+        // The pre-identity payload shape, unchanged. An analysis over a
+        // snapshot of unknown provenance is legitimate — it simply cannot be
+        // attributed.
+        let json = r#"{"elements":[{"id":"a","bbox":{"x":0,"y":0,"w":10,"h":10}}]}"#;
+        let snap: ElementSnapshot = serde_json::from_str(json).expect("id is optional");
+        assert!(snap.snapshot_id.is_none());
+        assert_eq!(snap.elements.len(), 1);
+
+        // ...and an unattributed snapshot emits no key at all, so a consumer
+        // never has to distinguish `null` from a real id.
+        let wire = serde_json::to_string(&snap).unwrap();
+        assert!(
+            !wire.contains("snapshot_id") && !wire.contains("snapshotId"),
+            "absent id must be omitted, not serialized as null: {wire}"
+        );
+    }
+
+    #[test]
+    fn new_builds_an_unattributed_snapshot() {
+        let snap = ElementSnapshot::new(vec![]);
+        assert!(snap.snapshot_id.is_none());
+        assert!(ElementSnapshot::default().snapshot_id.is_none());
     }
 
     #[test]
