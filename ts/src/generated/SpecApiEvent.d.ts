@@ -88,3 +88,29 @@ export type SpecApiEvent =
       type: "flywheel-proposal-demoted";
       [k: string]: unknown;
     };
+
+/**
+ * Existing `POST /spec/author` change-broadcast payload. Pre-dates the
+ * Plan 06 `SpecApiEvent` sum-type but keeps the same shape so external
+ * SSE subscribers (the runner's `use-discovered-specs.ts`) keep working.
+ */
+export interface SpecChanged {
+  /**
+   * Owning app id (multi-tenant Spec API). Subscribers filter on this
+   * to receive only their app's events. `#[serde(default)]` allows
+   * legacy emitters (pre-multi-app) to omit the field; downstream
+   * per-app routing treats empty as `qontinui-runner` for back-compat.
+   */
+  appId: string;
+  /**
+   * Epoch milliseconds the event was emitted at.
+   */
+  atMs: number;
+  /**
+   * "ir-and-projection" today; future kinds may include
+   * "projection-only" if a regen runs without an IR write.
+   */
+  kind: string;
+  pageId: string;
+  [k: string]: unknown;
+}

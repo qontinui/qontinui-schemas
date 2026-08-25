@@ -17,6 +17,9 @@ import type { ConstraintSeverity } from "./ConstraintSeverity";
  */
 export type ConstraintProposal =
   | {
+      /**
+       * The proposed constraint definition.
+       */
       constraint: Constraint;
       type: "new_constraint";
     }

@@ -18,7 +18,13 @@ import type { FindingUserInput } from "./FindingUserInput";
  * observation.
  */
 export interface FindingCreate {
+  /**
+   * Type of action for this finding.
+   */
   actionType: FindingActionType;
+  /**
+   * Category of the finding.
+   */
   category: FindingCategory;
   /**
    * Code context, if the finding relates to specific code.
@@ -32,6 +38,9 @@ export interface FindingCreate {
    * Session number where the finding was detected.
    */
   sessionNum: number;
+  /**
+   * Severity level of the finding.
+   */
   severity: FindingSeverity;
   /**
    * Hash used to deduplicate findings across sessions.

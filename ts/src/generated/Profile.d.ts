@@ -14,7 +14,13 @@ import type { EnforcementProfile } from "./EnforcementProfile";
  * The top-level Priorities Profile.
  */
 export interface Profile {
+  /**
+   * Architectural shape + testing bar.
+   */
   architecture: ArchitectureProfile;
+  /**
+   * Target backend stack.
+   */
   backend: BackendProfile;
   /**
    * Naming / mapping conventions, as free-form `key -> value` pairs (e.g.

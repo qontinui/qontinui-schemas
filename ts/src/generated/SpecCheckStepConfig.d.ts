@@ -34,5 +34,8 @@ export interface SpecCheckStepConfig {
    * Page to evaluate.
    */
   pageId: string;
+  /**
+   * Policy that determines pass / fail.
+   */
   policy: SpecCheckPolicy;
 }

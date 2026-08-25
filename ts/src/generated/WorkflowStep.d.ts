@@ -45,6 +45,9 @@ export interface WorkflowStep {
    * Display name for the step.
    */
   name: string;
+  /**
+   * Phase in which the step appears.
+   */
   phase: WorkflowStepPhase;
   /**
    * Whether this step is required (default: `true` on consumer side).

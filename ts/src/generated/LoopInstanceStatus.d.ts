@@ -24,5 +24,8 @@ export interface LoopInstanceStatus {
    * Unique identifier for this loop.
    */
   loopId: string;
+  /**
+   * The per-loop status snapshot.
+   */
   status: OrchestrationLoopStatus;
 }

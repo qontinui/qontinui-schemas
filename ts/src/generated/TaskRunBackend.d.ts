@@ -74,6 +74,9 @@ export interface TaskRunBackend {
    * Number of AI sessions that have been run.
    */
   sessionsCount: number;
+  /**
+   * Current lifecycle status.
+   */
   status: TaskRunStatus;
   /**
    * Display name.

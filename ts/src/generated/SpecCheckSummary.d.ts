@@ -14,6 +14,9 @@ import type { SpecCheckConfidence } from "./SpecCheckConfidence";
  * Aggregate summary across all evaluated states.
  */
 export interface SpecCheckSummary {
+  /**
+   * Top-level pass / partial / no-match verdict.
+   */
   matchOutcome: MatchOutcome;
   /**
    * Mean of per-state match rates, weighted equally.
@@ -33,5 +36,8 @@ export interface SpecCheckSummary {
    * as "current". `None` when the matcher has no preference.
    */
   recommendedState?: RecommendedState | null;
+  /**
+   * Counts of assertion failures bucketed by severity.
+   */
   severityCounts: AssertionSeverityCounts;
 }

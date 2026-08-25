@@ -1,0 +1,65 @@
+name: ts-typecheck
+
+# Type-checks the `ts/` package, including the gate over its OWN generated
+# `.d.ts` files (`ts/tsconfig.generated.json`, chained into the `typecheck`
+# script).
+#
+# WHY THIS WORKFLOW EXISTS
+#
+# Before it, NO workflow in this repo ran `tsc` at all: `publish.yml` runs
+# `npm run build`, but only on a `ts-v*` tag — i.e. after the code has already
+# been merged and a release cut. `schema-drift` regenerates the bindings and
+# compares bytes; it never asks whether the bytes compile. So a generated
+# binding could reference a type that does not exist and nothing in CI would
+# notice — which is exactly what happened. `PolicyEvaluation.d.ts` shipped
+# `overallStatus: PolicyStatus1` and `IrPageSpec.d.ts` shipped
+# `apiAssertions?: IrApiCheck[] | null`, both naming types nothing declared,
+# and both reached npm.
+#
+# Adding `tsconfig.generated.json` without a CI caller would have left the
+# gate unable to go red, which is the failure mode `scripts/check-generated-
+# drift.sh` was written to end: a gate that cannot go red manufactures
+# confidence.
+#
+# NOT folded into `schema-drift.yml`: `check-drift` is a REQUIRED status check
+# on this repo's main-merge ruleset and does a cross-repo sibling checkout of
+# qontinui-runner. Bolting an unrelated failure mode onto it would put a
+# whole-repo train freeze one bug away. This job is self-contained — checkout,
+# npm ci, tsc — and fails only on this repo's own TypeScript.
+#
+# No `paths:` filter: the type of a generated binding can be broken by a change
+# to the generator, to a tsconfig, to a dependency version, or to hand-authored
+# `ts/src` — and any PR can carry a merge-base that shifts the result. The job
+# is ~1 minute; scoping it would buy little and could green a PR the gate had
+# not actually seen.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ts-typecheck-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (source + generated .d.ts gate)
+        run: npm run typecheck

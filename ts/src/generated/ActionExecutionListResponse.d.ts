@@ -16,5 +16,8 @@ export interface ActionExecutionListResponse {
    * Page of matching actions.
    */
   actions: ActionExecutionResponse[];
+  /**
+   * Pagination envelope.
+   */
   pagination: Pagination;
 }

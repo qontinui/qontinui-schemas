@@ -20,5 +20,8 @@ export interface ConjunctEvaluation {
    * Snapshot of `PolicyConjunct.name`.
    */
   name: string;
+  /**
+   * Pass / fail / indeterminate.
+   */
   status: PolicyStatus;
 }

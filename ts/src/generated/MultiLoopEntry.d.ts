@@ -20,6 +20,9 @@ import type { SummarizationConfig } from "./SummarizationConfig";
  * A single entry in a multi-loop configuration.
  */
 export interface MultiLoopEntry {
+  /**
+   * The loop configuration.
+   */
   config: OrchestrationLoopConfig;
   /**
    * Human label (e.g., `"Pages 1–10"` or an app section name).

@@ -45,6 +45,9 @@ export interface VerificationResultResponse {
    * Number of steps that passed.
    */
   passedSteps: number;
+  /**
+   * Full typed verification result payload.
+   */
   resultJson: VerificationPhaseResult;
   /**
    * Number of steps that were skipped.

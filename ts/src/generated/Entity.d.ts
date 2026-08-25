@@ -13,6 +13,9 @@ import type { SpecProvenance } from "./SpecProvenance";
  * A domain entity inferred from rendered data shapes.
  */
 export interface Entity {
+  /**
+   * How this entity's existence was established.
+   */
   confidence: SpecProvenance;
   /**
    * Optional deduction strength ∈ [0,1]. Present only on `Inferred` nodes;

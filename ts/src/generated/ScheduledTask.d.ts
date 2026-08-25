@@ -91,6 +91,9 @@ export interface ScheduledTask {
    * Next scheduled run time (ISO 8601), computed by the runner.
    */
   nextRun?: string | null;
+  /**
+   * Schedule configuration.
+   */
   schedule: ScheduleExpression;
   /**
    * Skip future runs once the task has succeeded at least once.
@@ -100,5 +103,8 @@ export interface ScheduledTask {
    * Free-form description of success criteria, for human reference.
    */
   successCriteria?: string | null;
+  /**
+   * Task type and its per-type configuration.
+   */
   task: ScheduledTaskType;
 }

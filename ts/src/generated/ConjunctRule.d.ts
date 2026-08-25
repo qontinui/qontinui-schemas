@@ -50,6 +50,9 @@ export type ConjunctRule =
     }
   | {
       kind: "match_outcome_at_least";
+      /**
+       * Minimum acceptable outcome.
+       */
       outcome: MatchOutcome;
       [k: string]: unknown;
     };

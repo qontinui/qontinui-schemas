@@ -49,6 +49,9 @@ export interface TaskExecutionRecord {
    * ISO 8601 timestamp when execution started.
    */
   startedAt: string;
+  /**
+   * Current status of this execution.
+   */
   status: ScheduledTaskStatus;
   /**
    * Whether the task succeeded, read from the session checkpoint.

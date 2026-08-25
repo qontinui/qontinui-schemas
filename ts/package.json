@@ -106,7 +106,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.generated.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rimraf dist",

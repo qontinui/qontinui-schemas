@@ -31,5 +31,8 @@ export interface ApiAssertion {
    * Comparison operator; defaults to `equals` on the consumer side.
    */
   operator?: ApiAssertionOperator | null;
+  /**
+   * Kind of assertion.
+   */
   type: ApiAssertionType;
 }

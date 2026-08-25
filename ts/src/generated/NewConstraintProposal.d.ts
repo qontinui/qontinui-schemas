@@ -16,5 +16,8 @@ import type { ConstraintSeverity } from "./ConstraintSeverity";
  * enum's internal tag.
  */
 export interface NewConstraintProposal {
+  /**
+   * The proposed constraint definition.
+   */
   constraint: Constraint;
 }

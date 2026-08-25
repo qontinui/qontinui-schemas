@@ -16,6 +16,9 @@ export interface ExecutionIssueListResponse {
    * Page of matching issues.
    */
   issues: ExecutionIssueResponse[];
+  /**
+   * Pagination envelope.
+   */
   pagination: Pagination;
   /**
    * Summary keyed by severity or status. Shape is intentionally opaque.

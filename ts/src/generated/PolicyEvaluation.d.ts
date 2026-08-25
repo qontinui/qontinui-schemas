@@ -18,5 +18,9 @@ export interface PolicyEvaluation {
    * order.
    */
   conjunctResults: ConjunctEvaluation[];
-  overallStatus: PolicyStatus1;
+  /**
+   * Aggregate of all conjunct statuses — fails if any conjunct fails;
+   * indeterminate if any conjunct is indeterminate and none failed.
+   */
+  overallStatus: PolicyStatus;
 }

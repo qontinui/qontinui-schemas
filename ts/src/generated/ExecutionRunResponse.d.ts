@@ -32,10 +32,16 @@ export interface ExecutionRunResponse {
    * Human-readable run name.
    */
   runName: string;
+  /**
+   * Kind of run.
+   */
   runType: RunType;
   /**
    * ISO 8601 timestamp when the run started.
    */
   startedAt: string;
+  /**
+   * Current lifecycle status.
+   */
   status: RunStatus;
 }

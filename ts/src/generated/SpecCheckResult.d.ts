@@ -29,6 +29,9 @@ import type { StateMatchResult } from "./StateMatchResult";
  * deserialize as `0`.
  */
 export interface SpecCheckResult {
+  /**
+   * App / route / bridge-version fingerprint at snapshot time. §5.8 G3.
+   */
   bridgeFingerprint: BridgeFingerprint;
   /**
    * Red/Yellow/Green classification of the overall match rate.
@@ -77,10 +80,29 @@ export interface SpecCheckResult {
    * One result per `IrState` in the spec.
    */
   stateResults: StateMatchResult[];
+  /**
+   * Aggregate summary across all evaluated states.
+   */
   summary: SpecCheckSummary;
   thresholdsUsed: ThresholdConfig;
   /**
    * Soft signals — currently used for `Stale` from `SnapshotFetchError`.
    */
   warnings?: string[];
+}
+/**
+ * The threshold configuration that was active at evaluation time.
+ * Immutable snapshot for audit purposes — allows historical results
+ * to be cross-checked against their contemporaneous thresholds.
+ */
+export interface ThresholdConfig {
+  /**
+   * Red threshold (0.0–1.0). Match rate < this → Red.
+   */
+  redThreshold: number;
+  /**
+   * Yellow threshold (0.0–1.0). Match rate >= this → Green.
+   * Must be > `red_threshold`.
+   */
+  yellowThreshold: number;
 }

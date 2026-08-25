@@ -20,6 +20,9 @@ export interface VectorSearchResult {
    * Distance metric from query.
    */
   distance: number;
+  /**
+   * The matched GUI element.
+   */
   element: GUIElementChunk;
   /**
    * Which embedding was matched: `"text"`, `"image"`, or `"hybrid"`.

@@ -17,6 +17,13 @@ export interface PolicyConjunct {
    * Human-readable name used in `ConjunctEvaluation.name`.
    */
   name: string;
+  /**
+   * The conjunct rule.
+   */
   rule: ConjunctRule;
+  /**
+   * Filter narrowing which assertions / states this conjunct applies
+   * to.
+   */
   scope: AssertionScope;
 }

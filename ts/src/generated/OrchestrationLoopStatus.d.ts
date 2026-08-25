@@ -35,6 +35,9 @@ export interface OrchestrationLoopStatus {
    * Iteration cap for this run. `None` renders as `"∞"`/unlimited in the UI.
    */
   maxIterations?: number | null;
+  /**
+   * Current phase.
+   */
   phase: LoopPhase;
   /**
    * Whether the loop is currently running.

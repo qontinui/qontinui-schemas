@@ -20,6 +20,48 @@ import type { IrWaitSpec } from "./IrWaitSpec";
 import type { ProposalStatus } from "./ProposalStatus";
 
 /**
+ * API assertion: either a value-level assertion (status_code, json_path, etc.)
+ * or a schema-conformance assertion (conforms_to — Phase 2 placeholder).
+ */
+export type IrApiAssertion =
+  | {
+      expected: unknown;
+      operator?: string | null;
+      type: "status_code";
+      [k: string]: unknown;
+    }
+  | {
+      expected: unknown;
+      json_path: string;
+      operator?: string | null;
+      type: "json_path";
+      [k: string]: unknown;
+    }
+  | {
+      expected: unknown;
+      header_name: string;
+      operator?: string | null;
+      type: "header";
+      [k: string]: unknown;
+    }
+  | {
+      expected: unknown;
+      type: "body_contains";
+      [k: string]: unknown;
+    }
+  | {
+      expected: unknown;
+      operator?: string | null;
+      type: "response_time";
+      [k: string]: unknown;
+    }
+  | {
+      schema: string;
+      type: "conforms_to";
+      [k: string]: unknown;
+    };
+
+/**
  * Top-level IR page specification (formerly `IrDocument`).
  *
  * One `IrPageSpec` corresponds to one `state-machine.derived.json` file on
@@ -53,5 +95,25 @@ export interface IrPageSpec {
    * Schema version. Currently always `"1.0"`.
    */
   version: string;
+  [k: string]: unknown;
+}
+/**
+ * A single API-contract check: issue a request, validate the response.
+ */
+export interface IrApiCheck {
+  assertions: IrApiAssertion[];
+  description?: string | null;
+  effect: string;
+  id: string;
+  request: IrApiRequest;
+  [k: string]: unknown;
+}
+export interface IrApiRequest {
+  body?: unknown;
+  headers?: {
+    [k: string]: string;
+  } | null;
+  method: string;
+  path: string;
   [k: string]: unknown;
 }

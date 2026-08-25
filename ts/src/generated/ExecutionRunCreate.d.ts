@@ -31,7 +31,13 @@ export interface ExecutionRunCreate {
    * Human-readable run name.
    */
   runName: string;
+  /**
+   * Kind of run being created.
+   */
   runType: RunType;
+  /**
+   * Runner environment metadata.
+   */
   runnerMetadata: RunnerMetadata;
   /**
    * Workflow metadata, if the run executes a workflow.

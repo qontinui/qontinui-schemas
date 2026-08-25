@@ -39,6 +39,9 @@ export interface ExecutionScreenshotCreate {
    * Client-generated screenshot identifier.
    */
   screenshotId: string;
+  /**
+   * Kind of screenshot.
+   */
   screenshotType: ScreenshotType;
   /**
    * Sequence number of the screenshot within the run.

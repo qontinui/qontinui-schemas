@@ -23,6 +23,9 @@ export interface ScreenshotAnnotation {
    * Free-form label for the annotation.
    */
   label?: string | null;
+  /**
+   * Shape of the annotation.
+   */
   type: ScreenshotAnnotationShape;
   /**
    * Annotation width in pixels.

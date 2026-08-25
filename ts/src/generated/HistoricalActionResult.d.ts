@@ -16,6 +16,9 @@ export interface HistoricalActionResult {
    * Human-readable action name.
    */
   actionName: string;
+  /**
+   * Kind of action.
+   */
   actionType: ExecutionActionType;
   /**
    * Duration in milliseconds.
@@ -49,6 +52,9 @@ export interface HistoricalActionResult {
    * URL to an associated screenshot, if any.
    */
   screenshotUrl?: string | null;
+  /**
+   * Outcome.
+   */
   status: ActionStatus;
   /**
    * Target state.

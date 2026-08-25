@@ -21,6 +21,9 @@ export interface ActionExecutionCreate {
    * Human-readable action name.
    */
   actionName: string;
+  /**
+   * Kind of action.
+   */
   actionType: ExecutionActionType;
   /**
    * IDs of states active when the action ran.
@@ -112,6 +115,9 @@ export interface ActionExecutionCreate {
    * ISO 8601 timestamp when the action started.
    */
   startedAt: string;
+  /**
+   * Outcome of the action.
+   */
   status: ActionStatus;
   /**
    * Destination state ID for state-machine actions.

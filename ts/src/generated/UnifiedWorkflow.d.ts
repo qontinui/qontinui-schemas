@@ -215,6 +215,14 @@ export interface UnifiedWorkflow {
    * Whether this workflow is marked as a favorite for quick access.
    */
   isFavorite: boolean;
+  /**
+   * Log source selection for this workflow.
+   *
+   * - `"default"`: use the global default profile (from Settings → Log Sources)
+   * - `"ai"`: let AI automatically select relevant sources based on context
+   * - `"all"`: use all enabled log sources
+   * - `{ "profile_id": "..." }`: use a specific profile
+   */
   logSourceSelection?: LogSourceSelection;
   /**
    * Whether to automatically include a `log_watch` step before verification.

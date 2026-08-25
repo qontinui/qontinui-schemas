@@ -45,6 +45,9 @@ export interface TaskRunBackendDetail {
    * Error message if the task failed.
    */
   errorMessage: string | null;
+  /**
+   * Aggregated counts of findings.
+   */
   findingSummary: TaskRunFindingSummary;
   /**
    * Findings surfaced during this task run.
@@ -86,6 +89,9 @@ export interface TaskRunBackendDetail {
    * Number of AI sessions that have been run.
    */
   sessionsCount: number;
+  /**
+   * Current lifecycle status.
+   */
   status: TaskRunStatus;
   /**
    * Display name.

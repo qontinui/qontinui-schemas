@@ -61,6 +61,9 @@ export interface CompletenessVerdict {
    * re-dispatches generation for.
    */
   gaps?: CoverageGap[];
+  /**
+   * Overall node counts by provenance.
+   */
   provenanceMix: ProvenanceMix;
   /**
    * Per-section breakdown.

@@ -45,6 +45,9 @@ export interface ExecutionIssueCreate {
    * IDs of screenshots illustrating the issue.
    */
   screenshotIds?: string[] | null;
+  /**
+   * Severity.
+   */
   severity: IssueSeverity;
   /**
    * State ID active when the issue was observed.

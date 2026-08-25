@@ -25,7 +25,13 @@ export interface ExecutionRunComplete {
    * Error message if the run failed.
    */
   errorMessage?: string | null;
+  /**
+   * Aggregate execution statistics.
+   */
   stats: ExecutionStats;
+  /**
+   * Final lifecycle status.
+   */
   status: RunStatus;
   /**
    * Free-form run summary.

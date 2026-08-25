@@ -57,13 +57,25 @@ export interface ExecutionRunDetail {
    * Human-readable run name.
    */
   runName: string;
+  /**
+   * Kind of run.
+   */
   runType: RunType;
+  /**
+   * Runner environment metadata.
+   */
   runnerMetadata: RunnerMetadata;
   /**
    * ISO 8601 timestamp when the run started.
    */
   startedAt: string;
+  /**
+   * Aggregate execution statistics.
+   */
   stats: ExecutionStats;
+  /**
+   * Current lifecycle status.
+   */
   status: RunStatus;
   /**
    * ISO 8601 timestamp when the record was last updated.

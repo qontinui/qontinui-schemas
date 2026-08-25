@@ -20,6 +20,9 @@ import type { HelperVerdict } from "./HelperVerdict";
  * verdict and routes it back through [`source`](HelperTask::source).
  */
 export interface HelperTask {
+  /**
+   * The set of allowed answers and preset reason codes offered to the helper.
+   */
   answerSchema: HelperAnswerSchema;
   /**
    * Application the task pertains to.
@@ -38,7 +41,13 @@ export interface HelperTask {
    * Task ID (UUID v4 string).
    */
   id: string;
+  /**
+   * Which kind of judgment is being asked for.
+   */
   kind: HelperTaskKind;
+  /**
+   * Kind-specific content (screenshot URL, compare URLs, steps, …).
+   */
   payload: HelperTaskPayload;
   /**
    * Human-readable question shown to the helper (e.g. "Does this login
@@ -49,7 +58,14 @@ export interface HelperTask {
    * Number of helper answers required before the task is `Answered`.
    */
   requiredVotes: number;
+  /**
+   * Provenance linking the task back to its originating finding / page /
+   * spec-check.
+   */
   source: HelperTaskSource;
+  /**
+   * Current lifecycle status.
+   */
   status: HelperTaskStatus;
   /**
    * Tenant that owns the task (coord tenant id).

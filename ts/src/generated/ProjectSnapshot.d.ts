@@ -44,6 +44,9 @@ export interface ProjectSnapshot {
    * Managed processes whose `cwd` is under the project root.
    */
   processes: ProcessStatusLite[];
+  /**
+   * The registry entry this snapshot describes.
+   */
   project: SavedProject;
   /**
    * Questions waiting on the user, from `deferred_questions`.
