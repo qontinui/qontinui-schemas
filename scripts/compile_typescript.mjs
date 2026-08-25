@@ -317,7 +317,7 @@ function promoteDefaultsToRequired(node) {
   for (const v of Object.values(node)) promoteDefaultsToRequired(v);
 }
 
-/** @type {Map<string, { schema: unknown, imports: Set<string> }>} */
+/** @type {Map<string, { schema: unknown, imports: Set<string>, declarable: Set<string> }>} */
 const processed = new Map();
 
 for (const [name, schema] of Object.entries(schemas)) {
@@ -353,7 +353,28 @@ for (const [name, schema] of Object.entries(schemas)) {
   }
   // Ensure the top-level type carries its name for json2ts output.
   if (!rewritten.title) rewritten.title = name;
-  processed.set(name, { schema: rewritten, imports });
+  // The names json2ts is ALLOWED to declare in this file: the root type, plus
+  // whatever local `$defs` survived the externalized strip above. Both the raw
+  // key and the `title` are admissible (`customName` prefers the title), and
+  // both are recorded in their `toSafeString` form too because that
+  // normalization is applied to every emitted name and `applyRenames` only
+  // reverses it for TOP-LEVEL types. Anything the emitted file declares that is
+  // not in this set is a name json2ts INVENTED — see the fork guard below.
+  const declarable = new Set([name]);
+  if (rewritten.$defs) {
+    for (const [defKey, defSchema] of Object.entries(rewritten.$defs)) {
+      const defTitle =
+        defSchema && typeof defSchema === 'object' && typeof defSchema.title === 'string'
+          ? defSchema.title
+          : undefined;
+      for (const candidate of [defKey, defTitle]) {
+        if (!candidate) continue;
+        declarable.add(candidate);
+        declarable.add(toSafeString(candidate));
+      }
+    }
+  }
+  processed.set(name, { schema: rewritten, imports, declarable });
 }
 
 // ─── Compile pass ───────────────────────────────────────────────────────────
@@ -569,6 +590,33 @@ function stripDuplicateExports(source, importedNames) {
   return result.join('\n');
 }
 
+/**
+ * Every top-level exported declaration name in one emitted file body.
+ *
+ * Called on the per-file string json2ts produced — after `applyRenames` and
+ * `stripDuplicateExports`, but BEFORE the banner and the `import type` lines
+ * are prepended — so only json2ts's own declarations are in scope, never an
+ * import this script injected. json2ts emits every declaration at column 0
+ * (`export interface X {`, `export type X =`), which is what the `^` anchor
+ * keys off; nested members are indented and cannot match.
+ *
+ * @param {string} source
+ * @returns {string[]}
+ */
+function declaredNames(source) {
+  const re = /^export\s+(?:declare\s+)?(?:interface|type|enum|const\s+enum)\s+([A-Za-z_$][\w$]*)/gm;
+  return [...source.matchAll(re)].map((m) => m[1]);
+}
+
+/**
+ * One emitted declaration: the name, and the top-level type whose file
+ * declares it. Collected as each file is emitted; asserted over once
+ * generation completes (see the fork guard).
+ *
+ * @type {{ decl: string, owner: string }[]}
+ */
+const declarations = [];
+
 let emitted = 0;
 let failed = 0;
 for (const [name, { schema, imports }] of processed) {
@@ -586,6 +634,9 @@ for (const [name, { schema, imports }] of processed) {
     ts = stripDuplicateExports(ts, imports);
     // Collapse runs of 2+ blank lines that the stripping may have left behind.
     ts = ts.replace(/\n{3,}/g, '\n\n');
+
+    // Record what this file declares, for the fork guard below.
+    for (const decl of declaredNames(ts)) declarations.push({ decl, owner: name });
 
     const importLines = [...imports]
       .sort()
@@ -608,6 +659,101 @@ for (const [name, { schema, imports }] of processed) {
     console.error(`  FAILED ${name}: ${err.message}`);
     failed++;
   }
+}
+
+// ─── Fork guard ─────────────────────────────────────────────────────────────
+//
+// `declareExternallyReferenced: true` (see compileOpts) converts one failure
+// mode into another, and only one of the two is visible to `tsc`.
+//
+// With the flag OFF, a duplicate AST for the same type got a `usedNames`
+// suffix (`Delta1`) and was then NOT declared — a DANGLING IDENTIFIER, which
+// the `tsconfig.generated.json` gate reds on. With the flag ON, that same
+// duplicate AST is declared: the file gets a second, structurally identical
+// copy under the invented name, `Delta.kids` is typed `Delta1[]` instead of
+// `Delta[]`, and the result compiles perfectly clean. A FORKED TYPE is
+// invisible to a type-checker by construction — TypeScript is structural, so
+// the two copies are mutually assignable and nothing downstream complains
+// until the two halves of the fork drift apart.
+//
+// So the flag flip needs its own guard, at the layer that can still see the
+// difference: the generator itself, which knows which names it is ENTITLED to
+// emit. Three invariants over the full emitted set:
+//
+//   (a) no declaration name appears in more than one output file;
+//   (b) no declaration name equals a top-level type name other than the
+//       file's own (that name has its own file — a local copy forks it);
+//   (c) no declaration name falls outside the file's `declarable` closure
+//       (root type + surviving local `$defs`). This is the one that catches
+//       the suffix case above: `Delta1` is neither the root nor any `$defs`
+//       key, so it can only have been invented by json2ts's uniquifier.
+//
+// (c) is not redundant with (a)/(b) — it is the only one of the three that
+// fires on the shape this guard was written for, because an invented `Delta1`
+// lives in exactly one file and is not a top-level type name. (a) and (b) are
+// kept because they catch the other direction: a helper duplicated across
+// files, and a local redeclaration of a type that already has its own module.
+//
+// All three currently hold at zero violations. This FAILS rather than warns —
+// a warning in a generator nobody watches is the same defect class as a gate
+// that cannot go red. It runs before the barrel is written, so a forked tree
+// never gets the `index.ts` consumers import.
+
+/** @type {Map<string, string[]>} declaration name → owning type name(s) */
+const declarationSites = new Map();
+for (const { decl, owner } of declarations) {
+  const sites = declarationSites.get(decl);
+  if (sites) sites.push(owner);
+  else declarationSites.set(decl, [owner]);
+}
+
+/** @type {string[]} */
+const forkViolations = [];
+
+for (const [decl, owners] of declarationSites) {
+  if (owners.length > 1) {
+    forkViolations.push(
+      `${decl}: declared in ${owners.length} files (${owners
+        .map((o) => `${o}.d.ts`)
+        .join(', ')}). Each copy is a separate structural type.`,
+    );
+  }
+}
+
+for (const { decl, owner } of declarations) {
+  if (typeNames.has(decl) && decl !== owner) {
+    forkViolations.push(
+      `${decl}: declared in ${owner}.d.ts, but it is a top-level type with its ` +
+        `own ${decl}.d.ts. The local copy forks it — it should have been imported.`,
+    );
+    // (c) would fire on the same declaration for the same underlying reason;
+    // one report per offending declaration is enough.
+    continue;
+  }
+  const declarable = processed.get(owner)?.declarable;
+  if (declarable && !declarable.has(decl)) {
+    forkViolations.push(
+      `${decl}: declared in ${owner}.d.ts, but that file's schema names no such ` +
+        `type — its declarable closure is {${[...declarable].sort().join(', ')}}. ` +
+        `Either json2ts invented the name (a \`usedNames\` suffix on a duplicate ` +
+        `AST of a type it already parsed) or a nested schema \`title\` claimed it; ` +
+        `either way ${owner}.d.ts carries a second structural copy of that type.`,
+    );
+  }
+}
+
+if (forkViolations.length > 0) {
+  console.error(
+    `\nERROR: forked type declarations in ${outDir}\n` +
+      `${forkViolations.length} violation(s) — the generated tree declares names it must not:\n`,
+  );
+  for (const v of forkViolations) console.error(`  - ${v}`);
+  console.error(
+    '\nA forked type compiles clean (TypeScript is structural) but is a real defect:\n' +
+      'two declarations that are one type today and drift apart tomorrow. Fix the\n' +
+      'schema or the rewrite passes in this script — do not silence this check.\n',
+  );
+  process.exit(1);
 }
 
 // ─── Barrel ─────────────────────────────────────────────────────────────────
