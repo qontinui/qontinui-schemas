@@ -326,6 +326,14 @@ pub struct AnalyzeReport {
     total: usize,
     /// Counts by severity (`"info"`/`"warning"`/`"critical"`).
     counts: HashMap<String, usize>,
+    /// Which snapshot these findings describe — echoed verbatim from
+    /// [`ElementSnapshot::snapshot_id`], exactly as [`AssertReport`] does.
+    /// The two report shapes are the same surface to a caller, so attribution
+    /// that worked on only one of them would be a half-surface. `None` when
+    /// the snapshot carried no id; omitted from the JSON in that case so a
+    /// consumer cannot read `null` as an id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snapshot_id: Option<String>,
     /// OCR/VLM are runner-side only; flagged so CI knows OCR checks did not run.
     notes: Vec<String>,
 }
@@ -354,6 +362,7 @@ pub fn analyze(snapshot: &ElementSnapshot, frame: &Frame, which: &[Analyzer]) ->
         findings,
         total,
         counts,
+        snapshot_id: snapshot.snapshot_id.clone(),
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
                      contains_text falls back to snapshot text"
             .to_string()],
@@ -394,6 +403,12 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
         report.counts.get("warning").copied().unwrap_or(0),
         report.counts.get("critical").copied().unwrap_or(0),
     ));
+    // Name the snapshot analyzed, when the producer supplied one — same
+    // reason as the assert summary: a CI reader looking at findings needs to
+    // know WHICH capture produced them.
+    if let Some(id) = &report.snapshot_id {
+        lines.push(format!("  snapshot: {id}"));
+    }
     match fail_on {
         None => lines.push("gate: --fail-on not set; exit 0 regardless of findings".to_string()),
         Some(t) => {
@@ -827,6 +842,40 @@ mod tests {
         assert_eq!(
             analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
             EXIT_OK
+        );
+    }
+
+    // ---- analyze attribution ----
+
+    #[test]
+    fn analyze_report_names_the_snapshot_it_analyzed() {
+        let mut snap = snap_with_overlap();
+        let id = "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        snap.snapshot_id = Some(id.to_string());
+
+        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        assert!(report.total >= 1, "expected at least one finding");
+        assert_eq!(report.snapshot_id.as_deref(), Some(id));
+
+        // On the machine-JSON stdout contract CI keys off...
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire.get("snapshotId").and_then(|v| v.as_str()), Some(id));
+
+        // ...and on the human summary, so findings name their capture.
+        assert!(
+            analyze_summary(&report, None, EXIT_OK).contains(id),
+            "summary must name the snapshot"
+        );
+    }
+
+    #[test]
+    fn analyze_report_omits_attribution_for_an_unattributed_snapshot() {
+        let report = analyze(&snap_with_overlap(), &frame_1x1(), &[Analyzer::Layout]);
+        assert!(report.snapshot_id.is_none());
+        let wire = serde_json::to_value(&report).unwrap();
+        assert!(
+            wire.get("snapshotId").is_none(),
+            "unattributed findings must omit the key, not emit null"
         );
     }
 
