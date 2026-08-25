@@ -15,6 +15,9 @@ export interface McpToolInfo {
    * Tool description shown to users.
    */
   description?: string | null;
+  /**
+   * Input-argument schema. Wire field is `"inputSchema"` per MCP spec.
+   */
   inputSchema: McpToolInputSchema;
   /**
    * Tool name (the argument passed back on `tools/call`).

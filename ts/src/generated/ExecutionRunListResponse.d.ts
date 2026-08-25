@@ -14,6 +14,9 @@ import type { RunType } from "./RunType";
  * Paginated list of execution runs.
  */
 export interface ExecutionRunListResponse {
+  /**
+   * Pagination envelope.
+   */
   pagination: Pagination;
   /**
    * Page of matching runs.

@@ -11,6 +11,9 @@ import type { Confidence } from "./Confidence";
  * A finding recorded by a worker agent.
  */
 export interface Finding {
+  /**
+   * Confidence level.
+   */
   confidence: Confidence;
   /**
    * Description of the finding.

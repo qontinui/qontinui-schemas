@@ -42,6 +42,9 @@ export interface HelperAnswer {
    * The [`HelperTask`] this answers.
    */
   taskId: string;
+  /**
+   * The verdict the helper gave.
+   */
   verdict: HelperVerdict;
   [k: string]: unknown;
 }

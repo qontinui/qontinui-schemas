@@ -104,6 +104,9 @@ export interface CommandStep {
    * Display name for the step.
    */
   name: string;
+  /**
+   * Phase in which the step appears.
+   */
   phase: CommandStepPhase;
   /**
    * Repository selector for repository-targeted steps.

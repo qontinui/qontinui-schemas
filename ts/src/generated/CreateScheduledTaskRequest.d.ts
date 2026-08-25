@@ -50,6 +50,9 @@ export interface CreateScheduledTaskRequest {
    * Display name.
    */
   name: string;
+  /**
+   * Schedule configuration.
+   */
   schedule: ScheduleExpression;
   /**
    * Skip future runs once the task has succeeded.
@@ -59,5 +62,8 @@ export interface CreateScheduledTaskRequest {
    * Free-form success criteria description.
    */
   successCriteria?: string | null;
+  /**
+   * Task type and its per-type configuration.
+   */
   task: ScheduledTaskType;
 }

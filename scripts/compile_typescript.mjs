@@ -20,12 +20,12 @@
  * is constructed from stubs and consumers cannot narrow by the `type`
  * discriminator.
  *
- * The fix: rewrite every `$ref: "#/$defs/X"` where `X` is itself a
- * top-level type into a file-relative `$ref: "./X.schema.json"`, strip
- * those externalized entries from the local `$defs`, compile with
- * `declareExternallyReferenced: false` (so json2ts references `X` by name
- * without redeclaring it), then prepend `import type { X } from './X'`.
- * The bundled output then has exactly one declaration per type.
+ * The fix: for every `$ref: "#/$defs/X"` where `X` is itself a top-level
+ * type, drop the ref in favour of json2ts's `tsType` escape hatch
+ * (`{ tsType: "X" }`, which json2ts emits as the bare identifier `X`),
+ * strip those externalized entries from the local `$defs`, then prepend
+ * `import type { X } from './X'`. The bundled output then has exactly one
+ * declaration per type.
  *
  * Usage:
  *   node compile_typescript.mjs --input SCHEMAS_JSON --output OUT_DIR
@@ -103,10 +103,11 @@ function applyRenames(source) {
 // ─── Rewrite pass ───────────────────────────────────────────────────────────
 // For each top-level type T:
 //   1. Walk its schema tree
-//   2. Replace `$ref: "#/$defs/X"` with `$ref: "./X.schema.json"` when X is
-//      another top-level type (but not T itself — self-references stay local)
+//   2. Mark `$ref: "#/$defs/X"` as external when X is another top-level type
+//      (but not T itself — self-references stay local)
 //   3. Collect the set of externalized refs → used later for import injection
 //   4. Strip externalized entries from T's local $defs
+//   5. Turn each marked ref into `{ tsType: "X" }` (see externalRefsToTsType)
 //
 // Collision handling: when two Rust types share a short name (e.g.
 // `tree_events::ActionType` and `execution::ActionType`), one of them is
@@ -137,6 +138,15 @@ function resolveTopLevelRefName(refName, localDefs) {
 }
 
 /**
+ * Internal-only `$ref` sentinel for "this points at a sibling type's own
+ * file". It stays a `$ref` (rather than becoming `tsType` immediately) so
+ * that `flattenRefSiblingsToAllOf` — which keys off `$ref` — still sees it
+ * and can lift discriminator constraints out of the ref node. The sentinel
+ * is erased by `externalRefsToTsType` before json2ts ever sees the schema.
+ */
+const EXTERNAL_REF_PREFIX = '#/$qontinui-external/';
+
+/**
  * @param {unknown} node
  * @param {string} selfName
  * @param {Set<string>} collected
@@ -154,7 +164,7 @@ function rewriteRefs(node, selfName, collected, localDefs) {
       const resolved = resolveTopLevelRefName(m[1], localDefs);
       if (resolved && resolved !== selfName) {
         collected.add(resolved);
-        const out = { ...node, $ref: `./${resolved}.schema.json` };
+        const out = { ...node, $ref: `${EXTERNAL_REF_PREFIX}${resolved}` };
         return out;
       }
     }
@@ -162,6 +172,62 @@ function rewriteRefs(node, selfName, collected, localDefs) {
   const out = {};
   for (const [k, v] of Object.entries(node)) {
     out[k] = rewriteRefs(v, selfName, collected, localDefs);
+  }
+  return out;
+}
+
+/**
+ * Replace every externalized ref with json2ts's `tsType` escape hatch, which
+ * emits the given string verbatim as the type.
+ *
+ * This runs LAST of the three schema passes, after `flattenRefSiblingsToAllOf`
+ * has moved any discriminator constraint off the ref node — `tsType`
+ * supersedes every other directive in json2ts (`typesOfSchema` returns
+ * `CUSTOM_TYPE` and stops), so a `properties`/`required` sibling left in
+ * place here would be silently dropped.
+ *
+ * ── WHY NOT A REAL `$ref` TO A SIBLING FILE ─────────────────────────────────
+ *
+ * The previous implementation wrote each rewritten schema to a temp directory
+ * and pointed the ref at `./X.schema.json`, relying on
+ * `declareExternallyReferenced: false` to stop json2ts redeclaring the target.
+ * That shipped a whole class of dangling identifiers to npm:
+ *
+ *   PolicyEvaluation.d.ts       overallStatus: PolicyStatus1;
+ *   TaskCompletionResult.d.ts   last_results?: IterationVerificationResults1 | null;
+ *
+ * json2ts caches parsed ASTs by schema-object IDENTITY and uniquifies names
+ * with a `usedNames` counter, so the same type reached as two different
+ * objects gets a second name — and `declareExternallyReferenced: false`
+ * then declines to declare it, leaving a reference to a type that does not
+ * exist. `$RefParser` hands back distinct objects for the same target
+ * routinely:
+ *
+ *   * once per referencing FILE (`PolicyEvaluation` refs `PolicyStatus`
+ *     directly and again through `ConjunctEvaluation.schema.json`), and
+ *   * once per ref site that carries SIBLING KEYS — `{ $ref, description }`
+ *     is merged into a fresh object, which is why `TaskCompletionResult`
+ *     got one name for the ref site with a doc comment and another for the
+ *     bare ones.
+ *
+ * `tsType` removes the mechanism rather than the symptom: no file is
+ * resolved, no second object exists, no name is ever allocated for the
+ * imported type, so a suffixed alias cannot be emitted. It also removes the
+ * need for a temp directory of sibling schemas entirely.
+ *
+ * @param {unknown} node
+ * @returns {unknown}
+ */
+function externalRefsToTsType(node) {
+  if (Array.isArray(node)) return node.map(externalRefsToTsType);
+  if (node === null || typeof node !== 'object') return node;
+  if (typeof node.$ref === 'string' && node.$ref.startsWith(EXTERNAL_REF_PREFIX)) {
+    const { $ref, ...rest } = node;
+    return { ...rest, tsType: $ref.slice(EXTERNAL_REF_PREFIX.length) };
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    out[k] = externalRefsToTsType(v);
   }
   return out;
 }
@@ -253,23 +319,22 @@ function promoteDefaultsToRequired(node) {
 
 /** @type {Map<string, { schema: unknown, imports: Set<string> }>} */
 const processed = new Map();
-/** Temp directory — json2ts's $RefParser resolves ./X.schema.json from here. */
-const tmpDir = join(outDir, '.tmp-schemas');
-rmSync(tmpDir, { recursive: true, force: true });
-mkdirSync(tmpDir, { recursive: true });
 
 for (const [name, schema] of Object.entries(schemas)) {
   const imports = new Set();
   // Pass the schema's own $defs so title-renamed inline defs can be resolved
   // to their true top-level type names during ref rewriting.
   const localDefs = (schema && typeof schema === 'object') ? schema.$defs : undefined;
-  const rewritten = rewriteRefs(schema, name, imports, localDefs);
+  let rewritten = rewriteRefs(schema, name, imports, localDefs);
   // Convert `$ref` + sibling property constraints into `allOf` so json2ts
   // preserves discriminator literals on tagged-union variants. Must run
   // before the compile call; order relative to `promoteDefaultsToRequired`
   // doesn't matter.
   flattenRefSiblingsToAllOf(rewritten);
   promoteDefaultsToRequired(rewritten);
+  // Erase the external-ref sentinel in favour of `tsType`. Strictly after
+  // flattenRefSiblingsToAllOf — `tsType` supersedes sibling constraints.
+  rewritten = externalRefsToTsType(rewritten);
   // Strip externalized $defs — we don't want stubs emitted for them.
   // Match by both raw def-key and (when present) title, since the imports
   // set stores the resolved top-level name (which may be the title, not the
@@ -289,7 +354,6 @@ for (const [name, schema] of Object.entries(schemas)) {
   // Ensure the top-level type carries its name for json2ts output.
   if (!rewritten.title) rewritten.title = name;
   processed.set(name, { schema: rewritten, imports });
-  writeFileSync(join(tmpDir, `${name}.schema.json`), JSON.stringify(rewritten));
 }
 
 // ─── Compile pass ───────────────────────────────────────────────────────────
@@ -304,10 +368,34 @@ const BANNER = `/* eslint-disable */
  */`;
 
 const compileOpts = {
-  cwd: tmpDir,
-  // Critical: don't inline sibling schemas; reference them by name and let us
-  // inject the matching import statements.
-  declareExternallyReferenced: false,
+  // No schema reaches json2ts with a file-relative `$ref` any more (see
+  // externalRefsToTsType), so nothing is ever resolved against this — it is
+  // set to the output dir purely because json2ts requires a base path.
+  cwd: outDir,
+  // Must be TRUE, despite the name reading like the opposite of what we want.
+  //
+  // json2ts's flag does not mean "declare types that came from another file".
+  // In `generator.ts` it is the escape hatch on a much blunter predicate:
+  //
+  //     ast.standaloneName === rootASTName || options.declareExternallyReferenced
+  //
+  // With the flag off, the ONLY named object json2ts declares in a file is the
+  // root type itself. Every other named object — including a helper that lives
+  // in this schema's OWN `$defs` and was never externalized — is referenced by
+  // name and then silently not declared. That is how `IrPageSpec.d.ts` came to
+  // say `apiAssertions?: IrApiCheck[] | null` with no `IrApiCheck` anywhere:
+  // `IrApiCheck` is a `$defs`-only helper (not registered top-level in the
+  // runner's `schema_export.rs`, so it gets no file of its own and no import),
+  // and the flag suppressed its local declaration. Same for `SpecChanged` and
+  // `ThresholdConfig`. Union and enum helpers escaped the bug because
+  // `declareNamedTypes` emits those unconditionally — only object helpers were
+  // dropped, which is why this went unnoticed for so long.
+  //
+  // Turning it on is safe precisely because `tsType` means there is nothing
+  // "external" left in the schema json2ts sees: the reachable named closure is
+  // the root type plus its genuinely-local `$defs` helpers, which is exactly
+  // what this file should declare.
+  declareExternallyReferenced: true,
   bannerComment: '',
   // Disable json2ts's *internal* Prettier pass and run our own pinned pass at
   // the end of each file instead (see PRETTIER_OPTS below). json2ts loads
@@ -364,10 +452,15 @@ const PRETTIER_OPTS = {
 
 /**
  * Strip `export type X = ...;` and `export interface X { ... }` blocks whose
- * name is in `importedNames`. `declareExternallyReferenced: false` does this
- * for most shapes, but json-schema-to-typescript still re-emits unions
- * referenced across files (verified: a `oneOf` in the external schema
- * produces a duplicate `export type X = A | B;` alongside the import).
+ * name is in `importedNames` — a declaration of an imported name would shadow
+ * the `import type { X } from './X'` we inject and re-create the duplicate
+ * declarations this script exists to remove.
+ *
+ * Since the `tsType` rewrite this is a backstop rather than the load-bearing
+ * pass it once was: json2ts is no longer handed any external schema whose
+ * body it could redeclare. It still guards the one remaining way an imported
+ * name could be declared locally — a `$defs` entry that survived the
+ * externalized-defs strip below under a name that collides with an import.
  *
  * This scanner walks the file, finds each `export type|interface NAME`, and
  * deletes the full block when NAME is externally imported. The deletion
@@ -478,9 +571,7 @@ function stripDuplicateExports(source, importedNames) {
 
 let emitted = 0;
 let failed = 0;
-for (const [name, { imports }] of processed) {
-  const schemaPath = join(tmpDir, `${name}.schema.json`);
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+for (const [name, { schema, imports }] of processed) {
   try {
     // `compile(schema, typeName)` — the name is used as the exported type
     // name. Passing the name matches json2ts CLI behavior which derives it
@@ -532,7 +623,11 @@ writeFileSync(join(outDir, 'index.ts'), barrel);
 
 // ─── Cleanup ────────────────────────────────────────────────────────────────
 
-rmSync(tmpDir, { recursive: true, force: true });
+// Older revisions staged a `.tmp-schemas/` directory of sibling schemas inside
+// the output dir for `$ref` resolution. `tsType` removed the need for it, but
+// `generate_types.sh` only sweeps `*.d.ts` + `index.ts`, so an existing tree
+// would otherwise linger in a checkout that was generated before this change.
+rmSync(join(outDir, '.tmp-schemas'), { recursive: true, force: true });
 
 console.log(`Emitted ${emitted} .d.ts files to ${outDir}`);
 if (failed > 0) {

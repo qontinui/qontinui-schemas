@@ -19,11 +19,17 @@ import type { MissReason } from "./MissReason";
  */
 export type AssertionOutcome =
   | {
+      /**
+       * The element that satisfied the assertion.
+       */
       matched: MatchedElement;
       status: "pass";
       [k: string]: unknown;
     }
   | {
+      /**
+       * Diagnostic detail.
+       */
       miss: AssertionMiss;
       status: "fail";
       [k: string]: unknown;

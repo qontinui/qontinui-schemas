@@ -38,6 +38,9 @@ export interface SuccessCriterion {
    * Whether this criterion must pass for task completion.
    */
   required: boolean;
+  /**
+   * Type of verification required. Serialized as `"type"` on the wire.
+   */
   type: CriterionType;
   /**
    * Configuration blob for the verification method (command args, log

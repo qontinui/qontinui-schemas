@@ -34,6 +34,9 @@ export interface AgenticPhaseOutput {
    * Reflection fixes (when reflection_mode is enabled).
    */
   reflectionFixes: ReflectionFixOutput[];
+  /**
+   * Overall status of the agentic phase.
+   */
   status: AgenticStatus;
   /**
    * Human-readable summary of what was done.

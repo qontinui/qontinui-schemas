@@ -44,5 +44,8 @@ export interface CreateMcpServerInput {
    * Override for the default `timeout_seconds = 30`.
    */
   timeoutSeconds?: number | null;
+  /**
+   * Transport selector.
+   */
   transport: McpTransport;
 }

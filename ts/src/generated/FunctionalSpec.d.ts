@@ -66,6 +66,9 @@ export interface FunctionalSpec {
    * Schema version. Currently always `"0"`. Additive-only until `"1"`.
    */
   specVersion: string;
+  /**
+   * What was observed and when.
+   */
   target: SpecTarget;
   /**
    * Section (3a) UI STATES — a literal superset of the UI Bridge IR. These are the

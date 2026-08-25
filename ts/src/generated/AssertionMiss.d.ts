@@ -18,5 +18,8 @@ export interface AssertionMiss {
    * descending.
    */
   candidates?: CandidateMiss[];
+  /**
+   * Coarse-grained classification of why the match failed.
+   */
   reason: MissReason;
 }

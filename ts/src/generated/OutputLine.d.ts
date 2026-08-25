@@ -15,6 +15,9 @@ export interface OutputLine {
    * The line content
    */
   line: string;
+  /**
+   * Which stream this came from
+   */
   stream: OutputStream;
   /**
    * ISO 8601 timestamp

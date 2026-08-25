@@ -17,6 +17,9 @@ import type { VerificationCategoryKind } from "./VerificationCategoryKind";
  * UI Bridge SDK interaction — navigate, execute, assert, snapshot, compare.
  */
 export interface UiBridgeStep {
+  /**
+   * Action kind.
+   */
   action: UiBridgeAction;
   /**
    * Structured action plan (for `action_plan`).
@@ -76,6 +79,9 @@ export interface UiBridgeStep {
    * Display name for the step.
    */
   name: string;
+  /**
+   * Phase in which the step appears.
+   */
   phase: UiBridgeStepPhase;
   /**
    * Reference snapshot ID (for `compare` / `snapshot_assert`).

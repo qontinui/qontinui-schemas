@@ -47,6 +47,9 @@ export interface UIBridgeElement {
    * Unique element ID within the registry.
    */
   id: string;
+  /**
+   * Identifier bundle for locating the element.
+   */
   identifier: ElementIdentifier;
   /**
    * Human-readable label for the element.
@@ -65,6 +68,9 @@ export interface UIBridgeElement {
    * Populated by the SDK's element walker. Source of truth for IrElementCriteria.role.
    */
   role?: string | null;
+  /**
+   * Current observable state.
+   */
   state: ElementState;
   /**
    * HTML tag name in lowercase. Source of truth for IrElementCriteria.tag_name.

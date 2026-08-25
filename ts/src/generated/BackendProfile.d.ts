@@ -11,6 +11,9 @@ import type { ApiStyle } from "./ApiStyle";
  * Target backend stack.
  */
 export interface BackendProfile {
+  /**
+   * REST vs GraphQL.
+   */
   apiStyle: ApiStyle;
   /**
    * Backend auth strategy (e.g. `"jwt"`, `"session"`). Free-form; `None` lets

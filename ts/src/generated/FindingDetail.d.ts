@@ -19,7 +19,13 @@ import type { FindingUserInput } from "./FindingUserInput";
  * string (see crate-level wire-format note).
  */
 export interface FindingDetail {
+  /**
+   * Type of action for this finding.
+   */
   actionType: FindingActionType;
+  /**
+   * Category of the finding.
+   */
   category: FindingCategory;
   /**
    * Code context, if the finding relates to specific code.
@@ -53,11 +59,17 @@ export interface FindingDetail {
    * Session number where the finding was detected.
    */
   sessionNum: number;
+  /**
+   * Severity level of the finding.
+   */
   severity: FindingSeverity;
   /**
    * Hash used to deduplicate findings across sessions.
    */
   signatureHash?: string | null;
+  /**
+   * Current status of the finding.
+   */
   status: FindingStatus;
   /**
    * Parent task run ID.

@@ -36,7 +36,13 @@ export interface Ticket {
    * Labels applied to the ticket by the provider.
    */
   labels?: string[];
+  /**
+   * Which provider this ticket came from.
+   */
   source: TicketSource;
+  /**
+   * Abstract lifecycle state.
+   */
   state: TicketState;
   /**
    * Ticket title / summary.

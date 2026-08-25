@@ -18,13 +18,22 @@ export interface CoverageGap {
    * Free-form diagnostic detail (e.g. the verifier's near-miss explanation).
    */
   detail?: string | null;
+  /**
+   * Provenance of the gapped node — always `Observed` or `Inferred`.
+   */
   nodeProvenance: SpecProvenance;
+  /**
+   * Why it is uncovered.
+   */
   reason: GapReason;
   /**
    * Dotted ref into the spec, e.g. `"entities.Invoice.fields.amount"` or
    * `"operations.createInvoice"`.
    */
   ref: string;
+  /**
+   * Which section the gapped node belongs to.
+   */
   section: SpecSection;
   [k: string]: unknown;
 }

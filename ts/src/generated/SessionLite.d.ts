@@ -31,6 +31,9 @@ export interface SessionLite {
    * Session name — `task_runs.task_name` or the terminal's title.
    */
   name?: string | null;
+  /**
+   * Where this row came from.
+   */
   source: SessionSource;
   /**
    * `task_runs.status` ("running", "completed", …) for AI sessions;

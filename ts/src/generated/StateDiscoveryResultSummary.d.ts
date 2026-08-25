@@ -45,6 +45,9 @@ export interface StateDiscoveryResultSummary {
    * ID of the project.
    */
   projectId: string;
+  /**
+   * Discovery source.
+   */
   sourceType: DiscoverySourceType;
   /**
    * Number of states.

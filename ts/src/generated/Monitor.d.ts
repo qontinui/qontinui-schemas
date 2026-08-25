@@ -28,6 +28,9 @@ export interface Monitor {
    * Display name (e.g., "DELL U2720Q").
    */
   name?: string | null;
+  /**
+   * Spatial position based on X coordinate (for UI display).
+   */
   position: MonitorPosition;
   /**
    * DPI scale factor (1.0 = 100%, 1.5 = 150%, 2.0 = 200%).

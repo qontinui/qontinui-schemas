@@ -25,6 +25,9 @@ export interface IterationResult {
    * Diagnostic-phase result (if the diagnose phase is configured).
    */
   diagnosticResult?: DiagnosticResult | null;
+  /**
+   * Exit-check outcome for this iteration.
+   */
   exitCheck: ExitCheckResult;
   /**
    * Number of fixes proposed during reflection.

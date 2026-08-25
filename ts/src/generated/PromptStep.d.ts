@@ -57,6 +57,9 @@ export interface PromptStep {
    * Display name for the step.
    */
   name: string;
+  /**
+   * Phase in which the step appears.
+   */
   phase: PromptStepPhase;
   /**
    * Saved prompt ID (when the body is a reference).

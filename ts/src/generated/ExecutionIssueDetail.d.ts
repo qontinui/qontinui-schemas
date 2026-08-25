@@ -44,6 +44,9 @@ export interface ExecutionIssueDetail {
    * Issue ID.
    */
   id: string;
+  /**
+   * Category label for the issue.
+   */
   issueType: IssueType;
   /**
    * Opaque additional metadata.
@@ -71,12 +74,21 @@ export interface ExecutionIssueDetail {
    * Full screenshot records associated with the issue.
    */
   screenshots?: ExecutionScreenshotResponse[];
+  /**
+   * Severity.
+   */
   severity: IssueSeverity;
+  /**
+   * Source that detected the issue.
+   */
   source: IssueSource;
   /**
    * State ID where the issue was observed, if any.
    */
   stateName?: string | null;
+  /**
+   * Current lifecycle status.
+   */
   status: IssueStatus;
   /**
    * Short title.

@@ -50,6 +50,9 @@ export interface WorkerInstance {
    * ISO 8601 timestamp when the worker started.
    */
   startedAt?: string | null;
+  /**
+   * Current status.
+   */
   status: WorkerStatus;
   /**
    * Files this worker has touched.

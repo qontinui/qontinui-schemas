@@ -35,6 +35,9 @@ export interface TicketProviderConfig {
    * Poll interval in seconds. Default: 60.
    */
   pollIntervalSeconds: number;
+  /**
+   * Which provider this config targets.
+   */
   source: TicketSource;
   /**
    * Provider-specific target:

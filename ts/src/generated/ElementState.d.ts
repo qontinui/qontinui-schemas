@@ -53,6 +53,9 @@ export interface ElementState {
    * Whether the element currently has keyboard focus.
    */
   focused: boolean;
+  /**
+   * Bounding rectangle of the element.
+   */
   rect: ElementRect;
   /**
    * Currently selected options for `<select>` elements.

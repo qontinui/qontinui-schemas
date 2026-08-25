@@ -41,11 +41,17 @@ export interface TreeNode {
    * Display name for this node.
    */
   name: string;
+  /**
+   * Type of node (workflow / action / transition).
+   */
   nodeType: NodeType;
   /**
    * ID of parent node, `None` for root.
    */
   parentId?: string | null;
+  /**
+   * Current execution status.
+   */
   status: NodeStatus;
   /**
    * When this node was created (Unix epoch seconds).

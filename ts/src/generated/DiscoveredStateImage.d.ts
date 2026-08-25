@@ -14,6 +14,9 @@ import type { DiscoveryBoundingBox } from "./DiscoveryBoundingBox";
  * optional pixel-level identification.
  */
 export interface DiscoveredStateImage {
+  /**
+   * Bounding box within the screenshot.
+   */
   bbox: DiscoveryBoundingBox;
   /**
    * Confidence score for this image (0.0–1.0). Defaults to `1.0`.

@@ -76,6 +76,9 @@ export interface StateDiscoveryResult {
    * ID of the source session (extraction, recording, …).
    */
   sourceSessionId?: string | null;
+  /**
+   * How this state machine was discovered.
+   */
   sourceType: DiscoverySourceType;
   /**
    * Number of states (statistic).

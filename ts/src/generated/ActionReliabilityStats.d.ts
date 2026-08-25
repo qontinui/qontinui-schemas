@@ -15,6 +15,9 @@ export interface ActionReliabilityStats {
    * Human-readable action name.
    */
   actionName: string;
+  /**
+   * Kind of action.
+   */
   actionType: ExecutionActionType;
   /**
    * Mean duration in milliseconds.

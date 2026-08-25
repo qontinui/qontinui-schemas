@@ -17,7 +17,13 @@ import type { TaskRunFindingStatus } from "./TaskRunFindingStatus";
  * possibly `null`), so they use `serde(default)` without `skip_serializing_if`.
  */
 export interface TaskRunFinding {
+  /**
+   * How the finding should be acted upon.
+   */
   actionType: TaskRunFindingActionType;
+  /**
+   * Category (bug, security, performance, etc.).
+   */
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
@@ -75,11 +81,17 @@ export interface TaskRunFinding {
    * Session number in which the finding was resolved.
    */
   resolvedInSession: number | null;
+  /**
+   * Severity of the finding.
+   */
   severity: TaskRunFindingSeverity;
   /**
    * Hash used to deduplicate findings across runs.
    */
   signatureHash: string | null;
+  /**
+   * Current lifecycle status.
+   */
   status: TaskRunFindingStatus;
   /**
    * Parent task run ID.

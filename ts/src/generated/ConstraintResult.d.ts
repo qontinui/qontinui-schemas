@@ -24,6 +24,9 @@ export interface ConstraintResult {
    * Whether the constraint passed.
    */
   passed: boolean;
+  /**
+   * Severity of the constraint (for quick filtering).
+   */
   severity: ConstraintSeverity;
   /**
    * Details about the violation (empty if passed).

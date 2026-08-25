@@ -28,6 +28,9 @@ export interface AssertionResult {
    * Snapshot of `IrAssertion.description`.
    */
   description: string;
+  /**
+   * Pass / fail discriminator + payload.
+   */
   outcome: AssertionOutcome;
   /**
    * Free-form severity string — `"critical"` / `"error"` / `"warning"`

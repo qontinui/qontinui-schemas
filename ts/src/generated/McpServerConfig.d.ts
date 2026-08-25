@@ -69,6 +69,9 @@ export interface McpServerConfig {
    * ISO 8601 timestamp of when `cached_tools` was populated.
    */
   toolsCachedAt?: string | null;
+  /**
+   * Which transport this server uses.
+   */
   transport: McpTransport;
   /**
    * ISO 8601 last-update timestamp.

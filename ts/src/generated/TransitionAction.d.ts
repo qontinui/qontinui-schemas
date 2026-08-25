@@ -77,6 +77,9 @@ export interface TransitionAction {
    * Text to type (`type` action).
    */
   text?: string | null;
+  /**
+   * The kind of action to perform.
+   */
   type: StandardActionType;
   /**
    * Keystroke delay in milliseconds (`type` action).

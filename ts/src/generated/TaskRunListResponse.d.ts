@@ -13,6 +13,9 @@ import type { TaskRunStatus } from "./TaskRunStatus";
  * Response for `GET /task-runs`.
  */
 export interface TaskRunListResponse {
+  /**
+   * Pagination envelope.
+   */
   pagination: Pagination;
   /**
    * Page of matching task runs.

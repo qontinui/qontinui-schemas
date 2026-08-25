@@ -26,6 +26,9 @@ import type { UiBridgeHttpHealthData } from "./UiBridgeHttpHealthData";
  * other three fields are always present.
  */
 export interface UiBridgeHttpHealthEnvelope {
+  /**
+   * Transport-diagnostics payload (typed signals + open diagnostics spread).
+   */
   data: UiBridgeHttpHealthData;
   /**
    * Always `true` on the health path.

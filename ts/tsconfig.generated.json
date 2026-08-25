@@ -1,0 +1,49 @@
+{
+  "//": [
+    "Type gate for THIS package's own generated .d.ts files. Chained into the",
+    "`typecheck` script, so `npm run typecheck` (root and ts/) and the",
+    "ts-typecheck workflow all enforce it.",
+
+    "WHY A SECOND CONFIG. tsconfig.json sets skipLibCheck: true, and that is not",
+    "a preference — a dependency ships a .d.ts this package cannot compile:",
+    "node_modules/vite/types/importGlob.d.ts references the DOM `Worker` type",
+    "while `lib` here is [\"ES2020\"] with no DOM. Flipping the flag off on the",
+    "main config would red-x CI on code the repo does not control.",
+
+    "But skipLibCheck is all-or-nothing: it skips EVERY .d.ts, including the 544",
+    "in src/generated/ that this repo generates and publishes. So the main",
+    "typecheck was structurally incapable of seeing a broken generated binding,",
+    "and broken ones shipped to npm — PolicyEvaluation.overallStatus was typed",
+    "`PolicyStatus1` and IrPageSpec.apiAssertions `IrApiCheck[]`, names nothing",
+    "declared. Both compiled clean here and only exploded downstream. This",
+    "config is the narrow gate that closes the hole: same options, restricted to",
+    "the generated tree, with skipLibCheck OFF.",
+
+    "THE TWO DETAILS THAT MAKE IT WORK.",
+
+    "1. `include` names the .d.ts files explicitly. An ambient declaration file",
+    "is only type-checked when it is a program ROOT — merely being reachable",
+    "from a root is not enough, and a .d.ts reached that way is silently skipped",
+    "even with skipLibCheck: false. A gate that cannot go red is worse than no",
+    "gate, so the .d.ts glob is stated rather than implied.",
+
+    "2. `types: []` stops TypeScript auto-including every @types/* package, and",
+    "the narrow `include` keeps the test files (and therefore vitest -> vite)",
+    "out of the program. Together they are what keeps vite's uncompilable",
+    "importGlob.d.ts from failing a gate that is not about it.",
+
+    "(This key is ignored by tsc. It is a string array rather than a // comment",
+    "because .pre-commit-config.yaml runs check-json over *.json.)"
+  ],
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "types": [],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src/generated/**/*.d.ts", "src/generated/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

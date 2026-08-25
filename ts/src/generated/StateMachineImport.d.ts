@@ -21,5 +21,8 @@ export interface StateMachineImport {
    * Override name (uses export name when omitted).
    */
   name?: string | null;
+  /**
+   * The state machine to import.
+   */
   stateMachine: StateMachineExport;
 }

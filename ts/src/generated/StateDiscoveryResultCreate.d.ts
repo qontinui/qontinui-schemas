@@ -53,6 +53,9 @@ export interface StateDiscoveryResultCreate {
    * ID of the source session.
    */
   sourceSessionId?: string | null;
+  /**
+   * Discovery source.
+   */
   sourceType: DiscoverySourceType;
   /**
    * Discovered states.

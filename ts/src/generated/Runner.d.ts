@@ -28,6 +28,10 @@ export interface Runner {
    * ISO 8601 timestamp when the runner was first registered.
    */
   createdAt: string;
+  /**
+   * Computed health state derived from `ws_connected` and
+   * `last_heartbeat`. Authoritative for UI display.
+   */
   derivedStatus: RunnerStatus;
   /**
    * Reported hostname of the machine the runner is running on.

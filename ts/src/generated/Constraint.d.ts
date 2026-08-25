@@ -12,6 +12,9 @@ import type { ConstraintSeverity } from "./ConstraintSeverity";
  * A constraint definition.
  */
 export interface Constraint {
+  /**
+   * What to check.
+   */
   check: ConstraintCheck;
   /**
    * Why this constraint exists (shown to the AI on violation).
@@ -29,5 +32,8 @@ export interface Constraint {
    * Human-readable name.
    */
   name: string;
+  /**
+   * How severe a violation is.
+   */
   severity: ConstraintSeverity;
 }

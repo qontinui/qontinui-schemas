@@ -57,6 +57,9 @@ export interface AccessibilityNode {
    * Reference ID like `@e1`, `@e2` for AI interaction.
    */
   ref: string;
+  /**
+   * Accessibility role (button, textbox, etc.).
+   */
   role: AccessibilityRole;
   /**
    * Current state flags.

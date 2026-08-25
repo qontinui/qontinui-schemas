@@ -32,6 +32,9 @@ export type WorkerCoordinationMessage =
     }
   | {
       data: {
+        /**
+         * The finding payload.
+         */
         finding: Finding;
         /**
          * ID of the worker that made the finding.

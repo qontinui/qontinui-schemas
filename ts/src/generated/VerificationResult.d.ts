@@ -20,6 +20,9 @@ export interface VerificationResult {
    * The criterion that was checked.
    */
   criterionId: string;
+  /**
+   * Type of verification performed.
+   */
   criterionType: CriterionType;
   /**
    * Issues found (if failed).

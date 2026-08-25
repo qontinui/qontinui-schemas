@@ -18,6 +18,9 @@ export interface TaskRunFindingCreate {
    * Action type (defaults server-side if omitted).
    */
   actionType?: TaskRunFindingActionType | null;
+  /**
+   * Category.
+   */
   category: TaskRunFindingCategory;
   /**
    * Snippet of code illustrating the issue.
@@ -63,6 +66,9 @@ export interface TaskRunFindingCreate {
    * Resolution text, if already resolved.
    */
   resolution?: string | null;
+  /**
+   * Severity.
+   */
   severity: TaskRunFindingSeverity;
   /**
    * Deduplication hash.

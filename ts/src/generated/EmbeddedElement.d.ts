@@ -16,6 +16,9 @@ import type { GUIElementChunk } from "./GUIElementChunk";
  * Mirrors `rag.models.EmbeddedElement`.
  */
 export interface EmbeddedElement {
+  /**
+   * The GUI element that was embedded.
+   */
   element: GUIElementChunk;
   /**
    * Model used for embedding.

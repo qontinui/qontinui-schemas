@@ -34,5 +34,8 @@ export interface ProcessStatusLite {
    * process declares no health port.
    */
   portHealthy?: boolean | null;
+  /**
+   * Lifecycle state as reported by the process manager.
+   */
   state: ProcessState;
 }

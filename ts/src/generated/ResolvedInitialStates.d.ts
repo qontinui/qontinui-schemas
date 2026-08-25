@@ -13,6 +13,9 @@ import type { InitialStatesSource } from "./InitialStatesSource";
  * resolution came from.
  */
 export interface ResolvedInitialStates {
+  /**
+   * Where the resolution came from.
+   */
   source: InitialStatesSource;
   /**
    * Resolved initial state IDs.

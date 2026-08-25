@@ -29,6 +29,9 @@ export type TaskCompletionResult =
        */
       iterations: number;
       status: "success";
+      /**
+       * Final verification results.
+       */
       verification_results: IterationVerificationResults;
       [k: string]: unknown;
     }
@@ -44,7 +47,7 @@ export type TaskCompletionResult =
       /**
        * Last verification results (if any).
        */
-      last_results?: IterationVerificationResults1 | null;
+      last_results?: IterationVerificationResults | null;
       /**
        * Human-readable reason for the failure.
        */
@@ -80,7 +83,7 @@ export type TaskCompletionResult =
       /**
        * Last verification results (if any).
        */
-      last_results?: IterationVerificationResults1 | null;
+      last_results?: IterationVerificationResults | null;
       /**
        * The max-iteration limit that triggered the pause.
        */

@@ -20,6 +20,9 @@ export interface ResolvedInitialStatesResult {
    * Error message when resolution failed.
    */
   error?: string | null;
+  /**
+   * Where the resolution came from.
+   */
   source: InitialStatesSource;
   /**
    * Resolved initial state IDs.

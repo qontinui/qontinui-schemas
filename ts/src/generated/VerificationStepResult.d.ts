@@ -14,6 +14,9 @@ import type { VerificationStepDetails } from "./VerificationStepDetails";
  * Result of a single step within a verification phase.
  */
 export interface VerificationStepResult {
+  /**
+   * Execution config for the step.
+   */
   config: StepExecutionConfig;
   /**
    * Step duration in milliseconds.

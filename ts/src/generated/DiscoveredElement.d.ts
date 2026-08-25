@@ -36,6 +36,9 @@ export interface DiscoveredElement {
    * ARIA role attribute.
    */
   role?: string | null;
+  /**
+   * Current observable state.
+   */
   state: ElementState;
   /**
    * HTML tag name (e.g. `"BUTTON"`, `"INPUT"`).

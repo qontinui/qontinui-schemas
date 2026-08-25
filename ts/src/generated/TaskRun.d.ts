@@ -63,6 +63,9 @@ export interface TaskRun {
    * Number of AI sessions that have been run.
    */
   sessionsCount: number;
+  /**
+   * Current lifecycle status.
+   */
   status: TaskRunStatus;
   /**
    * AI-generated summary of the task run.
@@ -76,6 +79,9 @@ export interface TaskRun {
    * Display name of the task.
    */
   taskName: string;
+  /**
+   * Kind of task (one-off, automation, or scheduled).
+   */
   taskType: TaskType;
   /**
    * ISO 8601 timestamp when the task record was last updated.

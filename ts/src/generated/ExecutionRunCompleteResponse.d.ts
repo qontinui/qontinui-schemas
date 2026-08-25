@@ -33,6 +33,12 @@ export interface ExecutionRunCompleteResponse {
    * ISO 8601 timestamp when the run started.
    */
   startedAt: string;
+  /**
+   * Aggregate execution statistics.
+   */
   stats: ExecutionStats;
+  /**
+   * Final lifecycle status.
+   */
   status: RunStatus;
 }

@@ -18,11 +18,17 @@ import type { AccessibilityState } from "./AccessibilityState";
  * capture source and summary statistics.
  */
 export interface AccessibilitySnapshot {
+  /**
+   * Backend used for capture.
+   */
   backend: AccessibilityBackend;
   /**
    * Number of interactive nodes.
    */
   interactiveNodes: number;
+  /**
+   * Root node of the accessibility tree.
+   */
   root: AccessibilityNode;
   /**
    * Unix timestamp of capture.

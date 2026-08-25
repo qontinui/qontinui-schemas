@@ -20,5 +20,8 @@ export interface TaskRunFindingsListResponse {
    * Findings for the task run.
    */
   findings: TaskRunFinding[];
+  /**
+   * Aggregated counts of findings.
+   */
   summary: TaskRunFindingSummary;
 }
