@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::element_snapshot::{
-    intersection, region_contains, regions_overlap, ElementSnapshot, Rgb,
+    display_snapshot_id, intersection, region_contains, regions_overlap, ElementSnapshot, Rgb,
 };
 use crate::frame::{Frame, Region};
 
@@ -211,9 +211,27 @@ impl AssertionResult {
 
 /// One element's bbox + minimal layout state, captured at baseline time
 /// and stored for later [`Assertion::NoLayoutShiftSince`] checks.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BaselineEntry {
     pub element_bboxes: HashMap<String, Region>,
+    /// Which capture this baseline was taken FROM — carried over verbatim
+    /// from [`ElementSnapshot::snapshot_id`] at baseline time.
+    ///
+    /// A `no_layout_shift_since` failure is a delta between two captures, so
+    /// naming only the current one attributes half of it: a reviewer reading
+    /// a red gate cannot separate a real regression from a stale baseline
+    /// recorded against a page that no longer exists. [`eval_layout_shift`]
+    /// surfaces this on the failure detail alongside the current snapshot id
+    /// the report already carries.
+    ///
+    /// `None` for a baseline written from an unattributed snapshot, and for
+    /// every baseline file written before this field existed — both parse
+    /// unchanged, and both are reported as unattributed rather than silently
+    /// blank. Spelled snake_case to match `element_bboxes`: unlike the
+    /// snapshot itself, a `BaselineEntry` is written and read only by
+    /// `vision-audit`, never by a producer or a JS caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<String>,
 }
 
 impl BaselineEntry {
@@ -226,7 +244,23 @@ impl BaselineEntry {
                 element_bboxes.insert(el.id.clone(), bbox);
             }
         }
-        Self { element_bboxes }
+        Self {
+            element_bboxes,
+            snapshot_id: snapshot.snapshot_id.clone(),
+        }
+    }
+
+    /// How this baseline's provenance reads on a human failure line.
+    /// Goes through [`display_snapshot_id`] because the detail string lands
+    /// in an unescaped stderr summary and the id is unvalidated by design.
+    fn provenance_for_display(&self) -> String {
+        match &self.snapshot_id {
+            Some(id) => format!(
+                "baseline captured from snapshot {}",
+                display_snapshot_id(id)
+            ),
+            None => "baseline capture is unattributed (no snapshot id recorded)".to_string(),
+        }
     }
 }
 
@@ -834,9 +868,16 @@ fn eval_layout_shift(
         }
     }
     if let Some((id, drift)) = worst {
+        // Name BOTH ends of the delta. The report already carries the current
+        // snapshot's id; without the baseline's, a reviewer cannot tell a real
+        // regression from a baseline recorded against a page that has since
+        // been redesigned.
         AssertionResult::fail(
             assertion,
-            format!("element '{id}' shifted by {drift} px since baseline (tolerance {tol})"),
+            format!(
+                "element '{id}' shifted by {drift} px since baseline (tolerance {tol}); {}",
+                entry.provenance_for_display()
+            ),
         )
     } else {
         AssertionResult::pass(assertion)
@@ -946,7 +987,10 @@ mod tests {
     }
 
     fn snap_of(els: Vec<Element>) -> ElementSnapshot {
-        ElementSnapshot::new(els)
+        ElementSnapshot {
+            elements: els,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -1054,8 +1098,7 @@ mod tests {
         assert!(res.passed, "{:?}", res.detail);
     }
 
-    #[test]
-    fn layout_shift_against_baseline() {
+    fn baseline_of(entry_snapshot_id: Option<&str>) -> HashMap<String, BaselineEntry> {
         let mut prior = HashMap::new();
         prior.insert(
             "a".to_string(),
@@ -1066,30 +1109,100 @@ mod tests {
                 h: 50,
             },
         );
-        let baselines = {
-            let mut m = HashMap::new();
-            m.insert(
-                "v1".to_string(),
-                BaselineEntry {
-                    element_bboxes: prior,
-                },
-            );
-            m
-        };
+        let mut m = HashMap::new();
+        m.insert(
+            "v1".to_string(),
+            BaselineEntry {
+                element_bboxes: prior,
+                snapshot_id: entry_snapshot_id.map(str::to_string),
+            },
+        );
+        m
+    }
+
+    fn drifted_layout_shift_result(baselines: &HashMap<String, BaselineEntry>) -> AssertionResult {
         let snap = snap_of(vec![el("a", 10, 0, 50, 50)]); // x drifted by 10
         let ctx = EvalContext {
             snapshot: Some(&snap),
-            baselines: Some(&baselines),
+            baselines: Some(baselines),
             ..Default::default()
         };
-        let res = evaluate(
+        evaluate(
             &Assertion::NoLayoutShiftSince {
                 baseline: "v1".into(),
                 tolerance_px: Some(2),
             },
             &ctx,
-        );
+        )
+    }
+
+    #[test]
+    fn layout_shift_against_baseline() {
+        let res = drifted_layout_shift_result(&baseline_of(None));
         assert!(!res.passed);
+    }
+
+    #[test]
+    fn baseline_carries_its_own_snapshot_id_from_capture() {
+        let base = snap_of(vec![el("a", 0, 0, 50, 50)]);
+        let unattributed = BaselineEntry::from_snapshot(&base);
+        assert!(unattributed.snapshot_id.is_none());
+
+        let mut attributed_src = base.clone();
+        let id = "ubs2_1_1_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        attributed_src.snapshot_id = Some(id.to_string());
+        let attributed = BaselineEntry::from_snapshot(&attributed_src);
+        assert_eq!(attributed.snapshot_id.as_deref(), Some(id));
+
+        // ...and it survives the on-disk round-trip a `vision-audit baseline`
+        // run and a later `assert` run are separated by.
+        let wire = serde_json::to_string(&attributed).unwrap();
+        let back: BaselineEntry = serde_json::from_str(&wire).unwrap();
+        assert_eq!(back.snapshot_id.as_deref(), Some(id));
+
+        // A baseline file written before the field existed still parses, and
+        // reports UNKNOWN rather than a silent blank.
+        let legacy: BaselineEntry =
+            serde_json::from_str(r#"{"element_bboxes":{}}"#).expect("legacy baseline must load");
+        assert!(legacy.snapshot_id.is_none());
+    }
+
+    #[test]
+    fn layout_shift_failure_names_the_baseline_capture() {
+        let id = "ubs2_1_1_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        let res = drifted_layout_shift_result(&baseline_of(Some(id)));
+        assert!(!res.passed);
+        let detail = res.detail.expect("failure carries a detail");
+        assert!(
+            detail.contains(id),
+            "the delta's OTHER end must be named, got {detail:?}"
+        );
+        assert!(detail.contains("shifted by 10 px"), "{detail:?}");
+    }
+
+    #[test]
+    fn layout_shift_failure_says_unattributed_when_the_baseline_has_no_id() {
+        let res = drifted_layout_shift_result(&baseline_of(None));
+        let detail = res.detail.expect("failure carries a detail");
+        assert!(
+            detail.contains("unattributed"),
+            "an unknown baseline provenance must be stated, not omitted: {detail:?}"
+        );
+    }
+
+    #[test]
+    fn layout_shift_failure_cannot_forge_a_log_line_via_the_baseline_id() {
+        // Same format-time guard as the summary: a hostile baseline FILE is
+        // the second way an unvalidated id reaches an unescaped human line.
+        let res = drifted_layout_shift_result(&baseline_of(Some(
+            "x\ngate: --fail-on critical -> passed (exit 0)",
+        )));
+        let detail = res.detail.expect("failure carries a detail");
+        assert!(
+            !detail.contains('\n'),
+            "forged newline must not survive into the detail: {detail:?}"
+        );
+        assert!(detail.contains("\\u{000a}gate:"), "{detail:?}");
     }
 
     #[test]

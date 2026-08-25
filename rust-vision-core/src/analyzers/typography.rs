@@ -96,23 +96,29 @@ mod tests {
 
     #[test]
     fn flags_many_distinct_families() {
-        let snap = ElementSnapshot::new(vec![
-            text_el("a", "Inter", 16.0),
-            text_el("b", "Roboto", 16.0),
-            text_el("c", "Arial", 16.0),
-            text_el("d", "Helvetica", 16.0),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                text_el("a", "Inter", 16.0),
+                text_el("b", "Roboto", 16.0),
+                text_el("c", "Arial", 16.0),
+                text_el("d", "Helvetica", 16.0),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(findings.iter().any(|f| f.kind == "font_family_drift"));
     }
 
     #[test]
     fn no_findings_when_consistent() {
-        let snap = ElementSnapshot::new(vec![
-            text_el("a", "Inter", 14.0),
-            text_el("b", "Inter", 16.0),
-            text_el("c", "Inter", 24.0),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                text_el("a", "Inter", 14.0),
+                text_el("b", "Inter", 16.0),
+                text_el("c", "Inter", 24.0),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(findings.is_empty());
     }

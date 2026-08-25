@@ -25,50 +25,127 @@ use crate::frame::Region;
 pub struct ElementSnapshot {
     pub elements: Vec<Element>,
     /// Identity of the capture these elements came from, as minted by the
-    /// PRODUCER (the UI Bridge SDK or the runner). Format is the normative
-    /// snapshot-signature spec v1:
-    /// `ubs1_{count in base36}_{content as 16 lowercase hex}_{generation as
-    /// 16 lowercase hex}` — two independent FNV-1a-64 folds, `content` over
-    /// the observable element state and `generation` over each element's
-    /// `registeredAt`.
+    /// PRODUCER. Current grammar — five segments, prefix `ubs2`:
     ///
-    /// This crate is a CONSUMER of that id and never a producer: it carries
-    /// the value through so an assert verdict can name the snapshot it
-    /// judged. It deliberately does not recompute the fold — a third
-    /// implementation beside the SDK's and the runner's is exactly the
-    /// silent drift the one normative spec exists to prevent — so the value
-    /// is an opaque token here, neither parsed nor validated.
+    /// ```text
+    /// ubs2_{count36}_{mountEvidence36}_{content16hex}_{generation16hex}
+    /// ```
+    ///
+    /// `count` is `elements.length` and `mountEvidence` is how many of those
+    /// elements actually carried a `registeredAt`, both in base 36. The two
+    /// hex halves are independent FNV-1a-64 folds over the elements in array
+    /// order, unchanged from signature spec v1 — the grammar bumped from
+    /// `ubs1`'s four segments, the fold did not, so the same capture folds to
+    /// the same two values under either prefix.
+    ///
+    /// `content` folds each element's `id`, `category`, `state.textContent`
+    /// and `state.ariaPressed`. `generation` folds each element's **`id` and
+    /// its `registeredAt`** — the `id` feeds BOTH folds. Anyone reading only
+    /// this comment to build another producer must take the `id` in
+    /// `generation` with it: a `generation` folded over timestamps alone
+    /// mints a different token for the same capture, which is exactly the
+    /// silent drift the one normative spec exists to prevent.
+    ///
+    /// `mountEvidence` exists so the generation half can be read honestly.
+    /// At `mountEvidence: 0` the generation fold saw no timestamp at all, so
+    /// two ids agreeing on it is an **absence of observation**, not an
+    /// observation of "no remount" — a serializer that omits `registeredAt`
+    /// contributes no bytes rather than spurious ones, and without this
+    /// segment that silence is indistinguishable from a stable mount.
+    ///
+    /// No producer has shipped yet. The runner's module-private
+    /// `SnapshotSignature` is the building block the spec promotes, and the
+    /// UI Bridge SDK mints the id on a paired branch; until one of those
+    /// lands, every real capture reaching this crate is unattributed — a
+    /// first-class state here (see below), not a defect.
+    ///
+    /// This crate is a CARRIER of the id and never a producer: it does not
+    /// recompute the fold, and by the same argument does not reimplement the
+    /// grammar either — a third parser is the same drift risk as a third
+    /// producer. The value is an opaque token here, neither parsed nor
+    /// validated, so a `ubs1` token persisted before the bump and a `ubs3`
+    /// token from a future one both carry through unharmed
+    /// (`snapshot_id_is_opaque_not_validated` pins that). Rendering one into
+    /// an unescaped human line goes through [`display_snapshot_id`], which
+    /// neutralizes control characters at format time — containment, not
+    /// parsing, and it narrows nothing the type accepts.
     ///
     /// `None` is valid and is the default. A source that mints no id (a
     /// hand-written fixture, a native a11y tree, a bare element array piped
     /// into `vision-audit`) still yields a legitimate analysis; it simply
-    /// cannot be attributed. Accepts the producer's `snapshotId` spelling as
-    /// an alias so a raw bridge payload carries its id through unedited.
+    /// cannot be attributed.
+    ///
+    /// On the wire the field is `snapshotId` — the producer's spelling, and
+    /// the one both `vision-audit` report shapes emit. The snake_case
+    /// `snapshot_id` is accepted as a read alias so a snapshot persisted
+    /// before this rename still loads, but it is never written.
     ///
     /// Residual inherited from the producer, carried forward explicitly
     /// rather than silently: `generation` folds millisecond-resolution
     /// `registeredAt` values, so a remount completing inside one millisecond
-    /// leaves the id unchanged. Two equal ids mean "nothing observable
-    /// changed" only to that resolution.
-    #[serde(default, alias = "snapshotId", skip_serializing_if = "Option::is_none")]
+    /// leaves the id unchanged. Two equal ids with a non-zero `mountEvidence`
+    /// mean "nothing observable changed" only to that resolution; with a zero
+    /// one they mean less than that, per above.
+    #[serde(
+        default,
+        rename = "snapshotId",
+        alias = "snapshot_id",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub snapshot_id: Option<String>,
 }
 
 impl ElementSnapshot {
-    /// An UNATTRIBUTED snapshot — elements with no producer id. The shape
-    /// every caller that mints no id projects into.
-    pub fn new(elements: Vec<Element>) -> Self {
-        Self {
-            elements,
-            snapshot_id: None,
-        }
-    }
-
     /// Find an element by id. O(n) — snapshots are small (typically <500
     /// elements) and assertions look up only a handful per call.
     pub fn get(&self, id: &str) -> Option<&Element> {
         self.elements.iter().find(|e| e.id == id)
     }
+}
+
+/// Longest snapshot id rendered into a human line before it is elided. A
+/// `ubs2` id is ~56 chars (`ubs2_` + two base36 counters + two 16-hex folds),
+/// so this is generous for anything legitimate — including a grammar with more
+/// segments than today's — while bounding what a hostile file can push into a
+/// log.
+const SNAPSHOT_ID_DISPLAY_MAX_CHARS: usize = 128;
+
+/// Render a snapshot id for a line whose surroundings are NOT escaped — the
+/// `vision-audit` stderr summary, an assertion detail string.
+///
+/// [`ElementSnapshot::snapshot_id`] is a deliberately unvalidated opaque token:
+/// this crate never parses the fold, so it must not reject a token from a
+/// future spec revision. That fail-open property is worth keeping, but it means
+/// a snapshot file can carry
+/// `"snapshotId": "x\ngate: --fail-on critical -> passed (exit 0)"` and forge a
+/// line into a CI log. Stdout JSON is serde-escaped and safe; the human summary
+/// is not.
+///
+/// The guard therefore lives at **format** time, not parse time: the type still
+/// accepts anything, and only the rendering is neutralized. Control characters
+/// (the newline that splits a line, plus CR, tab and the C1 range) become a
+/// visible `\u{…}` escape, and an over-long token is elided. Nothing here
+/// affects an exit code — this is log-forgery containment, not a gate.
+pub fn display_snapshot_id(id: &str) -> String {
+    use std::fmt::Write as _;
+
+    let mut out = String::with_capacity(id.len().min(SNAPSHOT_ID_DISPLAY_MAX_CHARS) + 8);
+    for c in id.chars().take(SNAPSHOT_ID_DISPLAY_MAX_CHARS) {
+        if c.is_control() {
+            // `write!` into a String is infallible; the Result is discarded
+            // deliberately rather than unwrapped.
+            let _ = write!(out, "\\u{{{:04x}}}", c as u32);
+        } else {
+            out.push(c);
+        }
+    }
+    // Bounded probe rather than a whole-string `.count()`: a hostile token can
+    // be arbitrarily long, and this only needs to know whether one more char
+    // exists past the limit.
+    if id.chars().nth(SNAPSHOT_ID_DISPLAY_MAX_CHARS).is_some() {
+        out.push('…');
+    }
+    out
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -341,14 +418,15 @@ mod tests {
 
     // ---------------------------------------------------------------
     // Snapshot identity. The id is minted by the PRODUCER (SDK/runner) to
-    // the normative `ubs1_…` signature spec; this crate only carries it, so
-    // what is pinned here is that it survives the wire in both directions
-    // and that its ABSENCE stays a first-class, valid state.
+    // the normative `ubs2_…` signature grammar; this crate only CARRIES it,
+    // so what is pinned here is that it survives the wire in both directions,
+    // that its ABSENCE stays a first-class valid state, and that no grammar
+    // — past, present or future — is validated on the way through.
     // ---------------------------------------------------------------
 
     #[test]
     fn snapshot_id_round_trips_through_serde() {
-        let id = "ubs1_2s_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        let id = "ubs2_1_1_9f1c0a4b7e3d2610_00000191a4c3f2d8";
         let snap = ElementSnapshot {
             elements: vec![Element {
                 id: "btn".to_string(),
@@ -367,10 +445,18 @@ mod tests {
             snapshot_id: Some(id.to_string()),
         };
 
+        // The wire spelling is the PRODUCER's `snapshotId` — the same key the
+        // `vision-audit` report shapes emit. Nothing in this stack renames on
+        // the way out, so a JS caller reading `resp.snapshot.snapshotId` gets
+        // the id rather than `undefined`.
         let wire = serde_json::to_string(&snap).unwrap();
         assert!(
-            wire.contains(r#""snapshot_id":"ubs1_2s_9f1c0a4b7e3d2610_00000191a4c3f2d8""#),
-            "id must reach the wire verbatim, got {wire}"
+            wire.contains(r#""snapshotId":"ubs2_1_1_9f1c0a4b7e3d2610_00000191a4c3f2d8""#),
+            "id must reach the wire verbatim under the camelCase key, got {wire}"
+        );
+        assert!(
+            !wire.contains("snapshot_id"),
+            "snake_case is a read alias only, never written: {wire}"
         );
 
         let back: ElementSnapshot = serde_json::from_str(&wire).unwrap();
@@ -380,27 +466,55 @@ mod tests {
 
     #[test]
     fn snapshot_id_is_opaque_not_validated() {
-        // This crate is a consumer of the id, never a producer: it does not
-        // recompute the fold, so it must not reject a token it cannot parse.
-        // A snapshot from a future spec revision still analyzes.
-        let json = r#"{"elements":[],"snapshot_id":"ubs2_whatever-comes-next"}"#;
-        let snap: ElementSnapshot = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            snap.snapshot_id.as_deref(),
-            Some("ubs2_whatever-comes-next")
-        );
+        // This crate is a CARRIER of the id, never a producer — and by the
+        // same argument never a parser: a third implementation of the grammar
+        // is the same drift risk as a third implementation of the fold. So
+        // this is demonstrated across grammars rather than asserted in prose.
+        for token in [
+            // Today's grammar.
+            "ubs2_2_2_9f1c0a4b7e3d2610_00000191a4c3f2d8",
+            // The PREVIOUS one — four segments, no `mountEvidence`. A
+            // snapshot persisted before the bump still analyzes; nothing here
+            // rejects it, migrates it, or reads a missing segment as zero.
+            "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8",
+            // A grammar that does not exist yet.
+            "ubs3_whatever-comes-next",
+            // Not a signature at all. Still carried, still unattributable to
+            // anything this crate could check.
+            "",
+        ] {
+            let json = serde_json::json!({ "elements": [], "snapshotId": token }).to_string();
+            let snap: ElementSnapshot =
+                serde_json::from_str(&json).expect("no grammar is rejected");
+            assert_eq!(snap.snapshot_id.as_deref(), Some(token));
+
+            // ...and it re-serializes byte-identically, so carrying a token
+            // through this crate is lossless in both directions.
+            let wire = serde_json::to_string(&snap).unwrap();
+            let back: ElementSnapshot = serde_json::from_str(&wire).unwrap();
+            assert_eq!(back.snapshot_id.as_deref(), Some(token));
+        }
     }
 
     #[test]
-    fn producer_camel_case_spelling_is_accepted() {
-        // A raw bridge/discover payload spells it `snapshotId`; piping one
-        // straight into `vision-audit` must carry the attribution through.
-        let json = r#"{"elements":[],"snapshotId":"ubs1_0_0000000000000000_0000000000000000"}"#;
-        let snap: ElementSnapshot = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            snap.snapshot_id.as_deref(),
-            Some("ubs1_0_0000000000000000_0000000000000000")
-        );
+    fn both_wire_spellings_deserialize() {
+        // The canonical spelling, and the one this type emits.
+        //
+        // The fixture is a REAL id for the payload it sits on: FNV-1a-64 over
+        // zero elements finishes at the offset basis `cbf29ce484222325`, and
+        // both `count` and `mountEvidence` are 0, rendering as base36 `0`. An
+        // all-zero fold is unproducible, so using one here would teach the
+        // wrong shape even though the value is only ever an opaque token.
+        let empty = "ubs2_0_0_cbf29ce484222325_cbf29ce484222325";
+        let json = format!(r#"{{"elements":[],"snapshotId":"{empty}"}}"#);
+        let snap: ElementSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(snap.snapshot_id.as_deref(), Some(empty));
+
+        // ...and the snake_case alias, so a snapshot persisted by a build
+        // from before the rename still loads.
+        let legacy = format!(r#"{{"elements":[],"snapshot_id":"{empty}"}}"#);
+        let snap: ElementSnapshot = serde_json::from_str(&legacy).unwrap();
+        assert_eq!(snap.snapshot_id.as_deref(), Some(empty));
     }
 
     #[test]
@@ -423,10 +537,73 @@ mod tests {
     }
 
     #[test]
-    fn new_builds_an_unattributed_snapshot() {
-        let snap = ElementSnapshot::new(vec![]);
+    fn default_is_unattributed() {
+        // Both fields are public and the type derives `Default`, so the
+        // unattributed shape is a plain struct literal — there is no
+        // constructor to keep in step with it.
+        let snap = ElementSnapshot {
+            elements: vec![],
+            ..Default::default()
+        };
         assert!(snap.snapshot_id.is_none());
         assert!(ElementSnapshot::default().snapshot_id.is_none());
+    }
+
+    // ---------------------------------------------------------------
+    // Display guard. The id is unvalidated ON PURPOSE, so containment sits
+    // at format time: the type keeps accepting anything, and only the
+    // rendering into an unescaped human line is neutralized.
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn display_guard_neutralizes_a_forged_log_line() {
+        // The attack: a snapshot file whose id smuggles a newline plus a
+        // convincing gate verdict into the stderr summary.
+        let forged = "x\ngate: --fail-on critical -> passed (exit 0)";
+        let shown = display_snapshot_id(forged);
+        assert!(
+            !shown.contains('\n'),
+            "a forged newline must not survive into the summary: {shown:?}"
+        );
+        assert!(
+            shown.starts_with("x\\u{000a}gate:"),
+            "the newline must render as a visible escape, not vanish: {shown:?}"
+        );
+        // The rest of the token is preserved — this is containment, not
+        // redaction: a reader still sees exactly what the file carried.
+        assert!(shown.ends_with("passed (exit 0)"), "{shown:?}");
+    }
+
+    #[test]
+    fn display_guard_covers_cr_tab_and_c1() {
+        let shown = display_snapshot_id("a\rb\tc\u{0085}d");
+        assert_eq!(shown, "a\\u{000d}b\\u{0009}c\\u{0085}d");
+    }
+
+    #[test]
+    fn display_guard_passes_a_real_id_through_byte_for_byte() {
+        let id = "ubs2_2s_1p_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        assert_eq!(display_snapshot_id(id), id);
+        // ...as is a token from the PREVIOUS grammar, and one from a future
+        // revision. The guard neutralizes control characters; it does not
+        // recognize, normalize or reject a grammar.
+        for other in [
+            "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8",
+            "ubs3_whatever-comes-next",
+        ] {
+            assert_eq!(display_snapshot_id(other), other);
+        }
+    }
+
+    #[test]
+    fn display_guard_elides_an_overlong_token() {
+        let long = "u".repeat(SNAPSHOT_ID_DISPLAY_MAX_CHARS + 40);
+        let shown = display_snapshot_id(&long);
+        assert_eq!(shown.chars().count(), SNAPSHOT_ID_DISPLAY_MAX_CHARS + 1);
+        assert!(shown.ends_with('…'));
+        // Exactly at the limit is not elided.
+        let at_limit = "u".repeat(SNAPSHOT_ID_DISPLAY_MAX_CHARS);
+        assert_eq!(display_snapshot_id(&at_limit), at_limit);
     }
 
     #[test]

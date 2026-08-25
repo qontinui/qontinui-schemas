@@ -95,7 +95,10 @@ mod tests {
 
     #[test]
     fn empty_snapshot_critical() {
-        let snap = ElementSnapshot::new(vec![]);
+        let snap = ElementSnapshot {
+            elements: vec![],
+            ..Default::default()
+        };
         let f = run(&snap);
         assert_eq!(f[0].kind, "empty_snapshot");
         assert_eq!(f[0].severity, Severity::Critical);
@@ -103,7 +106,10 @@ mod tests {
 
     #[test]
     fn tiny_target_warning() {
-        let snap = ElementSnapshot::new(vec![el("close", 16, 16, true, None)]);
+        let snap = ElementSnapshot {
+            elements: vec![el("close", 16, 16, true, None)],
+            ..Default::default()
+        };
         let f = run(&snap);
         assert!(f.iter().any(|x| x.kind == "tiny_target"));
     }
@@ -115,7 +121,10 @@ mod tests {
         // has no geometry so it must NOT be flagged tiny_target.
         let mut e = el("hidden-btn", 0, 0, true, Some("Submit"));
         e.bbox = None;
-        let snap = ElementSnapshot::new(vec![e]);
+        let snap = ElementSnapshot {
+            elements: vec![e],
+            ..Default::default()
+        };
         let f = run(&snap);
         assert!(!f.iter().any(|x| x.kind == "no_interactive"));
         assert!(!f.iter().any(|x| x.kind == "tiny_target"));
@@ -123,10 +132,13 @@ mod tests {
 
     #[test]
     fn ok_when_normal() {
-        let snap = ElementSnapshot::new(vec![
-            el("btn", 100, 40, true, Some("Save")),
-            el("h", 200, 30, false, Some("Heading")),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("btn", 100, 40, true, Some("Save")),
+                el("h", 200, 30, false, Some("Heading")),
+            ],
+            ..Default::default()
+        };
         let f = run(&snap);
         assert!(f.is_empty());
     }

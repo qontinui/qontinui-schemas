@@ -32,7 +32,8 @@ pub use assertions::{
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use element_snapshot::{
-    intersection, region_contains, regions_overlap, Element, ElementSnapshot, Rgb,
+    display_snapshot_id, intersection, region_contains, regions_overlap, Element, ElementSnapshot,
+    Rgb,
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};

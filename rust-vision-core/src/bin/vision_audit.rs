@@ -31,7 +31,7 @@ use qontinui_vision_core::analyzers::{self, AnalyzeInput, Analyzer, Finding, Sev
 use qontinui_vision_core::assertions::{
     evaluate as evaluate_assertion, Assertion, AssertionResult, BaselineEntry, EvalContext,
 };
-use qontinui_vision_core::element_snapshot::ElementSnapshot;
+use qontinui_vision_core::element_snapshot::{display_snapshot_id, ElementSnapshot};
 use qontinui_vision_core::frame::{Frame, FrameSource};
 
 // ===========================================================================
@@ -183,14 +183,30 @@ fn require<'a>(flags: &'a HashMap<String, String>, key: &str) -> Result<&'a Stri
 // Snapshot loading + envelope unwrap
 // ===========================================================================
 
-/// Parse an `ElementSnapshot` from raw JSON bytes, transparently unwrapping the
-/// common bridge `discover` envelopes so a CI script can pipe
-/// `curl .../discover | jq .data` (or even the raw response) straight in:
+/// Parse an `ElementSnapshot` from raw JSON bytes, peeling a single `{data:
+/// ...}` transport wrapper and normalizing a bare element array:
 ///
 ///   * `{ "elements": [...] }`         -> the snapshot itself
 ///   * `{ "data": { "elements": [...] } }` -> unwrap `.data`
 ///   * `{ "data": [...] }`             -> `.data` is the element array
 ///   * `[ ... ]`                       -> a bare element array
+///
+/// **This is not a `curl .../discover | jq .data` pipe, and must not be
+/// advertised as one.** The bridge's `DiscoveredElement` shares exactly ONE
+/// field with [`ElementSnapshot`]'s `Element`: `id`. It carries no `bbox`, no
+/// `text` and no `interactable`, so a discover payload does parse — into a
+/// snapshot where every element is `interactable: false, text: None`, on a
+/// page with forty working buttons. `analyzers::elements` then emits
+/// `no_interactive` + `no_text`, `analyze --fail-on warning` exits 2, and the
+/// summary stamps the capture's own `snapshotId` on that verdict: a
+/// confidently wrong answer wearing authoritative attribution. The
+/// `a_raw_discover_payload_is_not_a_supported_input` test pins that, so the
+/// claim cannot quietly come back.
+///
+/// The unwrap exists for a caller that has ALREADY projected into this shape
+/// and merely left a transport envelope around it. Projecting a discover
+/// payload — mapping geometry, text and interactivity onto `Element` — is the
+/// caller's job; there is no shortcut for it here.
 pub fn parse_snapshot(bytes: &[u8]) -> Result<ElementSnapshot, String> {
     let value: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|e| format!("snapshot is not valid JSON: {e}"))?;
@@ -405,9 +421,11 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
     ));
     // Name the snapshot analyzed, when the producer supplied one — same
     // reason as the assert summary: a CI reader looking at findings needs to
-    // know WHICH capture produced them.
+    // know WHICH capture produced them. Rendered through
+    // `display_snapshot_id`: stdout JSON is serde-escaped, this line is not,
+    // and the id is unvalidated by design.
     if let Some(id) = &report.snapshot_id {
-        lines.push(format!("  snapshot: {id}"));
+        lines.push(format!("  snapshot: {}", display_snapshot_id(id)));
     }
     match fail_on {
         None => lines.push("gate: --fail-on not set; exit 0 regardless of findings".to_string()),
@@ -544,9 +562,9 @@ fn assert_summary(report: &AssertReport) -> String {
     )];
     // Name the snapshot judged, when the producer supplied one — a CI reader
     // looking at a red gate needs to know WHICH capture failed, not merely
-    // that one did.
+    // that one did. Same format-time guard as the analyze summary.
     if let Some(id) = &report.snapshot_id {
-        lines.push(format!("  snapshot: {id}"));
+        lines.push(format!("  snapshot: {}", display_snapshot_id(id)));
     }
     for r in &report.results {
         if !r.passed {
@@ -587,10 +605,19 @@ fn run_baseline(args: &[String]) -> Result<u8, CliError> {
         .map_err(|e| CliError::io(format!("cannot write {}: {e}", path.display())))?;
 
     println!("{json}");
+    // Name the capture the baseline was taken FROM. A later
+    // `no_layout_shift_since` failure names both ends of the delta, so the
+    // operator recording the baseline should be able to see which end this
+    // file becomes. Same format-time guard as the analyze/assert summaries.
     eprintln!(
-        "vision-audit baseline: wrote {} element bbox(es) to {}",
+        "vision-audit baseline: wrote {} element bbox(es) to {} (from snapshot {})",
         entry.element_bboxes.len(),
-        path.display()
+        path.display(),
+        entry
+            .snapshot_id
+            .as_deref()
+            .map(display_snapshot_id)
+            .unwrap_or_else(|| "<unattributed>".to_string()),
     );
     Ok(EXIT_OK)
 }
@@ -712,15 +739,15 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_id_survives_the_bridge_envelope() {
-        // `curl .../discover | jq .data` piped straight in: the id lives on
-        // the inner object under the producer's camelCase spelling, and must
-        // reach the report rather than being dropped with the wrapper.
-        let json = br#"{"data":{"elements":[{"id":"a"}],"snapshotId":"ubs1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb"}}"#;
+    fn transport_envelope_peel_keeps_an_already_projected_id() {
+        // A snapshot ALREADY in `ElementSnapshot` shape with one `{data: ...}`
+        // transport wrapper left around it. Peeling the wrapper must not drop
+        // the id with it.
+        let json = br#"{"data":{"elements":[{"id":"a","bbox":{"x":0,"y":0,"w":10,"h":10},"interactable":true}],"snapshotId":"ubs2_1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb"}}"#;
         let snap = parse_snapshot(json).unwrap();
         assert_eq!(
             snap.snapshot_id.as_deref(),
-            Some("ubs1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb")
+            Some("ubs2_1_1_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbb")
         );
 
         // A bare element array carries no envelope and therefore no id — the
@@ -729,6 +756,52 @@ mod tests {
             .unwrap()
             .snapshot_id
             .is_none());
+    }
+
+    #[test]
+    fn a_raw_discover_payload_is_not_a_supported_input() {
+        // Withdrawn endorsement, pinned executable so it cannot quietly come
+        // back. `DiscoveredElement` shares exactly ONE field with `Element`:
+        // `id`. Everything the analyzers judge on — geometry, text,
+        // interactivity — is spelled differently and is silently dropped.
+        let discover = br#"{"data":{"elements":[
+            {"id":"save","category":"button","state":{"textContent":"Save"},"rect":{"x":10,"y":20,"width":80,"height":32}},
+            {"id":"cancel","category":"button","state":{"textContent":"Cancel"},"rect":{"x":100,"y":20,"width":80,"height":32}},
+            {"id":"title","category":"text","state":{"textContent":"Settings"},"rect":{"x":10,"y":0,"width":200,"height":18}},
+            {"id":"tab-a","category":"tab","state":{"textContent":"A"},"rect":{"x":10,"y":60,"width":40,"height":24}},
+            {"id":"tab-b","category":"tab","state":{"textContent":"B"},"rect":{"x":54,"y":60,"width":40,"height":24}},
+            {"id":"tab-c","category":"tab","state":{"textContent":"C"},"rect":{"x":98,"y":60,"width":40,"height":24}},
+            {"id":"submit","category":"button","state":{"textContent":"Apply"},"rect":{"x":10,"y":100,"width":80,"height":32}}
+        ]}}"#;
+        let snap = parse_snapshot(discover).expect("it parses — that is the trap");
+
+        assert_eq!(snap.elements.len(), 7);
+        assert!(
+            snap.elements
+                .iter()
+                .all(|e| e.bbox.is_none() && e.text.is_none() && !e.interactable),
+            "every field the analyzers judge on is dropped: {:?}",
+            snap.elements
+        );
+
+        // ...and that under-populated snapshot trips the elements analyzer,
+        // so `--fail-on warning` would exit 2 on a page whose seven controls
+        // all work. This is the attributed-garbage verdict the doc claim used
+        // to advertise a pipe to.
+        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Elements]);
+        let kinds: Vec<&str> = report
+            .findings
+            .values()
+            .flatten()
+            .map(|f| f.kind.as_str())
+            .collect();
+        assert!(kinds.contains(&"no_interactive"), "{kinds:?}");
+        assert!(kinds.contains(&"no_text"), "{kinds:?}");
+        assert_eq!(
+            analyze_exit_code(&report, Some(severity_rank(Severity::Warning))),
+            EXIT_GATE_FAILED,
+            "a healthy page would fail the gate"
+        );
     }
 
     #[test]
@@ -792,7 +865,10 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        ElementSnapshot::new(vec![mk("a", 0), mk("b", 50)])
+        ElementSnapshot {
+            elements: vec![mk("a", 0), mk("b", 50)],
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -837,7 +913,10 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        let snap = ElementSnapshot::new(vec![mk("a", 0), mk("b", 500)]);
+        let snap = ElementSnapshot {
+            elements: vec![mk("a", 0), mk("b", 500)],
+            ..Default::default()
+        };
         let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
         assert_eq!(
             analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
@@ -850,7 +929,7 @@ mod tests {
     #[test]
     fn analyze_report_names_the_snapshot_it_analyzed() {
         let mut snap = snap_with_overlap();
-        let id = "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        let id = "ubs2_2_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
         snap.snapshot_id = Some(id.to_string());
 
         let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
@@ -913,7 +992,7 @@ mod tests {
     #[test]
     fn assert_report_names_the_snapshot_it_judged() {
         let mut snap = snap_with_overlap();
-        let id = "ubs1_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
+        let id = "ubs2_2_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
         snap.snapshot_id = Some(id.to_string());
         let bl = HashMap::new();
 
@@ -958,6 +1037,62 @@ mod tests {
         );
     }
 
+    // ---- log-forgery containment ----
+
+    /// A snapshot id is deliberately unvalidated (this crate is a consumer of
+    /// the fold, never a producer), so a hostile snapshot file can carry a
+    /// newline plus a convincing verdict. Stdout JSON is serde-escaped; the
+    /// stderr summary is not. The guard sits at FORMAT time so the fail-open
+    /// "opaque token" property survives — exit codes are untouched either way.
+    const FORGED_ID: &str = "x\ngate: --fail-on critical -> passed (exit 0)";
+
+    #[test]
+    fn analyze_summary_cannot_be_forged_through_the_snapshot_id() {
+        let mut snap = snap_with_overlap();
+        snap.snapshot_id = Some(FORGED_ID.to_string());
+        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+
+        // The token still reaches the report and the JSON verbatim — nothing
+        // is rejected or rewritten at parse time.
+        assert_eq!(report.snapshot_id.as_deref(), Some(FORGED_ID));
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(
+            wire.get("snapshotId").and_then(|v| v.as_str()),
+            Some(FORGED_ID)
+        );
+
+        // ...but the unescaped human summary gains no forged line.
+        let summary = analyze_summary(&report, Some(severity_rank(Severity::Critical)), EXIT_OK);
+        let gate_lines = summary.lines().filter(|l| l.starts_with("gate: ")).count();
+        assert_eq!(gate_lines, 1, "exactly one gate verdict line: {summary:?}");
+        assert!(summary.contains("\\u{000a}gate:"), "{summary:?}");
+    }
+
+    #[test]
+    fn assert_summary_cannot_be_forged_through_the_snapshot_id() {
+        let mut snap = snap_with_overlap();
+        snap.snapshot_id = Some(FORGED_ID.to_string());
+        let report = assert_all(
+            &snap,
+            &frame_1x1(),
+            &[Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            }],
+            &HashMap::new(),
+        );
+        assert!(!report.all_passed);
+
+        let summary = assert_summary(&report);
+        assert!(
+            !summary.lines().any(|l| l.starts_with("gate: ")),
+            "assert summaries carry no bare gate line at all: {summary:?}"
+        );
+        assert!(summary.contains("\\u{000a}gate:"), "{summary:?}");
+        // The verdict line the summary DOES own is still the real one.
+        assert!(summary.starts_with("vision-audit assert: 0 passed, 1 failed"));
+    }
+
     // ---- baseline path safety + round-trip ----
 
     #[test]
@@ -992,7 +1127,10 @@ mod tests {
             children_ids: vec![],
         };
         e.fg_color = Some(Rgb::new(0, 0, 0));
-        let snap = ElementSnapshot::new(vec![e]);
+        let snap = ElementSnapshot {
+            elements: vec![e],
+            ..Default::default()
+        };
         let entry = BaselineEntry::from_snapshot(&snap);
         let path = baseline_path(dir.path(), "v1").unwrap();
         std::fs::write(&path, serde_json::to_string(&entry).unwrap()).unwrap();
@@ -1025,7 +1163,10 @@ mod tests {
             parent_id: None,
             children_ids: vec![],
         };
-        let base_snap = ElementSnapshot::new(vec![base_el]);
+        let base_snap = ElementSnapshot {
+            elements: vec![base_el],
+            ..Default::default()
+        };
         let entry = BaselineEntry::from_snapshot(&base_snap);
         let path = baseline_path(dir.path(), "v1").unwrap();
         std::fs::write(&path, serde_json::to_string(&entry).unwrap()).unwrap();

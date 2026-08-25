@@ -140,10 +140,13 @@ mod tests {
 
     #[test]
     fn detects_overlap_between_interactive_elements() {
-        let snap = ElementSnapshot::new(vec![
-            el("btn-a", 0, 0, 100, 50, true),
-            el("btn-b", 50, 25, 100, 50, true),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("btn-a", 0, 0, 100, 50, true),
+                el("btn-b", 50, 25, 100, 50, true),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(findings.iter().any(|f| f.kind == "overlap"));
     }
@@ -151,27 +154,33 @@ mod tests {
     #[test]
     fn ignores_nested_layouts() {
         // child fully inside parent — not an overlap finding
-        let snap = ElementSnapshot::new(vec![
-            el("container", 0, 0, 200, 200, true),
-            el("nested-btn", 50, 50, 50, 50, true),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("container", 0, 0, 200, 200, true),
+                el("nested-btn", 50, 50, 50, 50, true),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
     }
 
     #[test]
     fn flags_zero_area_elements() {
-        let snap = ElementSnapshot::new(vec![el("hidden", 10, 10, 0, 50, false)]);
+        let snap = ElementSnapshot {
+            elements: vec![el("hidden", 10, 10, 0, 50, false)],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(findings.iter().any(|f| f.kind == "zero_area"));
     }
 
     #[test]
     fn no_false_overlap_when_separated() {
-        let snap = ElementSnapshot::new(vec![
-            el("a", 0, 0, 50, 50, true),
-            el("b", 100, 0, 50, 50, true),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![el("a", 0, 0, 50, 50, true), el("b", 100, 0, 50, 50, true)],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
     }
@@ -182,11 +191,14 @@ mod tests {
         // on-screen button. Under the old clamped-to-0 encoding all three
         // collapsed onto the viewport origin and reported as mutually
         // overlapping; with a signed origin they are correctly disjoint.
-        let snap = ElementSnapshot::new(vec![
-            el("skip-link", -9999, 0, 120, 32, true),
-            el("sr-only", -9999, 40, 120, 32, true),
-            el("real-button", 10, 10, 100, 40, true),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("skip-link", -9999, 0, 120, 32, true),
+                el("sr-only", -9999, 40, 120, 32, true),
+                el("real-button", 10, 10, 100, 40, true),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(
             !findings.iter().any(|f| f.kind == "overlap"),
@@ -205,13 +217,16 @@ mod tests {
         // A mix of positioned and bbox-less elements: the positioned pair
         // overlaps (1 finding); the bbox-less elements must NOT yield
         // overlap/zero_area/alignment findings and must not panic.
-        let snap = ElementSnapshot::new(vec![
-            el("btn-a", 0, 0, 100, 50, true),
-            el("btn-b", 50, 25, 100, 50, true),
-            el_no_bbox("hidden-1", true),
-            el_no_bbox("hidden-2", false),
-            el_no_bbox("hidden-3", true),
-        ]);
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("btn-a", 0, 0, 100, 50, true),
+                el("btn-b", 50, 25, 100, 50, true),
+                el_no_bbox("hidden-1", true),
+                el_no_bbox("hidden-2", false),
+                el_no_bbox("hidden-3", true),
+            ],
+            ..Default::default()
+        };
         let findings = run(&snap);
         assert!(findings.iter().any(|f| f.kind == "overlap"));
         // None of the bbox-less ids appear in any finding.
