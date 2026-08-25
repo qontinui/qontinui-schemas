@@ -6,15 +6,38 @@ name: ts-typecheck
 #
 # WHY THIS WORKFLOW EXISTS
 #
-# Before it, NO workflow in this repo ran `tsc` at all: `publish.yml` runs
-# `npm run build`, but only on a `ts-v*` tag — i.e. after the code has already
+# Before it, NO workflow in this repo ran `tsc` at all: `publish.yml` ran
+# `npm run build` — tsup, which transpiles and bundles declarations but does
+# not type-check — and only on a `ts-v*` tag, i.e. after the code had already
 # been merged and a release cut. `schema-drift` regenerates the bindings and
 # compares bytes; it never asks whether the bytes compile. So a generated
 # binding could reference a type that does not exist and nothing in CI would
 # notice — which is exactly what happened. `PolicyEvaluation.d.ts` shipped
 # `overallStatus: PolicyStatus1` and `IrPageSpec.d.ts` shipped
-# `apiAssertions?: IrApiCheck[] | null`, both naming types nothing declared,
-# and both reached npm.
+# `apiAssertions?: IrApiCheck[] | null`, both naming types nothing declared.
+#
+# WHAT THAT ACTUALLY COST — stated precisely, because the whole point of this
+# gate is to stop the package asserting things that are not true. Both files
+# reached the npm tarball, but only as raw source: `ts/package.json` has
+# `files: ["dist","src"]`, and none of the five affected types (`IrPageSpec`,
+# `SpecCheckResult`, `PolicyEvaluation`, `TaskCompletionResult`,
+# `SpecApiEvent`) is re-exported by any of the 18 tsup entry points, so none of
+# them appears in `dist/` at all. They shipped as unreferenced
+# `src/generated/*.d.ts`, reachable only through a deep-path import — and no
+# such import exists in `qontinui-runner/src` or `qontinui-web/frontend/src`.
+# The defect was LATENT: it broke no consumer.
+#
+# That is not a weakening of the case for this workflow. Which generated types
+# get re-exported is an ordinary editorial choice in `src/*/index.ts` that
+# moves with every schema addition; the next broken binding that IS picked up
+# by an entry point carries the identical defect into `dist/` and into every
+# consumer importing the package normally. The job costs ~1 minute and the
+# blast radius of the next one is bounded by nothing.
+#
+# `publish.yml` now runs `npm run typecheck` too (and `ts/package.json`'s
+# `prepublishOnly` chains it), because a `ts-v*` tag can be cut from a commit
+# this workflow never saw. The two are complementary, not duplicative: this one
+# catches it on the PR, that one catches it at the release.
 #
 # Adding `tsconfig.generated.json` without a CI caller would have left the
 # gate unable to go red, which is the failure mode `scripts/check-generated-
@@ -42,6 +65,14 @@ on:
 concurrency:
   group: ts-typecheck-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only. This job checks out the repo, installs npm deps and runs tsc; it
+# writes nothing and touches no API. Stated here rather than inherited from the
+# repo-level `default_workflow_permissions` — that is an operator-flippable
+# setting invisible in this file, and the same reasoning schema-drift.yml and
+# runner-consumer-check.yml spell out applies.
+permissions:
+  contents: read
 
 jobs:
   typecheck:

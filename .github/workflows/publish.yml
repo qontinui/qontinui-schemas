@@ -69,6 +69,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type-check (source + generated .d.ts gate)
+        # `npm run build` is tsup, which does NOT type-check: it transpiles and
+        # runs rollup-dts over the declarations. So without this step a `ts-v*`
+        # tag on a commit carrying a broken generated binding built green and
+        # published. `ts-typecheck.yml` covers pull_request and push-to-main,
+        # but a tag can be cut from any commit — including one that never went
+        # through a PR — so the publish path needs its own gate rather than
+        # inheriting confidence from a job that may not have run on this sha.
+        #
+        # `ts/package.json`'s `prepublishOnly` runs this too, which makes the
+        # step redundant on paper. It is stated here anyway so the failure lands
+        # on a named step BEFORE the OIDC publish begins, instead of surfacing
+        # inside `npm publish` output after the token has been minted.
+        run: npm run typecheck
+
       - name: Build
         run: npm run build
 

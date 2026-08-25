@@ -15,9 +15,20 @@
     "typecheck was structurally incapable of seeing a broken generated binding,",
     "and broken ones shipped to npm — PolicyEvaluation.overallStatus was typed",
     "`PolicyStatus1` and IrPageSpec.apiAssertions `IrApiCheck[]`, names nothing",
-    "declared. Both compiled clean here and only exploded downstream. This",
-    "config is the narrow gate that closes the hole: same options, restricted to",
-    "the generated tree, with skipLibCheck OFF.",
+    "declared. Both compiled clean here.",
+
+    "WHAT THAT COST, PRECISELY. They reached the npm tarball but not dist/:",
+    "package.json has files: [\"dist\",\"src\"], and none of the five affected",
+    "types (IrPageSpec, SpecCheckResult, PolicyEvaluation, TaskCompletionResult,",
+    "SpecApiEvent) is re-exported by any of the 18 tsup entry points. They",
+    "shipped as unreferenced src/generated/*.d.ts, reachable only by a deep-path",
+    "import, and no consumer writes one. So the defect was LATENT — it broke",
+    "nobody. The gate is still justified: which generated types get re-exported",
+    "is an ordinary editorial choice in src/*/index.ts that moves with every",
+    "schema addition, and the next broken binding that IS re-exported carries",
+    "the identical defect straight into dist/ and into every normal import.",
+    "This config is the narrow gate that closes the hole: same options,",
+    "restricted to the generated tree, with skipLibCheck OFF.",
 
     "THE TWO DETAILS THAT MAKE IT WORK.",
 
