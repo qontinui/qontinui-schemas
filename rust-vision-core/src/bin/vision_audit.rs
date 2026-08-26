@@ -864,6 +864,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         };
         ElementSnapshot {
             elements: vec![mk("a", 0), mk("b", 50)],
@@ -912,6 +914,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         };
         let snap = ElementSnapshot {
             elements: vec![mk("a", 0), mk("b", 500)],
@@ -1125,6 +1129,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         };
         e.fg_color = Some(Rgb::new(0, 0, 0));
         let snap = ElementSnapshot {
@@ -1162,6 +1168,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         };
         let base_snap = ElementSnapshot {
             elements: vec![base_el],

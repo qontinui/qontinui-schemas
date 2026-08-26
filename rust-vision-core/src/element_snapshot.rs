@@ -199,6 +199,31 @@ pub struct Element {
     /// Children ids, when known.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children_ids: Vec<String>,
+    /// Resolved index into the document's painting sequence. HIGHER paints
+    /// LATER, i.e. on top. This is **not** a raw `z-index`: raw z-index is
+    /// only comparable between siblings within one stacking context, so
+    /// comparing it across contexts is actively wrong rather than merely
+    /// imprecise. The motivating case: a `z-50` dropdown nested inside a
+    /// title bar that is itself a stacking context at `z-index:10` paints
+    /// BELOW a `z-20` panel outside it, because the whole title-bar subtree
+    /// paints as one atom at rank 10 — raw z-index reports `50 > 20` and
+    /// gets the answer backwards.
+    ///
+    /// `None` when the snapshot source cannot resolve stacking (native a11y
+    /// trees, mobile `discover`). Assertions that need it report an honest
+    /// "cannot answer" rather than guessing — see
+    /// [`crate::assertions::Assertion::ElementAbove`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paint_order: Option<u32>,
+    /// Id of the nearest ancestor that establishes a stacking context
+    /// (`position` + `z-index`, `transform`, `filter`, `backdrop-filter`,
+    /// `opacity < 1`, `will-change`, …), when the source can resolve it.
+    ///
+    /// Carried for FAILURE DETAIL only — [`paint_order`](Self::paint_order)
+    /// alone decides an ordering verdict. Naming the context is what turns
+    /// an absurd-looking "z-50 lost to z-20" into a diagnosis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stacking_context_id: Option<String>,
 }
 
 /// Linear-light RGB color (no alpha). Used for both `fg_color` and
@@ -441,6 +466,8 @@ mod tests {
                 line_height_px: None,
                 parent_id: None,
                 children_ids: vec![],
+                paint_order: None,
+                stacking_context_id: None,
             }],
             snapshot_id: Some(id.to_string()),
         };

@@ -50,6 +50,31 @@ pub enum Assertion {
         #[serde(default)]
         tolerance_px: Option<u32>,
     },
+    /// `elements[0]` paints ON TOP OF `elements[1]`.
+    ///
+    /// Decided from [`Element::paint_order`](crate::element_snapshot::Element::paint_order)
+    /// — the resolved painting sequence — never from a raw `z-index`. Raw
+    /// z-index is comparable only between siblings of one stacking context,
+    /// so the naive check is FALSIFIED across contexts, not merely coarse:
+    /// a `z-50` dropdown inside a `z-index:10` title bar loses to a `z-20`
+    /// panel outside it, and comparing 50 against 20 answers backwards while
+    /// emitting the identical verdict before and after the fix.
+    ///
+    /// When either element carries no `paint_order`, the snapshot source did
+    /// not resolve stacking and this reports "cannot answer" rather than a
+    /// verdict.
+    ElementAbove {
+        /// `[above, below]` — asserts elements[0] paints on top of elements[1].
+        elements: [String; 2],
+        /// Require the two bboxes to intersect before ruling on order.
+        ///
+        /// Defaults to **true**: "which is on top" is not a question two
+        /// disjoint elements answer, and a vacuous pass is worse than a loud
+        /// failure. Set `false` to assert a pure ordering (e.g. a modal layer
+        /// that must outrank a toast it does not currently overlap).
+        #[serde(default = "default_true")]
+        require_overlap: bool,
+    },
     /// Element/region contains expected text (OCR or snapshot-text).
     ContainsText {
         target: TextTarget,
@@ -119,6 +144,11 @@ pub enum Assertion {
 
 fn default_wcag_aa() -> WcagLevel {
     WcagLevel::Aa
+}
+
+/// Serde default for [`Assertion::ElementAbove::require_overlap`].
+fn default_true() -> bool {
+    true
 }
 
 /// Targeting mode for [`Assertion::ContainsText`].
@@ -294,6 +324,10 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
             elements,
             tolerance_px,
         } => eval_no_overlap(elements, tolerance_px, ctx),
+        Assertion::ElementAbove {
+            elements,
+            require_overlap,
+        } => eval_element_above(elements, require_overlap, ctx),
         Assertion::ContainsText { target, text, kind } => {
             eval_contains_text(target, text, kind, ctx)
         }
@@ -421,6 +455,165 @@ fn inset_region(r: Region, inset: u32) -> Region {
         w: r.w.saturating_sub(2 * inset),
         h: r.h.saturating_sub(2 * inset),
     }
+}
+
+/// How an element's stacking context reads on a failure line. Present only
+/// to make an absurd-looking verdict diagnosable — it never decides one.
+fn stacking_context_for_display(el: &crate::element_snapshot::Element) -> String {
+    match &el.stacking_context_id {
+        Some(id) => format!("'{}' (stacking context '{}')", el.id, id),
+        None => format!("'{}' (stacking context not recorded)", el.id),
+    }
+}
+
+/// [`Assertion::ElementAbove`] — does `elements[0]` paint on top of
+/// `elements[1]`?
+///
+/// The verdict is decided by `paint_order` ALONE. `stacking_context_id` is
+/// folded into the failure text only, because the whole reason this
+/// assertion exists is that the intuitive signal (raw `z-index`) gets the
+/// motivating case backwards; naming the context is what makes a correct
+/// "z-50 lost to z-20" verdict legible instead of looking like a bug in the
+/// assertion.
+///
+/// Three non-verdict outcomes are deliberately worded so they cannot be
+/// confused with each other or with a real ordering failure:
+///
+/// 1. `cannot answer` — an element has no `paint_order`. The snapshot source
+///    did not resolve stacking. This is a SKIP in meaning; [`AssertionResult`]
+///    has only a boolean `passed`, so it is reported as `passed=false` with
+///    an explicitly skip-shaped detail. It must NOT pass: a vacuous pass here
+///    is a silent false negative for exactly the bug class this variant was
+///    added to catch.
+/// 2. `same paint order` — both resolve to one rank, so neither is above.
+/// 3. `do not overlap` — `require_overlap` (default true) was not satisfied.
+fn eval_element_above(
+    elements: [String; 2],
+    require_overlap: bool,
+    ctx: &EvalContext<'_>,
+) -> AssertionResult {
+    let assertion = Assertion::ElementAbove {
+        elements: elements.clone(),
+        require_overlap,
+    };
+    let snap = match require_snapshot(ctx, &assertion) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    let a = match snap.get(&elements[0]) {
+        Some(e) => e,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{}' not found in snapshot", elements[0]),
+            )
+        }
+    };
+    let b = match snap.get(&elements[1]) {
+        Some(e) => e,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{}' not found in snapshot", elements[1]),
+            )
+        }
+    };
+
+    // Precondition (3): an ill-posed assertion is reported before any
+    // capability question, so an author who named two disjoint elements
+    // learns that rather than hearing about the snapshot source.
+    if require_overlap {
+        let a_bbox = match a.bbox {
+            Some(bb) => bb,
+            None => {
+                return AssertionResult::fail(
+                    assertion,
+                    format!("element '{}' has no geometry (bbox)", elements[0]),
+                )
+            }
+        };
+        let b_bbox = match b.bbox {
+            Some(bb) => bb,
+            None => {
+                return AssertionResult::fail(
+                    assertion,
+                    format!("element '{}' has no geometry (bbox)", elements[1]),
+                )
+            }
+        };
+        if !regions_overlap(a_bbox, b_bbox) {
+            return AssertionResult::fail(
+                assertion,
+                format!(
+                    "'{}' and '{}' do not overlap, so 'above' is not a question they answer \
+                     (require_overlap is true; set require_overlap=false to assert a pure ordering)",
+                    elements[0], elements[1]
+                ),
+            );
+        }
+    }
+
+    // Capability (1): no resolved painting sequence -> no honest verdict.
+    let (a_order, b_order) = match (a.paint_order, b.paint_order) {
+        (Some(x), Some(y)) => (x, y),
+        _ => {
+            let missing: Vec<&str> = [(a, &elements[0]), (b, &elements[1])]
+                .iter()
+                .filter(|(el, _)| el.paint_order.is_none())
+                .map(|(_, id)| id.as_str())
+                .collect();
+            return AssertionResult::fail(
+                assertion,
+                format!(
+                    "cannot answer (skipped): no resolved paint_order for {} — this snapshot \
+                     source did not resolve stacking (native a11y tree, mobile discover, or a \
+                     capture taken before paint-order resolution shipped). No ordering verdict \
+                     was reached; raw z-index is NOT a substitute.",
+                    missing
+                        .iter()
+                        .map(|id| format!("'{id}'"))
+                        .collect::<Vec<_>>()
+                        .join(" and ")
+                ),
+            );
+        }
+    };
+
+    // (2) One rank means neither paints above the other.
+    if a_order == b_order {
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "{} and {} resolve to the SAME paint order ({}) — neither paints above the other",
+                stacking_context_for_display(a),
+                stacking_context_for_display(b),
+                a_order
+            ),
+        );
+    }
+
+    if a_order > b_order {
+        return AssertionResult::pass_with(
+            assertion,
+            format!(
+                "'{}' paints above '{}' (paint order {} > {})",
+                elements[0], elements[1], a_order, b_order
+            ),
+        );
+    }
+
+    AssertionResult::fail(
+        assertion,
+        format!(
+            "{} paints BELOW {} (paint order {} < {}) — raw z-index is not comparable across \
+             stacking contexts, so a higher z-index on the lower element is expected, not a \
+             contradiction",
+            stacking_context_for_display(a),
+            stacking_context_for_display(b),
+            a_order,
+            b_order
+        ),
+    )
 }
 
 fn eval_contains_text(
@@ -983,6 +1176,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         }
     }
 
@@ -1025,6 +1220,284 @@ mod tests {
             &ctx,
         );
         assert!(!res.passed);
+    }
+
+    /// The motivating shape, verbatim from the shipped bug:
+    ///
+    /// - `title-bar` is `position:absolute; z-index:10` AND has
+    ///   `backdrop-filter: blur()` — either alone establishes a stacking
+    ///   context, so its whole subtree paints as one atom at rank 10.
+    /// - `titlebar-dropdown` is its child with `z-index:50`. That 50 is
+    ///   comparable only to other children of `title-bar`.
+    /// - `prompts-panel` is an outside sibling with `z-index:20`.
+    ///
+    /// Raw z-index says `50 > 20` -> "dropdown on top" -> the assertion
+    /// passes and the bug ships. Resolved paint order says 11 < 20 -> the
+    /// panel really does cover the dropdown, which is the bug.
+    fn title_bar_bug_snapshot() -> ElementSnapshot {
+        let mut title_bar = el("title-bar", 0, 0, 800, 40);
+        title_bar.paint_order = Some(10);
+        title_bar.stacking_context_id = Some("root".into());
+
+        let mut dropdown = el("titlebar-dropdown", 600, 30, 180, 200);
+        dropdown.parent_id = Some("title-bar".into());
+        // Painted inside the title bar's atom: above its siblings there,
+        // still below anything the atom itself sits under.
+        dropdown.paint_order = Some(11);
+        dropdown.stacking_context_id = Some("title-bar".into());
+
+        let mut panel = el("prompts-panel", 500, 20, 300, 400);
+        panel.paint_order = Some(20);
+        panel.stacking_context_id = Some("root".into());
+
+        snap_of(vec![title_bar, dropdown, panel])
+    }
+
+    #[test]
+    fn element_above_gets_the_cross_stacking_context_case_right() {
+        let snap = title_bar_bug_snapshot();
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+
+        // What a naive raw-z-index check would have asserted, and passed.
+        let wrong = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["titlebar-dropdown".into(), "prompts-panel".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        assert!(
+            !wrong.passed,
+            "z-50 dropdown is a DESCENDANT of a z-10 stacking context; it does not \
+             outrank a z-20 element outside it. detail={:?}",
+            wrong.detail
+        );
+        let detail = wrong.detail.as_deref().unwrap_or("");
+        assert!(detail.contains("paints BELOW"), "got {detail:?}");
+        // The stacking context is what makes the verdict legible.
+        assert!(detail.contains("title-bar"), "got {detail:?}");
+
+        // And the true ordering passes.
+        let right = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["prompts-panel".into(), "titlebar-dropdown".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        assert!(right.passed, "detail={:?}", right.detail);
+    }
+
+    #[test]
+    fn element_above_cannot_answer_without_paint_order() {
+        // The pre-capture-side state: nothing resolves stacking, so the
+        // assertion must decline rather than guess in either direction.
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["a".into(), "b".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        assert!(
+            !res.passed,
+            "a vacuous pass here is a silent false negative"
+        );
+        let detail = res.detail.as_deref().unwrap_or("");
+        assert!(detail.contains("cannot answer (skipped)"), "got {detail:?}");
+        assert!(detail.contains("no resolved paint_order"), "got {detail:?}");
+        assert!(detail.contains("'a' and 'b'"), "got {detail:?}");
+
+        // Naming only the element that is actually missing it.
+        let mut a = el("a", 0, 0, 100, 100);
+        a.paint_order = Some(3);
+        let snap = snap_of(vec![a, el("b", 50, 50, 100, 100)]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["a".into(), "b".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        let detail = res.detail.as_deref().unwrap_or("");
+        assert!(detail.contains("for 'b'"), "got {detail:?}");
+        assert!(!detail.contains("'a' and 'b'"), "got {detail:?}");
+    }
+
+    #[test]
+    fn element_above_rejects_equal_paint_order() {
+        let mut a = el("a", 0, 0, 100, 100);
+        a.paint_order = Some(7);
+        let mut b = el("b", 50, 50, 100, 100);
+        b.paint_order = Some(7);
+        let snap = snap_of(vec![a, b]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["a".into(), "b".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        assert!(!res.passed);
+        let detail = res.detail.as_deref().unwrap_or("");
+        assert!(detail.contains("SAME paint order (7)"), "got {detail:?}");
+    }
+
+    #[test]
+    fn element_above_require_overlap_both_arms() {
+        let mut a = el("a", 0, 0, 50, 50);
+        a.paint_order = Some(20);
+        let mut b = el("b", 200, 200, 50, 50);
+        b.paint_order = Some(10);
+        let snap = snap_of(vec![a, b]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+
+        // Default arm: disjoint elements do not answer "which is on top".
+        let res = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["a".into(), "b".into()],
+                require_overlap: true,
+            },
+            &ctx,
+        );
+        assert!(!res.passed, "disjoint elements must not pass vacuously");
+        let detail = res.detail.as_deref().unwrap_or("");
+        assert!(detail.contains("do not overlap"), "got {detail:?}");
+        assert!(detail.contains("require_overlap=false"), "got {detail:?}");
+
+        // Opt-out arm: a pure ordering claim is still answerable.
+        let res = evaluate(
+            &Assertion::ElementAbove {
+                elements: ["a".into(), "b".into()],
+                require_overlap: false,
+            },
+            &ctx,
+        );
+        assert!(res.passed, "detail={:?}", res.detail);
+    }
+
+    #[test]
+    fn element_above_non_verdict_details_are_pairwise_distinguishable() {
+        // A consumer routing on the detail text must be able to tell the
+        // three non-verdict outcomes apart.
+        fn detail_of(snap: &ElementSnapshot, require_overlap: bool) -> String {
+            let ctx = EvalContext {
+                snapshot: Some(snap),
+                ..Default::default()
+            };
+            evaluate(
+                &Assertion::ElementAbove {
+                    elements: ["a".into(), "b".into()],
+                    require_overlap,
+                },
+                &ctx,
+            )
+            .detail
+            .unwrap_or_default()
+        }
+
+        let no_order = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+
+        let mut a = el("a", 0, 0, 100, 100);
+        a.paint_order = Some(4);
+        let mut b = el("b", 50, 50, 100, 100);
+        b.paint_order = Some(4);
+        let equal = snap_of(vec![a, b]);
+
+        let mut a = el("a", 0, 0, 50, 50);
+        a.paint_order = Some(9);
+        let mut b = el("b", 500, 500, 50, 50);
+        b.paint_order = Some(1);
+        let disjoint = snap_of(vec![a, b]);
+
+        let details = [
+            detail_of(&no_order, true),
+            detail_of(&equal, true),
+            detail_of(&disjoint, true),
+        ];
+        for (i, x) in details.iter().enumerate() {
+            assert!(!x.is_empty(), "detail {i} was empty");
+            for (j, y) in details.iter().enumerate() {
+                if i != j {
+                    assert_ne!(x, y, "details {i} and {j} are indistinguishable");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn element_above_wire_form_defaults_require_overlap_true() {
+        let a: Assertion = serde_json::from_str(r#"{"type":"element_above","elements":["x","y"]}"#)
+            .expect("must deserialize");
+        match &a {
+            Assertion::ElementAbove {
+                elements,
+                require_overlap,
+            } => {
+                assert_eq!(elements, &["x".to_string(), "y".to_string()]);
+                assert!(*require_overlap, "require_overlap must default to true");
+            }
+            other => panic!("wrong variant: {other:?}"),
+        }
+        let round = serde_json::to_string(&a).expect("must serialize");
+        assert!(round.contains(r#""type":"element_above""#), "got {round}");
+
+        let explicit: Assertion = serde_json::from_str(
+            r#"{"type":"element_above","elements":["x","y"],"require_overlap":false}"#,
+        )
+        .expect("must deserialize");
+        match explicit {
+            Assertion::ElementAbove {
+                require_overlap, ..
+            } => assert!(!require_overlap),
+            other => panic!("wrong variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn paint_order_fields_are_snake_case_and_omitted_when_absent() {
+        // The struct carries no `rename_all`, so snake_case is the wire
+        // spelling — same as `fg_color` / `parent_id` / `children_ids`.
+        let json = r#"{
+            "elements": [
+                {"id": "a", "bbox": {"x": 0, "y": 0, "w": 10, "h": 10},
+                 "paint_order": 12, "stacking_context_id": "title-bar"},
+                {"id": "b", "bbox": {"x": 0, "y": 0, "w": 10, "h": 10}}
+            ]
+        }"#;
+        let snap: ElementSnapshot = serde_json::from_str(json).expect("must deserialize");
+        assert_eq!(snap.get("a").unwrap().paint_order, Some(12));
+        assert_eq!(
+            snap.get("a").unwrap().stacking_context_id.as_deref(),
+            Some("title-bar")
+        );
+        assert_eq!(snap.get("b").unwrap().paint_order, None);
+        assert_eq!(snap.get("b").unwrap().stacking_context_id, None);
+
+        // Additive-optional: an element without them round-trips with no
+        // new keys on the wire.
+        let out = serde_json::to_string(snap.get("b").unwrap()).expect("must serialize");
+        assert!(!out.contains("paint_order"), "got {out}");
+        assert!(!out.contains("stacking_context_id"), "got {out}");
     }
 
     #[test]

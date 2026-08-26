@@ -284,6 +284,8 @@ mod tests {
             line_height_px: None,
             parent_id: None,
             children_ids: vec![],
+            paint_order: None,
+            stacking_context_id: None,
         }
     }
 
