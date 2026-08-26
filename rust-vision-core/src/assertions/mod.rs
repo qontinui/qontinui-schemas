@@ -50,6 +50,25 @@ pub enum Assertion {
         #[serde(default)]
         tolerance_px: Option<u32>,
     },
+    /// `[above, below]` — asserts `elements[0]` paints on top of `elements[1]`.
+    ///
+    /// The counterpart to [`crate::analyzers::layout`]'s `occlusion` finding:
+    /// the analyzer REPORTS whatever stacking trouble it happens to trip over,
+    /// while this variant lets an author DECLARE the expectation and get a
+    /// pass/fail. "The dropdown must render over the panel" is a requirement,
+    /// not an observation.
+    ///
+    /// `require_overlap` defaults **true**: "which of these is on top?" is not
+    /// a question two disjoint elements answer, so asserting it over a pair
+    /// that never touches is almost always an authoring mistake. Set it
+    /// `false` for the rare case where the ordering matters independently of
+    /// present geometry (an element about to be animated into place).
+    ElementAbove {
+        /// `[above, below]` — asserts elements[0] paints on top of elements[1].
+        elements: [String; 2],
+        #[serde(default = "default_true")]
+        require_overlap: bool,
+    },
     /// Element/region contains expected text (OCR or snapshot-text).
     ContainsText {
         target: TextTarget,
@@ -127,6 +146,13 @@ pub enum Assertion {
 
 fn default_wcag_aa() -> WcagLevel {
     WcagLevel::Aa
+}
+
+/// Default for [`Assertion::ElementAbove`]'s `require_overlap`. A bare `bool`
+/// field defaults to `false` under `#[serde(default)]`, which is the wrong
+/// safety direction here — see the variant doc.
+fn default_true() -> bool {
+    true
 }
 
 /// Targeting mode for [`Assertion::ContainsText`].
@@ -302,6 +328,10 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
             elements,
             tolerance_px,
         } => eval_no_overlap(elements, tolerance_px, ctx),
+        Assertion::ElementAbove {
+            elements,
+            require_overlap,
+        } => eval_element_above(elements, require_overlap, ctx),
         Assertion::ContainsText { target, text, kind } => {
             eval_contains_text(target, text, kind, ctx)
         }
@@ -429,6 +459,179 @@ fn inset_region(r: Region, inset: u32) -> Region {
         w: r.w.saturating_sub(2 * inset),
         h: r.h.saturating_sub(2 * inset),
     }
+}
+
+/// Evaluate [`Assertion::ElementAbove`].
+///
+/// **Check order is load-bearing** — element lookup, then (when required)
+/// geometry, then ordering evidence. Producers do not populate `z_index` yet,
+/// so an evidence-first order would answer every authoring mistake with
+/// "missing z_index" and hide the mistake itself: an author who named two
+/// disjoint elements must hear about THAT.
+///
+/// **Verdict rule**, derived from the semantics `analyzers::layout` already
+/// established for the same three fields, in this precedence:
+///
+/// 1. [`crate::element_snapshot::Element::occluded_by`] — the producer hit-tested the live tree and
+///    attributed the occlusion. That beats anything inferable here, exactly as
+///    the analyzer's `attributed` pass beats its derived pass. No inference
+///    needed, so it is consulted first and answers in both directions: it can
+///    confirm the assertion *or* refute it.
+/// 2. [`crate::element_snapshot::Element::z_index`] — the producer's RESOLVED painting order. Higher
+///    paints on top; equal means neither does (document order decides, and a
+///    snapshot does not carry it reliably — the analyzer declines to guess
+///    there too, and so do we).
+/// 3. Neither available → the assertion cannot be answered. See below.
+///
+/// **On the ancestry exemption.** `analyzers::layout` skips ancestor/descendant
+/// pairs, because a descendant painting over its ancestor's box is what nesting
+/// IS and reporting it would put a false `occlusion` on every nested layout.
+/// That exemption is NOT mirrored here, deliberately: it exists to suppress
+/// *unsolicited* findings over pairs nobody asked about, and an assertion has
+/// no such noise problem — the author chose both ids. Worse, mirroring it would
+/// make the single most common real question unanswerable, since a dropdown
+/// asserted to paint over its own title bar is precisely a descendant/ancestor
+/// pair. So a descendant over its ancestor is answered on the evidence, like
+/// any other pair.
+///
+/// **On "cannot answer".** [`AssertionResult`] carries only `passed: bool`, so
+/// there is no third state to return. This reports `passed = false` with a
+/// skip-shaped detail rather than the vacuous-pass idiom `AnimationSettled`
+/// uses: a pass with no evidence behind it is a silent false negative for
+/// exactly the stacking bug this variant exists to catch. A tri-state
+/// `AssertionResult` would be the better answer and remains a possible
+/// follow-up.
+fn eval_element_above(
+    elements: [String; 2],
+    require_overlap: bool,
+    ctx: &EvalContext<'_>,
+) -> AssertionResult {
+    let assertion = Assertion::ElementAbove {
+        elements: elements.clone(),
+        require_overlap,
+    };
+    let snap = match require_snapshot(ctx, &assertion) {
+        Ok(s) => s,
+        Err(r) => return r,
+    };
+    let (above_id, below_id) = (&elements[0], &elements[1]);
+
+    // 1. Element lookup.
+    let above = match snap.get(above_id) {
+        Some(e) => e,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{above_id}' not found in snapshot"),
+            )
+        }
+    };
+    let below = match snap.get(below_id) {
+        Some(e) => e,
+        None => {
+            return AssertionResult::fail(
+                assertion,
+                format!("element '{below_id}' not found in snapshot"),
+            )
+        }
+    };
+
+    // 2. Geometry, only when the caller requires the pair to actually overlap.
+    if require_overlap {
+        let (above_bbox, below_bbox) = match (above.bbox, below.bbox) {
+            (Some(a), Some(b)) => (a, b),
+            _ => {
+                let which = match (above.bbox.is_none(), below.bbox.is_none()) {
+                    (true, true) => format!("both '{above_id}' and '{below_id}'"),
+                    (true, false) => format!("'{above_id}'"),
+                    _ => format!("'{below_id}'"),
+                };
+                return AssertionResult::fail(
+                    assertion,
+                    format!(
+                        "element_above[{above_id}, {below_id}]: no geometry (bbox) on {which}, \
+                         so the required overlap could not be checked. Set \
+                         `require_overlap: false` to assert stacking order without it."
+                    ),
+                );
+            }
+        };
+        if !regions_overlap(above_bbox, below_bbox) {
+            return AssertionResult::fail(
+                assertion,
+                format!(
+                    "element_above[{above_id}, {below_id}]: the two elements do not overlap, so \
+                     which one paints on top is not a question they answer. Set \
+                     `require_overlap: false` if the ordering matters anyway."
+                ),
+            );
+        }
+    }
+
+    // 3a. Producer attribution — strongest evidence, answers both directions.
+    if below.occluded_by.as_deref() == Some(above_id.as_str()) {
+        return AssertionResult::pass_with(
+            assertion,
+            format!(
+                "element_above[{above_id}, {below_id}]: confirmed by the producer's own \
+                 attribution (`occluded_by`)"
+            ),
+        );
+    }
+    if above.occluded_by.as_deref() == Some(below_id.as_str()) {
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "element_above[{above_id}, {below_id}]: the producer attributed the occlusion the \
+                 OTHER WAY — '{above_id}' is occluded_by '{below_id}', so '{below_id}' paints on \
+                 top."
+            ),
+        );
+    }
+
+    // 3b. Resolved stacking order.
+    let (Some(az), Some(bz)) = (above.z_index, below.z_index) else {
+        let which = match (above.z_index.is_none(), below.z_index.is_none()) {
+            (true, true) => format!("both '{above_id}' and '{below_id}'"),
+            (true, false) => format!("'{above_id}'"),
+            _ => format!("'{below_id}'"),
+        };
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
+                 reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
+                 missing on {which}. Reported as a failure because `AssertionResult` has no third \
+                 state and a vacuous pass would silently hide the very stacking bug this \
+                 assertion exists to catch. Note `z_index` is the producer's RESOLVED painting \
+                 order: a raw CSS `z-index` value is NOT a substitute and must not be projected \
+                 in its place."
+            ),
+        );
+    };
+    if az == bz {
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "element_above[{above_id}, {below_id}]: EQUAL resolved stacking order (z_index \
+                 {az} on both), so neither paints above the other. At equal z the painting order \
+                 falls to document order, which a snapshot does not carry reliably."
+            ),
+        );
+    }
+    if az < bz {
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "element_above[{above_id}, {below_id}]: '{above_id}' paints BELOW '{below_id}' \
+                 (resolved z_index {az} < {bz})."
+            ),
+        );
+    }
+    AssertionResult::pass_with(
+        assertion,
+        format!("element_above[{above_id}, {below_id}]: resolved z_index {az} > {bz}"),
+    )
 }
 
 fn eval_contains_text(
@@ -1063,6 +1266,313 @@ mod tests {
             &ctx,
         );
         assert!(!res.passed);
+    }
+
+    // -----------------------------------------------------------------
+    // element_above
+    // -----------------------------------------------------------------
+
+    fn above(elements: [&str; 2], require_overlap: bool) -> Assertion {
+        Assertion::ElementAbove {
+            elements: [elements[0].into(), elements[1].into()],
+            require_overlap,
+        }
+    }
+
+    fn eval_on(snap: &ElementSnapshot, assertion: &Assertion) -> AssertionResult {
+        let ctx = EvalContext {
+            snapshot: Some(snap),
+            ..Default::default()
+        };
+        evaluate(assertion, &ctx)
+    }
+
+    /// The reported bug shape: the prompts panel (Tailwind `z-20`) vs the
+    /// title bar's dropdown (`z-50`), where the dropdown is a DESCENDANT of
+    /// the `z-10` title bar.
+    ///
+    /// A raw CSS comparison reads 50 > 20 and concludes the dropdown wins.
+    /// That is exactly backwards: the `z-10` title bar establishes a stacking
+    /// context, so the dropdown's `z-50` is resolved WITHIN it and its whole
+    /// subtree paints between the title bar and the next sibling context —
+    /// below the panel's z-20. `Element::z_index` is documented as the
+    /// RESOLVED order, so the fixture carries what a layout engine actually
+    /// computes: dropdown just above its own title bar, still under the panel.
+    fn prompts_panel_stacking() -> ElementSnapshot {
+        snap_of(vec![
+            Element {
+                id: "title-bar".into(),
+                bbox: Some(Region {
+                    x: 0,
+                    y: 0,
+                    w: 1000,
+                    h: 48,
+                }),
+                z_index: Some(10),
+                ..Default::default()
+            },
+            Element {
+                // CSS `z-50`, resolved inside the title bar's context.
+                id: "title-bar-dropdown".into(),
+                bbox: Some(Region {
+                    x: 700,
+                    y: 40,
+                    w: 240,
+                    h: 300,
+                }),
+                parent_id: Some("title-bar".into()),
+                z_index: Some(11),
+                ..Default::default()
+            },
+            Element {
+                // CSS `z-20`, a sibling stacking context of the title bar's.
+                id: "prompts-panel".into(),
+                bbox: Some(Region {
+                    x: 600,
+                    y: 0,
+                    w: 400,
+                    h: 800,
+                }),
+                z_index: Some(20),
+                ..Default::default()
+            },
+        ])
+    }
+
+    #[test]
+    fn element_above_uses_resolved_stacking_not_raw_css_z_index() {
+        let snap = prompts_panel_stacking();
+
+        // What the bug report assumed (50 > 20) — and it is false.
+        let res = eval_on(&snap, &above(["title-bar-dropdown", "prompts-panel"], true));
+        assert!(
+            !res.passed,
+            "dropdown must NOT be reported above the panel: {:?}",
+            res.detail
+        );
+        let detail = res.detail.unwrap();
+        assert!(detail.contains("paints BELOW"), "{detail}");
+
+        // What actually renders.
+        let res = eval_on(&snap, &above(["prompts-panel", "title-bar-dropdown"], true));
+        assert!(res.passed, "{:?}", res.detail);
+    }
+
+    #[test]
+    fn element_above_answers_a_descendant_over_its_own_ancestor() {
+        // `analyzers::layout` exempts ancestor/descendant pairs from its
+        // unsolicited occlusion sweep. A DECLARED assertion does not inherit
+        // that exemption — the author named both ids, and this pair shape is
+        // the commonest real question there is.
+        let snap = prompts_panel_stacking();
+        let res = eval_on(&snap, &above(["title-bar-dropdown", "title-bar"], true));
+        assert!(res.passed, "{:?}", res.detail);
+    }
+
+    #[test]
+    fn element_above_prefers_occluded_by_over_z_index() {
+        // z_index says "panel on top"; the producer hit-tested and says the
+        // dropdown is. The attribution wins in both directions.
+        let snap = snap_of(vec![
+            Element {
+                id: "dropdown".into(),
+                bbox: Some(Region {
+                    x: 0,
+                    y: 0,
+                    w: 100,
+                    h: 100,
+                }),
+                z_index: Some(1),
+                ..Default::default()
+            },
+            Element {
+                id: "panel".into(),
+                bbox: Some(Region {
+                    x: 50,
+                    y: 50,
+                    w: 100,
+                    h: 100,
+                }),
+                z_index: Some(99),
+                occluded_by: Some("dropdown".into()),
+                ..Default::default()
+            },
+        ]);
+
+        let res = eval_on(&snap, &above(["dropdown", "panel"], true));
+        assert!(res.passed, "{:?}", res.detail);
+        assert!(res.detail.unwrap().contains("occluded_by"));
+
+        let res = eval_on(&snap, &above(["panel", "dropdown"], true));
+        assert!(!res.passed, "{:?}", res.detail);
+        assert!(res.detail.unwrap().contains("OTHER WAY"));
+    }
+
+    #[test]
+    fn element_above_without_evidence_cannot_answer_and_does_not_pass() {
+        let snap = snap_of(vec![
+            el("a", 0, 0, 100, 100),
+            Element {
+                id: "b".into(),
+                bbox: Some(Region {
+                    x: 50,
+                    y: 50,
+                    w: 100,
+                    h: 100,
+                }),
+                z_index: Some(3),
+                ..Default::default()
+            },
+        ]);
+        let res = eval_on(&snap, &above(["a", "b"], true));
+        assert!(
+            !res.passed,
+            "a vacuous pass here hides the bug being hunted"
+        );
+        let detail = res.detail.unwrap();
+        assert!(detail.contains("CANNOT ANSWER"), "{detail}");
+        assert!(detail.contains("'a'"), "must name the element: {detail}");
+        assert!(!detail.contains("'b'"), "must not blame 'b': {detail}");
+        assert!(detail.contains("raw CSS"), "{detail}");
+    }
+
+    #[test]
+    fn element_above_equal_z_index_means_neither_is_above() {
+        let snap = snap_of(vec![
+            Element {
+                id: "a".into(),
+                bbox: Some(Region {
+                    x: 0,
+                    y: 0,
+                    w: 100,
+                    h: 100,
+                }),
+                z_index: Some(7),
+                ..Default::default()
+            },
+            Element {
+                id: "b".into(),
+                bbox: Some(Region {
+                    x: 50,
+                    y: 50,
+                    w: 100,
+                    h: 100,
+                }),
+                z_index: Some(7),
+                ..Default::default()
+            },
+        ]);
+        let res = eval_on(&snap, &above(["a", "b"], true));
+        assert!(!res.passed);
+        assert!(res
+            .detail
+            .unwrap()
+            .contains("EQUAL resolved stacking order"));
+    }
+
+    #[test]
+    fn element_above_disjoint_fails_on_overlap_before_evidence() {
+        // Neither element carries z_index. The author still must hear about
+        // the disjoint pair they named, not about the missing evidence —
+        // producers do not populate z_index yet, so an evidence-first order
+        // would mask every authoring mistake behind the same message.
+        let snap = snap_of(vec![el("a", 0, 0, 50, 50), el("b", 500, 500, 50, 50)]);
+        let res = eval_on(&snap, &above(["a", "b"], true));
+        assert!(!res.passed);
+        let detail = res.detail.unwrap();
+        assert!(detail.contains("do not overlap"), "{detail}");
+        assert!(detail.contains("require_overlap"), "{detail}");
+        assert!(!detail.contains("CANNOT ANSWER"), "{detail}");
+    }
+
+    #[test]
+    fn element_above_disjoint_is_answered_when_overlap_not_required() {
+        let snap = snap_of(vec![
+            Element {
+                id: "a".into(),
+                bbox: Some(Region {
+                    x: 0,
+                    y: 0,
+                    w: 50,
+                    h: 50,
+                }),
+                z_index: Some(5),
+                ..Default::default()
+            },
+            Element {
+                id: "b".into(),
+                bbox: Some(Region {
+                    x: 500,
+                    y: 500,
+                    w: 50,
+                    h: 50,
+                }),
+                z_index: Some(1),
+                ..Default::default()
+            },
+        ]);
+        assert!(eval_on(&snap, &above(["a", "b"], false)).passed);
+        assert!(!eval_on(&snap, &above(["a", "b"], true)).passed);
+    }
+
+    #[test]
+    fn element_above_wire_form_defaults_require_overlap_to_true() {
+        let a: Assertion =
+            serde_json::from_str(r#"{"type":"element_above","elements":["x","y"]}"#).unwrap();
+        match &a {
+            Assertion::ElementAbove {
+                elements,
+                require_overlap,
+            } => {
+                assert_eq!(elements, &["x".to_string(), "y".to_string()]);
+                assert!(*require_overlap, "absent require_overlap must default true");
+            }
+            other => panic!("wrong variant: {other:?}"),
+        }
+        // And the tag round-trips as snake_case.
+        let json = serde_json::to_string(&a).unwrap();
+        assert!(json.contains(r#""type":"element_above""#), "{json}");
+    }
+
+    #[test]
+    fn element_above_four_outcomes_are_pairwise_distinct() {
+        // 1. cannot answer
+        let cannot = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        // 2. equal z_index
+        let z = |id: &str, x: i32, zi: i32| Element {
+            id: id.into(),
+            bbox: Some(Region {
+                x,
+                y: 0,
+                w: 100,
+                h: 100,
+            }),
+            z_index: Some(zi),
+            ..Default::default()
+        };
+        let equal = snap_of(vec![z("a", 0, 4), z("b", 50, 4)]);
+        // 3. no overlap while require_overlap
+        let disjoint = snap_of(vec![z("a", 0, 9), z("b", 900, 1)]);
+        // 4. the real ordering failure
+        let inverted = snap_of(vec![z("a", 0, 1), z("b", 50, 9)]);
+
+        let details: Vec<String> = [&cannot, &equal, &disjoint, &inverted]
+            .iter()
+            .map(|s| {
+                let res = eval_on(s, &above(["a", "b"], true));
+                assert!(!res.passed);
+                res.detail.expect("every failure carries a detail")
+            })
+            .collect();
+
+        for i in 0..details.len() {
+            for j in (i + 1)..details.len() {
+                assert_ne!(
+                    details[i], details[j],
+                    "outcomes {i} and {j} are indistinguishable"
+                );
+            }
+        }
     }
 
     #[test]
