@@ -15,6 +15,32 @@ use crate::element_snapshot::{intersection, ElementSnapshot};
 /// thing.
 const OCCLUSION_MIN_PCT: f64 = 2.0;
 
+/// Whether `ancestor` is an ancestor of `node`, following `parent_id` to the
+/// root.
+///
+/// A free function rather than a closure: a closure taking `&str` parameters
+/// AND capturing the borrowed map makes rustc infer `'static` for the map's
+/// values and reject every borrow from the snapshot.
+///
+/// The depth cap terminates on a malformed snapshot containing a parent
+/// cycle — the analyzer must not hang on hostile input, and 64 is far past
+/// any real DOM nesting that carries registered elements.
+fn is_ancestor_of(
+    parent_of: &std::collections::HashMap<&str, &str>,
+    ancestor: &str,
+    node: &str,
+) -> bool {
+    let mut cur = node;
+    for _ in 0..64 {
+        match parent_of.get(cur) {
+            Some(&p) if p == ancestor => return true,
+            Some(&p) => cur = p,
+            None => return false,
+        }
+    }
+    false
+}
+
 pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
 
@@ -88,11 +114,32 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         .filter_map(|e| e.bbox.map(|b| (e, b)))
         .collect();
 
+    // Ancestry, walked to the ROOT rather than one hop.
+    //
+    // A one-level `parent_id` check misses the common shape: card > header
+    // > title, where the title carries its own `z-index` and overlaps the
+    // card's box. That is ordinary containment two levels up, and reporting
+    // it would put a false `occlusion` on essentially every nested layout
+    // with a stacking context in it.
+    // Type elided deliberately: an explicit `HashMap<&str, &str>` annotation
+    // makes rustc infer `'static` for both elided lifetimes and reject the
+    // borrows from `snapshot`. Inference gets it right.
+    let parent_of = snapshot
+        .elements
+        .iter()
+        .filter_map(|e| e.parent_id.as_deref().map(|p| (e.id.as_str(), p)))
+        .collect::<std::collections::HashMap<_, _>>();
     // A producer that already attributed the occlusion is authoritative —
     // it hit-tested the live tree, which beats anything derivable from
-    // bounding boxes here.
+    // bounding boxes here. Recorded so the derived pass below does not
+    // report the same pair a second time from a weaker signal.
+    // Same lifetime-elision rule as `parent_of` above: annotating the `&str`
+    // pair here would pin both to `'static` and reject borrows from
+    // `snapshot`.
+    let mut attributed = std::collections::HashSet::new();
     for (el, _) in &positioned {
         if let Some(occluder) = &el.occluded_by {
+            attributed.insert((occluder.as_str(), el.id.as_str()));
             findings.push(
                 Finding::new(
                     "occlusion",
@@ -123,10 +170,10 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
             let (a, a_bbox) = positioned[i];
             let (b, b_bbox) = positioned[j];
 
-            // Skip ancestor/descendant pairs: a child painting over its
-            // own parent's box is what nesting IS, not a defect.
-            if a.parent_id.as_deref() == Some(b.id.as_str())
-                || b.parent_id.as_deref() == Some(a.id.as_str())
+            // Skip ancestor/descendant pairs at any depth: a descendant
+            // painting over an ancestor's box is what nesting IS.
+            if is_ancestor_of(&parent_of, a.id.as_str(), b.id.as_str())
+                || is_ancestor_of(&parent_of, b.id.as_str(), a.id.as_str())
             {
                 continue;
             }
@@ -153,6 +200,11 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
             } else {
                 (b, a, a_bbox)
             };
+            // Already reported from the producer's hit-test above, which is
+            // the stronger signal — do not say it twice from geometry.
+            if attributed.contains(&(over.id.as_str(), under.id.as_str())) {
+                continue;
+            }
             let under_area = under_bbox.w as u64 * under_bbox.h as u64;
             if under_area == 0 {
                 continue; // zero_area reports this separately
@@ -509,5 +561,64 @@ mod tests {
             ..Default::default()
         };
         assert!(!run(&snap).iter().any(|f| f.kind == "occlusion"));
+    }
+
+    #[test]
+    fn a_grandchild_painting_over_its_grandparent_is_not_occlusion() {
+        // card > header > title, with the title carrying its own stacking
+        // context. A one-hop `parent_id` check misses this and would put a
+        // false `occlusion` on essentially every nested layout.
+        let card = el_z("card", 0, 0, 400, 300, 0);
+        let mut header = el_z("header", 0, 0, 400, 40, 1);
+        header.parent_id = Some("card".into());
+        let mut title = el_z("title", 0, 0, 200, 20, 5);
+        title.parent_id = Some("header".into());
+        title.text = Some("My Card".into());
+
+        let snap = ElementSnapshot {
+            elements: vec![card, header, title],
+            ..Default::default()
+        };
+        assert!(
+            !run(&snap).iter().any(|f| f.kind == "occlusion"),
+            "nesting is nesting however deep it goes"
+        );
+    }
+
+    #[test]
+    fn a_parent_cycle_terminates_instead_of_hanging() {
+        // A malformed snapshot must not wedge the analyzer.
+        let mut a = el_z("a", 0, 0, 100, 100, 1);
+        a.parent_id = Some("b".into());
+        let mut b = el_z("b", 0, 0, 100, 100, 2);
+        b.parent_id = Some("a".into());
+        let snap = ElementSnapshot {
+            elements: vec![a, b],
+            ..Default::default()
+        };
+        let _ = run(&snap); // must return at all
+    }
+
+    #[test]
+    fn a_pair_is_not_reported_twice_from_two_sources() {
+        // The producer's hit-test is the stronger signal. When geometry
+        // derives the same pair, saying it again is noise.
+        let mut header = el_z("header", 0, 0, 400, 20, 10);
+        header.text = Some("Zone 8".into());
+        header.occluded_by = Some("minimap".into());
+        let widget = el_z("minimap", 0, 0, 400, 20, 30);
+        let snap = ElementSnapshot {
+            elements: vec![header, widget],
+            ..Default::default()
+        };
+        let occ: Vec<_> = run(&snap)
+            .into_iter()
+            .filter(|f| f.kind == "occlusion")
+            .collect();
+        assert_eq!(occ.len(), 1, "one pair, one finding: {occ:?}");
+        assert!(
+            occ[0].detail.contains("hit-test"),
+            "the stronger source wins"
+        );
     }
 }
