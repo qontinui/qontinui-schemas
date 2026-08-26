@@ -16,8 +16,8 @@
 //! | 1    | usage / IO / parse error                                      |
 //!
 //! Modes:
-//!   * `vision-audit analyze  --snapshot S --frame F [--analyzer A] [--fail-on L]`
-//!   * `vision-audit assert   --snapshot S --frame F --assertions A [--baseline-dir D]`
+//!   * `vision-audit analyze  --snapshot S [--frame F] [--analyzer A] [--fail-on L]`
+//!   * `vision-audit assert   --snapshot S [--frame F] --assertions A [--baseline-dir D]`
 //!   * `vision-audit baseline --snapshot S --name N --baseline-dir D`
 //!
 //! SCOPE: OCR / VLM clients live runner-side; this bin runs the snapshot-text
@@ -66,8 +66,8 @@ const USAGE: &str = "\
 vision-audit — runner-less vision analyzer / assertion gate for CI
 
 USAGE:
-    vision-audit analyze  --snapshot <file> --frame <file> [--analyzer <a>] [--fail-on <level>]
-    vision-audit assert   --snapshot <file> --frame <file> --assertions <file> [--baseline-dir <dir>]
+    vision-audit analyze  --snapshot <file> [--frame <file>] [--analyzer <a>] [--fail-on <level>]
+    vision-audit assert   --snapshot <file> [--frame <file>] --assertions <file> [--baseline-dir <dir>]
     vision-audit baseline --snapshot <file> --name <name> --baseline-dir <dir>
 
 ANALYZE:
@@ -315,13 +315,22 @@ fn parse_analyzer(value: Option<&str>) -> Result<Vec<Analyzer>, String> {
 fn run_analyze(args: &[String]) -> Result<u8, CliError> {
     let flags = parse_flags(args, &["snapshot", "frame", "analyzer", "fail-on"])?;
     let snapshot = load_snapshot(Path::new(require(&flags, "snapshot")?))?;
-    let frame = load_frame(Path::new(require(&flags, "frame")?))?;
+    // `--frame` is OPTIONAL. Three of the five analyzers — layout,
+    // typography, elements — are pure geometry over the snapshot and never
+    // read a pixel, and `analyzers::run` already degrades color/dynamic to an
+    // explicit "skipped" finding without one. Requiring it made the geometric
+    // checks unavailable to exactly the callers that need them most: a CI job
+    // or a headless probe holding a snapshot and no screenshot.
+    let frame = match flags.get("frame") {
+        Some(path) => Some(load_frame(Path::new(path))?),
+        None => None,
+    };
     let analyzers_to_run =
         parse_analyzer(flags.get("analyzer").map(String::as_str)).map_err(CliError::usage)?;
     let fail_on =
         parse_fail_on(flags.get("fail-on").map(String::as_str)).map_err(CliError::usage)?;
 
-    let report = analyze(&snapshot, &frame, &analyzers_to_run);
+    let report = analyze(&snapshot, frame.as_ref(), &analyzers_to_run);
     let exit = analyze_exit_code(&report, fail_on);
 
     println!(
@@ -354,10 +363,17 @@ pub struct AnalyzeReport {
     notes: Vec<String>,
 }
 
-/// Pure: run the requested analyzers over the snapshot+frame and tally.
-pub fn analyze(snapshot: &ElementSnapshot, frame: &Frame, which: &[Analyzer]) -> AnalyzeReport {
+/// Pure: run the requested analyzers over the snapshot (+ optional frame)
+/// and tally. `frame: None` is a supported mode, not a degraded one — the
+/// snapshot-only analyzers produce identical output either way, and the
+/// pixel-dependent ones report themselves skipped.
+pub fn analyze(
+    snapshot: &ElementSnapshot,
+    frame: Option<&Frame>,
+    which: &[Analyzer],
+) -> AnalyzeReport {
     let input = AnalyzeInput {
-        frame: Some(frame),
+        frame,
         snapshot: Some(snapshot),
         prior_frame: None,
     };
@@ -455,14 +471,21 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
 fn run_assert(args: &[String]) -> Result<u8, CliError> {
     let flags = parse_flags(args, &["snapshot", "frame", "assertions", "baseline-dir"])?;
     let snapshot = load_snapshot(Path::new(require(&flags, "snapshot")?))?;
-    let frame = load_frame(Path::new(require(&flags, "frame")?))?;
+    // Optional here for a stronger reason than in `analyze`: NO assertion in
+    // the DSL reads `ctx.frame`. Every one evaluates from the snapshot, the
+    // OCR blocks or the baseline registry, so a required `--frame` was a hard
+    // precondition for a value the evaluator never consulted.
+    let frame = match flags.get("frame") {
+        Some(path) => Some(load_frame(Path::new(path))?),
+        None => None,
+    };
     let assertions = load_assertions(Path::new(require(&flags, "assertions")?))?;
     let baselines = match flags.get("baseline-dir") {
         Some(dir) => load_baselines(Path::new(dir))?,
         None => HashMap::new(),
     };
 
-    let report = assert_all(&snapshot, &frame, &assertions, &baselines);
+    let report = assert_all(&snapshot, frame.as_ref(), &assertions, &baselines);
     let exit = if report.all_passed {
         EXIT_OK
     } else {
@@ -520,13 +543,13 @@ pub struct AssertReport {
 /// Pure: evaluate every assertion against the snapshot/frame/baselines.
 pub fn assert_all(
     snapshot: &ElementSnapshot,
-    frame: &Frame,
+    frame: Option<&Frame>,
     assertions: &[Assertion],
     baselines: &HashMap<String, BaselineEntry>,
 ) -> AssertReport {
     let ctx = EvalContext {
         snapshot: Some(snapshot),
-        frame: Some(frame),
+        frame,
         ocr_blocks: None, // runner-side only
         baselines: Some(baselines),
     };
@@ -788,7 +811,7 @@ mod tests {
         // so `--fail-on warning` would exit 2 on a page whose seven controls
         // all work. This is the attributed-garbage verdict the doc claim used
         // to advertise a pipe to.
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Elements]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Elements]);
         let kinds: Vec<&str> = report
             .findings
             .values()
@@ -873,7 +896,7 @@ mod tests {
     #[test]
     fn analyze_exit_default_is_ok_even_with_findings() {
         let snap = snap_with_overlap();
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
         // No --fail-on -> always 0.
         assert_eq!(analyze_exit_code(&report, None), EXIT_OK);
     }
@@ -881,7 +904,7 @@ mod tests {
     #[test]
     fn analyze_exit_fail_on_warning_trips_on_overlap() {
         let snap = snap_with_overlap();
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
         assert!(report.total >= 1, "expected at least one finding");
         // The overlap finding is at warning-or-above, so fail-on warning trips.
         assert_eq!(
@@ -915,7 +938,7 @@ mod tests {
             elements: vec![mk("a", 0), mk("b", 500)],
             ..Default::default()
         };
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
         assert_eq!(
             analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
             EXIT_OK
@@ -930,7 +953,7 @@ mod tests {
         let id = "ubs2_2_2_9f1c0a4b7e3d2610_00000191a4c3f2d8";
         snap.snapshot_id = Some(id.to_string());
 
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
         assert!(report.total >= 1, "expected at least one finding");
         assert_eq!(report.snapshot_id.as_deref(), Some(id));
 
@@ -947,7 +970,11 @@ mod tests {
 
     #[test]
     fn analyze_report_omits_attribution_for_an_unattributed_snapshot() {
-        let report = analyze(&snap_with_overlap(), &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(
+            &snap_with_overlap(),
+            Some(&frame_1x1()),
+            &[Analyzer::Layout],
+        );
         assert!(report.snapshot_id.is_none());
         let wire = serde_json::to_value(&report).unwrap();
         assert!(
@@ -965,7 +992,7 @@ mod tests {
         // Passing assertion: no_clipping (no parent relationships -> passes).
         let pass = assert_all(
             &snap,
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoClipping { region: None }],
             &bl,
         );
@@ -974,7 +1001,7 @@ mod tests {
         // Failing assertion: a and b overlap.
         let fail = assert_all(
             &snap,
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoOverlap {
                 elements: ["a".into(), "b".into()],
                 tolerance_px: None,
@@ -996,7 +1023,7 @@ mod tests {
 
         let report = assert_all(
             &snap,
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoOverlap {
                 elements: ["a".into(), "b".into()],
                 tolerance_px: None,
@@ -1022,7 +1049,7 @@ mod tests {
     fn assert_report_omits_attribution_for_an_unattributed_snapshot() {
         let report = assert_all(
             &snap_with_overlap(),
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoClipping { region: None }],
             &HashMap::new(),
         );
@@ -1048,7 +1075,7 @@ mod tests {
     fn analyze_summary_cannot_be_forged_through_the_snapshot_id() {
         let mut snap = snap_with_overlap();
         snap.snapshot_id = Some(FORGED_ID.to_string());
-        let report = analyze(&snap, &frame_1x1(), &[Analyzer::Layout]);
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
 
         // The token still reaches the report and the JSON verbatim — nothing
         // is rejected or rewritten at parse time.
@@ -1072,7 +1099,7 @@ mod tests {
         snap.snapshot_id = Some(FORGED_ID.to_string());
         let report = assert_all(
             &snap,
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoOverlap {
                 elements: ["a".into(), "b".into()],
                 tolerance_px: None,
@@ -1170,7 +1197,7 @@ mod tests {
 
         let report = assert_all(
             &snap_with_overlap(), // 'a' is at x=0 here, 'b' at x=50; a matches baseline
-            &frame_1x1(),
+            Some(&frame_1x1()),
             &[Assertion::NoLayoutShiftSince {
                 baseline: "v1".into(),
                 tolerance_px: Some(2),
@@ -1190,5 +1217,47 @@ mod tests {
     #[test]
     fn run_no_subcommand_is_usage_error() {
         assert!(matches!(run(&[]), Err(CliError::Usage(_))));
+    }
+
+    #[test]
+    fn geometry_analyzers_run_with_no_frame_at_all() {
+        // The headless case: a CI job or a probe against a runner whose
+        // window is missing holds a snapshot and no screenshot. Requiring a
+        // frame made exactly these callers unable to run the checks that
+        // need no pixels.
+        let report = analyze(&snap_with_overlap(), None, &[Analyzer::Layout]);
+        assert!(
+            report.total > 0,
+            "layout is pure geometry and must produce findings without a frame"
+        );
+    }
+
+    #[test]
+    fn frameless_layout_matches_framed_layout_exactly() {
+        // Not merely "it runs" — the frame contributes NOTHING to these
+        // analyzers, so the two runs must agree finding-for-finding. If they
+        // ever diverge, one of them is reading something it should not.
+        let snap = snap_with_overlap();
+        let with = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
+        let without = analyze(&snap, None, &[Analyzer::Layout]);
+        assert_eq!(with.total, without.total);
+        assert_eq!(
+            serde_json::to_string(&with.findings).unwrap(),
+            serde_json::to_string(&without.findings).unwrap()
+        );
+    }
+
+    #[test]
+    fn assertions_evaluate_with_no_frame() {
+        // Stronger than the analyze case: no assertion in the DSL reads
+        // `ctx.frame` at all, so a required frame gated a value nothing used.
+        let bl = HashMap::new();
+        let r = assert_all(
+            &snap_with_overlap(),
+            None,
+            &[Assertion::NoClipping { region: None }],
+            &bl,
+        );
+        assert!(r.all_passed);
     }
 }
