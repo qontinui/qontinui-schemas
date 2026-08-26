@@ -862,8 +862,7 @@ mod tests {
             font_size_px: None,
             font_family: None,
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         };
         ElementSnapshot {
             elements: vec![mk("a", 0), mk("b", 50)],
@@ -910,8 +909,7 @@ mod tests {
             font_size_px: None,
             font_family: None,
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         };
         let snap = ElementSnapshot {
             elements: vec![mk("a", 0), mk("b", 500)],
@@ -1123,8 +1121,7 @@ mod tests {
             font_size_px: None,
             font_family: None,
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         };
         e.fg_color = Some(Rgb::new(0, 0, 0));
         let snap = ElementSnapshot {
@@ -1160,8 +1157,7 @@ mod tests {
             font_size_px: None,
             font_family: None,
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         };
         let base_snap = ElementSnapshot {
             elements: vec![base_el],

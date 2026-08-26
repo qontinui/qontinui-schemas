@@ -1,0 +1,35 @@
+{
+  "elements": [
+    {
+      "id": "terminal-zone-header-8",
+      "bbox": { "x": 640, "y": 360, "w": 400, "h": 20 },
+      "text": "Zone 8: qontinui-web (a3f2c1d0)",
+      "interactable": false,
+      "font_size_px": 10,
+      "scroll_width_px": 380,
+      "z_index": 10
+    },
+    {
+      "id": "terminal-zone-minimap",
+      "bbox": { "x": 912, "y": 356, "w": 128, "h": 88 },
+      "interactable": false,
+      "z_index": 30
+    },
+    {
+      "id": "zone-8-card",
+      "bbox": { "x": 640, "y": 360, "w": 400, "h": 300 },
+      "interactable": false,
+      "z_index": 0
+    },
+    {
+      "id": "truncated-session-name",
+      "bbox": { "x": 8, "y": 8, "w": 80, "h": 20 },
+      "text": "qontinui-web-frontend",
+      "interactable": false,
+      "font_size_px": 10,
+      "scroll_width_px": 160,
+      "text_overflow": "ellipsis",
+      "z_index": 1
+    }
+  ]
+}

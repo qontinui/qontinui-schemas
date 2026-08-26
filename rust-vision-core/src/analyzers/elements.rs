@@ -88,8 +88,7 @@ mod tests {
             font_size_px: None,
             font_family: None,
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         }
     }
 

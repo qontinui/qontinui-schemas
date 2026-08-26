@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "Regression fixture for the two defects found on the runner's Terminal page",
+    "in 2026-08: a floating widget covering a session name, and a session name",
+    "ellipsised down to a fragment. Before the directed-occlusion pass and the",
+    "horizontal arm of text_fits_container, BOTH of these snapshots analysed",
+    "and asserted completely clean.",
+    "",
+    "What each element pins:",
+    "  terminal-zone-minimap  z=30, parked over the right end of a z=10 tile",
+    "                         header -> a directed `occlusion` finding naming the",
+    "                         minimap as occluder and quoting the hidden text.",
+    "                         Not `interactable`, so the legacy `overlap` pass",
+    "                         cannot see it -- that is the point.",
+    "  zone-8-card            z=0, the header's own container. Fully overlapped",
+    "                         by both, and must NOT be reported: it is under",
+    "                         them by ordinary nesting, and `occlusion` is only",
+    "                         about what is HIDDEN from the reader.",
+    "  truncated-session-name 160px of text in an 80px box -> text_fits_container",
+    "                         must FAIL horizontally even though the box is tall",
+    "                         enough for the font (the vertical arm passes)."
+  ],
+  "analyzers": {
+    "layout": { "kinds": ["occlusion"], "count_min": 1, "count_max": 6 }
+  },
+  "assertions": [
+    {
+      "assertion": {
+        "type": "text_fits_container",
+        "element": "truncated-session-name"
+      },
+      "expect_passed": false
+    },
+    {
+      "assertion": {
+        "type": "text_fits_container",
+        "element": "terminal-zone-header-8"
+      },
+      "expect_passed": true
+    }
+  ]
+}

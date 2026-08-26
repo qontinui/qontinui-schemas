@@ -89,8 +89,7 @@ mod tests {
             font_size_px: Some(size),
             font_family: Some(family.into()),
             line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         }
     }
 

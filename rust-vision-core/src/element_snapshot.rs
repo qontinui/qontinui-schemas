@@ -148,7 +148,12 @@ pub fn display_snapshot_id(id: &str) -> String {
     out
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// `Default` is derived so test fixtures and snapshot projections can spread
+/// `..Default::default()` instead of restating every field. This struct grows
+/// (stacking and text-overflow fields were appended after the first release),
+/// and a literal that enumerates all of them turns each addition into a
+/// mechanical edit across every construction site.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Element {
     /// Stable identifier. Matches the SDK's element registry id where one
     /// exists; otherwise an opaque token.
@@ -199,6 +204,59 @@ pub struct Element {
     /// Children ids, when known.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children_ids: Vec<String>,
+
+    // ---- Stacking + visibility -------------------------------------------
+    //
+    // Without these three fields the crate can observe that two boxes
+    // intersect but never which of them the user actually sees, so the
+    // strongest finding it could produce was the symmetric "A and B
+    // overlap". Occlusion is a DIRECTED relation, and these carry the
+    // direction.
+    /// Resolved stacking order, as the producer's layout engine computed
+    /// it (CSS `z-index` with `auto` resolved against the painting order,
+    /// or the platform equivalent). Higher paints later, i.e. on top.
+    ///
+    /// `None` means the producer could not determine stacking — treated as
+    /// UNKNOWN by every consumer, never as zero. A snapshot with no
+    /// `z_index` anywhere cannot answer an occlusion question, and
+    /// [`crate::analyzers::layout`] says so rather than guessing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub z_index: Option<i32>,
+    /// Whether the element is genuinely rendered AND reachable — not
+    /// merely present in the tree. A producer that hit-tests (the SDK's
+    /// `isElementVisible` does) reports `false` for an element covered by
+    /// a higher stacking context, clipped by an ancestor's overflow, or
+    /// `display:none`.
+    ///
+    /// `None` = the producer does not measure visibility. Distinguishing
+    /// that from `Some(false)` is the whole point of the `Option`: absence
+    /// of the measurement is not evidence the element is visible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
+    /// Id of the element painting above this one, when the producer both
+    /// detected occlusion and could attribute it. This is the field that
+    /// turns "something is covering the session name" into a defect report
+    /// naming the widget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occluded_by: Option<String>,
+
+    // ---- Horizontal text overflow ----------------------------------------
+    /// Width of the element's laid-out content in CSS pixels — the DOM's
+    /// `scrollWidth`. When it exceeds the element's own `bbox.w`, the text
+    /// is horizontally truncated (a Tailwind `truncate`, a
+    /// `text-overflow: ellipsis`, or a plain `overflow: hidden`).
+    ///
+    /// `text_fits_container` compared only heights before this field
+    /// existed, so an ellipsised label — the dominant way a name gets lost
+    /// in this codebase — passed cleanly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll_width_px: Option<u32>,
+    /// The producer's own `text-overflow` computed style (`"ellipsis"`,
+    /// `"clip"`, …), when known. Only used to sharpen a finding's wording;
+    /// the truncation verdict itself comes from `scroll_width_px`, which
+    /// is measurement rather than declaration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_overflow: Option<String>,
 }
 
 /// Linear-light RGB color (no alpha). Used for both `fg_color` and
@@ -439,8 +497,7 @@ mod tests {
                 font_size_px: None,
                 font_family: None,
                 line_height_px: None,
-                parent_id: None,
-                children_ids: vec![],
+                ..Default::default()
             }],
             snapshot_id: Some(id.to_string()),
         };

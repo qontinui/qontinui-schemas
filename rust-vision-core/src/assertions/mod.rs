@@ -57,8 +57,16 @@ pub enum Assertion {
         #[serde(default)]
         kind: TextMatchKind,
     },
-    /// Element's text bbox fits within the element's content box.
-    /// Catches `overflow:visible` + `white-space:nowrap` clipping bugs.
+    /// Element's text fits within the element's content box, in BOTH axes.
+    ///
+    /// Horizontal: `scroll_width_px > bbox.w` means the laid-out text is
+    /// wider than the box showing it, i.e. it is ellipsised or clipped.
+    /// Vertical: `bbox.h` shorter than ~1.5x the font size.
+    ///
+    /// The horizontal arm needs the producer to populate `scroll_width_px`;
+    /// without it that arm reports UNKNOWN rather than passing, because a
+    /// silent pass on the un-measured axis is what let truncated labels
+    /// through before.
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -554,10 +562,12 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         Some(e) => e,
         None => return AssertionResult::fail(assertion, format!("element '{element}' not found")),
     };
-    // We approximate "text fits" by checking that the element has either
-    // no text, or text whose declared font_size_px is consistent with
-    // the bbox height. A stricter check would re-measure text using a
-    // font metrics table; that's Phase 6.5+ work.
+    // Two axes, and they fail differently. HORIZONTAL truncation is a
+    // measurement (`scroll_width_px` vs the box) and is the common case —
+    // a `truncate` / `text-overflow: ellipsis` label whose name is cut to
+    // a fragment. VERTICAL is an estimate from font size against the box
+    // height. Only heights were checked before, so every ellipsised label
+    // in the app passed this assertion.
     if el.text.is_none() {
         return AssertionResult::pass_with(assertion, "element has no text — vacuously fits");
     }
@@ -570,6 +580,28 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             )
         }
     };
+    // --- Horizontal: a measurement, so it is the stronger signal. ---
+    if let Some(sw) = el.scroll_width_px {
+        if sw > bbox.w {
+            let how = match el.text_overflow.as_deref() {
+                Some("ellipsis") => "ellipsised",
+                Some("clip") => "clipped",
+                _ => "truncated",
+            };
+            let shown = el.text.as_deref().unwrap_or_default().trim();
+            return AssertionResult::fail(
+                assertion,
+                format!(
+                    "text is {how}: content is {sw}px wide but the box is only {}px \
+                     ({}px hidden). Full text: {shown:?}",
+                    bbox.w,
+                    sw - bbox.w
+                ),
+            );
+        }
+    }
+
+    // --- Vertical: an estimate from the declared font size. ---
     if let Some(size) = el.font_size_px {
         // Reasonable upper bound: text line height is ~font_size * 1.5.
         let needed = (size * 1.5).ceil() as u32;
@@ -582,6 +614,18 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
                 ),
             );
         }
+    }
+
+    // Both arms are clear — but say which ones actually RAN. An element
+    // with no `scroll_width_px` was never checked for truncation, and
+    // reporting that as an unqualified pass is what let ellipsised labels
+    // through.
+    if el.scroll_width_px.is_none() {
+        return AssertionResult::pass_with(
+            assertion,
+            "vertical fit OK; horizontal fit UNKNOWN — the snapshot carries no \
+             `scroll_width_px` for this element, so truncation was not checked",
+        );
     }
     AssertionResult::pass(assertion)
 }
@@ -976,13 +1020,7 @@ mod tests {
             text: None,
             role: None,
             interactable: false,
-            fg_color: None,
-            bg_color: None,
-            font_size_px: None,
-            font_family: None,
-            line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
         }
     }
 
@@ -1328,5 +1366,99 @@ mod tests {
             &ctx,
         );
         assert!(!res.passed);
+    }
+
+    // --- text_fits_container: the horizontal arm (added with
+    // `scroll_width_px`). Before it, an ellipsised label passed cleanly,
+    // which is how a truncated session name cleared this assertion.
+
+    #[test]
+    fn text_fits_fails_when_text_is_horizontally_truncated() {
+        let mut e = el("label", 0, 0, 80, 20);
+        e.text = Some("qontinui-web-frontend".into());
+        e.font_size_px = Some(10.0);
+        e.scroll_width_px = Some(160);
+        e.text_overflow = Some("ellipsis".into());
+        let snap = snap_of(vec![e]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::TextFitsContainer {
+                element: "label".into(),
+            },
+            &ctx,
+        );
+        assert!(!res.passed, "160px of text in an 80px box must fail");
+        let d = res.detail.unwrap_or_default();
+        assert!(d.contains("ellipsised"), "detail should name HOW: {d}");
+        assert!(d.contains("80px hidden"), "detail should quantify: {d}");
+    }
+
+    #[test]
+    fn text_fits_passes_when_content_is_narrower_than_the_box() {
+        let mut e = el("label", 0, 0, 200, 20);
+        e.text = Some("short".into());
+        e.font_size_px = Some(10.0);
+        e.scroll_width_px = Some(40);
+        let snap = snap_of(vec![e]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::TextFitsContainer {
+                element: "label".into(),
+            },
+            &ctx,
+        );
+        assert!(res.passed);
+    }
+
+    #[test]
+    fn text_fits_reports_horizontal_unknown_when_scroll_width_is_absent() {
+        // The un-measured axis must not read as a clean pass — that silent
+        // pass is the defect this arm exists to close.
+        let mut e = el("label", 0, 0, 80, 20);
+        e.text = Some("qontinui-web-frontend".into());
+        e.font_size_px = Some(10.0);
+        let snap = snap_of(vec![e]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::TextFitsContainer {
+                element: "label".into(),
+            },
+            &ctx,
+        );
+        assert!(res.passed, "vertical fit is genuinely OK here");
+        let d = res.detail.unwrap_or_default();
+        assert!(
+            d.contains("UNKNOWN"),
+            "an unchecked axis must say so, not pass silently: {d}"
+        );
+    }
+
+    #[test]
+    fn text_fits_still_fails_on_the_vertical_axis() {
+        let mut e = el("label", 0, 0, 200, 6);
+        e.text = Some("tall text".into());
+        e.font_size_px = Some(16.0);
+        e.scroll_width_px = Some(40);
+        let snap = snap_of(vec![e]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(
+            &Assertion::TextFitsContainer {
+                element: "label".into(),
+            },
+            &ctx,
+        );
+        assert!(!res.passed, "6px box for a 16px font must still fail");
     }
 }

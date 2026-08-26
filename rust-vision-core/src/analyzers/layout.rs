@@ -4,6 +4,17 @@
 use super::{Finding, Severity};
 use crate::element_snapshot::{intersection, ElementSnapshot};
 
+/// Minimum share of the covered element's own area that must be hidden
+/// before a derived occlusion is reported, in percent.
+///
+/// Not zero: sub-pixel rounding and 1px borders routinely produce hairline
+/// intersections between correctly-laid-out siblings, and a check that
+/// fires on those gets muted, which costs more than the tail it catches.
+/// Low enough that clipping the end of a label still reports — the
+/// motivating defect covered a corner of a tile header, not the whole
+/// thing.
+const OCCLUSION_MIN_PCT: f64 = 2.0;
+
 pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
 
@@ -48,6 +59,154 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
                 );
             }
         }
+    }
+
+    // 1b. Directed OCCLUSION — which element is on top, and what it hides.
+    //
+    // Deliberately a separate pass from the `overlap` check above, which
+    // answers a different question ("do two clickable targets collide?")
+    // and whose semantics are pinned by CI specs. Three differences, each
+    // required for this pass to see the bug class it exists for:
+    //
+    //   * ALL bbox-bearing elements participate, not just `interactable`
+    //     ones. The thing a floating widget hides is usually a label — a
+    //     name, a status, a count — and labels are never interactive.
+    //   * FULL containment is the strongest signal, not an exemption. The
+    //     `overlap` pass skips nesting as intentional layout (a button
+    //     inside its container); for occlusion, an element completely
+    //     covering another is the worst case, so nesting is scored, not
+    //     skipped. The two passes disagree on purpose.
+    //   * Direction comes from `z_index`, so the finding names the
+    //     OCCLUDER and the OCCLUDED rather than an unordered pair.
+    //
+    // Ancestry is the one exemption: a child painting over its own
+    // ancestor's box is ordinary containment (every element covers part of
+    // its parent), so pairs related by `parent_id` are skipped.
+    let positioned: Vec<(&_, crate::frame::Region)> = snapshot
+        .elements
+        .iter()
+        .filter_map(|e| e.bbox.map(|b| (e, b)))
+        .collect();
+
+    // A producer that already attributed the occlusion is authoritative —
+    // it hit-tested the live tree, which beats anything derivable from
+    // bounding boxes here.
+    for (el, _) in &positioned {
+        if let Some(occluder) = &el.occluded_by {
+            findings.push(
+                Finding::new(
+                    "occlusion",
+                    Severity::Critical,
+                    format!(
+                        "{} is covered by {} (reported by the snapshot producer's hit-test)",
+                        el.id, occluder
+                    ),
+                )
+                .with_elements(vec![el.id.clone(), occluder.clone()]),
+            );
+        }
+    }
+
+    // Derived occlusion needs stacking order. Where it is missing, this
+    // pass must say so rather than return quietly — a snapshot with no
+    // `z_index` would otherwise render as "no occlusion found".
+    //
+    // Reported only for pairs that ACTUALLY INTERSECT, not for every
+    // z-less snapshot. Boxes that do not touch have no occlusion question
+    // to be unknown about, and firing on those would put an unresolvable
+    // Info on every legacy capture — noise that gets the whole finding
+    // muted, which is how a real UNKNOWN ends up being ignored.
+    let mut undirected_intersections = 0usize;
+
+    for i in 0..positioned.len() {
+        for j in (i + 1)..positioned.len() {
+            let (a, a_bbox) = positioned[i];
+            let (b, b_bbox) = positioned[j];
+
+            // Skip ancestor/descendant pairs: a child painting over its
+            // own parent's box is what nesting IS, not a defect.
+            if a.parent_id.as_deref() == Some(b.id.as_str())
+                || b.parent_id.as_deref() == Some(a.id.as_str())
+            {
+                continue;
+            }
+
+            // Geometry first: no intersection means there is nothing to
+            // be occluded, and nothing to be unknown about either.
+            let Some(inter) = intersection(a_bbox, b_bbox) else {
+                continue;
+            };
+
+            let (Some(az), Some(bz)) = (a.z_index, b.z_index) else {
+                undirected_intersections += 1;
+                continue;
+            };
+            // Equal stacking = document order decides, which a snapshot
+            // does not carry reliably. Leave those to the `overlap` pass
+            // rather than guess a direction.
+            if az == bz {
+                undirected_intersections += 1;
+                continue;
+            }
+            let (over, under, under_bbox) = if az > bz {
+                (a, b, b_bbox)
+            } else {
+                (b, a, a_bbox)
+            };
+            let under_area = under_bbox.w as u64 * under_bbox.h as u64;
+            if under_area == 0 {
+                continue; // zero_area reports this separately
+            }
+            let covered = inter.w as u64 * inter.h as u64;
+            let pct = (covered as f64 / under_area as f64) * 100.0;
+            if pct < OCCLUSION_MIN_PCT {
+                continue;
+            }
+
+            // Hiding text is worse than hiding a blank box: a covered
+            // label destroys information the user has no other way to
+            // recover, which is exactly the reported defect.
+            let hides_text = under.text.as_deref().is_some_and(|t| !t.trim().is_empty());
+            let severity = if hides_text {
+                Severity::Critical
+            } else {
+                Severity::Warning
+            };
+            let what = match under.text.as_deref().map(str::trim) {
+                Some(t) if !t.is_empty() => format!(" (text: {t:?})"),
+                _ => String::new(),
+            };
+            findings.push(
+                Finding::new(
+                    "occlusion",
+                    severity,
+                    format!(
+                        "{} (z={}) covers {:.0}% of {} (z={}){}",
+                        over.id,
+                        over.z_index.unwrap_or_default(),
+                        pct,
+                        under.id,
+                        under.z_index.unwrap_or_default(),
+                        what
+                    ),
+                )
+                .with_region(inter)
+                .with_elements(vec![over.id.clone(), under.id.clone()]),
+            );
+        }
+    }
+
+    if undirected_intersections > 0 {
+        findings.push(Finding::new(
+            "occlusion_unknown",
+            Severity::Info,
+            format!(
+                "{undirected_intersections} intersecting pair(s) carry no usable stacking \
+                 order, so it is UNKNOWN which element is on top and whether anything is \
+                 hidden. This is not a clean result — populate `z_index` in the snapshot \
+                 projection to resolve it."
+            ),
+        ));
     }
 
     // 2. Zero-area elements — usually layout regressions ("display:none on a
@@ -128,13 +287,15 @@ mod tests {
             text: None,
             role: None,
             interactable,
-            fg_color: None,
-            bg_color: None,
-            font_size_px: None,
-            font_family: None,
-            line_height_px: None,
-            parent_id: None,
-            children_ids: vec![],
+            ..Default::default()
+        }
+    }
+
+    /// `el()` plus a stacking order — the occlusion pass needs a direction.
+    fn el_z(id: &str, x: i32, y: i32, w: u32, h: u32, z: i32) -> Element {
+        Element {
+            z_index: Some(z),
+            ..el(id, x, y, w, h, false)
         }
     }
 
@@ -241,5 +402,112 @@ mod tests {
         }
         // No zero_area fabricated for the bbox-less elements.
         assert!(!findings.iter().any(|f| f.kind == "zero_area"));
+    }
+
+    // --- Directed occlusion (the ZoneMinimap class of defect) ---------------
+
+    #[test]
+    fn reports_which_element_is_on_top_and_what_it_hides() {
+        let mut header = el_z("zone-header-8", 0, 0, 400, 20, 10);
+        header.text = Some("Zone 8: qontinui-web (a3f2c1d0)".into());
+        // A small widget parked over the right end of that header — the
+        // shape of the reported bug.
+        let widget = el_z("zone-minimap", 260, 0, 128, 88, 30);
+        let snap = ElementSnapshot {
+            elements: vec![header, widget],
+            ..Default::default()
+        };
+        let f = run(&snap);
+        let occ = f
+            .iter()
+            .find(|f| f.kind == "occlusion")
+            .expect("a widget covering a header must report occlusion");
+        // Direction: the finding must name the OCCLUDER first.
+        assert_eq!(occ.elements[0], "zone-minimap");
+        assert_eq!(occ.elements[1], "zone-header-8");
+        // Hiding text is Critical, not a Warning.
+        assert_eq!(occ.severity, Severity::Critical);
+        assert!(
+            occ.detail.contains("Zone 8: qontinui-web"),
+            "the finding must quote the text being hidden: {}",
+            occ.detail
+        );
+    }
+
+    #[test]
+    fn full_containment_is_occlusion_not_an_exemption() {
+        // The `overlap` pass skips this as intentional nesting. For
+        // occlusion it is the WORST case, so the two passes must disagree.
+        let mut label = el_z("label", 100, 100, 50, 10, 1);
+        label.text = Some("important".into());
+        let cover = el_z("cover", 0, 0, 400, 400, 99);
+        let snap = ElementSnapshot {
+            elements: vec![label, cover],
+            ..Default::default()
+        };
+        let f = run(&snap);
+        assert!(
+            !f.iter().any(|f| f.kind == "overlap"),
+            "the legacy overlap pass still exempts nesting"
+        );
+        let occ = f.iter().find(|f| f.kind == "occlusion").expect("occluded");
+        assert!(occ.detail.contains("100%"), "detail: {}", occ.detail);
+    }
+
+    #[test]
+    fn a_child_painting_over_its_own_parent_is_not_occlusion() {
+        let parent = el_z("card", 0, 0, 200, 100, 0);
+        let mut child = el_z("card-title", 0, 0, 200, 20, 5);
+        child.parent_id = Some("card".into());
+        child.text = Some("title".into());
+        let snap = ElementSnapshot {
+            elements: vec![parent, child],
+            ..Default::default()
+        };
+        assert!(!run(&snap).iter().any(|f| f.kind == "occlusion"));
+    }
+
+    #[test]
+    fn missing_z_index_reports_unknown_rather_than_clean() {
+        // Absence of stacking data must not read as "nothing is covered".
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("a", 0, 0, 100, 100, false),
+                el("b", 0, 0, 100, 100, false),
+            ],
+            ..Default::default()
+        };
+        let f = run(&snap);
+        assert!(f.iter().any(|f| f.kind == "occlusion_unknown"));
+        assert!(!f.iter().any(|f| f.kind == "occlusion"));
+    }
+
+    #[test]
+    fn a_producer_attributed_occlusion_is_reported_directly() {
+        let mut covered = el("session-name", 0, 0, 200, 20, false);
+        covered.text = Some("my-session".into());
+        covered.occluded_by = Some("toast".into());
+        let snap = ElementSnapshot {
+            elements: vec![covered],
+            ..Default::default()
+        };
+        let occ = run(&snap)
+            .into_iter()
+            .find(|f| f.kind == "occlusion")
+            .expect("occluded_by is authoritative");
+        assert_eq!(occ.severity, Severity::Critical);
+        assert!(occ.detail.contains("toast"));
+    }
+
+    #[test]
+    fn hairline_intersections_do_not_fire() {
+        // A 1px seam between correctly-laid-out siblings must stay quiet.
+        let a = el_z("row-1", 0, 0, 400, 100, 1);
+        let b = el_z("row-2", 0, 99, 400, 100, 2);
+        let snap = ElementSnapshot {
+            elements: vec![a, b],
+            ..Default::default()
+        };
+        assert!(!run(&snap).iter().any(|f| f.kind == "occlusion"));
     }
 }
