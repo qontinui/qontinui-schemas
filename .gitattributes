@@ -1,0 +1,27 @@
+# Scoped intentionally narrow. qontinui-schemas has core.autocrlf=true and no
+# other .gitattributes, so a repo-wide `* text=auto eol=lf` would rewrite the
+# line endings of ~85% of the tracked tree on the next checkout. Only the
+# generated bindings are pinned here.
+#
+# Two reasons they need pinning:
+#
+# 1. Without it a long-lived Windows checkout can report the whole generated
+#    tree as MODIFIED while the files are byte-identical to HEAD. Observed
+#    2026-08-27 on the operator box: 541 files under ts/src/generated reported
+#    changed, `git diff` empty, `cmp` against the committed blob matching. That
+#    is a stale stat-cache against LF-committed blobs, and it hides real drift
+#    inside permanent noise. (A fresh clone does not show it; the repo only
+#    grows into the state.)
+#
+# 2. .github/workflows/schema-drift.yml fails CI when these two trees drift from
+#    what codegen produces, and uploads exactly these paths as the
+#    `regenerated-bindings` artifact. eol=lf keeps blob == working tree on every
+#    platform, so a Windows checkout can never introduce CR and trip that check
+#    for a reason unrelated to schema content.
+#
+# The committed blobs are already LF, so this changes no committed bytes:
+# applied to main, `git status` reports 0 modified files and
+# `git add --renormalize` on both trees stages 0 changes. It does mean the next
+# checkout rewrites ~1090 generated files from CRLF to LF in the WORKING TREE.
+ts/src/generated/** text eol=lf
+src/qontinui_schemas/generated/** text eol=lf
