@@ -98,17 +98,27 @@ name: schema-drift
 # announce a declination, because it never saw a declaration. The behaviour is
 # safe; the diagnostics are not yet good.
 #
-# qontinui-runner#1028 is what adds the other two forms plus an
-# `accept-trailing-sibling` input defaulting to false, at which point a
-# trailing declaration becomes `trailing-declined` and SAYS SO. This call site
-# is written to inherit that improvement without a further change: it does not
-# pass the input, so it takes the safe default, and the reporting step below
-# already handles the `trailing-declined` value it cannot yet receive. Do not
-# add the input before #1028 lands — an unknown input to a composite action is
-# a warning on every run.
+# RESOLVED 2026-08-27 — this paragraph used to say the opposite, and the
+# instruction it carried expired without anything noticing.
 #
-# See the LIMITATION note on the resolver step for the direction that stays
-# open even after #1028.
+# qontinui-runner#1028 added the other two forms plus the
+# `accept-trailing-sibling` input, and it MERGED 2026-08-12. Its old
+# instruction here — "do not add the input before #1028 lands" — was correct
+# when written and became stale the moment it did, so for two weeks a shipped
+# hatch sat unarmed while qontinui-schemas#144 was unmergeable by construction.
+# A dated, conditional instruction in a comment has no mechanism that re-checks
+# it; treat that as the defect class, not as a one-off.
+#
+# The input is now PASSED (see the resolver step), so BOTH merge orders
+# resolve. `trailing-declined` is consequently unreachable from this call site;
+# the reporting step keeps its arm anyway, because the input could be turned
+# off again and a silently-missing arm is worse than an unused one.
+#
+# The LIMITATION note this used to point at is GONE, because the limitation it
+# described is the one now closed. See instead "WHAT THIS COSTS" on the
+# resolver step, which states what following an unlanded tree actually buys and
+# what it does not. The governing rule -- compile sites off, pair questions on
+# -- is action.yml:94-98.
 #
 # WHAT THIS DOES ADD TO THE TRUST SURFACE, stated because the paragraph above
 # deliberately narrows the claim. Reusing runner main's ACTION is less trust
@@ -274,31 +284,48 @@ jobs:
       # `$GITHUB_WORKSPACE/../<name>`. `GENERATE_TYPES_SH` above is written
       # against exactly this location.
       #
-      # `accept-trailing-sibling` is NOT passed — see DIRECTION SAFETY in the
-      # header. It is left at its safe default rather than set to 'false'
-      # explicitly, because that input only exists once qontinui-runner#1028
-      # lands and passing an unknown input to a composite action is a warning
-      # this workflow should not carry.
+      # `accept-trailing-sibling: 'true'` is PASSED below. Both merge orders now
+      # resolve, which closes the LIMITATION this step used to carry: a schemas
+      # PR that LEADS, whose runner adaptation TRAILS. That case had no hatch,
+      # and it is not hypothetical — qontinui-schemas#144 sat unmergeable on it,
+      # its four `add!` registrations living on the open runner#1147, which
+      # already carried the correct `coord:downstream-of=qontinui-schemas#144`
+      # declaration. The resolver read that as no declaration at all.
       #
-      # LIMITATION, stated rather than discovered later. Only a LEADING runner
-      # sibling is followed. The mirror case — a schemas PR that leads, whose
-      # runner adaptation TRAILS, where runner main cannot even build against
-      # this PR's `rust/src/**` so the regen step dies before drift is
-      # measured — is still without a hatch here. It needs the trailing opt-in
-      # from qontinui-runner#1028, which is open and not yet landed, and it is
-      # a genuinely different judgement call: for a drift check the question is
-      # about the PAIR, so following a trailing sibling is defensible, but it
-      # must be an opt-in decision made in daylight, not a side effect of this
-      # change. Note the compile half of that case is already measured by
-      # `consumer-gate` (runner-consumer-check.yml leg 2), which does resolve a
-      # trailing runner PR — so the gap is narrower than it looks: what is
-      # missing is the drift verdict, not the knowledge that the pair compiles.
+      # The opt-in decision, made in daylight as the old text asked. For a DRIFT
+      # check the question is about the PAIR — "do the checked-in artifacts
+      # match what the paired tree generates" — so it must read that tree in
+      # either merge order. That is exactly the axis the action itself sorts on
+      # (action.yml:95-98), and the runner's mirror gate
+      # (`qontinui-types-drift.yml:183`) has been opted in since 2026-08-12.
+      # This workflow is its twin; the asymmetry was the anomaly.
+      #
+      # WHAT THIS COSTS, stated rather than discovered later. A green here is a
+      # claim about a tree that has NOT landed. Between a leading schemas PR
+      # landing and its trailing runner PR landing, main's push-triggered run
+      # WILL be red — that is real, it is why `workflow_dispatch` is on this
+      # workflow, and the runner side already accepted the same window. A
+      # trailing head is also not merged with runner main, so if main has moved
+      # any codegen input since it branched, the regen reds on UNRELATED types;
+      # check that before blaming the schemas author. Note the compile half is
+      # already measured by `consumer-gate` (runner-consumer-check.yml leg 2),
+      # which resolves a trailing runner PR too — so this makes the repo's two
+      # required cross-repo gates agree rather than introducing a new posture.
       - name: Check out sibling qontinui-runner (declared PR, else default branch)
         id: sibling
         uses: qontinui/qontinui-runner/.github/actions/checkout-sibling@main
         with:
           repo: qontinui/qontinui-runner
           path: ${{ github.workspace }}/qontinui-runner
+          # ARMED 2026-08-27. This is a PAIR question, not a compile question,
+          # and the action's own rule sorts sites on exactly that axis
+          # (action.yml:95-98): a site asking "do the checked-in artifacts match
+          # what the paired tree generates" must read that tree in EITHER merge
+          # order; every COMPILE site leaves this off. The runner's mirror gate
+          # `qontinui-types-drift.yml:183` has set it since 2026-08-12. This is
+          # its twin -- the same contract measured from the other side -- so
+          # leaving it off was the asymmetry, not the safe default.
+          accept-trailing-sibling: 'true'
 
       # Make the resolution legible in the run itself, not only inside the
       # action's step log. A drift verdict means something different depending
@@ -330,21 +357,24 @@ jobs:
             echo "| pinned sha | \`${SIB_SHA:-n/a - default branch tip}\` |"
             echo ""
             case "${SIB_SOURCE:-none}" in
-              none)
+              none|none+pinned)
                 echo "No LEADING qontinui-runner sibling was resolved, so this"
                 echo "regenerated against runner's default branch — the correct"
                 echo "baseline for a schemas-only change."
                 echo ""
-                echo "This says nothing about whether a label EXISTS. Until"
-                echo "qontinui-runner#1028 lands, the resolver reads only the two"
-                echo "label forms meaning 'the runner PR merges first', so a"
-                echo "declaration pointing the other way (this PR leads, the runner"
-                echo "PR adapts after) reaches this same outcome and cannot be"
-                echo "distinguished from having no label. If you declared a pair and"
-                echo "expected it to be followed, check the direction of the label"
-                echo "before concluding the resolver missed it."
+                echo "This says nothing about whether a label EXISTS -- but"
+                echo "DIRECTION is no longer a possible explanation. This site sets"
+                echo "accept-trailing-sibling, so all four label forms resolve and a"
+                echo "declaration in EITHER merge order would have been followed."
+                echo ""
+                echo "So if you expected a pair to be followed and got none, the"
+                echo "cause is one of: no coord dep-edge label on either PR; a"
+                echo "malformed label; or one naming a CLOSED or nonexistent PR."
+                echo "Check that the label exists and its target is open -- do NOT"
+                echo "go re-pointing the direction, which was the pre-2026-08-27"
+                echo "advice here and is now a dead end."
                 ;;
-              trailing-declined)
+              trailing-declined|trailing-declined+pinned)
                 echo "A declaration was found but it orders the runner PR AFTER this"
                 echo "one, so it was DECLINED and the default branch used instead."
                 echo "If this PR carries bindings for a type that only exists on that"
@@ -360,6 +390,16 @@ jobs:
                 echo "main after the land — that is the check that closes the loop,"
                 echo "and it is why the generated dirs are in this workflow's push"
                 echo "paths. If the pair's landing order slips, expect it to red."
+                echo ""
+                echo "This site accepts a TRAILING sibling (a runner PR that lands"
+                echo "AFTER this one), so the declared tree may not be runner main"
+                echo "for a while yet. Two consequences worth expecting rather than"
+                echo "rediscovering: main WILL read red on schema-drift between the"
+                echo "two lands (clear it with 'gh workflow run schema-drift.yml"
+                echo "--ref main' once the sibling lands), and because a trailing"
+                echo "head is NOT merged with runner main, a red here can come from"
+                echo "an UNRELATED type whose codegen input moved on main since that"
+                echo "head branched. Check that before regenerating anything."
                 ;;
             esac
           } >> "$GITHUB_STEP_SUMMARY"
