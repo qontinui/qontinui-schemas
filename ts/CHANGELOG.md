@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.12.0...ts-v0.12.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **ts:** declare $defs types and gate generated .d.ts with skipLibCheck off ([fb3389b](https://github.com/qontinui/qontinui-schemas/commit/fb3389bfcfd1a88ab13d36f6c122dfb15cadc3db))
+* **ts:** fail codegen on forked type declarations; gate the publish path ([0b0df85](https://github.com/qontinui/qontinui-schemas/commit/0b0df856d1f73fa596473933c8e936dda112f8d6))
+
 ## [0.12.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.11.0...ts-v0.12.0) (2026-08-22)
 
 
