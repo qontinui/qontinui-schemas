@@ -205,13 +205,67 @@ pub enum TypographyDimension {
     LineHeight,
 }
 
-/// Result of evaluating one assertion. `passed=false` always carries a
-/// `detail` explaining why; `passed=true` may include observational
-/// notes (e.g., the actual measured value when one was checked).
+/// Which of the THREE things happened to an assertion.
+///
+/// `passed: bool` alone cannot say them: it collapses "evaluated, and the
+/// expectation was violated" together with "could not be evaluated at all".
+/// Those are different facts and call for different action — the first is a
+/// bug in the page, the second is a gap in the snapshot (or in the caller's
+/// inputs), and only the first should send anyone looking at the UI.
+///
+/// The bit is kept alongside as the GATE, and every consumer that reads it
+/// keeps its current behaviour: [`AssertionOutcome::Unknown`] is
+/// `passed = false`. That is deliberate and is the safe direction — a
+/// vacuous pass over an un-evaluated assertion is a silent false negative
+/// for exactly the bug the assertion was written to catch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AssertionOutcome {
+    /// The assertion was evaluated against real inputs and HELD.
+    Passed,
+    /// The assertion was evaluated against real inputs and was VIOLATED.
+    /// A verdict was reached; the page is wrong.
+    Failed,
+    /// The assertion could NOT be evaluated — an input it needs was absent
+    /// (no snapshot, an operand missing from the snapshot, a measurement
+    /// field the producer does not populate, no registered baseline, no OCR
+    /// blocks). Nothing is known about whether the expectation holds.
+    ///
+    /// This is NOT a weaker failure. Reading it as one sends a reader
+    /// looking for a layout bug that no evidence points at; reading it as a
+    /// pass hides one that no evidence would have ruled out.
+    Unknown,
+}
+
+impl AssertionOutcome {
+    /// The gate bit. Only [`Self::Passed`] is green — see the type doc for
+    /// why `Unknown` deliberately is not.
+    pub fn passed(self) -> bool {
+        matches!(self, Self::Passed)
+    }
+    /// True when no verdict was reached. Callers that want to report
+    /// coverage ("3 passed, 1 failed, 2 not evaluated") read this rather
+    /// than subtracting counts.
+    pub fn is_unknown(self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+}
+
+/// Result of evaluating one assertion. A non-`Passed` outcome always carries
+/// a `detail` explaining why; a pass may include observational notes (e.g.,
+/// the actual measured value when one was checked).
+///
+/// `passed` and `outcome` are two views of one verdict and are always
+/// consistent: `passed == outcome.passed()`. `passed` is retained as the
+/// wire-stable gate bit every existing consumer already reads (the runner's
+/// `all_passed`, `vision-audit`'s exit code); `outcome` is the finer answer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(from = "AssertionResultWire")]
 pub struct AssertionResult {
     pub passed: bool,
+    /// The three-way verdict. See [`AssertionOutcome`].
+    pub outcome: AssertionOutcome,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     /// Echo of the input assertion for downstream display. Owned (cloned)
@@ -219,27 +273,67 @@ pub struct AssertionResult {
     pub assertion: Assertion,
 }
 
-impl AssertionResult {
-    fn pass(assertion: Assertion) -> Self {
+/// Deserialization shim for results written BEFORE `outcome` existed.
+///
+/// Such a payload carries `passed` only. `true` maps to
+/// [`AssertionOutcome::Passed`] exactly; `false` maps to
+/// [`AssertionOutcome::Failed`], which is not a guess — it is precisely what
+/// that bit meant when the payload was written, since every un-evaluatable
+/// case was reported as a failure back then. The information the third state
+/// adds is simply not in the old wire form, and this shim does not invent
+/// it.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AssertionResultWire {
+    passed: bool,
+    outcome: Option<AssertionOutcome>,
+    #[serde(default)]
+    detail: Option<String>,
+    assertion: Assertion,
+}
+
+impl From<AssertionResultWire> for AssertionResult {
+    fn from(w: AssertionResultWire) -> Self {
+        let outcome = w.outcome.unwrap_or(if w.passed {
+            AssertionOutcome::Passed
+        } else {
+            AssertionOutcome::Failed
+        });
         Self {
-            passed: true,
-            detail: None,
+            // The outcome is authoritative: a payload whose two fields
+            // disagree is repaired toward the richer one rather than
+            // carried forward inconsistent.
+            passed: outcome.passed(),
+            outcome,
+            detail: w.detail,
+            assertion: w.assertion,
+        }
+    }
+}
+
+impl AssertionResult {
+    fn of(assertion: Assertion, outcome: AssertionOutcome, detail: Option<String>) -> Self {
+        Self {
+            passed: outcome.passed(),
+            outcome,
+            detail,
             assertion,
         }
+    }
+    fn pass(assertion: Assertion) -> Self {
+        Self::of(assertion, AssertionOutcome::Passed, None)
     }
     fn pass_with(assertion: Assertion, detail: impl Into<String>) -> Self {
-        Self {
-            passed: true,
-            detail: Some(detail.into()),
-            assertion,
-        }
+        Self::of(assertion, AssertionOutcome::Passed, Some(detail.into()))
     }
     fn fail(assertion: Assertion, detail: impl Into<String>) -> Self {
-        Self {
-            passed: false,
-            detail: Some(detail.into()),
-            assertion,
-        }
+        Self::of(assertion, AssertionOutcome::Failed, Some(detail.into()))
+    }
+    /// The assertion could not be evaluated. `detail` must say WHICH input
+    /// was missing — an `unknown` whose detail does not name the gap is
+    /// indistinguishable from a failure to the reader it exists to inform.
+    fn unknown(assertion: Assertion, detail: impl Into<String>) -> Self {
+        Self::of(assertion, AssertionOutcome::Unknown, Some(detail.into()))
     }
 }
 
@@ -359,14 +453,23 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
         } => eval_layout_shift(baseline, tolerance_px, ctx),
         Assertion::NoClipping { region } => eval_no_clipping(region, ctx),
         Assertion::AnimationSettled { .. } => {
-            // Animation settle requires the runner to capture N frames over time
-            // and pass them in. The vision-core assertion module is sync + frame-pair
-            // aware (via dynamic analyzer), but multi-frame settle needs runner-
-            // side orchestration. For Phase 6 first-pass we return "skipped"
-            // with a directive; the /visual-audit skill documents how to compose.
-            AssertionResult::pass_with(
+            // Animation settle needs N captures over time, which is runner-side
+            // orchestration this sync evaluator cannot do. Nothing anywhere
+            // supplies them today: the runner's `vision/assert` handler maps
+            // EVERY assertion straight through this function, so no multi-frame
+            // path has ever run.
+            //
+            // The Phase 6 first-pass returned a `pass_with` "skipping" note
+            // here — a green gate over an assertion that was never evaluated,
+            // for any caller, ever. That is the silent false negative
+            // `AssertionOutcome::Unknown` exists to remove: an
+            // `animation_settled` in a suite now reports that it was not
+            // checked instead of reporting that it held.
+            AssertionResult::unknown(
                 assertion.clone(),
-                "animation_settled is evaluated by the runner via successive captures; skipping in vision-core",
+                "animation_settled needs successive captures that this evaluator is never given, \
+                 so nothing was measured. No runner-side multi-frame path is wired up yet; until \
+                 one is, this assertion cannot answer.",
             )
         }
         Assertion::ContrastMeetsWcag { element, level } => eval_contrast(element, level, ctx),
@@ -377,12 +480,30 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
 // Variant evaluators
 // ---------------------------------------------------------------------------
 
+/// Detail for an operand the assertion named that the snapshot does not
+/// contain. Always an [`AssertionOutcome::Unknown`]: an absent operand means
+/// the check never ran, and the two live causes point at different people —
+/// a wrong id is the author's, an unregistered surface is the producer's.
+///
+/// `consequence` completes "..., so {consequence}." and should name what was
+/// NOT done, in the past tense.
+fn missing_operand(id: &str, consequence: &str) -> String {
+    format!(
+        "element '{id}' is not in the snapshot, so {consequence}. Either the id is wrong, or \
+         the surface is not registered with the producer."
+    )
+}
+
 fn require_snapshot<'a>(
     ctx: &'a EvalContext<'_>,
     assertion: &Assertion,
 ) -> Result<&'a ElementSnapshot, AssertionResult> {
-    ctx.snapshot
-        .ok_or_else(|| AssertionResult::fail(assertion.clone(), "missing ElementSnapshot"))
+    ctx.snapshot.ok_or_else(|| {
+        AssertionResult::unknown(
+            assertion.clone(),
+            "no ElementSnapshot supplied, so this assertion was never evaluated",
+        )
+    })
 }
 
 fn eval_no_overlap(
@@ -401,36 +522,42 @@ fn eval_no_overlap(
     let a = match snap.get(&elements[0]) {
         Some(e) => e,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{}' not found in snapshot", elements[0]),
+                missing_operand(&elements[0], "the pair was never compared"),
             )
         }
     };
     let b = match snap.get(&elements[1]) {
         Some(e) => e,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{}' not found in snapshot", elements[1]),
+                missing_operand(&elements[1], "the pair was never compared"),
             )
         }
     };
     let a_bbox = match a.bbox {
         Some(bb) => bb,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{}' has no geometry (bbox)", elements[0]),
+                format!(
+                    "element '{}' carries no geometry (bbox), so overlap was never measured",
+                    elements[0]
+                ),
             )
         }
     };
     let b_bbox = match b.bbox {
         Some(bb) => bb,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{}' has no geometry (bbox)", elements[1]),
+                format!(
+                    "element '{}' carries no geometry (bbox), so overlap was never measured",
+                    elements[1]
+                ),
             )
         }
     };
@@ -520,18 +647,18 @@ fn eval_element_above(
     let above = match snap.get(above_id) {
         Some(e) => e,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{above_id}' not found in snapshot"),
+                missing_operand(above_id, "no ordering verdict was reached"),
             )
         }
     };
     let below = match snap.get(below_id) {
         Some(e) => e,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{below_id}' not found in snapshot"),
+                missing_operand(below_id, "no ordering verdict was reached"),
             )
         }
     };
@@ -546,7 +673,7 @@ fn eval_element_above(
                     (true, false) => format!("'{above_id}'"),
                     _ => format!("'{below_id}'"),
                 };
-                return AssertionResult::fail(
+                return AssertionResult::unknown(
                     assertion,
                     format!(
                         "element_above[{above_id}, {below_id}]: no geometry (bbox) on {which}, \
@@ -596,16 +723,16 @@ fn eval_element_above(
             (true, false) => format!("'{above_id}'"),
             _ => format!("'{below_id}'"),
         };
-        return AssertionResult::fail(
+        return AssertionResult::unknown(
             assertion,
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
                  reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
-                 missing on {which}. Reported as a failure because `AssertionResult` has no third \
-                 state and a vacuous pass would silently hide the very stacking bug this \
-                 assertion exists to catch. Note `z_index` is the producer's RESOLVED painting \
-                 order: a raw CSS `z-index` value is NOT a substitute and must not be projected \
-                 in its place."
+                 missing on {which}. Reported as `unknown`, not as a failure: nothing was \
+                 measured, so nothing is known — and not as a pass either, because a vacuous \
+                 pass would silently hide the very stacking bug this assertion exists to catch. \
+                 Note `z_index` is the producer's RESOLVED, GLOBAL paint rank: a raw CSS \
+                 `z-index` value is NOT a substitute and must not be projected in its place."
             ),
         );
     };
@@ -655,9 +782,9 @@ fn eval_contains_text(
             // snapshot-text path still works).
             Some(e) => e.bbox,
             None => {
-                return AssertionResult::fail(
+                return AssertionResult::unknown(
                     assertion,
-                    format!("element '{}' not found", t.element),
+                    missing_operand(&t.element, "its text was never read"),
                 )
             }
         },
@@ -729,9 +856,9 @@ fn eval_contains_text(
         };
     }
 
-    AssertionResult::fail(
+    AssertionResult::unknown(
         assertion,
-        "no snapshot text and no ocr_blocks supplied — cannot check contains_text",
+        "no snapshot text and no ocr_blocks supplied, so the text was never read",
     )
 }
 
@@ -763,7 +890,12 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     };
     let el = match snap.get(&element) {
         Some(e) => e,
-        None => return AssertionResult::fail(assertion, format!("element '{element}' not found")),
+        None => {
+            return AssertionResult::unknown(
+                assertion,
+                missing_operand(&element, "text fit was never checked"),
+            )
+        }
     };
     // Two axes, and they fail differently. HORIZONTAL truncation is a
     // measurement (`scroll_width_px` vs the box) and is the common case —
@@ -777,9 +909,11 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     let bbox = match el.bbox {
         Some(bb) => bb,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("element '{element}' has no geometry (bbox) — cannot check text fit"),
+                format!(
+                    "element '{element}' carries no geometry (bbox), so text fit was never checked"
+                ),
             )
         }
     };
@@ -867,7 +1001,12 @@ fn eval_aligned(
     for id in &elements {
         let el = match snap.get(id) {
             Some(e) => e,
-            None => return AssertionResult::fail(assertion, format!("element '{id}' not found")),
+            None => {
+                return AssertionResult::unknown(
+                    assertion,
+                    missing_operand(id, "alignment was never measured"),
+                )
+            }
         };
         let bbox = match el.bbox {
             Some(bb) => bb,
@@ -920,11 +1059,21 @@ fn eval_color_within(
     };
     let el = match snap.get(&element) {
         Some(e) => e,
-        None => return AssertionResult::fail(assertion, format!("element '{element}' not found")),
+        None => {
+            return AssertionResult::unknown(
+                assertion,
+                missing_operand(&element, "its color was never read"),
+            )
+        }
     };
     let actual = match el.fg_color {
         Some(c) => c,
-        None => return AssertionResult::fail(assertion, "element has no fg_color in snapshot"),
+        None => {
+            return AssertionResult::unknown(
+                assertion,
+                "the snapshot carries no `fg_color` for this element, so no color was compared",
+            )
+        }
     };
     let de = delta_e_76(actual, expected);
     let max = delta_e_max.unwrap_or(5.0);
@@ -1017,7 +1166,12 @@ fn eval_typography(
     for id in &elements {
         let el = match snap.get(id) {
             Some(e) => e,
-            None => return AssertionResult::fail(assertion, format!("element '{id}' not found")),
+            None => {
+                return AssertionResult::unknown(
+                    assertion,
+                    missing_operand(id, "typography was never compared"),
+                )
+            }
         };
         if let Some(prev) = first {
             for dim in &dims {
@@ -1084,14 +1238,22 @@ fn eval_layout_shift(
     };
     let baselines = match ctx.baselines {
         Some(b) => b,
-        None => return AssertionResult::fail(assertion, "no baselines registered"),
+        None => {
+            return AssertionResult::unknown(
+                assertion,
+                "no baselines were supplied to the evaluator, so no shift was measured",
+            )
+        }
     };
     let entry = match baselines.get(&baseline) {
         Some(e) => e,
         None => {
-            return AssertionResult::fail(
+            return AssertionResult::unknown(
                 assertion,
-                format!("baseline '{baseline}' not registered"),
+                format!(
+                    "baseline '{baseline}' is not registered, so no shift was measured — \
+                     register it with `vision/baseline` first"
+                ),
             )
         }
     };
@@ -1185,15 +1347,28 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
     };
     let el = match snap.get(&element) {
         Some(e) => e,
-        None => return AssertionResult::fail(assertion, format!("element '{element}' not found")),
+        None => {
+            return AssertionResult::unknown(
+                assertion,
+                missing_operand(&element, "contrast was never computed"),
+            )
+        }
     };
     let (fg, bg) = match (el.fg_color, el.bg_color) {
         (Some(f), Some(b)) => (f, b),
         _ => {
-            return AssertionResult::fail(
+            let which = match (el.fg_color.is_none(), el.bg_color.is_none()) {
+                (true, true) => "`fg_color` and `bg_color`",
+                (true, false) => "`fg_color`",
+                _ => "`bg_color`",
+            };
+            return AssertionResult::unknown(
                 assertion,
-                "element missing fg_color and/or bg_color — can't compute contrast",
-            )
+                format!(
+                    "the snapshot carries no {which} for this element, so contrast was never \
+                     computed"
+                ),
+            );
         }
     };
     let ratio = crate::analyzers::color::wcag_contrast(fg, bg);
@@ -1479,6 +1654,10 @@ mod tests {
         let snap = snap_of(vec![el("a", 0, 0, 50, 50), el("b", 500, 500, 50, 50)]);
         let res = eval_on(&snap, &above(["a", "b"], true));
         assert!(!res.passed);
+        // Failed, not Unknown: the geometry WAS measured and the declared
+        // overlap requirement was violated. Contrast with the missing-bbox
+        // arm above, where there was nothing to measure.
+        assert_eq!(res.outcome, AssertionOutcome::Failed);
         let detail = res.detail.unwrap();
         assert!(detail.contains("do not overlap"), "{detail}");
         assert!(detail.contains("require_overlap"), "{detail}");
@@ -1573,6 +1752,319 @@ mod tests {
                 );
             }
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Tri-state outcome
+    //
+    // The bit and the outcome are two views of one verdict, so the tests
+    // that matter are the ones pinning that they never disagree and that
+    // the two RED kinds stay apart. `element_above` motivated the third
+    // state, but the property is crate-wide.
+    // -----------------------------------------------------------------
+
+    /// Every result this crate can produce, over a snapshot deliberately
+    /// missing most of what the evaluators want. The invariant is not about
+    /// any one verdict: it is that `passed` is exactly `outcome == Passed`,
+    /// never an independently-set bool that can drift from it.
+    #[test]
+    fn passed_bit_is_exactly_the_passed_outcome() {
+        let snap = snap_of(vec![
+            el("a", 0, 0, 100, 100),
+            el("b", 50, 50, 100, 100),
+            Element {
+                id: "c".into(),
+                bbox: Some(Region {
+                    x: 0,
+                    y: 0,
+                    w: 10,
+                    h: 10,
+                }),
+                text: Some("hello".into()),
+                fg_color: Some(Rgb::new(0, 0, 0)),
+                bg_color: Some(Rgb::new(255, 255, 255)),
+                font_size_px: Some(4.0),
+                z_index: Some(1),
+                ..Default::default()
+            },
+        ]);
+        let all = vec![
+            Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            },
+            Assertion::NoOverlap {
+                elements: ["a".into(), "ghost".into()],
+                tolerance_px: None,
+            },
+            above(["a", "b"], true),
+            above(["c", "a"], false),
+            Assertion::ContainsText {
+                target: TextTarget::Element(ElementTextTarget {
+                    element: "c".into(),
+                }),
+                text: "hello".into(),
+                kind: TextMatchKind::Contains,
+            },
+            Assertion::ContainsText {
+                target: TextTarget::Element(ElementTextTarget {
+                    element: "a".into(),
+                }),
+                text: "hello".into(),
+                kind: TextMatchKind::Contains,
+            },
+            Assertion::TextFitsContainer {
+                element: "c".into(),
+            },
+            Assertion::TextFitsContainer {
+                element: "ghost".into(),
+            },
+            Assertion::AlignedHorizontally {
+                elements: vec!["a".into(), "ghost".into()],
+                axis_tolerance_px: None,
+            },
+            Assertion::AlignedVertically {
+                elements: vec!["a".into(), "b".into()],
+                axis_tolerance_px: Some(1000),
+            },
+            Assertion::ColorWithin {
+                element: "a".into(),
+                expected: Rgb::new(0, 0, 0),
+                delta_e_max: None,
+            },
+            Assertion::TypographyConsistent {
+                elements: vec!["c".into(), "ghost".into()],
+                dimensions: vec![TypographyDimension::FontSize],
+            },
+            Assertion::NoLayoutShiftSince {
+                baseline: "never-registered".into(),
+                tolerance_px: None,
+            },
+            Assertion::NoClipping { region: None },
+            Assertion::AnimationSettled {
+                region: None,
+                settle_frames: None,
+            },
+            Assertion::ContrastMeetsWcag {
+                element: "a".into(),
+                level: WcagLevel::Aa,
+            },
+        ];
+
+        let mut seen_pass = false;
+        let mut seen_fail = false;
+        let mut seen_unknown = false;
+        for a in &all {
+            let res = eval_on(&snap, a);
+            assert_eq!(
+                res.passed,
+                res.outcome == AssertionOutcome::Passed,
+                "bit and outcome disagree for {a:?}: {res:?}"
+            );
+            match res.outcome {
+                AssertionOutcome::Passed => seen_pass = true,
+                AssertionOutcome::Failed => {
+                    seen_fail = true;
+                    assert!(res.detail.is_some(), "a failure must say why: {a:?}");
+                }
+                AssertionOutcome::Unknown => {
+                    seen_unknown = true;
+                    assert!(
+                        res.detail.is_some(),
+                        "an unknown whose detail does not name the missing input is \
+                         indistinguishable from a failure: {a:?}"
+                    );
+                }
+            }
+        }
+        // A corpus that exercises only one arm would satisfy the invariant
+        // vacuously.
+        assert!(seen_pass && seen_fail && seen_unknown, "corpus is too thin");
+    }
+
+    /// The distinction the third state exists for: `element_above` with no
+    /// evidence is NOT the same result as `element_above` with evidence that
+    /// refutes it. Both are red; only one of them says the page is wrong.
+    #[test]
+    fn cannot_answer_is_unknown_while_a_real_inversion_is_failed() {
+        let z = |id: &str, zi: Option<i32>| Element {
+            id: id.into(),
+            bbox: Some(Region {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+            }),
+            z_index: zi,
+            ..Default::default()
+        };
+
+        // No z_index anywhere, no occluded_by: nothing was measured.
+        let blind = snap_of(vec![z("a", None), z("b", None)]);
+        let res = eval_on(&blind, &above(["a", "b"], true));
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
+        assert!(!res.passed, "an un-evaluated assertion must not be green");
+        assert!(res.detail.as_deref().unwrap().contains("CANNOT ANSWER"));
+
+        // Measured, and the ordering is the other way round.
+        let inverted = snap_of(vec![z("a", Some(1)), z("b", Some(9))]);
+        let res = eval_on(&inverted, &above(["a", "b"], true));
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{:?}", res.detail);
+        assert!(res.detail.as_deref().unwrap().contains("paints BELOW"));
+
+        // And the producer's own attribution refuting it is likewise a real
+        // failure, not an absence of evidence.
+        let mut attributed = snap_of(vec![z("a", None), z("b", None)]);
+        attributed.elements[0].occluded_by = Some("b".into());
+        let res = eval_on(&attributed, &above(["a", "b"], true));
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{:?}", res.detail);
+    }
+
+    /// The CANNOT ANSWER detail is the only place a producer is warned off
+    /// projecting a raw CSS `z-index` into `z_index`. Losing that sentence
+    /// would cost nothing visible and invert verdicts silently, so it is
+    /// pinned.
+    #[test]
+    fn cannot_answer_names_the_global_paint_rank_contract() {
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        let detail = eval_on(&snap, &above(["a", "b"], true))
+            .detail
+            .expect("cannot-answer carries a detail");
+        assert!(detail.contains("raw CSS"), "{detail}");
+        assert!(detail.contains("GLOBAL"), "{detail}");
+    }
+
+    /// `animation_settled` used to return a `pass_with` "skipping" note. No
+    /// caller has ever supplied the successive captures it needs — the
+    /// runner's `vision/assert` maps every assertion straight through
+    /// `evaluate` — so that was an unconditional green gate over an
+    /// assertion nobody had ever evaluated.
+    #[test]
+    fn animation_settled_reports_unknown_rather_than_passing_vacuously() {
+        let snap = snap_of(vec![el("a", 0, 0, 10, 10)]);
+        let res = eval_on(
+            &snap,
+            &Assertion::AnimationSettled {
+                region: None,
+                settle_frames: Some(3),
+            },
+        );
+        assert_eq!(res.outcome, AssertionOutcome::Unknown);
+        assert!(!res.passed, "a gate that never ran must not report green");
+        assert!(res
+            .detail
+            .as_deref()
+            .unwrap()
+            .contains("nothing was measured"));
+    }
+
+    /// An operand the producer never registered is a gap in the snapshot,
+    /// not a defect in the page. Reported as a failure it sends a reader
+    /// hunting a layout bug that no evidence points at.
+    #[test]
+    fn a_missing_operand_is_unknown_not_failed() {
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100)]);
+        let cases: Vec<Assertion> = vec![
+            Assertion::NoOverlap {
+                elements: ["a".into(), "unregistered".into()],
+                tolerance_px: None,
+            },
+            above(["a", "unregistered"], false),
+            Assertion::TextFitsContainer {
+                element: "unregistered".into(),
+            },
+            Assertion::AlignedHorizontally {
+                elements: vec!["a".into(), "unregistered".into()],
+                axis_tolerance_px: None,
+            },
+            Assertion::ColorWithin {
+                element: "unregistered".into(),
+                expected: Rgb::new(0, 0, 0),
+                delta_e_max: None,
+            },
+            Assertion::ContrastMeetsWcag {
+                element: "unregistered".into(),
+                level: WcagLevel::Aa,
+            },
+        ];
+        for a in &cases {
+            let res = eval_on(&snap, a);
+            assert_eq!(
+                res.outcome,
+                AssertionOutcome::Unknown,
+                "{a:?} -> {:?}",
+                res.detail
+            );
+            assert!(
+                res.detail
+                    .as_deref()
+                    .unwrap()
+                    .contains("not in the snapshot"),
+                "the detail must name the gap: {:?}",
+                res.detail
+            );
+        }
+    }
+
+    /// A caller that supplies no snapshot at all learns that nothing ran,
+    /// rather than that everything failed.
+    #[test]
+    fn no_snapshot_makes_every_assertion_unknown() {
+        let res = evaluate(
+            &Assertion::NoClipping { region: None },
+            &EvalContext::default(),
+        );
+        assert_eq!(res.outcome, AssertionOutcome::Unknown);
+        assert!(!res.passed);
+    }
+
+    /// Wire shape. `passed` stays where every existing consumer reads it,
+    /// and `unknown` is false there — the gate does not change.
+    #[test]
+    fn unknown_serializes_as_not_passed() {
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        let v = serde_json::to_value(eval_on(&snap, &above(["a", "b"], true))).unwrap();
+        assert_eq!(v["passed"], serde_json::json!(false));
+        assert_eq!(v["outcome"], serde_json::json!("unknown"));
+    }
+
+    /// A result written before `outcome` existed still parses. Its `false`
+    /// carried no third state, so it reads back as `Failed` — which is
+    /// exactly what that bit meant when it was written, not a guess.
+    #[test]
+    fn a_result_without_an_outcome_field_parses_from_the_bit() {
+        let legacy = serde_json::json!({
+            "passed": false,
+            "detail": "a and b overlap by 4 px\u{00b2}",
+            "assertion": { "type": "no_overlap", "elements": ["a", "b"] }
+        });
+        let res: AssertionResult = serde_json::from_value(legacy).unwrap();
+        assert_eq!(res.outcome, AssertionOutcome::Failed);
+        assert!(!res.passed);
+
+        let legacy_pass = serde_json::json!({
+            "passed": true,
+            "assertion": { "type": "no_clipping" }
+        });
+        let res: AssertionResult = serde_json::from_value(legacy_pass).unwrap();
+        assert_eq!(res.outcome, AssertionOutcome::Passed);
+        assert!(res.passed);
+    }
+
+    /// A payload whose two fields disagree is repaired toward the richer
+    /// one rather than carried forward inconsistent — otherwise the
+    /// invariant `passed == outcome.passed()` would hold everywhere except
+    /// across a deserialization boundary, which is where it matters most.
+    #[test]
+    fn a_disagreeing_payload_is_repaired_toward_the_outcome() {
+        let contradictory = serde_json::json!({
+            "passed": true,
+            "outcome": "unknown",
+            "assertion": { "type": "no_clipping" }
+        });
+        let res: AssertionResult = serde_json::from_value(contradictory).unwrap();
+        assert_eq!(res.outcome, AssertionOutcome::Unknown);
+        assert!(!res.passed, "the bit must follow the outcome");
     }
 
     #[test]

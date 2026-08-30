@@ -29,7 +29,8 @@ use std::process::ExitCode;
 
 use qontinui_vision_core::analyzers::{self, AnalyzeInput, Analyzer, Finding, Severity};
 use qontinui_vision_core::assertions::{
-    evaluate as evaluate_assertion, Assertion, AssertionResult, BaselineEntry, EvalContext,
+    evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
+    EvalContext,
 };
 use qontinui_vision_core::element_snapshot::{display_snapshot_id, ElementSnapshot};
 use qontinui_vision_core::frame::{Frame, FrameSource};
@@ -78,7 +79,10 @@ ANALYZE:
 ASSERT:
     --assertions JSON array of assertion objects ({\"type\":\"no_overlap\", ...}).
     --baseline-dir  dir of <name>.json baselines for no_layout_shift_since.
-    Exit 0 iff every assertion passed; else 2.
+    Exit 0 iff every assertion PASSED; else 2. An assertion that could not be
+    evaluated (missing element, missing measurement, unregistered baseline)
+    reports `outcome: \"unknown\"` and is NOT a pass -- it counts toward exit 2,
+    because an unchecked assertion must never read as a green one.
 
 BASELINE:
     Serialize the snapshot's element bboxes to <baseline-dir>/<name>.json so a
@@ -528,7 +532,17 @@ pub fn parse_assertions(bytes: &[u8]) -> Result<Vec<Assertion>, String> {
 pub struct AssertReport {
     all_passed: bool,
     passed: usize,
+    /// Assertions that were EVALUATED and VIOLATED. Before the tri-state
+    /// landed this counted `unknown` too, which made a suite whose operands
+    /// were simply absent from the snapshot read as a page full of layout
+    /// bugs. The gate is unchanged — `all_passed` is still
+    /// `failed + unknown == 0` — only the attribution is now honest.
     failed: usize,
+    /// Assertions that could NOT be evaluated: a missing operand, a
+    /// measurement field the producer does not populate, an unregistered
+    /// baseline. Counted separately because "we did not check" and "we
+    /// checked and it is broken" call for different work.
+    unknown: usize,
     results: Vec<AssertionResult>,
     /// Which snapshot this verdict judged — echoed verbatim from
     /// [`ElementSnapshot::snapshot_id`]. `None` when the snapshot carried no
@@ -557,12 +571,19 @@ pub fn assert_all(
         .iter()
         .map(|a| evaluate_assertion(a, &ctx))
         .collect();
-    let passed = results.iter().filter(|r| r.passed).count();
-    let failed = results.len() - passed;
+    let passed = results
+        .iter()
+        .filter(|r| r.outcome == AssertionOutcome::Passed)
+        .count();
+    let unknown = results.iter().filter(|r| r.outcome.is_unknown()).count();
+    let failed = results.len() - passed - unknown;
     AssertReport {
-        all_passed: failed == 0,
+        // An un-evaluated assertion is not a pass. Same gate as before the
+        // tri-state: only `Passed` is green.
+        all_passed: failed + unknown == 0,
         passed,
         failed,
+        unknown,
         results,
         snapshot_id: snapshot.snapshot_id.clone(),
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
@@ -573,10 +594,11 @@ pub fn assert_all(
 
 fn assert_summary(report: &AssertReport) -> String {
     let mut lines = vec![format!(
-        "vision-audit assert: {} passed, {} failed of {} -> {}",
+        "vision-audit assert: {} passed, {} failed, {} not evaluated of {} -> {}",
         report.passed,
         report.failed,
-        report.passed + report.failed,
+        report.unknown,
+        report.passed + report.failed + report.unknown,
         if report.all_passed {
             "PASS (exit 0)"
         } else {
@@ -589,14 +611,28 @@ fn assert_summary(report: &AssertReport) -> String {
     if let Some(id) = &report.snapshot_id {
         lines.push(format!("  snapshot: {}", display_snapshot_id(id)));
     }
+    // Label the two red kinds apart. A reader triaging a red gate needs to
+    // know which lines send them to the UI and which send them to the
+    // producer; before the tri-state both said FAIL.
     for r in &report.results {
-        if !r.passed {
-            lines.push(format!(
-                "  FAIL {}: {}",
-                assertion_type_name(&r.assertion),
-                r.detail.as_deref().unwrap_or("(no detail)")
-            ));
-        }
+        let label = match r.outcome {
+            AssertionOutcome::Passed => continue,
+            AssertionOutcome::Failed => "FAIL",
+            AssertionOutcome::Unknown => "UNKNOWN",
+        };
+        lines.push(format!(
+            "  {label} {}: {}",
+            assertion_type_name(&r.assertion),
+            r.detail.as_deref().unwrap_or("(no detail)")
+        ));
+    }
+    if report.unknown > 0 {
+        lines.push(
+            "  note: UNKNOWN lines were never evaluated — the snapshot (or the caller) did not \
+             carry what they needed. They are red because an unchecked assertion must not read \
+             as a passing one, NOT because the page is known to be wrong."
+                .to_string(),
+        );
     }
     lines.join("\n")
 }

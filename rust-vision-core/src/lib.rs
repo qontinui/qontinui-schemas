@@ -26,8 +26,8 @@ pub mod strip;
 
 pub use analyzers::{AnalyzeInput, Analyzer, Finding, Severity};
 pub use assertions::{
-    evaluate as evaluate_assertion, Assertion, AssertionResult, BaselineEntry, EvalContext,
-    OcrBlockRef, TextMatchKind, TextTarget, TypographyDimension, WcagLevel,
+    evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
+    EvalContext, OcrBlockRef, TextMatchKind, TextTarget, TypographyDimension, WcagLevel,
 };
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};

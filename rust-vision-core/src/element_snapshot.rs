@@ -212,14 +212,54 @@ pub struct Element {
     // strongest finding it could produce was the symmetric "A and B
     // overlap". Occlusion is a DIRECTED relation, and these carry the
     // direction.
-    /// Resolved stacking order, as the producer's layout engine computed
-    /// it (CSS `z-index` with `auto` resolved against the painting order,
-    /// or the platform equivalent). Higher paints later, i.e. on top.
+    /// **A GLOBAL PAINT RANK over the whole snapshot — not a CSS
+    /// `z-index`.** Higher paints later, i.e. on top. Two elements' values
+    /// are comparable to each other whatever their position in the tree, and
+    /// every consumer in this crate compares them that way.
+    ///
+    /// # Producer contract
+    ///
+    /// The producer must emit the element's rank in the document's RESOLVED
+    /// painting order — the position a full traversal of the stacking-context
+    /// tree gives it. Concretely, a DFS over the stacking contexts,
+    /// numbering elements in the order they are painted.
+    ///
+    /// **`getComputedStyle(el).zIndex` is NOT this value and must never be
+    /// projected into this field.** A CSS `z-index` is resolved *within* its
+    /// own stacking context, so it is meaningless across contexts, and
+    /// writing it here does not merely lose precision — it INVERTS verdicts,
+    /// silently, in exactly the case these fields exist to catch:
+    ///
+    /// > A `z-50` dropdown nested inside a `z-10` title bar paints *below* a
+    /// > `z-20` panel that is a sibling of that title bar, because the title
+    /// > bar establishes a context and the dropdown is resolved inside it.
+    /// > Under a raw CSS projection the comparison reads `50 > 20` and
+    /// > reports the OPPOSITE of the truth — while passing cleanly, both
+    /// > before and after anyone fixes the bug. The resolved ranks for that
+    /// > shape are title-bar 10 / dropdown 11 / panel 20.
+    ///
+    /// The absolute values carry no meaning; only their ORDER does. A
+    /// producer is free to emit dense ranks (0, 1, 2, …) rather than
+    /// anything resembling CSS values, and doing so is the clearer signal
+    /// that a resolver — not a style read — produced them.
+    ///
+    /// # Absence
     ///
     /// `None` means the producer could not determine stacking — treated as
     /// UNKNOWN by every consumer, never as zero. A snapshot with no
     /// `z_index` anywhere cannot answer an occlusion question, and
-    /// [`crate::analyzers::layout`] says so rather than guessing.
+    /// [`crate::analyzers::layout`] says so rather than guessing, as does
+    /// [`crate::assertions::Assertion::ElementAbove`]. Emitting a wrong rank
+    /// is strictly worse than emitting none: absence is refused honestly,
+    /// while a per-context value is believed.
+    ///
+    /// # Which consumer proves what
+    ///
+    /// The evaluators here are pinned against hand-built resolved snapshots,
+    /// which is necessary but **cannot police the producer** — no test in
+    /// this crate can see how a capture side computed the number. Whoever
+    /// ships a capture side owes an end-to-end fixture of the nested-dropdown
+    /// shape above.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub z_index: Option<i32>,
     /// Whether the element is genuinely rendered AND reachable — not
