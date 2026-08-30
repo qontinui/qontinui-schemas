@@ -392,8 +392,17 @@ jobs:
             echo "| ref | \`${SIB_REF:-main}\` |"
             echo "| pinned sha | \`${SIB_SHA:-n/a - default branch tip}\` |"
             echo ""
+            # The resolver emits exactly one of: `none`; `trailing-declined`;
+            # or a `+`-joined subset of the four declaration forms
+            # (`downstream-of`, `upstream-of`, `self-upstream-of`,
+            # `sibling-downstream-of`) — action.yml:567-577,615 build it and
+            # :249-258 document it. `none` and `trailing-declined` are assigned
+            # standalone and are never `+`-joined, so they need no suffix
+            # alternate; everything else is a resolved declaration and falls to
+            # `*)`. Keep this list checkable against those lines rather than
+            # guessing at suffixes the action does not emit.
             case "${SIB_SOURCE:-none}" in
-              none|none+pinned)
+              none)
                 echo "No LEADING qontinui-runner sibling was resolved, so this"
                 echo "regenerated against runner's default branch — the correct"
                 echo "baseline for a schemas-only change."
@@ -410,7 +419,7 @@ jobs:
                 echo "go re-pointing the direction, which was the pre-2026-08-27"
                 echo "advice here and is now a dead end."
                 ;;
-              trailing-declined|trailing-declined+pinned)
+              trailing-declined)
                 echo "A declaration was found but it orders the runner PR AFTER this"
                 echo "one, so it was DECLINED and the default branch used instead."
                 echo "If this PR carries bindings for a type that only exists on that"
