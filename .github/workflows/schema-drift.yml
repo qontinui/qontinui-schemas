@@ -139,6 +139,38 @@ on:
   # drift is fixed. `gh workflow run schema-drift.yml --ref main`
   # refreshes the visible status without forcing a noop rust/src/**
   # commit.
+  #
+  # ⚠️ IT REFRESHES THE VISIBLE STATUS ONLY — IT DOES NOT UNBLOCK COORD.
+  # coord scores main from `coord.ci_baselines`, and
+  # `establishes_main_baseline()` accepts `event == Some("push")` and
+  # nothing else (qontinui-coord crates/coord/src/ci_baseline.rs). A
+  # `workflow_dispatch` run neither writes NOR prunes that baseline — the
+  # Option-C refinement is explicit that a red baseline may be cleared
+  # ONLY by a real push verdict. So after a green dispatch you get a green
+  # checkmark on GitHub while coord still reports main-red and still holds
+  # every PR in this repo.
+  #
+  # THE REMEDY IS A RE-RUN, NOT A DISPATCH AND NOT A NEW COMMIT.
+  # `gh run rerun --failed <the failed push run>` re-runs the ORIGINAL
+  # push run: GitHub reuses the same run id, bumps `run_attempt`, and
+  # KEEPS `event: push`, so coord ingests it as a real baseline. coord
+  # says so itself — ci_baseline.rs: "a re-run preserves `event: push`
+  # and writes a real baseline", and the run-id guard is deliberately
+  # `<` rather than `<=` precisely "so an equal id MUST still write …
+  # That is the sanctioned red-main remedy".
+  #
+  # Why not "just push a commit touching a `paths:` glob": while main is
+  # red coord blocks EVERY PR in this repo, including the one carrying
+  # that commit — so it cannot land, and the suggestion is circular. The
+  # re-run needs no PR at all, which is exactly why it is the remedy.
+  #
+  # Note the re-run re-executes at the SAME sha; it clears the red only
+  # if the inputs have genuinely changed since (e.g. the paired
+  # qontinui-runner fix landed on runner main). Re-running against an
+  # unchanged world just reproduces the red.
+  #
+  # Measured 2026-08-30: main sat red ~33h on exactly this shape while
+  # PRs #154 and #155 were blocked behind it.
   workflow_dispatch:
   push:
     branches: [main]
@@ -395,8 +427,11 @@ jobs:
                 echo "AFTER this one), so the declared tree may not be runner main"
                 echo "for a while yet. Two consequences worth expecting rather than"
                 echo "rediscovering: main WILL read red on schema-drift between the"
-                echo "two lands (clear it with 'gh workflow run schema-drift.yml"
-                echo "--ref main' once the sibling lands), and because a trailing"
+                echo "two lands. Once the sibling lands, clear it with"
+                echo "'gh run rerun --failed <failed push run>' -- a re-run keeps"
+                echo "event: push so coord ingests a real baseline. A"
+                echo "'workflow run --ref main' dispatch only refreshes the badge"
+                echo "and leaves coord red), and because a trailing"
                 echo "head is NOT merged with runner main, a red here can come from"
                 echo "an UNRELATED type whose codegen input moved on main since that"
                 echo "head branched. Check that before regenerating anything."
