@@ -60,9 +60,22 @@ These must be green on your PR before merge:
 
   Declare the pair instead. Label **this** PR `coord:downstream-of=qontinui-runner#<n>` (use the `coord-pr-label` skill — it validates the namespace before sending), naming the runner PR that authors the type. `check-drift` then regenerates against **that PR's** tree instead of runner `main`, and it re-runs automatically on the `labeled` event — no manual re-run needed. The same label is what tells coord to land the runner PR first, so satisfying this gate produces the correct cross-repo landing order rather than being extra bookkeeping. The run's summary states which runner tree it used, so check there before believing either colour.
 
-  Only a runner PR that lands **before** this one is followed, because only that tree predicts what runner `main` will hold when this PR lands. A declaration pointing the other way — this PR leads, the runner PR adapts afterwards — is *not* followed, and today it is **indistinguishable from having applied no label at all**: the resolver reads only the two "runner merges first" label forms, so the other direction simply doesn't match and the run falls back to `main` reporting `none`. If you declared a pair and it looks ignored, check the label's direction first. (qontinui-runner#1028 makes that case report `trailing-declined` explicitly; it hasn't landed yet.) For that direction the compile half is covered by `consumer-gate`, but the drift verdict has no hatch.
+  **Both merge orders are followed.** `check-drift` asks a question about the *pair* — "do the checked-in artifacts match what the paired tree generates" — so it must read the declared tree whichever side lands first, and since 2026-08-27 it does (`accept-trailing-sibling` is passed at the resolver step). All four label forms resolve; one edge is enough, because a coord dep-edge is visible from both ends, which is what lets a single declaration serve both repos' gates.
 
-  A green `check-drift` against a declared sibling is a claim about a tree that hasn't landed. The push-triggered run on `main` re-measures against real runner `main` afterwards — so if the pair's landing order slips, expect `main` to red and fix it there rather than assuming the pre-merge green still holds.
+  | Which of the pair lands FIRST | Label **this** PR… | …or label the **runner** PR |
+  | --- | --- | --- |
+  | The runner PR — it authors a type this PR carries bindings for | `coord:downstream-of=qontinui-runner#<n>` | `coord:upstream-of=qontinui-schemas#<n>` |
+  | **This** PR — the runner adapts afterwards | `coord:upstream-of=qontinui-runner#<n>` | `coord:downstream-of=qontinui-schemas#<n>` |
+
+  Declare **one** direction. A pair declared in both is a cycle in coord's dependency graph that would hold both PRs forever, so the resolver hard-fails on it rather than quietly picking a side.
+
+  So if you declared a pair and the run still reports `declaration=none`, **direction is no longer a possible explanation** — it was the right first guess before 2026-08-27 and it is now a dead end. What remains: no coord dep-edge label on either PR, a malformed value, or one naming a **closed** or nonexistent PR.
+
+  A green `check-drift` against a declared sibling is a claim about a tree that **hasn't landed**, and the cost of that is worth expecting rather than rediscovering. Between the two lands `main` here **will** read red on `schema-drift`, and while `main` is red coord holds *every* PR in this repo. Measured 2026-08-30: `main` sat red ~33h on exactly this shape after qontinui-schemas#144 landed ahead of its runner half, with #154 and #155 blocked behind it throughout.
+
+  Clearing it needs a **re-run of the failed push run** (`gh run rerun --failed <run-id>`), and only after the paired runner PR has landed — a re-run re-executes at the same sha, so against an unchanged world it just reproduces the red. A re-run keeps `event: push`, which is what coord ingests as a baseline; `gh workflow run schema-drift.yml --ref main` refreshes the GitHub checkmark but writes no baseline at all (`establishes_main_baseline` accepts `event == Some("push")` and nothing else — qontinui-coord `crates/coord/src/ci_baseline.rs`), so it leaves coord red while looking like it worked. Pushing a fixing commit is circular: it needs a PR, and PRs are what the red is blocking.
+
+  One more asymmetry to expect when the runner PR TRAILS: its head is not merged with runner `main`, so a red here can come from an unrelated type whose codegen input moved on `main` since that head branched. Check that before regenerating anything.
 
 Both are therefore green-or-blocking on *every* PR, not just Rust-touching ones. "Required when it runs" is still the rulesets default in general — checks that didn't trigger don't show as `pending` and don't block merge — but for these two the antecedent is always satisfied. Don't reach for an admin bypass on the theory that one of them "shouldn't have fired".
 
