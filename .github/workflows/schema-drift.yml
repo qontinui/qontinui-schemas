@@ -335,8 +335,12 @@ jobs:
       # WHAT THIS COSTS, stated rather than discovered later. A green here is a
       # claim about a tree that has NOT landed. Between a leading schemas PR
       # landing and its trailing runner PR landing, main's push-triggered run
-      # WILL be red — that is real, it is why `workflow_dispatch` is on this
-      # workflow, and the runner side already accepted the same window. A
+      # WILL be red — that is real, and the runner side already accepted the
+      # same window. Clearing that red needs a RE-RUN of the failed push run
+      # (`gh run rerun --failed <run id>`) once the sibling lands, because only
+      # `event: push` establishes a coord baseline; the `workflow_dispatch`
+      # trigger on this workflow refreshes the badge and leaves coord holding
+      # every PR in the repo. The trigger comment above carries the long form. A
       # trailing head is also not merged with runner main, so if main has moved
       # any codegen input since it branched, the regen reds on UNRELATED types;
       # check that before blaming the schemas author. Note the compile half is
@@ -423,18 +427,47 @@ jobs:
                 echo "and it is why the generated dirs are in this workflow's push"
                 echo "paths. If the pair's landing order slips, expect it to red."
                 echo ""
-                echo "This site accepts a TRAILING sibling (a runner PR that lands"
-                echo "AFTER this one), so the declared tree may not be runner main"
-                echo "for a while yet. Two consequences worth expecting rather than"
-                echo "rediscovering: main WILL read red on schema-drift between the"
-                echo "two lands. Once the sibling lands, clear it with"
-                echo "'gh run rerun --failed <failed push run>' -- a re-run keeps"
-                echo "event: push so coord ingests a real baseline. A"
-                echo "'workflow run --ref main' dispatch only refreshes the badge"
-                echo "and leaves coord red), and because a trailing"
-                echo "head is NOT merged with runner main, a red here can come from"
-                echo "an UNRELATED type whose codegen input moved on main since that"
-                echo "head branched. Check that before regenerating anything."
+                echo "The declared tree is a PR HEAD, not a merge with runner main."
+                echo "If runner main has moved any codegen input since that head"
+                echo "branched, this can red on an UNRELATED type -- check that"
+                echo "before regenerating anything."
+                # Which merge ORDER was declared changes what to expect next, so
+                # say it rather than printing the trailing caveat for both. The
+                # action tracks the same split (action.yml `leads`/`trails`): the
+                # LEADING forms are `downstream-of`/`upstream-of`, the TRAILING
+                # ones `self-upstream-of`/`sibling-downstream-of`. A pair declared
+                # in BOTH directions is rejected before this step runs (a cycle,
+                # action.yml `Contradictory merge ORDER`), so a `+`-join is always
+                # all-leading or all-trailing and this test cannot straddle. Match
+                # TRAILING first: `*upstream-of*` would also catch
+                # `self-upstream-of`.
+                case "${SIB_SOURCE:-}" in
+                  *self-upstream-of*|*sibling-downstream-of*)
+                    echo ""
+                    echo "ORDER: the runner PR is declared to land AFTER this one --"
+                    echo "a TRAILING sibling, which this site accepts. So the tree"
+                    echo "measured above will not be runner main for a while yet,"
+                    echo "and main WILL read red on schema-drift between the two"
+                    echo "lands. Once the sibling lands, clear that red with"
+                    echo "'gh run rerun --failed <the failed push run>': a re-run"
+                    echo "keeps event: push, which is the only event coord accepts"
+                    echo "as a main baseline. A 'gh workflow run schema-drift.yml"
+                    echo "--ref main' dispatch refreshes the badge only -- it leaves"
+                    echo "coord red, and so leaves every PR in this repo held."
+                    ;;
+                  *)
+                    echo ""
+                    echo "ORDER: the runner PR is declared to land BEFORE this one --"
+                    echo "a LEADING sibling. In that order runner main already"
+                    echo "carries the paired change by the time this PR lands, so no"
+                    echo "red window on main is expected. If the order slips and"
+                    echo "this lands first, the trailing case applies instead: main"
+                    echo "reds until the sibling lands, and only"
+                    echo "'gh run rerun --failed <the failed push run>' clears it"
+                    echo "for coord -- a --ref main dispatch refreshes the badge"
+                    echo "and leaves coord red."
+                    ;;
+                esac
                 ;;
             esac
           } >> "$GITHUB_STEP_SUMMARY"

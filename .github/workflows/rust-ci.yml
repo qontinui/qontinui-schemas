@@ -14,7 +14,20 @@ name: Rust CI
 #     no-Rust-change PRs fast.
 #   push: only when Rust sources actually change — main pushes that
 #     don't touch Rust don't need to re-run.
-#   workflow_dispatch: manual escape hatch.
+#   workflow_dispatch: manual escape hatch — for re-running a job whose
+#     failure was environmental. It is NOT a way to clear a red main, and
+#     reaching for it there is the trap schema-drift.yml documents at
+#     length. coord scores main from `coord.ci_baselines`, and
+#     `establishes_main_baseline()` accepts `event == Some("push")` and
+#     nothing else (qontinui-coord crates/coord/src/ci_baseline.rs); a
+#     `workflow_dispatch` run neither writes NOR prunes that row. So a green
+#     dispatch of THIS workflow leaves a green checkmark on GitHub while
+#     coord still reports main-red and still holds every PR in this repo.
+#     The remedy is `gh run rerun --failed <the failed push run>`: a re-run
+#     reuses the run id, bumps `run_attempt` and KEEPS `event: push`, so
+#     coord ingests a real baseline. This is not specific to `check-drift` —
+#     the baseline table is keyed per repo and workflow name, so it applies
+#     to every push-triggered gate here, this one included.
 #   workflow_call: lets publish-rust.yml (F2 hard gate, per
 #     qontinui-dev-notes/rust-release-engineering) reuse this job and
 #     require it green for the tagged commit before publishing.
