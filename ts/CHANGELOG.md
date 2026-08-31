@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.12.1...ts-v0.13.0) (2026-08-31)
+
+
+### Features
+
+* add AgentTextUnit canonical types for the agent text corpus ([c61fc22](https://github.com/qontinui/qontinui-schemas/commit/c61fc2220f76fd0b09567c68099772a366fe0442))
+
 ## [0.12.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.12.0...ts-v0.12.1) (2026-08-28)
 
 

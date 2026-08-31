@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.7.0...rust-v1.8.0) (2026-08-31)
+
+
+### Features
+
+* add AgentTextUnit canonical types for the agent text corpus ([c61fc22](https://github.com/qontinui/qontinui-schemas/commit/c61fc2220f76fd0b09567c68099772a366fe0442))
+
 ## [1.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.6.0...rust-v1.7.0) (2026-08-22)
 
 
