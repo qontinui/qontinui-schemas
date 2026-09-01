@@ -22,6 +22,7 @@ export type { AgentCommand } from './AgentCommand';
 export type { AgentCommandError } from './AgentCommandError';
 export type { AgentCommandVersion } from './AgentCommandVersion';
 export type { AgentTextUnit } from './AgentTextUnit';
+export type { AgentTextUnitDefault } from './AgentTextUnitDefault';
 export type { AgentTextUnitError } from './AgentTextUnitError';
 export type { AgentTextUnitFile } from './AgentTextUnitFile';
 export type { AgentTextUnitVersion } from './AgentTextUnitVersion';

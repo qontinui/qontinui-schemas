@@ -591,6 +591,157 @@ impl AgentTextUnitFile {
 }
 
 // ---------------------------------------------------------------------------
+// The embedded-default layer
+// ---------------------------------------------------------------------------
+
+/// One embedded default as the **runner binary** ships it, on its way to the
+/// account so there is a baseline to diff an override against.
+///
+/// ## Why this exists as a third layer
+///
+/// [`AgentTextUnit`]'s resolution chain is
+/// `account override → fleet default → embedded default (runner binary)`, and
+/// the store holds rows for the first two only — the binary's copy has never
+/// had a row anywhere. That is the gap this type closes. A user who overrode
+/// `/implement-plan` can diff their versions against each other but not
+/// against what actually ships, and `ResetToDefaultDialog` cannot preview the
+/// text it is about to restore, because there is no baseline to put on the
+/// left-hand side.
+///
+/// Plan `2026-08-31-runner-publishes-embedded-command-defaults`; the deferral
+/// it discharges is recorded in the code at qontinui-web's
+/// `settings/agent-commands/_components/VersionDiff.tsx`.
+///
+/// ## What it is NOT
+///
+/// * **Not an [`AgentTextUnit`].** There is no `id`, no version chain, and no
+///   `is_shared` — a published default is content plus provenance, not a
+///   corpus row with an edit history. It is the *input* to a row.
+/// * **Not fleet-scoped.** `organization_id` is deliberately absent from the
+///   wire: the runner publishes with the operator's own user bearer, so the
+///   server assigns the org from that credential. A client-supplied org — or
+///   the fleet layer's `organization_id IS NULL` — would let any signed-in
+///   user rewrite another tenant's baseline, or silently clobber an
+///   operator's deliberate fleet default.
+/// * **Not authoritative for provisioning.** The runner keeps resolving
+///   `fresh fetch → disk cache → embedded default`; this is a *display*
+///   baseline. Publishing it must never put the network on the
+///   out-of-the-box path.
+///
+/// ## The checksum is the files-map digest, not the single-body one
+///
+/// [`checksum`](Self::checksum) is [`agent_text_unit_files_checksum`] — the
+/// same digest [`AgentTextUnit::checksum`] and [`AgentTextUnitVersion`] carry,
+/// so a published default and the override it is diffed against are
+/// comparable. It is **not**
+/// [`crate::agent_commands::agent_command_checksum`], which digests a single
+/// body and is what the legacy `/agent-commands` wire still carries. Those two
+/// deliberately disagree even for a one-entry map, so a default digested with
+/// the wrong one would never compare equal to its override — an always-drifted
+/// baseline, which is strictly worse than the honest "baseline unavailable"
+/// state it would replace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AgentTextUnitDefault {
+    /// What sort of unit this default is. The corpus is `kind`-discriminated,
+    /// so the default layer must be too — otherwise a command and a skill of
+    /// the same name collapse into one baseline.
+    pub kind: AgentTextUnitKind,
+
+    /// The unit slug, e.g. `vet-plan`. Must satisfy the same
+    /// [`validate_agent_text_unit_name`] rules as an override: a default that
+    /// could not be named as an override could never be paired with one for a
+    /// diff, which is the only thing it is for.
+    pub name: String,
+
+    /// The embedded content: **relative path → text**. A command carries one
+    /// entry; a skill carries `SKILL.md` plus siblings. Same arity-agnostic
+    /// shape as [`AgentTextUnit::files`].
+    pub files: AgentTextUnitFiles,
+
+    /// Canonical digest over [`files`](Self::files), from
+    /// [`agent_text_unit_files_checksum`].
+    ///
+    /// Required, unlike [`AgentTextUnit::checksum`] — that one is optional only
+    /// to describe rows written before a checksum was computed, whereas a
+    /// publish is always freshly computed. The receiving store **recomputes it
+    /// and rejects a mismatch**: a client-asserted digest is not evidence.
+    /// [`checksum_matches`](Self::checksum_matches) is that check.
+    pub checksum: String,
+
+    /// The runner version that published this body, e.g. `"0.4.12"`.
+    ///
+    /// Carried so the UI can label the baseline **"published by runner
+    /// vX.Y.Z"** rather than "the default" — an org whose devices run
+    /// different builds has no single default, and the label must not claim
+    /// otherwise. It is also the monotonic guard's input: the store rejects a
+    /// publish older than the version it already holds.
+    ///
+    /// That guard is a **mitigation, not a fix** — a genuine downgrade still
+    /// wins and equal versions tie-break last-writer — so neither this field
+    /// nor the UI built on it may describe the baseline as authoritative.
+    pub published_by_version: String,
+
+    /// ISO 8601 (RFC 3339) publish timestamp, matching this module's wire
+    /// convention for [`AgentTextUnit::updated_at`] and
+    /// [`AgentTextUnitVersion::created_at`].
+    pub published_at: String,
+}
+
+impl AgentTextUnitDefault {
+    /// The key of [`files`](Self::files) holding this default's primary text,
+    /// derived from `(kind, name)`.
+    ///
+    /// Not a stored field: [`AgentTextUnit::entrypoint`] is recomputed on every
+    /// response and ignored on write, so carrying one here would be a second
+    /// copy of a derived value that could only ever disagree.
+    pub fn entrypoint(&self) -> String {
+        agent_text_unit_entrypoint(&self.kind, &self.name)
+    }
+
+    /// The digest [`checksum`](Self::checksum) *should* hold, recomputed from
+    /// [`files`](Self::files).
+    pub fn computed_checksum(&self) -> String {
+        agent_text_unit_files_checksum(&self.files)
+    }
+
+    /// Whether the carried [`checksum`](Self::checksum) matches the content.
+    ///
+    /// The store calls this after [`validate_agent_text_unit_default`] and
+    /// refuses the publish when it is `false`. Kept separate from validation
+    /// because a mismatch is a *transport or client* fault, not a malformed
+    /// unit, and the two deserve different refusals.
+    pub fn checksum_matches(&self) -> bool {
+        self.checksum == self.computed_checksum()
+    }
+
+    /// This default's content as a path-ordered list of
+    /// [`AgentTextUnitFile`]s — the form a diff view iterates.
+    pub fn files_sorted(&self) -> Vec<AgentTextUnitFile> {
+        AgentTextUnitFile::from_map(&self.files)
+    }
+}
+
+/// Validate a published default at the write boundary.
+///
+/// Applies exactly the rules an override must satisfy — name, kind, file
+/// paths, size bounds, and the presence of the `(kind, name)` entrypoint — by
+/// delegating to [`validate_agent_text_unit_name`],
+/// [`validate_agent_text_unit_kind`] and [`validate_agent_text_unit_files`].
+/// Nothing is relaxed for defaults: a baseline that could not itself be stored
+/// as a unit is not a baseline anything can be diffed against.
+///
+/// The checksum is deliberately **not** checked here — see
+/// [`AgentTextUnitDefault::checksum_matches`] for why it is a separate step.
+pub fn validate_agent_text_unit_default(
+    unit: &AgentTextUnitDefault,
+) -> Result<(), AgentTextUnitError> {
+    validate_agent_text_unit_kind(&unit.kind)?;
+    validate_agent_text_unit_name(&unit.name)?;
+    validate_agent_text_unit_files(&unit.kind, &unit.name, &unit.files)?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Write-boundary primitives
 // ---------------------------------------------------------------------------
 
@@ -1727,5 +1878,130 @@ mod tests {
             agent_text_unit_files_canonical_stream(&content),
             b"5\n\xc3\xa9.md2\n\xce\xbb".to_vec()
         );
+    }
+
+    // -- AgentTextUnitDefault (the embedded-default layer) -------------------
+
+    fn a_default(name: &str, entries: &[(&str, &str)]) -> AgentTextUnitDefault {
+        let files = files(entries);
+        AgentTextUnitDefault {
+            kind: AgentTextUnitKind::command(),
+            name: name.to_string(),
+            checksum: agent_text_unit_files_checksum(&files),
+            files,
+            published_by_version: "0.4.12".to_string(),
+            published_at: "2026-08-31T12:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn default_round_trips_over_the_wire() {
+        let unit = a_default("vet-plan", &[("vet-plan.md", "# Vet Plan\n")]);
+        let json = serde_json::to_string(&unit).unwrap();
+        let back: AgentTextUnitDefault = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, unit);
+    }
+
+    #[test]
+    fn default_carries_no_organization_on_the_wire() {
+        // Org scoping is assigned server-side from the publishing bearer. A
+        // client-supplied org would let any signed-in user write another
+        // tenant's baseline, so the field must not exist to be supplied.
+        let json = serde_json::to_value(a_default("gate", &[("gate.md", "x")])).unwrap();
+        assert!(json.get("organization_id").is_none());
+        assert!(json.get("id").is_none());
+    }
+
+    #[test]
+    fn default_checksum_matches_its_own_content() {
+        assert!(a_default("policy", &[("policy.md", "body")]).checksum_matches());
+    }
+
+    #[test]
+    fn default_detects_an_asserted_checksum_that_does_not_match() {
+        // A client-asserted digest is not evidence; the store recomputes.
+        let mut unit = a_default("policy", &[("policy.md", "body")]);
+        unit.files
+            .insert("policy.md".to_string(), "edited".to_string());
+        assert!(!unit.checksum_matches());
+        assert_eq!(
+            unit.computed_checksum(),
+            agent_text_unit_files_checksum(&unit.files)
+        );
+    }
+
+    #[test]
+    fn default_checksum_is_the_files_digest_not_the_single_body_one() {
+        // THE trap this layer exists to avoid. `agent_command_checksum`
+        // digests a bare body; `agent_text_unit_files_checksum` digests the
+        // path→text map, and the two disagree even at one entry. A default
+        // digested with the legacy function would never compare equal to the
+        // override it is meant to be diffed against — an always-drifted
+        // baseline, worse than the honest "baseline unavailable" state.
+        let body = "# Vet Plan\n";
+        let unit = a_default("vet-plan", &[("vet-plan.md", body)]);
+        assert_ne!(
+            unit.checksum,
+            crate::agent_commands::agent_command_checksum(body),
+            "the two digests must stay distinguishable at arity one"
+        );
+        assert!(unit.checksum.starts_with("sha256-"));
+    }
+
+    #[test]
+    fn default_entrypoint_is_derived_not_stored() {
+        let unit = a_default("vet-plan", &[("vet-plan.md", "x")]);
+        assert_eq!(
+            unit.entrypoint(),
+            agent_text_unit_entrypoint(&unit.kind, &unit.name)
+        );
+        let json = serde_json::to_value(&unit).unwrap();
+        assert!(json.get("entrypoint").is_none());
+    }
+
+    #[test]
+    fn default_holds_a_multi_file_skill_the_same_way_as_a_command() {
+        // Commands and skills are one shape at two arities — the default layer
+        // must not special-case either, or it can never carry the skills and
+        // agents bundles.
+        let files = files(&[("SKILL.md", "# Skill\n"), ("run.sh", "echo hi\n")]);
+        let unit = AgentTextUnitDefault {
+            kind: AgentTextUnitKind::skill(),
+            name: "coord-revive".to_string(),
+            checksum: agent_text_unit_files_checksum(&files),
+            files,
+            published_by_version: "0.4.12".to_string(),
+            published_at: "2026-08-31T12:00:00Z".to_string(),
+        };
+        assert!(unit.checksum_matches());
+        assert!(validate_agent_text_unit_default(&unit).is_ok());
+        assert_eq!(unit.files_sorted().len(), 2);
+    }
+
+    #[test]
+    fn default_validation_applies_the_same_rules_as_an_override() {
+        assert!(
+            validate_agent_text_unit_default(&a_default("vet-plan", &[("vet-plan.md", "x")]))
+                .is_ok()
+        );
+
+        // A name an override could not take, a default may not take either —
+        // the two must be pairable for a diff.
+        assert!(matches!(
+            validate_agent_text_unit_default(&a_default("Vet-Plan", &[("Vet-Plan.md", "x")])),
+            Err(AgentTextUnitError::InvalidName { .. })
+        ));
+
+        // Missing entrypoint for the (kind, name).
+        assert!(matches!(
+            validate_agent_text_unit_default(&a_default("vet-plan", &[("other.md", "x")])),
+            Err(AgentTextUnitError::MissingEntrypoint { .. })
+        ));
+
+        // Empty file set.
+        assert!(matches!(
+            validate_agent_text_unit_default(&a_default("vet-plan", &[])),
+            Err(AgentTextUnitError::EmptyFileSet)
+        ));
     }
 }

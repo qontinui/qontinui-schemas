@@ -24,6 +24,7 @@ from .per_type.agent_command import AgentCommand
 from .per_type.agent_command_error import AgentCommandError
 from .per_type.agent_command_version import AgentCommandVersion
 from .per_type.agent_text_unit import AgentTextUnit
+from .per_type.agent_text_unit_default import AgentTextUnitDefault
 from .per_type.agent_text_unit_error import AgentTextUnitError
 from .per_type.agent_text_unit_file import AgentTextUnitFile
 from .per_type.agent_text_unit_version import AgentTextUnitVersion
@@ -574,6 +575,7 @@ __all__ = [
     "AgentCommandError",
     "AgentCommandVersion",
     "AgentTextUnit",
+    "AgentTextUnitDefault",
     "AgentTextUnitError",
     "AgentTextUnitFile",
     "AgentTextUnitVersion",
