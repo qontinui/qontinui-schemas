@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.13.0...ts-v0.14.0) (2026-09-02)
+
+
+### Features
+
+* AgentTextUnitDefault — the embedded-default layer the corpus never had ([de80cca](https://github.com/qontinui/qontinui-schemas/commit/de80ccab1ebcf29ea6f71c572ba3c2b345a399f8))
+
 ## [0.13.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.12.1...ts-v0.13.0) (2026-08-31)
 
 

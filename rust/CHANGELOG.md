@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.8.0...rust-v1.9.0) (2026-09-02)
+
+
+### Features
+
+* AgentTextUnitDefault — the embedded-default layer the corpus never had ([de80cca](https://github.com/qontinui/qontinui-schemas/commit/de80ccab1ebcf29ea6f71c572ba3c2b345a399f8))
+
 ## [1.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.7.0...rust-v1.8.0) (2026-08-31)
 
 
