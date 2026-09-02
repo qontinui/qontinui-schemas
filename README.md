@@ -12,17 +12,17 @@ This package provides schema definitions used across multiple Qontinui services:
 
 ## CI schema drift check
 
-The generated TypeScript (`ts/src/generated/`) and Python (`src/qontinui_schemas/generated/`) bindings are produced from the Rust schema crate by `qontinui-runner/src-tauri/scripts/generate_types.sh`. A GitHub Actions workflow (`.github/workflows/schema-drift.yml`) re-runs the generator on every push and pull request to `main` that touches the Rust schema sources, the runner-side `schema_export.rs` entry point, or the generator script itself, then fails the build if the working tree has any uncommitted diff under those generated directories.
+The generated TypeScript (`ts/src/generated/`) and Python (`src/qontinui_schemas/generated/`) bindings are produced from this repo's Rust schema crate by qontinui-runner's `src-tauri/scripts/generate_types.sh`. The codegen contract is two-sided: a binding exists only when the type is **defined here** and **registered for export** in the runner (`src-tauri/src/schema_export.rs`). `.github/workflows/schema-drift.yml` (`check-drift`, a required context) re-runs that generator in CI and fails if it produces any diff under those two directories.
 
-If the drift check fails, regenerate the bindings locally and commit the result:
+It runs on **every pull request**. The `pull_request` trigger deliberately carries no path filter: branch protection matches check-runs created by the `pull_request` event, so a filtered trigger that does not fire would leave the required check permanently "missing" and unsatisfiable short of an admin bypass. The `paths:` list filters the **push-to-`main`** trigger only, and it is `rust/src/**`, the workflow file, and both generated directories — the generated directories because a bindings-only PR touches nothing else, and that push run is the only post-merge measurement this gate gets.
 
-```bash
-just generate-types
-git add qontinui-schemas/ts/src/generated qontinui-schemas/src/qontinui_schemas/generated
-git commit -m "chore: regenerate typed bindings"
-```
+Drift introduced from the *other* side of the contract — the runner's `schema_export.rs`, `tauri_event_payloads.rs`, `relay_envelopes.rs`, or `generate_types.sh` itself — is caught by the mirror workflow, qontinui-runner's `qontinui-types-drift.yml`. The two are one cross-repo gate; a `paths:` filter in this repo cannot watch files in that one.
 
-The workflow assumes CI runs from the `qontinui-root` mono-repo checkout (so both `qontinui-runner/` and `qontinui-schemas/` are present side-by-side). If this package is later extracted to a standalone repository, the workflow will need to be adjusted to check out the runner as well (or the generator will need to be vendored into this repo).
+**If `check-drift` reds**, the cheap path is the `regenerated-bindings` artifact the run uploads — it is uploaded on failed runs too, precisely so a red hands you the exact bytes CI expected instead of a diff to reverse-engineer. Download it and commit those bytes. Reproducing the regeneration locally needs a sibling qontinui-runner checkout, its Rust toolchain, and the pinned `datamodel-code-generator`.
+
+**But if the bindings belong to a type that does not exist on qontinui-runner `main` yet, regenerating cannot help you** — that is the common shape for a "regenerate bindings for `<type>`" PR, and the fix is to declare the cross-repo pair with a `coord:` dep-edge label rather than to push anything here. That case, both merge orders, and what a red `main` costs (coord holds *every* PR in this repo until it clears, and only a re-run of the failed **push** run clears it — a `workflow_dispatch` refreshes the badge and leaves coord red) are documented in [CONTRIBUTING.md → CI & Merge Readiness](CONTRIBUTING.md#ci--merge-readiness).
+
+This repo is standalone. The workflow does not assume a `qontinui-root` mono-repo checkout: it checks qontinui-runner out itself, SHA-pinned, through the shared `checkout-sibling` action, and recreates the side-by-side layout (`qontinui-schemas/` + `qontinui-runner/` under `$GITHUB_WORKSPACE`) that `generate_types.sh` and the runner crate's path-deps expect.
 
 ## Why This Package Exists
 
