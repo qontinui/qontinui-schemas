@@ -6,3 +6,18 @@ members = ["rust", "rust-runner-client", "rust-vision-core", "code-graph"]
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/qontinui/qontinui-schemas"
+
+# Workspace-level profile override. Cargo honours [profile.*] only in the
+# workspace root.
+[profile.dev]
+# incremental: OFF, and it is a DISK decision, not a speed one. rustc keys its
+# incremental cache on the SOURCE PATH, so the many worktrees that share this
+# repo's CARGO_TARGET_DIR each mint their own cache inside it, and nothing
+# reaps them. Measured on merytshost 2026-09-02: target/debug/incremental held
+# 2.0 GB across 26 per-source-tree caches — small here, but the same defect
+# that put 101 GB in qontinui-runner and 236 GB in qontinui-coord, where it
+# drove the root fs to 100% and made Rust phase agents die with `No space left
+# on device` (coord finding 91ff6f2d). A developer who wants incremental
+# locally overrides per-invocation with CARGO_INCREMENTAL=1.
+# Sibling fixes: qontinui-coord#1851, qontinui-runner#1302.
+incremental = false
