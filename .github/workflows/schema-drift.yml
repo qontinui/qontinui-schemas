@@ -390,18 +390,54 @@ jobs:
             echo "| --- | --- |"
             echo "| declaration | \`${SIB_SOURCE:-none}\` |"
             echo "| ref | \`${SIB_REF:-main}\` |"
-            echo "| pinned sha | \`${SIB_SHA:-n/a - default branch tip}\` |"
+            echo "| commit | \`${SIB_SHA:-n/a - default branch tip}\` |"
             echo ""
             # The resolver emits exactly one of: `none`; `trailing-declined`;
             # or a `+`-joined subset of the four declaration forms
             # (`downstream-of`, `upstream-of`, `self-upstream-of`,
-            # `sibling-downstream-of`) — action.yml:567-577,615 build it and
-            # :249-258 document it. `none` and `trailing-declined` are assigned
-            # standalone and are never `+`-joined, so they need no suffix
-            # alternate; everything else is a resolved declaration and falls to
-            # `*)`. Keep this list checkable against those lines rather than
-            # guessing at suffixes the action does not emit.
+            # `sibling-downstream-of`). ANY of those may carry a trailing
+            # `+pinned`. Checkable against the action rather than guessed at:
+            # its `add_form`/`SOURCE=` lines build the join, `apply_pin`
+            # appends the suffix, and the `source:` output description spells
+            # out both. Cited by NAME, not by line number — the numbers this
+            # list used to carry had already moved by the time anyone re-read
+            # them, which is how the suffix came to be called nonexistent.
+            #
+            # `+pinned` IS emitted, and this site does not opt in to it: the
+            # action's `pin-file` input defaults to a non-empty path
+            # (`.github/sibling-pins.conf`), and `apply_pin` resolves that
+            # against $GITHUB_WORKSPACE first, then against the root of the
+            # repo owning the action. From here the second path is the
+            # RUNNER's manifest, because this job checks schemas out under
+            # `path: qontinui-schemas` so $GITHUB_WORKSPACE/.github does not
+            # exist. Neither manifest lists qontinui/qontinui-runner today, so
+            # the suffix cannot fire — but that is a fact about two config
+            # files, one of them in another repo, not a property of this
+            # workflow. Route it EXPLICITLY and FIRST. A pin means the tree
+            # came from neither a declaration nor a default-branch tip, which
+            # is the third answer the suffix exists to keep distinguishable,
+            # and every other arm below states it wrongly: `*)`, where an
+            # unrouted `none+pinned` lands, would announce a DECLARED runner
+            # PR that was never resolved.
             case "${SIB_SOURCE:-none}" in
+              *+pinned)
+                echo "No declaration resolved, so the RECORDED PIN was used: the"
+                echo "commit above is the one CI is configured to build against --"
+                echo "NOT runner's default-branch tip, and NOT a PR head."
+                echo ""
+                echo "So a green here is a claim about that pinned commit alone. If"
+                echo "runner main has moved a codegen input since the pin was"
+                echo "recorded, this says nothing about whether these bindings match"
+                echo "runner main; the bump PR that moves the pin is where that gets"
+                echo "measured. The pin is deliberately the LOWEST-priority answer --"
+                echo "a coord dep-edge label on this PR outranks it, so declare the"
+                echo "pair to build against a different runner tree for this PR."
+                echo "The resolver's log line above names the manifest and the sha."
+                echo ""
+                echo "The 'ref' row above still reads main. That is the resolver's"
+                echo "default, not a second answer -- a pin is a COMMIT, and the"
+                echo "commit row is what was actually checked out."
+                ;;
               none)
                 echo "No LEADING qontinui-runner sibling was resolved, so this"
                 echo "regenerated against runner's default branch — the correct"
@@ -420,6 +456,16 @@ jobs:
                 echo "advice here and is now a dead end."
                 ;;
               trailing-declined)
+                # UNREACHABLE while this site passes `accept-trailing-sibling:
+                # 'true'` above: the action assigns this value only under
+                # `[ -z "${leads}" ] && [ "${ACCEPT_TRAILING:-false}" != "true" ]`.
+                # Kept rather than deleted, because it is the correct text the
+                # moment that opt-in is removed, and without it such a removal
+                # would fall to `*)` and claim a DECLARED tree was used when
+                # the default branch was. If you are reading this text in a
+                # real run, the opt-in is gone -- check that first, because the
+                # ACCEPTED trailing case is handled by the ORDER split at the
+                # bottom of `*)` instead, not here.
                 echo "A declaration was found but it orders the runner PR AFTER this"
                 echo "one, so it was DECLINED and the default branch used instead."
                 echo "If this PR carries bindings for a type that only exists on that"
