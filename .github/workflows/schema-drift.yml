@@ -118,7 +118,8 @@ name: schema-drift
 # described is the one now closed. See instead "WHAT THIS COSTS" on the
 # resolver step, which states what following an unlanded tree actually buys and
 # what it does not. The governing rule -- compile sites off, pair questions on
-# -- is action.yml:94-98.
+# -- is the compile-vs-pair paragraph in the action's header ("Only a step
+# whose question is genuinely about the PAIR opts in").
 #
 # WHAT THIS DOES ADD TO THE TRUST SURFACE, stated because the paragraph above
 # deliberately narrows the claim. Reusing runner main's ACTION is less trust
@@ -328,8 +329,8 @@ jobs:
       # check the question is about the PAIR — "do the checked-in artifacts
       # match what the paired tree generates" — so it must read that tree in
       # either merge order. That is exactly the axis the action itself sorts on
-      # (action.yml:95-98), and the runner's mirror gate
-      # (`qontinui-types-drift.yml:183`) has been opted in since 2026-08-12.
+      # (the compile-vs-pair paragraph in its header), and the runner's mirror gate
+      # (`qontinui-types-drift.yml`) has been opted in since 2026-08-12.
       # This workflow is its twin; the asymmetry was the anomaly.
       #
       # WHAT THIS COSTS, stated rather than discovered later. A green here is a
@@ -355,10 +356,11 @@ jobs:
           path: ${{ github.workspace }}/qontinui-runner
           # ARMED 2026-08-27. This is a PAIR question, not a compile question,
           # and the action's own rule sorts sites on exactly that axis
-          # (action.yml:95-98): a site asking "do the checked-in artifacts match
-          # what the paired tree generates" must read that tree in EITHER merge
-          # order; every COMPILE site leaves this off. The runner's mirror gate
-          # `qontinui-types-drift.yml:183` has set it since 2026-08-12. This is
+          # (its header's compile-vs-pair paragraph): a site asking "do the
+          # checked-in artifacts match what the paired tree generates" must read
+          # that tree in EITHER merge order; every COMPILE site leaves this off.
+          # The runner's mirror gate `qontinui-types-drift.yml` has set it on
+          # its own `check-drift` sibling checkout since 2026-08-12. This is
           # its twin -- the same contract measured from the other side -- so
           # leaving it off was the asymmetry, not the safe default.
           accept-trailing-sibling: 'true'
@@ -456,16 +458,18 @@ jobs:
                 echo "advice here and is now a dead end."
                 ;;
               trailing-declined)
-                # UNREACHABLE while this site passes `accept-trailing-sibling:
-                # 'true'` above: the action assigns this value only under
-                # `[ -z "${leads}" ] && [ "${ACCEPT_TRAILING:-false}" != "true" ]`.
-                # Kept rather than deleted, because it is the correct text the
-                # moment that opt-in is removed, and without it such a removal
-                # would fall to `*)` and claim a DECLARED tree was used when
-                # the default branch was. If you are reading this text in a
-                # real run, the opt-in is gone -- check that first, because the
-                # ACCEPTED trailing case is handled by the ORDER split at the
-                # bottom of `*)` instead, not here.
+                # UNREACHABLE from this call site, and deliberately kept — the
+                # header says so ("`trailing-declined` is consequently
+                # unreachable ... a silently-missing arm is worse than an
+                # unused one") and this is the arm it is talking about. What
+                # the header does not say, and a reader standing here needs:
+                # the action assigns this value only under
+                # `[ -z "${leads}" ] && [ "${ACCEPT_TRAILING:-false}" != "true" ]`,
+                # so the one thing that can make this text appear in a real run
+                # is the `accept-trailing-sibling: 'true'` above having been
+                # removed. Check that first. And note where the live trailing
+                # case went: an ACCEPTED trailing sibling is `*)` now, handled
+                # by the ORDER split at the bottom of it, not here.
                 echo "A declaration was found but it orders the runner PR AFTER this"
                 echo "one, so it was DECLINED and the default branch used instead."
                 echo "If this PR carries bindings for a type that only exists on that"
