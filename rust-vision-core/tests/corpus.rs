@@ -120,7 +120,22 @@ fn check_one(stem: &str, frame_path: &Path, golden_path: &Path) -> Result<(), St
     for (analyzer_name, expectation) in &golden.analyzers {
         let analyzer = parse_analyzer(analyzer_name)
             .ok_or_else(|| format!("[{stem}] unknown analyzer '{analyzer_name}'"))?;
-        let findings = analyzers::run(analyzer, &input);
+        // `.findings` alone is the OLD, unsafe read — an empty list is not
+        // self-describing. The corpus checks finding kinds, so it takes that
+        // view deliberately, and asserts the verdict alongside so a fixture
+        // cannot start passing because its analyzer stopped being able to
+        // run: a `blocked` analyzer here means the FIXTURE degraded, not the
+        // code.
+        let result = analyzers::run(analyzer, &input);
+        let findings = &result.findings;
+        if result.verdict.is_blocked() && !expectation.kinds.is_empty() {
+            return Err(format!(
+                "[{stem}] {analyzer_name}: BLOCKED ({}) — a fixture expecting kinds {:?} \
+                 must supply an input the analyzer can actually examine",
+                result.verdict.reason().unwrap_or_default(),
+                expectation.kinds
+            ));
+        }
         let count = findings.len();
         if count < expectation.count_min || count > expectation.count_max {
             return Err(format!(

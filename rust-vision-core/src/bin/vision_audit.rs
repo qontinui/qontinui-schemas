@@ -12,7 +12,7 @@
 //! | exit | meaning                                                       |
 //! |------|--------------------------------------------------------------|
 //! | 0    | OK (analyze: ran; or no finding at/above `--fail-on`. assert: allPassed) |
-//! | 2    | GATE FAILED (a finding at/above `--fail-on`, or an assertion failed) |
+//! | 2    | GATE FAILED (a finding at/above `--fail-on`, an analyzer that could not run, or an assertion failed) |
 //! | 1    | usage / IO / parse error                                      |
 //!
 //! Modes:
@@ -27,11 +27,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use qontinui_vision_core::analyzers::{self, AnalyzeInput, Analyzer, Finding, Severity};
+use qontinui_vision_core::analyzers::{
+    self, AnalyzeInput, Analyzer, AnalyzerVerdict, Finding, Severity,
+};
 use qontinui_vision_core::assertions::{
     evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
     EvalContext,
 };
+use qontinui_vision_core::coverage::SnapshotCoverage;
 use qontinui_vision_core::element_snapshot::{display_snapshot_id, ElementSnapshot};
 use qontinui_vision_core::frame::{Frame, FrameSource};
 
@@ -350,7 +353,26 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
 #[serde(rename_all = "camelCase")]
 pub struct AnalyzeReport {
     /// Per-analyzer findings, keyed by wire-name (`"layout"`, ...).
+    ///
+    /// **Never read this without `verdicts`.** An empty list under a
+    /// `blocked` verdict is not a clean page — it is an analyzer that could
+    /// not examine anything, and before `verdicts` existed the two were
+    /// byte-identical on this surface.
     findings: HashMap<String, Vec<Finding>>,
+    /// Per-analyzer verdict, keyed by the same wire-name as `findings`.
+    /// Every key in `findings` appears here and vice versa.
+    verdicts: HashMap<String, AnalyzerVerdict>,
+    /// The gate bit for the run: false when ANY analyzer was blocked.
+    /// Derived, never set independently — see [`analyze_exit_code`].
+    conclusive: bool,
+    /// What the analyzed snapshot actually carried. One measurement for the
+    /// whole run, because it is a property of the SNAPSHOT rather than of
+    /// any analyzer, and every analyzer here was handed the same one.
+    ///
+    /// This is the evidence behind the verdicts: a reader who disagrees with
+    /// a `blocked` can check the counts that produced it without re-running
+    /// anything.
+    coverage: SnapshotCoverage,
     /// Total finding count across all analyzers.
     total: usize,
     /// Counts by severity (`"info"`/`"warning"`/`"critical"`).
@@ -382,20 +404,31 @@ pub fn analyze(
         prior_frame: None,
     };
     let mut findings = HashMap::new();
+    let mut verdicts = HashMap::new();
     let mut counts: HashMap<String, usize> = HashMap::new();
     let mut total = 0usize;
+    let mut conclusive = true;
     for &a in which {
-        let fs = analyzers::run(a, &input);
-        for f in &fs {
+        let result = analyzers::run(a, &input);
+        for f in &result.findings {
             total += 1;
             *counts
                 .entry(severity_name(f.severity).to_string())
                 .or_insert(0) += 1;
         }
-        findings.insert(a.name().to_string(), fs);
+        // One blocked analyzer poisons the run's gate bit. It is not that
+        // the others' findings are suspect — they stand — but that the run
+        // as a whole did not check what it was asked to check, and a caller
+        // folding this to a single boolean must not be told otherwise.
+        conclusive &= result.conclusive;
+        findings.insert(a.name().to_string(), result.findings);
+        verdicts.insert(a.name().to_string(), result.verdict);
     }
     AnalyzeReport {
         findings,
+        verdicts,
+        conclusive,
+        coverage: SnapshotCoverage::of(snapshot),
         total,
         counts,
         snapshot_id: snapshot.snapshot_id.clone(),
@@ -414,10 +447,27 @@ fn severity_name(s: Severity) -> &'static str {
 }
 
 /// Pure: map an analyze report + threshold to an exit code.
+///
+/// Two independent ways to fail the gate, and the second is the point of
+/// this whole surface:
+///
+/// 1. A finding at or above `--fail-on`. The original contract.
+/// 2. **An analyzer that could not run at all.** A blocked analyzer produces
+///    no findings, so under (1) alone `--fail-on critical` returned 0 for a
+///    snapshot whose every element had lost its geometry — the same 0 a
+///    healthy page returns. A gate that cannot be tripped by the absence of
+///    evidence is not a gate.
+///
+/// `--fail-on` remains the opt-in for both: with no threshold set, the caller
+/// has said it is not gating on this run, and (2) does not override that.
+/// The verdicts and coverage are still on the report either way.
 pub fn analyze_exit_code(report: &AnalyzeReport, fail_on: Option<u8>) -> u8 {
     let Some(threshold) = fail_on else {
         return EXIT_OK;
     };
+    if !report.conclusive {
+        return EXIT_GATE_FAILED;
+    }
     let tripped = report
         .findings
         .values()
@@ -447,6 +497,30 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
     if let Some(id) = &report.snapshot_id {
         lines.push(format!("  snapshot: {}", display_snapshot_id(id)));
     }
+    // The coverage the verdicts were derived from, in the same wording the
+    // projector's `--stats` uses, so a reader comparing the two surfaces is
+    // reading one sentence rather than two dialects of it.
+    lines.push(format!("  coverage: {}", report.coverage.summary()));
+    // Name every analyzer that did not reach a conclusion, and why. Ordered
+    // so the same run prints the same lines — a HashMap iteration order in a
+    // CI log is a diff nobody can read.
+    let mut non_checked: Vec<(&String, &AnalyzerVerdict)> = report
+        .verdicts
+        .iter()
+        .filter(|(_, v)| !matches!(v, AnalyzerVerdict::Checked))
+        .collect();
+    non_checked.sort_by(|a, b| a.0.cmp(b.0));
+    for (name, verdict) in non_checked {
+        let label = if verdict.is_blocked() {
+            "BLOCKED"
+        } else {
+            "degraded"
+        };
+        lines.push(format!(
+            "  {name}: {label} — {}",
+            verdict.reason().unwrap_or_default()
+        ));
+    }
     match fail_on {
         None => lines.push("gate: --fail-on not set; exit 0 regardless of findings".to_string()),
         Some(t) => {
@@ -456,11 +530,16 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
                 "warning"
             };
             lines.push(format!(
-                "gate: --fail-on {level} -> {}",
+                "gate: --fail-on {level} -> {}{}",
                 if exit == EXIT_GATE_FAILED {
                     "FAILED (exit 2)"
                 } else {
                     "passed (exit 0)"
+                },
+                if report.conclusive {
+                    ""
+                } else {
+                    " [an analyzer was BLOCKED: this run checked less than it was asked to]"
                 }
             ));
         }
@@ -952,6 +1031,12 @@ mod tests {
     #[test]
     fn analyze_clean_snapshot_passes_fail_on() {
         // Two disjoint elements -> no overlap finding.
+        //
+        // Nothing here is `interactable`, so layout reports `Degraded` (its
+        // pairwise-overlap pass had no candidates) — and this test is
+        // therefore also the gate-level pin that **a degraded verdict does
+        // not fail the gate**. It is asserted below rather than left
+        // implicit in the exit code.
         let mk = |id: &str, x: i32| Element {
             id: id.into(),
             bbox: Some(Region {
@@ -975,10 +1060,108 @@ mod tests {
             ..Default::default()
         };
         let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
+        assert!(
+            report.verdicts["layout"].is_degraded(),
+            "expected the degraded arm: {:?}",
+            report.verdicts
+        );
+        assert!(
+            report.conclusive,
+            "a Degraded verdict must NOT move the gate bit: {:?}",
+            report.verdicts
+        );
         assert_eq!(
             analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
             EXIT_OK
         );
+    }
+
+    #[test]
+    fn a_blocked_analyzer_fails_the_gate_with_zero_findings() {
+        // The whole point of wiring the verdict into the exit code. Three
+        // elements, every one stripped of geometry: layout produces NO
+        // findings, so the severity fold below cannot trip, and before the
+        // verdict existed `--fail-on critical` returned 0 — the same 0 a
+        // healthy page returns.
+        let mk = |id: &str| Element {
+            id: id.into(),
+            bbox: None,
+            text: Some("label".into()),
+            interactable: true,
+            ..Default::default()
+        };
+        let snap = ElementSnapshot {
+            elements: vec![mk("a"), mk("b"), mk("c")],
+            ..Default::default()
+        };
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
+
+        assert_eq!(report.total, 0, "the premise: no findings at all");
+        assert!(!report.conclusive);
+        assert!(report.verdicts["layout"].is_blocked());
+        assert_eq!(
+            analyze_exit_code(&report, Some(severity_rank(Severity::Critical))),
+            EXIT_GATE_FAILED,
+            "a gate that cannot be tripped by the absence of evidence is not a gate"
+        );
+
+        // `--fail-on` stays the opt-in for BOTH failure routes: a caller that
+        // set no threshold has said it is not gating this run, and the block
+        // does not override that. The verdict is still on the report.
+        assert_eq!(analyze_exit_code(&report, None), EXIT_OK);
+    }
+
+    #[test]
+    fn the_report_carries_the_coverage_its_verdicts_were_derived_from() {
+        // Evidence, not just a verdict: a reader who disagrees with a block
+        // can check the counts that produced it without re-running anything.
+        let snap = snap_with_overlap();
+        let report = analyze(&snap, Some(&frame_1x1()), &[Analyzer::Layout]);
+        assert_eq!(report.coverage, SnapshotCoverage::of(&snap));
+
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire["coverage"]["withGeometry"], serde_json::json!(2));
+        assert_eq!(wire["coverage"]["interactable"], serde_json::json!(2));
+        // The two elements intersect and carry no stacking order, so
+        // occlusion is UNKNOWN: `degraded`, and still green.
+        assert_eq!(
+            wire["verdicts"]["layout"]["state"],
+            serde_json::json!("degraded")
+        );
+        assert!(wire["verdicts"]["layout"]["reason"].is_string());
+        assert_eq!(wire["conclusive"], serde_json::json!(true));
+
+        // …and the human summary names it, in the projector's own wording.
+        let summary = analyze_summary(&report, None, EXIT_OK);
+        assert!(
+            summary.contains("coverage: 2 elements: 2 with geometry"),
+            "{summary}"
+        );
+    }
+
+    #[test]
+    fn the_summary_names_every_analyzer_that_did_not_reach_a_conclusion() {
+        let snap = ElementSnapshot {
+            elements: vec![Element {
+                id: "a".into(),
+                text: Some("label".into()),
+                interactable: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let report = analyze(&snap, None, &[Analyzer::Layout, Analyzer::Typography]);
+        let exit = analyze_exit_code(&report, Some(severity_rank(Severity::Critical)));
+        let summary = analyze_summary(&report, Some(severity_rank(Severity::Critical)), exit);
+
+        assert!(summary.contains("layout: BLOCKED"), "{summary}");
+        assert!(
+            summary.contains("an analyzer was BLOCKED"),
+            "the gate line must say WHY it failed with no findings: {summary}"
+        );
+        // Typography had its whole input (text present) and must not be
+        // listed at all.
+        assert!(!summary.contains("typography:"), "{summary}");
     }
 
     // ---- analyze attribution ----

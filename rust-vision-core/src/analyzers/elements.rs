@@ -1,10 +1,12 @@
 //! Elements analyzer — coverage + interactivity statistics over an
 //! [`ElementSnapshot`]. Pure structural; no pixels.
 
-use super::{Finding, Severity};
+use super::{AnalyzerResult, Finding, Severity};
+use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::ElementSnapshot;
 
-pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
+pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
+    let coverage = SnapshotCoverage::of(snapshot);
     let mut findings = Vec::new();
 
     let total = snapshot.elements.len();
@@ -14,7 +16,13 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
             Severity::Critical,
             "ElementSnapshot has zero elements — page is unrendered, gated, or under-instrumented",
         ));
-        return findings;
+        // `Checked`, not `Blocked`, and the distinction is the point: this
+        // analyzer's input is the element LIST, and it read it, found it
+        // empty, and said so at `Severity::Critical`. That is a conclusion
+        // about the page, reached from evidence — the opposite of a refusal
+        // to answer. A `Blocked` here would demote a real Critical finding
+        // into "we could not tell", which is strictly less true.
+        return AnalyzerResult::checked(Some(coverage), findings);
     }
 
     let interactive = snapshot.elements.iter().filter(|e| e.interactable).count();
@@ -67,7 +75,28 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         );
     }
 
-    findings
+    // This analyzer is never blocked on coverage. It is pure structural —
+    // its checks are counts over the element list itself — and it stays
+    // meaningful on a snapshot with no geometry at all, which is exactly
+    // when `layout` cannot run. That asymmetry is deliberate and is why the
+    // full analyzer set catches shapes a single-analyzer call does not.
+    //
+    // Geometry is read by ONE check, `tiny_target`, and without it no
+    // target-size claim can be made either way. That is a named unmeasured
+    // dimension, i.e. `Degraded` — green, findings intact.
+    if coverage.with_geometry == 0 {
+        return AnalyzerResult::degraded(
+            format!(
+                "no element carries a bbox (0/{}), so target size (`tiny_target`, WCAG \
+                 2.5.8) was not evaluated for any of the {} interactive element(s). The \
+                 structural checks above are unaffected.",
+                coverage.elements, coverage.interactable
+            ),
+            Some(coverage),
+            findings,
+        );
+    }
+    AnalyzerResult::checked(Some(coverage), findings)
 }
 
 #[cfg(test)]
@@ -98,7 +127,7 @@ mod tests {
             elements: vec![],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert_eq!(f[0].kind, "empty_snapshot");
         assert_eq!(f[0].severity, Severity::Critical);
     }
@@ -109,7 +138,7 @@ mod tests {
             elements: vec![el("close", 16, 16, true, None)],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert!(f.iter().any(|x| x.kind == "tiny_target"));
     }
 
@@ -124,7 +153,7 @@ mod tests {
             elements: vec![e],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert!(!f.iter().any(|x| x.kind == "no_interactive"));
         assert!(!f.iter().any(|x| x.kind == "tiny_target"));
     }
@@ -138,7 +167,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert!(f.is_empty());
     }
 }

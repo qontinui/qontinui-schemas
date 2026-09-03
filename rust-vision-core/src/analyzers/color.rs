@@ -4,11 +4,28 @@
 
 use std::collections::BTreeMap;
 
-use super::{Finding, Severity};
+use super::{AnalyzerResult, Finding, Severity};
+use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::{ElementSnapshot, Rgb};
 use crate::frame::{Frame, Region};
 
-pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
+pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
+    let coverage = SnapshotCoverage::of(snapshot);
+    // Text is this analyzer's entire candidate set — the loop below
+    // `continue`s on every element whose `text` is `None`, so with none at
+    // all it measures no contrast anywhere and returns the same empty list
+    // a page with perfect contrast returns.
+    if coverage.with_text == 0 {
+        return AnalyzerResult::blocked(
+            format!(
+                "no element carries text (0/{}), so no foreground/background pair was \
+                 sampled and no contrast ratio was computed.",
+                coverage.elements
+            ),
+            Some(coverage),
+            Vec::new(),
+        );
+    }
     let mut findings = Vec::new();
 
     // Only DECLARED-color elements feed the density roll-up. Pixel-sampled
@@ -16,6 +33,11 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
     // density warning or emit Warning/Critical findings.
     let mut declared_low_contrast = 0usize;
     let mut declared_checked = 0usize;
+    // Every element for which a contrast ratio was actually computed, by
+    // either regime. Distinct from `declared_checked`, which gates the
+    // density roll-up: this one answers "did this analyzer measure anything
+    // at all?", and zero is the vacuous-pass condition.
+    let mut ratios_computed = 0usize;
     for el in &snapshot.elements {
         if el.text.is_none() {
             continue;
@@ -48,6 +70,7 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
             },
         };
         let ratio = wcag_contrast(fg, bg);
+        ratios_computed += 1;
 
         if declared {
             declared_checked += 1;
@@ -103,7 +126,59 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> Vec<Finding> {
         ));
     }
 
-    findings
+    verdict(coverage, ratios_computed, findings)
+}
+
+/// Classify a completed color run.
+///
+/// # Blocked
+///
+/// Two arms, one condition: **no contrast ratio was computed for anything.**
+/// `with_text == 0` is the coverage-level form, handled at the top of
+/// [`run`] (the loop `continue`s on every element whose `text` is `None`, so
+/// the candidate set is empty); `ratios_computed == 0` is the same fact one
+/// level in — text elements existed, but not one carried declared colors and
+/// not one could be sampled from the frame, so nothing was measured. Both
+/// produce the empty finding list a page with flawless contrast produces.
+///
+/// The second arm is deliberately not `Degraded`: a run that measured
+/// nothing has established nothing about the page, and calling that green
+/// would leave open exactly the hole the first arm closes.
+///
+/// # Degraded
+///
+/// Some but not all text elements yielded a ratio. The findings stand for
+/// the ones that did; the rest were not checked, and a reader deserves to be
+/// told the sample was partial rather than infer full coverage from silence.
+fn verdict(
+    coverage: SnapshotCoverage,
+    ratios_computed: usize,
+    findings: Vec<Finding>,
+) -> AnalyzerResult {
+    if ratios_computed == 0 {
+        return AnalyzerResult::blocked(
+            format!(
+                "no contrast ratio could be computed for any of the {} text element(s): \
+                 none carried declared foreground/background colors and none could be \
+                 sampled from the frame.",
+                coverage.with_text
+            ),
+            Some(coverage),
+            findings,
+        );
+    }
+    if ratios_computed < coverage.with_text {
+        return AnalyzerResult::degraded(
+            format!(
+                "contrast measured for {}/{} text element(s); the rest carried neither \
+                 declared colors nor a sampleable bbox and were not checked.",
+                ratios_computed, coverage.with_text
+            ),
+            Some(coverage),
+            findings,
+        );
+    }
+    AnalyzerResult::checked(Some(coverage), findings)
 }
 
 /// WCAG 2.x relative-luminance contrast ratio. Always returns a value in
@@ -297,7 +372,7 @@ mod tests {
             elements: vec![text_el("footer-link", None, None)],
             ..Default::default()
         };
-        let findings = run(&f, &snap);
+        let findings = run(&f, &snap).findings;
         let lc: Vec<_> = findings
             .iter()
             .filter(|x| x.kind == "low_contrast")
@@ -321,7 +396,7 @@ mod tests {
             )],
             ..Default::default()
         };
-        let findings = run(&f, &snap);
+        let findings = run(&f, &snap).findings;
         let lc = findings
             .iter()
             .find(|x| x.kind == "low_contrast")
@@ -347,7 +422,7 @@ mod tests {
             (3.0..4.5).contains(&r),
             "fixture ratio {r} not in [3.0,4.5)"
         );
-        let findings = run(&f, &snap);
+        let findings = run(&f, &snap).findings;
         let lc = findings
             .iter()
             .find(|x| x.kind == "low_contrast")
@@ -373,7 +448,7 @@ mod tests {
             elements,
             ..Default::default()
         };
-        let findings = run(&f, &snap);
+        let findings = run(&f, &snap).findings;
         // 5 sampled Info findings, 1 declared (good contrast, no finding).
         assert!(!findings.iter().any(|x| x.kind == "contrast_density"));
         assert_eq!(

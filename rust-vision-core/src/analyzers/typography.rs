@@ -4,10 +4,12 @@
 
 use std::collections::BTreeMap;
 
-use super::{Finding, Severity};
+use super::{AnalyzerResult, Finding, Severity};
+use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::ElementSnapshot;
 
-pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
+pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
+    let coverage = SnapshotCoverage::of(snapshot);
     let mut findings = Vec::new();
 
     // Cluster by (rounded font_size, font_family). Skip elements without
@@ -31,8 +33,20 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         }
     }
 
+    // Nothing to cluster. This analyzer's entire input is text, so an empty
+    // candidate set is not "the typography is consistent" — it is "no
+    // typography was observed", and the two produced the same empty finding
+    // list before the verdict existed.
     if text_elements == 0 {
-        return findings;
+        return AnalyzerResult::blocked(
+            format!(
+                "no element carries text (0/{}), so no font family, size or line-height \
+                 was observed and no consistency claim can be made.",
+                coverage.elements
+            ),
+            Some(coverage),
+            findings,
+        );
     }
 
     // Heuristic: more than 3 distinct font families across text elements
@@ -63,7 +77,15 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         ));
     }
 
-    findings
+    // Reached only with `text_elements > 0`, i.e. the preconditions held.
+    //
+    // No `Degraded` arm: an element that carries text but no `font_family`
+    // or `font_size_px` simply does not join that cluster, and the counts
+    // reported in the findings are of the elements that DID. Degrading on
+    // partial font data would fire on every snapshot from a producer that
+    // populates one field and not the other, without naming a defect class
+    // that went unchecked.
+    AnalyzerResult::checked(Some(coverage), findings)
 }
 
 #[cfg(test)]
@@ -104,7 +126,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(findings.iter().any(|f| f.kind == "font_family_drift"));
     }
 
@@ -118,7 +140,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(findings.is_empty());
     }
 }

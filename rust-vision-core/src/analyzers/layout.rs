@@ -1,7 +1,8 @@
 //! Layout analyzer — overlaps, misalignments, off-screen elements, missing
 //! gutters, etc. Pure geometry over [`ElementSnapshot`]; no pixels.
 
-use super::{Finding, Severity};
+use super::{AnalyzerResult, Finding, Severity};
+use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::{intersection, ElementSnapshot};
 
 /// Minimum share of the covered element's own area that must be hidden
@@ -41,7 +42,8 @@ fn is_ancestor_of(
     false
 }
 
-pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
+pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
+    let coverage = SnapshotCoverage::of(snapshot);
     let mut findings = Vec::new();
 
     // Only positioned (bbox-bearing) interactive elements participate in the
@@ -323,7 +325,99 @@ pub fn run(snapshot: &ElementSnapshot) -> Vec<Finding> {
         i = j;
     }
 
-    findings
+    verdict(coverage, undirected_intersections, findings)
+}
+
+/// Classify a completed layout run.
+///
+/// # Blocked — `with_geometry == 0`
+///
+/// This analyzer is pure geometry, and with no bbox anywhere EVERY pass
+/// above examined nothing: the interactive-overlap pass, the directed and
+/// derived occlusion passes, zero-area and alignment all build their working
+/// set from `e.bbox`. The empty finding list they produce is byte-identical
+/// to a healthy page's, which is the vacuous pass this verdict exists to
+/// make impossible to read as a pass.
+///
+/// The findings are still carried (see [`AnalyzerResult`]); what `Blocked`
+/// withdraws is the claim that an empty list here means the page is clean.
+///
+/// # Degraded — `interactable == 0` with geometry present
+///
+/// **Not `Blocked`, and the corpus proves why.** Only ONE of this
+/// analyzer's passes filters on `interactable` (the pairwise-overlap pass,
+/// whose working set is `.filter(|e| e.interactable).filter_map(…bbox)`).
+/// The directed-occlusion pass added later builds `positioned` from bbox
+/// alone, as do the zero-area and alignment passes — so a snapshot with
+/// nothing flagged interactable is not unexaminable, it is examined by four
+/// passes out of five.
+///
+/// `tests/fixtures/analyzer_corpus/007-widget-occludes-label` is exactly
+/// that snapshot: four elements, every one `interactable: false`, and it
+/// yields the `Severity::Critical` `occlusion` finding that pins the
+/// Terminal-page regression this crate was extended to catch. Blocking it
+/// would stamp "no finding list from this run is a statement about the page"
+/// on the most valuable finding the analyzer emits. What is genuinely
+/// unmeasured is the overlap pass, and naming that is what `Degraded` is
+/// for.
+///
+/// # Degraded — intersecting pairs with no usable stacking order
+///
+/// The condition that already emits `occlusion_unknown`, promoted onto the
+/// verdict channel so a consumer reading verdicts rather than finding kinds
+/// can see it. The finding itself is kept, at `Severity::Info`, because it
+/// names the pair count and consumers already display it.
+///
+/// Deliberately NOT keyed on `with_stacking == 0` in general. A healthy
+/// projected snapshot routinely carries no stacking order at all — the
+/// projector emits `z_index` only for a computed `zIndex` that parses as an
+/// integer, and `auto` does not — so a blanket degradation there would fire
+/// on essentially every real capture while saying nothing about whether an
+/// occlusion question was even asked. Boxes that do not intersect have no
+/// occlusion question to be unknown about.
+fn verdict(
+    coverage: SnapshotCoverage,
+    undirected_intersections: usize,
+    findings: Vec<Finding>,
+) -> AnalyzerResult {
+    if coverage.with_geometry == 0 {
+        return AnalyzerResult::blocked(
+            format!(
+                "no element carries a bbox (0/{}), so every geometric check — overlap, \
+                 occlusion, zero-area, alignment — examined nothing. An empty finding \
+                 list here is not a clean page.",
+                coverage.elements
+            ),
+            Some(coverage),
+            findings,
+        );
+    }
+
+    // Both degradations can hold at once, and each names a different
+    // unchecked defect class, so they are reported together rather than
+    // one shadowing the other.
+    let mut degradations: Vec<String> = Vec::new();
+    if coverage.interactable == 0 {
+        degradations.push(format!(
+            "no element is flagged interactable (0/{}), so the pairwise-overlap pass \
+             examined nothing; the occlusion, zero-area and alignment passes are \
+             unaffected",
+            coverage.elements
+        ));
+    }
+    if undirected_intersections > 0 {
+        degradations.push(format!(
+            "{undirected_intersections} intersecting pair(s) carry no usable stacking \
+             order, so it is UNKNOWN which element is on top and whether anything is \
+             hidden ({}/{} elements carry a paint rank)",
+            coverage.with_stacking, coverage.elements
+        ));
+    }
+    if degradations.is_empty() {
+        AnalyzerResult::checked(Some(coverage), findings)
+    } else {
+        AnalyzerResult::degraded(degradations.join("; "), Some(coverage), findings)
+    }
 }
 
 #[cfg(test)]
@@ -351,6 +445,140 @@ mod tests {
         }
     }
 
+    /// An element carrying TEXT and interactivity but NO geometry — the
+    /// partial-projection shape. Distinct from `el_no_bbox` below, which
+    /// carries neither text nor a real box; the text is load-bearing here,
+    /// because it is what keeps the `elements` analyzer quiet and made this
+    /// shape invisible.
+    fn el_text_no_bbox(id: &str, text: &str, interactable: bool) -> Element {
+        Element {
+            id: id.to_string(),
+            bbox: None,
+            text: Some(text.to_string()),
+            role: None,
+            interactable,
+            ..Default::default()
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // The vacuous-pass acceptance. Plan
+    // `2026-09-03-a-degenerate-snapshot-audits-clean`: an empty finding list
+    // used to be byte-identical whether the page was clean or the input was
+    // too impoverished to check. These pin BOTH degenerate shapes by name so
+    // the equivalence cannot silently come back.
+    // ---------------------------------------------------------------------
+
+    /// Shape 1: elements present, every `bbox: None`. Every geometric check
+    /// examines nothing, so the finding list says nothing.
+    #[test]
+    fn a_zero_geometry_snapshot_is_blocked_not_clean() {
+        let snap = ElementSnapshot {
+            elements: vec![
+                Element {
+                    id: "a".into(),
+                    bbox: None,
+                    interactable: true,
+                    ..Default::default()
+                },
+                Element {
+                    id: "b".into(),
+                    bbox: None,
+                    interactable: true,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let result = run(&snap);
+
+        assert!(
+            result.verdict.is_blocked(),
+            "zero-geometry snapshot must be Blocked, got {:?}",
+            result.verdict
+        );
+        // The gate bit is the thing consumers read, and it must be false.
+        assert!(
+            !result.conclusive,
+            "Blocked must not be conclusive — that is the whole defect"
+        );
+        // The reason must name the measurement, not merely assert failure.
+        assert!(
+            result.verdict.reason().is_some_and(|r| r.contains("bbox")),
+            "Blocked must say WHY: {:?}",
+            result.verdict.reason()
+        );
+        let cov = result
+            .coverage
+            .expect("a snapshot was supplied, so it was measured");
+        assert_eq!(cov.elements, 2);
+        assert_eq!(cov.with_geometry, 0);
+    }
+
+    /// Shape 2 — **the one this plan exists for.** Elements DO carry `text`
+    /// and `interactable: true`, and only `bbox` is missing. Measured
+    /// 2026-09-03 against the pre-fix crate, this produced output
+    /// byte-identical to a healthy page: zero findings, exit 0. `elements`
+    /// is content with it (`total > 0`, interactive > 0, text > 0), so no
+    /// analyzer in the set said anything at all.
+    #[test]
+    fn a_partial_projection_with_text_and_interactivity_but_no_geometry_is_blocked() {
+        let snap = ElementSnapshot {
+            elements: vec![
+                el_text_no_bbox("btn-save", "Save", true),
+                el_text_no_bbox("btn-cancel", "Cancel", true),
+                el_text_no_bbox("title", "Settings", false),
+            ],
+            ..Default::default()
+        };
+        let result = run(&snap);
+
+        assert!(
+            result.verdict.is_blocked(),
+            "a partial projection must be Blocked, got {:?}",
+            result.verdict
+        );
+        assert!(!result.conclusive);
+
+        // The coverage must show the discriminator: text and interactivity
+        // present, geometry absent. That combination is precisely what made
+        // this shape invisible to every other signal.
+        let cov = result.coverage.expect("a snapshot was supplied");
+        assert_eq!(cov.elements, 3);
+        assert_eq!(cov.with_geometry, 0, "the missing dimension");
+        assert_eq!(cov.with_text, 3, "text WAS present — this is the trap");
+        assert_eq!(cov.interactable, 2, "interactivity WAS present too");
+    }
+
+    /// The control: a healthy snapshot must stay green, and `Degraded` must
+    /// NOT move the gate bit. Absent stacking order is the common case (the
+    /// projector emits `z_index` only for an integer computed `zIndex`), so a
+    /// Degraded-fails rule would fire on essentially every real page.
+    #[test]
+    fn a_healthy_snapshot_is_conclusive_and_degraded_stays_green() {
+        let snap = ElementSnapshot {
+            elements: vec![
+                el("btn-a", 0, 0, 100, 50, true),
+                el("btn-b", 200, 0, 100, 50, true),
+            ],
+            ..Default::default()
+        };
+        let result = run(&snap);
+
+        assert!(
+            !result.verdict.is_blocked(),
+            "a measurable snapshot must never be Blocked: {:?}",
+            result.verdict
+        );
+        assert!(
+            result.conclusive,
+            "Checked and Degraded are both green; only Blocked is not"
+        );
+        let cov = result.coverage.expect("a snapshot was supplied");
+        assert_eq!(cov.with_geometry, 2);
+        assert_eq!(cov.with_stacking, 0, "no z_index — the ordinary case");
+    }
+
     #[test]
     fn detects_overlap_between_interactive_elements() {
         let snap = ElementSnapshot {
@@ -360,7 +588,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(findings.iter().any(|f| f.kind == "overlap"));
     }
 
@@ -374,7 +602,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
     }
 
@@ -384,7 +612,7 @@ mod tests {
             elements: vec![el("hidden", 10, 10, 0, 50, false)],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(findings.iter().any(|f| f.kind == "zero_area"));
     }
 
@@ -394,7 +622,7 @@ mod tests {
             elements: vec![el("a", 0, 0, 50, 50, true), el("b", 100, 0, 50, 50, true)],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(!findings.iter().any(|f| f.kind == "overlap"));
     }
 
@@ -412,7 +640,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(
             !findings.iter().any(|f| f.kind == "overlap"),
             "off-screen elements must not overlap each other or on-screen ones: {findings:?}"
@@ -440,7 +668,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let findings = run(&snap);
+        let findings = run(&snap).findings;
         assert!(findings.iter().any(|f| f.kind == "overlap"));
         // None of the bbox-less ids appear in any finding.
         for f in &findings {
@@ -469,7 +697,7 @@ mod tests {
             elements: vec![header, widget],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         let occ = f
             .iter()
             .find(|f| f.kind == "occlusion")
@@ -497,7 +725,7 @@ mod tests {
             elements: vec![label, cover],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert!(
             !f.iter().any(|f| f.kind == "overlap"),
             "the legacy overlap pass still exempts nesting"
@@ -516,7 +744,7 @@ mod tests {
             elements: vec![parent, child],
             ..Default::default()
         };
-        assert!(!run(&snap).iter().any(|f| f.kind == "occlusion"));
+        assert!(!run(&snap).findings.iter().any(|f| f.kind == "occlusion"));
     }
 
     #[test]
@@ -529,7 +757,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let f = run(&snap);
+        let f = run(&snap).findings;
         assert!(f.iter().any(|f| f.kind == "occlusion_unknown"));
         assert!(!f.iter().any(|f| f.kind == "occlusion"));
     }
@@ -544,6 +772,7 @@ mod tests {
             ..Default::default()
         };
         let occ = run(&snap)
+            .findings
             .into_iter()
             .find(|f| f.kind == "occlusion")
             .expect("occluded_by is authoritative");
@@ -560,7 +789,7 @@ mod tests {
             elements: vec![a, b],
             ..Default::default()
         };
-        assert!(!run(&snap).iter().any(|f| f.kind == "occlusion"));
+        assert!(!run(&snap).findings.iter().any(|f| f.kind == "occlusion"));
     }
 
     #[test]
@@ -580,7 +809,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            !run(&snap).iter().any(|f| f.kind == "occlusion"),
+            !run(&snap).findings.iter().any(|f| f.kind == "occlusion"),
             "nesting is nesting however deep it goes"
         );
     }
@@ -612,6 +841,7 @@ mod tests {
             ..Default::default()
         };
         let occ: Vec<_> = run(&snap)
+            .findings
             .into_iter()
             .filter(|f| f.kind == "occlusion")
             .collect();
