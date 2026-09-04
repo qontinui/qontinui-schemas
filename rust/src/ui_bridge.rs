@@ -172,6 +172,69 @@ pub struct ElementIdentifier {
 // Registered element / component
 // ============================================================================
 
+/// Information about a single custom (application-defined) action exposed by a
+/// UI Bridge **element**.
+///
+/// The element-level twin of [`ComponentActionInfo`], and deliberately the same
+/// field vocabulary so a consumer that walks both action planes reads one shape,
+/// not two. One field is NOT carried over: `path`. A component action has a
+/// resolved per-action invocation path because the SDK annotates one
+/// (`/control/component/<componentId>/action/<actionId>`); an element action has
+/// no analogue — every element action is invoked through the single
+/// `/control/element/<elementId>/action` route with the action name in the body.
+/// A field nothing would ever populate is dead schema surface, so it is absent
+/// rather than perpetually `null`.
+///
+/// ## Why this is an object rather than a name
+///
+/// It exists so `effect` has somewhere to live. A bare list of action NAMES is
+/// unannotatable: there is no slot on a name for a safety class, so an
+/// element-level custom action could not declare itself `destructive` however
+/// much its author wanted to. That is not hypothetical — the runner exposes
+/// element custom actions that write raw bytes into a live agent PTY, and some
+/// of them act on a pane with no visible view.
+///
+/// The wire projection is widened FIRST and the annotation lands on top of it.
+/// The reverse order ships an UNREACHABLE annotation, which is worse than an
+/// absent one: the author believes the delete button is marked, and the walker
+/// walks it anyway.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct ElementActionInfo {
+    /// Unique action identifier within the element — the key the action is
+    /// registered under, and the name `/control/element/<id>/action` is called
+    /// with.
+    pub id: String,
+    /// Human-readable label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Longer description of what the action does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Free-form declaration of the action's parameters, author-supplied on the
+    /// SDK side and surfaced verbatim. Conventionally a small JSON Schema
+    /// subset, but the SDK does not constrain the shape, so it is carried
+    /// through untyped — the same treatment `ElementActionRequest::params` and
+    /// `ComponentActionInfo::param_schema` get.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param_schema: Option<serde_json::Value>,
+    /// Safety class of this action: `read`, `write` or `destructive`.
+    ///
+    /// **A safety annotation, not a hint.** An autonomous walk MUST NOT fire an
+    /// action annotated `destructive`; that is the same exclusion the IR already
+    /// applies to `destructive` transitions when generating auto-regressions.
+    /// Author-declared, because only the app author knows that a particular
+    /// custom action sends the keystrokes that end a session.
+    ///
+    /// Absent means **unclassified, not safe** — an action nobody has judged
+    /// must be treated as unknown rather than as `read`. `skip_serializing_if`
+    /// keeps an un-annotated action ABSENT on the wire rather than defaulting to
+    /// a class nobody chose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<IrEffect>,
+}
+
 /// A registered element in the UI Bridge registry.
 ///
 /// This is the serializable subset of the React `RegisteredElement`; it
@@ -192,8 +255,18 @@ pub struct UIBridgeElement {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<String>,
     /// Custom (application-defined) actions.
+    ///
+    /// **Objects, not names.** These used to be a bare `Vec<String>` of action
+    /// names, which left an element-level custom action with nowhere to carry a
+    /// safety class — so the walker had no way to tell a `refresh` from a
+    /// `sendKeys` that writes raw bytes into a live agent PTY. Widening this to
+    /// [`ElementActionInfo`] is what makes `effect` REACHABLE from an element;
+    /// see that type's docs.
+    ///
+    /// Absent (`None`) means the element declares none. That is deliberately
+    /// distinct from an empty list, which would mean "declared, and empty".
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub custom_actions: Option<Vec<String>>,
+    pub custom_actions: Option<Vec<ElementActionInfo>>,
     /// Identifier bundle for locating the element.
     pub identifier: ElementIdentifier,
     /// Current observable state.
@@ -751,6 +824,132 @@ mod tests {
             r#"{"id":"a","effect":"Destructive"}"#
         )
         .is_err());
+    }
+
+    // ── ElementActionInfo — the element-level effect annotation ──────────
+    //
+    // These are the reachability tests for the widened `customActions`
+    // projection. Every one pins hand-written wire bytes rather than a
+    // round-trip of a Rust value, because the property under test is the
+    // SERDE CONTRACT with the SDK, not internal consistency: a round-trip of
+    // whatever Rust happens to emit stays green through a rename.
+
+    /// All three vocabulary members survive an element action intact, each
+    /// rendering lowercase, in both directions.
+    #[test]
+    fn element_action_info_round_trips_each_effect() {
+        for (wire, expected) in [
+            (
+                r#"{"id":"readBuffer","label":"Read buffer","effect":"read"}"#,
+                IrEffect::Read,
+            ),
+            (
+                r#"{"id":"setTitle","label":"Set title","effect":"write"}"#,
+                IrEffect::Write,
+            ),
+            (
+                r#"{"id":"sendKeys","label":"Send keys","effect":"destructive"}"#,
+                IrEffect::Destructive,
+            ),
+        ] {
+            let action: ElementActionInfo = serde_json::from_str(wire).expect("deserializes");
+
+            assert_eq!(action.effect, Some(expected));
+            assert_eq!(serde_json::to_string(&action).expect("serializes"), wire);
+        }
+    }
+
+    /// An UN-ANNOTATED action must serialize with `effect` **absent** — not
+    /// `null`, and above all not defaulted to `read`.
+    ///
+    /// Absence is the encoding of "nobody has judged this action". A default
+    /// would silently claim a safety class no author chose, and a walker
+    /// reading it would fire the action believing it had been cleared.
+    #[test]
+    fn element_action_info_omits_an_unannotated_effect() {
+        let action = ElementActionInfo {
+            id: "scrollToTop".to_string(),
+            label: None,
+            description: None,
+            param_schema: None,
+            effect: None,
+        };
+
+        let json = serde_json::to_string(&action).expect("serializes");
+        assert_eq!(json, r#"{"id":"scrollToTop"}"#);
+        assert!(!json.contains("effect"));
+        assert!(!json.contains("null"));
+
+        // And the absence survives the read back as `None`, rather than
+        // resolving to any member of the vocabulary.
+        let back: ElementActionInfo = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(back.effect, None);
+    }
+
+    /// `effect` is a CLOSED set here too. A plausible-but-wrong verb must be
+    /// REJECTED, not carried as data — an unrecognised value accepted would let
+    /// a destructive element action masquerade as unclassified and get walked.
+    #[test]
+    fn element_action_info_rejects_an_out_of_vocabulary_effect() {
+        let err = serde_json::from_str::<ElementActionInfo>(r#"{"id":"sendKeys","effect":"send"}"#)
+            .expect_err("an out-of-vocabulary effect must not deserialize");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown variant") && msg.contains("send"),
+            "expected an unknown-variant error naming the bad value, got: {msg}"
+        );
+
+        // Capitalisation is not a synonym either — the wire form is lowercase.
+        assert!(
+            serde_json::from_str::<ElementActionInfo>(r#"{"id":"a","effect":"Destructive"}"#)
+                .is_err()
+        );
+    }
+
+    /// The whole point of the widening: an ELEMENT's custom actions arrive as
+    /// objects that carry `effect`, mixed freely with un-annotated ones.
+    ///
+    /// Pinned against literal element bytes, because the old shape here was
+    /// `["sendKeys","readBuffer"]` and nothing but a wire assertion would
+    /// notice a regression back to a list of names.
+    #[test]
+    fn ui_bridge_element_round_trips_annotated_custom_actions() {
+        let wire = r##"{"id":"term-pane-3","type":"terminal","actions":["click"],"customActions":[{"id":"sendKeys","label":"Send keys","effect":"destructive"},{"id":"readBuffer","effect":"read"},{"id":"scrollToTop"}],"identifier":{"xpath":"/div[3]","selector":"#term-3"},"state":{"visible":true,"enabled":true,"disabled":false,"ariaDisabled":false,"focused":false,"rect":{"x":0.0,"y":0.0,"width":640.0,"height":480.0,"top":0.0,"right":640.0,"bottom":480.0,"left":0.0}},"registeredAt":1755800000000,"mounted":true}"##;
+
+        let element: UIBridgeElement = serde_json::from_str(wire).expect("deserializes");
+
+        let custom = element
+            .custom_actions
+            .as_ref()
+            .expect("customActions present");
+        assert_eq!(custom.len(), 3);
+
+        assert_eq!(custom[0].id, "sendKeys");
+        assert_eq!(custom[0].label.as_deref(), Some("Send keys"));
+        assert_eq!(custom[0].effect, Some(IrEffect::Destructive));
+
+        assert_eq!(custom[1].id, "readBuffer");
+        assert_eq!(custom[1].effect, Some(IrEffect::Read));
+
+        // Unclassified, and it stays unclassified — not promoted to `read`.
+        assert_eq!(custom[2].id, "scrollToTop");
+        assert_eq!(custom[2].effect, None);
+
+        assert_eq!(serde_json::to_string(&element).expect("serializes"), wire);
+    }
+
+    /// `None` and `Some(vec![])` are different wire shapes and must stay so:
+    /// "declares no custom actions" is not "declares an empty set".
+    #[test]
+    fn ui_bridge_element_omits_absent_custom_actions() {
+        let wire = r#"{"id":"plain","type":"button","identifier":{"xpath":"/button[1]","selector":"button"},"state":{"visible":true,"enabled":true,"disabled":false,"ariaDisabled":false,"focused":false,"rect":{"x":0.0,"y":0.0,"width":10.0,"height":10.0,"top":0.0,"right":10.0,"bottom":10.0,"left":0.0}},"registeredAt":1755800000000,"mounted":true}"#;
+
+        let element: UIBridgeElement = serde_json::from_str(wire).expect("deserializes");
+        assert!(element.custom_actions.is_none());
+
+        let json = serde_json::to_string(&element).expect("serializes");
+        assert_eq!(json, wire);
+        assert!(!json.contains("customActions"));
     }
 
     /// The component-level `actionInvocationPath` is a TEMPLATE carrying a
