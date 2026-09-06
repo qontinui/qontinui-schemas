@@ -197,9 +197,9 @@ For situations where release-please isn't appropriate — emergency hotfix, the 
 
 1. `<crate>/Cargo.toml` (or `package.json`) — version bump.
 2. `release-please-manifest.json` — the component entry must match the new version.
-3. `release-please-config.json` — set the component's `last-release-sha` to the prep PR's squash-merge SHA so release-please anchors at this release going forward (see "Why `last-release-sha` matters" below).
+3. The tag `<component>-v<version>` on the merge SHA (which also fires the publish workflow and creates the GitHub release). **The tag, not `last-release-sha`, is what anchors release-please** — see "Why `last-release-sha` matters — and what actually anchors a release" below. Setting the component's `last-release-sha` in `release-please-config.json` is optional bookkeeping; it is not consulted once a manifest version is set.
 
-If you skip step 3, release-please's next "chore: release main" PR will re-propose every conventional commit since the previous `last-release-sha`, including the change you just shipped — see PRs #34 → #35 → #36 → #37 (2026-05-10) for the full thrash and recovery.
+If you skip step 3, release-please's next "chore: release main" PR will re-propose every conventional commit in the component's history, including the change you just shipped — see PRs #34 → #35 → #36 → #37 (2026-05-10) for the full thrash and recovery, and qontinui-schemas#160 (2026-09) for the same shape reached through a release PR that landed untagged.
 
 Recommended flow — prep PR + tag from main, mirroring phases 10a/b/c of `qontinui-dev-notes/rust-release-engineering`:
 
@@ -207,8 +207,6 @@ Recommended flow — prep PR + tag from main, mirroring phases 10a/b/c of `qonti
 git checkout -b chore/types-0.1.3 origin/main
 
 # Bump the version in Cargo.toml + manifest, refresh Cargo.lock.
-# (last-release-sha can't be set yet — you don't know the squash-merge
-# SHA until after the PR merges — handle in step 4.)
 cargo update -p qontinui-types
 git commit -am "chore: release qontinui-types 0.1.3"
 git push -u origin chore/types-0.1.3
@@ -221,14 +219,10 @@ git tag rust-v0.1.3
 git push origin rust-v0.1.3
 # Tag fires publish-rust.yml → verify-ci → F4 dry-run → cargo publish
 
-# Step 4: bump last-release-sha in a tiny follow-up PR (or fold into a
-# bigger anchor-fix PR if you have one) so the next release-please run
-# starts scanning from this release, not from before:
-git checkout -b chore/release-please-anchor-types-0.1.3 origin/main
-# edit release-please-config.json: rust.last-release-sha = "<merge-sha>"
-git commit -am "chore(release-please): anchor rust at <merge-sha>"
-git push -u origin chore/release-please-anchor-types-0.1.3
-gh pr create
+# The tag above is the anchor release-please reads. (Historical step 4 —
+# a follow-up PR bumping rust.last-release-sha in release-please-config.json
+# — is optional bookkeeping: that key is not consulted once a manifest
+# version is set. See "what actually anchors a release" below.)
 ```
 
 Or use the `workflow_dispatch` escape hatch (skips the tag, fires the workflow directly):
@@ -241,17 +235,48 @@ gh workflow run publish-rust.yml -f crate=qontinui-runner-client
 
 Both paths still go through the F2 + F4 gates.
 
-#### Why `last-release-sha` matters
+#### Why `last-release-sha` matters — and what actually anchors a release
 
-release-please decides which version to propose by scanning conventional commits between `last-release-sha` (or a default origin-of-history if absent) and `HEAD` for each component's path. It does NOT consult git tags or compare against the manifest version directly — the manifest tells release-please "we're currently at vN" but `last-release-sha` tells release-please "we already know about every commit up to this point."
+release-please decides which version to propose by scanning conventional commits
+for each component's path since that component's **latest release**, and it
+finds the latest release by looking for a GitHub release / tag named
+`<component>-v<manifest-version>` (in `manifest.ts`: recently merged release
+PRs first, then GitHub releases, then tags). The manifest tells release-please
+"we're currently at vN"; the tag named after vN tells it *where* vN is. A
+per-package `last-release-sha` is **not** consulted on that path once a manifest
+version is set (see "Bootstrapping a new release-please component" below) — it
+was believed to be the anchor when the paragraph above this one was written, and
+the 2026-09 incident below proved it is not.
 
-So when a manual-override release is shipped without updating `last-release-sha`, the post-release run sees:
+When the tag for the manifest version is missing, release-please falls back to
+walking the **entire** history for that path and re-proposes every conventional
+commit ever made — including any old `feat!` — so a stale anchor shows up as a
+wrong, usually *major*, bump plus a changelog reaching back to the first commit.
+Two ways to get there:
 
-- manifest: `0.1.3` ✓
-- last-release-sha: still pointing at the previous release (or absent)
-- conventional-commits in window: includes the same `feat:` that drove `0.1.3`
+- **A manual-override release shipped without the tag** (the case the recipe
+  above exists for) — the fix is step 3 of that recipe, the tag.
+- **A release PR that landed without GitHub marking it merged.** coord lands PRs
+  by rebase + push to `main`; when that rebase rewrites the release PR's SHA
+  (its tip was behind `main`), GitHub never records the merge, so release-please
+  never creates the release or tag for the version that just landed. Its next
+  run then re-derives the bogus major, force-pushes it onto the same open PR,
+  and every consumer's `qontinui-types = "<2.0.0"` bound turns five checks red
+  with a version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
+  10+ coord `ci-not-green` cycles). The `release-pr-sanity` workflow now fails
+  a release PR with this recipe when a base manifest version has no tag:
+  1. find the landed release commit —
+     `git log --format='%h %an %s' -3 -- release-please-manifest.json`;
+  2. create the release release-please would have, for each component:
+     `gh release create <component>-v<version> --target <sha> --title '<component>: v<version>' --notes "<CHANGELOG section>"`;
+  3. `gh workflow run release-please.yml --ref main`;
+  4. close the stale release PR if release-please leaves it unchanged (it only
+     rewrites on a body change). **Never** widen consumer version bounds to
+     accept the bogus bump.
 
-…and proposes `0.1.3 → 0.2.0` again. The ergonomics of skipping the follow-up PR: every manual override generates one stale "chore: release main" PR that you close manually. The ergonomics of doing the follow-up PR: one extra ~3-line PR, but the release-please flow stays clean.
+The ergonomics of skipping the anchor: every override generates one stale
+"chore: release main" PR proposing the wrong version that you close by hand. The
+ergonomics of doing it: one tag.
 
 ### Pre-release / RC channel
 

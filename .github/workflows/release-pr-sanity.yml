@@ -1,0 +1,56 @@
+name: release-pr-sanity
+
+# On a release-please PR, prove that the versions the BASE manifest already
+# claims are actually released (a `<component>-v<version>` tag exists).
+#
+# WHY THIS WORKFLOW EXISTS
+#
+# release-please resolves "the latest release" from GitHub releases/tags named
+# after the manifest version — never from `last-release-sha` once a manifest
+# version is set. coord lands PRs by rebasing and pushing to main; when that
+# rebase rewrites the SHA of a release PR, GitHub never marks the PR merged,
+# release-please never tags it, and its next run finds no release for the
+# manifest version, walks the ENTIRE history and re-proposes every commit ever
+# made — including any old `feat!` — as a bogus major bump. Every consumer pins
+# `qontinui-types = "<2.0.0"`, so rust-ci, check-drift, both consumer-checks
+# and consumer-gate go red with a version-resolution error that names the
+# symptom, not the cause. qontinui-schemas#160 sat that way from 2026-09-02 to
+# 2026-09-07 through 10+ coord `ci-not-green` cycles.
+#
+# This job fails ONE check, on the release PR only, with the cause and the
+# recovery recipe. It is a detector, not the fix — the fix is coord landing
+# release-please PRs so that GitHub records the merge (plan
+# `2026-09-07-coord-release-please-prs-must-land-without-sha-rewrite` in
+# qontinui-dev-notes).
+#
+# Scoped to release-please's head branches by a job-level `if:` rather than a
+# trigger filter: `pull_request` has no head-branch filter, and skipping the job
+# (rather than never registering it) keeps the check name stable on every PR.
+#
+# NOT a required check, deliberately: the fix for what it detects is a manual
+# recovery, and a required red would freeze the train on a PR that must be
+# closed anyway. Its value is the message.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-pr-sanity:
+    if: startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The script reads the BASE commit's manifest and config with
+          # `git show`; a shallow PR checkout does not carry the base.
+          fetch-depth: 0
+
+      - name: Every base manifest version has a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash .github/scripts/release-pr-sanity.sh
