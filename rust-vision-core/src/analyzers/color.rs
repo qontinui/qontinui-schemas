@@ -59,16 +59,31 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
         //     fully-undeclared arm AND the partial-declaration arms
         //     (Some/None, None/Some): any element whose contrast required
         //     pixel sampling is informational only.
-        let (fg, bg, declared) = match (el.fg_color, el.bg_color) {
-            (Some(f), Some(b)) => (f, b, true),
+        // `sampled_confidence` is `None` on the declared arm and `Some` on
+        // the sampled one — the two contrast regimes ARE the estimate /
+        // deduction distinction [`Finding::confidence`] exists to state, so
+        // it is carried straight through onto the finding rather than
+        // recomputed or guessed at.
+        //
+        // `declared` is DERIVED from it rather than tracked alongside it,
+        // the same way `AnalyzerResult::conclusive` is derived from its
+        // verdict: two independently-maintained encodings of one fact can
+        // drift when a third regime is added, and the drift would be a
+        // finding silently losing its confidence with nothing failing.
+        let (fg, bg, sampled_confidence) = match (el.fg_color, el.bg_color) {
+            (Some(f), Some(b)) => (f, b, None),
             // At least one color undeclared: fall back to sampling the frame
             // under the element's bbox. Requires geometry — bbox-less
             // elements can't be sampled, so they're skipped (no finding).
-            _ => match el.bbox.and_then(|bbox| sample_dominant_two(frame, bbox)) {
-                Some((f, b)) => (f, b, false),
+            _ => match el
+                .bbox
+                .and_then(|bbox| sample_dominant_two_scored(frame, bbox))
+            {
+                Some((f, b, share)) => (f, b, Some(share)),
                 None => continue,
             },
         };
+        let declared = sampled_confidence.is_none();
         let ratio = wcag_contrast(fg, bg);
         ratios_computed += 1;
 
@@ -96,6 +111,13 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
             // Pixel-sampled, no declared colors: informational only. Never
             // Warning/Critical and never counted toward density — the
             // two-mode histogram is unreliable for sparse text.
+            //
+            // This is the crate's one ESTIMATED analyzer observation, so it
+            // is the one that carries a confidence. Everything else here is
+            // exact arithmetic over declared values and states so by
+            // leaving `confidence` at `None`.
+            let share = sampled_confidence
+                .expect("`declared` is derived from this Option, so the sampled arm always scores");
             findings.push(
                 Finding::new(
                     "low_contrast",
@@ -106,7 +128,8 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
                         el.id, ratio
                     ),
                 )
-                .with_elements(vec![el.id.clone()]),
+                .with_elements(vec![el.id.clone()])
+                .with_confidence(share),
             );
         }
     }
@@ -195,7 +218,47 @@ pub fn wcag_contrast(a: Rgb, b: Rgb) -> f64 {
 /// background of a text element when the snapshot didn't supply computed
 /// styles. Quantizes RGB to a 5-bit-per-channel cube (32×32×32 = 32k bins)
 /// so background gradients still collapse to one mode in practice.
+///
+/// Thin wrapper over [`sample_dominant_two_scored`] that discards the score.
+/// Prefer the scored form where the caller is producing an observation a
+/// reader will act on — the score is what lets that reader tell an estimate
+/// from a deduction.
 pub fn sample_dominant_two(frame: &Frame, region: Region) -> Option<(Rgb, Rgb)> {
+    sample_dominant_two_scored(frame, region).map(|(fg, bg, _)| (fg, bg))
+}
+
+/// [`sample_dominant_two`], plus **the share of the region's sampled pixels
+/// falling in the two dominant quantization bins**.
+///
+/// Bins, not colours: the returned `Rgb`s are those bins' dequantized
+/// representatives, so a counted pixel matches a returned colour to within
+/// one 5-bit bin (up to ~7 per channel), not exactly. Saying "the two
+/// returned colors account for" would overclaim by exactly that margin.
+///
+/// The value is in `0.0..=1.0`, but the reachable FLOOR is not 0.0: with
+/// 32 768 bins the two dominant ones always hold at least `2/32768` of a
+/// fully-scattered region, so calibrate a "low" threshold against real
+/// regions rather than against zero.
+///
+/// That share is the honest confidence for anything derived from this pair,
+/// and it is a MEASUREMENT rather than a judgement. Read it as exactly what
+/// it says and nothing more:
+///
+/// - It answers *"how much of this region does a two-color model describe?"*
+///   A flat label on a flat background scores near `1.0`; a region full of
+///   gradient, imagery or antialiasing spreads across many quantization bins
+///   and scores low, which is precisely when the sampled pair is least
+///   trustworthy as a foreground/background reading.
+/// - It does **not** claim the pair was correctly identified AS foreground
+///   and background. A sparse-text element whose glyphs are a small minority
+///   of pixels can score high while both modes collapse to background — the
+///   known failure mode this analyzer caps at `Severity::Info` for.
+///
+/// A region with a single occupied bin has no second color: the pair
+/// degenerates (both entries are the mode) and the score is that one bin's
+/// share, i.e. `1.0`. The model describes the region perfectly; there is
+/// simply no foreground in it.
+pub fn sample_dominant_two_scored(frame: &Frame, region: Region) -> Option<(Rgb, Rgb, f64)> {
     if region.w == 0 || region.h == 0 {
         return None;
     }
@@ -204,27 +267,44 @@ pub fn sample_dominant_two(frame: &Frame, region: Region) -> Option<(Rgb, Rgb)> 
     let (rx, ry, rw, rh) = region.clamp_to_frame(frame.width, frame.height)?;
 
     let mut hist: BTreeMap<u16, u32> = BTreeMap::new();
+    let mut sampled: u64 = 0;
     for y in ry..(ry + rh) {
         for x in rx..(rx + rw) {
             let p = frame.buffer.get_pixel(x, y).0;
             let key = quantize_rgb(p[0], p[1], p[2]);
             *hist.entry(key).or_default() += 1;
+            sampled += 1;
         }
     }
-    if hist.is_empty() {
+    if hist.is_empty() || sampled == 0 {
         return None;
     }
     let mut entries: Vec<_> = hist.into_iter().collect();
     entries.sort_by_key(|e| std::cmp::Reverse(e.1));
     let primary = dequantize_rgb(entries[0].0);
-    let secondary = if entries.len() > 1 {
-        dequantize_rgb(entries[1].0)
+    let (secondary, second_count) = if entries.len() > 1 {
+        (dequantize_rgb(entries[1].0), u64::from(entries[1].1))
     } else {
-        // Single-color region: use its complement as the "other" color so
-        // contrast math degenerates gracefully (ratio ≈ 1.0).
-        primary
+        // Single-color region: reuse the mode as the "other" color so the
+        // contrast math degenerates gracefully (ratio ≈ 1.0). The comment
+        // here used to say "its complement", which the code has never done
+        // — a complement would give a HIGH ratio and turn a blank region
+        // into a clean bill of health.
+        //
+        // No second color was OBSERVED, so it contributes no pixels to the
+        // score: the share is the mode's alone.
+        (primary, 0)
     };
-    Some((primary, secondary))
+    let share = (u64::from(entries[0].1) + second_count) as f64 / sampled as f64;
+    // The two bins are disjoint subsets of the sampled pixels, so this
+    // cannot exceed 1.0 — and a `clamp` alone would LAUNDER the one likely
+    // typo here (double-counting the mode in the degenerate arm) into a
+    // passing 1.0. Assert first, then clamp for float slop.
+    debug_assert!(
+        share <= 1.0,
+        "top-two bins ({share}) exceeded the sampled pixel count — a bin was counted twice"
+    );
+    Some((primary, secondary, share.clamp(0.0, 1.0)))
 }
 
 fn quantize_rgb(r: u8, g: u8, b: u8) -> u16 {
@@ -273,6 +353,90 @@ mod tests {
         // light-gray on white: ~1.6:1
         let r = wcag_contrast(Rgb::new(200, 200, 200), Rgb::new(255, 255, 255));
         assert!(r < 2.0);
+    }
+
+    /// This is the SECOND-TERM guard: it is the only test that reaches the
+    /// `entries.len() > 1` arm, so dropping `second_count` from the sum
+    /// reddens here (0.50 against an expected 0.80) and nowhere else. The
+    /// double-count mutation is caught elsewhere, by the `debug_assert!` on
+    /// `share` reached through the single-bin test below — this fixture has
+    /// six occupied bins and never enters the degenerate arm at all.
+    ///
+    /// It also pins WHICH pair comes back, so a mutation that picks
+    /// `entries[2]` as the runner-up while still summing `entries[1]`'s
+    /// count cannot slip through on the share alone.
+    #[test]
+    fn scored_share_counts_only_the_two_dominant_bins() {
+        // 10x10 = 100 px. 50 of A, 30 of B, then 5 px each of four further
+        // colours, all far enough apart to land in distinct 5-bit bins.
+        // Every pixel is overwritten below, so the fill colour is arbitrary.
+        let mut img = image::RgbaImage::from_pixel(10, 10, image::Rgba([0, 0, 0, 0xff]));
+        let others = [
+            [0x40, 0x00, 0x00, 0xff],
+            [0x00, 0x40, 0x00, 0xff],
+            [0x00, 0x00, 0x40, 0xff],
+            [0x80, 0x80, 0x00, 0xff],
+        ];
+        for i in 0u32..100 {
+            let (x, y) = (i % 10, i / 10);
+            let px = if i < 50 {
+                [0xF0, 0xF0, 0xF0, 0xff] // A: 50
+            } else if i < 80 {
+                [0x10, 0x10, 0x10, 0xff] // B: 30
+            } else {
+                others[((i - 80) / 5) as usize] // 4 x 5
+            };
+            img.put_pixel(x, y, image::Rgba(px));
+        }
+        let f = Frame::from_rgba(img, FrameSource::synthetic_now());
+        let (p, s, share) = sample_dominant_two_scored(
+            &f,
+            Region {
+                x: 0,
+                y: 0,
+                w: 10,
+                h: 10,
+            },
+        )
+        .unwrap();
+        assert!(
+            (share - 0.80).abs() < 1e-9,
+            "top two bins hold 50+30 of 100 px, expected 0.80, got {share}"
+        );
+        // Round-tripped through the same quantization rather than
+        // hardcoded, so this pins the SELECTION without also pinning the
+        // 5->8 bit expansion.
+        assert_eq!(
+            p,
+            dequantize_rgb(quantize_rgb(0xF0, 0xF0, 0xF0)),
+            "A (50 px) is the mode"
+        );
+        assert_eq!(
+            s,
+            dequantize_rgb(quantize_rgb(0x10, 0x10, 0x10)),
+            "B (30 px) is the runner-up"
+        );
+    }
+
+    /// The degenerate arm: one occupied bin means no SECOND colour was
+    /// observed, so it must contribute zero pixels rather than the mode's
+    /// count a second time. Asserted alongside the bin count so "share is
+    /// 1.0" cannot pass for the wrong reason.
+    #[test]
+    fn scored_share_on_a_single_bin_region_counts_the_mode_once() {
+        let f = solid_frame(20, 20, [0x80, 0x80, 0x80, 0xff]);
+        let r = Region {
+            x: 0,
+            y: 0,
+            w: 20,
+            h: 20,
+        };
+        let (p, s, share) = sample_dominant_two_scored(&f, r).unwrap();
+        assert_eq!(p, s, "a single-bin region has no distinct second colour");
+        assert!(
+            (share - 1.0).abs() < 1e-9,
+            "one bin holding every pixel is a share of 1.0, got {share}"
+        );
     }
 
     #[test]

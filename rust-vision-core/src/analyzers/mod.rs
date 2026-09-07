@@ -10,7 +10,10 @@
 //! Each analyzer's `run()` returns an [`AnalyzerResult`]: the findings it
 //! produced, the [`SnapshotCoverage`] it had to work with, and an
 //! [`AnalyzerVerdict`] saying whether its preconditions were met at all. A
-//! [`Finding`] is structured: kind, severity, optional region, detail.
+//! [`Finding`] is structured: kind, severity, optional region, detail —
+//! plus the provenance every observation carries, [`Finding::analyzer`]
+//! (which analyzer produced it) and [`Finding::confidence`] (whether it
+//! rests on an estimated input, or is an exact deduction).
 //! Callers can choose to format them as text (the runner's
 //! `/vision/analyze` endpoint serializes them as JSON, the `/visual-audit`
 //! skill formats them as markdown).
@@ -79,6 +82,24 @@ pub struct Finding {
     /// can match on it.
     pub kind: String,
     pub severity: Severity,
+    /// Which analyzer produced this observation.
+    ///
+    /// Stamped by [`run`] — the dispatcher — for every finding the run
+    /// produced, rather than at each `Finding::new` site inside the five
+    /// analyzers. Attribution that each analyzer had to remember is
+    /// attribution a sixth analyzer will forget, and the moment a caller
+    /// merges five analyzers' findings into one list (which is exactly what
+    /// a five-analyzer audit does) an unattributed finding is unreadable.
+    ///
+    /// `None` means the finding was produced OUTSIDE the dispatcher — a
+    /// direct `layout::run(..)` call, or a value built by hand or read from
+    /// a payload written before this field existed. That is genuinely
+    /// UNKNOWN attribution, not a claim that no analyzer produced it, which
+    /// is why it is omitted from the wire rather than written as `null`.
+    /// Contrast [`Self::confidence`], whose `None` is a positive statement
+    /// and is therefore always on the wire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analyzer: Option<Analyzer>,
     /// Pixel-space region where the finding manifests, when one is
     /// meaningful (e.g., the overlapping intersection bbox).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +109,33 @@ pub struct Finding {
     /// IDs of elements involved (for analyses that compare 2+ elements).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub elements: Vec<String>,
+    /// How far this observation rests on an ESTIMATED input, when it rests
+    /// on one at all.
+    ///
+    /// **`None` is a positive statement, not a gap: no estimated input
+    /// contributed to this finding — it is a deduction, not an estimate.**
+    /// An `overlap` finding derived from two bounding boxes, a
+    /// `frame_delta` counted pixel-for-pixel, a `low_contrast` computed from
+    /// colours the snapshot DECLARED: each is exact, and a number attached
+    /// to it would manufacture precision that was never measured. Saying so
+    /// is the whole point of the field. A silently ambiguous `None` —
+    /// "either exact or nobody said" — would recreate the collapsed
+    /// distinction this crate's verdict types ([`AnalyzerVerdict`],
+    /// [`crate::AssertionOutcome`]) exist to prevent.
+    ///
+    /// It is therefore **always serialized**, as `"confidence": null`, and
+    /// never skipped: a reader must be able to tell "this producer states
+    /// the finding is a deduction" from "this producer says nothing about
+    /// confidence", and an omitted key cannot say the first. A payload with
+    /// no key at all is the second, and comes only from a producer older
+    /// than this field — every `Finding` this crate emits states one.
+    ///
+    /// `Some(c)` is in `0.0..=1.0` and its MEANING is the producing site's
+    /// to document; there is no crate-wide scale. Today exactly one site
+    /// sets it: [`color`]'s pixel-sampled contrast arm (see
+    /// [`color::sample_dominant_two_scored`]).
+    #[serde(default)]
+    pub confidence: Option<f64>,
 }
 
 impl Finding {
@@ -95,9 +143,11 @@ impl Finding {
         Self {
             kind: kind.into(),
             severity,
+            analyzer: None,
             region: None,
             detail: detail.into(),
             elements: Vec::new(),
+            confidence: None,
         }
     }
 
@@ -108,6 +158,27 @@ impl Finding {
 
     pub fn with_elements(mut self, ids: impl IntoIterator<Item = String>) -> Self {
         self.elements = ids.into_iter().collect();
+        self
+    }
+
+    /// Record that this observation rests on an estimated input, at `c`.
+    ///
+    /// Call this ONLY where the input really was estimated — see
+    /// [`Self::confidence`]. Leaving it uncalled is the statement that the
+    /// finding is a deduction, and that statement reaches the wire.
+    ///
+    /// The `debug_assert` here is belt-and-braces rather than a guard, and
+    /// that differs from its twin on [`crate::AssertionResult`]: the only
+    /// caller is `color`'s sampled arm, whose value is a ratio of integer
+    /// pixel counts over a divisor `clamp_to_frame` guarantees is `>= 1`, so
+    /// it is finite and in range by construction. The assertion on the
+    /// assertion side guards a value composed OUTSIDE this crate.
+    pub fn with_confidence(mut self, c: f64) -> Self {
+        debug_assert!(
+            (0.0..=1.0).contains(&c),
+            "confidence {c} is outside the documented 0.0..=1.0"
+        );
+        self.confidence = Some(c);
         self
     }
 }
@@ -347,6 +418,20 @@ pub struct AnalyzeInput<'a> {
 /// already displays disappears. One vocabulary: a `skipped` finding IS a
 /// blocked verdict, rather than a second, parallel mechanism for saying the
 /// same thing.
+///
+/// # Attribution happens here, once
+///
+/// Every finding this function returns leaves it carrying
+/// [`Finding::analyzer`], stamped in one place at the end. That includes the
+/// `skipped` findings of a [`AnalyzerVerdict::Blocked`] run: **a refusal to
+/// answer is still an observation, and it needs its provenance more than a
+/// clean result does** — it is the one a reader is most likely to be holding
+/// out of context, merged into a five-analyzer report, wondering which
+/// analyzer declined and why.
+///
+/// Stamping here rather than at each `Finding::new` site is deliberate: a
+/// duty spread over five call sites is a duty a sixth analyzer will forget,
+/// and the failure is silent.
 pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
     /// The blocked-on-missing-input result, built once so all five arms
     /// spell it identically.
@@ -358,7 +443,7 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
         )
     }
 
-    match analyzer {
+    let mut result = match analyzer {
         Analyzer::Layout => match input.snapshot {
             Some(s) => layout::run(s),
             None => missing_input("layout analyzer requires an ElementSnapshot", None),
@@ -385,5 +470,69 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
             Some(s) => elements::run(s),
             None => missing_input("elements analyzer requires an ElementSnapshot", None),
         },
+    };
+
+    stamp_attribution(&mut result, analyzer);
+    result
+}
+
+/// The single attribution site.
+///
+/// `get_or_insert` rather than assignment so that a finding which already
+/// names its producer (a future analyzer that folds another's output) keeps
+/// the finer attribution instead of being relabelled by the outer dispatch.
+///
+/// Extracted from [`run`] rather than inlined there so the test that pins
+/// that property exercises THIS code and not a copy of it. A test carrying
+/// its own `get_or_insert` would stay green through a "simplification" of
+/// the real one to a plain assignment, which is the exact regression it
+/// exists to catch.
+fn stamp_attribution(result: &mut AnalyzerResult, analyzer: Analyzer) {
+    for f in &mut result.findings {
+        f.analyzer.get_or_insert(analyzer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The dispatcher stamps attribution, but it must not RELABEL a finding
+    /// that already names a finer producer — a future analyzer that folds
+    /// another's output would otherwise have its inner attribution
+    /// overwritten by the outer dispatch.
+    ///
+    /// Nothing in the crate does that today, which is exactly why this test
+    /// exists: without it, `get_or_insert` and a plain assignment are
+    /// observationally identical, and a later "simplification" to
+    /// assignment would pass CI while deleting the property the field's doc
+    /// comment promises.
+    #[test]
+    fn the_dispatcher_does_not_relabel_an_already_attributed_finding() {
+        let mut result = AnalyzerResult::checked(
+            None,
+            vec![
+                Finding {
+                    analyzer: Some(Analyzer::Typography),
+                    ..Finding::new("inner", Severity::Info, "folded from another analyzer")
+                },
+                Finding::new(
+                    "outer",
+                    Severity::Info,
+                    "produced by the dispatched analyzer",
+                ),
+            ],
+        );
+
+        // The production stamp itself, not a copy of it — that is the whole
+        // point of `stamp_attribution` being a named function.
+        stamp_attribution(&mut result, Analyzer::Layout);
+
+        assert_eq!(
+            result.findings[0].analyzer,
+            Some(Analyzer::Typography),
+            "an existing attribution was overwritten by the outer dispatch"
+        );
+        assert_eq!(result.findings[1].analyzer, Some(Analyzer::Layout));
     }
 }

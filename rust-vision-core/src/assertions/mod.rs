@@ -9,6 +9,25 @@
 //! fields and `skip_serializing_if` keeps absent ones off the wire entirely.
 //! Removing or renaming one is breaking.
 //!
+//! **One field deliberately declines `skip_serializing_if`:**
+//! [`AssertionResult::confidence`] (and its analyzer-side twin
+//! [`crate::Finding::confidence`]). Its `None` is a positive statement —
+//! "no estimated input contributed to this verdict" — and a skipped key
+//! cannot make a statement, only withhold one. So it always emits, as
+//! `null`. That ADDS a key to the wire rather than removing one, so it is
+//! additive **on the wire**: a consumer that does not read it is
+//! unaffected, and one that does can finally tell a deduction from an
+//! unstated confidence.
+//!
+//! **On the RUST side, adding a field is not free**, and the paragraph above
+//! must not be read as saying it is. [`AssertionResult`] and
+//! [`crate::Finding`] are plain `pub` structs with public fields and no
+//! `#[non_exhaustive]`, so a downstream STRUCT LITERAL gains a required
+//! field at re-pin and stops compiling. Callers going through
+//! `Finding::new` / the `AssertionResult` constructors are unaffected. Given
+//! the re-pin model above that surfaces as an honest build break rather than
+//! silently, which is why it is acceptable — not because it cannot happen.
+//!
 //! **A breaking change costs a consumer RE-PIN, not an in-band version bump.**
 //! This crate is unpublished (it is absent from `release-please-config.json`
 //! and from `publish-rust.yml`), so every consumer pins a commit instead:
@@ -271,6 +290,82 @@ pub struct AssertionResult {
     /// Echo of the input assertion for downstream display. Owned (cloned)
     /// to keep the result self-contained; cost is negligible.
     pub assertion: Assertion,
+    /// How far this verdict rests on an ESTIMATED input, when it rests on
+    /// one at all.
+    ///
+    /// **`None` is a positive statement, not a gap: no estimated input
+    /// contributed to this verdict** — with one enumerated exception, named
+    /// below, which this doc states rather than leaves for a reader to
+    /// discover. Every other operand is exact — bboxes, declared
+    /// `fg_color`/`bg_color`, snapshot text, a recorded baseline — so the
+    /// result is a deduction and a number attached to it would manufacture
+    /// precision nobody measured. That covers the OCR path's own no-op case
+    /// too: when not one OCR block overlapped the target, nothing was read,
+    /// so nothing estimated reached the verdict.
+    ///
+    /// It is therefore **always serialized**, as `"confidence": null`, and
+    /// never skipped. A reader must be able to tell "this producer states
+    /// the verdict is a deduction" from "this producer says nothing about
+    /// confidence", and an omitted key cannot say the first — it says only
+    /// the second, and that is what a payload written before this field
+    /// existed means.
+    ///
+    /// `Some(c)` is in `0.0..=1.0`. Today exactly one evaluator sets it:
+    /// [`Assertion::ContainsText`]'s OCR fallback, which reports the LOWEST
+    /// [`OcrBlockRef::confidence`] among the blocks whose text it actually
+    /// read. Lowest, not mean: the aggregate string is only as trustworthy
+    /// as its worst-read fragment, and averaging would let one crisp block
+    /// launder a garbled one.
+    ///
+    /// **One case yields a `Some(c)` that is not any block's reported
+    /// value.** When blocks contributed and not one carried a FINITE
+    /// confidence, the value is floored to `Some(0.0)`. An OCR reading
+    /// decided the verdict, so `None` would be a false claim of exactness —
+    /// and a `NaN` would reach the wire as `null` and make that same false
+    /// claim, since `serde_json` writes a non-finite float as null. `0.0` is
+    /// the conservative representable answer: a consumer thresholding on
+    /// this discards a verdict it might have kept, and never keeps one it
+    /// should have discarded.
+    ///
+    /// Note what that costs. "The engine reported `0.0`" and "no usable
+    /// confidence was reported at all" are now ONE representation and cannot
+    /// be told apart. That is deliberate and bounded — no consumer behaves
+    /// differently on the two, and the alternatives are worse — but it IS a
+    /// collapse, and this field exists so collapses get stated rather than
+    /// absorbed.
+    ///
+    /// Note what does NOT set it, and that the two reasons are different.
+    ///
+    /// Every other evaluator is exact, and there is a MECHANICAL reason to
+    /// trust that rather than a hand-maintained list: **no evaluator reads
+    /// [`EvalContext::frame`] at all**, so none of them samples a pixel.
+    /// They compare declared snapshot values ([`Assertion::ContrastMeetsWcag`],
+    /// [`Assertion::ColorWithin`], [`Assertion::TypographyConsistent`]),
+    /// recorded baselines ([`Assertion::NoLayoutShiftSince`]) and bboxes.
+    /// `ContrastMeetsWcag` in particular returns `Unknown` when a colour is
+    /// absent rather than falling back to sampling.
+    ///
+    /// The test to apply when adding an evaluator, so the next author
+    /// classifies their own site without re-reading the crate: **does the
+    /// verdict rest on a quantity the snapshot did not carry, which this
+    /// crate stood in for?** A THRESHOLD over an exactly-measured quantity is
+    /// not that — `dynamic`'s per-channel tolerance of 8, `typography`'s
+    /// more-than-three-families drift, `elements`' 24 px target are policy
+    /// choices over exact inputs and correctly state `None`.
+    ///
+    /// [`Assertion::TextFitsContainer`]'s **vertical** arm IS that, and is
+    /// the one place in this evaluator where `None` is a KNOWN GAP in this
+    /// field's coverage rather than a claim of exactness. It thresholds
+    /// `bbox.h` against a hard-coded `font_size_px * 1.5` line-height guess
+    /// and its own failure detail says "text likely clipped". It states
+    /// `None` today because `1.5` is an unmeasured constant: deriving a
+    /// number from it would manufacture exactly the precision this field
+    /// exists to avoid. Its horizontal arm (`scroll_width_px` against the
+    /// box) is a real measurement and is genuinely exact. Closing the
+    /// vertical gap needs a measured line height on the wire, not a
+    /// coefficient invented here.
+    #[serde(default)]
+    pub confidence: Option<f64>,
 }
 
 /// Deserialization shim for results written BEFORE `outcome` existed.
@@ -290,6 +385,10 @@ struct AssertionResultWire {
     #[serde(default)]
     detail: Option<String>,
     assertion: Assertion,
+    /// Absent in every payload written before the field existed, and that
+    /// absence is carried through as `None` — see [`AssertionResult::confidence`].
+    #[serde(default)]
+    confidence: Option<f64>,
 }
 
 impl From<AssertionResultWire> for AssertionResult {
@@ -307,6 +406,7 @@ impl From<AssertionResultWire> for AssertionResult {
             outcome,
             detail: w.detail,
             assertion: w.assertion,
+            confidence: w.confidence,
         }
     }
 }
@@ -318,7 +418,23 @@ impl AssertionResult {
             outcome,
             detail,
             assertion,
+            confidence: None,
         }
+    }
+
+    /// Record that this verdict rests on an estimated input, at `c`.
+    ///
+    /// Call this ONLY where the input really was estimated — see
+    /// [`Self::confidence`]. Leaving it uncalled is the statement that the
+    /// verdict is a deduction, and that statement reaches the wire.
+    fn with_confidence(mut self, c: f64) -> Self {
+        debug_assert!(
+            (0.0..=1.0).contains(&c),
+            "confidence {c} is outside 0.0..=1.0 — an OcrBlockRef built on a \
+             percentage scale, or a share that overflowed"
+        );
+        self.confidence = Some(c);
+        self
     }
     fn pass(assertion: Assertion) -> Self {
         Self::of(assertion, AssertionOutcome::Passed, None)
@@ -398,6 +514,11 @@ impl BaselineEntry {
 #[derive(Debug, Default)]
 pub struct EvalContext<'a> {
     pub snapshot: Option<&'a ElementSnapshot>,
+    /// **No evaluator reads this today**, and that absence is what makes
+    /// [`AssertionResult::confidence`]'s enumeration checkable by grep rather
+    /// than by hand: nothing here samples a pixel, so nothing here estimates
+    /// a colour. The first evaluator that does read it will be producing an
+    /// ESTIMATE and owes a confidence — see that field.
     pub frame: Option<&'a Frame>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
@@ -411,6 +532,16 @@ pub struct EvalContext<'a> {
 pub struct OcrBlockRef<'a> {
     pub bbox: Region,
     pub text: &'a str,
+    /// The OCR engine's confidence for this block, in `0.0..=1.0`.
+    ///
+    /// **Callers normalise.** This crate passes the value through to
+    /// [`AssertionResult::confidence`] unchanged, so an engine reporting a
+    /// percentage must divide by 100 before building this struct — otherwise
+    /// that field's documented range is a lie, and every consumer
+    /// calibrating a threshold on it is calibrating against the wrong scale.
+    /// The composing caller is out of this repo (the runner assembles these
+    /// from `vision/extract` output), which is why the contract is stated
+    /// here, on the surface it reads.
     pub confidence: f64,
 }
 
@@ -829,30 +960,72 @@ fn eval_contains_text(
 
     // OCR fallback
     if let (Some(blocks), Some(bbox)) = (ctx.ocr_blocks, bbox) {
-        let aggregate: String = blocks
+        let contributing: Vec<&OcrBlockRef<'_>> = blocks
             .iter()
             .filter(|b| regions_overlap(b.bbox, bbox))
+            .collect();
+        let aggregate: String = contributing
+            .iter()
             .map(|b| b.text)
             .collect::<Vec<_>>()
             .join(" ");
+        // The only ESTIMATED input in this whole evaluator: OCR text.
+        //
+        // Non-finite block confidences are FILTERED rather than folded. One
+        // malformed block must not erase a reading every other block agrees
+        // on — `f64::min`'s non-NaN-wins behaviour would give that for free,
+        // but only until every contributor is non-finite, and then the fold
+        // yields `NaN`. That must never reach the wire: `serde_json` writes a
+        // non-finite float as `null`, byte-identical to the `None` that
+        // states "this was a deduction". A `debug_assert` does not stop it
+        // either, since the runner consumes this crate in release.
+        //
+        // So the three cases are spelled out, because each is a different
+        // fact. See [`AssertionResult::confidence`].
+        let finite = contributing
+            .iter()
+            .map(|b| b.confidence)
+            .filter(|c| c.is_finite())
+            .reduce(f64::min);
+        let confidence = match (finite, contributing.is_empty()) {
+            // At least one usable reading: report the WORST of them, not the
+            // mean. The aggregate string is only as trustworthy as its
+            // worst-read fragment, and averaging would let one crisp block
+            // launder a garbled one.
+            (Some(c), _) => Some(c),
+            // No contributing block at all: no OCR text was read, so nothing
+            // estimated reached the verdict, and `None` is accurate.
+            (None, true) => None,
+            // Blocks contributed and not one carried a usable confidence. An
+            // OCR reading DID decide this verdict, so `None` would be a false
+            // claim of exactness. Floor it: estimated, and trusted not at all.
+            (None, false) => Some(0.0),
+        };
+        let qualify = |r: AssertionResult| match confidence {
+            Some(c) => r.with_confidence(c),
+            None => r,
+        };
         let matched = match kind {
             TextMatchKind::Exact => aggregate.trim() == text,
             TextMatchKind::Contains => aggregate.contains(&text),
             TextMatchKind::Regex => match regex_lite_match(&text, &aggregate) {
                 Ok(m) => m,
+                // An unsupported pattern is an authoring error, not an OCR
+                // reading: no estimated input decided it, so it carries no
+                // confidence.
                 Err(e) => return AssertionResult::fail(assertion, format!("invalid regex: {e}")),
             },
         };
         return if matched {
-            AssertionResult::pass(assertion)
+            qualify(AssertionResult::pass(assertion))
         } else {
-            AssertionResult::fail(
+            qualify(AssertionResult::fail(
                 assertion,
                 format!(
                     "OCR text {:?} does not match expected {:?}",
                     aggregate, text
                 ),
-            )
+            ))
         };
     }
 
