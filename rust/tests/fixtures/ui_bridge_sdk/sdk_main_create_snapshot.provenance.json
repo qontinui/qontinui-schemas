@@ -8,5 +8,5 @@
   "capture_command": "cp rust/tests/fixtures/ui_bridge_sdk/capture/wire-fixture.capture.test.ts <ui-bridge>/packages/ui-bridge/src/core/ && cd <ui-bridge>/packages/ui-bridge && WIRE_FIXTURE_OUT=<abs path>/sdk_main_create_snapshot.json npx vitest run src/core/wire-fixture.capture.test.ts",
   "captured_at": "2026-09-10",
   "trim": "none — the whole createSnapshot() output; timestamp/snapshotId/signature/registeredAt are whatever the run produced",
-  "notes": "Exercises: an element with customActions (sendKeys, getScrollback), a component with ComponentActionInfo actions (paramSchema, effect), a workflow, and the undoRedo enricher."
+  "notes": "Exercises: an element with customActions (sendKeys, getScrollback) serialized as names, a component with ComponentActionInfo actions (id, label, description, effect), a workflow, and the undoRedo enricher. The harness also registers a paramSchema on the `save` action, but createSnapshot() drops paramSchema from component actions by design (serializeRegisteredComponent, packages/ui-bridge/src/core/registry.ts at the commit above), so it is NOT on this wire; /control/components is the surface that carries it."
 }

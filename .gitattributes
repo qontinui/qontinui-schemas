@@ -25,3 +25,10 @@
 # checkout rewrites ~1090 generated files from CRLF to LF in the WORKING TREE.
 ts/src/generated/** text eol=lf
 src/qontinui_schemas/generated/** text eol=lf
+
+# Recorded UI Bridge SDK wire fixtures (rust/tests/ui_bridge_sdk_wire.rs). Their
+# .provenance.json sidecars pin each fixture's sha256, so a checkout must never
+# rewrite their bytes: under core.autocrlf=true a Windows checkout would convert
+# them to CRLF and fail the digest test locally. `-text` stores and checks them
+# out byte-for-byte; the committed blobs are LF already.
+rust/tests/fixtures/ui_bridge_sdk/*.json -text

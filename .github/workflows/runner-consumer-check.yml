@@ -860,6 +860,101 @@ jobs:
           exit 1
 
   # ------------------------------------------------------------------
+  # wire-gate-guard: the SDK wire gate cannot be edited away.
+  #
+  # Compiling the consumers (consumer-check) cannot see a WIRE break: a
+  # schemas type change can compile everywhere and still make every live UI
+  # Bridge snapshot fail the consumers' strict serde parse
+  # (qontinui-schemas#164). rust/tests/ui_bridge_sdk_wire.rs closes that by
+  # parsing recorded, genuine SDK snapshots — and it is only worth anything if
+  # a PR cannot pass it by rewriting the recording or the test.
+  #
+  # So, without the `wire-gate:override` label:
+  #   - an existing fixture or .provenance.json sidecar under
+  #     rust/tests/fixtures/ui_bridge_sdk/ may not be Modified, Deleted or
+  #     Renamed (a new capture from a new SDK release is an Addition and
+  #     always passes; the capture/ harness is not guarded);
+  #   - rust/tests/ui_bridge_sdk_wire.rs may not be Modified or Deleted — an
+  #     edit could #[ignore] the gate, lower MIN_FIXTURES or repoint the
+  #     fixture directory, and its 4 tests are far below rust-ci's floor.
+  # The label is the deliberate decision (retiring an SDK's wire, or
+  # changing the gate itself), visible on the PR.
+  #
+  # Its own job, not a step of consumer-gate, so it answers in seconds rather
+  # than after the ~16-minute runner compile; consumer-gate needs it, so the
+  # required context still carries its verdict.
+  #
+  # Three-dot (merge-base) diff, deliberately — unlike the consumer path
+  # predicate, this must see ONLY the PR's own changes, or a fixture added to
+  # main after the branch point would read as a deletion here.
+  # ------------------------------------------------------------------
+  wire-gate-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qontinui-schemas (PR head, full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: SDK wire gate is append-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THIS_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          fixtures='rust/tests/fixtures/ui_bridge_sdk/'
+          test_file='rust/tests/ui_bridge_sdk_wire.rs'
+          # --diff-filter=a: every change EXCEPT an Addition. --no-renames
+          # splits a rename into D + A, so its D side is caught here. -z keeps
+          # any file name intact. Written to a file first so a failing
+          # `git diff` fails the step under set -e.
+          changed_list="$RUNNER_TEMP/wire-gate-changed"
+          git diff --no-renames --name-only --diff-filter=a -z \
+            "$BASE_SHA...$HEAD_SHA" -- "$fixtures" "$test_file" > "$changed_list"
+          violations=()
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              "$test_file") violations+=("$path") ;;
+              "${fixtures}capture/"*) ;;
+              "$fixtures"*.json) violations+=("$path") ;;
+            esac
+          done < "$changed_list"
+          if [ "${#violations[@]}" -eq 0 ]; then
+            echo "SDK wire gate: append-only invariant holds."
+            exit 0
+          fi
+
+          # Labels read LIVE (and paginated), never from the frozen event
+          # payload; an unanswered probe is UNKNOWN, not "no label".
+          set +e
+          labels="$(gh api --paginate "repos/${THIS_REPO}/issues/${PR_NUMBER}/labels" --jq '.[].name')"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Could not read labels on ${THIS_REPO}#${PR_NUMBER} (gh api rc=${rc}); refusing to guess."
+            exit 1
+          fi
+          # Here-string, not a pipe: `grep -q` exits on the first match, and
+          # under pipefail the writer's SIGPIPE would turn a found label into
+          # "not found".
+          if grep -qxF 'wire-gate:override' <<< "$labels"; then
+            echo "::warning::The SDK wire gate was changed under the wire-gate:override label:"
+            printf '  %s\n' "${violations[@]}"
+            exit 0
+          fi
+          echo "::error::This PR modifies or removes the recorded UI Bridge SDK wire gate:"
+          printf '  %s\n' "${violations[@]}"
+          echo "Fixtures are append-only. If the SDK's wire changed, capture a NEW fixture from"
+          echo "that SDK release (with its .provenance.json) and keep the old ones — deployed apps"
+          echo "still emit the old wire. To deliberately retire an SDK's wire or change the gate"
+          echo "itself, label this PR wire-gate:override."
+          exit 1
+
+  # ------------------------------------------------------------------
   # consumer-gate: THE REQUIRED CONTEXT.
   #
   # A matrix job's `result` aggregates correctly across entries (failure
@@ -875,86 +970,23 @@ jobs:
   # filter would have excluded.
   # ------------------------------------------------------------------
   consumer-gate:
-    needs: [consumer-check]
+    needs: [consumer-check, wire-gate-guard]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      # ----------------------------------------------------------------
-      # SDK WIRE FIXTURES ARE APPEND-ONLY.
-      #
-      # Compiling the consumers (above) cannot see a WIRE break: a schemas
-      # type change can compile everywhere and still make every live UI
-      # Bridge snapshot fail the consumers' strict serde parse
-      # (qontinui-schemas#164). rust/tests/ui_bridge_sdk_wire.rs closes that
-      # by parsing recorded, genuine SDK snapshots — and that test is only
-      # worth anything if a PR cannot "fix" it by rewriting the recording.
-      #
-      # So: an existing fixture or its .provenance.json sidecar may not be
-      # Modified, Deleted or Renamed. Adding a new one (a capture from a new
-      # SDK release) always passes. Retiring one is a deliberate decision to
-      # stop accepting that SDK's wire, declared with the `wire-fixture:retire`
-      # label. The capture harness under capture/ is not guarded; the
-      # recorded bytes are.
-      #
-      # Three-dot (merge-base) diff, deliberately — unlike the consumer path
-      # predicate above, this must see ONLY the PR's own changes, or a fixture
-      # added to main after the branch point would read as a deletion here.
-      # ----------------------------------------------------------------
-      - name: Checkout qontinui-schemas (fixture guard)
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: SDK wire fixtures are append-only
-        if: github.event_name == 'pull_request'
+      - name: SDK wire gate verdict
         env:
-          GH_TOKEN: ${{ github.token }}
-          THIS_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RESULT: ${{ needs.wire-gate-guard.result }}
         run: |
           set -euo pipefail
-          dir='rust/tests/fixtures/ui_bridge_sdk/'
-          # --no-renames: a rename is reported as D + A, so it is refused like
-          # a deletion instead of slipping through as an "R" nobody matched.
-          changed="$(git diff --no-renames --name-status "$BASE_SHA...$HEAD_SHA" -- "$dir")"
-          violations="$(printf '%s\n' "$changed" | awk -v d="$dir" '
-            $1 != "A" && index($2, d) == 1 && $2 !~ /\/capture\// && $2 ~ /\.json$/ { print }')"
-          if [ -n "$changed" ]; then
-            printf '%s\n' "$changed" | sed 's/^/  fixture change: /'
-          fi
-          if [ -z "$violations" ]; then
-            echo "SDK wire fixtures: append-only invariant holds."
-            exit 0
-          fi
-
-          # Labels read LIVE, never from the frozen event payload; an
-          # unanswered probe is UNKNOWN, not "no label".
-          set +e
-          labels="$(gh api "repos/${THIS_REPO}/issues/${PR_NUMBER}/labels" --jq '.[].name')"
-          rc=$?
-          set -e
-          if [ "$rc" -ne 0 ]; then
-            echo "::error::Could not read labels on ${THIS_REPO}#${PR_NUMBER} (gh api rc=${rc}); refusing to guess."
-            exit 1
-          fi
-          # Here-string, not a pipe: `grep -q` exits on the first match, and
-          # under pipefail the writer's SIGPIPE would turn a found label into
-          # "not found".
-          if grep -qxF 'wire-fixture:retire' <<< "$labels"; then
-            echo "::warning::Existing SDK wire fixtures changed under the wire-fixture:retire label:"
-            printf '%s\n' "$violations" | sed 's/^/  /'
-            exit 0
-          fi
-          echo "::error::This PR modifies, deletes or renames recorded UI Bridge SDK wire fixtures:"
-          printf '%s\n' "$violations" | sed 's/^/  /'
-          echo "Fixtures are append-only. If the SDK's wire changed, capture a NEW fixture from"
-          echo "that SDK release (with its .provenance.json) and keep the old ones — deployed apps"
-          echo "still emit the old wire. To deliberately stop accepting an SDK's wire, label this"
-          echo "PR wire-fixture:retire."
-          exit 1
+          echo "wire-gate-guard result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *)
+              echo "::error::The SDK wire gate guard failed — see the wire-gate-guard job."
+              exit 1
+              ;;
+          esac
 
       - name: Aggregate consumer verdicts
         env:

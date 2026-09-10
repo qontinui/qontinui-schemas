@@ -28,9 +28,11 @@
 //! **Fixtures are append-only.** A wire-changing SDK release ADDS a fixture
 //! captured from that release; the old ones stay, because deployed apps keep
 //! emitting the old wire until they upgrade. Modifying, deleting or renaming an
-//! existing fixture or sidecar is refused by the `consumer-gate` job in
-//! `.github/workflows/runner-consumer-check.yml` unless the PR carries the
-//! `wire-fixture:retire` label — retiring a fixture means "we no longer accept
+//! existing fixture or sidecar — or modifying or deleting THIS file, which could
+//! otherwise `#[ignore]` the gate or lower its floor — is refused by the
+//! `wire-gate-guard` job in `.github/workflows/runner-consumer-check.yml` (a
+//! dependency of the required `consumer-gate`) unless the PR carries the
+//! `wire-gate:override` label. Retiring a fixture means "we no longer accept
 //! that SDK's wire", which is a decision, not a fix.
 
 use qontinui_types::ui_bridge::UIBridgeSnapshot;
@@ -220,45 +222,77 @@ fn recorded_sdk_snapshots_strict_parse_into_ui_bridge_snapshot() {
     let mut failures = Vec::new();
     for fixture in load_fixtures() {
         let raw = as_json(&fixture);
-        let snapshot = match parses_as_the_runner_does(raw.clone()) {
-            Ok(s) => s,
-            Err(e) => {
-                failures.push(format!("{}: {e}", fixture.name));
-                continue;
-            }
-        };
-
-        // Nothing may be silently dropped on the way in.
-        assert_eq!(
-            snapshot.elements.len(),
-            array_len(&raw, "elements"),
-            "{}: element count changed across the parse",
-            fixture.name
-        );
-        assert_eq!(
-            snapshot.components.len(),
-            array_len(&raw, "components"),
-            "{}: component count changed across the parse",
-            fixture.name
-        );
-        for (parsed, wire) in snapshot
-            .elements
-            .iter()
-            .zip(raw["elements"].as_array().into_iter().flatten())
-        {
-            assert_eq!(
-                parsed.custom_actions.as_ref().map_or(0, Vec::len),
-                array_len(wire, "customActions"),
-                "{}: element {} lost custom actions across the parse",
-                fixture.name,
-                parsed.id
-            );
+        match parses_as_the_runner_does(raw.clone()) {
+            Ok(snapshot) => failures.extend(dropped_on_the_way_in(&fixture.name, &raw, &snapshot)),
+            Err(e) => failures.push(format!("{}: {e}", fixture.name)),
         }
     }
     assert!(
         failures.is_empty(),
-        "recorded UI Bridge SDK snapshots no longer parse into UIBridgeSnapshot — every \
-         consumer's live parse would fail the same way:\n  {}",
+        "recorded UI Bridge SDK snapshots no longer parse into UIBridgeSnapshot intact — every \
+         consumer's live parse would fail or lose data the same way:\n  {}",
         failures.join("\n  ")
     );
+}
+
+/// A parse that SUCCEEDS can still be a break: nearly every plane is
+/// `#[serde(default)]` and serde ignores unknown keys, so renaming the serde
+/// key of a modelled field (`actions`, `undoRedo`, `workflows`, ...) parses
+/// clean and silently empties it. Compare every modelled plane against what
+/// the wire actually carried.
+fn dropped_on_the_way_in(name: &str, raw: &Value, snapshot: &UIBridgeSnapshot) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut count = |what: &str, parsed: usize, wire: usize| {
+        if parsed != wire {
+            out.push(format!(
+                "{name}: {what}: the wire carries {wire}, the parse kept {parsed}"
+            ));
+        }
+    };
+
+    count(
+        "elements",
+        snapshot.elements.len(),
+        array_len(raw, "elements"),
+    );
+    count(
+        "components",
+        snapshot.components.len(),
+        array_len(raw, "components"),
+    );
+    count(
+        "workflows",
+        snapshot.workflows.len(),
+        array_len(raw, "workflows"),
+    );
+    let wire_elements = raw["elements"].as_array().into_iter().flatten();
+    for (parsed, wire) in snapshot.elements.iter().zip(wire_elements) {
+        count(
+            &format!("element {} customActions", parsed.id),
+            parsed.custom_actions.as_ref().map_or(0, Vec::len),
+            array_len(wire, "customActions"),
+        );
+    }
+    let wire_components = raw["components"].as_array().into_iter().flatten();
+    for (parsed, wire) in snapshot.components.iter().zip(wire_components) {
+        count(
+            &format!("component {} actions", parsed.id),
+            parsed.actions.len(),
+            array_len(wire, "actions"),
+        );
+    }
+
+    for (key, parsed) in [
+        ("undoRedo", snapshot.undo_redo.is_some()),
+        ("toasts", snapshot.toasts.is_some()),
+        ("modalStack", snapshot.modal_stack.is_some()),
+    ] {
+        let on_wire = raw.get(key).is_some_and(|v| !v.is_null());
+        if on_wire != parsed {
+            out.push(format!(
+                "{name}: {key}: present on the wire = {on_wire}, present after the parse = {parsed}"
+            ));
+        }
+    }
+    out
 }

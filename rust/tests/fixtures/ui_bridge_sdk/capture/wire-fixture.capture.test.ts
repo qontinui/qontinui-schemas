@@ -8,6 +8,14 @@
  * an element carrying `customActions`, a component with `ComponentActionInfo`
  * actions, a workflow, and the undoRedo enricher — and writes the wire bytes
  * (a JSON round-trip, i.e. exactly what goes over HTTP) to $WIRE_FIXTURE_OUT.
+ *
+ * The `save` action registers a `paramSchema`, but the snapshot projection
+ * (`serializeRegisteredComponent`) drops it by design, so it does not appear in
+ * the captured fixture; `/control/components` is the surface that carries it.
+ *
+ * Usage (from a ui-bridge checkout with dependencies installed): copy this file
+ * to packages/ui-bridge/src/core/, then from packages/ui-bridge run
+ *   WIRE_FIXTURE_OUT=<abs path>.json npx vitest run src/core/wire-fixture.capture.test.ts
  */
 import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
