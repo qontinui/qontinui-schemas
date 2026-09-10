@@ -940,7 +940,10 @@ jobs:
             echo "::error::Could not read labels on ${THIS_REPO}#${PR_NUMBER} (gh api rc=${rc}); refusing to guess."
             exit 1
           fi
-          if printf '%s\n' "$labels" | grep -qxF 'wire-fixture:retire'; then
+          # Here-string, not a pipe: `grep -q` exits on the first match, and
+          # under pipefail the writer's SIGPIPE would turn a found label into
+          # "not found".
+          if grep -qxF 'wire-fixture:retire' <<< "$labels"; then
             echo "::warning::Existing SDK wire fixtures changed under the wire-fixture:retire label:"
             printf '%s\n' "$violations" | sed 's/^/  /'
             exit 0
