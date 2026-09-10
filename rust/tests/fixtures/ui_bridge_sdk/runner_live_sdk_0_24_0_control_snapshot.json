@@ -1,0 +1,1673 @@
+{
+  "activeTab": "terminal",
+  "availableTabs": [
+    {
+      "active": false,
+      "canonical": "projects",
+      "id": "projects",
+      "label": "Projects"
+    },
+    {
+      "active": false,
+      "canonical": "prompt-home",
+      "id": "prompt-home",
+      "label": "Home"
+    },
+    {
+      "active": false,
+      "canonical": "gui-automation",
+      "id": "gui-automation",
+      "label": "Execute"
+    },
+    {
+      "active": false,
+      "canonical": "workflow-queue",
+      "id": "workflow-queue",
+      "label": "Workflow Queue"
+    },
+    {
+      "active": false,
+      "canonical": "active",
+      "id": "active",
+      "label": "Active Dashboard"
+    },
+    {
+      "active": false,
+      "canonical": "runs",
+      "id": "runs",
+      "label": "Runs"
+    },
+    {
+      "active": false,
+      "canonical": "history",
+      "id": "history",
+      "label": "History"
+    },
+    {
+      "active": false,
+      "canonical": "error-monitor",
+      "id": "error-monitor",
+      "label": "Error Monitor"
+    },
+    {
+      "active": false,
+      "canonical": "processes",
+      "id": "processes",
+      "label": "Process Manager"
+    },
+    {
+      "active": false,
+      "canonical": "reflection",
+      "id": "reflection",
+      "label": "Reflection"
+    },
+    {
+      "active": false,
+      "canonical": "observations",
+      "id": "observations",
+      "label": "Observations"
+    },
+    {
+      "active": false,
+      "canonical": "architecture",
+      "id": "architecture",
+      "label": "Architecture"
+    },
+    {
+      "active": false,
+      "canonical": "generator-eval",
+      "id": "generator-eval",
+      "label": "Generator Eval"
+    },
+    {
+      "active": false,
+      "canonical": "meta-optimizer",
+      "id": "meta-optimizer",
+      "label": "Meta-Optimizer"
+    },
+    {
+      "active": false,
+      "canonical": "run-recap",
+      "id": "run-recap",
+      "label": "Run Recap"
+    },
+    {
+      "active": false,
+      "canonical": "run-actions",
+      "id": "run-actions",
+      "label": "Run Actions"
+    },
+    {
+      "active": false,
+      "canonical": "run-image",
+      "id": "run-image",
+      "label": "Image Recognition"
+    },
+    {
+      "active": false,
+      "canonical": "run-findings",
+      "id": "run-findings",
+      "label": "Findings"
+    },
+    {
+      "active": false,
+      "canonical": "run-state-explorer",
+      "id": "run-state-explorer",
+      "label": "State Explorer"
+    },
+    {
+      "active": false,
+      "canonical": "run-tests",
+      "id": "run-tests",
+      "label": "Test Results"
+    },
+    {
+      "active": false,
+      "canonical": "run-ai-output",
+      "id": "run-ai-output",
+      "label": "AI Output"
+    },
+    {
+      "active": false,
+      "canonical": "run-statistics",
+      "id": "run-statistics",
+      "label": "Statistics"
+    },
+    {
+      "active": false,
+      "canonical": "run-ai-data",
+      "id": "run-ai-data",
+      "label": "AI Data Viewer"
+    },
+    {
+      "active": false,
+      "canonical": "run-traces",
+      "id": "run-traces",
+      "label": "Traces"
+    },
+    {
+      "active": false,
+      "canonical": "ai",
+      "id": "ai",
+      "label": "AI Output (Legacy)"
+    },
+    {
+      "active": false,
+      "canonical": "logs",
+      "id": "logs",
+      "label": "Logs"
+    },
+    {
+      "active": false,
+      "canonical": "monitor-findings",
+      "id": "monitor-findings",
+      "label": "Monitor Findings"
+    },
+    {
+      "active": false,
+      "canonical": "monitor-state-explorer",
+      "id": "monitor-state-explorer",
+      "label": "Monitor State Explorer"
+    },
+    {
+      "active": false,
+      "canonical": "monitor-statistics",
+      "id": "monitor-statistics",
+      "label": "Monitor Statistics"
+    },
+    {
+      "active": false,
+      "canonical": "library",
+      "id": "library",
+      "label": "Library"
+    },
+    {
+      "active": false,
+      "canonical": "step-builders",
+      "id": "step-builders",
+      "label": "Step Builders"
+    },
+    {
+      "active": false,
+      "canonical": "check-builder",
+      "id": "check-builder",
+      "label": "Check Builder"
+    },
+    {
+      "active": false,
+      "canonical": "check-group-builder",
+      "id": "check-group-builder",
+      "label": "Check Group Builder"
+    },
+    {
+      "active": false,
+      "canonical": "shell-command-builder",
+      "id": "shell-command-builder",
+      "label": "Shell Command Builder"
+    },
+    {
+      "active": false,
+      "canonical": "task-builder",
+      "id": "task-builder",
+      "label": "Task Builder"
+    },
+    {
+      "active": false,
+      "canonical": "context-builder",
+      "id": "context-builder",
+      "label": "Context Builder"
+    },
+    {
+      "active": false,
+      "canonical": "playwright-test-builder",
+      "id": "playwright-test-builder",
+      "label": "Playwright Test Builder"
+    },
+    {
+      "active": false,
+      "canonical": "unified-workflow-builder",
+      "id": "unified-workflow-builder",
+      "label": "Workflow Builder"
+    },
+    {
+      "active": false,
+      "canonical": "state-machine",
+      "id": "state-machine",
+      "label": "State Machines"
+    },
+    {
+      "active": false,
+      "canonical": "specs",
+      "id": "specs",
+      "label": "Specs"
+    },
+    {
+      "active": false,
+      "canonical": "capture",
+      "id": "capture",
+      "label": "Capture"
+    },
+    {
+      "active": false,
+      "canonical": "config-log-sources",
+      "id": "config-log-sources",
+      "label": "Log Sources"
+    },
+    {
+      "active": false,
+      "canonical": "config-findings",
+      "id": "config-findings",
+      "label": "Findings Config"
+    },
+    {
+      "active": false,
+      "canonical": "config-hooks",
+      "id": "config-hooks",
+      "label": "Hooks"
+    },
+    {
+      "active": false,
+      "canonical": "config-ui-bridge",
+      "id": "config-ui-bridge",
+      "label": "UI Bridge"
+    },
+    {
+      "active": false,
+      "canonical": "triggers",
+      "id": "triggers",
+      "label": "Triggers"
+    },
+    {
+      "active": false,
+      "canonical": "tasks",
+      "id": "tasks",
+      "label": "Scheduler"
+    },
+    {
+      "active": false,
+      "canonical": "settings",
+      "id": "settings",
+      "label": "Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-account",
+      "id": "settings-account",
+      "label": "Account Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-ai",
+      "id": "settings-ai",
+      "label": "AI Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-agentic",
+      "id": "settings-agentic",
+      "label": "Agentic Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-self-healing",
+      "id": "settings-self-healing",
+      "label": "Self-Healing Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-world-state-verifier",
+      "id": "settings-world-state-verifier",
+      "label": "World State Verifier Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-playwright",
+      "id": "settings-playwright",
+      "label": "Playwright Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-mobile",
+      "id": "settings-mobile",
+      "label": "Mobile Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-discovery",
+      "id": "settings-discovery",
+      "label": "Discovery Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-backend-connection",
+      "id": "settings-backend-connection",
+      "label": "Backend Connection Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-dev-loop",
+      "id": "settings-dev-loop",
+      "label": "Test My Change"
+    },
+    {
+      "active": false,
+      "canonical": "settings-mcp",
+      "id": "settings-mcp",
+      "label": "MCP Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-log-sources",
+      "id": "settings-log-sources",
+      "label": "Log Sources Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-execution-variables",
+      "id": "settings-execution-variables",
+      "label": "Execution Variables"
+    },
+    {
+      "active": false,
+      "canonical": "settings-general",
+      "id": "settings-general",
+      "label": "General Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-storage",
+      "id": "settings-storage",
+      "label": "Storage Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-backup",
+      "id": "settings-backup",
+      "label": "Backup Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-instances",
+      "id": "settings-instances",
+      "label": "Instances Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-debug",
+      "id": "settings-debug",
+      "label": "Debug Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-security",
+      "id": "settings-security",
+      "label": "Security Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-notifications",
+      "id": "settings-notifications",
+      "label": "Notification Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-otel",
+      "id": "settings-otel",
+      "label": "OpenTelemetry Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-containers",
+      "id": "settings-containers",
+      "label": "Container Isolation Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-ci-runner",
+      "id": "settings-ci-runner",
+      "label": "CI Runner Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-app-freshness",
+      "id": "settings-app-freshness",
+      "label": "App Freshness Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-lock-yield",
+      "id": "settings-lock-yield",
+      "label": "Lock-yield Policy Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-resource-guard",
+      "id": "settings-resource-guard",
+      "label": "Resource Guard Settings"
+    },
+    {
+      "active": false,
+      "canonical": "settings-paths",
+      "id": "settings-paths",
+      "label": "Paths Settings"
+    },
+    {
+      "active": false,
+      "canonical": "accessibility-explorer",
+      "id": "accessibility-explorer",
+      "label": "Accessibility Explorer"
+    },
+    {
+      "active": false,
+      "canonical": "settings-updates",
+      "id": "settings-updates",
+      "label": "Updates Settings"
+    },
+    {
+      "active": false,
+      "canonical": "orchestration-loop",
+      "id": "orchestration-loop",
+      "label": "Orchestration Loop"
+    },
+    {
+      "active": false,
+      "canonical": "image-quality-tests",
+      "id": "image-quality-tests",
+      "label": "Image Quality Tests"
+    },
+    {
+      "active": true,
+      "canonical": "terminal",
+      "id": "terminal",
+      "label": "Terminal"
+    },
+    {
+      "active": false,
+      "canonical": "llm-analytics",
+      "id": "llm-analytics",
+      "label": "LLM Analytics"
+    },
+    {
+      "active": false,
+      "canonical": "cost-control",
+      "id": "cost-control",
+      "label": "Cost Control"
+    },
+    {
+      "active": false,
+      "canonical": "evaluation",
+      "id": "evaluation",
+      "label": "Evaluation"
+    },
+    {
+      "active": false,
+      "canonical": "skills",
+      "id": "skills",
+      "label": "Skills"
+    },
+    {
+      "active": false,
+      "canonical": "help",
+      "id": "help",
+      "label": "Help"
+    },
+    {
+      "active": false,
+      "canonical": "automation-health",
+      "id": "automation-health",
+      "label": "Automation Health"
+    },
+    {
+      "active": false,
+      "canonical": "activity-timeline",
+      "id": "activity-timeline",
+      "label": "Activity Timeline"
+    },
+    {
+      "active": false,
+      "canonical": "watchers",
+      "id": "watchers",
+      "label": "Watchers"
+    },
+    {
+      "active": false,
+      "canonical": "knowledge-explorer",
+      "id": "knowledge-explorer",
+      "label": "Knowledge Explorer"
+    },
+    {
+      "active": false,
+      "canonical": "event-history",
+      "id": "event-history",
+      "label": "Event History"
+    },
+    {
+      "active": false,
+      "canonical": "development-intelligence",
+      "id": "development-intelligence",
+      "label": "Development Intelligence"
+    },
+    {
+      "active": false,
+      "canonical": "demo-video",
+      "id": "demo-video",
+      "label": "Demo Video"
+    },
+    {
+      "active": false,
+      "canonical": "product-tours",
+      "id": "product-tours",
+      "label": "Product Tours"
+    },
+    {
+      "active": false,
+      "canonical": "session-recap",
+      "id": "session-recap",
+      "label": "Session Recap"
+    },
+    {
+      "active": false,
+      "canonical": "api-surface",
+      "id": "api-surface",
+      "label": "API Surface"
+    },
+    {
+      "active": false,
+      "canonical": "decision-trail",
+      "id": "decision-trail",
+      "label": "Decision Trail"
+    },
+    {
+      "active": false,
+      "canonical": "memory-search",
+      "id": "memory-search",
+      "label": "Memory Search"
+    },
+    {
+      "active": false,
+      "canonical": "online-learning",
+      "id": "online-learning",
+      "label": "Online Learning"
+    },
+    {
+      "active": false,
+      "canonical": "dag-workflow-editor",
+      "id": "dag-workflow-editor",
+      "label": "DAG Workflow Editor"
+    },
+    {
+      "active": false,
+      "canonical": "project-explainer",
+      "id": "project-explainer",
+      "label": "Project Explainer"
+    },
+    {
+      "active": false,
+      "canonical": "wrappers",
+      "id": "wrappers",
+      "label": "Wrappers"
+    },
+    {
+      "active": false,
+      "canonical": "productivity",
+      "id": "productivity",
+      "label": "Productivity"
+    },
+    {
+      "active": false,
+      "canonical": "regression",
+      "id": "regression",
+      "label": "Regression"
+    },
+    {
+      "active": false,
+      "canonical": "helper-tasks",
+      "id": "helper-tasks",
+      "label": "Helper Tasks"
+    }
+  ],
+  "components": [
+    {
+      "actionInvocationPath": "/ui-bridge/control/component/setup-wizard/action/{actionId}",
+      "actions": [
+        {
+          "description": "Mark setup complete and dismiss the wizard. Persists via the same `complete_setup` Tauri command the user-driven 'Finish' button uses. Does NOT save process configs — a programmatic caller has picked none.",
+          "id": "complete",
+          "label": "Complete Setup"
+        },
+        {
+          "description": "Open the wizard at a specific step. Values 0-6 correspond to: Tier, Welcome, Projects, Processes, Dev Services, AI Provider, Claude Sessions. NON-DESTRUCTIVE: opening flips in-memory view state only; the persisted `setup_completed` setting is untouched.",
+          "id": "go-to-step",
+          "label": "Jump to Step"
+        }
+      ],
+      "description": "First-launch onboarding wizard. Use 'complete' to dismiss programmatically without driving 7 step interactions. Use 'go-to-step' to jump to a specific step (0-6) — this also OPENS the wizard if it is currently dismissed, which is how you reach first-run surfaces on a runner that auto-bypassed setup (any supervisor temp runner, unless spawned with extra_env: { QONTINUI_TEST_AUTO_LOGIN_EMAIL: \"\" }).",
+      "elementIds": [],
+      "id": "setup-wizard",
+      "mounted": true,
+      "name": "Setup Wizard",
+      "registeredAt": 1788980430435,
+      "scope": "global"
+    },
+    {
+      "actionInvocationPath": "/ui-bridge/control/component/terminal-page/action/{actionId}",
+      "actions": [
+        {
+          "description": "Spawn a new PTY-backed terminal tab and assign it to the next free zone.",
+          "id": "create-terminal",
+          "label": "Create Terminal"
+        },
+        {
+          "description": "Spawn one plain (non-AI) PTY terminal in the user's default shell, assign it to the active page's next free zone, and mount its xterm. Robust from a fresh page. Returns { success, tab_id }. Use this to drive the terminal surface headlessly.",
+          "id": "create-plain-terminal",
+          "label": "Create Plain Terminal"
+        },
+        {
+          "description": "Return [{id, title, isAlive}] for every currently mounted terminal tab.",
+          "id": "list-terminals",
+          "label": "List Terminals"
+        },
+        {
+          "description": "Open a new pop-out OS window (same process) that hosts its own terminal tabs. Returns the new window record { label, kind, ... }.",
+          "id": "open-terminal-window",
+          "label": "Open Terminal Window"
+        },
+        {
+          "description": "Open a new pop-out window and move the active terminal tab into it. Returns { window, terminalId }.",
+          "id": "pop-out-active-terminal",
+          "label": "Pop Out Active Terminal"
+        },
+        {
+          "description": "Detach an ENTIRE terminal page (all its terminals + zone layout) into its own pop-out window bound to the page. Params: { pageId?: string } (defaults to the active page). Returns { window, pageId }.",
+          "id": "pop-out-page",
+          "label": "Pop Out Page"
+        },
+        {
+          "description": "Move a terminal tab to a window. Params: { terminalId: string, windowLabel: string } where windowLabel is 'main' or 'term-N'.",
+          "id": "move-terminal-to-window",
+          "label": "Move Terminal To Window"
+        },
+        {
+          "description": "Maximize one zone to fill the page. Params: { zoneIndex: number }. Returns { maximizedZone, previousMaximizedZone, zoneCount, changed }.",
+          "id": "maximize-zone",
+          "label": "Maximize Zone"
+        },
+        {
+          "description": "Leave the maximized view and return to the tiled layout. No params. Returns { maximizedZone: null, previousMaximizedZone, zoneCount, changed } — `changed: false` means nothing was maximized.",
+          "id": "restore-zone",
+          "label": "Restore Zone"
+        },
+        {
+          "description": "Maximize the given zone, or restore if it is already maximized — the same rule the keyboard shortcut uses. Params: { zoneIndex: number }.",
+          "id": "toggle-maximize-zone",
+          "label": "Toggle Maximize Zone"
+        },
+        {
+          "description": "Return { maximizedZone, zoneCount, layoutId } — the read that lets a caller assert the maximized view without inferring it from a DOM snapshot.",
+          "id": "get-zone-view-state",
+          "label": "Get Zone View State"
+        },
+        {
+          "description": "Return this runner process's own windows [{ label, kind, title }] (main + pop-outs).",
+          "id": "list-runner-windows",
+          "label": "List Runner Windows"
+        },
+        {
+          "description": "Close every pop-out OS window that has no live terminal tab and prune its record; also prunes records for pop-outs whose OS window is already gone (the recovery path when a stale page binding is hiding a page and the grid shows zero zones). Returns the labels closed.",
+          "id": "close-empty-terminal-windows",
+          "label": "Close Empty Terminal Windows"
+        }
+      ],
+      "description": "Multi-terminal workspace with zone-based layout. Agents can create terminals via HTTP POST /terminals with initialCommand.",
+      "elementIds": [
+        "terminal-zone-minimap",
+        "terminal.command-bar-input",
+        "terminal.session-manager-toggle",
+        "svg-child-1",
+        "terminal-zone-minimap-toggle",
+        "terminal-page-generic-1"
+      ],
+      "id": "terminal-page",
+      "mounted": true,
+      "name": "Terminal Page",
+      "registeredAt": 1788980430459
+    }
+  ],
+  "dragDrop": {
+    "byOrigin": {
+      "aria": 0,
+      "declared": 0,
+      "dom": 0
+    },
+    "count": {
+      "dragSources": 0,
+      "dropZones": 0
+    },
+    "dragSources": [],
+    "dropZones": []
+  },
+  "elements": [
+    {
+      "accessibleName": "Terminal",
+      "actions": [
+        "focus",
+        "blur",
+        "click",
+        "hover",
+        "middleClick"
+      ],
+      "ariaLabel": "Terminal",
+      "bbox": {
+        "height": 36,
+        "width": 183,
+        "x": 7,
+        "y": 114
+      },
+      "category": "interactive",
+      "id": "nav:terminal",
+      "identifier": {
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > div > nav > div:nth-child(1) > div:nth-child(1) > div > button:nth-child(2)",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/div/nav/div[1]/div[1]/div/button[2]"
+      },
+      "kind": "interactive",
+      "label": "Terminal",
+      "mounted": true,
+      "origin": "auto",
+      "registeredAt": 1788980430629,
+      "role": "button",
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "1e793b33a93f4f7b",
+        "id": "nav:terminal",
+        "semanticPath": "div.h-screen > div.flex > div.flex > nav.h-full > div.flex-1 > div.space-y-1 > div.space-y-0\\.5 > button.w-full",
+        "stableId": "nav:terminal"
+      },
+      "state": {
+        "accessibleName": "Terminal",
+        "ariaCurrent": "page",
+        "ariaDisabled": false,
+        "computedStyles": {
+          "backgroundColor": "oklab(0.795484 -0.109439 -0.097705 / 0.15)",
+          "borderColor": "rgb(0, 208, 255)",
+          "borderRadius": "6px",
+          "borderWidth": "0px 0px 0px 2px",
+          "color": "rgb(0, 208, 255)",
+          "colorScheme": "dark",
+          "cursor": "default",
+          "display": "flex",
+          "fontSize": "14px",
+          "fontWeight": "500",
+          "lineHeight": "20px",
+          "margin": "0px 0px 2px -1px",
+          "opacity": "1",
+          "overflow": "visible",
+          "padding": "8px 12px",
+          "pointerEvents": "auto",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "normal",
+          "zIndex": "auto"
+        },
+        "dataset": {
+          "navItem": "terminal",
+          "uiBridgeId": "nav:terminal",
+          "uiBridgePersist": "true"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": true,
+        "normalizedRect": {
+          "height": 0.033930254476908575,
+          "width": 0.0953125,
+          "x": 0.0036458333333333334,
+          "y": 0.10744580584354382
+        },
+        "rect": {
+          "bottom": 150,
+          "height": 36,
+          "left": 7,
+          "right": 190,
+          "top": 114,
+          "width": 183,
+          "x": 7,
+          "y": 114
+        },
+        "textContent": "Terminal",
+        "visible": false
+      },
+      "tagName": "button",
+      "text": "Terminal",
+      "type": "button",
+      "uiBridgeId": "nav:terminal",
+      "visible": true
+    },
+    {
+      "actions": [],
+      "bbox": {
+        "height": 24,
+        "width": 606,
+        "x": 657,
+        "y": 382
+      },
+      "category": "content",
+      "content": "You can change this any time from Settings → Account.",
+      "contentMetadata": {
+        "contentRole": "body-text"
+      },
+      "id": "content-paragraph-you-can-change-this-0",
+      "identifier": {
+        "selector": "#root > div:nth-child(2) > div > div > div:nth-child(2) > div:nth-child(1) > p",
+        "xpath": "/div[@id=\"root\"]/div[2]/div/div/div[2]/div[1]/p"
+      },
+      "kind": "content",
+      "label": "You can change this any time from Settings → Accou",
+      "mounted": true,
+      "origin": "auto",
+      "registeredAt": 1788980430777,
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "2f5c749ce845df4a",
+        "id": "content-paragraph-you-can-change-this-0",
+        "semanticPath": "#root > div.fixed > div.min-h-screen > div.card > div.space-y-6 > div.space-y-2 > p.text-muted-foreground"
+      },
+      "state": {
+        "accessibleName": "You can change this any time from Settings → Account.",
+        "ariaDisabled": false,
+        "computedStyles": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderColor": "rgba(255, 255, 255, 0.1)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "color": "rgb(156, 162, 171)",
+          "colorScheme": "dark",
+          "cursor": "auto",
+          "display": "block",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "24px",
+          "margin": "0px",
+          "opacity": "1",
+          "overflow": "visible",
+          "padding": "0px",
+          "pointerEvents": "auto",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "normal",
+          "zIndex": "auto"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": true,
+        "normalizedRect": {
+          "height": 0.022620169651272386,
+          "width": 0.315625,
+          "x": 0.3421875,
+          "y": 0.3600377002827521
+        },
+        "rect": {
+          "bottom": 406,
+          "height": 24,
+          "left": 657,
+          "right": 1263,
+          "top": 382,
+          "width": 606,
+          "x": 657,
+          "y": 382
+        },
+        "textContent": "You can change this any time from Settings → Account.",
+        "visible": true
+      },
+      "tagName": "p",
+      "text": "You can change this any time from Settings → Account.",
+      "type": "paragraph",
+      "visible": true
+    },
+    {
+      "accessibleName": "Terminal command bar",
+      "actions": [
+        "focus",
+        "blur",
+        "hover",
+        "scroll",
+        "scrollIntoView",
+        "click",
+        "hoverClick",
+        "type",
+        "clear",
+        "sendKeys"
+      ],
+      "ariaLabel": "Terminal command bar",
+      "bbox": {
+        "height": 16.5,
+        "width": 1619,
+        "x": 251,
+        "y": 1039.25
+      },
+      "category": "interactive",
+      "componentActionBasePath": "/ui-bridge/control/component/terminal-page",
+      "id": "terminal.command-bar-input",
+      "identifier": {
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > main > div > div:nth-child(2) > div:nth-child(17) > div > div:nth-child(4) > div > input",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/main/div/div[2]/div[17]/div/div[3]/div/input"
+      },
+      "kind": "interactive",
+      "label": "Command bar",
+      "mounted": true,
+      "origin": "hook",
+      "ownedByComponent": "terminal-page",
+      "registeredAt": 1788980431010,
+      "role": "combobox",
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "99f3b05fe07d5f6b",
+        "id": "terminal.command-bar-input",
+        "semanticPath": "main.flex-1 > div.absolute > div.flex-1 > div > div.h-full > div.relative > div.h-7 > input[role=\"combobox\"].flex-1",
+        "stableId": "terminal.command-bar-input"
+      },
+      "state": {
+        "accessibleName": "Terminal command bar",
+        "ariaDisabled": false,
+        "ariaExpanded": false,
+        "computedStyles": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderColor": "rgba(255, 255, 255, 0.1)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "color": "rgb(192, 202, 245)",
+          "colorScheme": "dark",
+          "cursor": "auto",
+          "display": "block",
+          "fontSize": "11px",
+          "fontWeight": "400",
+          "lineHeight": "16.5px",
+          "margin": "0px",
+          "opacity": "1",
+          "overflow": "visible",
+          "padding": "0px",
+          "pointerEvents": "auto",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "normal",
+          "zIndex": "auto"
+        },
+        "dataset": {
+          "uiBridgeId": "terminal.command-bar-input"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": true,
+        "normalizedRect": {
+          "height": 0.015551366635249765,
+          "width": 0.8432291666666667,
+          "x": 0.13072916666666667,
+          "y": 0.9795004712535345
+        },
+        "rect": {
+          "bottom": 1055.75,
+          "height": 16.5,
+          "left": 251,
+          "right": 1870,
+          "top": 1039.25,
+          "width": 1619,
+          "x": 251,
+          "y": 1039.25
+        },
+        "role": "combobox",
+        "textContent": "Terminal command bar",
+        "value": "",
+        "visible": false
+      },
+      "tagName": "input",
+      "type": "input",
+      "uiBridgeId": "terminal.command-bar-input",
+      "visible": true
+    },
+    {
+      "actions": [
+        "focus",
+        "blur",
+        "sendKeys",
+        "writeToTerminal",
+        "paste",
+        "pasteText",
+        "getScrollback"
+      ],
+      "bbox": {
+        "height": 1,
+        "width": 1,
+        "x": -9799,
+        "y": 54
+      },
+      "category": "interactive",
+      "customActions": [
+        "focus",
+        "blur",
+        "sendKeys",
+        "writeToTerminal",
+        "paste",
+        "pasteText",
+        "getScrollback"
+      ],
+      "id": "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
+      "identifier": {
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > main > div > div:nth-child(2) > div:nth-child(1) > textarea:nth-child(1)",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/main/div/div[2]/div[1]/textarea[1]"
+      },
+      "kind": "interactive",
+      "label": "Terminal input (cafd43f7) [no mounted view — claim:pr:qontinui/qontinui-dev-notes#1030]",
+      "mounted": true,
+      "origin": "hook",
+      "registeredAt": 1788984770385,
+      "role": "textbox",
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "2bbdba4d5f59e9d9",
+        "id": "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
+        "semanticPath": "div.contents > div.h-screen > div.flex > main.flex-1 > div.absolute > div.flex-1 > div > textarea"
+      },
+      "state": {
+        "ariaDisabled": false,
+        "computedStyles": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderColor": "rgb(255, 255, 255)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "color": "rgb(255, 255, 255)",
+          "colorScheme": "dark",
+          "cursor": "auto",
+          "display": "inline-block",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "24px",
+          "margin": "0px",
+          "opacity": "0",
+          "overflow": "auto",
+          "padding": "0px",
+          "pointerEvents": "none",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "pre-wrap",
+          "zIndex": "auto"
+        },
+        "dataset": {
+          "terminalBridgeProxy": "cafd43f7-f172-4745-9dd3-cc0b96fd54a1"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": false,
+        "normalizedRect": {
+          "height": 0.000942507068803016,
+          "width": 0.0005208333333333333,
+          "x": -5.103645833333333,
+          "y": 0.05089538171536286
+        },
+        "opacityHidden": true,
+        "rect": {
+          "bottom": 55,
+          "height": 1,
+          "left": -9799,
+          "right": -9798,
+          "top": 54,
+          "width": 1,
+          "x": -9799,
+          "y": 54
+        },
+        "scrollInfo": {
+          "canScrollDown": true,
+          "canScrollLeft": false,
+          "canScrollRight": false,
+          "canScrollUp": false,
+          "clientHeight": 1,
+          "clientWidth": 1,
+          "scrollHeight": 24,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 1
+        },
+        "value": "",
+        "visible": false
+      },
+      "tagName": "textarea",
+      "type": "textarea",
+      "visible": true
+    }
+  ],
+  "modalStack": {
+    "count": 0,
+    "hasBlockingModal": false,
+    "modals": []
+  },
+  "page": {
+    "hash": "",
+    "pageContext": {
+      "breadcrumb": [
+        "Tools",
+        "Terminal"
+      ],
+      "meta": {
+        "tabId": "terminal"
+      },
+      "name": "Terminal",
+      "section": "tools"
+    },
+    "pathname": "/",
+    "recentNavigations": [
+      {
+        "from": "",
+        "timestamp": 1788980430258,
+        "to": "tauri://localhost",
+        "trigger": "initial"
+      }
+    ],
+    "route": {
+      "id": "terminal",
+      "pattern": "terminal"
+    },
+    "search": "",
+    "title": "Qontinui Runner",
+    "url": "tauri://localhost"
+  },
+  "registration": {
+    "activeTab": "terminal",
+    "byRoute": {
+      "/": {
+        "count": 63,
+        "ids": [
+          "button-workspace",
+          "nav:projects",
+          "nav:terminal",
+          "nav:productivity",
+          "button-system",
+          "nav:settings",
+          "nav:help",
+          "button-collapse-sidebar",
+          "tab-switch-to-page-1-0",
+          "tab-switch-to-page-2-1",
+          "tab-switch-to-page-3-2",
+          "tab-switch-to-page-4-3",
+          "tab-switch-to-page-5-4",
+          "tab-switch-to-page-6-5",
+          "tab-switch-to-page-7-6",
+          "tab-switch-to-page-8-7",
+          "tab-switch-to-page-9-8",
+          "tab-switch-to-page-10-9",
+          "tab-switch-to-page-11-10",
+          "tab-switch-to-page-12-11",
+          "tab-switch-to-page-13-12",
+          "tab-switch-to-page-14-13",
+          "button-add-terminal-page-14",
+          "button-reorganize-pages-by-topic-15",
+          "button-open-terminal-in-a-new-window-16",
+          "button-local-airun-with-a-local-model-0",
+          "button-use-my-own-api-keypaste-your-a-1",
+          "button-sign-in-to-qontinuimulti-machi-2",
+          "button-ill-decide-later-start-in-loca",
+          "heading-1-qontinui-runner",
+          "content-badge-beta-1",
+          "heading-2-how-will-you-use-qontinui",
+          "content-paragraph-you-can-change-this-0",
+          "heading-3-local-ai-tier-0",
+          "content-paragraph-run-with-a-local-mod-0",
+          "heading-3-use-my-own-api-key-tier-1",
+          "content-paragraph-paste-your-anthropic-0",
+          "heading-3-sign-in-to-qontinui-tier-2",
+          "content-paragraph-multi-machine-coordi-0",
+          "terminal-zone-minimap",
+          "terminal.command-bar-input",
+          "tab-switch-to-terminal-0",
+          "terminal.session-manager-toggle",
+          "svg-child-1",
+          "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
+          "terminal-input-3cc474c0-0215-4e43-b024-f1ebf13e831e",
+          "terminal-input-7fb4e6f6-ae51-44a5-af26-965079ca6040",
+          "terminal-input-4d0f17fc-cc46-44ef-92ec-64ceb288c90a",
+          "terminal-input-bb9e3999-c721-4bd3-b345-057f0bd5e9af",
+          "terminal-input-120cbb6b-5fb4-46b1-96ee-8c14f20940c4",
+          "terminal-input-0eaa53d0-777f-4077-a021-32c91c43632f",
+          "terminal-input-42b585e2-6b19-4f4d-9369-07fd1150d246",
+          "terminal-input-9b4f5e60-150f-478a-9245-abe34f8c1d68",
+          "terminal-input-bfa99869-a4e9-4d27-b128-dcfb239d31ba",
+          "tab-switch-to-page-15-15",
+          "terminal-input-79337ad2-4497-44c3-a714-62d4a98627b9",
+          "terminal-input-34f65a03-941a-4581-816e-4dc3bde0d686",
+          "terminal-input-dd52769e-c6e6-4347-9b60-1f25ebd50abe",
+          "terminal-input-7913f73c-23aa-4805-8c98-47a32cb4713c",
+          "terminal-input-fc94cd2a-990d-41f4-923e-2f4c6bd5c225",
+          "terminal-input-d2cfe0b7-b1fb-41b9-97bc-c37b6e681abc",
+          "terminal-zone-minimap-toggle",
+          "terminal-page-generic-1"
+        ]
+      }
+    },
+    "everHadRegistrations": true,
+    "route": "/",
+    "totalRegistered": 63
+  },
+  "relationships": {
+    "byOrigin": {
+      "aria": 0,
+      "declared": 0,
+      "html": 0
+    },
+    "count": 0,
+    "relationships": []
+  },
+  "route": "/",
+  "shortcuts": {
+    "lastScanTimestamp": 1789028929173,
+    "shortcuts": [
+      {
+        "category": "Terminal Management",
+        "combo": "Ctrl+Shift+T",
+        "description": "Create new terminal session",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Terminal Management",
+        "combo": "Ctrl+Shift+W",
+        "description": "Close focused terminal session",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+Tab",
+        "description": "Cycle to next active run",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+Shift+Tab",
+        "description": "Cycle to previous active run",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+Shift+N",
+        "description": "Jump to next session needing input",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+F",
+        "description": "Maximize or restore focused zone",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+M",
+        "description": "Cycle view mode (auto/full/compact)",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+A",
+        "description": "Toggle auto-focus on needs-input",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+S",
+        "description": "Toggle sound notification",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Batch Actions",
+        "combo": "Ctrl+Shift+Enter",
+        "description": "Approve all waiting sessions",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+1",
+        "description": "Layout: Single zone",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+2",
+        "description": "Layout: 2 zones side-by-side",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+3",
+        "description": "Layout: 3 zones",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+4",
+        "description": "Layout: 4 zones grid",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+5",
+        "description": "Layout: 5 zones",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+6",
+        "description": "Layout: 6 zones",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+7",
+        "description": "Layout: 7 zones",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+8",
+        "description": "Layout: 8 zones",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+1",
+        "description": "Switch to widget 1",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+2",
+        "description": "Switch to widget 2",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+3",
+        "description": "Switch to widget 3",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+4",
+        "description": "Switch to widget 4",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+5",
+        "description": "Switch to widget 5",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+6",
+        "description": "Switch to widget 6",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+7",
+        "description": "Switch to widget 7",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Widget Selection",
+        "combo": "Ctrl+8",
+        "description": "Switch to widget 8",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+9",
+        "description": "Focus zone 9",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Actions",
+        "combo": "Ctrl+Shift+X",
+        "description": "Zone swap (press twice: source then target)",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Search",
+        "combo": "Ctrl+Shift+/",
+        "description": "Toggle output search",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+O",
+        "description": "Toggle pin on focused zone",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+D",
+        "description": "Toggle focus mode (dim non-focused zones)",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Actions",
+        "combo": "Ctrl+Shift+R",
+        "description": "Restart focused zone (completed/error only)",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Layouts",
+        "combo": "Ctrl+Shift+L",
+        "description": "Cycle through layout presets",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Palettes",
+        "combo": "Ctrl+Shift+K",
+        "description": "Toggle command palette",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Palettes",
+        "combo": "Ctrl+Shift+E",
+        "description": "Toggle knowledge browser",
+        "scope": "global",
+        "source": "developer"
+      },
+      {
+        "category": "View",
+        "combo": "Ctrl+Shift+I",
+        "description": "Toggle zone timeline",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Panels",
+        "combo": "Ctrl+Shift+P",
+        "description": "Toggle control panel",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Filters",
+        "combo": "Ctrl+Shift+G",
+        "description": "Cycle through tag filters",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Help",
+        "combo": "Ctrl+Shift+?",
+        "description": "Toggle keyboard shortcuts overlay",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+Shift+Left",
+        "description": "Go back in focus history",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+Shift+Right",
+        "description": "Go forward in focus history",
+        "scope": "terminal",
+        "source": "developer"
+      },
+      {
+        "category": "Actions",
+        "combo": "Escape",
+        "description": "Close command palette",
+        "scope": "command-palette",
+        "source": "developer"
+      },
+      {
+        "category": "Help",
+        "combo": "?",
+        "description": "Toggle shortcuts modal",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Actions",
+        "combo": "Ctrl+R",
+        "description": "Refresh dashboard data",
+        "scope": "active-dashboard",
+        "source": "developer"
+      },
+      {
+        "category": "Actions",
+        "combo": "Enter",
+        "description": "Execute selected command",
+        "scope": "command-palette",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Ctrl+`",
+        "description": "Cycle to next active run (alt)",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Tutorial Navigation",
+        "combo": "Arrowleft",
+        "description": "Previous tutorial step",
+        "scope": "tutorial",
+        "source": "developer"
+      },
+      {
+        "category": "Tutorial Navigation",
+        "combo": "Arrowright",
+        "description": "Next tutorial step",
+        "scope": "tutorial",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Home",
+        "description": "Jump to first run",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "End",
+        "description": "Jump to last run",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "1-9",
+        "description": "Quick select run by position",
+        "scope": "active-runs",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Arrowdown",
+        "description": "Select next command",
+        "scope": "command-palette",
+        "source": "developer"
+      },
+      {
+        "category": "Navigation",
+        "combo": "Arrowup",
+        "description": "Select previous command",
+        "scope": "command-palette",
+        "source": "developer"
+      },
+      {
+        "category": "Search",
+        "combo": "Ctrl+F",
+        "description": "Focus HTML search input",
+        "scope": "html-viewer",
+        "source": "developer"
+      }
+    ],
+    "totalCount": 54
+  },
+  "snapshotTakenAtMs": 1789028931082,
+  "tabActivation": {
+    "bodyExample": {
+      "tabId": "<one of availableTabs[].id>"
+    },
+    "description": "Switch tabs without a UI click",
+    "method": "POST",
+    "path": "/ui-bridge/control/tab/activate"
+  },
+  "timestamp": 1789028931082,
+  "toasts": {
+    "active": [],
+    "recent": [],
+    "totalCaptured": 78
+  },
+  "undoRedo": {
+    "canRedo": false,
+    "canUndo": false,
+    "summary": "Undo not available. Undo shortcut: Ctrl+Z"
+  },
+  "visibility": {
+    "hidden": false,
+    "state": "visible"
+  },
+  "workflows": []
+}

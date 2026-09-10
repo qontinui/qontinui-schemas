@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_main_create_snapshot.json",
+  "sha256": "72a69d104030327b81ba51e9b5cf8e47d7990d5668150f22c50680deaf6a86b9",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.26.0 (packages/ui-bridge/package.json at the commit below; unreleased main)",
+  "sdk_commit": "qontinui/ui-bridge 3ee636d2c5994c9ecb6a8e3b3f4c6fbd89c88701 (origin/main, 2026-09-06)",
+  "source": "UIBridgeRegistry.createSnapshot() — the payload GET /ui-bridge/control/snapshot serves — run under the SDK's own vitest/jsdom config; JSON round-tripped (the bytes that go over HTTP), pretty-printed with 2-space indent",
+  "capture_command": "cp rust/tests/fixtures/ui_bridge_sdk/capture/wire-fixture.capture.test.ts <ui-bridge>/packages/ui-bridge/src/core/ && cd <ui-bridge>/packages/ui-bridge && WIRE_FIXTURE_OUT=<abs path>/sdk_main_create_snapshot.json npx vitest run src/core/wire-fixture.capture.test.ts",
+  "captured_at": "2026-09-10",
+  "trim": "none — the whole createSnapshot() output; timestamp/snapshotId/signature/registeredAt are whatever the run produced",
+  "notes": "Exercises: an element with customActions (sendKeys, getScrollback), a component with ComponentActionInfo actions (paramSchema, effect), a workflow, and the undoRedo enricher."
+}
