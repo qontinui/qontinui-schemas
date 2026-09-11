@@ -51,6 +51,43 @@ export interface UIBridgeElement {
    *
    * Absent (`None`) means the element declares none. That is deliberately
    * distinct from an empty list, which would mean "declared, and empty".
+   * ---
+   *
+   * **TRANSITIONAL: this field also accepts the legacy bare-NAME form on the
+   * way in.** `["sendKeys"]` deserializes as
+   * `[ElementActionInfo { id: "sendKeys", .. }]`, with every other field —
+   * `effect` included — left `None`, i.e. UNCLASSIFIED. See
+   * [`deserialize_custom_actions`].
+   *
+   * **Why a shim exists at all**, when this workspace's rule is
+   * delete-over-deprecate. The shape change spans three repos that cannot
+   * land atomically — this crate owns the type, `ui-bridge` emits, and
+   * `qontinui-runner` parses live SDK snapshots strictly
+   * (`spec-check/src/fetch.rs`, `spec_api/spec_check.rs`) while pinning a
+   * PUBLISHED SDK. Both two-party orderings leave a window in which the
+   * fleet is broken: land this crate first and the runner rejects the names
+   * the published SDK still emits; land the SDK first and it emits objects
+   * at a runner whose type is still `Vec<String>`. Only a tolerant READER
+   * removes the window, and there is one reader against nine emitters.
+   *
+   * This is NOT here to spare a caller a breaking change — that is never a
+   * reason in this workspace.
+   *
+   * **DELETE ME, and the trigger is observable rather than intentional:**
+   * once no emitter produces names — `ui-bridge`'s eight element
+   * projections plus `qontinui-runner`'s
+   * `src/services/background-observer-service.ts` — and the runner's SDK pin
+   * has moved past that release, remove [`deserialize_custom_actions`] and
+   * this attribute, and flip
+   * `ui_bridge_element_tolerates_legacy_name_custom_actions` into a test
+   * that asserts a bare string is REJECTED. Plan
+   * `2026-09-04-effect-calculus-joins-the-component-action-registry`,
+   * Design decision 4, step 5.
+   *
+   * The published SCHEMA is deliberately not widened to advertise the name
+   * form: the schema states the target contract, while the reader is
+   * transitionally lenient. A producer validating against the schema is
+   * correctly told that names are not the shape to emit.
    */
   customActions?: ElementActionInfo[] | null;
   /**
