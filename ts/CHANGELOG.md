@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.14.0...ts-v1.0.0) (2026-09-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ui-bridge:** the published schema for `UIBridgeElement.customActions` changes from `string[] | null` to `ElementActionInfo[] | null`. Backward compatibility is deliberately not preserved — no shim, no union type.
+
+### Features
+
+* **ui-bridge:** element custom actions become objects that can carry `effect` ([cbcbe2f](https://github.com/qontinui/qontinui-schemas/commit/cbcbe2fa3452942edb1ecc87ab37e15b3aeb87c7))
+
 ## [0.14.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.13.0...ts-v0.14.0) (2026-09-02)
 
 
