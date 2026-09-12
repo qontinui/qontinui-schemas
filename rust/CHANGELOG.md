@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.9.0...rust-v2.0.0) (2026-09-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ui-bridge:** the published schema for `UIBridgeElement.customActions` changes from `string[] | null` to `ElementActionInfo[] | null`. Backward compatibility is deliberately not preserved — no shim, no union type.
+
+### Features
+
+* **ui-bridge:** accept the legacy bare-name custom action, transitionally ([c6bce2a](https://github.com/qontinui/qontinui-schemas/commit/c6bce2af6a19fc7ce093b727690b8c17a5c48b24))
+* **ui-bridge:** element custom actions become objects that can carry `effect` ([cbcbe2f](https://github.com/qontinui/qontinui-schemas/commit/cbcbe2fa3452942edb1ecc87ab37e15b3aeb87c7))
+
 ## [1.9.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.8.0...rust-v1.9.0) (2026-09-02)
 
 
