@@ -10,10 +10,12 @@
 # rebase-land does exactly that — release-please never tags it, then on its
 # next run finds no release for the manifest version, walks the ENTIRE history,
 # and re-proposes every commit ever made, including any old `feat!`, as a bogus
-# major bump. Every consumer pins `qontinui-types = "<2.0.0"`, so five checks
-# go red with a version-resolution error that says nothing about the cause
-# (qontinui-schemas#160, 2026-09-02 → 2026-09-07, 10+ coord `ci-not-green`
-# cycles).
+# major bump. On qontinui-schemas#160 (2026-09-02 → 2026-09-07, 10+ coord
+# `ci-not-green` cycles) the consumers' then-present `<2.0.0` bounds turned
+# five checks red with a version-resolution error that said nothing about the
+# cause. Consumers no longer carry bounds (CONTRIBUTING.md, "Consumer version
+# bounds"), so today the bogus version is wrong, not wedging, which makes this
+# check the ONLY thing that names it.
 #
 # This script fails ONE check with the cause and the recovery recipe instead.
 # Three distinct exits, because a wrong verdict here is worse than none:
@@ -76,8 +78,7 @@ if [[ "$missing" -gt 0 ]]; then
 
 The previous release PR landed without GitHub marking it merged (a SHA-rewriting
 land), so release-please never tagged it. The versions THIS PR proposes are
-derived from the whole history and are NOT trustworthy — do not widen consumer
-version bounds to make them fit.
+derived from the whole history and are NOT trustworthy — do not land them.
 
 TO FIX (recipe from qontinui-schemas#160):
   1. Find the landed release commit on main:

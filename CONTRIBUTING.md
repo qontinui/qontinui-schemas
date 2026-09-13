@@ -261,8 +261,8 @@ Two ways to get there:
   (its tip was behind `main`), GitHub never records the merge, so release-please
   never creates the release or tag for the version that just landed. Its next
   run then re-derives the bogus major, force-pushes it onto the same open PR,
-  and every consumer's `qontinui-types = "<2.0.0"` bound turns five checks red
-  with a version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
+  and the consumers' version bounds turned five checks red with a
+  version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
   10+ coord `ci-not-green` cycles). The `release-pr-sanity` workflow now fails
   a release PR with this recipe when a base manifest version has no tag:
   1. find the landed release commit —
@@ -271,8 +271,26 @@ Two ways to get there:
      `gh release create <component>-v<version> --target <sha> --title '<component>: v<version>' --notes "<CHANGELOG section>"`;
   3. `gh workflow run release-please.yml --ref main`;
   4. close the stale release PR if release-please leaves it unchanged (it only
-     rewrites on a body change). **Never** widen consumer version bounds to
-     accept the bogus bump.
+     rewrites on a body change). **Never** land the bogus bump: its proposed
+     versions come from the whole history and are not trustworthy.
+
+**Consumer version bounds (and why a REAL major no longer wedges anyone).**
+Consumers of these crates (qontinui-runner, qontinui-supervisor,
+qontinui-coord) depend on them as bare `path =` dependencies on a sibling
+checkout, with **no `version =` bound**. A bound on a path dep can only refuse
+the sibling, never select one. When release-please computed a real 2.0.0
+(qontinui-schemas#169, 2026-09-13), every `<2.0.0` bound wedged the release
+PR and all of its consumers, and nothing moved them. What protects a consumer
+is the `consumer-gate` compile check, not a range.
+
+The one bounded dependent is in this repo. `rust-runner-client` is published
+to crates.io, and `cargo publish` needs a `version` on its `qontinui-types`
+path dep. release-please's `cargo-workspace` plugin rewrites that requirement
+to the new version inside the release PR itself, patch-bumps
+`qontinui-runner-client`, and regenerates the root `Cargo.lock`. `rust-ci`
+checks the lock with `cargo metadata --locked`. Do not add a `version` bound
+to a consumer's schemas path dep. Plan:
+`2026-09-13-schemas-major-release-wedges-consumers`.
 
 The ergonomics of skipping the anchor: every override generates one stale
 "chore: release main" PR proposing the wrong version that you close by hand. The
