@@ -6,8 +6,8 @@
   "tag-separator": "-",
   "separate-pull-requests": false,
   "pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
-  "extra-files": [
-    "Cargo.lock"
+  "plugins": [
+    "cargo-workspace"
   ],
   "packages": {
     "rust": {

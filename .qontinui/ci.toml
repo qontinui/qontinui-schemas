@@ -200,6 +200,14 @@ version = 1
 cargo_build_jobs = 1
 
 [[steps]]
+name = "rust-lock"
+# rust-ci.yml "Cargo.lock is up to date". It is FIRST on purpose: fmt, clippy
+# and build each silently rewrite a stale lock, after which `--locked` passes
+# vacuously. A release PR that forgets the root lock must go red here, not be
+# repaired in passing. Plan: 2026-09-13-schemas-major-release-wedges-consumers.
+command = ["cargo", "metadata", "--locked", "--format-version", "1"]
+
+[[steps]]
 name = "rust-fmt"
 # rust-ci.yml "cargo fmt --check". Gated here, unlike qontinui-coord's manifest,
 # because this repo's main is rustfmt-clean and the Actions lane gates it.
