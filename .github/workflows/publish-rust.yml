@@ -202,17 +202,24 @@ jobs:
             echo "Not a plain x.y.z requirement; not waiting."
             exit 0
           fi
+          # Poll the SPARSE INDEX, which is what `cargo publish --dry-run`
+          # resolves through. The web API answers 200 once crates.io records a
+          # version, before the background index job has updated the CDN, and
+          # it also answers 200 for a yanked version. The index gives one JSON
+          # object per line.
           for i in $(seq 1 60); do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' -A 'qontinui-schemas publish-rust (github actions)' \
-              "https://crates.io/api/v1/crates/qontinui-types/${req}" || true)
-            if [ "$code" = "200" ]; then
-              echo "qontinui-types ${req} is on crates.io."
+            index=$(curl -fsS -A 'qontinui-schemas publish-rust (github actions)' \
+              "https://index.crates.io/qo/nt/qontinui-types" || true)
+            if printf '%s\n' "$index" \
+                 | jq -r --arg v "$req" 'select(.vers == $v and (.yanked | not)) | .vers' 2>/dev/null \
+                 | grep -qxF "$req"; then
+              echo "qontinui-types ${req} is in the crates.io sparse index (not yanked)."
               exit 0
             fi
-            echo "attempt ${i}/60: qontinui-types ${req} not on crates.io yet (HTTP ${code}); waiting 30s"
+            echo "attempt ${i}/60: qontinui-types ${req} not in the crates.io sparse index yet; waiting 30s"
             sleep 30
           done
-          echo "::error::qontinui-types ${req} did not appear on crates.io within 30 minutes; publish it first, then re-run this job."
+          echo "::error::qontinui-types ${req} did not appear (unyanked) in the crates.io sparse index within 30 minutes; publish it first, then re-run this job."
           exit 1
 
       - name: Dry-run publish
