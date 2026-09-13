@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.0...rust-runner-client-v0.2.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **rust-runner-client:** accept qontinui-types 2.x ([aa8c4a0](https://github.com/qontinui/qontinui-schemas/commit/aa8c4a0d3f98a37d70f6b1400eb54d3c033063ff))
+
 ## [0.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.1.1...rust-runner-client-v0.2.0) (2026-05-20)
 
 
