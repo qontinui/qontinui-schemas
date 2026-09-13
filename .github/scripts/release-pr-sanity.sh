@@ -13,9 +13,9 @@
 # major bump. On qontinui-schemas#160 (2026-09-02 → 2026-09-07, 10+ coord
 # `ci-not-green` cycles) the consumers' then-present `<2.0.0` bounds turned
 # five checks red with a version-resolution error that said nothing about the
-# cause. Consumers no longer carry bounds (CONTRIBUTING.md, "Consumer version
-# bounds"), so today the bogus version is wrong, not wedging, which makes this
-# check the ONLY thing that names it.
+# cause. Consumers are moving to bare path deps with no bound (CONTRIBUTING.md,
+# "Consumer version bounds"). Once they get there, a bogus version is silently
+# wrong rather than loudly red, and this check is what names it.
 #
 # This script fails ONE check with the cause and the recovery recipe instead.
 # Three distinct exits, because a wrong verdict here is worse than none:
