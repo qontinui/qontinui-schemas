@@ -148,6 +148,37 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # release-please's cargo-workspace plugin (release-please-config.json)
+      # cuts a qontinui-runner-client patch release on EVERY qontinui-types
+      # release, requiring the exact new types version. The two tags push
+      # separately and run as separate workflow runs, so `needs:` above orders
+      # nothing between them. Without this wait the dry-run below can resolve
+      # against crates.io before qontinui-types has been published there.
+      # A requirement that is not a plain x.y.z (a hand-written range) skips
+      # the wait.
+      - name: Wait for the required qontinui-types on crates.io
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          req=$(sed -nE 's/^qontinui-types = \{.*version = "([^"]+)".*/\1/p' Cargo.toml)
+          echo "qontinui-types requirement: ${req:-<none>}"
+          if ! [[ "$req" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Not a plain x.y.z requirement; not waiting."
+            exit 0
+          fi
+          for i in $(seq 1 60); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -A 'qontinui-schemas publish-rust (github actions)' \
+              "https://crates.io/api/v1/crates/qontinui-types/${req}" || true)
+            if [ "$code" = "200" ]; then
+              echo "qontinui-types ${req} is on crates.io."
+              exit 0
+            fi
+            echo "attempt ${i}/60: qontinui-types ${req} not on crates.io yet (HTTP ${code}); waiting 30s"
+            sleep 30
+          done
+          echo "::error::qontinui-types ${req} did not appear on crates.io within 30 minutes; publish it first, then re-run this job."
+          exit 1
+
       - name: Dry-run publish
         if: steps.check.outputs.skip != 'true'
         run: cargo publish --dry-run --token ${{ secrets.CRATES_IO_TOKEN }}
