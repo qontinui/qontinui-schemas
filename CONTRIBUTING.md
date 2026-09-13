@@ -288,8 +288,8 @@ Where each consumer stands as of 2026-09-13:
 | Consumer | Bounds |
 |---|---|
 | qontinui-coord | none |
-| qontinui-supervisor | removed by qontinui-supervisor#188 |
-| qontinui-runner | still bounded; removed after qontinui-runner#1523 lands |
+| qontinui-supervisor | still bounded (`qontinui-runner-client <2.0.0`); removal pending qontinui-supervisor#188 (open) |
+| qontinui-runner | still bounded (`<2.0.0`); qontinui-runner#1523 only widens it to `<3.0.0`, and removal follows once #1523 lands |
 
 Until a consumer is unbounded, a qontinui-types major still needs its bound
 widened BEFORE the release PR can go green. Do not add a new `version` bound
@@ -308,8 +308,9 @@ qontinui-types version is on crates.io.
 plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its
 public API, built on `qontinui-types::wire`, changes major under it. A
 crates.io user on `^0.2` would then silently pick up qontinui-types 2.x. Land
-a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer (or
-a `feat!`) in the same release. Plan:
+a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer in
+the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
+release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
 
 The ergonomics of skipping the anchor: every override generates one stale
