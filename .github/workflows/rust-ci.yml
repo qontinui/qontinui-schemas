@@ -83,6 +83,21 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # FIRST cargo command, deliberately. `cargo fmt`, `clippy` and `build`
+      # each silently rewrite a stale Cargo.lock, after which `--locked` would
+      # pass vacuously. Reproduced on a copy of main with rust/ at 2.0.0:
+      # `--locked` exits 101, a plain `cargo metadata` rewrites 1.9.0 -> 2.0.0,
+      # and `--locked` then exits 0. rust-cache's restore runs
+      # `cargo metadata --no-deps`, which resolves nothing, so it rewrites
+      # nothing.
+      #
+      # This is what catches a release PR that forgot the root lock. That had
+      # happened at every rust-v* tag until release-please's cargo-workspace
+      # plugin (release-please-config.json) began regenerating the lock.
+      # Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 4.
+      - name: Cargo.lock is up to date
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
