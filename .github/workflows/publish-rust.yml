@@ -43,7 +43,8 @@ name: Publish Rust crates to crates.io
 #   workflow `publish-rust.yml`, environment (none)
 # and "Trusted Publishing only" enabled on the same page. The long-lived API
 # token secret this replaced expired silently: every rust-v* tag from 1.2.0
-# through 1.9.0 failed at upload with "403 Forbidden: authentication failed" (plan 2026-09-14-schemas-crates-io-publish-fails-every-tag).
+# through 1.9.0 failed at upload with "the remote server responded with an
+# error (status 403 Forbidden): authentication failed" (plan 2026-09-14-schemas-crates-io-publish-fails-every-tag).
 
 on:
   push:

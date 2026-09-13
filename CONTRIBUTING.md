@@ -191,9 +191,9 @@ The publish workflows: re-run full `rust-ci.yml` on the tagged SHA (F2 hard gate
 
 **No auto-merge on release PRs.** The release PR is the human gate; auto-merging it defeats the purpose. `cargo publish` is irreversible — `cargo yank` only hides the version, it does not free the version number for reuse.
 
-### Manual override (emergency / first-publish ceremony)
+### Manual override (emergency / anchor tag)
 
-For situations where release-please isn't appropriate — emergency hotfix, the very-first-publish ceremony for a new crate, or a publish retry — bypass the release PR and tag directly. **Three files must move in lock-step:**
+For situations where release-please isn't appropriate — emergency hotfix, a new crate's release-please anchor tag (its first version is an owner-local `cargo publish`; see "Pre-release / RC channel"), or a publish retry — bypass the release PR and tag directly. **Three files must move in lock-step:**
 
 1. `<crate>/Cargo.toml` (or `package.json`) — version bump.
 2. `release-please-manifest.json` — the component entry must match the new version.
@@ -323,7 +323,7 @@ The `cargo publish --dry-run` step (F4) catches the most common failure modes (m
 
 ### Provisioning credentials
 
-- **crates.io trusted publishing** (OIDC): `publish-rust.yml` mints a short-lived token per job with `rust-lang/crates-io-auth-action`, so there is no repo secret to provision or rotate. A crate owner registers, once per crate at crates.io → crate → Settings → Trusted Publishing, a GitHub publisher with owner `qontinui`, repository `qontinui-schemas`, workflow `publish-rust.yml` and no environment, and enables **Trusted Publishing only** on the same page so token uploads are refused. The long-lived token this replaced expired silently: every `rust-v*` tag from 1.2.0 through 1.9.0 failed at upload with `403 Forbidden: authentication failed`.
+- **crates.io trusted publishing** (OIDC): `publish-rust.yml` mints a short-lived token per job with `rust-lang/crates-io-auth-action`, so there is no repo secret to provision or rotate. A crate owner registers, once per crate at crates.io → crate → Settings → Trusted Publishing, a GitHub publisher with owner `qontinui`, repository `qontinui-schemas`, workflow `publish-rust.yml` and no environment, and enables **Trusted Publishing only** on the same page so token uploads are refused. The long-lived token this replaced expired silently: every `rust-v*` tag from 1.2.0 through 1.9.0 failed at upload with `the remote server responded with an error (status 403 Forbidden): authentication failed`.
 - **npm trusted publishing** (OIDC): `publish.yml` uses GitHub Actions' OIDC integration with npm, no static token required. See npm's "Trusted Publishers" documentation if the OIDC trust needs to be re-established.
 
 ## Reporting bugs / requesting features
