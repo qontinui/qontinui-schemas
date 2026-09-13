@@ -11,11 +11,14 @@ name: release-pr-sanity
 # rebase rewrites the SHA of a release PR, GitHub never marks the PR merged,
 # release-please never tags it, and its next run finds no release for the
 # manifest version, walks the ENTIRE history and re-proposes every commit ever
-# made — including any old `feat!` — as a bogus major bump. Every consumer pins
-# `qontinui-types = "<2.0.0"`, so rust-ci, check-drift, both consumer-checks
-# and consumer-gate go red with a version-resolution error that names the
-# symptom, not the cause. qontinui-schemas#160 sat that way from 2026-09-02 to
-# 2026-09-07 through 10+ coord `ci-not-green` cycles.
+# made — including any old `feat!` — as a bogus major bump. On
+# qontinui-schemas#160 the consumers' then-present `<2.0.0` bounds turned
+# rust-ci, check-drift, both consumer-checks and consumer-gate red with a
+# version-resolution error that named the symptom, not the cause. It sat that
+# way from 2026-09-02 to 2026-09-07 through 10+ coord `ci-not-green` cycles.
+# Consumers no longer carry bounds (CONTRIBUTING.md, "Consumer version
+# bounds"), so a bogus major is now silently WRONG rather than loudly red, and
+# this job is what names it.
 #
 # This job fails ONE check, on the release PR only, with the cause and the
 # recovery recipe. It is a detector, not the fix — the fix is coord landing
