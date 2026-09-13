@@ -16,9 +16,9 @@ name: release-pr-sanity
 # rust-ci, check-drift, both consumer-checks and consumer-gate red with a
 # version-resolution error that named the symptom, not the cause. It sat that
 # way from 2026-09-02 to 2026-09-07 through 10+ coord `ci-not-green` cycles.
-# Consumers no longer carry bounds (CONTRIBUTING.md, "Consumer version
-# bounds"), so a bogus major is now silently WRONG rather than loudly red, and
-# this job is what names it.
+# Consumers are moving to bare path deps with no bound (CONTRIBUTING.md,
+# "Consumer version bounds"). Once they get there, a bogus major is silently
+# WRONG rather than loudly red, and this job is what names it.
 #
 # This job fails ONE check, on the release PR only, with the cause and the
 # recovery recipe. It is a detector, not the fix — the fix is coord landing
