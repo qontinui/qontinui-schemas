@@ -112,9 +112,28 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
+# Only a NEW HEAD SHA (`synchronize`) cancels a run in flight. A label event
+# on the SAME head queues behind the running run instead of cancelling it.
+#
+# Why: `labeled`/`unlabeled` are load-bearing triggers (see above) and coord
+# applies and strips dep labels programmatically. Under a blanket
+# `cancel-in-progress: true` every label event cancelled the in-flight run.
+# `consumer-gate` is `if: always()`, so it ran inside the cancelled run, saw
+# `consumer-check` = cancelled, and posted a RED on the head SHA that named no
+# breakage at all. qontinui-schemas#170 collected three of those in 13 minutes
+# (runs 34782176581, 34782199138, 34782711789), each with every consumer-check
+# entry `cancelled`.
+#
+# A queued run costs at most one extra run per label burst, because GitHub keeps
+# a single pending run per group and replaces an older pending one before it
+# starts any job. The verdict that finally posts is computed with the labels as
+# they stood after the burst. `synchronize` still cancels: the superseded run's
+# contexts land on a SHA that is no longer the head. `workflow_dispatch` has no
+# `action`, so it never cancels either.
+# Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 1.
 concurrency:
   group: runner-consumer-check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 # Read-only. This workflow reads PR metadata and labels across repos and
 # checks out public repos; it writes nothing and needs no elevated scope.
@@ -968,6 +987,16 @@ jobs:
   # note there. Both halves are required, and removing either one turns
   # this context into a permanently-unsatisfiable "Expected" on any PR the
   # filter would have excluded.
+  #
+  # `cancelled` is NOT a verdict and is reported as NO VERDICT, never as
+  # "broken" — the same rule as coord's `is_supersession_conclusion`
+  # (qontinui-coord `crates/coord/src/ci_baseline.rs`). It still exits 1: a
+  # required context on a head SHA must never read green without a verdict.
+  # The job is therefore kept on `always()` rather than `!cancelled()`,
+  # because a job skipped by `if:` posts `skipped`, and both GitHub and coord
+  # count `skipped` as passing. Label events no longer cancel a same-SHA run
+  # (see `concurrency` above), so this arm is left for a manual cancel or a
+  # timeout.
   # ------------------------------------------------------------------
   consumer-gate:
     needs: [consumer-check, wire-gate-guard]
@@ -982,6 +1011,10 @@ jobs:
           echo "wire-gate-guard result: $RESULT"
           case "$RESULT" in
             success|skipped) exit 0 ;;
+            cancelled)
+              echo "::error::NO VERDICT: wire-gate-guard was cancelled or timed out. This is not evidence the SDK wire gate was modified. A superseding run posts the verdict; otherwise re-run this workflow."
+              exit 1
+              ;;
             *)
               echo "::error::The SDK wire gate guard failed — see the wire-gate-guard job."
               exit 1
@@ -998,6 +1031,10 @@ jobs:
             success|skipped)
               echo "All consumers either compile against this PR at main, or have a verified declared adaptation."
               exit 0
+              ;;
+            cancelled)
+              echo "::error::NO VERDICT: consumer-check was cancelled or timed out before any consumer reached a verdict. This is not evidence a consumer is broken. A superseding run posts the verdict; otherwise re-run this workflow."
+              exit 1
               ;;
             *)
               echo "::error::At least one consumer is broken by this PR with no verified adaptation."
