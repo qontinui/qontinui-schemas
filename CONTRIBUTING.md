@@ -282,10 +282,10 @@ ergonomics of doing it: one tag.
 
 A crate that does not exist on crates.io yet cannot be published by `publish-rust.yml`: Trusted Publishing only authorizes uploads to an existing crate. Its first version is an owner-local `cargo publish`, after which the owner registers the trusted publisher (see "Provisioning credentials") and tag-driven publishing works from the second version on.
 
-The first publish of any new crate to crates.io should ship as `-rc.1` first, validate the registry round-trip (consumer pulls from crates.io, integration works), then promote to stable. This is decision 5 in `qontinui-dev-notes/rust-release-engineering/SESSION_PROMPT.md`.
+The first publish of any new crate to crates.io should ship as `-rc.1` first, validate the registry round-trip (consumer pulls from crates.io, integration works), then promote to stable. This is decision 5 in `qontinui-dev-notes/rust-release-engineering/SESSION_PROMPT.md`. For a NEW crate that `-rc.1` is the owner-local first publish above; its tag is then only the release-please anchor (the workflow's skip-if-published guard no-ops the run). Tag-driven RC publishing, as in the example below, applies to a crate that already exists.
 
 ```bash
-# Phase 7: bump rust/Cargo.toml to 0.1.2-rc.1 + update manifest
+# Existing crate: bump rust/Cargo.toml to 0.1.2-rc.1 + update manifest
 git tag rust-v0.1.2-rc.1 && git push origin rust-v0.1.2-rc.1
 
 # Validate by adding the RC to a throwaway test repo:
@@ -296,7 +296,7 @@ git tag rust-v0.1.2-rc.1 && git push origin rust-v0.1.2-rc.1
 git tag rust-v0.1.2 && git push origin rust-v0.1.2
 ```
 
-**Cross-crate RC dependency wrinkle.** When `qontinui-types` is at an RC version on crates.io but `qontinui-runner-client` needs to consume it (e.g. during the phase 8 first-publish of runner-client), Cargo's caret range `^0.1` does NOT match pre-release versions like `0.1.2-rc.1` — pre-releases require an explicit pre-release version specifier. Pin runner-client's `qontinui-types` dep to `=0.1.2-rc.1` for the duration of the RC, then change it back to `^0.1.2` after the types crate promotes to stable.
+**Cross-crate RC dependency wrinkle.** When `qontinui-types` is at an RC version on crates.io but `qontinui-runner-client` needs to consume it (e.g. while a runner-client release depends on a types RC), Cargo's caret range `^0.1` does NOT match pre-release versions like `0.1.2-rc.1` — pre-releases require an explicit pre-release version specifier. Pin runner-client's `qontinui-types` dep to `=0.1.2-rc.1` for the duration of the RC, then change it back to `^0.1.2` after the types crate promotes to stable.
 
 ### Bootstrapping a new release-please component
 
@@ -323,7 +323,7 @@ The `cargo publish --dry-run` step (F4) catches the most common failure modes (m
 
 ### Provisioning credentials
 
-- **crates.io trusted publishing** (OIDC): `publish-rust.yml` mints a short-lived token per job with `rust-lang/crates-io-auth-action`, so there is no repo secret to provision or rotate. A crate owner registers, once per crate at crates.io → crate → Settings → Trusted Publishing, a GitHub publisher with owner `qontinui`, repository `qontinui-schemas`, workflow `publish-rust.yml` and no environment, and enables **Trusted Publishing only** on the same page so token uploads are refused. The long-lived token this replaced expired silently and failed every `rust-v*` tag from 1.2.0 through 1.9.0.
+- **crates.io trusted publishing** (OIDC): `publish-rust.yml` mints a short-lived token per job with `rust-lang/crates-io-auth-action`, so there is no repo secret to provision or rotate. A crate owner registers, once per crate at crates.io → crate → Settings → Trusted Publishing, a GitHub publisher with owner `qontinui`, repository `qontinui-schemas`, workflow `publish-rust.yml` and no environment, and enables **Trusted Publishing only** on the same page so token uploads are refused. The long-lived token this replaced expired silently: every `rust-v*` tag from 1.2.0 through 1.9.0 failed at upload with `403 Forbidden: authentication failed`.
 - **npm trusted publishing** (OIDC): `publish.yml` uses GitHub Actions' OIDC integration with npm, no static token required. See npm's "Trusted Publishers" documentation if the OIDC trust needs to be re-established.
 
 ## Reporting bugs / requesting features

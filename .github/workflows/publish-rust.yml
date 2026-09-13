@@ -10,9 +10,8 @@ name: Publish Rust crates to crates.io
 # select the matching crate. The TS package uses `ts-v*` (handled by
 # publish.yml) and is unaffected.
 #
-# To release via tag (manual override of release-please, e.g. for the
-# very-first-publish ceremony documented in the rust-release-engineering
-# plan):
+# To release via tag (manual override of release-please, for a crate that
+# already exists on crates.io):
 #   git tag rust-v0.1.2-rc.1                  # qontinui-types
 #   git tag rust-runner-client-v0.1.0-rc.1    # qontinui-runner-client
 #   git push --tags
@@ -43,8 +42,8 @@ name: Publish Rust crates to crates.io
 #   owner `qontinui`, repository `qontinui-schemas`,
 #   workflow `publish-rust.yml`, environment (none)
 # and "Trusted Publishing only" enabled on the same page. The long-lived API
-# token secret this replaced expired silently and failed every rust-v* tag
-# from 1.2.0 through 1.9.0 (plan 2026-09-14-schemas-crates-io-publish-fails-every-tag).
+# token secret this replaced expired silently: every rust-v* tag from 1.2.0
+# through 1.9.0 failed at upload with "403 Forbidden: authentication failed" (plan 2026-09-14-schemas-crates-io-publish-fails-every-tag).
 
 on:
   push:
@@ -120,11 +119,12 @@ jobs:
         run: cargo publish --dry-run
 
       # Authenticate as late as possible: the token lives ~30 minutes, so it is
-      # minted after the dry-run (and after any wait step) rather than first.
+      # minted after the dry-run rather than first.
       - name: Authenticate to crates.io (trusted publishing)
         id: auth
         if: steps.check.outputs.skip != 'true'
-        uses: rust-lang/crates-io-auth-action@v1
+        # Pinned by SHA: this is the one action that handles a publish credential.
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
       - name: Publish qontinui-types
         if: steps.check.outputs.skip != 'true'
@@ -191,7 +191,8 @@ jobs:
       - name: Authenticate to crates.io (trusted publishing)
         id: auth
         if: steps.check.outputs.skip != 'true'
-        uses: rust-lang/crates-io-auth-action@v1
+        # Pinned by SHA: this is the one action that handles a publish credential.
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
       - name: Publish qontinui-runner-client
         if: steps.check.outputs.skip != 'true'
