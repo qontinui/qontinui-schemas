@@ -274,22 +274,42 @@ Two ways to get there:
      rewrites on a body change). **Never** land the bogus bump: its proposed
      versions come from the whole history and are not trustworthy.
 
-**Consumer version bounds (and why a REAL major no longer wedges anyone).**
-Consumers of these crates (qontinui-runner, qontinui-supervisor,
-qontinui-coord) depend on them as bare `path =` dependencies on a sibling
-checkout, with **no `version =` bound**. A bound on a path dep can only refuse
-the sibling, never select one. When release-please computed a real 2.0.0
-(qontinui-schemas#169, 2026-09-13), every `<2.0.0` bound wedged the release
-PR and all of its consumers, and nothing moved them. What protects a consumer
-is the `consumer-gate` compile check, not a range.
+**Consumer version bounds (and why a REAL major must not wedge anyone).**
+The target state is that consumers of these crates depend on them as bare
+`path =` dependencies on a sibling checkout, with **no `version =` bound**. A
+bound on a path dep can only refuse the sibling, never select one. When
+release-please computed a real 2.0.0 (qontinui-schemas#169, 2026-09-13),
+every `<2.0.0` bound wedged the release PR and all of its consumers, and
+nothing moved them. What protects a consumer is the `consumer-gate` compile
+check, not a range.
 
-The one bounded dependent is in this repo. `rust-runner-client` is published
+Where each consumer stands as of 2026-09-13:
+
+| Consumer | Bounds |
+|---|---|
+| qontinui-coord | none |
+| qontinui-supervisor | removed by qontinui-supervisor#188 |
+| qontinui-runner | still bounded; removed after qontinui-runner#1523 lands |
+
+Until a consumer is unbounded, a qontinui-types major still needs its bound
+widened BEFORE the release PR can go green. Do not add a new `version` bound
+to a consumer's schemas path dep.
+
+The one bound that stays is in this repo. `rust-runner-client` is published
 to crates.io, and `cargo publish` needs a `version` on its `qontinui-types`
-path dep. release-please's `cargo-workspace` plugin rewrites that requirement
-to the new version inside the release PR itself, patch-bumps
-`qontinui-runner-client`, and regenerates the root `Cargo.lock`. `rust-ci`
-checks the lock with `cargo metadata --locked`. Do not add a `version` bound
-to a consumer's schemas path dep. Plan:
+path dep. **release-please owns that line**: its `cargo-workspace` plugin
+rewrites the requirement to the new version inside the release PR itself,
+patch-bumps `qontinui-runner-client`, and regenerates the root `Cargo.lock`.
+So do not hand-widen it. `rust-ci` checks the lock with `cargo fetch --locked`,
+and `publish-rust.yml` makes the runner-client publish wait until the required
+qontinui-types version is on crates.io.
+
+**On a qontinui-types MAJOR, give runner-client a real version too.** The
+plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its
+public API, built on `qontinui-types::wire`, changes major under it. A
+crates.io user on `^0.2` would then silently pick up qontinui-types 2.x. Land
+a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer (or
+a `feat!`) in the same release. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
 
 The ergonomics of skipping the anchor: every override generates one stale
