@@ -17,6 +17,12 @@ name: Publish Rust crates to crates.io
 #   git tag rust-runner-client-v0.1.0-rc.1    # qontinui-runner-client
 #   git push --tags
 #
+# A crate's FIRST version cannot go through this workflow: crates.io Trusted
+# Publishing only authorizes uploads to a crate that already exists. Publish a
+# new crate's first version from an owner's machine (`cargo publish`), register
+# the trusted publisher (below), and tag-driven publishing works from the
+# second version on.
+#
 # To release manually (workflow_dispatch):
 #   gh workflow run publish-rust.yml -f crate=both
 #   gh workflow run publish-rust.yml -f crate=qontinui-types
@@ -29,7 +35,16 @@ name: Publish Rust crates to crates.io
 #                      `cargo publish --dry-run` to catch packaging
 #                      failures before the irreversible step
 #
-# Required secret: CRATES_IO_TOKEN (use a publish-only scoped token).
+# Authentication: crates.io Trusted Publishing (OIDC). There is NO repo secret.
+# `rust-lang/crates-io-auth-action` exchanges the job's GitHub OIDC token for a
+# ~30-minute crates.io token that is revoked when the job ends. Each crate needs
+# ONE GitHub trusted publisher, registered once by a crate owner under
+# crates.io -> crate -> Settings -> Trusted Publishing:
+#   owner `qontinui`, repository `qontinui-schemas`,
+#   workflow `publish-rust.yml`, environment (none)
+# and "Trusted Publishing only" enabled on the same page. The long-lived API
+# token secret this replaced expired silently and failed every rust-v* tag
+# from 1.2.0 through 1.9.0 (plan 2026-09-14-schemas-crates-io-publish-fails-every-tag).
 
 on:
   push:
@@ -65,6 +80,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.crate == 'both' || github.event.inputs.crate == 'qontinui-types'))
     runs-on: ubuntu-latest
+    # id-token: write lets crates-io-auth-action mint the trusted-publishing
+    # token. Scoped to this job; the reusable verify-ci call is unaffected.
+    permissions:
+      contents: read
+      id-token: write
     defaults:
       run:
         working-directory: rust
@@ -97,11 +117,20 @@ jobs:
 
       - name: Dry-run publish
         if: steps.check.outputs.skip != 'true'
-        run: cargo publish --dry-run --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --dry-run
+
+      # Authenticate as late as possible: the token lives ~30 minutes, so it is
+      # minted after the dry-run (and after any wait step) rather than first.
+      - name: Authenticate to crates.io (trusted publishing)
+        id: auth
+        if: steps.check.outputs.skip != 'true'
+        uses: rust-lang/crates-io-auth-action@v1
 
       - name: Publish qontinui-types
         if: steps.check.outputs.skip != 'true'
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish
 
   publish-qontinui-runner-client:
     # Always runs after qontinui-types so the dependency is available on
@@ -118,6 +147,11 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
          (github.event.inputs.crate == 'both' || github.event.inputs.crate == 'qontinui-runner-client')))
     runs-on: ubuntu-latest
+    # id-token: write lets crates-io-auth-action mint the trusted-publishing
+    # token. Scoped to this job; the reusable verify-ci call is unaffected.
+    permissions:
+      contents: read
+      id-token: write
     defaults:
       run:
         working-directory: rust-runner-client
@@ -150,8 +184,17 @@ jobs:
 
       - name: Dry-run publish
         if: steps.check.outputs.skip != 'true'
-        run: cargo publish --dry-run --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --dry-run
+
+      # Authenticate as late as possible: the token lives ~30 minutes, so it is
+      # minted after the dry-run (and after any wait step) rather than first.
+      - name: Authenticate to crates.io (trusted publishing)
+        id: auth
+        if: steps.check.outputs.skip != 'true'
+        uses: rust-lang/crates-io-auth-action@v1
 
       - name: Publish qontinui-runner-client
         if: steps.check.outputs.skip != 'true'
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish
