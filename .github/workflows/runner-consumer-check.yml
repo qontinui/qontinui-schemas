@@ -127,7 +127,11 @@ on:
 # A queued run costs at most one extra run per label burst, because GitHub keeps
 # a single pending run per group and replaces an older pending one before it
 # starts any job. The verdict that finally posts is computed with the labels as
-# they stood after the burst. `synchronize` still cancels: the superseded run's
+# they stood after the burst. The in-flight run DOES now finish, though. If it
+# read labels before a declaration landed, it posts a genuine verdict for those
+# labels, which can be red, and the queued run then posts the newer verdict on
+# the same head. That red is honest, not manufactured, and it is short-lived.
+# `synchronize` still cancels: the superseded run's
 # contexts land on a SHA that is no longer the head. `workflow_dispatch` has no
 # `action`, so it never cancels either.
 # Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 1.
@@ -201,8 +205,8 @@ jobs:
       # The surface is the same one check-consumers uses and the same one
       # the trigger used to filter on — all three must agree. It is the set
       # of paths a consumer can path-depend on: the four workspace crates
-      # plus both manifests (consumers pin version RANGES, so a
-      # manifest-only bump can break resolution).
+      # plus both manifests (a manifest-only bump can break resolution for
+      # any consumer that still pins a version range on a schemas path dep).
       #
       # Note this is a two-dot `base..head` diff, so when `main` moves under
       # an open PR the range includes commits the PR did not author. That
@@ -996,7 +1000,7 @@ jobs:
   # because a job skipped by `if:` posts `skipped`, and both GitHub and coord
   # count `skipped` as passing. Label events no longer cancel a same-SHA run
   # (see `concurrency` above), so this arm is left for a manual cancel or a
-  # timeout.
+  # run superseded by a new head.
   # ------------------------------------------------------------------
   consumer-gate:
     needs: [consumer-check, wire-gate-guard]
@@ -1012,7 +1016,7 @@ jobs:
           case "$RESULT" in
             success|skipped) exit 0 ;;
             cancelled)
-              echo "::error::NO VERDICT: wire-gate-guard was cancelled or timed out. This is not evidence the SDK wire gate was modified. A superseding run posts the verdict; otherwise re-run this workflow."
+              echo "::error::NO VERDICT: wire-gate-guard was cancelled. This is not evidence the SDK wire gate was modified. A superseding run posts the verdict; otherwise re-run this workflow."
               exit 1
               ;;
             *)
@@ -1033,7 +1037,7 @@ jobs:
               exit 0
               ;;
             cancelled)
-              echo "::error::NO VERDICT: consumer-check was cancelled or timed out before any consumer reached a verdict. This is not evidence a consumer is broken. A superseding run posts the verdict; otherwise re-run this workflow."
+              echo "::error::NO VERDICT: consumer-check was cancelled before any consumer reached a verdict. This is not evidence a consumer is broken. A superseding run posts the verdict; otherwise re-run this workflow."
               exit 1
               ;;
             *)
