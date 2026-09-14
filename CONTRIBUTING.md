@@ -187,13 +187,13 @@ Versioning and changelog generation are managed by [release-please](https://gith
    - Creates per-component tags: e.g. `rust-v0.1.2`, `rust-runner-client-v0.1.0`, `ts-v0.2.4`.
    - Tag pushes fire `publish-rust.yml` (Rust crates) or `publish.yml` (TS package).
 
-The publish workflows: re-run full `rust-ci.yml` on the tagged SHA (F2 hard gate), check whether the version is already on the registry (skip-if-published guard), run `cargo publish --dry-run` (F4 packaging pre-flight), then the real `cargo publish`. Any failure leaves the registry unchanged.
+The publish workflows: re-run full `rust-ci.yml` on the tagged SHA (F2 hard gate), check whether the version is already on the registry (skip-if-published guard), run `cargo publish --dry-run` (F4 packaging pre-flight), then the real `cargo publish`, authenticated with a ~30-minute crates.io Trusted Publishing token minted from the job's GitHub OIDC identity by `rust-lang/crates-io-auth-action` (no repo secret; see "Provisioning credentials"). Any failure leaves the registry unchanged.
 
 **No auto-merge on release PRs.** The release PR is the human gate; auto-merging it defeats the purpose. `cargo publish` is irreversible — `cargo yank` only hides the version, it does not free the version number for reuse.
 
-### Manual override (emergency / first-publish ceremony)
+### Manual override (emergency / anchor tag)
 
-For situations where release-please isn't appropriate — emergency hotfix, the very-first-publish ceremony for a new crate, or a publish retry — bypass the release PR and tag directly. **Three files must move in lock-step:**
+For situations where release-please isn't appropriate — emergency hotfix, a new crate's release-please anchor tag (its first version is an owner-local `cargo publish`; see "Pre-release / RC channel"), or a publish retry — bypass the release PR and tag directly. **Three files must move in lock-step:**
 
 1. `<crate>/Cargo.toml` (or `package.json`) — version bump.
 2. `release-please-manifest.json` — the component entry must match the new version.
@@ -319,10 +319,12 @@ ergonomics of doing it: one tag.
 
 ### Pre-release / RC channel
 
-The first publish of any new crate to crates.io should ship as `-rc.1` first, validate the registry round-trip (consumer pulls from crates.io, integration works), then promote to stable. This is decision 5 in `qontinui-dev-notes/rust-release-engineering/SESSION_PROMPT.md`.
+A crate that does not exist on crates.io yet cannot be published by `publish-rust.yml`: Trusted Publishing only authorizes uploads to an existing crate. Its first version is an owner-local `cargo publish`, after which the owner registers the trusted publisher (see "Provisioning credentials") and tag-driven publishing works from the second version on.
+
+The first publish of any new crate to crates.io should ship as `-rc.1` first, validate the registry round-trip (consumer pulls from crates.io, integration works), then promote to stable. This is decision 5 in `qontinui-dev-notes/rust-release-engineering/SESSION_PROMPT.md`. For a NEW crate that `-rc.1` is the owner-local first publish above; its tag is then only the release-please anchor (the workflow's skip-if-published guard no-ops the run). Tag-driven RC publishing, as in the example below, applies to a crate that already exists.
 
 ```bash
-# Phase 7: bump rust/Cargo.toml to 0.1.2-rc.1 + update manifest
+# Existing crate: bump rust/Cargo.toml to 0.1.2-rc.1 + update manifest
 git tag rust-v0.1.2-rc.1 && git push origin rust-v0.1.2-rc.1
 
 # Validate by adding the RC to a throwaway test repo:
@@ -333,7 +335,7 @@ git tag rust-v0.1.2-rc.1 && git push origin rust-v0.1.2-rc.1
 git tag rust-v0.1.2 && git push origin rust-v0.1.2
 ```
 
-**Cross-crate RC dependency wrinkle.** When `qontinui-types` is at an RC version on crates.io but `qontinui-runner-client` needs to consume it (e.g. during the phase 8 first-publish of runner-client), Cargo's caret range `^0.1` does NOT match pre-release versions like `0.1.2-rc.1` — pre-releases require an explicit pre-release version specifier. Pin runner-client's `qontinui-types` dep to `=0.1.2-rc.1` for the duration of the RC, then change it back to `^0.1.2` after the types crate promotes to stable.
+**Cross-crate RC dependency wrinkle.** When `qontinui-types` is at an RC version on crates.io but `qontinui-runner-client` needs to consume it (e.g. while a runner-client release depends on a types RC), Cargo's caret range `^0.1` does NOT match pre-release versions like `0.1.2-rc.1` — pre-releases require an explicit pre-release version specifier. Pin runner-client's `qontinui-types` dep to `=0.1.2-rc.1` for the duration of the RC, then change it back to `^0.1.2` after the types crate promotes to stable.
 
 ### Bootstrapping a new release-please component
 
@@ -343,7 +345,7 @@ The `bootstrap-sha` and `last-release-sha` per-package config keys are documente
 
 1. Bump the new component's `Cargo.toml` / `package.json` to the intended first-publish version, in lockstep with `release-please-manifest.json`.
 2. Open + merge a `chore:` PR with those bumps.
-3. Tag the merge SHA as `<component>-v<version>` and push the tag — this fires the publish workflow and creates the first GitHub release.
+3. Tag the merge SHA as `<component>-v<version>` and push the tag — this fires the publish workflow and creates the first GitHub release. For a Rust crate that is not on crates.io yet, the workflow cannot publish it (Trusted Publishing needs an existing crate): publish that first version from an owner's machine with `cargo publish` and register the trusted publisher before tagging.
 4. From then on, release-please finds the anchor tag, walks only post-tag commits affecting the component's path, and proposes correct bumps.
 
 Until step 3 lands, expect release-please to open release PRs proposing wrong bumps on the new component. Force-close them; they'll be regenerated correctly once the anchor tag exists.
@@ -360,7 +362,7 @@ The `cargo publish --dry-run` step (F4) catches the most common failure modes (m
 
 ### Provisioning credentials
 
-- **`CRATES_IO_TOKEN`** (repo secret): a publish-only scoped token from [crates.io/me](https://crates.io/me). Restrict scopes to publish + yank only — never use a full-access token. Rotate periodically.
+- **crates.io trusted publishing** (OIDC): `publish-rust.yml` mints a short-lived token per job with `rust-lang/crates-io-auth-action`, so there is no repo secret to provision or rotate. A crate owner registers, once per crate at crates.io → crate → Settings → Trusted Publishing, a GitHub publisher with owner `qontinui`, repository `qontinui-schemas`, workflow `publish-rust.yml` and no environment, and enables **Trusted Publishing only** on the same page so token uploads are refused. The long-lived token this replaced expired silently: every `rust-v*` tag from 1.2.0 through 1.9.0 failed at upload with `the remote server responded with an error (status 403 Forbidden): authentication failed`.
 - **npm trusted publishing** (OIDC): `publish.yml` uses GitHub Actions' OIDC integration with npm, no static token required. See npm's "Trusted Publishers" documentation if the OIDC trust needs to be re-established.
 
 ## Reporting bugs / requesting features

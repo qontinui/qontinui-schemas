@@ -121,8 +121,10 @@
 #           taiki-e/install-action step, since nextest is not preinstalled;
 #      iii. an ingest step POSTing the JUnit to /coord/test-results/ingest —
 #           which needs the COORD_INGEST_TOKEN repo secret. **qontinui-schemas
-#           does not have that secret** (`gh secret list` shows only
-#           CRATES_IO_TOKEN and the two RELEASE_PLEASE_* keys; coord has it).
+#           does not have that secret** (`gh secret list` shows only the two
+#           RELEASE_PLEASE_* keys once the expired crates.io token is deleted —
+#           crates publish via trusted publishing; coord has
+#           COORD_INGEST_TOKEN).
 #           Emitting JUnit that nothing ingests would leave Tier-7 exactly as
 #           closed as it is now, so (iii) is the load-bearing step and it is
 #           gated on an operator-held credential, not on code.
