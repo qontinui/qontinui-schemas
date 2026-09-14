@@ -184,6 +184,44 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # release-please's cargo-workspace plugin (release-please-config.json)
+      # cuts a qontinui-runner-client patch release on EVERY qontinui-types
+      # release, requiring the exact new types version. The two tags push
+      # separately and run as separate workflow runs, so `needs:` above orders
+      # nothing between them. Without this wait the dry-run below can resolve
+      # against crates.io before qontinui-types has been published there.
+      # A requirement that is not a plain x.y.z (a hand-written range) skips
+      # the wait.
+      - name: Wait for the required qontinui-types on crates.io
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          req=$(sed -nE 's/^qontinui-types = \{.*version = "([^"]+)".*/\1/p' Cargo.toml)
+          echo "qontinui-types requirement: ${req:-<none>}"
+          if ! [[ "$req" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Not a plain x.y.z requirement; not waiting."
+            exit 0
+          fi
+          # Poll the SPARSE INDEX, which is what `cargo publish --dry-run`
+          # resolves through. The web API answers 200 once crates.io records a
+          # version, before the background index job has updated the CDN, and
+          # it also answers 200 for a yanked version. The index gives one JSON
+          # object per line.
+          for i in $(seq 1 60); do
+            index=$(curl -fsS -A 'qontinui-schemas publish-rust (github actions)' \
+              "https://index.crates.io/qo/nt/qontinui-types" || true)
+            if printf '%s\n' "$index" \
+                 | jq -r --arg v "$req" 'select(.vers == $v and (.yanked | not)) | .vers' 2>/dev/null \
+                 | grep -qxF "$req"; then
+              echo "qontinui-types ${req} is in the crates.io sparse index (not yanked)."
+              exit 0
+            fi
+            echo "attempt ${i}/60: qontinui-types ${req} not in the crates.io sparse index yet; waiting 30s"
+            sleep 30
+          done
+          echo "::error::qontinui-types ${req} did not appear (unyanked) in the crates.io sparse index within 30 minutes; publish it first, then re-run this job."
+          exit 1
+
       - name: Dry-run publish
         if: steps.check.outputs.skip != 'true'
         run: cargo publish --dry-run

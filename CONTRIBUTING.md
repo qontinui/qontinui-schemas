@@ -261,8 +261,8 @@ Two ways to get there:
   (its tip was behind `main`), GitHub never records the merge, so release-please
   never creates the release or tag for the version that just landed. Its next
   run then re-derives the bogus major, force-pushes it onto the same open PR,
-  and every consumer's `qontinui-types = "<2.0.0"` bound turns five checks red
-  with a version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
+  and the consumers' version bounds turned five checks red with a
+  version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
   10+ coord `ci-not-green` cycles). The `release-pr-sanity` workflow now fails
   a release PR with this recipe when a base manifest version has no tag:
   1. find the landed release commit —
@@ -271,8 +271,47 @@ Two ways to get there:
      `gh release create <component>-v<version> --target <sha> --title '<component>: v<version>' --notes "<CHANGELOG section>"`;
   3. `gh workflow run release-please.yml --ref main`;
   4. close the stale release PR if release-please leaves it unchanged (it only
-     rewrites on a body change). **Never** widen consumer version bounds to
-     accept the bogus bump.
+     rewrites on a body change). **Never** land the bogus bump: its proposed
+     versions come from the whole history and are not trustworthy.
+
+**Consumer version bounds (and why a REAL major must not wedge anyone).**
+The target state is that consumers of these crates depend on them as bare
+`path =` dependencies on a sibling checkout, with **no `version =` bound**. A
+bound on a path dep can only refuse the sibling, never select one. When
+release-please computed a real 2.0.0 (qontinui-schemas#169, 2026-09-13),
+every `<2.0.0` bound wedged the release PR and all of its consumers, and
+nothing moved them. What protects a consumer is the `consumer-gate` compile
+check, not a range.
+
+Where each consumer stands as of 2026-09-13:
+
+| Consumer | Bounds |
+|---|---|
+| qontinui-coord | none |
+| qontinui-supervisor | still bounded (`qontinui-runner-client <2.0.0`); removal pending qontinui-supervisor#188 (open) |
+| qontinui-runner | still bounded (`<2.0.0`); qontinui-runner#1523 only widens it to `<3.0.0`, and removal follows once #1523 lands |
+
+Until a consumer is unbounded, a qontinui-types major still needs its bound
+widened BEFORE the release PR can go green. Do not add a new `version` bound
+to a consumer's schemas path dep.
+
+The one bound that stays is in this repo. `rust-runner-client` is published
+to crates.io, and `cargo publish` needs a `version` on its `qontinui-types`
+path dep. **release-please owns that line**: its `cargo-workspace` plugin
+rewrites the requirement to the new version inside the release PR itself,
+patch-bumps `qontinui-runner-client`, and regenerates the root `Cargo.lock`.
+So do not hand-widen it. `rust-ci` checks the lock with `cargo fetch --locked`,
+and `publish-rust.yml` makes the runner-client publish wait until the required
+qontinui-types version is on crates.io.
+
+**On a qontinui-types MAJOR, give runner-client a real version too.** The
+plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its
+public API, built on `qontinui-types::wire`, changes major under it. A
+crates.io user on `^0.2` would then silently pick up qontinui-types 2.x. Land
+a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer in
+the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
+release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
+`2026-09-13-schemas-major-release-wedges-consumers`.
 
 The ergonomics of skipping the anchor: every override generates one stale
 "chore: release main" PR proposing the wrong version that you close by hand. The
