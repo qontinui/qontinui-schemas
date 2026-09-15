@@ -63,11 +63,6 @@ export type { RunnerConnectedConnection } from "../generated/RunnerConnectedConn
 //    fields so the TS listener can spread them straight into a Finding. ──
 export type { DevSeedFindingPayload } from "../generated/DevSeedFindingPayload";
 
-// ── Recommendation review decision payloads (`review-approved` /
-//    `review-rejected` from `commands/productivity.rs`). One struct
-//    covers both channels — only `userDecision` differs. ──
-export type { RecommendationReviewDecisionPayload } from "../generated/RecommendationReviewDecisionPayload";
-
 // ── Canvas panel payload carried inside AppEvent::CanvasUpdate's
 //    `data.panel` field. Wire-format mirror of the runner's `StoredPanel`
 //    (`mcp/canvas.rs`). The hand-written `CanvasPanel` in `../canvas/index.ts`
