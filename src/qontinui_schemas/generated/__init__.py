@@ -334,7 +334,6 @@ from .per_type.rag_completion_event import RagCompletionEvent
 from .per_type.rag_processing_status import RagProcessingStatus
 from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
-from .per_type.recommendation_review_decision_payload import RecommendationReviewDecisionPayload
 from .per_type.recommended_state import RecommendedState
 from .per_type.record_git_op_request import RecordGitOpRequest
 from .per_type.reflection_fix_output import ReflectionFixOutput
@@ -885,7 +884,6 @@ __all__ = [
     "RagProcessingStatus",
     "RagProgressEvent",
     "ReadConfigResponse",
-    "RecommendationReviewDecisionPayload",
     "RecommendedState",
     "RecordGitOpRequest",
     "ReflectionFixOutput",
