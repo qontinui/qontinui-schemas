@@ -1,6 +1,6 @@
 {
-  "timestamp": 1789029087447,
-  "snapshotTakenAtMs": 1789029087447,
+  "timestamp": 1789823671907,
+  "snapshotTakenAtMs": 1789823671907,
   "route": "/",
   "visibility": {
     "hidden": false,
@@ -52,26 +52,26 @@
         },
         "textContent": "Terminal input",
         "computedStyles": {
-          "display": "inline-block",
+          "display": "inline",
           "visibility": "visible",
-          "opacity": "",
+          "opacity": "1",
           "pointerEvents": "auto",
           "cursor": "auto",
-          "color": "initial",
-          "backgroundColor": "rgb(255, 255, 255)",
-          "colorScheme": "",
-          "fontSize": "",
-          "fontWeight": "",
+          "color": "rgb(0, 0, 0)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "colorScheme": "normal",
+          "fontSize": "16px",
+          "fontWeight": "400",
           "lineHeight": "normal",
           "overflow": "",
-          "textOverflow": "",
+          "textOverflow": "clip",
           "whiteSpace": "pre-wrap",
-          "position": "",
-          "zIndex": "",
-          "padding": "2px",
-          "margin": "",
-          "borderColor": "",
-          "borderWidth": "1px",
+          "position": "static",
+          "zIndex": "auto",
+          "padding": "0",
+          "margin": "0",
+          "borderColor": "rgb(0, 0, 0)",
+          "borderWidth": "0px",
           "borderRadius": ""
         },
         "inViewport": false,
@@ -81,20 +81,28 @@
           "width": 0,
           "height": 0
         },
-        "value": "",
-        "constraints": {
-          "maxLength": 0
-        }
+        "value": ""
       },
-      "registeredAt": 1789029087446,
+      "registeredAt": 1789823671906,
       "mounted": true,
       "actions": [
         "focus",
         "type"
       ],
       "customActions": [
-        "sendKeys",
-        "getScrollback"
+        {
+          "id": "sendKeys",
+          "label": "Send keys",
+          "description": "Write raw key bytes into the PTY",
+          "effect": "destructive"
+        },
+        {
+          "id": "getScrollback",
+          "effect": "read"
+        },
+        {
+          "id": "paste"
+        }
       ],
       "category": "interactive",
       "kind": "interactive",
@@ -144,24 +152,24 @@
         "computedStyles": {
           "display": "inline-block",
           "visibility": "visible",
-          "opacity": "",
+          "opacity": "1",
           "pointerEvents": "auto",
-          "cursor": "default",
-          "color": "buttontext",
-          "backgroundColor": "buttonface",
-          "colorScheme": "",
-          "fontSize": "",
-          "fontWeight": "",
+          "cursor": "auto",
+          "color": "rgb(0, 0, 0)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "colorScheme": "normal",
+          "fontSize": "16px",
+          "fontWeight": "400",
           "lineHeight": "normal",
           "overflow": "",
-          "textOverflow": "",
+          "textOverflow": "clip",
           "whiteSpace": "",
-          "position": "",
-          "zIndex": "",
-          "padding": "2px 6px 3px",
-          "margin": "",
-          "borderColor": "buttonface",
-          "borderWidth": "2px",
+          "position": "static",
+          "zIndex": "auto",
+          "padding": "0",
+          "margin": "0",
+          "borderColor": "rgb(0, 0, 0)",
+          "borderWidth": "0px",
           "borderRadius": ""
         },
         "inViewport": false,
@@ -172,7 +180,7 @@
           "height": 0
         }
       },
-      "registeredAt": 1789029087447,
+      "registeredAt": 1789823671907,
       "mounted": true,
       "actions": [
         "focus",
@@ -222,7 +230,7 @@
         "save-btn",
         "terminal-input"
       ],
-      "registeredAt": 1789029087447,
+      "registeredAt": 1789823671907,
       "mounted": true
     }
   ],
@@ -242,11 +250,11 @@
     "redoDepth": 0,
     "summary": "Can undo (Typing)."
   },
-  "snapshotId": "ubs2_2_2_997dfdb786295a7b_7a096dd4982b0a6b",
+  "snapshotId": "ubs2_2_2_997dfdb786295a7b_8cd74c2b005c1045",
   "signature": {
     "count": 2,
     "content": "997dfdb786295a7b",
-    "generation": "7a096dd4982b0a6b",
+    "generation": "8cd74c2b005c1045",
     "mountEvidence": 2
   }
 }

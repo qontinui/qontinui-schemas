@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_main_0_27_0_create_snapshot.json",
+  "sha256": "9cfbecb775856b279963b0cec882c5984c62403b647ecd6e70ba7ff0cb86b6d5",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.27.0 (packages/ui-bridge/package.json at the commit below; published as tag ui-bridge-v0.27.0)",
+  "sdk_commit": "qontinui/ui-bridge cbb544588c0fd9bf7ef8e63a201272e81c40c1ce (origin/main, 2026-09-18)",
+  "source": "UIBridgeRegistry.createSnapshot() -- the payload GET /ui-bridge/control/snapshot serves -- run under the capture harness in capture/, against a jsdom registry exercising element customActions, a component with ComponentActionInfo actions, a workflow, and the undoRedo enricher.",
+  "capture_command": "cp rust/tests/fixtures/ui_bridge_sdk/capture/wire-fixture.capture.test.ts <ui-bridge>/packages/ui-bridge/src/core/ && cd <ui-bridge>/packages/ui-bridge && WIRE_FIXTURE_OUT=<abs path>.json npx vitest run src/core/wire-fixture.capture.test.ts",
+  "captured_at": "2026-09-19",
+  "trim": "None. The harness's createSnapshot() output is written verbatim (a JSON round-trip, i.e. exactly what goes over HTTP).",
+  "notes": "REPLACES sdk_main_create_snapshot.json, which was captured 2026-09-06 from 3ee636d2 -- BEFORE the object-emission commits landed -- and therefore still carried bare names. The harness was extended at this capture to annotate element customActions (sendKeys=destructive, getScrollback=read) while leaving `paste` UNANNOTATED, so the fixture pins all three states: the object form, a carried effect, and an ABSENT effect meaning UNCLASSIFIED rather than defaulting to read."
+}

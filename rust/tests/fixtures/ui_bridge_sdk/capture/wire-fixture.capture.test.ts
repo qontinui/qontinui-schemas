@@ -1,6 +1,6 @@
 /**
  * Capture harness for qontinui-schemas' SDK wire fixture
- * (rust/tests/fixtures/ui_bridge_sdk/sdk_main_create_snapshot.json).
+ * (rust/tests/fixtures/ui_bridge_sdk/sdk_main_0_27_0_create_snapshot.json).
  *
  * Not a test of this SDK: it drives the REAL `UIBridgeRegistry.createSnapshot()`
  * (the payload `GET /ui-bridge/control/snapshot` serves) over a registry that
@@ -38,13 +38,23 @@ describe('wire fixture capture', () => {
       label: 'Terminal input',
       actions: ['focus', 'type'],
       customActions: {
+        // ANNOTATED on purpose. Element-level `effect` is the field the whole
+        // effect calculus exists to carry, and until this capture the wire
+        // fixtures pinned only the COMPONENT side of it -- so a regression that
+        // dropped `effect` from the element projection would have gone unseen
+        // here. `sendKeys` is `destructive` for the reason its own description
+        // gives: raw key bytes into a live PTY are not reconstructable.
         sendKeys: {
           id: 'sendKeys',
           label: 'Send keys',
           description: 'Write raw key bytes into the PTY',
+          effect: 'destructive',
           handler: () => undefined,
         },
-        getScrollback: { id: 'getScrollback', handler: () => '' },
+        getScrollback: { id: 'getScrollback', effect: 'read', handler: () => '' },
+        // Deliberately UNANNOTATED: absent `effect` means UNCLASSIFIED, never
+        // `read`, and the wire must carry that absence rather than defaulting.
+        paste: { id: 'paste', handler: () => undefined },
       },
     });
 
@@ -95,8 +105,17 @@ describe('wire fixture capture', () => {
 
     const wire = JSON.parse(JSON.stringify(registry.createSnapshot()));
     writeFileSync(out as string, JSON.stringify(wire, null, 2) + '\n');
-    expect(wire.elements.some((e: { customActions?: unknown[] }) => e.customActions?.length)).toBe(
-      true
+    type WireAction = { id: string; effect?: string };
+    const custom: WireAction[] = wire.elements.flatMap(
+      (e: { customActions?: WireAction[] }) => e.customActions ?? []
     );
+    expect(custom.length).toBeGreaterThan(0);
+    // The OBJECT form, not bare names -- the shape qontinui-schemas retired its
+    // transitional name-tolerance for.
+    expect(custom.every((a) => typeof a === 'object' && a !== null)).toBe(true);
+    // ...carrying the author's class, and carrying its ABSENCE as absence.
+    expect(custom.find((a) => a.id === 'sendKeys')?.effect).toBe('destructive');
+    expect(custom.find((a) => a.id === 'getScrollback')?.effect).toBe('read');
+    expect(Object.hasOwn(custom.find((a) => a.id === 'paste') ?? {}, 'effect')).toBe(false);
   });
 });

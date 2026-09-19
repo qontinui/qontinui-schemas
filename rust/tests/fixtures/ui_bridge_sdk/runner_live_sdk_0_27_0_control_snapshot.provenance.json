@@ -1,0 +1,12 @@
+{
+  "fixture": "runner_live_sdk_0_27_0_control_snapshot.json",
+  "sha256": "4668836c4f495beab821fb328cf1e272ce577452cf61868b1aa563d1b3f8306a",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.27.0 (published; the version qontinui-runner's pnpm-lock.yaml locks at the build named in `source`)",
+  "sdk_commit": "qontinui/ui-bridge cbb544588c0fd9bf7ef8e63a201272e81c40c1ce is origin/main at capture; the LOCKED artifact is the published tag ui-bridge-v0.27.0",
+  "source": "live capture, read-only: GET http://127.0.0.1:9876/ui-bridge/control/snapshot on host merytshost (the operator runner's own UI), served by qontinui-runner build ce7f6ddcd (runner /health buildId ce7f6ddcd-1789766191747), whose pnpm-lock.yaml resolves @qontinui/ui-bridge@0.27.0. No runner was started, stopped or restarted to take it.",
+  "capture_command": "curl -s http://127.0.0.1:9876/ui-bridge/control/snapshot  # then keep .data and trim as described below",
+  "captured_at": "2026-09-19",
+  "trim": "The HTTP {success,data} envelope is removed (both runner parse sites receive the snapshot object). elements[] and components[] are trimmed by WHOLE-ENTRY selection only, never by editing an entry's interior: 3 of 160 elements (the one terminal-input element that carries customActions, plus button-workspace and nav:projects as un-annotated controls) and 2 of 6 components (those carrying annotated actions). Every other top-level key is verbatim.",
+  "notes": "REPLACES runner_live_sdk_0_24_0_control_snapshot.json, retired with the transitional bare-name tolerance (plan 2026-09-04-effect-calculus-joins-the-component-action-registry, Design decision 4 step 5). This capture is the same surface one SDK generation later: customActions arrive as OBJECTS (7 of them, 0 bare names) carrying the author's class -- 3 read, 4 destructive -- and the component actions carry 1 write + 5 read. It is the first recorded live evidence that element-level `effect` survives the wire."
+}

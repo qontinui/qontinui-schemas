@@ -235,54 +235,6 @@ pub struct ElementActionInfo {
     pub effect: Option<IrEffect>,
 }
 
-/// Deserialize `UIBridgeElement::custom_actions`, accepting BOTH the object
-/// form and the legacy bare-NAME form.
-///
-/// TRANSITIONAL — see the field's own docs for why a shim is admitted here and
-/// what deletes it. A name becomes `ElementActionInfo { id: <name>, .. }` with
-/// every other field `None`: an action carried across as a bare name has been
-/// classified by nobody, and `effect: None` is exactly the UNCLASSIFIED signal
-/// that states so. It must never be read as `read`.
-///
-/// An element action object carrying a bad `effect` is still REJECTED — the
-/// untagged match fails both arms. The error text is less specific than the
-/// `unknown variant` serde produces for a direct `ElementActionInfo` parse, and
-/// `element_action_info_rejects_an_out_of_vocabulary_effect` keeps pinning that
-/// sharper message on the type itself; the test below pins only that rejection
-/// still HAPPENS through the field.
-fn deserialize_custom_actions<'de, D>(
-    deserializer: D,
-) -> Result<Option<Vec<ElementActionInfo>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NameOrInfo {
-        // String FIRST: a JSON string can only be the legacy form, and an
-        // object cannot match it, so the ordering is unambiguous.
-        Name(String),
-        Info(ElementActionInfo),
-    }
-
-    let raw: Option<Vec<NameOrInfo>> = Option::deserialize(deserializer)?;
-    Ok(raw.map(|entries| {
-        entries
-            .into_iter()
-            .map(|entry| match entry {
-                NameOrInfo::Name(id) => ElementActionInfo {
-                    id,
-                    label: None,
-                    description: None,
-                    param_schema: None,
-                    effect: None,
-                },
-                NameOrInfo::Info(info) => info,
-            })
-            .collect()
-    }))
-}
-
 /// A registered element in the UI Bridge registry.
 ///
 /// This is the serializable subset of the React `RegisteredElement`; it
@@ -313,48 +265,31 @@ pub struct UIBridgeElement {
     ///
     /// Absent (`None`) means the element declares none. That is deliberately
     /// distinct from an empty list, which would mean "declared, and empty".
-    /// ---
     ///
-    /// **TRANSITIONAL: this field also accepts the legacy bare-NAME form on the
-    /// way in.** `["sendKeys"]` deserializes as
-    /// `[ElementActionInfo { id: "sendKeys", .. }]`, with every other field —
-    /// `effect` included — left `None`, i.e. UNCLASSIFIED. See
-    /// [`deserialize_custom_actions`].
-    ///
-    /// **Why a shim exists at all**, when this workspace's rule is
-    /// delete-over-deprecate. The shape change spans three repos that cannot
-    /// land atomically — this crate owns the type, `ui-bridge` emits, and
-    /// `qontinui-runner` parses live SDK snapshots strictly
-    /// (`spec-check/src/fetch.rs`, `spec_api/spec_check.rs`) while pinning a
-    /// PUBLISHED SDK. Both two-party orderings leave a window in which the
-    /// fleet is broken: land this crate first and the runner rejects the names
-    /// the published SDK still emits; land the SDK first and it emits objects
-    /// at a runner whose type is still `Vec<String>`. Only a tolerant READER
-    /// removes the window, and there is one reader against nine emitters.
-    ///
-    /// This is NOT here to spare a caller a breaking change — that is never a
-    /// reason in this workspace.
-    ///
-    /// **DELETE ME, and the trigger is observable rather than intentional:**
-    /// once no emitter produces names — `ui-bridge`'s eight element
-    /// projections plus `qontinui-runner`'s
-    /// `src/services/background-observer-service.ts` — and the runner's SDK pin
-    /// has moved past that release, remove [`deserialize_custom_actions`] and
-    /// this attribute, and flip
-    /// `ui_bridge_element_tolerates_legacy_name_custom_actions` into a test
-    /// that asserts a bare string is REJECTED. Plan
+    /// **The bare-NAME form is REJECTED.** A transitional shim accepted
+    /// `["sendKeys"]` here while the shape change rolled across three repos
+    /// that cannot land atomically. It was deleted once its own observable
+    /// trigger was met: no emitter produces names (every `ui-bridge` element
+    /// projection routes through `serializeElementCustomActions`, and
+    /// `qontinui-runner`'s `src/services/background-observer-service.ts` --
+    /// the ninth emitter -- does too), and the runner's SDK pin moved to
+    /// `@qontinui/ui-bridge` `^0.27.0`. Plan
     /// `2026-09-04-effect-calculus-joins-the-component-action-registry`,
     /// Design decision 4, step 5.
     ///
-    /// The published SCHEMA is deliberately not widened to advertise the name
-    /// form: the schema states the target contract, while the reader is
-    /// transitionally lenient. A producer validating against the schema is
-    /// correctly told that names are not the shape to emit.
-    #[serde(
-        default,
-        deserialize_with = "deserialize_custom_actions",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// The shim's deletion also required retiring the two recorded fixtures
+    /// that still carried names. That was admissible because the UI Bridge has
+    /// exactly one consumer -- Qontinui itself -- so "deployed apps still
+    /// emitting the old wire", the reason the wire gate keeps fixtures
+    /// append-only, has no instances. Both were REPLACED by captures from
+    /// 0.27.0 rather than merely dropped, so the gate still parses genuine SDK
+    /// output; it now parses the object form instead of the name form.
+    ///
+    /// Rejecting is the point, not a side effect: a name carries no `effect`,
+    /// so anything still emitting one would be shipping UNCLASSIFIED actions
+    /// to a consumer that must treat unclassified as unsafe. A hard parse
+    /// error names that producer; silent tolerance hid it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_actions: Option<Vec<ElementActionInfo>>,
     /// Identifier bundle for locating the element.
     pub identifier: ElementIdentifier,
@@ -1041,59 +976,50 @@ mod tests {
         assert!(!json.contains("customActions"));
     }
 
-    /// TRANSITIONAL tolerance — the legacy bare-NAME form still parses.
+    /// The legacy bare-NAME form is REJECTED.
     ///
-    /// This is not politeness toward old callers. Real recorded SDK output
-    /// carries names: `rust/tests/fixtures/ui_bridge_sdk/` holds a snapshot
-    /// captured from a LIVE runner on `@qontinui/ui-bridge` 0.24.0 whose
-    /// terminal element declares
-    /// `["focus","blur","sendKeys","writeToTerminal","paste","pasteText","getScrollback"]`.
-    /// Without this tolerance, retyping the field breaks every such parse —
-    /// including the runner's own terminal elements — the moment this crate
-    /// lands, because the published SDK the runner pins still emits names.
+    /// The inverse of the tolerance test this replaces. `["sendKeys"]` used to
+    /// deserialize into `ElementActionInfo { id: "sendKeys", effect: None }`
+    /// while the shape change rolled across three repos; the shim was deleted
+    /// once no emitter produced names and the runner's SDK pin moved to 0.27.0
+    /// (Design decision 4, step 5).
     ///
-    /// **A name carried across is UNCLASSIFIED, never `read`.** That is the
-    /// half of this test that must not be relaxed: `effect` comes back `None`,
-    /// which is the signal that nobody has judged what the action does. Eight
-    /// of the runner's nine element custom actions are raw PTY writes into live
-    /// agent sessions.
-    ///
-    /// DELETE with the shim — Design decision 4, step 5 — and replace with the
-    /// inverse assertion that a bare string is REJECTED.
+    /// Rejection is a SAFETY property, not tidiness. A bare name carries no
+    /// `effect`, so a producer still emitting one is shipping actions nobody
+    /// has classified — and eight of the runner's twelve element custom
+    /// actions are raw PTY writes into live agent sessions. A parse error
+    /// names that producer at the boundary; the shim absorbed it silently.
     #[test]
-    fn ui_bridge_element_tolerates_legacy_name_custom_actions() {
+    fn ui_bridge_element_rejects_legacy_name_custom_actions() {
         let wire = r#"{"id":"term","type":"custom","identifier":{"xpath":"/div[1]","selector":"div"},"customActions":["sendKeys","getScrollback"],"state":{"visible":true,"enabled":true,"disabled":false,"ariaDisabled":false,"focused":false,"rect":{"x":0.0,"y":0.0,"width":10.0,"height":10.0,"top":0.0,"right":10.0,"bottom":10.0,"left":0.0}},"registeredAt":1755800000000,"mounted":true}"#;
 
-        let element: UIBridgeElement =
-            serde_json::from_str(wire).expect("legacy names deserialize");
-        let actions = element.custom_actions.expect("custom actions present");
-        assert_eq!(actions.len(), 2);
-
-        assert_eq!(actions[0].id, "sendKeys");
-        assert_eq!(actions[1].id, "getScrollback");
-        for action in &actions {
-            assert_eq!(
-                action.effect, None,
-                "a name carried across the shim is UNCLASSIFIED — never `read`"
-            );
-            assert_eq!(action.label, None);
-            assert_eq!(action.description, None);
-            assert_eq!(action.param_schema, None);
-        }
+        let err = serde_json::from_str::<UIBridgeElement>(wire)
+            .expect_err("a bare name must no longer deserialize");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("invalid type: string") && msg.contains("ElementActionInfo"),
+            "the error must name the shape it wanted, got: {msg}"
+        );
     }
 
-    /// The two forms may be MIXED inside one element, because the transition is
-    /// per-emitter and nothing serialises a whole fleet atomically.
+    /// A name MIXED with objects poisons the whole list — no partial credit.
+    ///
+    /// While the shim lived, the two forms could coexist because the
+    /// transition was per-emitter and nothing serialises a fleet atomically.
+    /// Now a single bare name fails the element, even alongside a correctly
+    /// annotated `destructive` action. That is deliberate: a half-migrated
+    /// producer is exactly the case where a silently UNCLASSIFIED action would
+    /// slip through beside a classified one.
     #[test]
-    fn ui_bridge_element_tolerates_mixed_name_and_object_custom_actions() {
+    fn ui_bridge_element_rejects_a_name_mixed_with_objects() {
         let wire = r#"{"id":"term","type":"custom","identifier":{"xpath":"/div[1]","selector":"div"},"customActions":["sendKeys",{"id":"wipe","effect":"destructive"}],"state":{"visible":true,"enabled":true,"disabled":false,"ariaDisabled":false,"focused":false,"rect":{"x":0.0,"y":0.0,"width":10.0,"height":10.0,"top":0.0,"right":10.0,"bottom":10.0,"left":0.0}},"registeredAt":1755800000000,"mounted":true}"#;
 
-        let element: UIBridgeElement = serde_json::from_str(wire).expect("mixed forms deserialize");
-        let actions = element.custom_actions.expect("custom actions present");
-        assert_eq!(actions[0].id, "sendKeys");
-        assert_eq!(actions[0].effect, None);
-        assert_eq!(actions[1].id, "wipe");
-        assert_eq!(actions[1].effect, Some(IrEffect::Destructive));
+        let err = serde_json::from_str::<UIBridgeElement>(wire)
+            .expect_err("a name mixed with objects must not deserialize");
+        assert!(
+            err.to_string().contains("invalid type: string"),
+            "got: {err}"
+        );
     }
 
     /// The shim widens the ACCEPTED shape; it does not widen the `effect`

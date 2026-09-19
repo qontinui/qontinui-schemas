@@ -1,5 +1,6 @@
 {
   "activeTab": "terminal",
+  "appId": "qontinui-runner",
   "availableTabs": [
     {
       "active": false,
@@ -628,406 +629,231 @@
   ],
   "components": [
     {
+      "actionInvocationPath": "/ui-bridge/control/component/dev-giant-scc-fixture/action/{actionId}",
+      "actions": [
+        {
+          "effect": "read",
+          "id": "open",
+          "label": "Open fixture"
+        },
+        {
+          "effect": "read",
+          "id": "close",
+          "label": "Close fixture"
+        },
+        {
+          "description": "Selects a state inside the giant SCC; ChunkedGraphView's auto-drill effect should walk the nested path and render the secondary overview.",
+          "effect": "read",
+          "id": "drill-to-giant",
+          "label": "Auto-drill into the giant SCC"
+        },
+        {
+          "effect": "read",
+          "id": "select-hub",
+          "label": "Select hub state"
+        }
+      ],
+      "description": "Synthetic 201-state giant-SCC state machine rendered through ChunkedGraphView. Exists purely to exercise the nested-overview drill-in path.",
+      "elementIds": [],
+      "id": "dev-giant-scc-fixture",
+      "mounted": true,
+      "name": "Giant-SCC Dev Fixture",
+      "registeredAt": 1789766847054
+    },
+    {
       "actionInvocationPath": "/ui-bridge/control/component/setup-wizard/action/{actionId}",
       "actions": [
         {
-          "description": "Mark setup complete and dismiss the wizard. Persists via the same `complete_setup` Tauri command the user-driven 'Finish' button uses. Does NOT save process configs — a programmatic caller has picked none.",
+          "description": "Mark setup complete and dismiss the wizard. Persists via the same `complete_setup` Tauri command the user-driven 'Finish' button uses. Does NOT save process configs \u2014 a programmatic caller has picked none.",
+          "effect": "write",
           "id": "complete",
           "label": "Complete Setup"
         },
         {
           "description": "Open the wizard at a specific step. Values 0-6 correspond to: Tier, Welcome, Projects, Processes, Dev Services, AI Provider, Claude Sessions. NON-DESTRUCTIVE: opening flips in-memory view state only; the persisted `setup_completed` setting is untouched.",
+          "effect": "read",
           "id": "go-to-step",
           "label": "Jump to Step"
         }
       ],
-      "description": "First-launch onboarding wizard. Use 'complete' to dismiss programmatically without driving 7 step interactions. Use 'go-to-step' to jump to a specific step (0-6) — this also OPENS the wizard if it is currently dismissed, which is how you reach first-run surfaces on a runner that auto-bypassed setup (any supervisor temp runner, unless spawned with extra_env: { QONTINUI_TEST_AUTO_LOGIN_EMAIL: \"\" }).",
+      "description": "First-launch onboarding wizard. Use 'complete' to dismiss programmatically without driving 7 step interactions. Use 'go-to-step' to jump to a specific step (0-6) \u2014 this also OPENS the wizard if it is currently dismissed, which is how you reach first-run surfaces on a runner that auto-bypassed setup (any supervisor temp runner, unless spawned with extra_env: { QONTINUI_TEST_AUTO_LOGIN_EMAIL: \"\" }).",
       "elementIds": [],
       "id": "setup-wizard",
       "mounted": true,
       "name": "Setup Wizard",
-      "registeredAt": 1788980430435,
+      "registeredAt": 1789766847056,
       "scope": "global"
-    },
-    {
-      "actionInvocationPath": "/ui-bridge/control/component/terminal-page/action/{actionId}",
-      "actions": [
-        {
-          "description": "Spawn a new PTY-backed terminal tab and assign it to the next free zone.",
-          "id": "create-terminal",
-          "label": "Create Terminal"
-        },
-        {
-          "description": "Spawn one plain (non-AI) PTY terminal in the user's default shell, assign it to the active page's next free zone, and mount its xterm. Robust from a fresh page. Returns { success, tab_id }. Use this to drive the terminal surface headlessly.",
-          "id": "create-plain-terminal",
-          "label": "Create Plain Terminal"
-        },
-        {
-          "description": "Return [{id, title, isAlive}] for every currently mounted terminal tab.",
-          "id": "list-terminals",
-          "label": "List Terminals"
-        },
-        {
-          "description": "Open a new pop-out OS window (same process) that hosts its own terminal tabs. Returns the new window record { label, kind, ... }.",
-          "id": "open-terminal-window",
-          "label": "Open Terminal Window"
-        },
-        {
-          "description": "Open a new pop-out window and move the active terminal tab into it. Returns { window, terminalId }.",
-          "id": "pop-out-active-terminal",
-          "label": "Pop Out Active Terminal"
-        },
-        {
-          "description": "Detach an ENTIRE terminal page (all its terminals + zone layout) into its own pop-out window bound to the page. Params: { pageId?: string } (defaults to the active page). Returns { window, pageId }.",
-          "id": "pop-out-page",
-          "label": "Pop Out Page"
-        },
-        {
-          "description": "Move a terminal tab to a window. Params: { terminalId: string, windowLabel: string } where windowLabel is 'main' or 'term-N'.",
-          "id": "move-terminal-to-window",
-          "label": "Move Terminal To Window"
-        },
-        {
-          "description": "Maximize one zone to fill the page. Params: { zoneIndex: number }. Returns { maximizedZone, previousMaximizedZone, zoneCount, changed }.",
-          "id": "maximize-zone",
-          "label": "Maximize Zone"
-        },
-        {
-          "description": "Leave the maximized view and return to the tiled layout. No params. Returns { maximizedZone: null, previousMaximizedZone, zoneCount, changed } — `changed: false` means nothing was maximized.",
-          "id": "restore-zone",
-          "label": "Restore Zone"
-        },
-        {
-          "description": "Maximize the given zone, or restore if it is already maximized — the same rule the keyboard shortcut uses. Params: { zoneIndex: number }.",
-          "id": "toggle-maximize-zone",
-          "label": "Toggle Maximize Zone"
-        },
-        {
-          "description": "Return { maximizedZone, zoneCount, layoutId } — the read that lets a caller assert the maximized view without inferring it from a DOM snapshot.",
-          "id": "get-zone-view-state",
-          "label": "Get Zone View State"
-        },
-        {
-          "description": "Return this runner process's own windows [{ label, kind, title }] (main + pop-outs).",
-          "id": "list-runner-windows",
-          "label": "List Runner Windows"
-        },
-        {
-          "description": "Close every pop-out OS window that has no live terminal tab and prune its record; also prunes records for pop-outs whose OS window is already gone (the recovery path when a stale page binding is hiding a page and the grid shows zero zones). Returns the labels closed.",
-          "id": "close-empty-terminal-windows",
-          "label": "Close Empty Terminal Windows"
-        }
-      ],
-      "description": "Multi-terminal workspace with zone-based layout. Agents can create terminals via HTTP POST /terminals with initialCommand.",
-      "elementIds": [
-        "terminal-zone-minimap",
-        "terminal.command-bar-input",
-        "terminal.session-manager-toggle",
-        "svg-child-1",
-        "terminal-zone-minimap-toggle",
-        "terminal-page-generic-1"
-      ],
-      "id": "terminal-page",
-      "mounted": true,
-      "name": "Terminal Page",
-      "registeredAt": 1788980430459
     }
   ],
   "dragDrop": {
     "byOrigin": {
       "aria": 0,
       "declared": 0,
-      "dom": 0
+      "dom": 22
     },
     "count": {
-      "dragSources": 0,
+      "dragSources": 22,
       "dropZones": 0
     },
-    "dragSources": [],
+    "dragSources": [
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-1-0",
+        "label": "Page 1",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-2-1",
+        "label": "Page 2",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-3-2",
+        "label": "Page 3",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-4-3",
+        "label": "Page 4",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-5-4",
+        "label": "Page 5",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-6-5",
+        "label": "Page 6",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-7-6",
+        "label": "Page 7",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-8-7",
+        "label": "Page 8",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-9-8",
+        "label": "Page 9",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-10-9",
+        "label": "Page 10",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-11-10",
+        "label": "Page 11",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-12-11",
+        "label": "Page 12",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-13-12",
+        "label": "Page 13",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-14-13",
+        "label": "Page 14",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-15-14",
+        "label": "Page 15",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-16-15",
+        "label": "Page 16",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-17-16",
+        "label": "Page 17",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-18-17",
+        "label": "Page 18",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-19-18",
+        "label": "Page 19",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-20-19",
+        "label": "Page 20",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-page-21-20",
+        "label": "Page 21",
+        "nativeDraggable": true,
+        "origin": "dom"
+      },
+      {
+        "hasGrabCursor": false,
+        "id": "tab-switch-to-terminal-0",
+        "label": "Terminal",
+        "nativeDraggable": true,
+        "origin": "dom"
+      }
+    ],
     "dropZones": []
   },
   "elements": [
-    {
-      "accessibleName": "Terminal",
-      "actions": [
-        "focus",
-        "blur",
-        "click",
-        "hover",
-        "middleClick"
-      ],
-      "ariaLabel": "Terminal",
-      "bbox": {
-        "height": 36,
-        "width": 183,
-        "x": 7,
-        "y": 114
-      },
-      "category": "interactive",
-      "id": "nav:terminal",
-      "identifier": {
-        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > div > nav > div:nth-child(1) > div:nth-child(1) > div > button:nth-child(2)",
-        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/div/nav/div[1]/div[1]/div/button[2]"
-      },
-      "kind": "interactive",
-      "label": "Terminal",
-      "mounted": true,
-      "origin": "auto",
-      "registeredAt": 1788980430629,
-      "role": "button",
-      "route": "/",
-      "stableRef": {
-        "fingerprint": "1e793b33a93f4f7b",
-        "id": "nav:terminal",
-        "semanticPath": "div.h-screen > div.flex > div.flex > nav.h-full > div.flex-1 > div.space-y-1 > div.space-y-0\\.5 > button.w-full",
-        "stableId": "nav:terminal"
-      },
-      "state": {
-        "accessibleName": "Terminal",
-        "ariaCurrent": "page",
-        "ariaDisabled": false,
-        "computedStyles": {
-          "backgroundColor": "oklab(0.795484 -0.109439 -0.097705 / 0.15)",
-          "borderColor": "rgb(0, 208, 255)",
-          "borderRadius": "6px",
-          "borderWidth": "0px 0px 0px 2px",
-          "color": "rgb(0, 208, 255)",
-          "colorScheme": "dark",
-          "cursor": "default",
-          "display": "flex",
-          "fontSize": "14px",
-          "fontWeight": "500",
-          "lineHeight": "20px",
-          "margin": "0px 0px 2px -1px",
-          "opacity": "1",
-          "overflow": "visible",
-          "padding": "8px 12px",
-          "pointerEvents": "auto",
-          "position": "static",
-          "textOverflow": "clip",
-          "visibility": "visible",
-          "whiteSpace": "normal",
-          "zIndex": "auto"
-        },
-        "dataset": {
-          "navItem": "terminal",
-          "uiBridgeId": "nav:terminal",
-          "uiBridgePersist": "true"
-        },
-        "disabled": false,
-        "enabled": true,
-        "focused": false,
-        "inViewport": true,
-        "normalizedRect": {
-          "height": 0.033930254476908575,
-          "width": 0.0953125,
-          "x": 0.0036458333333333334,
-          "y": 0.10744580584354382
-        },
-        "rect": {
-          "bottom": 150,
-          "height": 36,
-          "left": 7,
-          "right": 190,
-          "top": 114,
-          "width": 183,
-          "x": 7,
-          "y": 114
-        },
-        "textContent": "Terminal",
-        "visible": false
-      },
-      "tagName": "button",
-      "text": "Terminal",
-      "type": "button",
-      "uiBridgeId": "nav:terminal",
-      "visible": true
-    },
-    {
-      "actions": [],
-      "bbox": {
-        "height": 24,
-        "width": 606,
-        "x": 657,
-        "y": 382
-      },
-      "category": "content",
-      "content": "You can change this any time from Settings → Account.",
-      "contentMetadata": {
-        "contentRole": "body-text"
-      },
-      "id": "content-paragraph-you-can-change-this-0",
-      "identifier": {
-        "selector": "#root > div:nth-child(2) > div > div > div:nth-child(2) > div:nth-child(1) > p",
-        "xpath": "/div[@id=\"root\"]/div[2]/div/div/div[2]/div[1]/p"
-      },
-      "kind": "content",
-      "label": "You can change this any time from Settings → Accou",
-      "mounted": true,
-      "origin": "auto",
-      "registeredAt": 1788980430777,
-      "route": "/",
-      "stableRef": {
-        "fingerprint": "2f5c749ce845df4a",
-        "id": "content-paragraph-you-can-change-this-0",
-        "semanticPath": "#root > div.fixed > div.min-h-screen > div.card > div.space-y-6 > div.space-y-2 > p.text-muted-foreground"
-      },
-      "state": {
-        "accessibleName": "You can change this any time from Settings → Account.",
-        "ariaDisabled": false,
-        "computedStyles": {
-          "backgroundColor": "rgba(0, 0, 0, 0)",
-          "borderColor": "rgba(255, 255, 255, 0.1)",
-          "borderRadius": "0px",
-          "borderWidth": "0px",
-          "color": "rgb(156, 162, 171)",
-          "colorScheme": "dark",
-          "cursor": "auto",
-          "display": "block",
-          "fontSize": "16px",
-          "fontWeight": "400",
-          "lineHeight": "24px",
-          "margin": "0px",
-          "opacity": "1",
-          "overflow": "visible",
-          "padding": "0px",
-          "pointerEvents": "auto",
-          "position": "static",
-          "textOverflow": "clip",
-          "visibility": "visible",
-          "whiteSpace": "normal",
-          "zIndex": "auto"
-        },
-        "disabled": false,
-        "enabled": true,
-        "focused": false,
-        "inViewport": true,
-        "normalizedRect": {
-          "height": 0.022620169651272386,
-          "width": 0.315625,
-          "x": 0.3421875,
-          "y": 0.3600377002827521
-        },
-        "rect": {
-          "bottom": 406,
-          "height": 24,
-          "left": 657,
-          "right": 1263,
-          "top": 382,
-          "width": 606,
-          "x": 657,
-          "y": 382
-        },
-        "textContent": "You can change this any time from Settings → Account.",
-        "visible": true
-      },
-      "tagName": "p",
-      "text": "You can change this any time from Settings → Account.",
-      "type": "paragraph",
-      "visible": true
-    },
-    {
-      "accessibleName": "Terminal command bar",
-      "actions": [
-        "focus",
-        "blur",
-        "hover",
-        "scroll",
-        "scrollIntoView",
-        "click",
-        "hoverClick",
-        "type",
-        "clear",
-        "sendKeys"
-      ],
-      "ariaLabel": "Terminal command bar",
-      "bbox": {
-        "height": 16.5,
-        "width": 1619,
-        "x": 251,
-        "y": 1039.25
-      },
-      "category": "interactive",
-      "componentActionBasePath": "/ui-bridge/control/component/terminal-page",
-      "id": "terminal.command-bar-input",
-      "identifier": {
-        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > main > div > div:nth-child(2) > div:nth-child(17) > div > div:nth-child(4) > div > input",
-        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/main/div/div[2]/div[17]/div/div[3]/div/input"
-      },
-      "kind": "interactive",
-      "label": "Command bar",
-      "mounted": true,
-      "origin": "hook",
-      "ownedByComponent": "terminal-page",
-      "registeredAt": 1788980431010,
-      "role": "combobox",
-      "route": "/",
-      "stableRef": {
-        "fingerprint": "99f3b05fe07d5f6b",
-        "id": "terminal.command-bar-input",
-        "semanticPath": "main.flex-1 > div.absolute > div.flex-1 > div > div.h-full > div.relative > div.h-7 > input[role=\"combobox\"].flex-1",
-        "stableId": "terminal.command-bar-input"
-      },
-      "state": {
-        "accessibleName": "Terminal command bar",
-        "ariaDisabled": false,
-        "ariaExpanded": false,
-        "computedStyles": {
-          "backgroundColor": "rgba(0, 0, 0, 0)",
-          "borderColor": "rgba(255, 255, 255, 0.1)",
-          "borderRadius": "0px",
-          "borderWidth": "0px",
-          "color": "rgb(192, 202, 245)",
-          "colorScheme": "dark",
-          "cursor": "auto",
-          "display": "block",
-          "fontSize": "11px",
-          "fontWeight": "400",
-          "lineHeight": "16.5px",
-          "margin": "0px",
-          "opacity": "1",
-          "overflow": "visible",
-          "padding": "0px",
-          "pointerEvents": "auto",
-          "position": "static",
-          "textOverflow": "clip",
-          "visibility": "visible",
-          "whiteSpace": "normal",
-          "zIndex": "auto"
-        },
-        "dataset": {
-          "uiBridgeId": "terminal.command-bar-input"
-        },
-        "disabled": false,
-        "enabled": true,
-        "focused": false,
-        "inViewport": true,
-        "normalizedRect": {
-          "height": 0.015551366635249765,
-          "width": 0.8432291666666667,
-          "x": 0.13072916666666667,
-          "y": 0.9795004712535345
-        },
-        "rect": {
-          "bottom": 1055.75,
-          "height": 16.5,
-          "left": 251,
-          "right": 1870,
-          "top": 1039.25,
-          "width": 1619,
-          "x": 251,
-          "y": 1039.25
-        },
-        "role": "combobox",
-        "textContent": "Terminal command bar",
-        "value": "",
-        "visible": false
-      },
-      "tagName": "input",
-      "type": "input",
-      "uiBridgeId": "terminal.command-bar-input",
-      "visible": true
-    },
     {
       "actions": [
         "focus",
@@ -1046,33 +872,63 @@
       },
       "category": "interactive",
       "customActions": [
-        "focus",
-        "blur",
-        "sendKeys",
-        "writeToTerminal",
-        "paste",
-        "pasteText",
-        "getScrollback"
+        {
+          "description": "REFUSED on a pane with no mounted view: there is nothing focusable. Scroll or select the pane so its TerminalInstance mounts, then focus it.",
+          "effect": "read",
+          "id": "focus"
+        },
+        {
+          "description": "REFUSED on a pane with no mounted view: nothing here can hold focus.",
+          "effect": "read",
+          "id": "blur"
+        },
+        {
+          "description": "Send key sequences to the terminal by id (no mounted view). Accepts `keys` as a raw string (written verbatim), an array of key names ([\"Enter\"]), or the SDK's descriptor array ([{ key: \"c\", modifiers: { ctrl: true } }]). Fails with TERMINAL_EXITED when the pane's process is gone.",
+          "effect": "destructive",
+          "id": "sendKeys"
+        },
+        {
+          "description": "Write text directly to the PTY by id (no mounted view). Fails with WRITE_TEXT_INVALID when `text` is not a string, and with TERMINAL_EXITED when the pane's process is gone.",
+          "effect": "destructive",
+          "id": "writeToTerminal"
+        },
+        {
+          "description": "Read clipboard and write to the PTY by id (same as Ctrl+V, no mounted view).",
+          "effect": "destructive",
+          "id": "paste"
+        },
+        {
+          "description": "Paste literal text to the PTY by id (no mounted view), through the same bracketed-paste-aware path as the mounted pane: the PTY's DEC 2004 state is read from the runner's own VT parser by id. Fails with PASTE_TEXT_INVALID when `text` is not a string.",
+          "effect": "destructive",
+          "id": "pasteText"
+        },
+        {
+          "description": "Read the terminal's scrollback as plain text. With no mounted xterm this comes from the Rust PTY ring rather than the rendered buffer, with escape sequences stripped. Fails with SCROLLBACK_MAX_LINES_INVALID when `maxLines` is not a positive integer.",
+          "effect": "read",
+          "id": "getScrollback"
+        }
       ],
-      "id": "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
+      "id": "terminal-input-b0fdb56e-3708-4446-9e17-b73fa7aa3ff9",
       "identifier": {
-        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > main > div > div:nth-child(2) > div:nth-child(1) > textarea:nth-child(1)",
-        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/main/div/div[2]/div[1]/textarea[1]"
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > main > div > div:nth-child(2) > div:nth-child(1) > textarea",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/main/div/div[2]/div[1]/textarea"
       },
       "kind": "interactive",
-      "label": "Terminal input (cafd43f7) [no mounted view — claim:pr:qontinui/qontinui-dev-notes#1030]",
+      "label": "Terminal input (b0fdb56e) [no mounted view \u2014 Terminal 1]",
       "mounted": true,
+      "nameSource": "none",
       "origin": "hook",
-      "registeredAt": 1788984770385,
+      "registeredAt": 1789766998785,
       "role": "textbox",
       "route": "/",
       "stableRef": {
         "fingerprint": "2bbdba4d5f59e9d9",
-        "id": "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
+        "id": "terminal-input-b0fdb56e-3708-4446-9e17-b73fa7aa3ff9",
         "semanticPath": "div.contents > div.h-screen > div.flex > main.flex-1 > div.absolute > div.flex-1 > div > textarea"
       },
       "state": {
         "ariaDisabled": false,
+        "clientWidth": 1,
         "computedStyles": {
           "backgroundColor": "rgba(0, 0, 0, 0)",
           "borderColor": "rgb(255, 255, 255)",
@@ -1097,12 +953,13 @@
           "zIndex": "auto"
         },
         "dataset": {
-          "terminalBridgeProxy": "cafd43f7-f172-4745-9dd3-cc0b96fd54a1"
+          "terminalBridgeProxy": "b0fdb56e-3708-4446-9e17-b73fa7aa3ff9"
         },
         "disabled": false,
-        "enabled": true,
+        "enabled": false,
         "focused": false,
         "inViewport": false,
+        "nameSource": "none",
         "normalizedRect": {
           "height": 0.000942507068803016,
           "width": 0.0005208333333333333,
@@ -1132,11 +989,216 @@
           "scrollTop": 0,
           "scrollWidth": 1
         },
+        "scrollWidth": 1,
         "value": "",
+        "visibilityReason": "hidden",
         "visible": false
       },
       "tagName": "textarea",
       "type": "textarea",
+      "visible": true
+    },
+    {
+      "accessibleName": "WORKSPACE",
+      "actions": [
+        "focus",
+        "blur",
+        "click",
+        "hover",
+        "middleClick"
+      ],
+      "bbox": {
+        "height": 27,
+        "width": 183,
+        "x": 8,
+        "y": 45
+      },
+      "category": "interactive",
+      "id": "button-workspace",
+      "identifier": {
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > div > nav > div:nth-child(1) > div:nth-child(1) > button",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/div/nav/div[1]/div[1]/button"
+      },
+      "kind": "interactive",
+      "label": "WORKSPACE",
+      "mounted": true,
+      "nameSource": "text",
+      "origin": "auto",
+      "registeredAt": 1789766847117,
+      "role": "button",
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "439abf8ef2b61874",
+        "id": "button-workspace",
+        "semanticPath": "div.contents > div.h-screen > div.flex > div.flex > nav.h-full > div.flex-1 > div.space-y-1 > button.w-full",
+        "stableId": "button-workspace"
+      },
+      "state": {
+        "accessibleName": "WORKSPACE",
+        "ariaDisabled": false,
+        "ariaExpanded": true,
+        "clientWidth": 183,
+        "computedStyles": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderColor": "rgba(255, 255, 255, 0.1)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "color": "oklab(0.709909 -0.003281 -0.013907 / 0.7)",
+          "colorScheme": "dark",
+          "cursor": "default",
+          "display": "flex",
+          "fontSize": "12px",
+          "fontWeight": "600",
+          "lineHeight": "16px",
+          "margin": "0px 0px 4px",
+          "opacity": "1",
+          "overflow": "visible",
+          "padding": "6px 8px",
+          "pointerEvents": "auto",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "normal",
+          "zIndex": "auto"
+        },
+        "dataset": {
+          "uiBridgeId": "button-workspace",
+          "uiBridgePersist": "true"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": true,
+        "nameSource": "text",
+        "normalizedRect": {
+          "height": 0.02544769085768143,
+          "width": 0.0953125,
+          "x": 0.004166666666666667,
+          "y": 0.04241281809613572
+        },
+        "occludedBy": "div.min-h-screen",
+        "occludedPct": 100,
+        "rect": {
+          "bottom": 72,
+          "height": 27,
+          "left": 8,
+          "right": 191,
+          "top": 45,
+          "width": 183,
+          "x": 8,
+          "y": 45
+        },
+        "scrollWidth": 183,
+        "textContent": "WORKSPACE",
+        "visibilityReason": "occluded",
+        "visible": false
+      },
+      "tagName": "button",
+      "text": "WORKSPACE",
+      "type": "button",
+      "uiBridgeId": "button-workspace",
+      "visible": true
+    },
+    {
+      "accessibleName": "Projects",
+      "actions": [
+        "focus",
+        "blur",
+        "click",
+        "hover",
+        "middleClick"
+      ],
+      "ariaLabel": "Projects",
+      "bbox": {
+        "height": 36,
+        "width": 183,
+        "x": 8,
+        "y": 76
+      },
+      "category": "interactive",
+      "id": "nav:projects",
+      "identifier": {
+        "selector": "#root > div:nth-child(1) > div > div:nth-child(2) > div > nav > div:nth-child(1) > div:nth-child(1) > div > button:nth-child(1)",
+        "xpath": "/div[@id=\"root\"]/div[1]/div/div[2]/div/nav/div[1]/div[1]/div/button[1]"
+      },
+      "kind": "interactive",
+      "label": "Projects",
+      "mounted": true,
+      "nameSource": "aria-label",
+      "origin": "auto",
+      "registeredAt": 1789766847117,
+      "role": "button",
+      "route": "/",
+      "stableRef": {
+        "fingerprint": "ce00aca01f529162",
+        "id": "nav:projects",
+        "semanticPath": "div.h-screen > div.flex > div.flex > nav.h-full > div.flex-1 > div.space-y-1 > div.space-y-0\\.5 > button.w-full",
+        "stableId": "nav:projects"
+      },
+      "state": {
+        "accessibleName": "Projects",
+        "ariaDisabled": false,
+        "clientWidth": 183,
+        "computedStyles": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderColor": "rgba(255, 255, 255, 0.1)",
+          "borderRadius": "6px",
+          "borderWidth": "0px",
+          "color": "rgb(156, 162, 171)",
+          "colorScheme": "dark",
+          "cursor": "default",
+          "display": "flex",
+          "fontSize": "14px",
+          "fontWeight": "500",
+          "lineHeight": "20px",
+          "margin": "0px 0px 2px",
+          "opacity": "1",
+          "overflow": "visible",
+          "padding": "8px 12px",
+          "pointerEvents": "auto",
+          "position": "static",
+          "textOverflow": "clip",
+          "visibility": "visible",
+          "whiteSpace": "normal",
+          "zIndex": "auto"
+        },
+        "dataset": {
+          "navItem": "projects",
+          "uiBridgeId": "nav:projects",
+          "uiBridgePersist": "true"
+        },
+        "disabled": false,
+        "enabled": true,
+        "focused": false,
+        "inViewport": true,
+        "nameSource": "aria-label",
+        "normalizedRect": {
+          "height": 0.033930254476908575,
+          "width": 0.0953125,
+          "x": 0.004166666666666667,
+          "y": 0.07163053722902922
+        },
+        "occludedBy": "div.min-h-screen",
+        "occludedPct": 100,
+        "rect": {
+          "bottom": 112,
+          "height": 36,
+          "left": 8,
+          "right": 191,
+          "top": 76,
+          "width": 183,
+          "x": 8,
+          "y": 76
+        },
+        "scrollWidth": 183,
+        "textContent": "Projects",
+        "visibilityReason": "occluded",
+        "visible": false
+      },
+      "tagName": "button",
+      "text": "Projects",
+      "type": "button",
+      "uiBridgeId": "nav:projects",
       "visible": true
     }
   ],
@@ -1162,7 +1224,7 @@
     "recentNavigations": [
       {
         "from": "",
-        "timestamp": 1788980430258,
+        "timestamp": 1789766846877,
         "to": "tauri://localhost",
         "trigger": "initial"
       }
@@ -1177,9 +1239,10 @@
   },
   "registration": {
     "activeTab": "terminal",
+    "appId": "qontinui-runner",
     "byRoute": {
       "/": {
-        "count": 63,
+        "count": 160,
         "ids": [
           "button-workspace",
           "nav:projects",
@@ -1203,15 +1266,22 @@
           "tab-switch-to-page-12-11",
           "tab-switch-to-page-13-12",
           "tab-switch-to-page-14-13",
-          "button-add-terminal-page-14",
-          "button-reorganize-pages-by-topic-15",
-          "button-open-terminal-in-a-new-window-16",
+          "tab-switch-to-page-15-14",
+          "tab-switch-to-page-16-15",
+          "tab-switch-to-page-17-16",
+          "tab-switch-to-page-18-17",
+          "tab-switch-to-page-19-18",
+          "tab-switch-to-page-20-19",
+          "tab-switch-to-page-21-20",
+          "button-add-terminal-page-21",
+          "button-reorganize-pages-by-topic-22",
+          "button-open-terminal-in-a-new-window-23",
+          "heading-1-qontinui-runner",
+          "content-badge-beta-1",
           "button-local-airun-with-a-local-model-0",
           "button-use-my-own-api-keypaste-your-a-1",
           "button-sign-in-to-qontinuimulti-machi-2",
           "button-ill-decide-later-start-in-loca",
-          "heading-1-qontinui-runner",
-          "content-badge-beta-1",
           "heading-2-how-will-you-use-qontinui",
           "content-paragraph-you-can-change-this-0",
           "heading-3-local-ai-tier-0",
@@ -1224,24 +1294,114 @@
           "terminal.command-bar-input",
           "tab-switch-to-terminal-0",
           "terminal.session-manager-toggle",
+          "terminal.spawn-tenant-picker",
           "svg-child-1",
-          "terminal-input-cafd43f7-f172-4745-9dd3-cc0b96fd54a1",
-          "terminal-input-3cc474c0-0215-4e43-b024-f1ebf13e831e",
-          "terminal-input-7fb4e6f6-ae51-44a5-af26-965079ca6040",
-          "terminal-input-4d0f17fc-cc46-44ef-92ec-64ceb288c90a",
-          "terminal-input-bb9e3999-c721-4bd3-b345-057f0bd5e9af",
-          "terminal-input-120cbb6b-5fb4-46b1-96ee-8c14f20940c4",
-          "terminal-input-0eaa53d0-777f-4077-a021-32c91c43632f",
-          "terminal-input-42b585e2-6b19-4f4d-9369-07fd1150d246",
-          "terminal-input-9b4f5e60-150f-478a-9245-abe34f8c1d68",
-          "terminal-input-bfa99869-a4e9-4d27-b128-dcfb239d31ba",
-          "tab-switch-to-page-15-15",
-          "terminal-input-79337ad2-4497-44c3-a714-62d4a98627b9",
-          "terminal-input-34f65a03-941a-4581-816e-4dc3bde0d686",
-          "terminal-input-dd52769e-c6e6-4347-9b60-1f25ebd50abe",
-          "terminal-input-7913f73c-23aa-4805-8c98-47a32cb4713c",
-          "terminal-input-fc94cd2a-990d-41f4-923e-2f4c6bd5c225",
-          "terminal-input-d2cfe0b7-b1fb-41b9-97bc-c37b6e681abc",
+          "content-label-c231d9da7ac125b6-0",
+          "terminal-input-b0fdb56e-3708-4446-9e17-b73fa7aa3ff9",
+          "terminal.session-manager-view-live",
+          "terminal.session-manager-view-previous",
+          "terminal.session-manager-view-fleet",
+          "terminal.fleet-picker-refresh",
+          "terminal.fleet-picker-search",
+          "terminal.fleet-picker-device-id-mode",
+          "terminal.fleet-picker-state-filter",
+          "terminal.fleet-picker-include-closed",
+          "terminal.fleet-picker-device-id-entry",
+          "terminal.fleet-picker-clear-filters",
+          "terminal.fleet-device.84c02292-32cb-4983-be85-d00f868b7003",
+          "terminal.fleet-device-create.84c02292-32cb-4983-be85-d00f868b7003",
+          "terminal.fleet-session.01a0997d-3e59-7cfe-8692-01cfb5fcea9e",
+          "terminal.fleet-session-attach.01a0997d-3e59-7cfe-8692-01cfb5fcea9e",
+          "terminal.fleet-session.01a0b5e1-0184-7504-8f68-cd17f52283a1",
+          "terminal.fleet-session-attach.01a0b5e1-0184-7504-8f68-cd17f52283a1",
+          "terminal.fleet-session.cb013f11-0071-4d12-8e45-99d314378f5c",
+          "terminal.fleet-session-attach.cb013f11-0071-4d12-8e45-99d314378f5c",
+          "terminal.fleet-session.20e8814a-cf67-473e-b683-84a8ae791f07",
+          "terminal.fleet-session-attach.20e8814a-cf67-473e-b683-84a8ae791f07",
+          "terminal.fleet-session.bb827a3d-7b01-4f41-8377-2541cbf01c3d",
+          "terminal.fleet-session-attach.bb827a3d-7b01-4f41-8377-2541cbf01c3d",
+          "terminal.fleet-session.94199116-6f96-4606-be04-503fe8a17230",
+          "terminal.fleet-session-attach.94199116-6f96-4606-be04-503fe8a17230",
+          "terminal.fleet-session.5a765d41-3ea2-41f7-9930-6bf9d0d716bf",
+          "terminal.fleet-session-attach.5a765d41-3ea2-41f7-9930-6bf9d0d716bf",
+          "terminal.fleet-session.01a0a13d-b2b2-7b39-910b-3738931673d2",
+          "terminal.fleet-session-attach.01a0a13d-b2b2-7b39-910b-3738931673d2",
+          "terminal.fleet-session.01a0b5e0-fc1e-7325-bb25-4ea4244e3e27",
+          "terminal.fleet-session-attach.01a0b5e0-fc1e-7325-bb25-4ea4244e3e27",
+          "terminal.fleet-session.ffe8829d-fa9b-48b4-9222-bedfb19b3918",
+          "terminal.fleet-session-attach.ffe8829d-fa9b-48b4-9222-bedfb19b3918",
+          "terminal.fleet-session.8b78d420-3cab-43ff-9cdc-971868ac5191",
+          "terminal.fleet-session-attach.8b78d420-3cab-43ff-9cdc-971868ac5191",
+          "terminal.fleet-session.99d61fe1-7450-4bd1-82d7-7cbda59063ea",
+          "terminal.fleet-session-attach.99d61fe1-7450-4bd1-82d7-7cbda59063ea",
+          "terminal.fleet-session.01a0b5e1-292f-7541-a6f7-378d82fe0947",
+          "terminal.fleet-session-attach.01a0b5e1-292f-7541-a6f7-378d82fe0947",
+          "terminal.fleet-session.01a0b5e1-2edf-77f0-bb29-a5278f529372",
+          "terminal.fleet-session-attach.01a0b5e1-2edf-77f0-bb29-a5278f529372",
+          "terminal.fleet-session.01a0b57d-2fa8-7533-bad5-3a8bb8d81361",
+          "terminal.fleet-session-attach.01a0b57d-2fa8-7533-bad5-3a8bb8d81361",
+          "terminal.fleet-session.01a0b57d-3086-7150-903f-e3485464bdcb",
+          "terminal.fleet-session-attach.01a0b57d-3086-7150-903f-e3485464bdcb",
+          "terminal.fleet-session.01a0b46c-6c0e-78ad-a5d2-42e4686c61d5",
+          "terminal.fleet-session-attach.01a0b46c-6c0e-78ad-a5d2-42e4686c61d5",
+          "terminal.fleet-session.01a0b04d-e3f3-78ae-b212-cea8ecc3119d",
+          "terminal.fleet-session-attach.01a0b04d-e3f3-78ae-b212-cea8ecc3119d",
+          "terminal.fleet-session.01a0a7de-b513-7a95-91f6-821aab4874f9",
+          "terminal.fleet-session-attach.01a0a7de-b513-7a95-91f6-821aab4874f9",
+          "terminal.fleet-session.01a0a868-fad0-771f-b7e7-7d62dbe3c081",
+          "terminal.fleet-session-attach.01a0a868-fad0-771f-b7e7-7d62dbe3c081",
+          "terminal.fleet-session.01a0a869-a1c5-7436-a93b-e9495d7a9434",
+          "terminal.fleet-session-attach.01a0a869-a1c5-7436-a93b-e9495d7a9434",
+          "terminal.fleet-session.01a0b335-d666-725d-b53d-f9fe77af1b57",
+          "terminal.fleet-session-attach.01a0b335-d666-725d-b53d-f9fe77af1b57",
+          "terminal.fleet-session.01a0a6c4-2b2f-73e3-b8ec-ffec541748b9",
+          "terminal.fleet-session-attach.01a0a6c4-2b2f-73e3-b8ec-ffec541748b9",
+          "terminal.fleet-session.9e70716e-ddde-43b8-975a-5b247c42695a",
+          "terminal.fleet-session-attach.9e70716e-ddde-43b8-975a-5b247c42695a",
+          "terminal.fleet-session.e3bf0bd0-4436-48b7-84f9-b2b6660e56c7",
+          "terminal.fleet-session-attach.e3bf0bd0-4436-48b7-84f9-b2b6660e56c7",
+          "terminal.fleet-session.01a0b3af-93e0-7714-a9e6-e99b947a76cc",
+          "terminal.fleet-session-attach.01a0b3af-93e0-7714-a9e6-e99b947a76cc",
+          "terminal.fleet-session.7b269e4c-f8de-4257-819a-21d222cb5f2d",
+          "terminal.fleet-session-attach.7b269e4c-f8de-4257-819a-21d222cb5f2d",
+          "terminal.fleet-session.14452de3-fc34-489f-8b7e-3f5d807ea291",
+          "terminal.fleet-session-attach.14452de3-fc34-489f-8b7e-3f5d807ea291",
+          "terminal.fleet-session.d5d6a6ef-60c7-4eb6-8fe0-28034c1cab10",
+          "terminal.fleet-session-attach.d5d6a6ef-60c7-4eb6-8fe0-28034c1cab10",
+          "terminal.fleet-session.f053ff1f-3158-4910-bc37-77ba7726ad04",
+          "terminal.fleet-session-attach.f053ff1f-3158-4910-bc37-77ba7726ad04",
+          "terminal.fleet-session.b8f12774-bf6b-40a3-9996-84a936739f12",
+          "terminal.fleet-session-attach.b8f12774-bf6b-40a3-9996-84a936739f12",
+          "terminal.fleet-session.6c40a390-48d7-407f-9f78-1bae63c53074",
+          "terminal.fleet-session-attach.6c40a390-48d7-407f-9f78-1bae63c53074",
+          "terminal.fleet-session.01a09cf7-38fe-75b1-b052-68f01186a5a3",
+          "terminal.fleet-session-attach.01a09cf7-38fe-75b1-b052-68f01186a5a3",
+          "terminal.fleet-session.01a09cd2-287c-726d-987b-d998dff85efe",
+          "terminal.fleet-session-attach.01a09cd2-287c-726d-987b-d998dff85efe",
+          "terminal.fleet-session.01a0997d-3ee7-71e2-bf53-cea66cef05b4",
+          "terminal.fleet-session-attach.01a0997d-3ee7-71e2-bf53-cea66cef05b4",
+          "terminal.fleet-session.2a2bbe2b-94ec-4e0a-9d2d-6d7c43835f50",
+          "terminal.fleet-session-attach.2a2bbe2b-94ec-4e0a-9d2d-6d7c43835f50",
+          "terminal.fleet-session.59d04ab6-1fa9-4a7c-a28a-46c1f7b48f3a",
+          "terminal.fleet-session-attach.59d04ab6-1fa9-4a7c-a28a-46c1f7b48f3a",
+          "terminal.fleet-session.01a09a4e-a6a3-7a1a-9d75-ef8e01e59945",
+          "terminal.fleet-session-attach.01a09a4e-a6a3-7a1a-9d75-ef8e01e59945",
+          "terminal.fleet-session.01a0997d-3f82-7cc0-9f3b-d6bb2a372dfe",
+          "terminal.fleet-session-attach.01a0997d-3f82-7cc0-9f3b-d6bb2a372dfe",
+          "terminal.fleet-session.75c6355d-ba95-43fb-b9c9-1233347a3246",
+          "terminal.fleet-session-attach.75c6355d-ba95-43fb-b9c9-1233347a3246",
+          "terminal.fleet-session.01a08564-1c0d-71e9-af88-cad5696ab11e",
+          "terminal.fleet-session-attach.01a08564-1c0d-71e9-af88-cad5696ab11e",
+          "terminal.fleet-session.01a08564-1bbc-75d1-9e71-df66cbca43fc",
+          "terminal.fleet-session-attach.01a08564-1bbc-75d1-9e71-df66cbca43fc",
+          "terminal.fleet-session.01a08f37-9515-78a3-92fd-3b964a18c3a9",
+          "terminal.fleet-session-attach.01a08f37-9515-78a3-92fd-3b964a18c3a9",
+          "terminal.fleet-session.01a08564-1aea-71ca-b3de-8557641156ba",
+          "terminal.fleet-session-attach.01a08564-1aea-71ca-b3de-8557641156ba",
+          "terminal.fleet-device-create-error.84c02292-32cb-4983-be85-d00f868b7003",
+          "terminal-page-button-9",
+          "content-list-item-no-preference-value-0",
+          "content-list-item-check-which-tenant-t-1",
           "terminal-zone-minimap-toggle",
           "terminal-page-generic-1"
         ]
@@ -1249,20 +1409,27 @@
     },
     "everHadRegistrations": true,
     "route": "/",
-    "totalRegistered": 63
+    "totalRegistered": 160
   },
   "relationships": {
     "byOrigin": {
       "aria": 0,
       "declared": 0,
-      "html": 0
+      "html": 1
     },
-    "count": 0,
-    "relationships": []
+    "count": 1,
+    "relationships": [
+      {
+        "origin": "html",
+        "source": "content-label-c231d9da7ac125b6-0",
+        "target": "terminal.spawn-tenant-picker",
+        "type": "labels"
+      }
+    ]
   },
   "route": "/",
   "shortcuts": {
-    "lastScanTimestamp": 1789028929173,
+    "lastScanTimestamp": 1789823482402,
     "shortcuts": [
       {
         "category": "Terminal Management",
@@ -1645,7 +1812,14 @@
     ],
     "totalCount": 54
   },
-  "snapshotTakenAtMs": 1789028931082,
+  "signature": {
+    "content": "8cf05f521ac8a312",
+    "count": 160,
+    "generation": "9fd9a75c99edb7e9",
+    "mountEvidence": 160
+  },
+  "snapshotId": "ubs2_4g_4g_8cf05f521ac8a312_9fd9a75c99edb7e9",
+  "snapshotTakenAtMs": 1789823483919,
   "tabActivation": {
     "bodyExample": {
       "tabId": "<one of availableTabs[].id>"
@@ -1654,11 +1828,23 @@
     "method": "POST",
     "path": "/ui-bridge/control/tab/activate"
   },
-  "timestamp": 1789028931082,
+  "timestamp": 1789823483919,
   "toasts": {
     "active": [],
-    "recent": [],
-    "totalCaptured": 78
+    "recent": [
+      {
+        "actionText": "Minimap",
+        "appearedAt": 1789823404895,
+        "dismissedAt": 1789823465129,
+        "durationMs": 60234,
+        "hasAction": true,
+        "id": "toast-199",
+        "level": "info",
+        "message": "3 sessionsMinimap3 workingno plan",
+        "visible": false
+      }
+    ],
+    "totalCaptured": 199
   },
   "undoRedo": {
     "canRedo": false,
