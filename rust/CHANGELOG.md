@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v2.0.0...rust-v3.0.0) (2026-09-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ui-bridge:** delete the transitional bare-name tolerance; the wire is objects only
+
+### Features
+
+* **ui-bridge:** delete the transitional bare-name tolerance; the wire is objects only ([b8e860d](https://github.com/qontinui/qontinui-schemas/commit/b8e860d5c435e01b3b90ed37ce284c576adf816a))
+
 ## [2.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v1.9.0...rust-v2.0.0) (2026-09-13)
 
 
