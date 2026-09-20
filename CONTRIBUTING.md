@@ -283,17 +283,57 @@ every `<2.0.0` bound wedged the release PR and all of its consumers, and
 nothing moved them. What protects a consumer is the `consumer-gate` compile
 check, not a range.
 
-Where each consumer stands as of 2026-09-13:
+Where each consumer stands (verified against `origin/main` 2026-09-20):
 
 | Consumer | Bounds |
 |---|---|
 | qontinui-coord | none |
-| qontinui-supervisor | still bounded (`qontinui-runner-client <2.0.0`); removal pending qontinui-supervisor#188 (open) |
-| qontinui-runner | still bounded (`<2.0.0`); qontinui-runner#1523 only widens it to `<3.0.0`, and removal follows once #1523 lands |
+| qontinui-supervisor | none — removed by qontinui-supervisor#188 |
+| qontinui-runner | none — removed by qontinui-runner#1525: seven `version =` bounds across `src-tauri/Cargo.toml` and the four `crates/*/Cargo.toml` that depend on schemas |
 
-Until a consumer is unbounded, a qontinui-types major still needs its bound
-widened BEFORE the release PR can go green. Do not add a new `version` bound
-to a consumer's schemas path dep.
+Every consumer is now unbounded, so a `qontinui-types` major no longer needs any
+consumer's BOUND widened before the release PR can go green — which is the whole
+point of removing them. That is narrower than "needs no consumer touched": the
+`consumer-gate` compile check still can, and should, go red on a genuinely
+breaking major, and the answer there is a consumer adaptation, never a range. Do
+not add a new `version` bound to a consumer's schemas path dep; that re-creates
+the wedge.
+
+Note the asymmetry while you are here: `consumer-check`'s matrix covers only
+qontinui-runner and qontinui-supervisor, so a `qontinui-types` major is never
+proved against qontinui-coord *on this side*. coord is not unprotected — it PINS
+the schemas sibling (`qontinui-coord/.github/sibling-pins.conf`) and takes a new
+schemas commit only through a commit that moves the pin and `Cargo.lock`
+together — automatically via `schemas-pin-bump.yml`, or by hand via
+`schemas-pin.sh rewrite` inside a coord PR. Either way coord's own CI compiles it
+at the new pin. So a break surfaces as a red PR in coord — usually
+`chore/schemas-pin-bump`, within a cron cycle (`23 */6 * * *`, longer if a bump
+PR is already open, since the workflow comments rather than moving an open
+branch) — rather than as coord main going red with no coord commit, the failure
+the pin exists to prevent and which a `qontinui-types` release caused five times
+before it. It never reds the schemas PR. `schemas-pin-bump.yml` also accepts a
+`repository_dispatch` of `schemas-released`, but this repo sends none, so the
+cron is the only automatic trigger today.
+
+Do not trust this table over the repos. Re-check in each of the four checkouts —
+`git grep` exits 1 on no match, so the "returns nothing" case is a non-zero exit,
+which matters if you lift this into a `set -e` script:
+
+```bash
+git fetch origin && \
+git grep -nE 'qontinui-(types|code-graph|vision-core|runner-client).*version' origin/main -- '*Cargo.toml'
+```
+
+The `git fetch` is not optional: `origin/main` is a local remote-tracking ref, so
+without it you get a confident answer about whatever you last fetched. It should
+return nothing in qontinui-coord, qontinui-supervisor and qontinui-runner, and
+exactly one line in this repo (the `rust-runner-client` bound below).
+
+One shape the regex cannot see: it matches `version` only on the same line as the
+crate name, so a bound written as a `[dependencies.qontinui-types]` section would
+read as unbounded. No consumer uses that form today — every schemas dep in all
+four repos is a single-line inline table — so this is a caveat on the census, not
+a hole in the table.
 
 The one bound that stays is in this repo. `rust-runner-client` is published
 to crates.io, and `cargo publish` needs a `version` on its `qontinui-types`
