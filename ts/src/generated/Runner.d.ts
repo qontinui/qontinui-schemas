@@ -6,6 +6,8 @@
  */
 
 import type { RunnerCrash } from "./RunnerCrash";
+import type { RunnerInstance } from "./RunnerInstance";
+import type { RunnerInstanceRole } from "./RunnerInstanceRole";
 import type { RunnerStatus } from "./RunnerStatus";
 import type { RunnerUiError } from "./RunnerUiError";
 
@@ -41,6 +43,13 @@ export interface Runner {
    * Runner identifier (UUID as a string).
    */
   id: string;
+  /**
+   * Currently connected runner instances on this machine, one entry per
+   * instance (see [`RunnerInstance`]). Empty when none is connected — and
+   * when the serving backend predates per-instance rows and omits the
+   * field, so absence deserializes to an empty list rather than failing.
+   */
+  instances: RunnerInstance[];
   /**
    * Reported network address the runner is reachable on.
    */

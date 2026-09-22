@@ -190,4 +190,6 @@ pub mod device {
     pub type DeviceStatus = crate::runner::RunnerStatus;
     pub type DeviceCrash = crate::runner::RunnerCrash;
     pub type DeviceUiError = crate::runner::RunnerUiError;
+    pub type DeviceInstance = crate::runner::RunnerInstance;
+    pub type DeviceInstanceRole = crate::runner::RunnerInstanceRole;
 }

@@ -360,6 +360,8 @@ export type { RunnerCrash } from './RunnerCrash';
 export type { RunnerFinding } from './RunnerFinding';
 export type { RunnerFindingCodeContext } from './RunnerFindingCodeContext';
 export type { RunnerFindingUserInput } from './RunnerFindingUserInput';
+export type { RunnerInstance } from './RunnerInstance';
+export type { RunnerInstanceRole } from './RunnerInstanceRole';
 export type { RunnerMetadata } from './RunnerMetadata';
 export type { RunnerRelayMessage } from './RunnerRelayMessage';
 export type { RunnerStatus } from './RunnerStatus';

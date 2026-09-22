@@ -362,6 +362,8 @@ from .per_type.runner_crash import RunnerCrash
 from .per_type.runner_finding import RunnerFinding
 from .per_type.runner_finding_code_context import RunnerFindingCodeContext
 from .per_type.runner_finding_user_input import RunnerFindingUserInput
+from .per_type.runner_instance import RunnerInstance
+from .per_type.runner_instance_role import RunnerInstanceRole
 from .per_type.runner_metadata import RunnerMetadata
 from .per_type.runner_relay_message import RunnerRelayMessage
 from .per_type.runner_status import RunnerStatus
@@ -912,6 +914,8 @@ __all__ = [
     "RunnerFinding",
     "RunnerFindingCodeContext",
     "RunnerFindingUserInput",
+    "RunnerInstance",
+    "RunnerInstanceRole",
     "RunnerMetadata",
     "RunnerRelayMessage",
     "RunnerStatus",
