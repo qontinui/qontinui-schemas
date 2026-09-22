@@ -332,7 +332,6 @@ export type { RagCompletionEvent } from './RagCompletionEvent';
 export type { RagProcessingStatus } from './RagProcessingStatus';
 export type { RagProgressEvent } from './RagProgressEvent';
 export type { ReadConfigResponse } from './ReadConfigResponse';
-export type { RecommendationReviewDecisionPayload } from './RecommendationReviewDecisionPayload';
 export type { RecommendedState } from './RecommendedState';
 export type { RecordGitOpRequest } from './RecordGitOpRequest';
 export type { ReflectionFixOutput } from './ReflectionFixOutput';
