@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v1.0.0...ts-v1.1.0) (2026-09-23)
+
+
+### Features
+
+* **schemas:** Runner.instances — per-instance wire rows ([a3711db](https://github.com/qontinui/qontinui-schemas/commit/a3711db3741adaaf89ea1db68c38c22368fce1b8))
+
 ## [1.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v0.14.0...ts-v1.0.0) (2026-09-13)
 
 
