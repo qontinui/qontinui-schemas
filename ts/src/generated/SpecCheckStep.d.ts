@@ -7,14 +7,17 @@
 
 import type { RetrySpec } from "./RetrySpec";
 import type { VerificationCategoryKind } from "./VerificationCategoryKind";
-import type { VisualAssertionType } from "./VisualAssertionType";
 
 /**
- * Assert visual properties of UI elements via the UI Bridge.
+ * Evaluate a page spec against the live UI of a registered app.
  *
- * Wire tag: `"ui_bridge_visual_assertion"`.
+ * Wire tag: `"spec_check"`.
+ *
+ * Not [`crate::spec_check::SpecCheckStepConfig`]: that is the camelCase,
+ * `deny_unknown_fields` policy config with no app id. This is the step as the
+ * workflow generator and the runner's `ExecutionStepConfig` carry it.
  */
-export interface UiBridgeVisualAssertionStep {
+export interface SpecCheckStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
@@ -66,32 +69,39 @@ export interface UiBridgeVisualAssertionStep {
     [k: string]: unknown;
   };
   /**
-   * Timeout in seconds.
+   * App id whose specs root resolves `spec_check_page_id`. Required at run
+   * time (the handler refuses a missing one); optional on the wire.
    */
-  timeoutSeconds?: number | null;
+  specCheckAppId?: string | null;
+  /**
+   * Snapshot-fetch error kinds that fail the step (lower snake_case, e.g.
+   * `"not_connected"`, `"timeout"`).
+   */
+  specCheckFailOn?: string[] | null;
+  /**
+   * Fail the step when the app is unreachable (default `true` on the
+   * consumer side).
+   */
+  specCheckFailWhenNoApp?: boolean | null;
+  /**
+   * Fail the step when the page has no spec (default `true` on the
+   * consumer side).
+   */
+  specCheckFailWhenNoSpec?: boolean | null;
+  /**
+   * Page id whose spec is evaluated.
+   */
+  specCheckPageId?: string | null;
+  /**
+   * AND-conjunct policy, carried verbatim; the handler reconstitutes the
+   * typed policy.
+   */
+  specCheckPolicy?: {
+    [k: string]: unknown;
+  };
   /**
    * Verification depth category.
    */
   verificationCategory?: VerificationCategoryKind | null;
-  /**
-   * Expected text (for text assertion) or element ID (for screenshot/highlight).
-   */
-  visualAssertionExpected?: string | null;
-  /**
-   * Options JSON for the assertion.
-   */
-  visualAssertionOptions?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Element query JSON for text assertions.
-   */
-  visualAssertionQuery?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
-   */
-  visualAssertionType?: VisualAssertionType | null;
   [k: string]: unknown;
 }

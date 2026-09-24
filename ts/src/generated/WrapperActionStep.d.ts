@@ -7,14 +7,22 @@
 
 import type { RetrySpec } from "./RetrySpec";
 import type { VerificationCategoryKind } from "./VerificationCategoryKind";
-import type { VisualAssertionType } from "./VisualAssertionType";
 
 /**
- * Assert visual properties of UI elements via the UI Bridge.
+ * Dispatch a typed action through an installed wrapper.
  *
- * Wire tag: `"ui_bridge_visual_assertion"`.
+ * Wire tag: `"wrapper_action"`.
+ *
+ * Serializes with the Builder's keys (`wrapperId`, `actionId`, `params`,
+ * `resultVariable` — what the runner frontend writes) and also accepts the
+ * runner's `ExecutionStepConfig` names (`wrapper_action_id`, `wrapper_params`,
+ * `wrapper_result_variable`).
  */
-export interface UiBridgeVisualAssertionStep {
+export interface WrapperActionStep {
+  /**
+   * Id of the action the wrapper exposes.
+   */
+  actionId?: string | null;
   /**
    * Acceptance criterion IDs verified by this step.
    */
@@ -48,9 +56,21 @@ export interface UiBridgeVisualAssertionStep {
    */
   name: string;
   /**
+   * Params passed to the action; values may carry `{{ variable }}`
+   * templates resolved at run time.
+   */
+  params?: {
+    [k: string]: unknown;
+  };
+  /**
    * Whether this step is required (default: `true` on consumer side).
    */
   required?: boolean | null;
+  /**
+   * Workflow variable the dispatch result is written to (empty / absent =
+   * not stored).
+   */
+  resultVariable?: string | null;
   /**
    * Per-step retry configuration.
    */
@@ -66,32 +86,12 @@ export interface UiBridgeVisualAssertionStep {
     [k: string]: unknown;
   };
   /**
-   * Timeout in seconds.
-   */
-  timeoutSeconds?: number | null;
-  /**
    * Verification depth category.
    */
   verificationCategory?: VerificationCategoryKind | null;
   /**
-   * Expected text (for text assertion) or element ID (for screenshot/highlight).
+   * Id of the installed wrapper to dispatch through.
    */
-  visualAssertionExpected?: string | null;
-  /**
-   * Options JSON for the assertion.
-   */
-  visualAssertionOptions?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Element query JSON for text assertions.
-   */
-  visualAssertionQuery?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
-   */
-  visualAssertionType?: VisualAssertionType | null;
+  wrapperId?: string | null;
   [k: string]: unknown;
 }

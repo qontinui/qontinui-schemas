@@ -42,7 +42,7 @@ export interface NativeAccessibilityStep {
    */
   failOnConsoleErrors?: boolean | null;
   /**
-   * Unique identifier for the step.
+   * Unique identifier for the step. Absent or `null` reads as `""`.
    */
   id: string;
   /**
@@ -68,7 +68,7 @@ export interface NativeAccessibilityStep {
    */
   maxElements?: number | null;
   /**
-   * Display name for the step.
+   * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
   /**

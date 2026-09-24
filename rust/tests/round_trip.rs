@@ -9173,3 +9173,303 @@ fn structured_override_roundtrips() {
     let back: StructuredOverride = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
+
+// ============================================================================
+// workflow_step — FullRunnerStep totality for live producer shapes
+//
+// Every fixture below is a shape a live producer emits (cited per test). Until
+// qontinui-types 3.1 each of them failed the typed parse, and the runner only
+// ran them through its string-key fallback. Plan
+// `2026-09-24-typed-step-dispatch-covers-every-registered-handler`, Phase 1.
+// ============================================================================
+
+/// Decode `raw` as `FullRunnerStep`, then prove the typed value is stable:
+/// serialize → decode → serialize yields the same JSON both times.
+fn decode_stable(raw: Value) -> FullRunnerStep {
+    let step: FullRunnerStep = serde_json::from_value(raw.clone())
+        .unwrap_or_else(|e| panic!("failed to decode {raw}: {e}"));
+    let once = serde_json::to_value(&step).unwrap();
+    let again: FullRunnerStep = serde_json::from_value(once.clone())
+        .unwrap_or_else(|e| panic!("re-decode of {once} failed: {e}"));
+    assert_eq!(step, again, "typed value drifted on round-trip");
+    assert_eq!(once, serde_json::to_value(&again).unwrap());
+    step
+}
+
+#[test]
+fn full_runner_step_spec_check_generator_shape() {
+    // workflow_generation/meta_workflow.rs "Canonical spec_check Step Example"
+    // and examples/workflows/spec-check-runs-pilot.json (qontinui-runner).
+    let step = decode_stable(json!({
+        "id": "0b7c8a55-3e9b-4a52-a0c9-0d3f5d8a0e11",
+        "type": "spec_check",
+        "phase": "verification",
+        "name": "spec_check active-runs",
+        "spec_check_app_id": "qontinui-web",
+        "spec_check_page_id": "active-runs",
+        "spec_check_fail_when_no_app": true,
+        "spec_check_fail_when_no_spec": true
+    }));
+    assert_eq!(step.step_type(), "spec_check");
+    let FullRunnerStep::SpecCheck(s) = step else {
+        panic!("expected SpecCheck, got {step:?}")
+    };
+    assert_eq!(s.spec_check_app_id.as_deref(), Some("qontinui-web"));
+    assert_eq!(s.spec_check_page_id.as_deref(), Some("active-runs"));
+    assert_eq!(s.spec_check_fail_when_no_app, Some(true));
+    assert_eq!(s.spec_check_fail_when_no_spec, Some(true));
+    // Canonical serialization is camelCase.
+    let v = serde_json::to_value(FullRunnerStep::SpecCheck(s)).unwrap();
+    assert_eq!(v["specCheckAppId"], "qontinui-web");
+}
+
+#[test]
+fn full_runner_step_wrapper_action_builder_shape() {
+    // qontinui-runner src/components/workflow-builder/AddStepDropdown.tsx
+    // (the "Wrapper Action" entry), with the pickers filled in.
+    let raw = json!({
+        "id": "step-1",
+        "type": "wrapper_action",
+        "name": "Wrapper Action",
+        "phase": "verification",
+        "wrapperId": "notepad",
+        "actionId": "open_file",
+        "params": {"path": "{{ file }}"},
+        "resultVariable": "opened"
+    });
+    let step = decode_stable(raw.clone());
+    let FullRunnerStep::WrapperAction(w) = &step else {
+        panic!("expected WrapperAction, got {step:?}")
+    };
+    assert_eq!(w.wrapper_id.as_deref(), Some("notepad"));
+    assert_eq!(w.action_id.as_deref(), Some("open_file"));
+    assert_eq!(w.params, Some(json!({"path": "{{ file }}"})));
+    assert_eq!(w.result_variable.as_deref(), Some("opened"));
+    // The Builder's keys ARE the canonical serialization — minus `phase`,
+    // which this variant does not carry.
+    let mut expected = raw;
+    expected.as_object_mut().unwrap().remove("phase");
+    assert_eq!(serde_json::to_value(&step).unwrap(), expected);
+}
+
+#[test]
+fn full_runner_step_wrapper_action_runner_field_names() {
+    // The runner's ExecutionStepConfig serializes these snake names.
+    let step = decode_stable(json!({
+        "type": "wrapper_action",
+        "id": "s",
+        "name": "n",
+        "wrapper_id": "notepad",
+        "wrapper_action_id": "open_file",
+        "wrapper_params": {"path": "a.txt"},
+        "wrapper_result_variable": "opened"
+    }));
+    let FullRunnerStep::WrapperAction(w) = step else {
+        panic!("expected WrapperAction")
+    };
+    assert_eq!(w.action_id.as_deref(), Some("open_file"));
+    assert_eq!(w.params, Some(json!({"path": "a.txt"})));
+    assert_eq!(w.result_variable.as_deref(), Some("opened"));
+}
+
+#[test]
+fn full_runner_step_effect_check_roundtrips() {
+    // Field names from qontinui-runner step_executor/executor_types.rs
+    // (effect_check_*). No producer emits this type today; it is reachable
+    // through hand-written workflow JSON.
+    let step = decode_stable(json!({
+        "type": "effect_check",
+        "id": "e1",
+        "name": "click save",
+        "effect_check_element_id": "btn-save",
+        "effect_check_action": "click",
+        "effect_check_params": {"value": "x"},
+        "effect_check_expected_outcome": "Confirmed"
+    }));
+    let FullRunnerStep::EffectCheck(e) = step else {
+        panic!("expected EffectCheck")
+    };
+    assert_eq!(e.effect_check_element_id.as_deref(), Some("btn-save"));
+    assert_eq!(e.effect_check_action.as_deref(), Some("click"));
+    assert_eq!(e.effect_check_params, Some(json!({"value": "x"})));
+    assert_eq!(
+        e.effect_check_expected_outcome.as_deref(),
+        Some("Confirmed")
+    );
+}
+
+#[test]
+fn full_runner_step_id_less_command_from_fixer() {
+    // qontinui-runner fixer/workflow.rs `build_api_step`: no id, and the
+    // runner serializes the unset Option as `null`.
+    let step = decode_stable(json!({
+        "type": "command",
+        "command_mode": "shell",
+        "id": null,
+        "name": "Fetch findings",
+        "phase": "setup",
+        "shell_command": "curl -sf -X GET 'http://localhost:9876/x'",
+        "timeoutSeconds": null,
+        "runOnSubsequentIterations": false
+    }));
+    let FullRunnerStep::Command(c) = step else {
+        panic!("expected Command")
+    };
+    assert_eq!(c.base.id, "");
+    assert_eq!(c.base.name, "Fetch findings");
+}
+
+#[test]
+fn full_runner_step_absent_id_and_name() {
+    // examples/workflows/spec-check-runs-pilot.json command steps carry no id.
+    let step = decode_stable(json!({
+        "type": "command",
+        "mode": "check",
+        "phase": "setup",
+        "check_type": "custom_command"
+    }));
+    let FullRunnerStep::Command(c) = step else {
+        panic!("expected Command")
+    };
+    assert_eq!(c.base.id, "");
+    assert_eq!(c.base.name, "");
+    assert_eq!(c.mode, Some(CommandMode::Check));
+}
+
+#[test]
+fn full_runner_step_null_name() {
+    let step = decode_stable(json!({
+        "type": "code_execution", "id": "c1", "name": null, "code": "print(1)"
+    }));
+    assert_eq!(step.step_type(), "code_execution");
+}
+
+#[test]
+fn full_runner_step_phase_less_command_and_prompt() {
+    for phase in [None, Some(Value::Null)] {
+        let mut cmd = json!({"type": "command", "id": "a", "name": "b"});
+        let mut prompt = json!({"type": "prompt", "id": "a", "name": "b", "content": "x"});
+        if let Some(p) = &phase {
+            cmd["phase"] = p.clone();
+            prompt["phase"] = p.clone();
+        }
+        let FullRunnerStep::Command(c) = decode_stable(cmd) else {
+            panic!("expected Command")
+        };
+        assert_eq!(c.phase, CommandStepPhase::Setup);
+        let FullRunnerStep::Prompt(p) = decode_stable(prompt) else {
+            panic!("expected Prompt")
+        };
+        assert_eq!(p.phase, PromptStepPhase::Setup);
+    }
+    // ui_bridge / workflow phases default the same way.
+    decode_stable(
+        json!({"type": "ui_bridge", "id": "u", "name": "n", "phase": null, "action": "snapshot"}),
+    );
+    decode_stable(
+        json!({"type": "workflow", "id": "w", "name": "n", "workflowId": "x", "workflowName": "y"}),
+    );
+}
+
+#[test]
+fn full_runner_step_vga_automate_runner_field_names() {
+    // The runner's ExecutionStepConfig serializes every vga_automate step
+    // with `vga_*` keys; before the aliases every such step failed the parse.
+    let step = decode_stable(json!({
+        "type": "vga_automate",
+        "id": "v1",
+        "name": "type into notepad",
+        "phase": null,
+        "vga_state_machine_id": "11111111-2222-3333-4444-555555555555",
+        "vga_target_process": "notepad++.exe",
+        "vga_action_sequence": [
+            {"kind": "click", "elementId": "e1"},
+            {"kind": "type", "text": "hello"}
+        ],
+        "vga_timeout_ms": 60000,
+        "vga_async": null
+    }));
+    let FullRunnerStep::VgaAutomate(v) = step else {
+        panic!("expected VgaAutomate")
+    };
+    assert_eq!(v.state_machine_id, "11111111-2222-3333-4444-555555555555");
+    assert_eq!(v.target_process, "notepad++.exe");
+    assert_eq!(v.action_sequence.len(), 2);
+    assert_eq!(v.timeout_ms, Some(60000));
+
+    // An unset sequence serializes as `null` from the runner — reads as empty.
+    let FullRunnerStep::VgaAutomate(v) = decode_stable(json!({
+        "type": "vga_automate", "id": "v", "name": "n",
+        "vga_state_machine_id": "sm", "vga_target_process": "p",
+        "vga_action_sequence": null
+    })) else {
+        panic!("expected VgaAutomate")
+    };
+    assert!(v.action_sequence.is_empty());
+}
+
+#[test]
+fn full_runner_step_ui_bridge_handler_actions() {
+    // The handler runs all four (step_executor/handlers/ui_bridge.rs); the
+    // generator's canonical examples emit wait_for_element and click, the
+    // runner's buildSpecWorkflow.ts emits element_action and wait.
+    for (wire, expected) in [
+        ("wait_for_element", UiBridgeAction::WaitForElement),
+        ("click", UiBridgeAction::Click),
+        ("element_action", UiBridgeAction::ElementAction),
+        ("wait", UiBridgeAction::Wait),
+    ] {
+        let FullRunnerStep::UiBridge(u) = decode_stable(json!({
+            "type": "ui_bridge",
+            "id": "u",
+            "name": "n",
+            "phase": "setup",
+            "action": wire,
+            "target": "{\"criteria\":{\"role\":\"main\"},\"timeout\":10000}"
+        })) else {
+            panic!("expected UiBridge")
+        };
+        assert_eq!(u.action, expected, "action {wire}");
+    }
+}
+
+#[test]
+fn full_runner_step_refusals_that_match_the_handler() {
+    // Command steps never run in the agentic phase: no producer emits it
+    // (prompt steps are the only agentic variant), so the parse refuses it.
+    assert!(serde_json::from_value::<FullRunnerStep>(json!({
+        "type": "command", "id": "a", "name": "b", "phase": "agentic"
+    }))
+    .is_err());
+    // The workflow_fixup handler fails an unknown mode ("Unknown fixup mode"),
+    // so refusing it at parse time is the same verdict, earlier.
+    assert!(serde_json::from_value::<FullRunnerStep>(json!({
+        "type": "workflow_fixup", "id": "a", "name": "b", "fixupMode": "zzz"
+    }))
+    .is_err());
+}
+
+#[test]
+fn unified_step_absorbs_command_without_id_name_or_phase() {
+    // Pins a behaviour change of qontinui-types 3.1 (BREAKING): id / name /
+    // phase now default, so a command payload lacking all three parses as
+    // `Canonical`. Before 3.1 it failed the canonical parse and fell through to
+    // `Other`, which round-tripped verbatim. Keys the canonical struct does not
+    // model are now DROPPED on re-serialization.
+    let raw = json!({"type": "command", "command": "ls", "unmodelled_key": 42});
+    let step: UnifiedStep = serde_json::from_value(raw).expect("deserialize");
+    let UnifiedStep::Canonical(CanonicalStep::Command(c)) = &step else {
+        panic!("expected Canonical(Command), got {step:?}")
+    };
+    assert_eq!(c.base.id, "");
+    assert_eq!(c.base.name, "");
+    assert_eq!(c.phase, CommandStepPhase::Setup);
+    assert_eq!(c.command.as_deref(), Some("ls"));
+    let back = serde_json::to_value(&step).unwrap();
+    assert!(
+        back.get("unmodelled_key").is_none(),
+        "unmodelled key survived: {back}"
+    );
+    assert_eq!(back["id"], "");
+    assert_eq!(back["phase"], "setup");
+}

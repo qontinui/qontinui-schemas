@@ -62,7 +62,7 @@ export interface UiBridgeStep {
    */
   failOnConsoleErrors?: boolean | null;
   /**
-   * Unique identifier for the step.
+   * Unique identifier for the step. Absent or `null` reads as `""`.
    */
   id: string;
   /**
@@ -76,13 +76,14 @@ export interface UiBridgeStep {
    */
   instruction?: string | null;
   /**
-   * Display name for the step.
+   * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
   /**
-   * Phase in which the step appears.
+   * Phase in which the step appears. Absent or `null` reads as the
+   * phase enum's default (`setup`).
    */
-  phase: UiBridgeStepPhase;
+  phase?: UiBridgeStepPhase & string;
   /**
    * Reference snapshot ID (for `compare` / `snapshot_assert`).
    */

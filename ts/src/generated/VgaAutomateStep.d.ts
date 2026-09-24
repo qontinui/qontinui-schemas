@@ -20,15 +20,17 @@ import type { VgaAction } from "./VgaAction";
  * entry in `action_sequence` by grounding the element prompt against a fresh
  * screenshot and dispatching the HAL click/type/wait primitive.
  *
- * Canonical field name for the VGA state machine reference is
- * `vgaStateMachineId` (camelCase) in emitted/accepted JSON. Two
- * legacy aliases exist for back-compat: `vga_state_machine_id`
- * (snake_case) and the bare `stateMachineId`. New code must emit
- * `vgaStateMachineId`. Aliases may be removed after 2026-Q3.
+ * The VGA state machine reference serializes as `stateMachineId`. Two
+ * aliases are accepted: `state_machine_id`, and `vga_state_machine_id` —
+ * the runner's `ExecutionStepConfig` field name, which is what every
+ * runner-built step carries. The other runner-side `vga_*` names
+ * (`vga_target_process`, `vga_action_sequence`, `vga_timeout_ms`,
+ * `vga_async`) are accepted for the same reason.
  */
 export interface VgaAutomateStep {
   /**
-   * Ordered sequence of VGA actions to execute.
+   * Ordered sequence of VGA actions to execute. Absent or `null` reads as
+   * empty.
    */
   actionSequence?: VgaAction[];
   /**
@@ -55,7 +57,7 @@ export interface VgaAutomateStep {
    */
   failOnConsoleErrors?: boolean | null;
   /**
-   * Unique identifier for the step.
+   * Unique identifier for the step. Absent or `null` reads as `""`.
    */
   id: string;
   /**
@@ -65,7 +67,7 @@ export interface VgaAutomateStep {
     [k: string]: string;
   };
   /**
-   * Display name for the step.
+   * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
   /**
@@ -90,6 +92,9 @@ export interface VgaAutomateStep {
    * UUID referencing `runner.vga_state_machines.id` — the persisted state
    * machine that defines the elements this step may click / type into /
    * wait for.
+   *
+   * `vga_state_machine_id` is the runner's `ExecutionStepConfig` field
+   * name — the key every runner-built `vga_automate` step serializes.
    */
   stateMachineId: string;
   /**

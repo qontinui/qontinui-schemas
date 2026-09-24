@@ -14,6 +14,7 @@ import type { CommandStepPhase } from "./CommandStepPhase";
 import type { DagApprovalStep } from "./DagApprovalStep";
 import type { DagCancelStep } from "./DagCancelStep";
 import type { DagLoopStep } from "./DagLoopStep";
+import type { EffectCheckStep } from "./EffectCheckStep";
 import type { ExecutePlaybookStep } from "./ExecutePlaybookStep";
 import type { NativeAccessibilityStep } from "./NativeAccessibilityStep";
 import type { PlaywrightExecutionMode } from "./PlaywrightExecutionMode";
@@ -22,6 +23,7 @@ import type { PromptStepPhase } from "./PromptStepPhase";
 import type { RestartProcessStep } from "./RestartProcessStep";
 import type { RetrySpec } from "./RetrySpec";
 import type { SaveWorkflowArtifactStep } from "./SaveWorkflowArtifactStep";
+import type { SpecCheckStep } from "./SpecCheckStep";
 import type { TestType } from "./TestType";
 import type { UiBridgeAction } from "./UiBridgeAction";
 import type { UiBridgeAssertType } from "./UiBridgeAssertType";
@@ -40,6 +42,7 @@ import type { WorkflowFixupStep } from "./WorkflowFixupStep";
 import type { WorkflowRefStep } from "./WorkflowRefStep";
 import type { WorkflowStep } from "./WorkflowStep";
 import type { WorkflowStepPhase } from "./WorkflowStepPhase";
+import type { WrapperActionStep } from "./WrapperActionStep";
 
 /**
  * Fully typed discriminated union over **all** step variants registered in
@@ -68,7 +71,7 @@ import type { WorkflowStepPhase } from "./WorkflowStepPhase";
  * |---------|----------|---------|
  * | `Command` | `"command"` | `CommandHandler` (sub-modes: shell/check/check_group/test) |
  * | `Prompt` | `"prompt"` | `PromptStepHandler` |
- * | `UiBridge` | `"ui_bridge"` | `UiBridgeHandler` (actions: navigate/execute/assert/snapshot/compare/snapshot_assert/action_plan) |
+ * | `UiBridge` | `"ui_bridge"` | `UiBridgeHandler` (actions: navigate/execute/assert/snapshot/compare/snapshot_assert/action_plan/wait_for_element/click/element_action/wait) |
  * | `Workflow` | `"workflow"` | `WorkflowStepHandler` |
  * | `CodeExecution` | `"code_execution"` | `CodeExecutionHandler` |
  * | `ExecutePlaybook` | `"execute_playbook"` | `ExecutePlaybookHandler` |
@@ -83,6 +86,9 @@ import type { WorkflowStepPhase } from "./WorkflowStepPhase";
  * | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
  * | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
  * | `DagLoop` | `"dag_loop"` | `dag_nodes::DagLoopHandler` |
+ * | `SpecCheck` | `"spec_check"` | `SpecCheckHandler` |
+ * | `WrapperAction` | `"wrapper_action"` | `WrapperActionHandler` |
+ * | `EffectCheck` | `"effect_check"` | `EffectCheckHandler` |
  *
  * Variant sizes range ~200–672 bytes depending on each step struct's field
  * cardinality. `#[allow(large_enum_variant)]` because the sizes reflect real
@@ -141,4 +147,13 @@ export type FullRunnerStep =
     })
   | (DagLoopStep & {
       type: "dag_loop";
+    })
+  | (SpecCheckStep & {
+      type: "spec_check";
+    })
+  | (WrapperActionStep & {
+      type: "wrapper_action";
+    })
+  | (EffectCheckStep & {
+      type: "effect_check";
     });

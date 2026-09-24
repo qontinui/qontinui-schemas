@@ -135,7 +135,7 @@
 * **rust:** UIBridgeSnapshot carries modalStack/toasts/undoRedo + route ([5d1b1ce](https://github.com/qontinui/qontinui-schemas/commit/5d1b1ce4e99fd797ab5720566c5d46b0f0326faa))
 * **schemas:** add canonical Runner type ([ed315d3](https://github.com/qontinui/qontinui-schemas/commit/ed315d3ac071aa6c2901a14d679728999de9f71a))
 * **schemas:** Add classification thresholds for spec evaluation ([e72c478](https://github.com/qontinui/qontinui-schemas/commit/e72c47894ab2e4ca9d4a8c4e7fb2fc7291e8a2b0))
-* **schemas:** add FullRunnerStep typed union covering all 16 runner step variants ([d2a083c](https://github.com/qontinui/qontinui-schemas/commit/d2a083cdfff6b6376eeeaeccc5ad543332048482))
+* **schemas:** add FullRunnerStep typed union covering all 16 runner step variants (the count at the time; 17 with `vga_automate`, and 20 from the release adding `spec_check` / `wrapper_action` / `effect_check`) ([d2a083c](https://github.com/qontinui/qontinui-schemas/commit/d2a083cdfff6b6376eeeaeccc5ad543332048482))
 * **schemas:** add HTN config fields to UnifiedWorkflow ([c5b35be](https://github.com/qontinui/qontinui-schemas/commit/c5b35be5978cecbb8bb91bd7a7327dbbe4b48af1))
 * **schemas:** add scheduler reliability fields + RemoteAgent task type ([0079343](https://github.com/qontinui/qontinui-schemas/commit/00793432877c3b68cbf2728f7a469a58e348ed0d))
 * **schemas:** auto_commit_subagents field on UnifiedWorkflow ([ea5d4a5](https://github.com/qontinui/qontinui-schemas/commit/ea5d4a5538c55923483dfffdefdcbd5b96c6663a))

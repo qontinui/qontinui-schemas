@@ -128,6 +128,7 @@ from .per_type.display_node import DisplayNode
 from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
+from .per_type.effect_check_step import EffectCheckStep
 from .per_type.element_action_request import ElementActionRequest
 from .per_type.element_bbox import ElementBbox
 from .per_type.element_identifier import ElementIdentifier
@@ -395,6 +396,7 @@ from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
 from .per_type.spec_check_result import SpecCheckResult
+from .per_type.spec_check_step import SpecCheckStep
 from .per_type.spec_check_step_config import SpecCheckStepConfig
 from .per_type.spec_check_summary import SpecCheckSummary
 from .per_type.spec_provenance import SpecProvenance
@@ -549,6 +551,7 @@ from .per_type.workflow_ref_step import WorkflowRefStep
 from .per_type.workflow_stage import WorkflowStage
 from .per_type.workflow_step import WorkflowStep
 from .per_type.workflow_step_phase import WorkflowStepPhase
+from .per_type.wrapper_action_step import WrapperActionStep
 from .per_type.write_config_request import WriteConfigRequest
 from .per_type.write_config_response import WriteConfigResponse
 
@@ -680,6 +683,7 @@ __all__ = [
     "DomainAssignment",
     "DomainKnowledge",
     "DomainVerificationResult",
+    "EffectCheckStep",
     "ElementActionRequest",
     "ElementBbox",
     "ElementIdentifier",
@@ -947,6 +951,7 @@ __all__ = [
     "SpecCheckConfidence",
     "SpecCheckPolicy",
     "SpecCheckResult",
+    "SpecCheckStep",
     "SpecCheckStepConfig",
     "SpecCheckSummary",
     "SpecProvenance",
@@ -1101,6 +1106,7 @@ __all__ = [
     "WorkflowStage",
     "WorkflowStep",
     "WorkflowStepPhase",
+    "WrapperActionStep",
     "WriteConfigRequest",
     "WriteConfigResponse",
 ]

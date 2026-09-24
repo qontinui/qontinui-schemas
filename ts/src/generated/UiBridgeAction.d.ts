@@ -7,6 +7,10 @@
 
 /**
  * UI Bridge action kind.
+ *
+ * `wait_for_element`, `click`, `element_action` and `wait` are the actions
+ * the runner's `UiBridgeHandler` runs beyond the original seven; the
+ * generator and the runner's Builder emit them.
  */
 export type UiBridgeAction =
   | "navigate"
@@ -15,4 +19,8 @@ export type UiBridgeAction =
   | "snapshot"
   | "compare"
   | "snapshot_assert"
-  | "action_plan";
+  | "action_plan"
+  | "wait_for_element"
+  | "click"
+  | "element_action"
+  | "wait";

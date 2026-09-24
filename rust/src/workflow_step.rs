@@ -62,6 +62,23 @@ fn vec_is_empty<T>(v: &[T]) -> bool {
     v.is_empty()
 }
 
+/// Deserialize `null` (and, paired with `#[serde(default)]`, an absent key)
+/// as `T::default()`.
+///
+/// The runner builds every step as an `ExecutionStepConfig`, whose `Option`
+/// fields (`id`, `name`, `phase`, …) serialize as JSON `null` when unset. A
+/// required `String` / phase enum would refuse that `null`, so the typed parse
+/// of a perfectly executable step (an id-less fixer step, a phase-less
+/// Builder step) would fail. This mirrors the runner's own
+/// `unwrap_or_default()` for those fields.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 // ============================================================================
 // HTTP / API helper unions
 // ============================================================================
@@ -251,11 +268,11 @@ pub struct RetrySpec {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct BaseStepFields {
-    /// Unique identifier for the step.
-    #[serde(alias = "id")]
+    /// Unique identifier for the step. Absent or `null` reads as `""`.
+    #[serde(default, deserialize_with = "null_as_default", alias = "id")]
     pub id: String,
-    /// Display name for the step.
-    #[serde(alias = "name")]
+    /// Display name for the step. Absent or `null` reads as `""`.
+    #[serde(default, deserialize_with = "null_as_default", alias = "name")]
     pub name: String,
     /// If `Some(true)`, a console-error signal from the UI fails this step.
     #[serde(
@@ -375,8 +392,9 @@ pub enum CommandMode {
 pub struct CommandStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
-    /// Phase in which the step appears.
-    #[serde(alias = "phase")]
+    /// Phase in which the step appears. Absent or `null` reads as the
+    /// phase enum's default (`setup`).
+    #[serde(default, deserialize_with = "null_as_default", alias = "phase")]
     pub phase: CommandStepPhase,
     /// Execution mode — which sub-kind of command step this is.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "mode")]
@@ -520,8 +538,9 @@ pub struct CommandStep {
 pub struct PromptStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
-    /// Phase in which the step appears.
-    #[serde(alias = "phase")]
+    /// Phase in which the step appears. Absent or `null` reads as the
+    /// phase enum's default (`setup`).
+    #[serde(default, deserialize_with = "null_as_default", alias = "phase")]
     pub phase: PromptStepPhase,
     /// Prompt body.
     #[serde(alias = "content")]
@@ -549,6 +568,10 @@ pub struct PromptStep {
 // ============================================================================
 
 /// UI Bridge action kind.
+///
+/// `wait_for_element`, `click`, `element_action` and `wait` are the actions
+/// the runner's `UiBridgeHandler` runs beyond the original seven; the
+/// generator and the runner's Builder emit them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UiBridgeAction {
@@ -560,6 +583,21 @@ pub enum UiBridgeAction {
     Compare,
     SnapshotAssert,
     ActionPlan,
+    // Plain `//` comments below, not `///`: a doc comment on a variant makes
+    // schemars emit a `oneOf` and the generated TS / Python become unions
+    // instead of a string enum.
+    //
+    // Poll the snapshot until an element matching the criteria in `target`
+    // appears (the generator's canonical readiness gate).
+    WaitForElement,
+    // Find-and-click: resolve the criteria object in `target` against a
+    // fresh snapshot and click the first match.
+    Click,
+    // Forward an element action (click / type / …) to the SDK's action
+    // endpoint.
+    ElementAction,
+    // Plain delay; `target` carries the milliseconds.
+    Wait,
 }
 
 /// Kinds of assertion supported by `assert` actions.
@@ -598,8 +636,9 @@ pub enum UiBridgeSeverity {
 pub struct UiBridgeStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
-    /// Phase in which the step appears.
-    #[serde(alias = "phase")]
+    /// Phase in which the step appears. Absent or `null` reads as the
+    /// phase enum's default (`setup`).
+    #[serde(default, deserialize_with = "null_as_default", alias = "phase")]
     pub phase: UiBridgeStepPhase,
     /// Action kind.
     #[serde(alias = "action")]
@@ -681,8 +720,9 @@ pub struct UiBridgeStep {
 pub struct WorkflowStep {
     #[serde(flatten)]
     pub base: BaseStepFields,
-    /// Phase in which the step appears.
-    #[serde(alias = "phase")]
+    /// Phase in which the step appears. Absent or `null` reads as the
+    /// phase enum's default (`setup`).
+    #[serde(default, deserialize_with = "null_as_default", alias = "phase")]
     pub phase: WorkflowStepPhase,
     /// ID of the saved workflow to run.
     #[serde(alias = "workflow_id")]
@@ -1173,11 +1213,12 @@ pub enum VgaAction {
 /// entry in `action_sequence` by grounding the element prompt against a fresh
 /// screenshot and dispatching the HAL click/type/wait primitive.
 ///
-/// Canonical field name for the VGA state machine reference is
-/// `vgaStateMachineId` (camelCase) in emitted/accepted JSON. Two
-/// legacy aliases exist for back-compat: `vga_state_machine_id`
-/// (snake_case) and the bare `stateMachineId`. New code must emit
-/// `vgaStateMachineId`. Aliases may be removed after 2026-Q3.
+/// The VGA state machine reference serializes as `stateMachineId`. Two
+/// aliases are accepted: `state_machine_id`, and `vga_state_machine_id` —
+/// the runner's `ExecutionStepConfig` field name, which is what every
+/// runner-built step carries. The other runner-side `vga_*` names
+/// (`vga_target_process`, `vga_action_sequence`, `vga_timeout_ms`,
+/// `vga_async`) are accepted for the same reason.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VgaAutomateStep {
@@ -1186,26 +1227,42 @@ pub struct VgaAutomateStep {
     /// UUID referencing `runner.vga_state_machines.id` — the persisted state
     /// machine that defines the elements this step may click / type into /
     /// wait for.
-    #[serde(alias = "state_machine_id")]
+    ///
+    /// `vga_state_machine_id` is the runner's `ExecutionStepConfig` field
+    /// name — the key every runner-built `vga_automate` step serializes.
+    #[serde(alias = "state_machine_id", alias = "vga_state_machine_id")]
     pub state_machine_id: String,
     /// Target process / window — e.g. `"notepad++.exe"`. Used by the HAL to
     /// focus the correct top-level window before each action.
-    #[serde(alias = "target_process")]
+    #[serde(alias = "target_process", alias = "vga_target_process")]
     pub target_process: String,
-    /// Ordered sequence of VGA actions to execute.
+    /// Ordered sequence of VGA actions to execute. Absent or `null` reads as
+    /// empty.
     #[serde(
         default,
+        deserialize_with = "null_as_default",
         skip_serializing_if = "vec_is_empty",
-        alias = "action_sequence"
+        alias = "action_sequence",
+        alias = "vga_action_sequence"
     )]
     pub action_sequence: Vec<VgaAction>,
     /// Overall step timeout in milliseconds. Defaults to `300000` (5 minutes)
     /// on the consumer side; bounds `[1000, 3600000]`.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timeout_ms")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timeout_ms",
+        alias = "vga_timeout_ms"
+    )]
     pub timeout_ms: Option<u64>,
     /// Reserved for future async mode. Currently must be `false` (or omitted)
     /// — the handler rejects `true` until async mode is implemented.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "async")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "async",
+        alias = "vga_async"
+    )]
     pub r#async: Option<bool>,
 }
 
@@ -1384,8 +1441,161 @@ pub struct DagLoopStep {
     pub loop_condition: Option<String>,
 }
 
+// ── SpecCheckStep ────────────────────────────────────────────────────────────
+
+/// Evaluate a page spec against the live UI of a registered app.
+///
+/// Wire tag: `"spec_check"`.
+///
+/// Not [`crate::spec_check::SpecCheckStepConfig`]: that is the camelCase,
+/// `deny_unknown_fields` policy config with no app id. This is the step as the
+/// workflow generator and the runner's `ExecutionStepConfig` carry it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SpecCheckStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// App id whose specs root resolves `spec_check_page_id`. Required at run
+    /// time (the handler refuses a missing one); optional on the wire.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_app_id"
+    )]
+    pub spec_check_app_id: Option<String>,
+    /// Page id whose spec is evaluated.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_page_id"
+    )]
+    pub spec_check_page_id: Option<String>,
+    /// AND-conjunct policy, carried verbatim; the handler reconstitutes the
+    /// typed policy.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_policy"
+    )]
+    pub spec_check_policy: Option<serde_json::Value>,
+    /// Fail the step when the app is unreachable (default `true` on the
+    /// consumer side).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_fail_when_no_app"
+    )]
+    pub spec_check_fail_when_no_app: Option<bool>,
+    /// Fail the step when the page has no spec (default `true` on the
+    /// consumer side).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_fail_when_no_spec"
+    )]
+    pub spec_check_fail_when_no_spec: Option<bool>,
+    /// Snapshot-fetch error kinds that fail the step (lower snake_case, e.g.
+    /// `"not_connected"`, `"timeout"`).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "spec_check_fail_on"
+    )]
+    pub spec_check_fail_on: Option<Vec<String>>,
+}
+
+// ── WrapperActionStep ────────────────────────────────────────────────────────
+
+/// Dispatch a typed action through an installed wrapper.
+///
+/// Wire tag: `"wrapper_action"`.
+///
+/// Serializes with the Builder's keys (`wrapperId`, `actionId`, `params`,
+/// `resultVariable` — what the runner frontend writes) and also accepts the
+/// runner's `ExecutionStepConfig` names (`wrapper_action_id`, `wrapper_params`,
+/// `wrapper_result_variable`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WrapperActionStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Id of the installed wrapper to dispatch through.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "wrapper_id")]
+    pub wrapper_id: Option<String>,
+    /// Id of the action the wrapper exposes.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "action_id",
+        alias = "wrapper_action_id",
+        alias = "wrapperActionId"
+    )]
+    pub action_id: Option<String>,
+    /// Params passed to the action; values may carry `{{ variable }}`
+    /// templates resolved at run time.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "wrapper_params",
+        alias = "wrapperParams"
+    )]
+    pub params: Option<serde_json::Value>,
+    /// Workflow variable the dispatch result is written to (empty / absent =
+    /// not stored).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "result_variable",
+        alias = "wrapper_result_variable",
+        alias = "wrapperResultVariable"
+    )]
+    pub result_variable: Option<String>,
+}
+
+// ── EffectCheckStep ──────────────────────────────────────────────────────────
+
+/// Perform an action on an element and classify the observed effect against
+/// its effect signature (effect calculus).
+///
+/// Wire tag: `"effect_check"`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectCheckStep {
+    #[serde(flatten)]
+    pub base: BaseStepFields,
+    /// Element id to act on. Required at run time; optional on the wire.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "effect_check_element_id"
+    )]
+    pub effect_check_element_id: Option<String>,
+    /// Action to perform (e.g. `"click"`, `"type"`). Required at run time.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "effect_check_action"
+    )]
+    pub effect_check_action: Option<String>,
+    /// Action-specific params forwarded verbatim to the SDK action endpoint.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "effect_check_params"
+    )]
+    pub effect_check_params: Option<serde_json::Value>,
+    /// Expected outcome: `"Confirmed"`, `"Surprise"`, `"Failure"`,
+    /// `"Contradiction"` or `"Partial"`.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "effect_check_expected_outcome"
+    )]
+    pub effect_check_expected_outcome: Option<String>,
+}
+
 // ============================================================================
-// FullRunnerStep — all 16 handler-registered step variants, internally tagged
+// FullRunnerStep — all 20 handler-registered step variants, internally tagged
 // ============================================================================
 
 /// Fully typed discriminated union over **all** step variants registered in
@@ -1414,7 +1624,7 @@ pub struct DagLoopStep {
 /// |---------|----------|---------|
 /// | `Command` | `"command"` | `CommandHandler` (sub-modes: shell/check/check_group/test) |
 /// | `Prompt` | `"prompt"` | `PromptStepHandler` |
-/// | `UiBridge` | `"ui_bridge"` | `UiBridgeHandler` (actions: navigate/execute/assert/snapshot/compare/snapshot_assert/action_plan) |
+/// | `UiBridge` | `"ui_bridge"` | `UiBridgeHandler` (actions: navigate/execute/assert/snapshot/compare/snapshot_assert/action_plan/wait_for_element/click/element_action/wait) |
 /// | `Workflow` | `"workflow"` | `WorkflowStepHandler` |
 /// | `CodeExecution` | `"code_execution"` | `CodeExecutionHandler` |
 /// | `ExecutePlaybook` | `"execute_playbook"` | `ExecutePlaybookHandler` |
@@ -1429,6 +1639,9 @@ pub struct DagLoopStep {
 /// | `DagCancel` | `"dag_cancel"` | `dag_nodes::DagCancelHandler` |
 /// | `DagApproval` | `"dag_approval"` | `dag_nodes::DagApprovalHandler` |
 /// | `DagLoop` | `"dag_loop"` | `dag_nodes::DagLoopHandler` |
+/// | `SpecCheck` | `"spec_check"` | `SpecCheckHandler` |
+/// | `WrapperAction` | `"wrapper_action"` | `WrapperActionHandler` |
+/// | `EffectCheck` | `"effect_check"` | `EffectCheckHandler` |
 ///
 /// Variant sizes range ~200–672 bytes depending on each step struct's field
 /// cardinality. `#[allow(large_enum_variant)]` because the sizes reflect real
@@ -1444,7 +1657,7 @@ pub enum FullRunnerStep {
     Prompt(PromptStep),
     UiBridge(UiBridgeStep),
     Workflow(WorkflowStep),
-    // ── 12 runner-specific variants ──
+    // ── 16 runner-specific variants ──
     CodeExecution(CodeExecutionStep),
     ExecutePlaybook(ExecutePlaybookStep),
     NativeAccessibility(NativeAccessibilityStep),
@@ -1458,6 +1671,9 @@ pub enum FullRunnerStep {
     DagCancel(DagCancelStep),
     DagApproval(DagApprovalStep),
     DagLoop(DagLoopStep),
+    SpecCheck(SpecCheckStep),
+    WrapperAction(WrapperActionStep),
+    EffectCheck(EffectCheckStep),
 }
 
 impl FullRunnerStep {
@@ -1481,6 +1697,9 @@ impl FullRunnerStep {
             Self::DagCancel(_) => "dag_cancel",
             Self::DagApproval(_) => "dag_approval",
             Self::DagLoop(_) => "dag_loop",
+            Self::SpecCheck(_) => "spec_check",
+            Self::WrapperAction(_) => "wrapper_action",
+            Self::EffectCheck(_) => "effect_check",
         }
     }
 }

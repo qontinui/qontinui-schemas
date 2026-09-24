@@ -7,14 +7,14 @@
 
 import type { RetrySpec } from "./RetrySpec";
 import type { VerificationCategoryKind } from "./VerificationCategoryKind";
-import type { VisualAssertionType } from "./VisualAssertionType";
 
 /**
- * Assert visual properties of UI elements via the UI Bridge.
+ * Perform an action on an element and classify the observed effect against
+ * its effect signature (effect calculus).
  *
- * Wire tag: `"ui_bridge_visual_assertion"`.
+ * Wire tag: `"effect_check"`.
  */
-export interface UiBridgeVisualAssertionStep {
+export interface EffectCheckStep {
   /**
    * Acceptance criterion IDs verified by this step.
    */
@@ -23,6 +23,25 @@ export interface UiBridgeVisualAssertionStep {
    * IDs of other steps that must complete first.
    */
   dependsOn?: string[];
+  /**
+   * Action to perform (e.g. `"click"`, `"type"`). Required at run time.
+   */
+  effectCheckAction?: string | null;
+  /**
+   * Element id to act on. Required at run time; optional on the wire.
+   */
+  effectCheckElementId?: string | null;
+  /**
+   * Expected outcome: `"Confirmed"`, `"Surprise"`, `"Failure"`,
+   * `"Contradiction"` or `"Partial"`.
+   */
+  effectCheckExpectedOutcome?: string | null;
+  /**
+   * Action-specific params forwarded verbatim to the SDK action endpoint.
+   */
+  effectCheckParams?: {
+    [k: string]: unknown;
+  };
   /**
    * Extractions published to subsequent steps.
    */
@@ -66,32 +85,8 @@ export interface UiBridgeVisualAssertionStep {
     [k: string]: unknown;
   };
   /**
-   * Timeout in seconds.
-   */
-  timeoutSeconds?: number | null;
-  /**
    * Verification depth category.
    */
   verificationCategory?: VerificationCategoryKind | null;
-  /**
-   * Expected text (for text assertion) or element ID (for screenshot/highlight).
-   */
-  visualAssertionExpected?: string | null;
-  /**
-   * Options JSON for the assertion.
-   */
-  visualAssertionOptions?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Element query JSON for text assertions.
-   */
-  visualAssertionQuery?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Assertion type: `"text"`, `"screenshot"`, or `"highlight"`.
-   */
-  visualAssertionType?: VisualAssertionType | null;
   [k: string]: unknown;
 }

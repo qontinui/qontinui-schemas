@@ -32,7 +32,7 @@ export interface WorkflowStep {
    */
   failOnConsoleErrors?: boolean | null;
   /**
-   * Unique identifier for the step.
+   * Unique identifier for the step. Absent or `null` reads as `""`.
    */
   id: string;
   /**
@@ -42,13 +42,14 @@ export interface WorkflowStep {
     [k: string]: string;
   };
   /**
-   * Display name for the step.
+   * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
   /**
-   * Phase in which the step appears.
+   * Phase in which the step appears. Absent or `null` reads as the
+   * phase enum's default (`setup`).
    */
-  phase: WorkflowStepPhase;
+  phase?: WorkflowStepPhase & string;
   /**
    * Whether this step is required (default: `true` on consumer side).
    */

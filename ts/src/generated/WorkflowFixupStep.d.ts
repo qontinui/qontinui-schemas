@@ -46,7 +46,7 @@ export interface WorkflowFixupStep {
    */
   fixupMode?: WorkflowFixupMode | null;
   /**
-   * Unique identifier for the step.
+   * Unique identifier for the step. Absent or `null` reads as `""`.
    */
   id: string;
   /**
@@ -56,7 +56,7 @@ export interface WorkflowFixupStep {
     [k: string]: string;
   };
   /**
-   * Display name for the step.
+   * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
   /**
