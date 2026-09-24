@@ -5,8 +5,8 @@
  * Runner types are used for local execution, web types for backend API communication.
  *
  * Types generated from Rust (source of truth: qontinui-schemas/rust/src/task_run.rs).
- * Do not edit by hand — regenerate via `just generate-types` (or
- * `qontinui-runner/src-tauri/scripts/generate_types.sh`).
+ * Do not edit by hand — regenerate via
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
 // =============================================================================

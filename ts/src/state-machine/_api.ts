@@ -17,7 +17,7 @@
  *
  * Most wire types in this module are generated from Rust (source of truth:
  * qontinui-schemas/rust/src/state_machine.rs). Do not edit those by hand —
- * regenerate via `just generate-types` (or the runner's generate_types.sh).
+ * regenerate via `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  * A small number of UI-only sugar types remain hand-authored below.
  */
 

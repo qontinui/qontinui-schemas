@@ -7,8 +7,8 @@
  *
  * Tier 1 (enums) and Tier 2 (request/response DTOs) are generated from Rust
  * (source of truth: qontinui-schemas/rust/src/execution.rs). Do not edit
- * those sections by hand — regenerate via `just generate-types` (or
- * `qontinui-runner/src-tauri/scripts/generate_types.sh`).
+ * those sections by hand — regenerate via
+ * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  *
  * Tier 3 (UI display / live-status-stream types) remains hand-authored below.
  */

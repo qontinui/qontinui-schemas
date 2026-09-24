@@ -1,6 +1,6 @@
 // Types generated from Rust (source of truth: qontinui-schemas/rust/src/scheduler.rs).
-// Do not edit by hand — regenerate via `just generate-types` (or
-// `qontinui-runner/src-tauri/scripts/generate_types.sh`).
+// Do not edit by hand — regenerate via
+// `qontinui-runner/src-tauri/scripts/generate_types.sh`.
 export type { ScheduleExpression } from "../generated/ScheduleExpression";
 export type { ConditionScheduleConfig } from "../generated/ConditionScheduleConfig";
 export type { ScheduleConditions } from "../generated/ScheduleConditions";

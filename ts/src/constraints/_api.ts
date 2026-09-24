@@ -1,6 +1,6 @@
 // Types generated from Rust (source of truth: qontinui-schemas/rust/src/constraints.rs).
-// Do not edit by hand — regenerate via `just generate-types` (or
-// `qontinui-runner/src-tauri/scripts/generate_types.sh`).
+// Do not edit by hand — regenerate via
+// `qontinui-runner/src-tauri/scripts/generate_types.sh`.
 export type { Constraint } from "../generated/Constraint";
 export type { ConstraintCheck } from "../generated/ConstraintCheck";
 export type { ConstraintSeverity } from "../generated/ConstraintSeverity";

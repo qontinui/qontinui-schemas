@@ -3,8 +3,9 @@
 //! Canonical DTO types shared across the Qontinui stack.
 //!
 //! Rust is the **single source of truth**. TypeScript and Python bindings are
-//! generated from the JSON Schemas emitted by `schemars` on these types; see
-//! `qontinui-schemas/scripts/` and the `just generate-types` task.
+//! generated from the JSON Schemas emitted by `schemars` on these types;
+//! regenerate with `qontinui-runner/src-tauri/scripts/generate_types.sh`,
+//! which drives the compilers in `qontinui-schemas/scripts/`.
 //!
 //! ## Conventions
 //!
