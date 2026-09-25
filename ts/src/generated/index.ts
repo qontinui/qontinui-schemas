@@ -496,6 +496,7 @@ export type { UIBridgeUndoContext } from './UIBridgeUndoContext';
 export type { UiBridgeAction } from './UiBridgeAction';
 export type { UiBridgeAssertType } from './UiBridgeAssertType';
 export type { UiBridgeComparisonMode } from './UiBridgeComparisonMode';
+export type { UiBridgeComponentActionTarget } from './UiBridgeComponentActionTarget';
 export type { UiBridgeDesignAuditStep } from './UiBridgeDesignAuditStep';
 export type { UiBridgeHttpErrorEnvelope } from './UiBridgeHttpErrorEnvelope';
 export type { UiBridgeHttpHealthAppInfo } from './UiBridgeHttpHealthAppInfo';

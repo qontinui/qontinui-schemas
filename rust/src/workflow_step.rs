@@ -569,16 +569,21 @@ pub struct PromptStep {
 
 /// UI Bridge action kind.
 ///
-/// `wait_for_element`, `click`, `element_action` and `wait` are the actions
-/// the runner's `UiBridgeHandler` runs beyond the original seven; the
-/// generator and the runner's Builder emit them.
+/// `wait_for_element`, `click`, `element_action`, `wait` and
+/// `component_action` are the actions the runner's `UiBridgeHandler` runs
+/// beyond the original seven; the generator and the runner's Builder emit
+/// them.
+///
+/// The default is `snapshot`: both step editors display an action-less step
+/// as `snapshot` and the runner's handler runs it as one, so the typed view
+/// agrees with what the user was shown.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UiBridgeAction {
-    #[default]
     Navigate,
     Execute,
     Assert,
+    #[default]
     Snapshot,
     Compare,
     SnapshotAssert,
@@ -598,6 +603,28 @@ pub enum UiBridgeAction {
     ElementAction,
     // Plain delay; `target` carries the milliseconds.
     Wait,
+    // Run a registered component's action through the SDK's
+    // component-action route; `target` carries a JSON-encoded
+    // `UiBridgeComponentActionTarget`.
+    ComponentAction,
+}
+
+/// Target of a `component_action` step: which registered component, which of
+/// its actions, and the action's parameters.
+///
+/// Carried JSON-encoded in [`UiBridgeStep::target`] (the runner's Builder
+/// writes `JSON.stringify({componentId, actionId, params})`); decode it with
+/// [`UiBridgeStep::component_action_target`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UiBridgeComponentActionTarget {
+    /// Registered component ID.
+    pub component_id: String,
+    /// Action ID on that component.
+    pub action_id: String,
+    /// Action parameters (the action's `paramSchema` shape).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
 }
 
 /// Kinds of assertion supported by `assert` actions.
@@ -708,6 +735,17 @@ pub struct UiBridgeStep {
         alias = "action_plan"
     )]
     pub action_plan: Option<serde_json::Value>,
+}
+
+impl UiBridgeStep {
+    /// Decode [`Self::target`] as a `component_action` target.
+    pub fn component_action_target(&self) -> Result<UiBridgeComponentActionTarget, String> {
+        let raw = self
+            .target
+            .as_deref()
+            .ok_or("component_action requires a target {componentId, actionId, params}")?;
+        serde_json::from_str(raw).map_err(|e| format!("component_action target: {e}"))
+    }
 }
 
 // ============================================================================
@@ -1712,6 +1750,46 @@ impl FullRunnerStep {
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+
+    #[test]
+    fn ui_bridge_action_defaults_to_snapshot() {
+        assert_eq!(UiBridgeAction::default(), UiBridgeAction::Snapshot);
+        let step: UiBridgeStep = serde_json::from_value(json!({
+            "id": "u", "name": "n", "action": "snapshot"
+        }))
+        .unwrap();
+        assert_eq!(step.action, UiBridgeStep::default().action);
+    }
+
+    #[test]
+    fn component_action_step_and_target_parse() {
+        let step: UiBridgeStep = serde_json::from_value(json!({
+            "id": "u", "name": "n", "action": "component_action",
+            "target": r#"{"componentId":"grid","actionId":"setLayout","params":{"layoutId":"single"}}"#
+        }))
+        .unwrap();
+        assert_eq!(step.action, UiBridgeAction::ComponentAction);
+        assert_eq!(
+            step.component_action_target().unwrap(),
+            UiBridgeComponentActionTarget {
+                component_id: "grid".into(),
+                action_id: "setLayout".into(),
+                params: Some(json!({"layoutId": "single"})),
+            }
+        );
+        let bare = UiBridgeStep {
+            target: Some(r#"{"componentId":"c","actionId":"a"}"#.into()),
+            ..Default::default()
+        };
+        assert_eq!(bare.component_action_target().unwrap().params, None);
+        assert!(UiBridgeStep::default().component_action_target().is_err());
+        assert!(UiBridgeStep {
+            target: Some(r#"{"actionId":"a"}"#.into()),
+            ..Default::default()
+        }
+        .component_action_target()
+        .is_err());
+    }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 

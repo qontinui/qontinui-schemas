@@ -58,6 +58,7 @@ export type { PlaywrightExecutionMode } from "../generated/PlaywrightExecutionMo
 export type { CheckType } from "../generated/CheckType";
 export type { CommandMode } from "../generated/CommandMode";
 export type { UiBridgeAction } from "../generated/UiBridgeAction";
+export type { UiBridgeComponentActionTarget } from "../generated/UiBridgeComponentActionTarget";
 export type { VerificationCategoryKind } from "../generated/VerificationCategoryKind";
 
 // ModelOverrides is a hand-authored convenience alias: the generated

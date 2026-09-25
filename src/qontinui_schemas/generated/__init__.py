@@ -498,6 +498,7 @@ from .per_type.ui_bridge_undo_context import UIBridgeUndoContext
 from .per_type.ui_bridge_action import UiBridgeAction
 from .per_type.ui_bridge_assert_type import UiBridgeAssertType
 from .per_type.ui_bridge_comparison_mode import UiBridgeComparisonMode
+from .per_type.ui_bridge_component_action_target import UiBridgeComponentActionTarget
 from .per_type.ui_bridge_design_audit_step import UiBridgeDesignAuditStep
 from .per_type.ui_bridge_http_error_envelope import UiBridgeHttpErrorEnvelope
 from .per_type.ui_bridge_http_health_app_info import UiBridgeHttpHealthAppInfo
@@ -1053,6 +1054,7 @@ __all__ = [
     "UiBridgeAction",
     "UiBridgeAssertType",
     "UiBridgeComparisonMode",
+    "UiBridgeComponentActionTarget",
     "UiBridgeDesignAuditStep",
     "UiBridgeHttpErrorEnvelope",
     "UiBridgeHttpHealthAppInfo",
