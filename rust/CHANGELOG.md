@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v3.1.0...rust-v4.0.0) (2026-09-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* UiBridgeAction's #[default] moves from Navigate to Snapshot. An action-less ui_bridge step is displayed as `snapshot` by both step editors and run as one by the runner's handler; only the typed view said `navigate`. Code that relied on UiBridgeAction::default() (or on UiBridgeStep::default().action) being Navigate now gets Snapshot.
+* FullRunnerStep and UiBridgeAction are public, non-#[non_exhaustive] enums and gain variants, so an exhaustive match on either no longer compiles.
+
+### Features
+
+* FullRunnerStep covers all 20 registered handlers and parses every live step shape ([8502266](https://github.com/qontinui/qontinui-schemas/commit/8502266f3894f5c0c2c7d0485f751ea1835c6ab6))
+* UiBridgeAction defaults to snapshot and gains component_action ([f733c88](https://github.com/qontinui/qontinui-schemas/commit/f733c88910dd559f9618e54098964d9c3c5430bb))
+
 ## [3.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v3.0.0...rust-v3.1.0) (2026-09-23)
 
 
