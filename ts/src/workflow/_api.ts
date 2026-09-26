@@ -96,6 +96,7 @@ export type {
   SingleStepTemplate,
   MultiStepTemplate,
   CompositionTemplate,
+  PlaybookTemplate,
   SkillRef,
   SkillTemplate,
   SkillDefinition,

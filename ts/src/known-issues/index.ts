@@ -5,149 +5,37 @@
  * Issues are scoped to specs, URLs, components, or global.
  */
 
-export type IssueCategory =
-  | "duplication"
-  | "rendering"
-  | "data_integrity"
-  | "timing"
-  | "layout"
-  | "state"
-  | "performance"
-  | "encoding"
-  | "navigation"
-  | "authentication"
-  | "other";
+// Every type below is generated from the runner's
+// `src-tauri/src/known_issue_types.rs` — the wire of the `known_issues` Tauri
+// commands. Do not edit by hand; regenerate via
+// `qontinui-runner/src-tauri/scripts/generate_types.sh`. Generic names are
+// published under a `KnownIssue*` title in the flat generated namespace and
+// re-exported here under the names this module has always used.
 
-export type ScopeType = "global" | "spec" | "url" | "component" | "feature";
+export type { KnownIssueCategory as IssueCategory } from "../generated/KnownIssueCategory";
+export type { KnownIssueScopeType as ScopeType } from "../generated/KnownIssueScopeType";
+export type { KnownIssueDetectionMethod as DetectionMethod } from "../generated/KnownIssueDetectionMethod";
+export type { KnownIssueSeverity } from "../generated/KnownIssueSeverity";
+export type { KnownIssueStatus as IssueStatus } from "../generated/KnownIssueStatus";
+export type { KnownIssueProvenance as IssueProvenance } from "../generated/KnownIssueProvenance";
+export type { KnownIssue } from "../generated/KnownIssue";
+export type { CreateKnownIssueRequest } from "../generated/CreateKnownIssueRequest";
+export type { UpdateKnownIssueRequest } from "../generated/UpdateKnownIssueRequest";
+export type { ListKnownIssuesQuery } from "../generated/ListKnownIssuesQuery";
+export type { CreatePatternTemplateRequest } from "../generated/CreatePatternTemplateRequest";
+export type { IssuePatternTemplateParameter as TemplateParameter } from "../generated/IssuePatternTemplateParameter";
+export type { IssuePatternTemplate } from "../generated/IssuePatternTemplate";
 
-export type DetectionMethod =
-  | "algorithmic"
-  | "ai_judgment"
-  | "visual"
-  | "command"
-  | "ui_bridge";
+import type { KnownIssueCategory } from "../generated/KnownIssueCategory";
+import type { KnownIssueSeverity } from "../generated/KnownIssueSeverity";
+import type { KnownIssueDetectionMethod } from "../generated/KnownIssueDetectionMethod";
 
-export type KnownIssueSeverity = "critical" | "high" | "medium" | "low";
-
-export type IssueStatus = "active" | "resolved" | "monitoring" | "wont_fix";
-
-export type IssueProvenance =
-  | "manual"
-  | "auto_detected"
-  | "reflection"
-  | "imported";
-
-export interface KnownIssue {
-  id: string;
-  title: string;
-  description: string;
-  category: IssueCategory;
-  scope_type: ScopeType;
-  scope_value: string | null;
-  scope_tags: string[];
-  detection_method: DetectionMethod;
-  detection_config: Record<string, unknown>;
-  pattern_template_id: string | null;
-  reproduction_context: string | null;
-  trigger_conditions: string[];
-  severity: KnownIssueSeverity;
-  status: IssueStatus;
-  confidence: number;
-  provenance: IssueProvenance;
-  source_finding_ids: string[];
-  source_task_run_id: string | null;
-  verification_hint: string | null;
-  verification_step_template: Record<string, unknown> | null;
-  times_detected: number;
-  times_checked: number;
-  last_detected_at: string | null;
-  last_checked_at: string | null;
-  resolved_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateKnownIssueRequest {
-  title: string;
-  description: string;
-  category: IssueCategory;
-  scope_type: ScopeType;
-  scope_value?: string | null;
-  scope_tags?: string[];
-  detection_method: DetectionMethod;
-  detection_config?: Record<string, unknown>;
-  pattern_template_id?: string | null;
-  reproduction_context?: string | null;
-  trigger_conditions?: string[];
-  severity: KnownIssueSeverity;
-  provenance?: IssueProvenance;
-  source_finding_ids?: string[];
-  source_task_run_id?: string | null;
-  verification_hint?: string | null;
-  verification_step_template?: Record<string, unknown> | null;
-}
-
-export interface UpdateKnownIssueRequest {
-  title?: string;
-  description?: string;
-  category?: IssueCategory;
-  scope_type?: ScopeType;
-  scope_value?: string | null;
-  scope_tags?: string[];
-  detection_method?: DetectionMethod;
-  detection_config?: Record<string, unknown>;
-  pattern_template_id?: string | null;
-  reproduction_context?: string | null;
-  trigger_conditions?: string[];
-  severity?: KnownIssueSeverity;
-  status?: IssueStatus;
-  confidence?: number;
-  verification_hint?: string | null;
-  verification_step_template?: Record<string, unknown> | null;
-}
-
-export interface ListKnownIssuesQuery {
-  scope_type?: string;
-  scope_value?: string;
-  category?: string;
-  severity?: string;
-  status?: string;
-  spec_id?: string;
-}
-
-export interface CreatePatternTemplateRequest {
-  name: string;
-  description: string;
-  category: string;
-  detection_type: string;
-  ai_prompt_template?: string | null;
-  parameters?: string | null;
-}
-
-export interface TemplateParameter {
-  name: string;
-  type: string;
-  description: string;
-  default?: unknown;
-}
-
-export interface IssuePatternTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  detection_type: string;
-  step_template: Record<string, unknown> | null;
-  ai_prompt_template: string | null;
-  parameters: TemplateParameter[];
-  built_in: boolean;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
+// ---------------------------------------------------------------------------
+// Display metadata (UI-only — no Rust source)
+// ---------------------------------------------------------------------------
 
 /** All issue categories with display labels */
-export const ISSUE_CATEGORIES: { value: IssueCategory; label: string }[] = [
+export const ISSUE_CATEGORIES: { value: KnownIssueCategory; label: string }[] = [
   { value: "duplication", label: "Duplication" },
   { value: "rendering", label: "Rendering" },
   { value: "data_integrity", label: "Data Integrity" },
@@ -170,7 +58,7 @@ export const ISSUE_SEVERITIES: { value: KnownIssueSeverity; label: string }[] = 
 ];
 
 /** All detection methods with display labels */
-export const DETECTION_METHODS: { value: DetectionMethod; label: string }[] = [
+export const DETECTION_METHODS: { value: KnownIssueDetectionMethod; label: string }[] = [
   { value: "algorithmic", label: "Algorithmic (automatic)" },
   { value: "ai_judgment", label: "AI Judgment" },
   { value: "visual", label: "Visual (screenshot)" },
