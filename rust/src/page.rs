@@ -1166,8 +1166,8 @@ mod tests {
     #[test]
     fn refusal_names_the_cursor_and_echoes_nothing_from_the_token() {
         let fp = scope(Uuid::nil(), None);
-        let secret = "c2VjcmV0LXZhbHVl";
-        let err = fp.decode(secret).unwrap_err();
+        let echoed = "bm90LWEtY3Vyc29y"; // base64 of "not-a-cursor"
+        let err = fp.decode(echoed).unwrap_err();
         let msg = err.refusal("/coord/agent-findings");
         assert!(
             msg.starts_with(
@@ -1176,8 +1176,8 @@ mod tests {
             "{msg}"
         );
         assert!(msg.contains("`cursor`"), "{msg}");
-        assert!(!msg.contains(secret), "{msg}");
-        assert!(!err.to_string().contains(secret));
+        assert!(!msg.contains(echoed), "{msg}");
+        assert!(!err.to_string().contains(echoed));
     }
 
     #[test]
