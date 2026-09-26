@@ -81,10 +81,12 @@ def test_scheduled_task_validates_status_enum() -> None:
 # ── DB round-trip validation ──
 #
 # These mirror the Rust integration tests in `rust/tests/round_trip.rs`. They
-# stand in for DB-persisted workflow rows: the full fixture exercises every
+# stand in for DB-persisted workflow rows: the full fixture carries every
 # FullRunnerStep variant; the unknown-step fixture exercises the `list[Any]`
 # fallback that lets the generated Pydantic model preserve runner-specific and
-# forward-compatible step types verbatim.
+# forward-compatible step types verbatim. Here the runner-specific steps are
+# opaque dicts (`UnifiedStep` is `CanonicalStep | Any`), so their field names
+# are checked only by the Rust side's per-variant decode.
 
 
 def test_unified_workflow_full_fixture_roundtrips() -> None:
