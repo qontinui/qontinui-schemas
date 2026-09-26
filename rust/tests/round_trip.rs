@@ -9473,3 +9473,78 @@ fn unified_step_absorbs_command_without_id_name_or_phase() {
     assert_eq!(back["id"], "");
     assert_eq!(back["phase"], "setup");
 }
+
+// ============================================================================
+// Bounded reads — BoundedReadMeta (the Layer-2 envelope every list door serves)
+// ============================================================================
+
+/// A probe page: `total` and nothing counted, a cursor, no narrowing. The
+/// `null`s must survive the trip AS KEYS — on this wire `null` is a value
+/// ("no count ran"), not an absence.
+#[test]
+fn bounded_read_meta_with_null_total_roundtrips() {
+    use qontinui_types::page::{BoundKind, BoundedReadMeta};
+    let wire = json!({
+        "count": 20, "limit": 20, "shown": 20,
+        "total": null, "truncated": true, "bound_kind": "at_least",
+        "next_cursor": "eyJ2IjoxfQ", "available": true, "filter_narrowed": null,
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(meta.bound_kind, BoundKind::AtLeast);
+    assert_eq!(meta.total, None);
+    assert_eq!(serde_json::to_value(&meta).unwrap(), wire);
+
+    let last = json!({
+        "count": 3, "limit": 20, "shown": 3,
+        "total": null, "truncated": false, "bound_kind": "complete",
+        "next_cursor": null, "available": true, "filter_narrowed": null,
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(last.clone()).unwrap();
+    assert_eq!(meta.next_cursor, None);
+    assert_eq!(serde_json::to_value(&meta).unwrap(), last);
+
+    // A RANKED read: truncated, no cursor, and the door that walks the corpus.
+    let ranked = json!({
+        "count": 50, "limit": 50, "shown": 50,
+        "total": null, "truncated": true, "bound_kind": "at_least",
+        "next_cursor": null, "available": true, "filter_narrowed": null,
+        "enumerate_via": "GET /api/v1/memory/records",
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(ranked.clone()).unwrap();
+    assert_eq!(
+        meta.enumerate_via.as_deref(),
+        Some("GET /api/v1/memory/records")
+    );
+    assert_eq!(serde_json::to_value(&meta).unwrap(), ranked);
+}
+
+/// A window-count page: `bound_kind: exact` carries a NUMBER in `total`, and
+/// a narrowed filter rides beside it.
+#[test]
+fn bounded_read_meta_with_exact_total_roundtrips() {
+    use qontinui_types::page::{BoundKind, BoundedReadMeta, FilterNarrowing};
+    let wire = json!({
+        "count": 2, "limit": 2, "shown": 2,
+        "total": 1483, "truncated": true, "bound_kind": "exact",
+        "next_cursor": "abc", "available": true,
+        "filter_narrowed": {"parameter": "resource_keys", "applied": 100, "cap": 100},
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(meta.bound_kind, BoundKind::Exact);
+    assert_eq!(meta.total, Some(1483));
+    assert_eq!(
+        meta.filter_narrowed,
+        Some(FilterNarrowing {
+            parameter: "resource_keys".into(),
+            applied: 100,
+            cap: 100
+        })
+    );
+    let json = serde_json::to_string(&meta).unwrap();
+    let back: BoundedReadMeta = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    assert_eq!(serde_json::to_value(&back).unwrap(), wire);
+}
