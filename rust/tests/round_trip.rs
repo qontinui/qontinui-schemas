@@ -9548,3 +9548,134 @@ fn bounded_read_meta_with_exact_total_roundtrips() {
     assert_eq!(json, serde_json::to_string(&back).unwrap());
     assert_eq!(serde_json::to_value(&back).unwrap(), wire);
 }
+
+// ----------------------------------------------------------------------------
+// BoundedReadMeta — the cross-language fixture contract (Rust half)
+// ----------------------------------------------------------------------------
+//
+// Each `tests/fixtures/bounded_read_meta_*.json` is stored in RFC 8785 (JCS)
+// canonical form, one line. The Rust half here and `tests/test_round_trip.py`
+// both deserialize it into the typed model (the generated Pydantic model on
+// the Python side), re-serialize, canonicalize with JCS and compare BYTES
+// against the file — not `Value`/dict equality, which would pass a key that
+// went missing on the way out as long as the other side also dropped it.
+// Plan `2026-09-05-every-bounded-read-is-a-page-that-reads-as-a-corpus`
+// Phase 1.
+
+/// Every envelope key. `null` is a value on this wire, so each must be
+/// PRESENT on serialization — an absent `total` would read as "older server",
+/// not "no count ran".
+const BOUNDED_READ_META_KEYS: [&str; 10] = [
+    "available",
+    "bound_kind",
+    "count",
+    "enumerate_via",
+    "filter_narrowed",
+    "limit",
+    "next_cursor",
+    "shown",
+    "total",
+    "truncated",
+];
+
+const BOUNDED_READ_META_FIXTURES: [(&str, &str); 7] = [
+    (
+        "exact",
+        include_str!("../../tests/fixtures/bounded_read_meta_exact.json"),
+    ),
+    (
+        "at_least",
+        include_str!("../../tests/fixtures/bounded_read_meta_at_least.json"),
+    ),
+    (
+        "complete",
+        include_str!("../../tests/fixtures/bounded_read_meta_complete.json"),
+    ),
+    (
+        "unknown",
+        include_str!("../../tests/fixtures/bounded_read_meta_unknown.json"),
+    ),
+    (
+        "unavailable",
+        include_str!("../../tests/fixtures/bounded_read_meta_unavailable.json"),
+    ),
+    (
+        "filter_narrowed",
+        include_str!("../../tests/fixtures/bounded_read_meta_filter_narrowed.json"),
+    ),
+    (
+        "ranked_not_pageable",
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json"),
+    ),
+];
+
+#[test]
+fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
+    use qontinui_types::page::BoundedReadMeta;
+    for (name, raw) in BOUNDED_READ_META_FIXTURES {
+        let expected = raw.trim_end_matches('\n');
+        // The fixture itself must already be canonical, or the byte
+        // comparison below would be against a spelling neither side emits.
+        let as_value: Value = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            serde_jcs::to_string(&as_value).unwrap(),
+            expected,
+            "{name}: fixture is not in JCS canonical form"
+        );
+
+        let meta: BoundedReadMeta = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("{name}: fixture does not deserialize: {e}"));
+        let reserialized = serde_json::to_value(&meta).unwrap();
+        let obj = reserialized.as_object().unwrap();
+        for key in BOUNDED_READ_META_KEYS {
+            assert!(
+                obj.contains_key(key),
+                "{name}: key `{key}` missing on serialization"
+            );
+        }
+        assert_eq!(
+            obj.len(),
+            BOUNDED_READ_META_KEYS.len(),
+            "{name}: unexpected extra keys"
+        );
+        assert_eq!(
+            serde_jcs::to_string(&meta).unwrap(),
+            expected,
+            "{name}: JCS bytes diverged after the round trip"
+        );
+
+        // An ABSENT key must be refused, never defaulted to `null`.
+        for key in BOUNDED_READ_META_KEYS {
+            let mut missing = as_value.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(
+                serde_json::from_value::<BoundedReadMeta>(missing).is_err(),
+                "{name}: a payload missing `{key}` deserialized"
+            );
+        }
+    }
+}
+
+/// The producer, not just the model: the constructors a door calls emit
+/// exactly the `unavailable` and `ranked_not_pageable` fixtures.
+#[test]
+fn bounded_read_meta_fixtures_are_what_the_page_constructors_emit() {
+    use qontinui_types::page::Page;
+    let meta = Page::<()>::unavailable(20).meta();
+    assert_eq!(
+        serde_jcs::to_string(&meta).unwrap(),
+        include_str!("../../tests/fixtures/bounded_read_meta_unavailable.json")
+            .trim_end_matches('\n')
+    );
+
+    let ranked = Page::not_pageable(
+        (0..51).collect::<Vec<u32>>(),
+        50,
+        "GET /api/v1/memory/records",
+    );
+    assert_eq!(
+        serde_jcs::to_string(&ranked.meta()).unwrap(),
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json")
+            .trim_end_matches('\n')
+    );
+}
