@@ -132,6 +132,9 @@ BOUNDED_READ_META_FIXTURES = [
     "unavailable",
     "filter_narrowed",
     "ranked_not_pageable",
+    # /memory/query with no capped arm: exact pool size, a ranking that cannot
+    # page (truncated, no cursor, enumerate_via set).
+    "ranked_exact",
 ]
 
 

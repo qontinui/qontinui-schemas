@@ -9578,7 +9578,7 @@ const BOUNDED_READ_META_KEYS: [&str; 10] = [
     "truncated",
 ];
 
-const BOUNDED_READ_META_FIXTURES: [(&str, &str); 7] = [
+const BOUNDED_READ_META_FIXTURES: [(&str, &str); 8] = [
     (
         "exact",
         include_str!("../../tests/fixtures/bounded_read_meta_exact.json"),
@@ -9606,6 +9606,15 @@ const BOUNDED_READ_META_FIXTURES: [(&str, &str); 7] = [
     (
         "ranked_not_pageable",
         include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json"),
+    ),
+    // The shape `POST /memory/query` serves when no retrieval arm was capped:
+    // an EXACT pool size beside a ranking that cannot page, so `truncated`
+    // is true with no cursor and `enumerate_via` names the walk. No Rust
+    // `Page` constructor emits it (a ranking there is always a probe), which
+    // is why it is pinned here as a fixture rather than as a producer test.
+    (
+        "ranked_exact",
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_exact.json"),
     ),
 ];
 
@@ -9678,4 +9687,96 @@ fn bounded_read_meta_fixtures_are_what_the_page_constructors_emit() {
         include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json")
             .trim_end_matches('\n')
     );
+}
+
+/// The wire half of `Page`'s envelope invariant, checked on every fixture.
+///
+/// `Page::envelope_is_consistent` (`rust/src/page.rs`) is PRIVATE — its
+/// constructors enforce it and `Page::meta` `debug_assert!`s it — so it cannot
+/// be called on a deserialized `BoundedReadMeta`. This re-expresses the same
+/// predicate over the wire keys, clause for clause; if the two ever diverge,
+/// `page.rs` is the authority and this copy is the one to fix.
+fn bounded_read_meta_envelope_is_consistent(meta: &qontinui_types::page::BoundedReadMeta) -> bool {
+    let cursor = meta.next_cursor.is_some();
+    let via = meta.enumerate_via.is_some();
+    match (meta.truncated, cursor, via) {
+        // A cursor IS the walk, so it never names another one.
+        (_, true, true) => false,
+        // A cursor only ever sits beside `truncated: true`.
+        (truncated, true, false) => truncated == Some(true),
+        // Truncated with no way forward is only honest for a ranking that
+        // names the door which walks the corpus.
+        (Some(true), false, via) => via,
+        _ => true,
+    }
+}
+
+#[test]
+fn bounded_read_meta_fixtures_satisfy_the_page_envelope_invariant() {
+    use qontinui_types::page::BoundedReadMeta;
+    for (name, raw) in BOUNDED_READ_META_FIXTURES {
+        let meta: BoundedReadMeta = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("{name}: fixture does not deserialize: {e}"));
+        assert!(
+            bounded_read_meta_envelope_is_consistent(&meta),
+            "{name}: fixture violates the Page envelope invariant \
+             (truncated={:?} next_cursor={:?} enumerate_via={:?})",
+            meta.truncated,
+            meta.next_cursor,
+            meta.enumerate_via
+        );
+    }
+}
+
+/// The predicate copy above must REJECT each forbidden state, or the fixture
+/// check is vacuous.
+#[test]
+fn bounded_read_meta_envelope_predicate_rejects_each_forbidden_state() {
+    use qontinui_types::page::BoundedReadMeta;
+    let base: Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/bounded_read_meta_exact.json"
+    ))
+    .unwrap();
+    let with = |truncated: Value, cursor: Value, via: Value| -> BoundedReadMeta {
+        let mut v = base.clone();
+        let o = v.as_object_mut().unwrap();
+        o.insert("truncated".into(), truncated);
+        o.insert("next_cursor".into(), cursor);
+        o.insert("enumerate_via".into(), via);
+        serde_json::from_value(v).unwrap()
+    };
+    // cursor beside enumerate_via
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        json!("tok"),
+        json!("door")
+    )));
+    // cursor beside truncated false / null
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(false),
+        json!("tok"),
+        Value::Null
+    )));
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        Value::Null,
+        json!("tok"),
+        Value::Null
+    )));
+    // truncated with no way forward
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        Value::Null,
+        Value::Null
+    )));
+    // and the two honest truncated shapes pass
+    assert!(bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        json!("tok"),
+        Value::Null
+    )));
+    assert!(bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        Value::Null,
+        json!("door")
+    )));
 }
