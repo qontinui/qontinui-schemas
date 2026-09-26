@@ -119,21 +119,12 @@ export type BuiltInCategoryId =
   | "security"
   | "performance";
 
-export type FindingActionType =
-  | "auto_fix"
-  | "needs_user_input"
-  | "manual"
-  | "informational";
-
-export type FindingStatus =
-  | "detected"
-  | "in_progress"
-  | "needs_input"
-  | "resolved"
-  | "wont_fix"
-  | "deferred";
-
-export type FindingSeverity = "critical" | "high" | "medium" | "low" | "info";
+// Value-identical to the enums in `qontinui-schemas/rust/src/findings.rs`, so
+// they are the generated types rather than hand-kept copies.
+import type { FindingActionType } from "../generated/FindingActionType";
+import type { FindingStatus } from "../generated/FindingStatus";
+import type { FindingSeverity } from "../generated/FindingSeverity";
+export type { FindingActionType, FindingStatus, FindingSeverity };
 
 export type UserInputType = "text" | "choice" | "boolean" | "code";
 
@@ -172,6 +163,11 @@ export interface CodeContext {
   snippet?: string;
 }
 
+// NOTE: this `Finding` is the UI execution-report finding (camelCase, numeric
+// epoch timestamps). It is NOT the generated `Finding`
+// (`qontinui_types::verification::Finding`) nor `RunnerFinding` (the runner's
+// `finding_detected` event payload) — a name collision, not a duplicate — so it
+// stays hand-authored.
 export interface Finding {
   id: string;
   categoryId: string;

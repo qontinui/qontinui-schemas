@@ -36,31 +36,40 @@ export type CanvasComponentType =
   | "MissionBrief"
   | "AcceptanceCriteria";
 
+import type { CanvasPanel as GeneratedCanvasPanel } from "../generated/CanvasPanel";
+import type { AppEvent } from "../generated/AppEvent";
+
+/** Display size of a canvas panel. */
+export type CanvasPanelSize = "compact" | "normal" | "large";
+
 /**
  * A canvas panel rendered in the dashboard.
+ *
+ * Generated from `qontinui-schemas/rust/src/app_events.rs` `CanvasPanel` (the
+ * wire mirror of the runner's `StoredPanel`); do not edit its fields by hand.
+ * The Rust struct types `component`, `size` and `data` as free strings / JSON
+ * because the runner validates them against an allowlist at runtime; the
+ * intersection below narrows them to the vocabulary this module owns.
  */
-export interface CanvasPanel {
-  panel_id: string;
+export type CanvasPanel = GeneratedCanvasPanel & {
   component: CanvasComponentType;
-  title: string;
+  size: CanvasPanelSize;
   data: Record<string, unknown>;
-  priority?: number;
-  size?: "compact" | "normal" | "large";
-  group?: string;
-  task_run_id?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+};
 
 /**
  * Event emitted when a canvas panel is created, updated, or deleted.
+ *
+ * The `data` body of the generated `AppEvent` `CanvasUpdate` variant, with
+ * `action` and `panel` narrowed as above.
  */
-export interface CanvasUpdateEvent {
+export type CanvasUpdateEvent = Extract<
+  AppEvent,
+  { event_type: "CanvasUpdate" }
+>["data"] & {
   action: "create" | "update" | "delete" | "clear";
-  panel_id: string;
-  panel?: CanvasPanel;
-  task_run_id?: string;
-}
+  panel?: CanvasPanel | null;
+};
 
 // ============================================================================
 // Component-specific data schemas
