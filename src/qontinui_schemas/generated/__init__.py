@@ -57,6 +57,8 @@ from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingReque
 from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
 from .per_type.batch_embedding_result import BatchEmbeddingResult
 from .per_type.between_iterations import BetweenIterations
+from .per_type.bound_kind import BoundKind
+from .per_type.bounded_read_meta import BoundedReadMeta
 from .per_type.bounding_box import BoundingBox
 from .per_type.bridge_fingerprint import BridgeFingerprint
 from .per_type.build_phase_config import BuildPhaseConfig
@@ -174,6 +176,7 @@ from .per_type.export_result import ExportResult
 from .per_type.extend_iterations_request import ExtendIterationsRequest
 from .per_type.field_diff import FieldDiff
 from .per_type.file_change import FileChange
+from .per_type.filter_narrowing import FilterNarrowing
 from .per_type.finding import Finding
 from .per_type.finding_action_type import FindingActionType
 from .per_type.finding_batch_create import FindingBatchCreate
@@ -613,6 +616,8 @@ __all__ = [
     "BatchComputeEmbeddingResponse",
     "BatchEmbeddingResult",
     "BetweenIterations",
+    "BoundKind",
+    "BoundedReadMeta",
     "BoundingBox",
     "BridgeFingerprint",
     "BuildPhaseConfig",
@@ -730,6 +735,7 @@ __all__ = [
     "ExtendIterationsRequest",
     "FieldDiff",
     "FileChange",
+    "FilterNarrowing",
     "Finding",
     "FindingActionType",
     "FindingBatchCreate",

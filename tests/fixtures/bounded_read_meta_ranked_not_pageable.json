@@ -1,0 +1,1 @@
+{"available":true,"bound_kind":"at_least","count":50,"enumerate_via":"GET /api/v1/memory/records","filter_narrowed":null,"limit":50,"next_cursor":null,"shown":50,"total":null,"truncated":true}

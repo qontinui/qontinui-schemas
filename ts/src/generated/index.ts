@@ -55,6 +55,8 @@ export type { BatchComputeEmbeddingRequest } from './BatchComputeEmbeddingReques
 export type { BatchComputeEmbeddingResponse } from './BatchComputeEmbeddingResponse';
 export type { BatchEmbeddingResult } from './BatchEmbeddingResult';
 export type { BetweenIterations } from './BetweenIterations';
+export type { BoundKind } from './BoundKind';
+export type { BoundedReadMeta } from './BoundedReadMeta';
 export type { BoundingBox } from './BoundingBox';
 export type { BridgeFingerprint } from './BridgeFingerprint';
 export type { BuildPhaseConfig } from './BuildPhaseConfig';
@@ -172,6 +174,7 @@ export type { ExportResult } from './ExportResult';
 export type { ExtendIterationsRequest } from './ExtendIterationsRequest';
 export type { FieldDiff } from './FieldDiff';
 export type { FileChange } from './FileChange';
+export type { FilterNarrowing } from './FilterNarrowing';
 export type { Finding } from './Finding';
 export type { FindingActionType } from './FindingActionType';
 export type { FindingBatchCreate } from './FindingBatchCreate';
