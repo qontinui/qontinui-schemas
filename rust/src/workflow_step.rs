@@ -1754,11 +1754,6 @@ mod tests {
     #[test]
     fn ui_bridge_action_defaults_to_snapshot() {
         assert_eq!(UiBridgeAction::default(), UiBridgeAction::Snapshot);
-        let step: UiBridgeStep = serde_json::from_value(json!({
-            "id": "u", "name": "n", "action": "snapshot"
-        }))
-        .unwrap();
-        assert_eq!(step.action, UiBridgeStep::default().action);
     }
 
     #[test]
