@@ -894,6 +894,30 @@ fn unknown_step_fixture_roundtrips() {
     );
 }
 
+/// Every wire `"type"` tag `FullRunnerStep` accepts, read from its JSON
+/// schema: each `oneOf` arm pins `properties.type` to one `const`.
+fn full_runner_step_tags() -> std::collections::BTreeSet<String> {
+    let schema = serde_json::to_value(schemars::schema_for!(FullRunnerStep)).unwrap();
+    let arms = schema["oneOf"]
+        .as_array()
+        .expect("FullRunnerStep schema has a oneOf");
+    let tags: std::collections::BTreeSet<String> = arms
+        .iter()
+        .map(|arm| {
+            arm["properties"]["type"]["const"]
+                .as_str()
+                .unwrap_or_else(|| panic!("oneOf arm without a const `type` tag: {}", arm))
+                .to_string()
+        })
+        .collect();
+    assert_eq!(
+        tags.len(),
+        arms.len(),
+        "duplicate `type` tag in FullRunnerStep"
+    );
+    tags
+}
+
 #[test]
 fn full_fixture_every_step_decodes_as_full_runner_step() {
     // Every step in the full-coverage fixture must decode cleanly into
@@ -949,28 +973,17 @@ fn full_fixture_every_step_decodes_as_full_runner_step() {
         }
     }
 
-    // Minimum coverage set — fixture must exercise at least these variants.
-    let required: [&str; 11] = [
-        "command",
-        "prompt",
-        "ui_bridge",
-        "workflow",
-        "code_execution",
-        "native_accessibility",
-        "restart_process",
-        "save_workflow_artifact",
-        "ui_bridge_design_audit",
-        "ui_bridge_visual_assertion",
-        "workflow_fixup",
-    ];
-    for tag in required.iter() {
-        assert!(
-            seen_types.contains(*tag),
-            "full-coverage fixture missing required step type {:?}; saw {:?}",
-            tag,
-            seen_types
-        );
-    }
+    // The fixture must exercise EVERY variant. The tag set is read from
+    // `FullRunnerStep`'s own JSON schema rather than listed here, so a variant
+    // added to the enum fails this test until the fixture carries it.
+    let all_tags = full_runner_step_tags();
+    let missing: Vec<&String> = all_tags.difference(&seen_types).collect();
+    assert!(
+        missing.is_empty(),
+        "full-coverage fixture missing step type(s) {:?}; saw {:?}",
+        missing,
+        seen_types
+    );
 }
 
 #[test]
@@ -9472,4 +9485,53 @@ fn unified_step_absorbs_command_without_id_name_or_phase() {
     );
     assert_eq!(back["id"], "");
     assert_eq!(back["phase"], "setup");
+}
+
+#[test]
+fn full_runner_step_snake_aliases_match_camel_keys() {
+    // The runner's ExecutionStepConfig serializes snake_case names; each step
+    // below must decode to the same value as its camelCase twin. Covers the
+    // variants whose aliases no other test exercises.
+    let pairs = [
+        (
+            json!({"type": "execute_playbook", "id": "p", "name": "n",
+                   "playbook_path": "playbooks/login.md", "timeout_seconds": 300}),
+            json!({"type": "execute_playbook", "id": "p", "name": "n",
+                   "playbookPath": "playbooks/login.md", "timeoutSeconds": 300}),
+        ),
+        (
+            json!({"type": "dag_approval", "id": "a", "name": "n",
+                   "approval_prompt": "Proceed?", "timeout_seconds": 60}),
+            json!({"type": "dag_approval", "id": "a", "name": "n",
+                   "approvalPrompt": "Proceed?", "timeoutSeconds": 60}),
+        ),
+        (
+            json!({"type": "dag_loop", "id": "l", "name": "n",
+                   "max_iterations": 3, "loop_condition": "verify-1"}),
+            json!({"type": "dag_loop", "id": "l", "name": "n",
+                   "maxIterations": 3, "loopCondition": "verify-1"}),
+        ),
+        (
+            json!({"type": "dag_cancel", "id": "c", "name": "n",
+                   "cancel_reason": "unrecoverable"}),
+            json!({"type": "dag_cancel", "id": "c", "name": "n",
+                   "cancelReason": "unrecoverable"}),
+        ),
+        (
+            json!({"type": "workflow_ref", "id": "r", "name": "n",
+                   "workflow_id": "wf-1", "ref_workflow_name": "Release notes",
+                   "ref_workflow_inputs": {"channel": "stable"},
+                   "ref_inherit_model_overrides": false, "timeout_seconds": 900}),
+            json!({"type": "workflow_ref", "id": "r", "name": "n",
+                   "workflowId": "wf-1", "refWorkflowName": "Release notes",
+                   "refWorkflowInputs": {"channel": "stable"},
+                   "refInheritModelOverrides": false, "timeoutSeconds": 900}),
+        ),
+    ];
+    for (snake, camel) in pairs {
+        let from_snake = decode_stable(snake.clone());
+        assert_eq!(from_snake, decode_stable(camel.clone()), "{snake}");
+        // Every snake key landed in a field: nothing was silently dropped.
+        assert_eq!(serde_json::to_value(&from_snake).unwrap(), camel);
+    }
 }

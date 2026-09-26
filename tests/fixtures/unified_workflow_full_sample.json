@@ -55,6 +55,21 @@
       "restartProcessName": "qontinui-backend",
       "restartWaitForHealth": true,
       "timeoutSeconds": 60
+    },
+    {
+      "type": "vga_automate",
+      "id": "setup-vga-0006",
+      "name": "Dismiss first-run dialog",
+      "stateMachineId": "4f6c2a1e-9b3d-4c7e-8a15-2d0e7b9c6f31",
+      "targetProcess": "notepad++.exe",
+      "actionSequence": [
+        {
+          "kind": "click",
+          "elementId": "0b7e3c9a-5d21-4f8e-9c64-1a2b3c4d5e6f",
+          "timeoutMs": 10000
+        }
+      ],
+      "timeoutMs": 60000
     }
   ],
   "verificationSteps": [
@@ -100,6 +115,40 @@
       "fixupInputPath": "{{artifact_dir}}/workflow.json",
       "fixupMode": "validate_criteria",
       "fixupCriteriaPath": "{{artifact_dir}}/criteria.json"
+    },
+    {
+      "type": "spec_check",
+      "id": "verify-spec-0105",
+      "name": "Runs page matches its spec",
+      "specCheckAppId": "qontinui-runner",
+      "specCheckPageId": "runs",
+      "specCheckPolicy": {
+        "requireAllAssertions": true
+      },
+      "specCheckFailWhenNoApp": true,
+      "specCheckFailWhenNoSpec": false,
+      "specCheckFailOn": [
+        "not_connected",
+        "timeout"
+      ]
+    },
+    {
+      "type": "effect_check",
+      "id": "verify-effect-0106",
+      "name": "Save button confirms its effect",
+      "effectCheckElementId": "save-button",
+      "effectCheckAction": "click",
+      "effectCheckParams": {
+        "button": "left"
+      },
+      "effectCheckExpectedOutcome": "Confirmed"
+    },
+    {
+      "type": "dag_approval",
+      "id": "verify-approval-0107",
+      "name": "Approve before agentic phase",
+      "approvalPrompt": "Verification passed — proceed to the agentic phase?",
+      "timeoutSeconds": 3600
     }
   ],
   "agenticSteps": [
@@ -121,6 +170,20 @@
       "interactiveOnly": true,
       "maxElements": 50,
       "timeoutSeconds": 15
+    },
+    {
+      "type": "execute_playbook",
+      "id": "agentic-playbook-0203",
+      "name": "Replay login playbook",
+      "playbookPath": "playbooks/login.md",
+      "timeoutSeconds": 300
+    },
+    {
+      "type": "dag_loop",
+      "id": "agentic-loop-0204",
+      "name": "Retry until green",
+      "maxIterations": 3,
+      "loopCondition": "verify-spec-0105"
     }
   ],
   "completionSteps": [
@@ -153,6 +216,35 @@
       "id": "complete-audit-0304",
       "name": "Design audit on final page",
       "timeoutSeconds": 45
+    },
+    {
+      "type": "wrapper_action",
+      "id": "complete-wrapper-0305",
+      "name": "Post result to tracker",
+      "wrapperId": "issue-tracker",
+      "actionId": "comment",
+      "params": {
+        "body": "Run {{ run_id }} finished"
+      },
+      "resultVariable": "tracker_comment"
+    },
+    {
+      "type": "workflow_ref",
+      "id": "complete-ref-0306",
+      "name": "Run release notes workflow",
+      "workflowId": "7c1d9e2f-3a4b-4c5d-8e6f-0a1b2c3d4e5f",
+      "refWorkflowName": "Release notes",
+      "refWorkflowInputs": {
+        "channel": "stable"
+      },
+      "refInheritModelOverrides": true,
+      "timeoutSeconds": 900
+    },
+    {
+      "type": "dag_cancel",
+      "id": "complete-cancel-0307",
+      "name": "Cancel on unrecoverable failure",
+      "cancelReason": "Unrecoverable failure after retries"
     }
   ],
   "maxIterations": 5,
