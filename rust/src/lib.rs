@@ -112,6 +112,11 @@ pub mod ir;
 pub mod mcp_config;
 pub mod memory;
 pub mod orchestration_config;
+/// Bounded reads — the shared [`page::Page`] type, the [`page::BoundedReadMeta`]
+/// wire envelope and the keyset cursor codec every list-shaped read serves, so a
+/// capped page can no longer read as the corpus. See
+/// `2026-09-05-every-bounded-read-is-a-page-that-reads-as-a-corpus.md` §3.
+pub mod page;
 /// Workspace-root resolution — the single answer to "where do the Qontinui repo
 /// checkouts live on this box?", shared by qontinui-runner and qontinui-coord so
 /// no product binary carries a build machine's layout. See
