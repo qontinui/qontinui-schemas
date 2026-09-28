@@ -53,6 +53,10 @@ on:
       - "rust-runner-client/**"
       - "rust-vision-core/**"
       - "code-graph/**"
+      # Not a workspace member, but rust/tests/fleet_nouns_vocabulary.rs is
+      # its only validator: a data-only edit must still run it on main.
+      - "fleet-nouns.toml"
+      - ".github/scripts/fleet-nouns-portability.*"
       - ".github/workflows/rust-ci.yml"
   workflow_dispatch:
   workflow_call:
@@ -176,3 +180,17 @@ jobs:
             exit 1
           fi
           exit "${SUBRC}"
+
+      - name: fleet-nouns.toml patterns agree across Rust, Python and JS
+        # fleet-nouns.toml promises one meaning per pattern under Rust `regex`,
+        # Python `re` and JS `new RegExp(p)`, because its consumer lints are
+        # written in all three. The Rust test can only run Rust's engine, so it
+        # writes its hit matrix and this step re-evaluates every text in the file
+        # (examples, literals, look-alikes, product constants, non-ASCII probes)
+        # under python3 and node — both preinstalled on ubuntu-latest — and fails
+        # on any disagreement.
+        run: |
+          FLEET_NOUNS_MATRIX_OUT=/tmp/fleet-nouns-rust.json \
+            cargo test -p qontinui-types --test fleet_nouns_vocabulary \
+            hit_matrix_for_the_cross_engine_check
+          python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json

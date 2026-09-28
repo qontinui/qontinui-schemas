@@ -143,6 +143,13 @@
 # 8. NO Swatinem/rust-cache EQUIVALENT. The Actions lane restores a warm cargo
 #    cache; a cold CI node compiles the workspace from scratch, which is why the
 #    compile-bearing steps below carry the maximum per-step timeout.
+#
+# 9. rust-ci's "fleet-nouns.toml patterns agree across Rust, Python and JS"
+#    step is NOT mirrored. It passes the Rust hit matrix to the next command
+#    through FLEET_NOUNS_MATRIX_OUT, which is not in ENV_ALLOWLIST, and it needs
+#    python3 and node on PATH, which this lane cannot provision (gap 7). The
+#    Rust half — rust/tests/fleet_nouns_vocabulary.rs, including the lexical
+#    portable-subset guard — does run here, inside `rust-test`.
 # ===========================================================================
 
 version = 1

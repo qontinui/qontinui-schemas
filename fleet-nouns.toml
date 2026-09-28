@@ -1,0 +1,437 @@
+# fleet-nouns.toml — the ONE vocabulary of "fleet nouns": words that are true on
+# the Qontinui maintainers' own machines and false on every user's install
+# (a sibling-repo checkout, a dev-stack port, the dev-only supervisor, a fleet
+# host name or device id, the maintainers' tenant, an operator's absolute path).
+#
+# DATA ONLY. Every fleet-noun lint reads this file from its sibling
+# qontinui-schemas checkout rather than carrying its own copy; a consumer that
+# cannot find it goes RED WITH THE REASON, never skips (an absent file is
+# UNKNOWN, not "no fleet nouns"). Plan
+# 2026-09-20-the-published-product-works-without-knowing-a-development-environment-exists,
+# Phase A ("One vocabulary, one file").
+#
+# Validated by rust/tests/fleet_nouns_vocabulary.rs (required fields, unique ids,
+# every pattern compiles and stays inside the portable subset, every `examples`
+# / `literals` entry hits its own class, NO product constant or look-alike hits
+# ANY class) and by .github/scripts/fleet-nouns-portability.py in rust-ci, which
+# evaluates every pattern under Python `re` and Node `RegExp` and fails unless
+# both give Rust's hit/no-hit answer for every text in this file.
+#
+# ---------------------------------------------------------------------------
+# SHAPE
+#
+#   version = 1
+#   lookalikes = [ ... ]          text that must hit NO class (negative fixtures)
+#   portability_probes = [ ... ]  text with no expected answer, only that all three
+#                                 engines give the SAME answer (non-ASCII edges)
+#   [[class]]
+#     id                          stable id; reused from the runner roster where one exists
+#     plan_class_names            the plan's working names this id absorbs (mapping below)
+#     pattern                     the text predicate (see PORTABLE SUBSET)
+#     exclude                     optional; see EXCLUDE below
+#     literals                    optional: the literal members a pattern enumerates
+#     examples                    text that MUST hit (planted positives for vacuity guards)
+#     why                         why this is a leak on a user's install
+#     next_action_for_author      what the author of a flagged line does instead
+#   [[product_constant]]
+#     value, why                  true for EVERY user of the product; never a class
+#
+# HOW A CONSUMER MATCHES — the contract every lint implements identically:
+#   * Match ONE LINE at a time with its line terminator stripped (\n and \r\n):
+#     `$` before a trailing newline, and a lone \r, mean different things per
+#     engine.
+#   * JavaScript: `new RegExp(pattern)` from the string, NO flags (not `u`, not
+#     `i`; `g` is allowed only to iterate matches, it changes no match); never a
+#     hand-transcribed /regex/ literal.
+#   * EXCLUDE applies to the MATCHED SPAN, not the line: find every match of
+#     `pattern` (non-overlapping, left to right) and every match of `exclude` in
+#     the same line; a pattern match is discarded when its span overlaps any
+#     exclude span. The line is a hit for the class when at least one pattern
+#     match survives. (So an excluded phrase never hides a genuine hit elsewhere
+#     on the same line.)
+#   * A match SPAN INCLUDES ITS GUARD CHARACTER: boundaries are written as
+#     consuming guards (below), so a span may start or end one character wider
+#     than the noun, and two nouns sharing one separator character can be
+#     counted as one match. Count lines, or treat per-match counts as a floor.
+#
+# PORTABLE SUBSET — every `pattern` / `exclude` must compile, with the same
+# meaning, under Rust `regex`, Python `re` and JavaScript `RegExp` (no flags):
+#   * no lookaround ((?= (?! (?<= (?<!) — Rust `regex` has none;
+#   * no inline flags ((?i) etc.) — JS has no leading inline flag, so case
+#     variants are spelled out as character classes or alternations;
+#   * no named groups ((?P<..> is Python/Rust, (?<..> is JS);
+#   * no \b \B \d \w \s (or their uppercase forms) \A \z \Z \p{..}: Rust and
+#     Python give them Unicode meaning, JS gives them ASCII meaning, so `\b`
+#     before a word after `é` is a boundary in JS and not in Rust. Write
+#     [0-9], explicit classes, ^ and $, and the ASCII word guards
+#     (?:^|[^A-Za-z0-9_]) ... (?:[^A-Za-z0-9_]|$) — a non-ASCII letter is then a
+#     separator in all three engines alike;
+#   * no Rust-only class syntax inside [...]: POSIX `[[:alpha:]]`, nested
+#     classes, set operations `&&` `--` `~~` (JS `v`-flag syntax too); a `||`
+#     inside a class is two literal `|` in all three, but reads as an
+#     alternation to a human — don't write it;
+#   * no `{,n}` quantifier: Rust `regex` rejects it (a compile error, which the
+#     validation test catches), Python reads 0..n, JS matches the literal text
+#     "{,n}" — write `{0,n}`;
+#   * no `.` where a line may carry U+2028/U+2029: JS `.` does not match them
+#     (they are line terminators there), Rust and Python `.` do — prefer an
+#     explicit negated class;
+#   * ASCII-only patterns.
+#
+# ---------------------------------------------------------------------------
+# ONE ID PER CLASS — the mapping from the plan's working names and from the two
+# shipped vocabularies onto the ids below.
+#
+#   plan name             -> id here               runner roster id          check #71 class
+#   sibling_repo_name     -> repo_layout           repo_layout               fleet-repo, workspace-layout
+#   plans_repo_name       -> repo_layout           repo_layout               fleet-repo (qontinui-dev-notes)
+#   dev_stack_port        -> dev_ports             dev_ports                 (none)
+#   supervisor_port       -> supervisor_dependency supervisor_dependency     (none)
+#   tenant_literal        -> tenant_literal        tenant_literal            (none)
+#   operator_drive_root   -> machine_path          machine_path              absolute-path
+#   fleet_host_name       -> fleet_host_name       (none — new here)         fleet-host (FLEET_HOSTS)
+#   fleet_device_uuid     -> fleet_device_uuid     (none — new here)         (none)
+#
+# Sources read (origin/main, 2026-09-28): qontinui-runner
+# src-tauri/tests/workspace_assumptions_are_enumerated.rs (CLASSES) and
+# docs/workspace-assumptions.dispositions.toml; qontinui-claude-config
+# scripts/lint-command-portability.py (CLASSES, FLEET_HOSTS, HOST_RE, REPO_RE,
+# LAYOUT_RE, DRIVE_RE, UNIX_HOME_RE, MSYS_RE, the product-constant self-test).
+#
+# Deliberate differences from those sources, each stated so a consumer that
+# re-points at this file knows what moves:
+#   * `9875` belongs to supervisor_dependency ONLY, and only in a PORT context
+#     (host:9875, a bare `:9875`, `port 9875` / `PORT=9875`) — not a bare
+#     `\b9875\b`, which hits `PR #9875`, `file.rs:9875` and UUID groups. The
+#     roster also lists it under dev_ports; one port, one class.
+#   * dev_ports is the union of the roster's ports and the plan census's
+#     (adds 8001, the embedding service).
+#   * tenant_literal is the maintainers' tenant LITERALLY, not the roster's
+#     "any UUID literal": a generic UUID pattern would swallow
+#     fleet_device_uuid and flag every example id in product prose.
+#   * machine_path's drive-letter arm is anchored to operator roots
+#     (claude, qontinui-root, Projects, Users\<name>; case-insensitive) — not the roster's "any
+#     drive letter then a letter", which hits `C:\Program Files\...` (a correct
+#     install location) and `"x:\t"` format strings.
+#   * `exclude` is SPAN-scoped here (see HOW A CONSUMER MATCHES); the runner
+#     roster's `exclude` is LINE-scoped ("a literal/line also matching this is
+#     NOT a hit"). A consumer porting a roster exclude must re-read it as
+#     span-scoped: it now removes only the matches it overlaps.
+#   * The roster's `plans_dir` class is NOT here: it flags code that reads
+#     `QONTINUI_PLANS_DIR`, and `$QONTINUI_PLANS_DIR` is a product constant
+#     below. The roster keeps it as a runner-local structural class.
+#   * The roster's `os_bound_tooling` class is NOT here: `powershell.exe` /
+#     `taskkill` are correct under cfg(windows), so it is a platform class, not
+#     a fleet noun (plan census, class G). It stays runner-local.
+#   * The roster's Code-target refinements (supervisor-named helper CALLS,
+#     Literal-vs-Code targeting) are structural, not vocabulary; a consumer may
+#     keep such refinements locally but may not redefine a class id here.
+#   * `personal-jspinak` is hit by both tenant_literal (the tenant slug) and
+#     fleet_host_name (`jspinak` is in #71's FLEET_HOSTS as a user name).
+#     Without lookbehind the two cannot be made disjoint; a consumer counting
+#     per class counts it under both, which is true of it.
+#
+# KNOWN GAPS (stated, not silently missed):
+#   * supervisor accessors are caught by the listed verb prefixes (get, default,
+#     fetch, create, resolve, build, new) and suffixes; an accessor spelled with
+#     any other verb (`loadSupervisorUrl`) is not a hit. Widening to "any
+#     lowercase prefix" would hit the in-process `workerSupervisor…` family.
+#   * `MSI` and `monster` are hits only in a machine context
+#     (`MSI laptop|box|machine|host|device`, `monster box|machine|host|device`);
+#     a bare "MSI" (the Windows Installer format) or "monster" (an English word)
+#     naming the machine is missed on purpose — both machines' device ids are
+#     still fleet_device_uuid.
+#   * repo_layout's relative-sibling arm matches `../qontinui-<lowercase,
+#     digits, hyphens>`, so `../qontinui-web2` hits, but a sibling renamed
+#     outside that shape (`../Qontinui_Web`) does not; the env-var arm covers
+#     `QONTINUI_ROOT`, `QONTINUI_WORKSPACE_ROOT` and any `QONTINUI_ROOT_*` /
+#     `QONTINUI_WORKSPACE_ROOT_*` (`QONTINUI_ROOT_DIR`), not other spellings.
+#   * machine_path's `Users\<name>` arm excludes the well-known non-operator
+#     profiles (Public, Default, All Users, Shared) and the literal placeholder
+#     `username`; any other placeholder spelled as a plain word
+#     (`Users\yourname`, `/home/me`) is a hit — write `Users\<you>`,
+#     `%USERNAME%` or `/home/<you>`. `/home/user` and `/home/username` are
+#     excluded as placeholders.
+#   * repo_layout cannot tell a monorepo-INTERNAL relative link from a sibling
+#     checkout: inside one repo, `../<pkg>` naming a package that happens to
+#     share a sibling repo's name (`../qontinui-web` in a packages/ tree) is a
+#     hit. Only the ui-bridge arm is narrowed (to `../ui-bridge` itself and
+#     `../ui-bridge/packages`), because ui-bridge's own packages link to
+#     `../ui-bridge-<pkg>` and `../ui-bridge/dist`.
+#   * dev_ports hits example URLs in user-facing docs (`localhost:8000/health`
+#     in a self-hosting guide). A literal port in a doc for self-hosters is a
+#     correct instruction, not a dependency; such a doc is a disposition
+#     (allowance with a reason), not a pattern change. (`uvicorn --port 8000`
+#     is NOT a hit: dev_ports needs a host before the port.)
+#
+# Product constants (below) are NOT a class, exactly as #71 already rules:
+# `127.0.0.1:9876` is the runner's own resolved port on every install,
+# `~/.qontinui/` is the product's per-user state dir, and so on.
+# ---------------------------------------------------------------------------
+
+version = 1
+
+# Must hit NO class. #71's "product constants and look-alikes are not leaks"
+# self-test, plus near-misses for each class.
+lookalikes = [
+  "$QONTINUI_PLANS_DIR and ${QONTINUI_PLANS_DIR}/x.md",
+  "https://coord.qontinui.io/agents/allocate and https://api.qontinui.io/api/v1",
+  "curl -sS http://127.0.0.1:9876/health",
+  "~/.qontinui/coord-device-jwt and ~/.qontinui/scratch",
+  "sed 's/a/b/g' and file:///tmp/x and localhost:9876/x",
+  "coord_memory_search, coord_register_gate",
+  "qontinui-runner/scripts/build.sh",
+  "Step A:/ then Step B:/",
+  "ab:/c and key:/value",
+  "A Spaceship is not a host",
+  "**Step A:/** and [Step A:/] and |Step A:/|",
+  "the worker_supervisor and task_supervisor modules",
+  "WorkerSupervisorClient::spawn(task)",
+  "an .msi installer bundle",
+  "Download the MSI installer",
+  "https://github.com/qontinui/qontinui-web/pull/1214",
+  "see mcp_api.rs:9875 for the handler",
+  "PR #9875",
+  "uuid 1234abcd-9875-4abc-8def-0123456789ab",
+  "let c = '\\u{9875}';",
+  "the spaceship operator <=>",
+  "https://github.com/jspinak/brobot",
+  "authors = [\"Joshua Spinak <jspinak@alum.mit.edu>\"]",
+  "(../ui-bridge-server)",
+  "\"../ui-bridge/dist\"",
+  "content-label-c231d9da7ac125b6-0",
+  "blob 3e7e4b04aa1",
+  "/home/user/.config and /home/username/x and /Users/username/x",
+  "Install to C:\\Program Files\\Qontinui",
+  "%LOCALAPPDATA%\\Qontinui\\settings.json",
+  "println!(\"x:\\t{}\", v)",
+  "C:/Users/<you>/.qontinui/",
+  "C:\\Users\\Public\\Desktop",
+  "C:/Users/Default/AppData",
+  "C:\\Users\\All Users\\Microsoft",
+  "/Users/Shared/Qontinui",
+  "C:\\Users\\username\\AppData\\Roaming",
+  "c:\\users\\PUBLIC",
+  "localhost:30010 and localhost:80001",
+]
+
+# No expected answer — only that Rust, Python and JS agree. Non-ASCII letters
+# beside nouns, where \b would have split the engines.
+portability_probes = [
+  "é:9875",
+  "é9875",
+  "9875é",
+  "spaceshipé",
+  "éspaceship",
+  "日本 merytshost 日本",
+  "🚀spaceship🚀",
+  "ÅQONTINUI_ROOTÅ",
+  "üc231d9da",
+  "éC:/claude/x",
+  "naïve fetchSupervisorUrl()",
+  "é/home/josh",
+  "\\\\wsl.localhost\\Ubuntu\\home\\spinak",
+  "PORT=8000 uvicorn",
+  "/root/.cargo",
+]
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "repo_layout"
+plan_class_names = ["sibling_repo_name", "plans_repo_name"]
+# 1. #71 workspace-layout: `<workspace-root>` and the workspace dir name.
+# 2. #71 fleet-repo: the two repos this fleet owns that are not product
+#    components (`qontinui-runner/...` and other product repo names are not hits,
+#    matching #71's look-alike rule).
+# 3. roster repo_layout: a RELATIVE sibling checkout (`../qontinui-schemas`,
+#    `../ui-bridge`, `../multistate`), and the `QONTINUI_ROOT` /
+#    `QONTINUI_WORKSPACE_ROOT` variables.
+pattern = '<workspace-root>|(?:^|[^A-Za-z0-9_-])qontinui-(?:root|dev-notes|claude-config)(?:[^A-Za-z0-9_-]|$)|\.\.[/\\](?:qontinui-[a-z][a-z0-9-]*|ui-bridge-auto|multistate)(?:[^A-Za-z0-9_-]|$)|\.\.[/\\]ui-bridge(?:[/\\]packages(?:[^A-Za-z0-9_-]|$)|[^A-Za-z0-9_/\\-]|$)|(?:^|[^A-Za-z0-9_])QONTINUI_(?:WORKSPACE_)?ROOT(?:_[A-Z0-9_]*)?(?:[^A-Za-z0-9_]|$)'
+examples = [
+  "write the plan to qontinui-dev-notes/plans/",
+  "bash <workspace-root>/qontinui-claude-config/scripts/x.sh",
+  "cd ~/Projects/qontinui-root",
+  "qontinui-types = { path = \"../qontinui-schemas/rust\" }",
+  "import from ../ui-bridge/packages/sdk",
+  "cd ../ui-bridge",
+  "path = \"../ui-bridge-auto\"",
+  "let root = std::env::var(\"QONTINUI_ROOT\")",
+  "QONTINUI_ROOT_DIR=/srv/x",
+  "path = \"../qontinui-web2/backend\"",
+]
+why = "Names the maintainers' multi-repo workspace: a sibling checkout, the workspace directory, or a repo that exists only on the fleet (plans, agent config). A user's install has none of these, so text or code that relies on one resolves to nothing there."
+next_action_for_author = "Resolve the thing the name stands for through a product door instead (the plan library API, coord, the runner's own settings), or declare the surface fleet-only (#71 `distribution`, a roster `dev_only_surface` disposition) with the reason."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "dev_ports"
+plan_class_names = ["dev_stack_port"]
+# The local DEV stack: backend 8000, embedding 8001, frontend 3001,
+# Postgres 5432/5433, Redis 6379, MinIO 9000. The runner's own 9876 is a product
+# constant; the supervisor's 9875 is supervisor_dependency.
+pattern = '(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal):(?:8000|8001|3001|5432|5433|6379|9000)(?:[^A-Za-z0-9_]|$)'
+examples = [
+  "curl http://localhost:8000/api/v1/health",
+  "NEXT_PUBLIC_API_URL || \"http://127.0.0.1:8000\"",
+  "open http://localhost:3001/admin",
+  "postgres://u@localhost:5433/qontinui_db",
+  "http://127.0.0.1:8001/embed",
+  "localhost:9000 minio",
+]
+why = "A loopback port of the maintainers' local development stack. A user's install talks to the served backend (api.qontinui.io) and runs no local web backend, frontend, database or object store, so the literal is unreachable there — and a literal fallback hides a missing configuration behind a dead address."
+next_action_for_author = "Read the address from the resolved configuration or the runner's transport resolver; when nothing resolves, surface that as a named, actionable error rather than falling back to a dev-stack literal."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "supervisor_dependency"
+plan_class_names = ["supervisor_port"]
+# The dev-only supervisor (:9875) — its port IN A PORT CONTEXT (a host before
+# the colon; a bare `:9875` whose colon is not glued to a file name, `#` or `.`;
+# `port 9875` / `PORT=9875`), its env vars, and supervisor URL/port/host/client
+# accessors in snake_case, SCREAMING_CASE and camelCase (roster pattern, with
+# the roster's `(?i)` spelled out because JS has no leading inline flag).
+pattern = '(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal):9875(?:[^0-9]|$)|(?:^|[^A-Za-z0-9_.#-]):9875(?:[^0-9]|$)|(?:^|[^A-Za-z0-9])(?:port|Port|PORT)[ :=]{0,3}9875(?:[^0-9]|$)|(?:^|[^A-Za-z0-9_])QONTINUI_SUPERVISOR[A-Z0-9_]*|(?:^|[^A-Za-z0-9_])(?:get_|default_|fetch_|create_|resolve_|build_|new_)?supervisor_(?:url|base|port|endpoint|client|api|host|addr|socket_addr)(?:[^A-Za-z0-9_]|$)|(?:^|[^A-Za-z0-9_])(?:[A-Z0-9]+_)*SUPERVISOR_(?:URL|BASE|PORT|ENDPOINT|CLIENT|API|HOST|ADDR|SOCKET_ADDR)(?:[^A-Za-z0-9_]|$)|(?:^|[^A-Za-z0-9_])(?:(?:get|default|fetch|create|resolve|build|new)Supervisor|supervisor|Supervisor)(?:Url|URL|Base|Port|Endpoint|Client|Api|API|Host|Addr|SocketAddr)(?:[^A-Za-z0-9_]|$)'
+examples = [
+  "curl http://127.0.0.1:9875/health",
+  "listening on :9875",
+  "--port 9875",
+  "SUPERVISOR_PORT=9875",
+  "DEV_BOX_SUPERVISOR_URL=x",
+  "QONTINUI_SUPERVISOR_NO_SERVING_RESTART=1",
+  "let base = get_supervisor_url();",
+  "SupervisorClient::new(addr)",
+  "const supervisorUrl = cfg.supervisorUrl",
+  "await fetchSupervisorUrl()",
+  "createSupervisorClient()",
+]
+why = "The supervisor is a development-only process: end users have no supervisor, no watchdog and no external observer. Behaviour that depends on it works on the maintainers' boxes and silently does nothing on a user's install."
+next_action_for_author = "Put the detection or recovery inside the runner process (the in-process recovery machinery), or, where a supervisor is genuinely optional, probe for it and say what the user gets without it — never let a user-facing path require :9875."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "tenant_literal"
+plan_class_names = ["tenant_literal"]
+# The maintainers' own tenant, by id prefix (either case, anchored on its second
+# group or a word guard, so `...-c231d9da7ac125b6-0` is not a hit) and by slug.
+pattern = '(?:^|[^A-Za-z0-9_])[Cc]231[Dd]9[Dd][Aa](?:-?0[Cc][Aa]8|[^A-Za-z0-9_]|$)|(?:^|[^A-Za-z0-9_])personal-jspinak(?:[^A-Za-z0-9_]|$)'
+literals = ["c231d9da-0ca8-4fe4-bd81-0e3d6c20339a", "personal-jspinak"]
+examples = [
+  "tenant_id = c231d9da-0ca8-4fe4-bd81-0e3d6c20339a",
+  "TENANT C231D9DA-0CA8-4FE4-BD81-0E3D6C20339A",
+  "active tenant c231d9da",
+  "org slug personal-jspinak",
+]
+why = "Hard-codes the maintainers' tenant. Every other tenant's install either reaches into a tenant it does not own or silently reads nothing."
+next_action_for_author = "Resolve the tenant from the caller's credential (the device JWT / session binding); when it cannot be proven, refuse with the reason instead of defaulting to a literal."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "machine_path"
+plan_class_names = ["operator_drive_root"]
+# 1. A drive-letter path into an OPERATOR root: claude, qontinui-root, Projects,
+#    or Users\<name> (not `C:\Program Files\...`, a correct install location).
+# 2. A /home/<user> or /Users/<user> path (roster), with #71's leading guard so
+#    `~/home` and `$HOME/home` are not hits. `~/.qontinui/` is a product constant.
+# 3. #71's MSYS/WSL spelling of an operator directory (/c/Users, /mnt/d/claude).
+# 4. A Windows view into a WSL home: \\wsl.localhost\<distro>\home\<user>
+#    and \\wsl$\<distro>\home\<user>.
+# Drive roots are case-insensitive (Windows paths are); the exclude drops a
+# `Users\<name>` match whose name is a well-known non-operator profile or the
+# placeholder `username` (span-scoped, so another path on the line still hits).
+pattern = '(?:^|[^A-Za-z0-9])[A-Za-z]:(?:\\|/)+(?:[Cc][Ll][Aa][Uu][Dd][Ee]|[Qq][Oo][Nn][Tt][Ii][Nn][Uu][Ii]-[Rr][Oo][Oo][Tt]|[Pp][Rr][Oo][Jj][Ee][Cc][Tt][Ss]|[Uu][Ss][Ee][Rr][Ss](?:\\|/)+[A-Za-z_])|(?:^|[^A-Za-z0-9_.~$}-])/(?:home|Users)/[A-Za-z_][A-Za-z0-9_.-]*|(?:^|[^A-Za-z0-9_.~$}-])/(?:mnt/)?[A-Za-z]/(?:[Uu]sers|[Cc]laude|[Pp]rojects|qontinui-root)(?:[^A-Za-z0-9_]|$)|\\\\wsl(?:\.localhost|\$)\\[^\\]+\\home\\[A-Za-z_]'
+exclude = '[Uu][Ss][Ee][Rr][Ss](?:\\|/)+(?:[Pp]ublic|PUBLIC|[Dd]efault|DEFAULT|[Aa]ll [Uu]sers|ALL USERS|[Ss]hared|SHARED|[Uu]sername|USERNAME)(?:[^A-Za-z0-9_]|$)|/home/(?:user|username)(?:[^A-Za-z0-9_.-]|$)'
+examples = [
+  "read C:/claude/memory-coord-cache/MEMORY-COORD.md",
+  "c:\\users\\josh\\AppData",
+  "D:/projects/qontinui",
+  "C:\\Users\\Public\\x and C:\\Users\\josh\\y",
+  "cd D:\\qontinui-root",
+  "C:\\Users\\josh\\AppData\\Roaming",
+  "cat /home/spinak/.bashrc",
+  "open /Users/josh/Projects",
+  "ls /mnt/c/Users",
+  "\\\\wsl.localhost\\Ubuntu\\home\\spinak",
+  "\\\\wsl$\\Debian\\home\\josh\\x",
+]
+why = "An absolute path on one operator's machine. It does not exist on a user's install, and on another OS it is not even a path."
+next_action_for_author = "Derive the location from a product-level resolver (the config dir, ~/.qontinui/, a configured setting, or an environment variable the product documents), and treat an unresolved location as UNKNOWN with a reason."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "fleet_host_name"
+plan_class_names = ["fleet_host_name"]
+# #71's FLEET_HOSTS (merytshost, spaceship, jspinak) with #71's case rule —
+# merytshost and jspinak in any case, spaceship only lower or ALL CAPS so the
+# English "Spaceship" is not a host — plus the MSI fleet laptop and the
+# `monster` box, but ONLY in a machine context (see KNOWN GAPS). Rust's `<=>` "spaceship operator" is
+# excluded by span, and so is the maintainer's PUBLIC identity — the
+# `github.com/jspinak/...` URL and a `jspinak@<dotted.domain>` author address
+# (a bare `jspinak@<host>` SSH target still hits; `jspinak@<host>.local` is a
+# KNOWN GAP) — which
+# legitimately appear in READMEs and package metadata.
+pattern = '(?:^|[^A-Za-z0-9])(?:[Mm][Ee][Rr][Yy][Tt][Ss][Hh][Oo][Ss][Tt]|[Jj][Ss][Pp][Ii][Nn][Aa][Kk]|spaceship|SPACESHIP|MSI[ -](?:laptop|box|machine|host|device)|monster[ -](?:box|machine|host|device))(?:[^A-Za-z0-9]|$)'
+exclude = 'spaceship operator|SPACESHIP OPERATOR|github\.com/jspinak(?:/|$)|jspinak@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z][A-Za-z]+'
+literals = ["merytshost", "spaceship", "jspinak", "MSI laptop"]
+examples = [
+  "measured on merytshost 2026-09-02",
+  "gh-runner-spaceship-wsl",
+  "run it on the MSI laptop",
+  "measured on the monster box",
+  "SPACESHIP box",
+  "Merytshost",
+  "the spaceship operator <=> ran on spaceship",
+  "ssh jspinak@merytshost",
+]
+why = "Names a maintainer machine or user. Text that names one describes the fleet, not the product; a user reading it is told about machines they do not have."
+next_action_for_author = "Describe the machine by its role or capability (\"the device running the runner\", \"a Linux CI host\") or resolve it at run time (hostname, machine.json); keep dated measurements in dev notes, not in served text."
+
+# ---------------------------------------------------------------------------
+[[class]]
+id = "fleet_device_uuid"
+plan_class_names = ["fleet_device_uuid"]
+# The four fleet device ids, matched by their first group in either case AND
+# anchored on their second group or a word guard, so the full UUID, the 12-hex
+# compact form (`eb2155ed4152`) and the bare 8-hex prefix all hit, but a longer
+# hex run that merely starts with the prefix (`3e7e4b04aa1`) does not.
+pattern = '(?:^|[^A-Za-z0-9_])(?:[Ee][Bb]2155[Ee][Dd](?:-?4152|[^A-Za-z0-9_]|$)|[Cc]79[Aa]07[Dd]5(?:-?7[Ee]40|[^A-Za-z0-9_]|$)|84[Cc]02292(?:-?32[Cc][Bb]|[^A-Za-z0-9_]|$)|3[Ee]7[Ee]4[Bb]04(?:-?75[Dd][Ee]|[^A-Za-z0-9_]|$))'
+literals = [
+  "eb2155ed-4152-4a91-be82-5d4346f717fc", # merytshost
+  "c79a07d5-7e40-49b4-87fa-554c749f9644", # spaceship
+  "84c02292-32cb-4983-be85-d00f868b7003", # MSI
+  "3e7e4b04-75de-4efb-b718-c8ce8fcf7b17", # monster
+]
+examples = [
+  "device_id = \"84c02292-32cb-4983-be85-d00f868b7003\"",
+  "DEVICE EB2155ED-4152-4A91-BE82-5D4346F717FC",
+  "the fleet has four device ids (`eb2155ed4152`, `c79a07d57e40`)",
+  "device:3e7e4b04",
+]
+why = "Names one of the maintainers' registered devices. A user's install has its own device id, so a literal one either addresses a device the user does not own or branches on a machine the product will never run on."
+next_action_for_author = "Read the current device from ~/.qontinui/machine.json or the device credential's claim; express machine-specific behaviour as a capability or setting, not as a device-id branch."
+
+# ---------------------------------------------------------------------------
+# PRODUCT CONSTANTS — true for every user of the product. A lint must never
+# flag these; the validation test fails if any class pattern matches one.
+[[product_constant]]
+value = "127.0.0.1:9876"
+why = "The runner's own HTTP API on the IPv4 loopback — present on every install."
+
+[[product_constant]]
+value = "localhost:9876"
+why = "The same runner API spelled with localhost (slower on Windows, still the product's port)."
+
+[[product_constant]]
+value = "~/.qontinui/"
+why = "The product's per-user state directory on every install."
+
+[[product_constant]]
+value = "coord.qontinui.io"
+why = "The served coordination service every install talks to."
+
+[[product_constant]]
+value = "api.qontinui.io"
+why = "The served web backend every install talks to."
+
+[[product_constant]]
+value = "$QONTINUI_PLANS_DIR"
+why = "The product's documented, optional plans-directory setting; its value is the user's, not the fleet's."
