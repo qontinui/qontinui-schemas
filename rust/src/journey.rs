@@ -37,11 +37,19 @@
 //!   the `trigger` column. This keeps agent-action capture inside the
 //!   structural redaction line of plan
 //!   `2026-07-20-ui-bridge-structural-redaction-enforcement` by construction.
-//! - Every other free string field in these types (`actionType`,
-//!   `targetFingerprint`, `affordanceFingerprint`, roles, spec/state ids,
-//!   pathnames, run and build ids) is an IDENTIFIER the runner derives from
-//!   structure or its own state — never user input. A producer that puts
-//!   user-entered content into one of them is violating this contract.
+//! - No field of a row carries a raw URL path or typed text. Every free
+//!   string field in these types (`actionType`, `targetFingerprint`,
+//!   `affordanceFingerprint`, roles, spec/state ids, `pageLabel`, run and
+//!   build ids) is an IDENTIFIER the runner derives from structure, from an
+//!   app-declared name, or from its own state — never user input. A producer
+//!   that puts user-entered content into one of them is violating this
+//!   contract.
+//! - [`JourneyNode::pathname_template`] is a framework ROUTE PATTERN
+//!   (`/agents/[id]`), never the concrete path (`/agents/42`,
+//!   `/search/<term>`, `/users/<email>`), which can embed user input. The
+//!   concrete path is deliberately not representable; `pageLabel` (an
+//!   app-declared page identifier) stands in for it, and
+//!   [`JourneyNode::validate`] rejects a `pageLabel` containing `/`.
 //!
 //! PRIVACY: the ledger's `timeline` column is deliberately NOT represented
 //! here. Phase 4 of the plan owns it and must add it as a closed
@@ -81,21 +89,16 @@ pub enum JourneyContractError {
         /// What is wrong with it.
         reason: &'static str,
     },
-    /// The outcome contradicts the endpoints: `no_change` between nodes with
-    /// different keys, or `changed` between nodes with the same key.
-    #[error(
-        "outcome is {} but fromNode key {from_key:?} and toNode key {to_key:?} {relation}",
-        .outcome.as_str()
-    )]
-    OutcomeContradictsNodes {
-        /// The outcome the observation carried.
-        outcome: EdgeOutcome,
+    /// The outcome is `no_change` but the endpoints' keys differ. (The
+    /// converse is NOT an error: a `changed` edge may link equal keys — an
+    /// unmodelled `/runs/[id]` → `/runs/[id]`, or a DOM change within the same
+    /// IR states.)
+    #[error("outcome is no_change but fromNode key {from_key:?} and toNode key {to_key:?} differ")]
+    NoChangeAcrossDifferentNodes {
         /// `fromNode.key()`.
         from_key: String,
         /// `toNode.key()`.
         to_key: String,
-        /// `"are equal"` or `"differ"`.
-        relation: &'static str,
     },
     /// A frontier row's `nodeKey` is not `node.key()`.
     #[error("nodeKey {node_key:?} does not match node.key() {expected:?}")]
@@ -116,7 +119,7 @@ pub enum JourneyContractError {
 /// Identity is a deterministic predicate, not a judgment: a node is
 /// `(spec_id, sorted active IR state ids)` within an app. When the page has
 /// no spec, or no state was classified present, the node is UNMODELLED and is
-/// identified by its pathname template (else its pathname) — it still takes
+/// identified by its route template (else its page label) — it still takes
 /// part in reachability and is counted as unmodelled in coverage.
 ///
 /// Build one with [`JourneyNode::new`], which sorts and dedups `state_ids`
@@ -124,7 +127,8 @@ pub enum JourneyContractError {
 /// stored in `journey_frontier.node_key`.
 ///
 /// Node identity is `key()` / `node_key` — NEVER jsonb equality of the
-/// serialized node (which also carries `pathname`, a per-visit detail).
+/// serialized node (which also carries non-identity detail such as
+/// `pageLabel` on a modelled node).
 /// Unlike the crate's other optional fields, this struct's optional fields
 /// always serialize, as `null` when absent, so every stored node has the same
 /// key set.
@@ -145,12 +149,19 @@ pub struct JourneyNode {
     pub state_ids: Vec<String>,
     /// True iff `spec_id` is present AND `state_ids` is non-empty.
     pub modelled: bool,
-    /// The route template (e.g. `/admin/coord/runs/[id]`), when known.
+    /// The framework route PATTERN the snapshot's page was served under
+    /// (e.g. `/admin/coord/runs/[id]`), when known. Never a concrete URL path:
+    /// a concrete path can embed user input (`/search/<term>`,
+    /// `/users/<email>`). Not heuristically validated — the producer must
+    /// fill it from the router's pattern, not from `location.pathname`.
     #[serde(default)]
     pub pathname_template: Option<String>,
-    /// The concrete pathname the snapshot was taken at, when known.
+    /// An APP-DECLARED page identifier. The runner fills it from the
+    /// snapshot's `page.pageContext.meta.tabId`, then `activeTab`, then
+    /// `page.pageContext.name` — never from the URL path. Never a URL path,
+    /// never user input; [`JourneyNode::validate`] rejects one containing `/`.
     #[serde(default)]
-    pub pathname: Option<String>,
+    pub page_label: Option<String>,
 }
 
 impl JourneyNode {
@@ -160,7 +171,7 @@ impl JourneyNode {
         spec_id: Option<String>,
         state_ids: impl IntoIterator<Item = String>,
         pathname_template: Option<String>,
-        pathname: Option<String>,
+        page_label: Option<String>,
     ) -> Self {
         let mut state_ids: Vec<String> = state_ids.into_iter().collect();
         state_ids.sort();
@@ -171,14 +182,14 @@ impl JourneyNode {
             state_ids,
             modelled,
             pathname_template,
-            pathname,
+            page_label,
         }
     }
 
     /// The canonical string identity of this node.
     ///
     /// - modelled: `"<specId>#<stateIds joined by ','>"`
-    /// - unmodelled: `"unmodelled:<pathnameTemplate ?? pathname ?? 'unknown'>"`
+    /// - unmodelled: `"unmodelled:<pathnameTemplate ?? pageLabel ?? 'unknown'>"`
     ///
     /// Precondition for injectivity: the node passes [`JourneyNode::validate`]
     /// — in particular `spec_id` contains no `#` and does not start with
@@ -191,7 +202,7 @@ impl JourneyNode {
                 "unmodelled:{}",
                 self.pathname_template
                     .as_deref()
-                    .or(self.pathname.as_deref())
+                    .or(self.page_label.as_deref())
                     .unwrap_or("unknown")
             ),
         }
@@ -217,6 +228,12 @@ impl JourneyNode {
                     reason: "specId must not start with 'unmodelled:' (the unmodelled key prefix)",
                 });
             }
+        }
+        if self.page_label.as_deref().is_some_and(|l| l.contains('/')) {
+            return Err(JourneyContractError::NonCanonicalNode {
+                which,
+                reason: "pageLabel must not contain '/' (a URL path must never leak into it)",
+            });
         }
         if self.state_ids.iter().any(|id| id.contains(',')) {
             return Err(JourneyContractError::NonCanonicalNode {
@@ -404,7 +421,10 @@ impl EdgeOutcome {
 /// Invariants (checked by [`JourneyEdgeObservation::validate`]; the first also
 /// by the migration's CHECK): `to_node` is `None` iff `outcome` is
 /// [`EdgeOutcome::ToNodeUnobserved`]; `no_change` joins nodes with equal
-/// keys and `changed` joins nodes with different keys.
+/// keys (a `changed` edge may also join equal keys).
+///
+/// The ledger's `timeline` column is deliberately unrepresented until
+/// Phase 4; readers select explicit columns rather than `*`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -457,9 +477,9 @@ pub struct JourneyEdgeObservation {
 impl JourneyEdgeObservation {
     /// Check the contract invariants the type cannot express: `toNode` is
     /// null iff `outcome` is `to_node_unobserved`; both nodes are in
-    /// canonical form; and `no_change` / `changed` agree with whether the
-    /// endpoints' [`JourneyNode::key`]s are equal. A producer calls this before writing a row; a reader
-    /// may call it on a row it did not write.
+    /// canonical form; and a `no_change` edge joins nodes with equal
+    /// [`JourneyNode::key`]s. A producer calls this before writing a row; a
+    /// reader may call it on a row it did not write.
     pub fn validate(&self) -> Result<(), JourneyContractError> {
         let unobserved = self.outcome == EdgeOutcome::ToNodeUnobserved;
         match (&self.to_node, unobserved) {
@@ -480,21 +500,15 @@ impl JourneyEdgeObservation {
         self.from_node.validate_as("fromNode")?;
         if let Some(to) = &self.to_node {
             to.validate_as("toNode")?;
-            let from_key = self.from_node.key();
-            let to_key = to.key();
-            let same = from_key == to_key;
-            let contradicts = match self.outcome {
-                EdgeOutcome::NoChange => !same,
-                EdgeOutcome::Changed => same,
-                _ => false,
-            };
-            if contradicts {
-                return Err(JourneyContractError::OutcomeContradictsNodes {
-                    outcome: self.outcome,
-                    from_key,
-                    to_key,
-                    relation: if same { "are equal" } else { "differ" },
-                });
+            if self.outcome == EdgeOutcome::NoChange {
+                let from_key = self.from_node.key();
+                let to_key = to.key();
+                if from_key != to_key {
+                    return Err(JourneyContractError::NoChangeAcrossDifferentNodes {
+                        from_key,
+                        to_key,
+                    });
+                }
             }
         }
         Ok(())
@@ -641,7 +655,7 @@ mod tests {
             Some("coord-runners".into()),
             ["b".to_string(), "a".to_string(), "b".to_string()],
             Some("/admin/coord/runners".into()),
-            Some("/admin/coord/runners".into()),
+            Some("runners-tab".into()),
         )
     }
 
@@ -727,20 +741,55 @@ mod tests {
             None,
             Vec::<String>::new(),
             Some("/runs/[id]".into()),
-            Some("/runs/42".into()),
+            Some("run-detail".into()),
         );
         assert_eq!(node.key(), "unmodelled:/runs/[id]");
     }
 
     #[test]
-    fn key_unmodelled_with_pathname_only() {
+    fn key_unmodelled_with_page_label_only() {
         let node = JourneyNode::new(
             Some("spec-with-no-state-present".into()),
             Vec::<String>::new(),
             None,
-            Some("/runs/42".into()),
+            Some("run-detail".into()),
         );
-        assert_eq!(node.key(), "unmodelled:/runs/42");
+        assert_eq!(node.key(), "unmodelled:run-detail");
+    }
+
+    #[test]
+    fn page_label_with_a_slash_is_rejected() {
+        // A concrete URL path leaking into pageLabel (it may embed user input).
+        for label in ["/users/someone@example.com", "search/term"] {
+            let node = JourneyNode::new(None, Vec::<String>::new(), None, Some(label.into()));
+            assert_eq!(
+                node.validate(),
+                Err(JourneyContractError::NonCanonicalNode {
+                    which: "node",
+                    reason: "pageLabel must not contain '/' (a URL path must never leak into it)",
+                }),
+                "{label}"
+            );
+        }
+        // And it is rejected inside an edge, too.
+        let mut e = edge(Some(other_node()), EdgeOutcome::Changed);
+        e.to_node.as_mut().unwrap().page_label = Some("/search/secret".into());
+        assert!(matches!(
+            e.validate(),
+            Err(JourneyContractError::NonCanonicalNode {
+                which: "toNode",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn node_has_no_concrete_path_field() {
+        // The published schema must offer no concrete-path property at all.
+        let schema = serde_json::to_value(schemars::schema_for!(JourneyNode)).unwrap();
+        let props = schema["properties"].as_object().unwrap();
+        assert!(!props.contains_key("pathname"));
+        assert!(props.contains_key("pageLabel"));
     }
 
     #[test]
@@ -759,7 +808,7 @@ mod tests {
                 "stateIds": ["a", "b"],
                 "modelled": true,
                 "pathnameTemplate": "/admin/coord/runners",
-                "pathname": "/admin/coord/runners",
+                "pageLabel": "runners-tab",
             })
         );
     }
@@ -1071,33 +1120,29 @@ mod tests {
     fn no_change_with_differing_keys_is_rejected() {
         assert_eq!(
             edge(Some(other_node()), EdgeOutcome::NoChange).validate(),
-            Err(JourneyContractError::OutcomeContradictsNodes {
-                outcome: EdgeOutcome::NoChange,
+            Err(JourneyContractError::NoChangeAcrossDifferentNodes {
                 from_key: "coord-runners#a,b".into(),
                 to_key: "coord-lands#lands-list".into(),
-                relation: "differ",
             })
         );
+        let msg = edge(Some(other_node()), EdgeOutcome::NoChange)
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(msg.starts_with("outcome is no_change "), "{msg}");
     }
 
     #[test]
-    fn changed_with_equal_keys_is_rejected() {
-        // Same key, different pathname: identity is key(), not jsonb equality.
+    fn changed_with_equal_keys_is_valid() {
+        // A DOM change within the same IR states: same key, still `changed`.
         let mut to = modelled_node();
-        to.pathname = Some("/admin/coord/runners?tab=2".into());
-        let err = edge(Some(to), EdgeOutcome::Changed)
-            .validate()
-            .expect_err("changed between equal keys must be rejected");
-        assert_eq!(
-            err,
-            JourneyContractError::OutcomeContradictsNodes {
-                outcome: EdgeOutcome::Changed,
-                from_key: "coord-runners#a,b".into(),
-                to_key: "coord-runners#a,b".into(),
-                relation: "are equal",
-            }
-        );
-        assert!(err.to_string().starts_with("outcome is changed "), "{err}");
+        to.page_label = Some("runners-tab-2".into());
+        assert_eq!(edge(Some(to), EdgeOutcome::Changed).validate(), Ok(()));
+        // An unmodelled /runs/[id] -> /runs/[id] (a different run).
+        let run = JourneyNode::new(None, Vec::<String>::new(), Some("/runs/[id]".into()), None);
+        let mut e = edge(Some(run.clone()), EdgeOutcome::Changed);
+        e.from_node = run;
+        assert_eq!(e.validate(), Ok(()));
     }
 
     #[test]
@@ -1150,7 +1195,7 @@ mod tests {
                 "stateIds": [],
                 "modelled": false,
                 "pathnameTemplate": null,
-                "pathname": null,
+                "pageLabel": null,
             })
         );
         // Absent keys still read as None.
