@@ -21,6 +21,7 @@ pub mod element_snapshot;
 pub mod encode;
 pub mod error;
 pub mod frame;
+pub mod observation;
 pub mod pipeline;
 pub mod stage;
 pub mod strip;
@@ -39,5 +40,9 @@ pub use element_snapshot::{
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};
+pub use observation::{
+    CacheProvenance, Observation, ObservationCoverage, ObservationError, ObservationState,
+    ObservationStatus, Producer, Provenance, UnknownCode, UnknownInfo, UnmeasuredDimension,
+};
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};

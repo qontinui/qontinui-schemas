@@ -4,6 +4,7 @@
 use super::{AnalyzerResult, Finding, Severity};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::ElementSnapshot;
+use crate::observation::UnknownCode;
 
 pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     let coverage = SnapshotCoverage::of(snapshot);
@@ -86,6 +87,7 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     // dimension, i.e. `Degraded` — green, findings intact.
     if coverage.with_geometry == 0 {
         return AnalyzerResult::degraded(
+            UnknownCode::InputMissing,
             format!(
                 "no element carries a bbox (0/{}), so target size (`tiny_target`, WCAG \
                  2.5.8) was not evaluated for any of the {} interactive element(s). The \
