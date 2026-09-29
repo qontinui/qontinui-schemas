@@ -323,6 +323,7 @@ from .per_type.policy_conjunct import PolicyConjunct
 from .per_type.policy_evaluation import PolicyEvaluation
 from .per_type.policy_status import PolicyStatus
 from .per_type.polling_config import PollingConfig
+from .per_type.probe_condition import ProbeCondition
 from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
@@ -885,6 +886,7 @@ __all__ = [
     "PolicyEvaluation",
     "PolicyStatus",
     "PollingConfig",
+    "ProbeCondition",
     "ProcessConfig",
     "ProcessState",
     "ProcessStatus",

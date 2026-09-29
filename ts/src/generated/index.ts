@@ -321,6 +321,7 @@ export type { PolicyConjunct } from './PolicyConjunct';
 export type { PolicyEvaluation } from './PolicyEvaluation';
 export type { PolicyStatus } from './PolicyStatus';
 export type { PollingConfig } from './PollingConfig';
+export type { ProbeCondition } from './ProbeCondition';
 export type { ProcessConfig } from './ProcessConfig';
 export type { ProcessState } from './ProcessState';
 export type { ProcessStatus } from './ProcessStatus';
