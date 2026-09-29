@@ -47,9 +47,15 @@
 //! - [`JourneyNode::pathname_template`] is a framework ROUTE PATTERN
 //!   (`/agents/[id]`), never the concrete path (`/agents/42`,
 //!   `/search/<term>`, `/users/<email>`), which can embed user input. The
-//!   concrete path is deliberately not representable; `pageLabel` (an
-//!   app-declared page identifier) stands in for it, and
-//!   [`JourneyNode::validate`] rejects a `pageLabel` containing `/`.
+//!   concrete path has no field; `pageLabel` (an app-declared page
+//!   identifier) stands in for it.
+//! - The `pageLabel` guarantee is a PRODUCER OBLIGATION, not something this
+//!   crate can check: the producer fills it only from
+//!   `page.pageContext.meta.tabId`, `activeTab` or `page.pageContext.name`
+//!   (slugged), and NEVER from `page.pathname` in any form — raw or slugged.
+//!   [`JourneyNode::validate`]'s rejection of a `/` is only a TRIPWIRE for an
+//!   unslugged path leaking in; a slugged path (`/search/secret` →
+//!   `search-secret`) passes it.
 //!
 //! PRIVACY: the ledger's `timeline` column is deliberately NOT represented
 //! here. Phase 4 of the plan owns it and must add it as a closed
@@ -156,10 +162,20 @@ pub struct JourneyNode {
     /// fill it from the router's pattern, not from `location.pathname`.
     #[serde(default)]
     pub pathname_template: Option<String>,
-    /// An APP-DECLARED page identifier. The runner fills it from the
-    /// snapshot's `page.pageContext.meta.tabId`, then `activeTab`, then
-    /// `page.pageContext.name` — never from the URL path. Never a URL path,
-    /// never user input; [`JourneyNode::validate`] rejects one containing `/`.
+    /// An APP-DECLARED page identifier — never a URL path, never user input.
+    ///
+    /// PRODUCER OBLIGATION (this is the privacy guarantee): fill it only from
+    /// the snapshot's `page.pageContext.meta.tabId`, then `activeTab`, then
+    /// `page.pageContext.name`, and NEVER from `page.pathname` in any form,
+    /// raw or slugged. (The runner's existing `resolve_page_label` in
+    /// `state_discovery/capture.rs` has a fourth fallback that slugs
+    /// `page.pathname`; the journey producer must not use that fallback.)
+    /// `pageContext.name` is a free-form display name (e.g. `"Import /
+    /// Export"`), so the producer SLUGS it before storing — which leaves a
+    /// `/` meaning only one thing: a leaked, unslugged path.
+    ///
+    /// [`JourneyNode::validate`] rejects a `/` as a TRIPWIRE for that leak.
+    /// It is not the guarantee: a slugged path contains no `/` and passes.
     #[serde(default)]
     pub page_label: Option<String>,
 }
@@ -232,7 +248,7 @@ impl JourneyNode {
         if self.page_label.as_deref().is_some_and(|l| l.contains('/')) {
             return Err(JourneyContractError::NonCanonicalNode {
                 which,
-                reason: "pageLabel must not contain '/' (a URL path must never leak into it)",
+                reason: "pageLabel contains '/': tripwire for an unslugged URL path leaking in (the producer must never derive pageLabel from page.pathname)",
             });
         }
         if self.state_ids.iter().any(|id| id.contains(',')) {
@@ -759,14 +775,15 @@ mod tests {
 
     #[test]
     fn page_label_with_a_slash_is_rejected() {
-        // A concrete URL path leaking into pageLabel (it may embed user input).
+        // Tripwire: an unslugged URL path leaking into pageLabel. A SLUGGED
+        // path would pass — the guarantee is the producer's obligation.
         for label in ["/users/someone@example.com", "search/term"] {
             let node = JourneyNode::new(None, Vec::<String>::new(), None, Some(label.into()));
             assert_eq!(
                 node.validate(),
                 Err(JourneyContractError::NonCanonicalNode {
                     which: "node",
-                    reason: "pageLabel must not contain '/' (a URL path must never leak into it)",
+                    reason: "pageLabel contains '/': tripwire for an unslugged URL path leaking in (the producer must never derive pageLabel from page.pathname)",
                 }),
                 "{label}"
             );
