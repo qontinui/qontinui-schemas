@@ -10,8 +10,10 @@
 # rust/tests/glossary_source.rs, which fails when:
 #   * the generated file does not match this file (regenerate:
 #     `QONTINUI_GLOSSARY_REGENERATE=1 cargo test -p qontinui-types --test glossary_source`);
-#   * this file's content changed but `version` was not raised above the
-#     generated file's GLOSSARY_VERSION (the regenerate mode refuses too);
+#   * this file's CONTENT changed but `version` was not raised — checked
+#     against the append-only ledger glossary/versions.lock, whose digest is
+#     of the parsed terms, so comment and formatting edits need no bump (the
+#     regenerate mode refuses too, and appends the new version otherwise);
 #   * an id is not stable snake_case or is duplicated, a `short` exceeds 160
 #     characters, a `long` exceeds 1200, a `see_also` names no term (dangling)
 #     or the term itself, `since` is not in 1..=version;
@@ -19,7 +21,7 @@
 #     definitions ship to every user, so they speak in product terms only.
 #
 # SHAPE
-#   version = <integer>     raise by one on EVERY content change
+#   version = <integer>     raise by one on every change to a term
 #   [[term]]
 #     id        stable snake_case id; never renamed (consumers cite it by id)
 #     term      the display name
@@ -50,11 +52,11 @@ since = 1
 [[term]]
 id = "continuation"
 term = "Continuation"
-short = "The action a gate performs when it clears: start an agent session, queue a pull request to land, or just notify."
+short = "The action a gate performs when it clears: start an agent session, queue a pull request to land, deploy, migrate, or just notify."
 long = """
 A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.
 
-Actions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), or *notify only*. Deploys and migrations only ever notify.
+Actions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Merge, deploy and migrate pass a safety check first and notify instead when it does not clear them; deploy and migrate notify by default and run only where the tenant has enabled that executor.
 
 Delivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.
 """
@@ -136,11 +138,11 @@ id = "merge_train"
 term = "Merge train"
 short = "The service that lands pull requests: it rebases each onto the latest main, runs CI, keeps overlapping changes apart and lands them in order."
 long = """
-The **merge train** is the only thing that lands pull requests on a managed repository. A green, non-draft pull request is queued with nothing further to do.
+By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do.
 
-For each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out, with a label that moves a change into a *land next* band.
+For each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.
 
-Only draft status, or a gate carrying a merge continuation, holds a pull request back. Its answer for one pull request is the **merge verdict**.
+What holds a pull request back: draft status, a gate carrying a merge continuation, or a dependency label naming another pull request that has not landed yet. Its answer for one pull request is the **merge verdict**.
 """
 see_also = ["merge_verdict", "landed", "continuation"]
 since = 1
@@ -325,7 +327,7 @@ short = "The isolation boundary that owns repositories, devices, gates, work uni
 long = """
 A **tenant** is the unit of ownership and isolation. Repositories, devices, gates, work units, findings, policies and intent documents all belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.
 
-The web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only once the tenant's rollout is live.
+The web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only where the tenant has automatic merging enabled, the repository has merging enabled, and the tenant has not paused merging; a tenant-wide pause overrides every repository.
 """
 see_also = ["device", "operator", "policy", "intent_document"]
 since = 1
@@ -337,7 +339,7 @@ short = "A registered machine running the runner. Pairing links it to your accou
 long = """
 A **device** is a machine (or runner instance) the product knows by its device id. The id is an identifier, not a secret.
 
-**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. The service works out the device's tenant from that credential; the device never claims it.
+**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. On authenticated requests the service works out the device's tenant from that credential rather than from anything the device asserts.
 
 Work is sent only to devices that are paired, heartbeating, capable of the work and not drained.
 """
@@ -361,9 +363,9 @@ id = "coord"
 term = "Coord"
 short = "The coordination service: claims, work units, gates, sessions, devices, tenants, policies and the merge train."
 long = """
-**Coord** is the central coordination service. It holds claims, work units, gates and their continuations, findings and dossiers, policy and intent documents, agent sessions, devices and tenants, and it runs the merge train, which makes it the only authority that lands pull requests.
+**Coord** is the central coordination service. It holds claims, work units, gates and their continuations, findings and dossiers, policy and intent documents, agent sessions, devices and tenants, and it runs the merge train, which policy makes the one route by which pull requests land.
 
-Agents reach it through tools and over HTTP. It knows nothing about plan files; plans reach it as work units.
+Agents reach it through tools and over HTTP. It does not read plan files; plans reach it as work units.
 """
 see_also = ["merge_train", "gate", "work_unit", "tenant", "runner"]
 since = 1

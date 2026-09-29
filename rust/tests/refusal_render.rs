@@ -33,8 +33,14 @@ fn every_shape() -> Vec<Refusal> {
     let delays = [None, Some(0), Some(1), Some(45), Some(u32::MAX)];
     let discriminators = [None, Some(""), Some("backend")];
     let mut out = Vec::new();
+    // Every producer kind plus the reader-side `Unrecognised`, which renders too.
+    let kinds: Vec<NextActionKind> = NextActionKind::ALL
+        .iter()
+        .copied()
+        .chain([NextActionKind::Unrecognised])
+        .collect();
     for &code in RefusalCode::ALL {
-        for &kind in NextActionKind::ALL {
+        for &kind in &kinds {
             for target in targets {
                 for retry_after_s in delays {
                     for disc in discriminators {
@@ -59,7 +65,7 @@ fn render_is_never_empty_and_never_names_a_fleet_noun() {
     let shapes = every_shape();
     assert_eq!(
         shapes.len(),
-        RefusalCode::ALL.len() * NextActionKind::ALL.len() * 5 * 5 * 3
+        RefusalCode::ALL.len() * (NextActionKind::ALL.len() + 1) * 5 * 5 * 3
     );
     let mut bad = Vec::new();
     for r in &shapes {
@@ -89,7 +95,10 @@ fn no_table_string_names_a_fleet_noun() {
         assert!(!code.headline().trim().is_empty(), "{code:?}");
         assert!(nouns.hits(code.headline()).is_empty(), "{code:?}");
     }
-    for &kind in NextActionKind::ALL {
+    for &kind in NextActionKind::ALL
+        .iter()
+        .chain([&NextActionKind::Unrecognised])
+    {
         let s = NextAction::new(kind).render();
         assert!(!s.trim().is_empty(), "{kind:?}");
         assert!(nouns.hits(&s).is_empty(), "{kind:?}: {s}");
