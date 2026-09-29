@@ -109,6 +109,10 @@ pub mod git_ops;
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
 pub mod ir;
+/// Journey twin — observed edges between IR-named page configurations and
+/// the frontier of seen-but-never-activated affordances. See
+/// `2026-09-20-ui-bridge-represents-the-users-path-and-the-passage-of-time.md`.
+pub mod journey;
 pub mod mcp_config;
 pub mod memory;
 pub mod orchestration_config;
