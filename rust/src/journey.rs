@@ -17,17 +17,36 @@
 //!
 //! - Structs serialize as `camelCase`; unit enums as `snake_case` strings,
 //!   exactly the values the migration's CHECK constraints list.
+//! - Every enum is `#[schemars(inline)]` (as [`crate::ir::IrEffect`] is), so
+//!   the generated schemas carry the closed value sets inline and the runner's
+//!   `schema_export.rs` need register only the structs — a `$ref` to an
+//!   unregistered enum would render as an undeclared TypeScript name.
 //! - Optional fields follow the crate convention
 //!   (`#[serde(default, skip_serializing_if = "Option::is_none")]`), so an
-//!   absent key and `null` both read as "not reported".
-//! - [`JourneyTrigger`] carries `#[serde(deny_unknown_fields)]` and has NO
-//!   field for a typed text or value. That absence is the privacy control:
-//!   a typed value is not representable in the ledger, so passive recording
-//!   stays inside the structural redaction line (plan
-//!   `2026-07-20-ui-bridge-structural-redaction-enforcement`) by construction
-//!   rather than by a caller remembering to strip it.
+//!   absent key and `null` both read as "not reported" — EXCEPT on
+//!   [`JourneyNode`], whose optional fields always serialize (as `null` when
+//!   absent). Node identity is [`JourneyNode::key`] / `node_key`, never jsonb
+//!   equality.
 //! - [`crate::ir::IrEffect`] is reused for declared effects; there is no
 //!   journey-specific effect enum.
+//!
+//! ## Privacy — what holds, exactly
+//!
+//! - [`JourneyTrigger`] is CLOSED: `#[serde(deny_unknown_fields)]`, and it has
+//!   no field for a typed text or value, so a caller cannot smuggle one into
+//!   the `trigger` column. This keeps agent-action capture inside the
+//!   structural redaction line of plan
+//!   `2026-07-20-ui-bridge-structural-redaction-enforcement` by construction.
+//! - Every other free string field in these types (`actionType`,
+//!   `targetFingerprint`, `affordanceFingerprint`, roles, spec/state ids,
+//!   pathnames, run and build ids) is an IDENTIFIER the runner derives from
+//!   structure or its own state — never user input. A producer that puts
+//!   user-entered content into one of them is violating this contract.
+//!
+//! PRIVACY: the ledger's `timeline` column is deliberately NOT represented
+//! here. Phase 4 of the plan owns it and must add it as a closed
+//! (`deny_unknown_fields`) type with no value/text slot — never as an open
+//! `serde_json::Value`, which would make a typed value representable again.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -42,7 +61,8 @@ pub enum JourneyContractError {
     /// outcome is `to_node_unobserved` but a `toNode` is present. The two are
     /// the same fact and must agree (the migration's CHECK enforces the same).
     #[error(
-        "toNode is {to_node} but outcome is {outcome:?}; toNode must be null iff outcome is to_node_unobserved"
+        "toNode is {to_node} but outcome is {}; toNode must be null iff outcome is to_node_unobserved",
+        .outcome.as_str()
     )]
     ToNodeOutcomeMismatch {
         /// `"null"` or `"present"`.
@@ -60,6 +80,22 @@ pub enum JourneyContractError {
         which: &'static str,
         /// What is wrong with it.
         reason: &'static str,
+    },
+    /// The outcome contradicts the endpoints: `no_change` between nodes with
+    /// different keys, or `changed` between nodes with the same key.
+    #[error(
+        "outcome is {} but fromNode key {from_key:?} and toNode key {to_key:?} {relation}",
+        .outcome.as_str()
+    )]
+    OutcomeContradictsNodes {
+        /// The outcome the observation carried.
+        outcome: EdgeOutcome,
+        /// `fromNode.key()`.
+        from_key: String,
+        /// `toNode.key()`.
+        to_key: String,
+        /// `"are equal"` or `"differ"`.
+        relation: &'static str,
     },
     /// A frontier row's `nodeKey` is not `node.key()`.
     #[error("nodeKey {node_key:?} does not match node.key() {expected:?}")]
@@ -86,23 +122,34 @@ pub enum JourneyContractError {
 /// Build one with [`JourneyNode::new`], which sorts and dedups `state_ids`
 /// and derives `modelled`; [`JourneyNode::key`] is the canonical string form
 /// stored in `journey_frontier.node_key`.
+///
+/// Node identity is `key()` / `node_key` — NEVER jsonb equality of the
+/// serialized node (which also carries `pathname`, a per-visit detail).
+/// Unlike the crate's other optional fields, this struct's optional fields
+/// always serialize, as `null` when absent, so every stored node has the same
+/// key set.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct JourneyNode {
     /// The page spec the snapshot matched; `None` = no spec for this page.
     /// Load-bearing: some state ids are declared on more than one page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Must not contain `#` or start with `unmodelled:` (see [`JourneyNode::key`]).
+    #[serde(default)]
     pub spec_id: Option<String>,
-    /// Ids of the IR states classified present — sorted ascending, deduped.
+    /// Ids of the IR states classified present — deduped, in BYTE-WISE
+    /// (UTF-8) ascending order, i.e. Rust's `str` ordering. Producers in
+    /// other languages must sort by UTF-8 bytes (not UTF-16 code units, not
+    /// a locale collation) or their keys will not match. No id may contain
+    /// `,` (see [`JourneyNode::key`]).
     pub state_ids: Vec<String>,
     /// True iff `spec_id` is present AND `state_ids` is non-empty.
     pub modelled: bool,
     /// The route template (e.g. `/admin/coord/runs/[id]`), when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub pathname_template: Option<String>,
     /// The concrete pathname the snapshot was taken at, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub pathname: Option<String>,
 }
 
@@ -132,6 +179,11 @@ impl JourneyNode {
     ///
     /// - modelled: `"<specId>#<stateIds joined by ','>"`
     /// - unmodelled: `"unmodelled:<pathnameTemplate ?? pathname ?? 'unknown'>"`
+    ///
+    /// Precondition for injectivity: the node passes [`JourneyNode::validate`]
+    /// — in particular `spec_id` contains no `#` and does not start with
+    /// `unmodelled:`, and no state id contains `,`. Otherwise two distinct
+    /// nodes could render the same key.
     pub fn key(&self) -> String {
         match (&self.spec_id, self.modelled) {
             (Some(spec_id), true) => format!("{spec_id}#{}", self.state_ids.join(",")),
@@ -152,6 +204,26 @@ impl JourneyNode {
     }
 
     fn validate_as(&self, which: &'static str) -> Result<(), JourneyContractError> {
+        if let Some(spec_id) = &self.spec_id {
+            if spec_id.contains('#') {
+                return Err(JourneyContractError::NonCanonicalNode {
+                    which,
+                    reason: "specId must not contain '#' (the key's spec/state separator)",
+                });
+            }
+            if spec_id.starts_with("unmodelled:") {
+                return Err(JourneyContractError::NonCanonicalNode {
+                    which,
+                    reason: "specId must not start with 'unmodelled:' (the unmodelled key prefix)",
+                });
+            }
+        }
+        if self.state_ids.iter().any(|id| id.contains(',')) {
+            return Err(JourneyContractError::NonCanonicalNode {
+                which,
+                reason: "stateIds must not contain ',' (the key's state separator)",
+            });
+        }
         if self.state_ids.windows(2).any(|w| w[0] >= w[1]) {
             return Err(JourneyContractError::NonCanonicalNode {
                 which,
@@ -178,6 +250,7 @@ impl JourneyNode {
 /// `NavigationTrigger` values (`initial` is the raw "arrived by deep link"
 /// signal).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum NavigationTriggerKind {
     /// An element or component action was activated.
@@ -212,6 +285,7 @@ impl NavigationTriggerKind {
 /// agent can act through is one of these; an edge from a transport not listed
 /// here is a producer defect, not a new variant to tolerate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum ChokePoint {
     /// `/ui-bridge/control/element/{id}/action`.
@@ -270,6 +344,7 @@ pub struct JourneyTrigger {
 
 /// Who produced the edge (`journey_edge_observations.run_kind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum RunKind {
     /// An agent acting through the runner's UI Bridge routes.
@@ -293,6 +368,7 @@ impl RunKind {
 
 /// How the edge closed (`journey_edge_observations.outcome`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeOutcome {
     /// The configuration changed.
@@ -325,9 +401,10 @@ impl EdgeOutcome {
 /// One observed edge of the journey graph — a row of
 /// `project.journey_edge_observations`.
 ///
-/// Invariant (checked by [`JourneyEdgeObservation::validate`] and by the
-/// migration's CHECK): `to_node` is `None` iff `outcome` is
-/// [`EdgeOutcome::ToNodeUnobserved`].
+/// Invariants (checked by [`JourneyEdgeObservation::validate`]; the first also
+/// by the migration's CHECK): `to_node` is `None` iff `outcome` is
+/// [`EdgeOutcome::ToNodeUnobserved`]; `no_change` joins nodes with equal
+/// keys and `changed` joins nodes with different keys.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -361,11 +438,8 @@ pub struct JourneyEdgeObservation {
     pub trigger: JourneyTrigger,
     /// How the edge closed.
     pub outcome: EdgeOutcome,
-    /// The interaction's `ChangeTimeline` (input → first response →
-    /// settled), carried verbatim from the SDK. Populated by the plan's
-    /// Phase 4; `None` = not captured for this edge.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeline: Option<serde_json::Value>,
+    // PRIVACY: the `timeline` column is not represented here — see the
+    // module doc. Phase 4 adds it as a closed type with no value slot.
     /// When the row was withdrawn (ISO 8601); `None` = live.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidated_at: Option<String>,
@@ -382,8 +456,9 @@ pub struct JourneyEdgeObservation {
 
 impl JourneyEdgeObservation {
     /// Check the contract invariants the type cannot express: `toNode` is
-    /// null iff `outcome` is `to_node_unobserved`, and both nodes are in
-    /// canonical form. A producer calls this before writing a row; a reader
+    /// null iff `outcome` is `to_node_unobserved`; both nodes are in
+    /// canonical form; and `no_change` / `changed` agree with whether the
+    /// endpoints' [`JourneyNode::key`]s are equal. A producer calls this before writing a row; a reader
     /// may call it on a row it did not write.
     pub fn validate(&self) -> Result<(), JourneyContractError> {
         let unobserved = self.outcome == EdgeOutcome::ToNodeUnobserved;
@@ -405,6 +480,22 @@ impl JourneyEdgeObservation {
         self.from_node.validate_as("fromNode")?;
         if let Some(to) = &self.to_node {
             to.validate_as("toNode")?;
+            let from_key = self.from_node.key();
+            let to_key = to.key();
+            let same = from_key == to_key;
+            let contradicts = match self.outcome {
+                EdgeOutcome::NoChange => !same,
+                EdgeOutcome::Changed => same,
+                _ => false,
+            };
+            if contradicts {
+                return Err(JourneyContractError::OutcomeContradictsNodes {
+                    outcome: self.outcome,
+                    from_key,
+                    to_key,
+                    relation: if same { "are equal" } else { "differ" },
+                });
+            }
         }
         Ok(())
     }
@@ -418,6 +509,7 @@ impl JourneyEdgeObservation {
 /// (`journey_frontier.reason`). An open frontier is what keeps "unexplored"
 /// distinguishable from "unreachable".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum FrontierReason {
     /// Seen, eligible, simply not activated yet.
@@ -504,6 +596,7 @@ impl FrontierEntry {
 /// growing must never read as a finished one, so every journey read repeats
 /// this state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum LedgerState {
     /// The schema probe found the tables and writes are succeeding.
@@ -552,6 +645,15 @@ mod tests {
         )
     }
 
+    fn other_node() -> JourneyNode {
+        JourneyNode::new(
+            Some("coord-lands".into()),
+            ["lands-list".to_string()],
+            Some("/admin/coord/lands".into()),
+            None,
+        )
+    }
+
     fn trigger() -> JourneyTrigger {
         JourneyTrigger {
             action_type: "click".into(),
@@ -577,7 +679,6 @@ mod tests {
             to_node,
             trigger: trigger(),
             outcome,
-            timeline: Some(json!({"events": [], "settleMs": 12, "settled": true})),
             invalidated_at: None,
             invalidated_reason: None,
             invalidated_by: None,
@@ -726,13 +827,17 @@ mod tests {
 
     #[test]
     fn edge_with_to_node_and_observed_outcome_is_valid() {
-        for outcome in [
-            EdgeOutcome::Changed,
-            EdgeOutcome::NoChange,
-            EdgeOutcome::Error,
-            EdgeOutcome::SettleTimeout,
-        ] {
+        assert_eq!(
+            edge(Some(other_node()), EdgeOutcome::Changed).validate(),
+            Ok(())
+        );
+        assert_eq!(
+            edge(Some(modelled_node()), EdgeOutcome::NoChange).validate(),
+            Ok(())
+        );
+        for outcome in [EdgeOutcome::Error, EdgeOutcome::SettleTimeout] {
             assert_eq!(edge(Some(modelled_node()), outcome).validate(), Ok(()));
+            assert_eq!(edge(Some(other_node()), outcome).validate(), Ok(()));
         }
         assert_eq!(edge(None, EdgeOutcome::ToNodeUnobserved).validate(), Ok(()));
     }
@@ -761,7 +866,7 @@ mod tests {
 
     #[test]
     fn edge_rejects_non_canonical_nodes() {
-        let mut bad = edge(Some(modelled_node()), EdgeOutcome::Changed);
+        let mut bad = edge(Some(other_node()), EdgeOutcome::Changed);
         bad.from_node.state_ids.reverse();
         assert!(matches!(
             bad.validate(),
@@ -770,7 +875,7 @@ mod tests {
                 ..
             })
         ));
-        let mut bad = edge(Some(modelled_node()), EdgeOutcome::Changed);
+        let mut bad = edge(Some(other_node()), EdgeOutcome::Changed);
         bad.to_node.as_mut().unwrap().modelled = false;
         assert!(matches!(
             bad.validate(),
@@ -904,7 +1009,7 @@ mod tests {
         assert_eq!(round_trip(&bare), bare);
 
         for e in [
-            edge(Some(modelled_node()), EdgeOutcome::Changed),
+            edge(Some(other_node()), EdgeOutcome::Changed),
             edge(None, EdgeOutcome::ToNodeUnobserved),
         ] {
             assert_eq!(round_trip(&e), e);
@@ -914,7 +1019,6 @@ mod tests {
         withdrawn.invalidated_reason = Some("bad run".into());
         withdrawn.invalidated_by = Some("operator".into());
         withdrawn.invalidation_token = Some("tok".into());
-        withdrawn.timeline = None;
         assert_eq!(round_trip(&withdrawn), withdrawn);
 
         let frontier = FrontierEntry {
@@ -961,6 +1065,156 @@ mod tests {
         let parsed: JourneyEdgeObservation = serde_json::from_value(value).unwrap();
         assert_eq!(parsed.to_node, None);
         assert_eq!(parsed.validate(), Ok(()));
+    }
+
+    #[test]
+    fn no_change_with_differing_keys_is_rejected() {
+        assert_eq!(
+            edge(Some(other_node()), EdgeOutcome::NoChange).validate(),
+            Err(JourneyContractError::OutcomeContradictsNodes {
+                outcome: EdgeOutcome::NoChange,
+                from_key: "coord-runners#a,b".into(),
+                to_key: "coord-lands#lands-list".into(),
+                relation: "differ",
+            })
+        );
+    }
+
+    #[test]
+    fn changed_with_equal_keys_is_rejected() {
+        // Same key, different pathname: identity is key(), not jsonb equality.
+        let mut to = modelled_node();
+        to.pathname = Some("/admin/coord/runners?tab=2".into());
+        let err = edge(Some(to), EdgeOutcome::Changed)
+            .validate()
+            .expect_err("changed between equal keys must be rejected");
+        assert_eq!(
+            err,
+            JourneyContractError::OutcomeContradictsNodes {
+                outcome: EdgeOutcome::Changed,
+                from_key: "coord-runners#a,b".into(),
+                to_key: "coord-runners#a,b".into(),
+                relation: "are equal",
+            }
+        );
+        assert!(err.to_string().starts_with("outcome is changed "), "{err}");
+    }
+
+    #[test]
+    fn error_messages_render_wire_strings() {
+        let err = edge(None, EdgeOutcome::SettleTimeout)
+            .validate()
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("outcome is settle_timeout;"), "{msg}");
+        assert!(!msg.contains("SettleTimeout"), "{msg}");
+    }
+
+    #[test]
+    fn key_ambiguous_spec_ids_are_rejected() {
+        for spec_id in ["a#b", "unmodelled:/x"] {
+            let node = JourneyNode::new(Some(spec_id.into()), ["s".to_string()], None, None);
+            assert!(
+                matches!(
+                    node.validate(),
+                    Err(JourneyContractError::NonCanonicalNode { .. })
+                ),
+                "{spec_id} must be rejected"
+            );
+        }
+        // Rejected even when unmodelled: the spec id is still stored.
+        let node = JourneyNode::new(Some("a#b".into()), Vec::<String>::new(), None, None);
+        assert!(node.validate().is_err());
+    }
+
+    #[test]
+    fn key_ambiguous_state_ids_are_rejected() {
+        // Without the rule, {"a,b"} and {"a","b"} would share the key "s#a,b".
+        let joined = JourneyNode::new(Some("s".into()), ["a,b".to_string()], None, None);
+        let split = JourneyNode::new(Some("s".into()), ["a", "b"].map(String::from), None, None);
+        assert_eq!(joined.key(), split.key());
+        assert!(matches!(
+            joined.validate(),
+            Err(JourneyContractError::NonCanonicalNode { .. })
+        ));
+        assert_eq!(split.validate(), Ok(()));
+    }
+
+    #[test]
+    fn node_optional_fields_serialize_as_null() {
+        let node = JourneyNode::new(None, Vec::<String>::new(), None, None);
+        assert_eq!(
+            serde_json::to_value(&node).unwrap(),
+            json!({
+                "specId": null,
+                "stateIds": [],
+                "modelled": false,
+                "pathnameTemplate": null,
+                "pathname": null,
+            })
+        );
+        // Absent keys still read as None.
+        let parsed: JourneyNode =
+            serde_json::from_value(json!({"stateIds": [], "modelled": false})).unwrap();
+        assert_eq!(parsed, node);
+    }
+
+    #[test]
+    fn state_id_order_is_bytewise() {
+        // 'Z' (0x5A) < 'a' (0x61) < 'é' (0xC3 0xA9): byte order, not collation.
+        let node = JourneyNode::new(
+            Some("s".into()),
+            ["é", "a", "Z"].map(String::from),
+            None,
+            None,
+        );
+        assert_eq!(node.state_ids, vec!["Z", "a", "é"]);
+    }
+
+    #[test]
+    fn struct_schemas_have_no_ref_to_a_journey_enum() {
+        const ENUMS: [&str; 7] = [
+            "NavigationTriggerKind",
+            "ChokePoint",
+            "RunKind",
+            "EdgeOutcome",
+            "FrontierReason",
+            "LedgerState",
+            "IrEffect",
+        ];
+        let schemas = [
+            (
+                "JourneyEdgeObservation",
+                schemars::schema_for!(JourneyEdgeObservation),
+            ),
+            ("JourneyTrigger", schemars::schema_for!(JourneyTrigger)),
+            ("FrontierEntry", schemars::schema_for!(FrontierEntry)),
+            (
+                "JourneyLedgerHealth",
+                schemars::schema_for!(JourneyLedgerHealth),
+            ),
+        ];
+        for (name, schema) in schemas {
+            let text = serde_json::to_string(&schema).unwrap();
+            for e in ENUMS {
+                assert!(
+                    !text.contains(&format!("\"#/$defs/{e}\"")),
+                    "{name} schema references {e} by $ref: {text}"
+                );
+            }
+        }
+        // Control: the probe's spelling does match a real $ref (the nested
+        // struct JourneyNode is referenced, not inlined), so a zero above is
+        // not vacuous.
+        let frontier = serde_json::to_string(&schemars::schema_for!(FrontierEntry)).unwrap();
+        assert!(frontier.contains("\"#/$defs/JourneyNode\""), "{frontier}");
+        // The inlined closed sets are still present.
+        let edge = serde_json::to_string(&schemars::schema_for!(JourneyEdgeObservation)).unwrap();
+        assert!(edge.contains("\"to_node_unobserved\"") && edge.contains("\"passive_session\""));
+        assert!(
+            !edge.contains("\"timeline\""),
+            "timeline must not be representable"
+        );
     }
 
     #[test]
