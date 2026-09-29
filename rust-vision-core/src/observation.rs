@@ -610,18 +610,25 @@ impl<T: Serialize> Serialize for Observation<T> {
     }
 }
 
-/// The flat wire form, read with KEY PRESENCE preserved for `value`: a
-/// `measured` whose `value` key is missing is refused even when `T` would
-/// accept `null` (`Option<_>`, `serde_json::Value`).
+/// The flat wire form, read with KEY PRESENCE preserved for `value` and
+/// `unknown`: a `measured` whose `value` key is missing is refused even when
+/// `T` would accept `null` (`Option<_>`, `serde_json::Value`), and a present
+/// `"unknown": null` on a non-unknown status is refused rather than read as
+/// absent.
+///
+/// Unrecognised sibling keys are IGNORED, not refused, so the envelope can
+/// grow without a flag day: the nested provenance types already accept extra
+/// keys, and refusing at the top level would drop the whole observation —
+/// value and unknown code alike — at every reader older than the writer.
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 #[serde(bound(deserialize = "T: Deserialize<'de>"))]
 struct ObservationWire<T> {
     status: ObservationStatus,
     #[serde(default, deserialize_with = "deserialize_present")]
     value: Option<T>,
-    #[serde(default)]
-    unknown: Option<UnknownInfo>,
+    #[serde(default, deserialize_with = "deserialize_present")]
+    unknown: Option<Option<UnknownInfo>>,
     provenance: Provenance,
 }
 
@@ -646,8 +653,8 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Observation<T> {
                 ))
             }
             (ObservationStatus::Absent, None, None) => ObservationState::Absent,
-            (ObservationStatus::Unknown, None, Some(u)) => ObservationState::Unknown(u),
-            (ObservationStatus::Unknown, _, None) => {
+            (ObservationStatus::Unknown, None, Some(Some(u))) => ObservationState::Unknown(u),
+            (ObservationStatus::Unknown, _, None | Some(None)) => {
                 return Err(de::Error::custom(
                     "an `unknown` observation must carry `unknown: { code, detail }`",
                 ))
@@ -995,6 +1002,10 @@ mod tests {
             json!({"status": "measured", "value": 1, "unknown": {"code": "stale_input", "detail": ""}, "provenance": p}),
             json!({"status": "unknown", "value": 1, "unknown": {"code": "stale_input", "detail": ""}, "provenance": p}),
             json!({"value": 1, "provenance": p}),
+            // A present `null` is not an absent key.
+            json!({"status": "absent", "unknown": null, "provenance": p}),
+            json!({"status": "measured", "value": 1, "unknown": null, "provenance": p}),
+            json!({"status": "unknown", "unknown": null, "provenance": p}),
         ] {
             assert!(
                 serde_json::from_value::<Observation<Value>>(bad.clone()).is_err(),
@@ -1009,6 +1020,20 @@ mod tests {
         let absent = json!({"status": "absent", "provenance": partial});
         let err = serde_json::from_value::<Observation<Value>>(absent).unwrap_err();
         assert!(err.to_string().contains("full coverage"), "{err}");
+    }
+
+    #[test]
+    fn an_unrecognised_sibling_key_is_ignored_so_the_envelope_can_grow() {
+        let v = json!({"status": "measured", "value": 1, "diagnostics": {"x": 1}, "provenance": wire_provenance()});
+        let o = serde_json::from_value::<Observation<Value>>(v).expect("extra key must not refuse");
+        assert_eq!(o.status(), ObservationStatus::Measured);
+    }
+
+    #[test]
+    fn a_cache_missing_stored_at_fails_to_deserialize() {
+        let mut p = wire_provenance();
+        p["cache"] = json!({"hit": false, "keyInputs": []});
+        assert!(serde_json::from_value::<Provenance>(p).is_err());
     }
 
     #[test]
