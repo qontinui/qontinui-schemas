@@ -57,6 +57,10 @@ on:
       # its only validator: a data-only edit must still run it on main.
       - "fleet-nouns.toml"
       - ".github/scripts/fleet-nouns-portability.*"
+      # Not a workspace member either: rust/tests/glossary_source.rs is the
+      # glossary source's only validator (invariants, fleet nouns, the version
+      # guard, and drift of the generated rust/src/glossary/generated.rs).
+      - "glossary/**"
       - ".github/workflows/rust-ci.yml"
   workflow_dispatch:
   workflow_call:

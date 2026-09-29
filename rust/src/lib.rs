@@ -104,6 +104,11 @@ pub mod findings;
 pub mod functional_spec;
 pub mod geometry;
 pub mod git_ops;
+/// The product glossary, compiled in: [`glossary::GlossaryTerm`] and the
+/// [`glossary::GLOSSARY`] table, generated from the repo-root
+/// `glossary/terms.toml`. Typed ids let a [`refusal::Refusal`] cite only terms
+/// that exist, and every surface renders definitions from its own build.
+pub mod glossary;
 /// Helper-task queue — human-judgment micro-tasks a runner emits for a
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
@@ -129,6 +134,9 @@ pub mod process_management;
 /// hazard. See `2026-07-24-runner-projects-dashboard.md` §4/§6.
 pub mod projects;
 pub mod rag;
+/// The next-action contract: [`refusal::Refusal`], one envelope for every
+/// operator-facing refusal, whose `next_action` is typed and never absent.
+pub mod refusal;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
