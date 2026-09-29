@@ -5,9 +5,14 @@ description = "Canonical DTO types for Qontinui. Rust is the source of truth; Ty
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-# The fleet-nouns validator reads ../fleet-nouns.toml, which is outside this
-# package; shipped in the .crate it could only fail. It is a repo test.
-exclude = ["tests/fleet_nouns_vocabulary.rs"]
+# These repo tests read files outside this package (../fleet-nouns.toml,
+# ../glossary/terms.toml); shipped in the .crate they could only fail.
+exclude = [
+  "tests/fleet_nouns_vocabulary.rs",
+  "tests/glossary_source.rs",
+  "tests/refusal_render.rs",
+  "tests/common/**",
+]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
