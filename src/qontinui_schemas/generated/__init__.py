@@ -199,6 +199,7 @@ from .per_type.git_commit_lite import GitCommitLite
 from .per_type.git_lite import GitLite
 from .per_type.git_op_list_response import GitOpListResponse
 from .per_type.git_op_record import GitOpRecord
+from .per_type.glossary_term import GlossaryTerm
 from .per_type.health_check_url import HealthCheckUrl
 from .per_type.health_level import HealthLevel
 from .per_type.health_lite import HealthLite
@@ -289,6 +290,8 @@ from .per_type.multi_loop_status import MultiLoopStatus
 from .per_type.native_accessibility_step import NativeAccessibilityStep
 from .per_type.navigation_result import NavigationResult
 from .per_type.new_constraint_proposal import NewConstraintProposal
+from .per_type.next_action import NextAction
+from .per_type.next_action_kind import NextActionKind
 from .per_type.next_task_info import NextTaskInfo
 from .per_type.node_metadata import NodeMetadata
 from .per_type.node_status import NodeStatus
@@ -338,6 +341,9 @@ from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommended_state import RecommendedState
 from .per_type.record_git_op_request import RecordGitOpRequest
 from .per_type.reflection_fix_output import ReflectionFixOutput
+from .per_type.refusal import Refusal
+from .per_type.refusal_code import RefusalCode
+from .per_type.refusal_source import RefusalSource
 from .per_type.region import Region
 from .per_type.register_app_request import RegisterAppRequest
 from .per_type.relationship import Relationship
@@ -755,6 +761,7 @@ __all__ = [
     "GitLite",
     "GitOpListResponse",
     "GitOpRecord",
+    "GlossaryTerm",
     "HealthCheckUrl",
     "HealthLevel",
     "HealthLite",
@@ -845,6 +852,8 @@ __all__ = [
     "NativeAccessibilityStep",
     "NavigationResult",
     "NewConstraintProposal",
+    "NextAction",
+    "NextActionKind",
     "NextTaskInfo",
     "NodeMetadata",
     "NodeStatus",
@@ -894,6 +903,9 @@ __all__ = [
     "RecommendedState",
     "RecordGitOpRequest",
     "ReflectionFixOutput",
+    "Refusal",
+    "RefusalCode",
+    "RefusalSource",
     "Region",
     "RegisterAppRequest",
     "Relationship",
