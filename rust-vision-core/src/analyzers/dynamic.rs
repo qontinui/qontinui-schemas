@@ -4,6 +4,7 @@
 
 use super::{AnalyzerResult, Finding, Severity};
 use crate::frame::Frame;
+use crate::observation::UnknownCode;
 
 /// Frame-to-frame diff.
 ///
@@ -39,6 +40,7 @@ pub fn run(prior: &Frame, current: &Frame) -> AnalyzerResult {
         // list this used to return was indistinguishable from "the page did
         // not change" — the same vacuous pass the snapshot analyzers had.
         return AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             format!(
                 "both frames are {}x{} — zero pixels to compare, so no frame delta was \
                  measured.",

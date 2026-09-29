@@ -14,6 +14,7 @@ use super::{AnalyzerResult, Finding, Severity};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::{ElementSnapshot, Rgb};
 use crate::frame::{Frame, Region};
+use crate::observation::UnknownCode;
 
 pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
     let coverage = SnapshotCoverage::of(snapshot);
@@ -23,6 +24,7 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
     // a page with perfect contrast returns.
     if coverage.with_text == 0 {
         return AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             format!(
                 "no element carries text (0/{}), so no foreground/background pair was \
                  sampled and no contrast ratio was computed.",
@@ -202,6 +204,7 @@ fn verdict(
     let why = unusable_scale.unwrap_or_default();
     if ratios_computed == 0 {
         return AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             format!(
                 "no contrast ratio could be computed for any of the {} text element(s): \
                  none carried declared foreground/background colors and none could be \
@@ -214,6 +217,7 @@ fn verdict(
     }
     if ratios_computed < coverage.with_text {
         return AnalyzerResult::degraded(
+            UnknownCode::InputMissing,
             format!(
                 "contrast measured for {}/{} text element(s); the rest carried neither \
                  declared colors nor a bbox that could be sampled on the frame and were \
