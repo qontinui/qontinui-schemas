@@ -13,8 +13,26 @@
 //!
 //! It also enforces the source's invariants — including that no text names a
 //! fleet noun from `fleet-nouns.toml`, because these definitions ship to every
-//! user — and the version guard: a content change whose `version` is not above
-//! the generated file's `GLOSSARY_VERSION` fails, in the regenerate mode too.
+//! user — and the version guard.
+//!
+//! ## The version guard: `glossary/versions.lock`
+//!
+//! An append-only ledger of `<version> <sha256>` lines, where the digest is of
+//! a CANONICAL rendering of the terms (their parsed fields as JSON — so
+//! comments, whitespace and key order do not count, and `version` itself is
+//! not hashed). It fails when:
+//!
+//! - the current `version` is in the ledger with a DIFFERENT digest (content
+//!   changed without raising `version`, or a version number was reused);
+//! - the current digest is in the ledger under another version (`version`
+//!   raised with no content change);
+//! - the current `version` is below the ledger's newest, or the ledger is not
+//!   strictly increasing, or repeats a digest;
+//! - the current `(version, digest)` is not yet in the ledger — the regenerate
+//!   mode appends it, and refuses in every case above.
+//!
+//! The ledger lives in git, so two branches that both claim the next version
+//! conflict on the same appended line instead of both passing their own CI.
 //!
 //! Both files live outside this crate's package, so this is a repo test
 //! (excluded from the published crate in `rust/Cargo.toml`).
@@ -24,7 +42,7 @@ mod common;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use common::fleet_nouns::FleetNouns;
@@ -40,7 +58,7 @@ struct Source {
     term: Vec<Term>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Term {
     id: String,
@@ -82,6 +100,108 @@ fn parse(text: &str) -> Source {
 
 fn sha256_hex(text: &str) -> String {
     hex::encode(Sha256::digest(text.as_bytes()))
+}
+
+fn lock_path() -> PathBuf {
+    repo_root().join("glossary").join("versions.lock")
+}
+
+/// The digest of the glossary's CONTENT: the parsed terms as JSON (struct
+/// field order, trimmed text). Comments, formatting and `version` do not count.
+fn content_sha(src: &Source) -> String {
+    let canon: Vec<Term> = src
+        .term
+        .iter()
+        .map(|t| Term {
+            id: t.id.clone(),
+            term: t.term.trim().to_string(),
+            short: t.short.trim().to_string(),
+            long: t.long.trim().to_string(),
+            see_also: t.see_also.clone(),
+            since: t.since,
+        })
+        .collect();
+    sha256_hex(&serde_json::to_string(&canon).expect("terms serialise"))
+}
+
+/// `(version, sha)` rows of versions.lock; `#` comments and blank lines skipped.
+fn parse_lock(text: &str) -> Result<Vec<(u32, String)>, String> {
+    let mut rows = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let (Some(v), Some(sha), None) = (parts.next(), parts.next(), parts.next()) else {
+            return Err(format!(
+                "versions.lock line {}: expected `<version> <sha256>`",
+                i + 1
+            ));
+        };
+        let v: u32 = v
+            .parse()
+            .map_err(|_| format!("versions.lock line {}: `{v}` is not a version", i + 1))?;
+        if sha.len() != 64 || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(format!(
+                "versions.lock line {}: `{sha}` is not a sha256",
+                i + 1
+            ));
+        }
+        rows.push((v, sha.to_string()));
+    }
+    Ok(rows)
+}
+
+/// What the ledger says about the current `(version, sha)`.
+#[derive(Debug, PartialEq, Eq)]
+enum LockVerdict {
+    /// Already recorded: nothing to do.
+    Recorded,
+    /// A legitimate new version: append `(version, sha)`.
+    Append,
+}
+
+fn check_lock(rows: &[(u32, String)], version: u32, sha: &str) -> Result<LockVerdict, String> {
+    for w in rows.windows(2) {
+        if w[1].0 <= w[0].0 {
+            return Err(format!(
+                "versions.lock is not strictly increasing ({} after {})",
+                w[1].0, w[0].0
+            ));
+        }
+    }
+    let mut seen = BTreeSet::new();
+    for (v, s) in rows {
+        if !seen.insert(s.as_str()) {
+            return Err(format!("versions.lock repeats digest {s} (at version {v})"));
+        }
+    }
+    if let Some((_, recorded)) = rows.iter().find(|(v, _)| *v == version) {
+        if recorded == sha {
+            return Ok(LockVerdict::Recorded);
+        }
+        let next = rows.last().map_or(1, |(v, _)| v + 1);
+        return Err(format!(
+            "glossary content changed (digest {sha}) but version {version} is already recorded \
+             in versions.lock with digest {recorded}. Raise `version` in glossary/terms.toml to \
+             {next} — every content change is a new glossary version."
+        ));
+    }
+    if let Some((v, _)) = rows.iter().find(|(_, s)| s == sha) {
+        return Err(format!(
+            "version raised to {version} but the content is unchanged since version {v}; \
+             put `version` back to {v}"
+        ));
+    }
+    if let Some((newest, _)) = rows.last() {
+        if version < *newest {
+            return Err(format!(
+                "version {version} is below the newest recorded version {newest}"
+            ));
+        }
+    }
+    Ok(LockVerdict::Append)
 }
 
 fn is_snake_case(id: &str) -> bool {
@@ -182,7 +302,7 @@ fn render(src: &Source, sha: &str) -> String {
     o.push_str("/// The glossary's `version` (glossary/terms.toml).\n");
     writeln!(o, "pub const GLOSSARY_VERSION: u32 = {};", src.version).unwrap();
     o.push_str(
-        "/// SHA-256 of the LF-normalised glossary/terms.toml this table was generated from.\n",
+        "/// SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock).\n",
     );
     writeln!(
         o,
@@ -238,24 +358,6 @@ fn render(src: &Source, sha: &str) -> String {
     o
 }
 
-/// The version guard: content that changed must carry a raised version.
-/// `committed` is what the compiled crate carries.
-fn version_guard(src_version: u32, sha: &str, committed: (u32, &str)) -> Result<(), String> {
-    let (committed_version, committed_sha) = committed;
-    if sha == committed_sha {
-        return Ok(());
-    }
-    if src_version <= committed_version {
-        return Err(format!(
-            "glossary/terms.toml changed (sha256 {sha}, generated from {committed_sha}) but its \
-             version is {src_version}, not above the generated GLOSSARY_VERSION {committed_version}. \
-             Raise `version` to {} — every content change is a new glossary version.",
-            committed_version + 1
-        ));
-    }
-    Ok(())
-}
-
 #[test]
 fn source_is_valid() {
     let src = parse(&source_text());
@@ -291,16 +393,35 @@ fn no_text_names_a_fleet_noun() {
 
 #[test]
 fn generated_rust_matches_the_source_and_the_version_was_raised() {
-    let text = source_text();
-    let src = parse(&text);
-    let sha = sha256_hex(&text);
-    let committed = (
-        qontinui_types::glossary::GLOSSARY_VERSION,
-        qontinui_types::glossary::GLOSSARY_CONTENT_SHA256,
-    );
-    if let Err(e) = version_guard(src.version, &sha, committed) {
-        panic!("{e}");
+    let src = parse(&source_text());
+    let sha = content_sha(&src);
+    let regenerate = std::env::var_os(REGENERATE_ENV).is_some();
+
+    let lock = lock_path();
+    let lock_text = std::fs::read_to_string(&lock)
+        .unwrap_or_else(|e| panic!("versions.lock unreadable at {} ({e})", lock.display()))
+        .replace("\r\n", "\n");
+    let rows = parse_lock(&lock_text).unwrap_or_else(|e| panic!("{e}"));
+    match check_lock(&rows, src.version, &sha) {
+        Err(e) => panic!("{e}"),
+        Ok(LockVerdict::Recorded) => {}
+        Ok(LockVerdict::Append) if regenerate => {
+            let mut text = lock_text.clone();
+            if !text.is_empty() && !text.ends_with('\n') {
+                text.push('\n');
+            }
+            text.push_str(&format!("{} {sha}\n", src.version));
+            std::fs::write(&lock, text)
+                .unwrap_or_else(|e| panic!("cannot write {}: {e}", lock.display()));
+            eprintln!("appended version {} to {}", src.version, lock.display());
+        }
+        Ok(LockVerdict::Append) => panic!(
+            "glossary version {} (digest {sha}) is not in versions.lock. Record it:\n  \
+             {REGENERATE_ENV}=1 cargo test -p qontinui-types --test glossary_source",
+            src.version
+        ),
     }
+
     let want = render(&src, &sha);
     let path = generated_path();
     let have = std::fs::read_to_string(&path)
@@ -309,7 +430,7 @@ fn generated_rust_matches_the_source_and_the_version_was_raised() {
     if have == want {
         return;
     }
-    if std::env::var_os(REGENERATE_ENV).is_some() {
+    if regenerate {
         std::fs::write(&path, &want)
             .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
         eprintln!("regenerated {}", path.display());
@@ -421,26 +542,55 @@ fn the_fleet_noun_check_is_not_vacuous() {
 }
 
 #[test]
-fn the_version_guard_refuses_an_unbumped_change() {
-    let committed = (3, "aaaa");
-    // Unchanged content: fine at the same version.
-    assert!(version_guard(3, "aaaa", committed).is_ok());
-    // Changed content at the same (or a lower) version: refused.
-    let e = version_guard(3, "bbbb", committed).unwrap_err();
-    assert!(e.contains("Raise `version` to 4"), "{e}");
-    assert!(version_guard(2, "bbbb", committed).is_err());
-    // Changed content with a raised version: accepted (then regenerated).
-    assert!(version_guard(4, "bbbb", committed).is_ok());
+fn the_version_lock_refuses_every_bad_transition() {
+    let a = "a".repeat(64);
+    let b = "b".repeat(64);
+    let c = "c".repeat(64);
+    let rows = vec![(1, a.clone()), (2, b.clone())];
+    // Recorded as-is.
+    assert_eq!(check_lock(&rows, 2, &b), Ok(LockVerdict::Recorded));
+    assert_eq!(check_lock(&rows, 1, &a), Ok(LockVerdict::Recorded));
+    // Content changed, version not raised (or a version reused).
+    let e = check_lock(&rows, 2, &c).unwrap_err();
+    assert!(e.contains("Raise `version`") && e.contains(" 3 "), "{e}");
+    assert!(check_lock(&rows, 1, &c).is_err());
+    // Version raised, content unchanged.
+    let e = check_lock(&rows, 3, &b).unwrap_err();
+    assert!(e.contains("unchanged"), "{e}");
+    // A new version with new content: append.
+    assert_eq!(check_lock(&rows, 3, &c), Ok(LockVerdict::Append));
+    // A malformed ledger.
+    assert!(check_lock(&[(2, a.clone()), (1, b.clone())], 3, &c).is_err());
+    assert!(check_lock(&[(1, a.clone()), (2, a.clone())], 3, &c).is_err());
+    assert!(parse_lock("1 nothex").is_err());
+    assert!(parse_lock(&format!("x {a}")).is_err());
+    assert_eq!(
+        parse_lock(&format!("# c\n\n1 {a}\n")).unwrap(),
+        vec![(1, a.clone())]
+    );
+    // An empty ledger accepts the first version.
+    assert_eq!(check_lock(&[], 1, &a), Ok(LockVerdict::Append));
 }
 
 #[test]
-fn render_is_deterministic_and_changes_with_content() {
+fn the_digest_is_of_content_not_formatting() {
     let text = source_text();
     let src = parse(&text);
-    let a = render(&src, &sha256_hex(&text));
-    assert_eq!(a, render(&src, &sha256_hex(&text)));
-    // Even a comment-only edit is a content change: new digest, new output.
-    let edited = format!("{text}\n# edited\n");
-    assert_ne!(sha256_hex(&edited), sha256_hex(&text));
-    assert_ne!(render(&parse(&edited), &sha256_hex(&edited)), a);
+    let sha = content_sha(&src);
+    let a = render(&src, &sha);
+    assert_eq!(a, render(&src, &content_sha(&parse(&text))));
+    // A comment-only edit, or a version change, is NOT a content change.
+    let commented = format!("{text}\n# edited\n");
+    assert_eq!(content_sha(&parse(&commented)), sha);
+    let bumped = text.replacen(
+        &format!("\nversion = {}\n", src.version),
+        &format!("\nversion = {}\n", src.version + 1),
+        1,
+    );
+    assert_ne!(bumped, text, "the version line was not found");
+    assert_eq!(content_sha(&parse(&bumped)), sha);
+    // An edit to a definition is.
+    let mut edited = parse(&text);
+    edited.term[0].short.push_str(" More.");
+    assert_ne!(content_sha(&edited), sha);
 }

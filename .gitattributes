@@ -39,4 +39,5 @@ rust/tests/fixtures/ui_bridge_sdk/*.json -text
 # platform so the generated file never reads as modified for a line-ending
 # reason alone.
 glossary/terms.toml text eol=lf
+glossary/versions.lock text eol=lf
 rust/src/glossary/generated.rs text eol=lf

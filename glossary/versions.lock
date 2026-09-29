@@ -1,0 +1,9 @@
+# glossary/versions.lock — APPEND-ONLY ledger of glossary versions.
+#
+#   <version> <sha256 of the canonical glossary content>
+#
+# Written by `QONTINUI_GLOSSARY_REGENERATE=1 cargo test -p qontinui-types
+# --test glossary_source`, checked by the same test (rules in its module docs):
+# a version never reappears with a different digest, a digest never appears
+# under two versions, and versions only increase. Never edit or delete a line.
+1 7ae958f557718a038bd972d3c579ff52da4c4626781d76ffc732b9c364a0a774

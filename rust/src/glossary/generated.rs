@@ -8,8 +8,8 @@ use super::GlossaryEntry;
 
 /// The glossary's `version` (glossary/terms.toml).
 pub const GLOSSARY_VERSION: u32 = 1;
-/// SHA-256 of the LF-normalised glossary/terms.toml this table was generated from.
-pub const GLOSSARY_CONTENT_SHA256: &str = "818f5c7d95356e67bed52f0643d772b41d755a0056d37398dd0c7bf501f79b97";
+/// SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock).
+pub const GLOSSARY_CONTENT_SHA256: &str = "7ae958f557718a038bd972d3c579ff52da4c4626781d76ffc732b9c364a0a774";
 
 /// A term the product glossary defines, by its stable snake_case id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
@@ -17,7 +17,7 @@ pub enum GlossaryTerm {
     #[doc = "A watched record of work that stopped because it is waiting on something observable; it resumes by itself when the condition clears."]
     #[serde(rename = "gate")]
     Gate,
-    #[doc = "The action a gate performs when it clears: start an agent session, queue a pull request to land, or just notify."]
+    #[doc = "The action a gate performs when it clears: start an agent session, queue a pull request to land, deploy, migrate, or just notify."]
     #[serde(rename = "continuation")]
     Continuation,
     #[doc = "A declaration by an agent or a person that a gate's condition is met, which clears an approval gate."]
@@ -176,8 +176,8 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
     GlossaryEntry {
         id: GlossaryTerm::Continuation,
         term: "Continuation",
-        short: "The action a gate performs when it clears: start an agent session, queue a pull request to land, or just notify.",
-        long: "A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.\n\nActions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), or *notify only*. Deploys and migrations only ever notify.\n\nDelivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.",
+        short: "The action a gate performs when it clears: start an agent session, queue a pull request to land, deploy, migrate, or just notify.",
+        long: "A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.\n\nActions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Merge, deploy and migrate pass a safety check first and notify instead when it does not clear them; deploy and migrate notify by default and run only where the tenant has enabled that executor.\n\nDelivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.",
         see_also: &[GlossaryTerm::Gate, GlossaryTerm::AgentSession, GlossaryTerm::MergeTrain],
         since: 1,
     },
@@ -225,7 +225,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::MergeTrain,
         term: "Merge train",
         short: "The service that lands pull requests: it rebases each onto the latest main, runs CI, keeps overlapping changes apart and lands them in order.",
-        long: "The **merge train** is the only thing that lands pull requests on a managed repository. A green, non-draft pull request is queued with nothing further to do.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out, with a label that moves a change into a *land next* band.\n\nOnly draft status, or a gate carrying a merge continuation, holds a pull request back. Its answer for one pull request is the **merge verdict**.",
+        long: "By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.\n\nWhat holds a pull request back: draft status, a gate carrying a merge continuation, or a dependency label naming another pull request that has not landed yet. Its answer for one pull request is the **merge verdict**.",
         see_also: &[GlossaryTerm::MergeVerdict, GlossaryTerm::Landed, GlossaryTerm::Continuation],
         since: 1,
     },
@@ -329,7 +329,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::Tenant,
         term: "Tenant",
         short: "The isolation boundary that owns repositories, devices, gates, work units, policies and memory. Shown as a Project in the app.",
-        long: "A **tenant** is the unit of ownership and isolation. Repositories, devices, gates, work units, findings, policies and intent documents all belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.\n\nThe web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only once the tenant's rollout is live.",
+        long: "A **tenant** is the unit of ownership and isolation. Repositories, devices, gates, work units, findings, policies and intent documents all belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.\n\nThe web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only where the tenant has automatic merging enabled, the repository has merging enabled, and the tenant has not paused merging; a tenant-wide pause overrides every repository.",
         see_also: &[GlossaryTerm::Device, GlossaryTerm::Operator, GlossaryTerm::Policy, GlossaryTerm::IntentDocument],
         since: 1,
     },
@@ -337,7 +337,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::Device,
         term: "Device",
         short: "A registered machine running the runner. Pairing links it to your account and issues the credential it uses.",
-        long: "A **device** is a machine (or runner instance) the product knows by its device id. The id is an identifier, not a secret.\n\n**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. The service works out the device's tenant from that credential; the device never claims it.\n\nWork is sent only to devices that are paired, heartbeating, capable of the work and not drained.",
+        long: "A **device** is a machine (or runner instance) the product knows by its device id. The id is an identifier, not a secret.\n\n**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. On authenticated requests the service works out the device's tenant from that credential rather than from anything the device asserts.\n\nWork is sent only to devices that are paired, heartbeating, capable of the work and not drained.",
         see_also: &[GlossaryTerm::Tenant, GlossaryTerm::Runner, GlossaryTerm::Drain],
         since: 1,
     },
@@ -353,7 +353,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::Coord,
         term: "Coord",
         short: "The coordination service: claims, work units, gates, sessions, devices, tenants, policies and the merge train.",
-        long: "**Coord** is the central coordination service. It holds claims, work units, gates and their continuations, findings and dossiers, policy and intent documents, agent sessions, devices and tenants, and it runs the merge train, which makes it the only authority that lands pull requests.\n\nAgents reach it through tools and over HTTP. It knows nothing about plan files; plans reach it as work units.",
+        long: "**Coord** is the central coordination service. It holds claims, work units, gates and their continuations, findings and dossiers, policy and intent documents, agent sessions, devices and tenants, and it runs the merge train, which policy makes the one route by which pull requests land.\n\nAgents reach it through tools and over HTTP. It does not read plan files; plans reach it as work units.",
         see_also: &[GlossaryTerm::MergeTrain, GlossaryTerm::Gate, GlossaryTerm::WorkUnit, GlossaryTerm::Tenant, GlossaryTerm::Runner],
         since: 1,
     },
