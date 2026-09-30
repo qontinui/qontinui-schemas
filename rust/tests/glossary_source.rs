@@ -422,7 +422,12 @@ fn render_ts(src: &Source, sha: &str) -> String {
     );
     o.push_str("}\n\n");
     o.push_str("/** The glossary's `version` (glossary/terms.toml). */\n");
-    writeln!(o, "export const GLOSSARY_VERSION = {};", src.version).unwrap();
+    writeln!(
+        o,
+        "export const GLOSSARY_VERSION: number = {};",
+        src.version
+    )
+    .unwrap();
     o.push_str(
         "/** SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock). */\n",
     );

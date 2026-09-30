@@ -20,7 +20,7 @@ export interface GlossaryEntry<Id extends GlossaryTerm = GlossaryTerm> {
 }
 
 /** The glossary's `version` (glossary/terms.toml). */
-export const GLOSSARY_VERSION = 1;
+export const GLOSSARY_VERSION: number = 1;
 /** SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock). */
 export const GLOSSARY_CONTENT_SHA256 = "6e753bcf582accfec2223bdde074407dadf79ea4b417c1e32c269033b3e4388c";
 

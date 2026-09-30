@@ -35,7 +35,7 @@ export function isGlossaryTerm(id: string): id is GlossaryTerm {
 export function glossaryEntry<Id extends GlossaryTerm>(
   id: Id
 ): GlossaryEntry<Id> {
-  return GLOSSARY[id] as GlossaryEntry<Id>;
+  return GLOSSARY[id];
 }
 
 /** The definition for an untyped id, or `null` when this version does not
