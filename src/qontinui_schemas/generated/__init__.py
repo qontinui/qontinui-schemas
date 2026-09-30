@@ -190,6 +190,7 @@ from .per_type.finding_update import FindingUpdate
 from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
+from .per_type.frontier_entry import FrontierEntry
 from .per_type.full_runner_step import FullRunnerStep
 from .per_type.functional_spec import FunctionalSpec
 from .per_type.gui_element_chunk import GUIElementChunk
@@ -243,6 +244,10 @@ from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.journey_edge_observation import JourneyEdgeObservation
+from .per_type.journey_ledger_health import JourneyLedgerHealth
+from .per_type.journey_node import JourneyNode
+from .per_type.journey_trigger import JourneyTrigger
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.legacy_assertion import LegacyAssertion
@@ -753,6 +758,7 @@ __all__ = [
     "FindingUserInput",
     "FindingsSummary",
     "FlowEvent",
+    "FrontierEntry",
     "FullRunnerStep",
     "FunctionalSpec",
     "GUIElementChunk",
@@ -806,6 +812,10 @@ __all__ = [
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "JourneyEdgeObservation",
+    "JourneyLedgerHealth",
+    "JourneyNode",
+    "JourneyTrigger",
     "LLMCostSummary",
     "LLMMetrics",
     "LegacyAssertion",
