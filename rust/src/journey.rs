@@ -317,6 +317,10 @@ impl NavigationTriggerKind {
 /// Which runner action choke point captured the edge. Every transport an
 /// agent can act through is one of these; an edge from a transport not listed
 /// here is a producer defect, not a new variant to tolerate.
+///
+/// A variant names the action's KIND. For `ComponentAction` and `BatchAction`
+/// the SDK and control transports share one variant: the transport is not
+/// recorded for those kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[schemars(inline)]
 #[serde(rename_all = "snake_case")]
@@ -331,6 +335,11 @@ pub enum ChokePoint {
     SdkElementAction,
     /// Any execute-with-diff route (runner routes and the SDK twin).
     ExecuteWithDiff,
+    /// An agent-driven navigation (`/ui-bridge/sdk/page/navigate`,
+    /// `navigate-to`): no affordance was activated, so the edge's
+    /// `navigationTrigger` is `push`/`replace` and `targetFingerprint` is
+    /// absent. These are the arrivals `requires_prior_knowledge` reads.
+    Navigation,
 }
 
 impl ChokePoint {
@@ -342,6 +351,7 @@ impl ChokePoint {
             Self::ComponentAction => "component_action",
             Self::SdkElementAction => "sdk_element_action",
             Self::ExecuteWithDiff => "execute_with_diff",
+            Self::Navigation => "navigation",
         }
     }
 }
@@ -991,6 +1001,7 @@ mod tests {
                 (ComponentAction, "component_action"),
                 (SdkElementAction, "sdk_element_action"),
                 (ExecuteWithDiff, "execute_with_diff"),
+                (Navigation, "navigation"),
             ],
             ChokePoint::as_str,
         );
