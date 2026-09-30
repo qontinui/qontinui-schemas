@@ -22,4 +22,5 @@ export type NextActionKind =
   | "resnapshot"
   | "scroll_into_view"
   | "wait_for_enabled"
-  | "broaden_selector";
+  | "broaden_selector"
+  | "unrecognised";

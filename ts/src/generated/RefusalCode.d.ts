@@ -8,9 +8,9 @@
 /**
  * What went wrong, as a stable machine-readable code.
  *
- * Extend by adding a variant (and its row in [`RefusalCode::headline`]); the
- * render table is an exhaustive `match`, so a new code without a sentence is
- * a compile error.
+ * Extend by adding a variant (and its row in [`RefusalCode::headline`] and
+ * [`RefusalCode::from_wire`]); the tables are exhaustive `match`es, so a new
+ * code without a sentence is a compile error.
  */
 export type RefusalCode =
   | "workspace_root_unresolved"

@@ -22,4 +22,5 @@ export interface NextAction {
    * setting to set, the gate to wait for. Its meaning is fixed by `kind`.
    */
   target?: string | null;
+  [k: string]: unknown;
 }

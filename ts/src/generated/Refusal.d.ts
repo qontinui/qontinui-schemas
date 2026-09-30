@@ -15,7 +15,8 @@ import type { RefusalSource } from "./RefusalSource";
  * One operator-facing refusal: what went wrong, and what to do next.
  *
  * Construct with [`Refusal::new`] and the `with_*` builders. `next_action` is
- * deliberately not optional — see the module docs.
+ * deliberately not optional — see the module docs. Decoding is lenient toward
+ * newer producers (module docs, "Forward compatibility").
  */
 export interface Refusal {
   code: RefusalCode;
@@ -31,7 +32,8 @@ export interface Refusal {
   discriminator?: string | null;
   /**
    * Glossary terms a reader may need to act on this refusal. Typed, so a
-   * refusal cannot cite a term the glossary does not define.
+   * producer cannot cite a term the glossary does not define. Always
+   * present on the wire (an empty list, never null).
    */
   glossary_terms: GlossaryTerm[];
   next_action: NextAction;
@@ -40,4 +42,16 @@ export interface Refusal {
    */
   observed_at: string;
   source: RefusalSource;
+  /**
+   * READER-SIDE: the raw `code` when this reader did not recognise it
+   * (`code` is then [`RefusalCode::Unknown`]). Absent when the producer
+   * itself said `unknown`. Never set by a producer.
+   */
+  unrecognised_code?: string | null;
+  /**
+   * READER-SIDE: glossary ids this reader's glossary does not define,
+   * removed from `glossary_terms`. Never set by a producer.
+   */
+  unrecognised_glossary_terms?: string[];
+  [k: string]: unknown;
 }

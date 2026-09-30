@@ -8,4 +8,5 @@
 /**
  * The component that produced a [`Refusal`].
  */
-export type RefusalSource = "runner" | "coord" | "web_backend" | "web_frontend";
+export type RefusalSource =
+  "runner" | "coord" | "web_backend" | "web_frontend" | "unrecognised";
