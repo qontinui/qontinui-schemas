@@ -45,13 +45,19 @@ export interface Refusal {
   /**
    * READER-SIDE: the raw `code` when this reader did not recognise it
    * (`code` is then [`RefusalCode::Unknown`]). Absent when the producer
-   * itself said `unknown`. Never set by a producer.
+   * itself said `unknown`. Producers must not emit it.
    */
   unrecognised_code?: string | null;
   /**
    * READER-SIDE: glossary ids this reader's glossary does not define,
-   * removed from `glossary_terms`. Never set by a producer.
+   * removed from `glossary_terms`. Producers must not emit it.
    */
   unrecognised_glossary_terms?: string[];
+  /**
+   * READER-SIDE: the raw `source` when this reader did not recognise it
+   * (`source` is then [`RefusalSource::Unrecognised`]). Producers must not
+   * emit it.
+   */
+  unrecognised_source?: string | null;
   [k: string]: unknown;
 }
