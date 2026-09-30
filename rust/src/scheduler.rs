@@ -312,6 +312,22 @@ pub enum ScheduledTaskType {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeout_seconds: Option<u64>,
     },
+    /// Run a shell command in-binary (no Claude session). The recorded
+    /// outcome is the command's exit status: success iff exit code 0; a
+    /// timeout is a failure.
+    Script {
+        /// Shell command line, run via the platform shell (`sh -c`; on
+        /// Windows `bash -c`, then `cmd /C` as the fallback).
+        command: String,
+        /// Working directory for the command. `None` = the runner's project
+        /// root.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        working_directory: Option<String>,
+        /// Wall-clock timeout in seconds. `None` = runner default
+        /// (600s = 10 min).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
+    },
 }
 
 /// Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
