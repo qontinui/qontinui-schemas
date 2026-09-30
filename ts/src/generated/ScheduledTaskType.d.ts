@@ -123,4 +123,23 @@ export type ScheduledTaskType =
        */
       working_directory?: string | null;
       [k: string]: unknown;
+    }
+  | {
+      /**
+       * Shell command line, run via the platform shell (`sh -c`; on
+       * Windows `bash -c`, then `cmd /C` as the fallback).
+       */
+      command: string;
+      task_type: "Script";
+      /**
+       * Wall-clock timeout in seconds. `None` = runner default
+       * (600s = 10 min).
+       */
+      timeout_seconds?: number | null;
+      /**
+       * Working directory for the command. `None` = the runner's project
+       * root.
+       */
+      working_directory?: string | null;
+      [k: string]: unknown;
     };
