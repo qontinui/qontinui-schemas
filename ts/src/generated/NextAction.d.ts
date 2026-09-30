@@ -8,7 +8,8 @@
 import type { NextActionKind } from "./NextActionKind";
 
 /**
- * The typed next step of a [`Refusal`].
+ * The typed next step of a [`Refusal`]. Decoding is lenient toward newer
+ * producers (module docs, "Forward compatibility").
  */
 export interface NextAction {
   kind: NextActionKind;
@@ -22,5 +23,11 @@ export interface NextAction {
    * setting to set, the gate to wait for. Its meaning is fixed by `kind`.
    */
   target?: string | null;
+  /**
+   * READER-SIDE: the raw `kind` when this reader did not recognise it
+   * (`kind` is then [`NextActionKind::Unrecognised`]). Producers must not
+   * emit it.
+   */
+  unrecognised_kind?: string | null;
   [k: string]: unknown;
 }
