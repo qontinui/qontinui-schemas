@@ -56,7 +56,7 @@ short = "The action a gate performs when it clears: start an agent session, queu
 long = """
 A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.
 
-Actions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Merge, deploy and migrate pass a safety check first and notify instead when it does not clear them; deploy and migrate notify by default and run only where the tenant has enabled that executor.
+Actions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Deploy and migrate pass a safety check first; they notify by default and run only where the service has been set up to run them.
 
 Delivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.
 """

@@ -4,6 +4,8 @@
 #
 # Written by `QONTINUI_GLOSSARY_REGENERATE=1 cargo test -p qontinui-types
 # --test glossary_source`, checked by the same test (rules in its module docs):
-# a version never reappears with a different digest, a digest never appears
-# under two versions, and versions only increase. Never edit or delete a line.
-1 7ae958f557718a038bd972d3c579ff52da4c4626781d76ffc732b9c364a0a774
+# versions strictly increase by one, the newest row decides, content changes
+# need a new version and a new version needs a content change (an older
+# digest may recur: a revert). Never edit or delete a line that has landed
+# on main.
+1 6e753bcf582accfec2223bdde074407dadf79ea4b417c1e32c269033b3e4388c
