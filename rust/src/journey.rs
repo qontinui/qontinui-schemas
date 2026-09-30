@@ -318,27 +318,32 @@ impl NavigationTriggerKind {
 /// agent can act through is one of these; an edge from a transport not listed
 /// here is a producer defect, not a new variant to tolerate.
 ///
-/// A variant names the action's KIND. For `ComponentAction` and `BatchAction`
-/// the SDK and control transports share one variant: the transport is not
-/// recorded for those kinds.
+/// A variant names the action's KIND. Every variant except `ElementAction` /
+/// `SdkElementAction` covers the SDK and the control transports alike: the
+/// transport is not recorded for those kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum ChokePoint {
     /// `/ui-bridge/control/element/{id}/action`.
     ElementAction,
-    /// `/ui-bridge/control/batch-actions`, `/control/actions/batch`.
+    /// One trigger for a whole batch: the control batch routes
+    /// (`/ui-bridge/control/batch-actions`, `/control/actions/batch`), the SDK
+    /// batch routes, and compound actions (action plans, transitions,
+    /// `ai/execute`, `fill-form`).
     BatchAction,
-    /// `/control/component/{id}/action/{action_id}`.
+    /// A component action: `/control/component/{id}/action/{action_id}` and
+    /// its SDK twin.
     ComponentAction,
     /// The SDK/WebSocket element action.
     SdkElementAction,
     /// Any execute-with-diff route (runner routes and the SDK twin).
     ExecuteWithDiff,
-    /// An agent-driven navigation (`/ui-bridge/sdk/page/navigate`,
-    /// `navigate-to`): no affordance was activated, so the edge's
-    /// `navigationTrigger` is `push`/`replace` and `targetFingerprint` is
-    /// absent. These are the arrivals `requires_prior_knowledge` reads.
+    /// An agent-driven navigation (the SDK and control `page/navigate` /
+    /// `page/navigate-to` routes): no affordance was activated, so
+    /// `targetFingerprint` is absent and the edge's `navigationTrigger` is
+    /// never `affordance` (typically `push`/`replace`). These are the arrivals
+    /// `requires_prior_knowledge` reads.
     Navigation,
 }
 
