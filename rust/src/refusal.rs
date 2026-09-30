@@ -34,16 +34,23 @@
 //! | Unrecognised on the wire | Decodes as |
 //! |---|---|
 //! | `code` | [`RefusalCode::Unknown`], raw string kept in [`Refusal::unrecognised_code`] |
-//! | `next_action.kind` | [`NextActionKind::Unrecognised`] (target and delay kept) |
-//! | `source` | [`RefusalSource::Unrecognised`] |
+//! | `next_action.kind` | [`NextActionKind::Unrecognised`] (target and delay kept), raw string kept in [`NextAction::unrecognised_kind`] |
+//! | `source` | [`RefusalSource::Unrecognised`], raw string kept in [`Refusal::unrecognised_source`] |
 //! | a `glossary_terms` id | dropped from `glossary_terms`, kept in [`Refusal::unrecognised_glossary_terms`] |
 //! | any other field | ignored (no `deny_unknown_fields` on the wire types or their schemas) |
 //!
 //! `unrecognised_code` is what keeps "the CAUSE is unknown" (a producer sent
 //! `code: "unknown"`) distinct from "this READER does not know the cause" (it
 //! sent a code newer than the reader). The `Unrecognised` variants and the two
-//! `unrecognised_*` fields are reader-side: producers never construct them,
+//! `unrecognised_*` fields are reader-side: producers MUST NOT emit them,
 //! and they are excluded from [`NextActionKind::ALL`] / [`RefusalSource::ALL`].
+//!
+//! **Relay fidelity.** A reader that re-emits a refusal it could not fully
+//! classify emits `unknown` / `unrecognised` plus the raw strings. A newer
+//! reader receiving that relay UPGRADES it: when the wire says `unknown` (or
+//! `unrecognised`) and the matching `unrecognised_*` string is one it knows,
+//! it decodes the known value and clears the raw string. Unrecognised
+//! glossary ids are re-classified the same way.
 //!
 //! **Generated TS and Python readers.** The bindings are generated from this
 //! module's JSON Schema, so enum fields are closed string unions there. A TS
@@ -214,8 +221,9 @@ pub enum NextActionKind {
     WaitForEnabled,
     /// Use a different or broader selector.
     BroadenSelector,
-    /// READER-SIDE ONLY: the producer named a kind newer than this reader.
-    /// Never constructed by a producer; not in [`NextActionKind::ALL`].
+    /// READER-SIDE ONLY: the producer named a kind newer than this reader
+    /// (raw string in [`NextAction::unrecognised_kind`]). Producers must not
+    /// emit it; not in [`NextActionKind::ALL`].
     #[serde(other)]
     Unrecognised,
 }
@@ -261,6 +269,12 @@ impl NextActionKind {
             NextActionKind::Unrecognised => "unrecognised",
         }
     }
+
+    /// The producer kind for a wire value, or `None` when this version does
+    /// not know it (`"unrecognised"` is never a producer kind).
+    pub fn from_wire(s: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|k| k.as_str() == s)
+    }
 }
 
 /// A delay beyond this is not rendered as a count: "try again in 3 years"
@@ -304,8 +318,9 @@ fn quotable(target: Option<&str>) -> Option<String> {
     (!collapsed.is_empty()).then_some(collapsed)
 }
 
-/// The typed next step of a [`Refusal`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// The typed next step of a [`Refusal`]. Decoding is lenient toward newer
+/// producers (module docs, "Forward compatibility").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct NextAction {
     pub kind: NextActionKind,
     /// What the action applies to: the command to run, the page to open, the
@@ -316,6 +331,68 @@ pub struct NextAction {
     /// seconds. Absent when no delay is known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_after_s: Option<u32>,
+    /// READER-SIDE: the raw `kind` when this reader did not recognise it
+    /// (`kind` is then [`NextActionKind::Unrecognised`]). Producers must not
+    /// emit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unrecognised_kind: Option<String>,
+}
+
+/// Classify a wire value against a closed vocabulary, honouring a relayed
+/// raw string: `(known value, raw string still unrecognised)`.
+fn classify<T: Copy>(
+    wire: String,
+    relayed_raw: Option<String>,
+    placeholder: &str,
+    fallback: T,
+    from_wire: fn(&str) -> Option<T>,
+) -> (T, Option<String>) {
+    if wire == placeholder {
+        // The placeholder (`unknown` / `unrecognised`), possibly a relay of an
+        // earlier reader's classification: upgrade when this reader knows the
+        // relayed raw value, otherwise keep the raw string.
+        return match relayed_raw {
+            Some(raw) => match from_wire(&raw) {
+                Some(v) if raw != placeholder => (v, None),
+                _ => (fallback, Some(raw)),
+            },
+            None => (fallback, None),
+        };
+    }
+    if let Some(v) = from_wire(&wire) {
+        return (v, None);
+    }
+    (fallback, Some(wire))
+}
+
+#[derive(Deserialize)]
+struct NextActionWire {
+    kind: String,
+    #[serde(default)]
+    target: Option<String>,
+    #[serde(default)]
+    retry_after_s: Option<u32>,
+    #[serde(default)]
+    unrecognised_kind: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for NextAction {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let w = NextActionWire::deserialize(deserializer)?;
+        let (kind, unrecognised_kind) = classify(
+            w.kind,
+            w.unrecognised_kind,
+            NextActionKind::Unrecognised.as_str(),
+            NextActionKind::Unrecognised,
+            NextActionKind::from_wire,
+        );
+        Ok(NextAction {
+            kind,
+            target: w.target,
+            retry_after_s: w.retry_after_s,
+            unrecognised_kind,
+        })
+    }
 }
 
 impl NextAction {
@@ -325,6 +402,7 @@ impl NextAction {
             kind,
             target: None,
             retry_after_s: None,
+            unrecognised_kind: None,
         }
     }
 
@@ -443,8 +521,9 @@ pub enum RefusalSource {
     WebBackend,
     /// The web application's frontend.
     WebFrontend,
-    /// READER-SIDE ONLY: a source newer than this reader. Never constructed
-    /// by a producer; not in [`RefusalSource::ALL`].
+    /// READER-SIDE ONLY: a source newer than this reader (raw string in
+    /// [`Refusal::unrecognised_source`]). Producers must not emit it; not in
+    /// [`RefusalSource::ALL`].
     #[serde(other)]
     Unrecognised,
 }
@@ -458,6 +537,23 @@ impl RefusalSource {
         RefusalSource::WebBackend,
         RefusalSource::WebFrontend,
     ];
+
+    /// The wire value (`snake_case`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RefusalSource::Runner => "runner",
+            RefusalSource::Coord => "coord",
+            RefusalSource::WebBackend => "web_backend",
+            RefusalSource::WebFrontend => "web_frontend",
+            RefusalSource::Unrecognised => "unrecognised",
+        }
+    }
+
+    /// The producer source for a wire value, or `None` when this version
+    /// does not know it.
+    pub fn from_wire(s: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|x| x.as_str() == s)
+    }
 }
 
 /// One operator-facing refusal: what went wrong, and what to do next.
@@ -486,11 +582,16 @@ pub struct Refusal {
     pub source: RefusalSource,
     /// READER-SIDE: the raw `code` when this reader did not recognise it
     /// (`code` is then [`RefusalCode::Unknown`]). Absent when the producer
-    /// itself said `unknown`. Never set by a producer.
+    /// itself said `unknown`. Producers must not emit it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unrecognised_code: Option<String>,
+    /// READER-SIDE: the raw `source` when this reader did not recognise it
+    /// (`source` is then [`RefusalSource::Unrecognised`]). Producers must not
+    /// emit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unrecognised_source: Option<String>,
     /// READER-SIDE: glossary ids this reader's glossary does not define,
-    /// removed from `glossary_terms`. Never set by a producer.
+    /// removed from `glossary_terms`. Producers must not emit it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unrecognised_glossary_terms: Vec<String>,
 }
@@ -508,27 +609,41 @@ struct RefusalWire {
     #[serde(default)]
     detail: Option<String>,
     observed_at: String,
-    source: RefusalSource,
+    source: String,
     #[serde(default)]
     unrecognised_code: Option<String>,
     #[serde(default)]
-    unrecognised_glossary_terms: Vec<String>,
+    unrecognised_source: Option<String>,
+    #[serde(default)]
+    unrecognised_glossary_terms: Option<Vec<String>>,
 }
 
 impl<'de> Deserialize<'de> for Refusal {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let w = RefusalWire::deserialize(deserializer)?;
-        let (code, mut unrecognised_code) = match RefusalCode::from_wire(&w.code) {
-            Some(c) => (c, None),
-            None => (RefusalCode::Unknown, Some(w.code)),
-        };
-        // A relayed refusal that was already classified keeps its record.
-        if unrecognised_code.is_none() && code == RefusalCode::Unknown {
-            unrecognised_code = w.unrecognised_code;
-        }
+        let (code, unrecognised_code) = classify(
+            w.code,
+            w.unrecognised_code,
+            RefusalCode::Unknown.as_str(),
+            RefusalCode::Unknown,
+            RefusalCode::from_wire,
+        );
+        let (source, unrecognised_source) = classify(
+            w.source,
+            w.unrecognised_source,
+            RefusalSource::Unrecognised.as_str(),
+            RefusalSource::Unrecognised,
+            RefusalSource::from_wire,
+        );
         let mut glossary_terms = Vec::new();
-        let mut unrecognised_glossary_terms = w.unrecognised_glossary_terms;
-        for id in w.glossary_terms.unwrap_or_default() {
+        let mut unrecognised_glossary_terms = Vec::new();
+        // Relayed unrecognised ids are re-classified: this reader may know them.
+        let ids = w
+            .glossary_terms
+            .unwrap_or_default()
+            .into_iter()
+            .chain(w.unrecognised_glossary_terms.unwrap_or_default());
+        for id in ids {
             match GlossaryTerm::from_id(&id) {
                 Some(t) => glossary_terms.push(t),
                 None => unrecognised_glossary_terms.push(id),
@@ -541,8 +656,9 @@ impl<'de> Deserialize<'de> for Refusal {
             glossary_terms,
             detail: w.detail,
             observed_at: w.observed_at,
-            source: w.source,
+            source,
             unrecognised_code,
+            unrecognised_source,
             unrecognised_glossary_terms,
         })
     }
@@ -565,6 +681,7 @@ impl Refusal {
             observed_at: observed_at.into(),
             source,
             unrecognised_code: None,
+            unrecognised_source: None,
             unrecognised_glossary_terms: Vec::new(),
         }
     }
@@ -782,8 +899,13 @@ mod tests {
             Some("some_code_from_a_newer_producer")
         );
         assert_eq!(r.next_action.kind, NextActionKind::Unrecognised);
+        assert_eq!(
+            r.next_action.unrecognised_kind.as_deref(),
+            Some("do_something_new")
+        );
         assert_eq!(r.next_action.target.as_deref(), Some("t"));
         assert_eq!(r.source, RefusalSource::Unrecognised);
+        assert_eq!(r.unrecognised_source.as_deref(), Some("a_new_component"));
         assert_eq!(r.glossary_terms, vec![GlossaryTerm::Gate]);
         assert_eq!(
             r.unrecognised_glossary_terms,
@@ -798,6 +920,77 @@ mod tests {
         // Re-emitting keeps the record, and decoding THAT again is stable.
         let again: Refusal = serde_json::from_value(serde_json::to_value(&r).unwrap()).unwrap();
         assert_eq!(again, r);
+    }
+
+    /// A relay from an OLDER reader carries `unknown` / `unrecognised` plus
+    /// the raw strings; a reader that knows those values upgrades them.
+    #[test]
+    fn a_relay_is_upgraded_by_a_reader_that_knows_the_raw_values() {
+        let relayed = serde_json::json!({
+            "code": "unknown",
+            "unrecognised_code": "endpoint_unresolved",
+            "next_action": {"kind": "unrecognised", "unrecognised_kind": "sign_in", "target": "t"},
+            "glossary_terms": ["gate"],
+            "unrecognised_glossary_terms": ["tenant", "still_not_a_term"],
+            "observed_at": AT,
+            "source": "unrecognised",
+            "unrecognised_source": "coord"
+        });
+        let r: Refusal = serde_json::from_value(relayed).unwrap();
+        assert_eq!(r.code, RefusalCode::EndpointUnresolved);
+        assert_eq!(r.unrecognised_code, None);
+        assert_eq!(r.next_action.kind, NextActionKind::SignIn);
+        assert_eq!(r.next_action.unrecognised_kind, None);
+        assert_eq!(r.next_action.target.as_deref(), Some("t"));
+        assert_eq!(r.source, RefusalSource::Coord);
+        assert_eq!(r.unrecognised_source, None);
+        assert_eq!(
+            r.glossary_terms,
+            vec![GlossaryTerm::Gate, GlossaryTerm::Tenant]
+        );
+        assert_eq!(
+            r.unrecognised_glossary_terms,
+            vec!["still_not_a_term".to_string()]
+        );
+
+        // A relay whose raw values this reader does not know either keeps them.
+        let still_unknown: Refusal = serde_json::from_value(serde_json::json!({
+            "code": "unknown",
+            "unrecognised_code": "newer_code",
+            "next_action": {"kind": "unrecognised", "unrecognised_kind": "newer_kind"},
+            "glossary_terms": [],
+            "unrecognised_glossary_terms": null,
+            "observed_at": AT,
+            "source": "unrecognised",
+            "unrecognised_source": "newer_source"
+        }))
+        .unwrap();
+        assert_eq!(
+            still_unknown.unrecognised_code.as_deref(),
+            Some("newer_code")
+        );
+        assert_eq!(
+            still_unknown.next_action.unrecognised_kind.as_deref(),
+            Some("newer_kind")
+        );
+        assert_eq!(
+            still_unknown.unrecognised_source.as_deref(),
+            Some("newer_source")
+        );
+        assert!(still_unknown.unrecognised_glossary_terms.is_empty());
+    }
+
+    #[test]
+    fn source_and_kind_wire_values_round_trip() {
+        for s in RefusalSource::ALL {
+            assert_eq!(serde_json::to_value(s).unwrap(), s.as_str());
+            assert_eq!(RefusalSource::from_wire(s.as_str()), Some(*s));
+        }
+        for k in NextActionKind::ALL {
+            assert_eq!(NextActionKind::from_wire(k.as_str()), Some(*k));
+        }
+        assert_eq!(NextActionKind::from_wire("unrecognised"), None);
+        assert_eq!(RefusalSource::from_wire("unrecognised"), None);
     }
 
     /// "The producer says the cause is unknown" and "this reader does not

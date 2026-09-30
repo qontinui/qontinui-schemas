@@ -20,16 +20,20 @@
 //! An append-only ledger of `<version> <sha256>` lines, where the digest is of
 //! a CANONICAL rendering of the terms (their parsed fields as JSON — so
 //! comments, whitespace and key order do not count, and `version` itself is
-//! not hashed). It fails when:
+//! not hashed). Only the NEWEST row decides; older rows are history. It
+//! fails when:
 //!
-//! - the current `version` is in the ledger with a DIFFERENT digest (content
-//!   changed without raising `version`, or a version number was reused);
-//! - the current digest is in the ledger under another version (`version`
-//!   raised with no content change);
-//! - the current `version` is below the ledger's newest, or the ledger is not
-//!   strictly increasing, or repeats a digest;
-//! - the current `(version, digest)` is not yet in the ledger — the regenerate
-//!   mode appends it, and refuses in every case above.
+//! - the ledger's versions are not strictly increasing;
+//! - the current `version` is below the newest recorded version;
+//! - the current `version` equals the newest but its digest differs (content
+//!   changed without raising `version`);
+//! - the current `version` is above the newest but not exactly newest + 1, or
+//!   its digest equals the newest's (`version` raised with no content change);
+//! - the current `(version, digest)` is a legitimate newest + 1 but not yet in
+//!   the ledger — the regenerate mode appends it.
+//!
+//! Returning to OLDER content under a new version is allowed (a revert is a
+//! new version whose digest may repeat an earlier row's).
 //!
 //! The ledger lives in git, so two branches that both claim the next version
 //! conflict on the same appended line instead of both passing their own CI.
@@ -171,35 +175,43 @@ fn check_lock(rows: &[(u32, String)], version: u32, sha: &str) -> Result<LockVer
             ));
         }
     }
-    let mut seen = BTreeSet::new();
-    for (v, s) in rows {
-        if !seen.insert(s.as_str()) {
-            return Err(format!("versions.lock repeats digest {s} (at version {v})"));
-        }
+    let Some((newest, newest_sha)) = rows.last() else {
+        return if version == 1 {
+            Ok(LockVerdict::Append)
+        } else {
+            Err(format!(
+                "versions.lock is empty, so the first version must be 1, not {version}"
+            ))
+        };
+    };
+    let newest = *newest;
+    if version < newest {
+        return Err(format!(
+            "version {version} is below the newest recorded version {newest}"
+        ));
     }
-    if let Some((_, recorded)) = rows.iter().find(|(v, _)| *v == version) {
-        if recorded == sha {
+    if version == newest {
+        if sha == newest_sha {
             return Ok(LockVerdict::Recorded);
         }
-        let next = rows.last().map_or(1, |(v, _)| v + 1);
         return Err(format!(
             "glossary content changed (digest {sha}) but version {version} is already recorded \
-             in versions.lock with digest {recorded}. Raise `version` in glossary/terms.toml to \
-             {next} — every content change is a new glossary version."
+             in versions.lock with digest {newest_sha}. Raise `version` in glossary/terms.toml to \
+             {} — every content change is a new glossary version.",
+            newest + 1
         ));
     }
-    if let Some((v, _)) = rows.iter().find(|(_, s)| s == sha) {
+    if version != newest + 1 {
         return Err(format!(
-            "version raised to {version} but the content is unchanged since version {v}; \
-             put `version` back to {v}"
+            "version {version} skips ahead; the next version is {}",
+            newest + 1
         ));
     }
-    if let Some((newest, _)) = rows.last() {
-        if version < *newest {
-            return Err(format!(
-                "version {version} is below the newest recorded version {newest}"
-            ));
-        }
+    if sha == newest_sha {
+        return Err(format!(
+            "version raised to {version} but the content is unchanged since version {newest}; \
+             put `version` back to {newest}"
+        ));
     }
     Ok(LockVerdict::Append)
 }
@@ -547,29 +559,37 @@ fn the_version_lock_refuses_every_bad_transition() {
     let b = "b".repeat(64);
     let c = "c".repeat(64);
     let rows = vec![(1, a.clone()), (2, b.clone())];
-    // Recorded as-is.
+    // The newest row, as-is.
     assert_eq!(check_lock(&rows, 2, &b), Ok(LockVerdict::Recorded));
-    assert_eq!(check_lock(&rows, 1, &a), Ok(LockVerdict::Recorded));
-    // Content changed, version not raised (or a version reused).
+    // Going back to an older version is refused, even with its old content.
+    let e = check_lock(&rows, 1, &a).unwrap_err();
+    assert!(e.contains("below the newest"), "{e}");
+    // Content changed, version not raised.
     let e = check_lock(&rows, 2, &c).unwrap_err();
     assert!(e.contains("Raise `version`") && e.contains(" 3 "), "{e}");
-    assert!(check_lock(&rows, 1, &c).is_err());
     // Version raised, content unchanged.
     let e = check_lock(&rows, 3, &b).unwrap_err();
     assert!(e.contains("unchanged"), "{e}");
+    // Version skipping ahead.
+    let e = check_lock(&rows, 4, &c).unwrap_err();
+    assert!(e.contains("skips ahead"), "{e}");
     // A new version with new content: append.
     assert_eq!(check_lock(&rows, 3, &c), Ok(LockVerdict::Append));
+    // Reverting to OLDER content under a new version is allowed.
+    assert_eq!(check_lock(&rows, 3, &a), Ok(LockVerdict::Append));
+    let reverted = vec![(1, a.clone()), (2, b.clone()), (3, a.clone())];
+    assert_eq!(check_lock(&reverted, 3, &a), Ok(LockVerdict::Recorded));
     // A malformed ledger.
     assert!(check_lock(&[(2, a.clone()), (1, b.clone())], 3, &c).is_err());
-    assert!(check_lock(&[(1, a.clone()), (2, a.clone())], 3, &c).is_err());
     assert!(parse_lock("1 nothex").is_err());
     assert!(parse_lock(&format!("x {a}")).is_err());
     assert_eq!(
         parse_lock(&format!("# c\n\n1 {a}\n")).unwrap(),
         vec![(1, a.clone())]
     );
-    // An empty ledger accepts the first version.
+    // An empty ledger accepts only version 1.
     assert_eq!(check_lock(&[], 1, &a), Ok(LockVerdict::Append));
+    assert!(check_lock(&[], 2, &a).is_err());
 }
 
 #[test]

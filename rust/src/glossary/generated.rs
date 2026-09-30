@@ -9,7 +9,7 @@ use super::GlossaryEntry;
 /// The glossary's `version` (glossary/terms.toml).
 pub const GLOSSARY_VERSION: u32 = 1;
 /// SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock).
-pub const GLOSSARY_CONTENT_SHA256: &str = "7ae958f557718a038bd972d3c579ff52da4c4626781d76ffc732b9c364a0a774";
+pub const GLOSSARY_CONTENT_SHA256: &str = "6e753bcf582accfec2223bdde074407dadf79ea4b417c1e32c269033b3e4388c";
 
 /// A term the product glossary defines, by its stable snake_case id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
@@ -177,7 +177,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::Continuation,
         term: "Continuation",
         short: "The action a gate performs when it clears: start an agent session, queue a pull request to land, deploy, migrate, or just notify.",
-        long: "A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.\n\nActions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Merge, deploy and migrate pass a safety check first and notify instead when it does not clear them; deploy and migrate notify by default and run only where the tenant has enabled that executor.\n\nDelivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.",
+        long: "A **continuation** is attached to a gate and runs when the gate clears, so blocked work picks itself back up without anyone remembering to restart it.\n\nActions: *run a skill* (start an agent session with arguments), *merge a pull request* (queue it on the merge train), *deploy*, *migrate*, or *notify only*. Deploy and migrate pass a safety check first; they notify by default and run only where the service has been set up to run them.\n\nDelivery: by default a new agent session is started; it can instead be delivered into a live session that still holds the context, falling back to a new session when none is live. The product records when a continuation was dispatched and when it was picked up, so one that never started is detected as stalled.",
         see_also: &[GlossaryTerm::Gate, GlossaryTerm::AgentSession, GlossaryTerm::MergeTrain],
         since: 1,
     },
