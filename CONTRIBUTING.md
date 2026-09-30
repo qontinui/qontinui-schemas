@@ -115,6 +115,30 @@ git -C qontinui-schemas diff --exit-code -I '^#   timestamp:' \
 
 The version pin matters — unpinned upstream releases tweak Pydantic output and surface as spurious drift. If you don't have qontinui-runner cloned, the CI run is your check.
 
+### Editing `fleet-nouns.toml`
+
+[`fleet-nouns.toml`](fleet-nouns.toml) is data read by lints in **other** repos, so a green PR here is only half the change. Pre-flight it locally, from the repo root, with the same two commands `rust-ci`'s cross-engine step runs (needs `python3` and `node` on PATH):
+
+```bash
+FLEET_NOUNS_MATRIX_OUT=/tmp/fleet-nouns-rust.json \
+  cargo test -p qontinui-types --test fleet_nouns_vocabulary \
+  hit_matrix_for_the_cross_engine_check
+python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json
+```
+
+(`cargo test --workspace` runs the Rust half, `rust/tests/fleet_nouns_vocabulary.rs`, on its own.)
+
+**Merging here changes no consumer's CI verdict.** Each consumer's CI reads the file at a *pinned* schemas commit, not at this repo's `main`, and the two pin shapes behave differently:
+
+- **sha256-pinned** consumers pin the file itself by ref **and** digest. A digest mismatch is red; they read the pinned blob locally as well as in CI, and an advisory drift step warns when schemas `main` has moved away from the pin.
+- **Sibling-pinned** consumers read `../qontinui-schemas/fleet-nouns.toml` from the SHA-pinned sibling checkout they already build against. That pin covers CI only: locally they read whatever commit your sibling checkout is on, and nothing warns them that `main` has moved.
+
+An edit therefore reaches a consumer's CI only when that consumer bumps its pin, in its own PR, where its own ratchet re-counts against the new patterns. So:
+
+- A pattern fix or a new class is **not live** until every consumer that should see it has bumped. Find them with `gh search code --owner qontinui fleet-nouns` rather than from a list here — it searches default branches only, so a consumer still adopting the file in an open PR will not show, and it also returns non-consumers (plans, docs) — and open (or declare, via `coord:upstream-of=<repo>#<n>`) the bump PRs.
+- The digest covers the **whole file**, comments included. Existing pins stay valid (they name an immutable ref), but a comment-only edit fires every drift warning and forces each consumer's next bump to re-pin the `sha256` — batch header edits with a substantive change rather than landing them alone.
+- Renaming or removing a class `id` breaks any consumer that keys an allowance or a disposition on it, and widening a `pattern` raises their counts. Either one reds or re-baselines the consumer at bump time, which is the intended place to settle it — say in this PR which consumers will need re-baselining.
+
 ### Active workstream awareness
 
 CI is a shared surface. Before opening a PR that touches `.github/workflows/` or anything CI-adjacent, check what's already in flight:
