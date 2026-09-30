@@ -1,11 +1,14 @@
-//! The glossary source (`glossary/terms.toml`) and its generated Rust
-//! (`rust/src/glossary/generated.rs`) — plan
+//! The glossary source (`glossary/terms.toml`) and its two generated tables
+//! — the Rust `rust/src/glossary/generated.rs` and the TypeScript
+//! `ts/src/glossary/generated.ts` — plan
 //! `2026-09-20-the-published-product-works-without-knowing-a-development-environment-exists`,
-//! Phase C1.
+//! Phases C1 and C3.
 //!
-//! This test IS the generator: it renders the Rust table from the TOML and
-//! fails when the checked-in file differs. To regenerate after editing the
-//! TOML (and raising its `version`):
+//! This test IS the generator: it renders both tables from the TOML and fails
+//! when either checked-in file differs. The TypeScript table is what a web
+//! surface renders a definition from without a request (C3), so it is
+//! generated from the same source by the same code rather than copied. To
+//! regenerate after editing the TOML (and raising its `version`):
 //!
 //! ```text
 //! QONTINUI_GLOSSARY_REGENERATE=1 cargo test -p qontinui-types --test glossary_source
@@ -86,6 +89,17 @@ fn generated_path() -> PathBuf {
         .join("src")
         .join("glossary")
         .join("generated.rs")
+}
+
+/// The generated TypeScript table, published as `@qontinui/shared-types/glossary`.
+/// Kept out of `ts/src/generated/`, which belongs to the JSON-Schema binding
+/// generator and its drift gate.
+fn generated_ts_path() -> PathBuf {
+    repo_root()
+        .join("ts")
+        .join("src")
+        .join("glossary")
+        .join("generated.ts")
 }
 
 /// The source text with CRLF normalised to LF, so the digest is the same on
@@ -370,6 +384,77 @@ fn render(src: &Source, sha: &str) -> String {
     o
 }
 
+/// A TypeScript string literal. JSON's string grammar is a subset of
+/// JavaScript's, so `serde_json` is the escaper.
+fn ts_lit(s: &str) -> String {
+    serde_json::to_string(s).expect("a string serialises")
+}
+
+/// Render `ts/src/glossary/generated.ts`. Deterministic: same source, same
+/// bytes.
+///
+/// The table's type is a mapped type over the `GlossaryTerm` union that the
+/// JSON-Schema binding generator emits (`ts/src/generated/GlossaryTerm.d.ts`),
+/// so the two generators are checked against each other by `tsc`: a term the
+/// union lacks is an excess property, a term the table lacks is a missing one.
+/// Field names are the Rust `GlossaryEntry`'s serialised names (`see_also`),
+/// so the same type describes a row read from a served glossary door.
+fn render_ts(src: &Source, sha: &str) -> String {
+    use std::fmt::Write;
+    let mut o = String::new();
+    o.push_str("/* eslint-disable */\n");
+    o.push_str(
+        "// @generated from glossary/terms.toml by rust/tests/glossary_source.rs — do not edit.\n",
+    );
+    o.push_str("// Regenerate: QONTINUI_GLOSSARY_REGENERATE=1 cargo test -p qontinui-types --test glossary_source\n\n");
+    o.push_str("import type { GlossaryTerm } from \"../generated/GlossaryTerm\";\n\n");
+    o.push_str("/** One glossary definition (the Rust `GlossaryEntry`, as it serialises). */\n");
+    o.push_str("export interface GlossaryEntry<Id extends GlossaryTerm = GlossaryTerm> {\n");
+    o.push_str("  readonly id: Id;\n");
+    o.push_str("  /** Display name. */\n  readonly term: string;\n");
+    o.push_str(
+        "  /** Plain text, at most 160 characters (tooltip). */\n  readonly short: string;\n",
+    );
+    o.push_str("  /** Markdown, at most 1200 characters. */\n  readonly long: string;\n");
+    o.push_str("  /** Related terms. */\n  readonly see_also: readonly GlossaryTerm[];\n");
+    o.push_str(
+        "  /** The glossary version that introduced this term. */\n  readonly since: number;\n",
+    );
+    o.push_str("}\n\n");
+    o.push_str("/** The glossary's `version` (glossary/terms.toml). */\n");
+    writeln!(o, "export const GLOSSARY_VERSION = {};", src.version).unwrap();
+    o.push_str(
+        "/** SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock). */\n",
+    );
+    writeln!(
+        o,
+        "export const GLOSSARY_CONTENT_SHA256 = {};\n",
+        ts_lit(sha)
+    )
+    .unwrap();
+    o.push_str("/** Every term id, in glossary order. */\n");
+    o.push_str("export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [\n");
+    for t in &src.term {
+        writeln!(o, "  {},", ts_lit(&t.id)).unwrap();
+    }
+    o.push_str("];\n\n");
+    o.push_str("/** Every definition, keyed by id. */\n");
+    o.push_str("export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {\n");
+    for t in &src.term {
+        writeln!(o, "  {}: {{", t.id).unwrap();
+        writeln!(o, "    id: {},", ts_lit(&t.id)).unwrap();
+        writeln!(o, "    term: {},", ts_lit(t.term.trim())).unwrap();
+        writeln!(o, "    short: {},", ts_lit(t.short.trim())).unwrap();
+        writeln!(o, "    long: {},", ts_lit(t.long.trim())).unwrap();
+        let see: Vec<String> = t.see_also.iter().map(|s| ts_lit(s)).collect();
+        writeln!(o, "    see_also: [{}],", see.join(", ")).unwrap();
+        writeln!(o, "    since: {},", t.since).unwrap();
+        o.push_str("  },\n");
+    }
+    o.push_str("};\n");
+    o
+}
+
 #[test]
 fn source_is_valid() {
     let src = parse(&source_text());
@@ -404,7 +489,7 @@ fn no_text_names_a_fleet_noun() {
 }
 
 #[test]
-fn generated_rust_matches_the_source_and_the_version_was_raised() {
+fn generated_tables_match_the_source_and_the_version_was_raised() {
     let src = parse(&source_text());
     let sha = content_sha(&src);
     let regenerate = std::env::var_os(REGENERATE_ENV).is_some();
@@ -434,24 +519,30 @@ fn generated_rust_matches_the_source_and_the_version_was_raised() {
         ),
     }
 
-    let want = render(&src, &sha);
-    let path = generated_path();
-    let have = std::fs::read_to_string(&path)
-        .unwrap_or_default()
-        .replace("\r\n", "\n");
-    if have == want {
-        return;
+    let mut stale = Vec::new();
+    for (path, want) in [
+        (generated_path(), render(&src, &sha)),
+        (generated_ts_path(), render_ts(&src, &sha)),
+    ] {
+        let have = std::fs::read_to_string(&path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
+        if have == want {
+            continue;
+        }
+        if regenerate {
+            std::fs::write(&path, &want)
+                .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
+            eprintln!("regenerated {}", path.display());
+            continue;
+        }
+        stale.push(path.display().to_string());
     }
-    if regenerate {
-        std::fs::write(&path, &want)
-            .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
-        eprintln!("regenerated {}", path.display());
-        return;
-    }
-    panic!(
-        "{} is stale against glossary/terms.toml. Regenerate:\n  \
+    assert!(
+        stale.is_empty(),
+        "stale against glossary/terms.toml: {}. Regenerate:\n  \
          {REGENERATE_ENV}=1 cargo test -p qontinui-types --test glossary_source",
-        path.display()
+        stale.join(", ")
     );
 }
 

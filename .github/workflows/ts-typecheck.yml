@@ -94,3 +94,11 @@ jobs:
 
       - name: Type-check (source + generated .d.ts gate)
         run: npm run typecheck
+
+      # The package's own unit tests (`src/**/__tests__`). Until the glossary
+      # table (`@qontinui/shared-types/glossary`, a generated RUNTIME value, not
+      # only types) this package's tests covered one projection and ran nowhere
+      # in CI. A value published to every web surface is checked here, on the
+      # PR, rather than first by a consumer.
+      - name: Unit tests
+        run: npm test
