@@ -277,8 +277,9 @@ impl AssertionOutcome {
 ///
 /// `passed` and `outcome` are two views of one verdict and are always
 /// consistent: `passed == outcome.passed()`. `passed` is retained as the
-/// wire-stable gate bit every existing consumer already reads (the runner's
-/// `all_passed`, `vision-audit`'s exit code); `outcome` is the finer answer.
+/// wire-stable gate bit existing consumers read (`vision-audit`'s exit code);
+/// `outcome` is the finer answer, and the runner's assert route rolls up
+/// `outcome` (failed > unknown > passed), never `passed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "AssertionResultWire")]
