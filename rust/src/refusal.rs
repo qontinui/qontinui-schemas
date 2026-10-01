@@ -275,7 +275,8 @@ impl RefusalCode {
 #[serde(rename_all = "snake_case")]
 pub enum NextActionKind {
     /// Try the same thing again later; [`NextAction::retry_after_s`] says when,
-    /// when it is known.
+    /// when it is known, and [`NextAction::target`] (when present) names what
+    /// to re-check first because the earlier attempt may already have applied.
     RetryLater,
     /// Run the command named in [`NextAction::target`].
     RunCommand,
@@ -410,6 +411,10 @@ pub struct NextAction {
     pub kind: NextActionKind,
     /// What the action applies to: the command to run, the page to open, the
     /// setting to set, the gate to wait for. Its meaning is fixed by `kind`.
+    /// On [`NextActionKind::RetryLater`] it is what to re-check BEFORE
+    /// retrying, because the earlier attempt may already have taken effect (an
+    /// [`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then
+    /// says so. Omit it on a retry that is safe to repeat blindly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// For [`NextActionKind::RetryLater`]: the earliest useful retry, in whole
@@ -522,14 +527,25 @@ impl NextAction {
         const UNNAMED: &str = "(it did not name one, which is itself a defect worth reporting)";
         let target = quotable(self.target.as_deref());
         match (self.kind, target) {
-            (NextActionKind::RetryLater, _) => match self.retry_after_s {
-                Some(0) => "Try again now".to_string(),
-                Some(s) if s > RETRY_RENDER_CEILING_S => {
-                    "Try again later; the suggested wait is more than two days".to_string()
+            (NextActionKind::RetryLater, target) => {
+                let when = match self.retry_after_s {
+                    Some(0) => "Try again now".to_string(),
+                    Some(s) if s > RETRY_RENDER_CEILING_S => {
+                        "Try again later; the suggested wait is more than two days".to_string()
+                    }
+                    Some(s) => format!("Try again in {}", humanise_delay(s)),
+                    None => "Try again later".to_string(),
+                };
+                match target {
+                    // A target on `retry_later` is what to re-check first: the
+                    // earlier attempt may already have taken effect, and a
+                    // blind retry of a write can apply it twice.
+                    Some(t) => format!(
+                        "{when}, but first check \"{t}\": the earlier attempt may already have taken effect"
+                    ),
+                    None => when,
                 }
-                Some(s) => format!("Try again in {}", humanise_delay(s)),
-                None => "Try again later".to_string(),
-            },
+            }
             (NextActionKind::RunCommand, Some(t)) => format!("Run the command \"{t}\""),
             (NextActionKind::RunCommand, None) => {
                 format!("Run the command this refusal refers to {UNNAMED}")
@@ -1142,6 +1158,27 @@ mod tests {
             "Try again later; the suggested wait is more than two days"
         );
         assert_eq!(r(u32::MAX), r(RETRY_RENDER_CEILING_S + 1));
+    }
+
+    /// A retry that may repeat an already-applied write says what to re-check
+    /// first; a blank target is no target, and a bare retry is unchanged.
+    #[test]
+    fn retry_later_with_a_target_warns_the_attempt_may_have_applied() {
+        assert_eq!(
+            NextAction::retry_later(Some(30))
+                .with_target("the saved workflow")
+                .render(),
+            "Try again in 30 seconds, but first check \"the saved workflow\": \
+             the earlier attempt may already have taken effect"
+        );
+        assert_eq!(
+            NextAction::retry_later(None).with_target("x").render(),
+            "Try again later, but first check \"x\": the earlier attempt may already have taken effect"
+        );
+        assert_eq!(
+            NextAction::retry_later(None).with_target("  ").render(),
+            "Try again later"
+        );
     }
 
     #[test]
