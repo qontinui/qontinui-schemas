@@ -446,7 +446,7 @@ fn render_ts(src: &Source, sha: &str) -> String {
     o.push_str("/** Every definition, keyed by id. */\n");
     o.push_str("export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {\n");
     for t in &src.term {
-        writeln!(o, "  {}: {{", t.id).unwrap();
+        writeln!(o, "  {}: {{", ts_lit(&t.id)).unwrap();
         writeln!(o, "    id: {},", ts_lit(&t.id)).unwrap();
         writeln!(o, "    term: {},", ts_lit(t.term.trim())).unwrap();
         writeln!(o, "    short: {},", ts_lit(t.short.trim())).unwrap();
