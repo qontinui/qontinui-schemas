@@ -543,6 +543,10 @@ impl fmt::Display for SiblingCheckoutAbsent {
     }
 }
 
+/// An error ONLY in its [`SiblingFallback::Unsupported`] arm. The
+/// [`SiblingFallback::EmbeddedCopy`] arm is a success notice: a caller whose
+/// embedded copy served the capability must not propagate it with `?` — check
+/// [`SiblingCheckoutAbsent::refusal`] (`None` there) first.
 impl std::error::Error for SiblingCheckoutAbsent {}
 
 /// A starting point for the ancestor walk, supplied by a caller that has a
@@ -855,6 +859,17 @@ pub fn resolve_workspace_root(
 /// worktree belongs to when it is a file ([`main_checkout_of_worktree`]).
 /// The answer is that checkout's parent, when it is an ordinary directory
 /// rather than a filesystem root. Anything unreadable skips the rung.
+///
+/// `repo` is NOT walked upward to find a `.git`: a session opened on a folder
+/// that is not itself a checkout (a project folder inside a home directory that
+/// is a dotfiles repository, say) would otherwise borrow an unrelated
+/// repository's parent. The caller passes the checkout's top level, which a
+/// session that knows its repository already has.
+///
+/// A full clone (`.git` a directory) is taken at face value: one cloned into a
+/// container directory answers with that container. This rung is reached only
+/// when no declaration and no ancestor walk answered, and for a full clone the
+/// parent is the only folder the checkout itself states.
 fn session_repo_parent(repo: &Path) -> Option<PathBuf> {
     if !repo.is_absolute()
         || repo
@@ -888,8 +903,15 @@ fn session_repo_parent(repo: &Path) -> Option<PathBuf> {
 /// lexical fold of a RELATIVE `gitdir:` read through a symlinked worktree path
 /// can land on a different admin directory, so the admin directory must name
 /// this worktree back: its own `gitdir` file (which git writes) must fold to
-/// this worktree's `.git`. Any mismatch skips the rung — a symlinked spelling
-/// costs the inference, it never yields another checkout's folder.
+/// this worktree's `.git`. Git writes that back-link with symlinks RESOLVED, so
+/// a session repository reached through a symlink (a symlinked home, macOS
+/// `/var` -> `/private/var`, a drive letter spelled in the other case) fails the
+/// lexical comparison; only then is the IDENTITY re-checked through
+/// `canonicalize` of both sides. Canonicalisation is used for that yes/no
+/// question only — the root returned is still the lexically folded spelling.
+/// A back-link that names another worktree either way skips the rung: a
+/// symlinked spelling may cost the inference, it never yields another
+/// checkout's folder.
 fn main_checkout_of_worktree(worktree: &Path, marker: &Path) -> Option<PathBuf> {
     let contents = std::fs::read_to_string(marker).ok()?;
     let gitdir = contents
@@ -901,9 +923,7 @@ fn main_checkout_of_worktree(worktree: &Path, marker: &Path) -> Option<PathBuf> 
     let gitdir = normalize_lexically(&worktree.join(gitdir));
     let back_link = std::fs::read_to_string(gitdir.join("gitdir")).ok()?;
     let back_link = back_link.trim();
-    if back_link.is_empty()
-        || normalize_lexically(&gitdir.join(back_link)) != normalize_lexically(marker)
-    {
+    if back_link.is_empty() || !names_same_file(&gitdir.join(back_link), marker) {
         return None;
     }
     let commondir = std::fs::read_to_string(gitdir.join("commondir")).ok()?;
@@ -919,6 +939,21 @@ fn main_checkout_of_worktree(worktree: &Path, marker: &Path) -> Option<PathBuf> 
     }
     let main = common.parent()?.to_path_buf();
     main.join(".git").is_dir().then_some(main)
+}
+
+/// Whether `a` and `b` name the same file: equal after a lexical fold, or —
+/// only when they are not — equal after `canonicalize` (both must exist). The
+/// fallback answers a spelling difference git introduced by resolving symlinks;
+/// it never changes what [`main_checkout_of_worktree`] returns.
+fn names_same_file(a: &Path, b: &Path) -> bool {
+    let (a, b) = (normalize_lexically(a), normalize_lexically(b));
+    if a == b {
+        return true;
+    }
+    matches!(
+        (std::fs::canonicalize(&a), std::fs::canonicalize(&b)),
+        (Ok(x), Ok(y)) if x == y
+    )
 }
 
 /// `path` with `.` components dropped and each `..` removing the component
@@ -1188,6 +1223,13 @@ mod tests {
         assert_eq!(got.root.as_deref(), Some(session_base.as_path()));
         assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent);
 
+        // An anchor that is supplied but finds no workspace falls through to it.
+        let missing_anchor = || Some(WorkspaceAnchor::new(&repo, "qontinui-runner"));
+        let got =
+            resolve_workspace_root(None, None, None, missing_anchor(), Some(&repo), Some(&home));
+        assert_eq!(got.root.as_deref(), Some(session_base.as_path()));
+        assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent);
+
         // And a rejected declaration still falls through to it, visibly.
         let got = resolve_workspace_root(Some("   "), None, None, None, Some(&repo), Some(&home));
         assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent);
@@ -1349,6 +1391,112 @@ mod tests {
             got.root, None,
             "a bare repository's worktree has no main checkout"
         );
+    }
+
+    /// The hand-written fixtures above pin the format this module expects; this
+    /// pins it against what the installed `git` actually writes. Skipped (with a
+    /// note) where no `git` is on PATH.
+    #[test]
+    fn session_repo_in_a_real_git_worktree_answers_with_the_main_checkouts_folder() {
+        let git = |dir: &Path, args: &[&str]| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(dir)
+                .args(args)
+                .env("GIT_CONFIG_GLOBAL", "/dev/null")
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .output()
+        };
+        let (base, _g) = other_root("session_real_git");
+        let workspace = base.join("workspace");
+        let main = workspace.join("my-app");
+        std::fs::create_dir_all(&main).unwrap();
+        match git(&main, &["init", "-q"]) {
+            Ok(o) if o.status.success() => {}
+            _ => {
+                eprintln!("git unavailable; real-worktree check skipped");
+                return;
+            }
+        }
+        let ok = |o: std::io::Result<std::process::Output>| {
+            let o = o.expect("git runs");
+            assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        };
+        ok(git(
+            &main,
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "init",
+            ],
+        ));
+        let worktree = base.join("containers").join("wt").join("my-app");
+        std::fs::create_dir_all(worktree.parent().unwrap()).unwrap();
+        ok(git(
+            &main,
+            &[
+                "worktree",
+                "add",
+                "-q",
+                "--detach",
+                worktree.to_str().unwrap(),
+            ],
+        ));
+        // Git writes resolved paths; compare against the resolved workspace so a
+        // symlinked temp dir (macOS `/var`) does not fail the assertion.
+        let got = resolve_workspace_root(None, None, None, None, Some(&worktree), None);
+        assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent, "{got:?}");
+        assert_eq!(
+            std::fs::canonicalize(got.root.unwrap()).unwrap(),
+            std::fs::canonicalize(&workspace).unwrap()
+        );
+    }
+
+    /// A worktree reached through a SYMLINKED spelling: git's back-link names the
+    /// resolved path, so the lexical comparison misses and the identity check
+    /// falls back to `canonicalize`. The rung still answers.
+    #[cfg(unix)]
+    #[test]
+    fn session_repo_reached_through_a_symlink_still_answers() {
+        let (base, _g) = other_root("session_symlink");
+        let workspace = base.join("workspace");
+        let main_git = workspace.join("my-app").join(".git");
+        let admin = main_git.join("worktrees").join("wt");
+        std::fs::create_dir_all(&admin).unwrap();
+        std::fs::write(admin.join("commondir"), "../..\n").unwrap();
+        let real = base.join("real").join("my-app");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join(".git"), format!("gitdir: {}\n", admin.display())).unwrap();
+        std::fs::write(
+            admin.join("gitdir"),
+            format!("{}\n", real.join(".git").display()),
+        )
+        .unwrap();
+        let link = base.join("link");
+        std::os::unix::fs::symlink(base.join("real"), &link).unwrap();
+        let via_link = link.join("my-app");
+
+        let got = resolve_workspace_root(None, None, None, None, Some(&via_link), None);
+        assert_eq!(got.root.as_deref(), Some(workspace.as_path()));
+        assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent);
+
+        // A back-link to a DIFFERENT real worktree is still refused through the link.
+        let other = base.join("other").join("my-app");
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(other.join(".git"), "gitdir: x\n").unwrap();
+        std::fs::write(
+            admin.join("gitdir"),
+            other.join(".git").display().to_string(),
+        )
+        .unwrap();
+        let got = resolve_workspace_root(None, None, None, None, Some(&via_link), None);
+        assert_eq!(got.root, None);
     }
 
     #[test]
