@@ -97,6 +97,16 @@
       "types": "./dist/tauri-events.d.ts",
       "import": "./dist/tauri-events.js",
       "require": "./dist/tauri-events.cjs"
+    },
+    "./glossary": {
+      "types": "./dist/glossary.d.ts",
+      "import": "./dist/glossary.js",
+      "require": "./dist/glossary.cjs"
+    },
+    "./refusal": {
+      "types": "./dist/refusal.d.ts",
+      "import": "./dist/refusal.js",
+      "require": "./dist/refusal.cjs"
     }
   },
   "files": [
