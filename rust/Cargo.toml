@@ -12,6 +12,7 @@ exclude = [
   "tests/glossary_source.rs",
   "tests/refusal_render.rs",
   "examples/refusal_render_fixtures.rs",
+  "tests/workspace_root_refusal.rs",
   "tests/common/**",
 ]
 
