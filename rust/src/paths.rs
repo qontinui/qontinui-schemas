@@ -1224,7 +1224,7 @@ mod tests {
         assert_eq!(got.kind, WorkspaceRootKind::SessionRepoParent);
 
         // An anchor that is supplied but finds no workspace falls through to it.
-        let missing_anchor = || Some(WorkspaceAnchor::new(&repo, "qontinui-runner"));
+        let missing_anchor = || Some(WorkspaceAnchor::new(&repo, "no-such-repo-for-this-test"));
         let got =
             resolve_workspace_root(None, None, None, missing_anchor(), Some(&repo), Some(&home));
         assert_eq!(got.root.as_deref(), Some(session_base.as_path()));
@@ -1399,8 +1399,16 @@ mod tests {
     #[test]
     fn session_repo_in_a_real_git_worktree_answers_with_the_main_checkouts_folder() {
         let git = |dir: &Path, args: &[&str]| {
-            std::process::Command::new("git")
-                .arg("-C")
+            let mut cmd = std::process::Command::new("git");
+            // A `GIT_DIR` / `GIT_INDEX_FILE` / … inherited from a hook would
+            // outrank `-C` and aim these commands at the developer's own
+            // repository. Strip every `GIT_*` before setting the two below.
+            for (k, _) in std::env::vars_os() {
+                if k.to_string_lossy().starts_with("GIT_") {
+                    cmd.env_remove(k);
+                }
+            }
+            cmd.arg("-C")
                 .arg(dir)
                 .args(args)
                 .env("GIT_CONFIG_GLOBAL", "/dev/null")
