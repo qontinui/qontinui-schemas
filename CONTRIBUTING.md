@@ -343,6 +343,13 @@ patch-bumps `qontinui-runner-client`, and regenerates the root `Cargo.lock`.
 So do not hand-widen it. `rust-ci` checks the lock with `cargo fetch --locked`,
 and `publish-rust.yml` makes the runner-client publish wait until the required
 qontinui-types version is on crates.io.
+The one exception is a feature PR that hand-declares the next `qontinui-types`
+version so a consumer's sibling pin can tell it from `main`: when that version
+is a MAJOR, this bound moves to it in the same commit (a `^N` bound cannot
+select N+1), and release-please later rewrites it to the same value. Such a
+hand-declared version must equal what release-please computes from the tagged
+manifest anchor (`feat` = one minor, `feat!` = one major above it), never stack
+on another unreleased hand bump, and never touch `release-please-manifest.json`.
 
 **On a qontinui-types MAJOR, give runner-client a real version too.** The
 plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its
