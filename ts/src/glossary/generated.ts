@@ -57,7 +57,7 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
 
 /** Every definition, keyed by id. */
 export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
-  gate: {
+  "gate": {
     id: "gate",
     term: "Gate",
     short: "A watched record of work that stopped because it is waiting on something observable; it resumes by itself when the condition clears.",
@@ -65,7 +65,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["continuation", "attestation", "work_unit", "unknown"],
     since: 1,
   },
-  continuation: {
+  "continuation": {
     id: "continuation",
     term: "Continuation",
     short: "The action a gate performs when it clears: start an agent session, queue a pull request to land, deploy, migrate, or just notify.",
@@ -73,7 +73,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["gate", "agent_session", "merge_train"],
     since: 1,
   },
-  attestation: {
+  "attestation": {
     id: "attestation",
     term: "Attestation",
     short: "A declaration by an agent or a person that a gate's condition is met, which clears an approval gate.",
@@ -81,7 +81,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["gate", "operator", "tenant"],
     since: 1,
   },
-  work_unit: {
+  "work_unit": {
     id: "work_unit",
     term: "Work unit",
     short: "The durable record of one piece of work: a slug with a status, an owner, the pull requests that implement it, and its dependencies.",
@@ -89,7 +89,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["plan", "gate", "tier", "claim"],
     since: 1,
   },
-  plan: {
+  "plan": {
     id: "plan",
     term: "Plan",
     short: "A written work document whose status is mirrored into a work unit and whose body is kept, versioned, in the plan library.",
@@ -97,7 +97,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["work_unit", "unknown", "tier"],
     since: 1,
   },
-  claim: {
+  "claim": {
     id: "claim",
     term: "Claim",
     short: "A short-lived reservation over something an agent is about to change, so other agents see it and do not collide.",
@@ -105,7 +105,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["tier", "worktree_allocation", "agent_session"],
     since: 1,
   },
-  tier: {
+  "tier": {
     id: "tier",
     term: "Tier",
     short: "A level in one of three ladders: coordination (claims, work units, plans), the autonomy dial, or a policy clause's permission level.",
@@ -113,7 +113,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["claim", "work_unit", "plan", "policy", "clause"],
     since: 1,
   },
-  merge_train: {
+  "merge_train": {
     id: "merge_train",
     term: "Merge train",
     short: "The service that lands pull requests: it rebases each onto the latest main, runs CI, keeps overlapping changes apart and lands them in order.",
@@ -121,7 +121,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["merge_verdict", "landed", "continuation"],
     since: 1,
   },
-  merge_verdict: {
+  "merge_verdict": {
     id: "merge_verdict",
     term: "Merge verdict",
     short: "The merge train's read-only answer for one pull request: its state, what blocks it, and the next action.",
@@ -129,7 +129,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["merge_train", "landed", "unknown", "gate"],
     since: 1,
   },
-  landed: {
+  "landed": {
     id: "landed",
     term: "Landed",
     short: "A pull request's commits are on main. The code host may show it as Closed or as Merged; both can mean landed.",
@@ -137,7 +137,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["merge_train", "merge_verdict"],
     since: 1,
   },
-  finding: {
+  "finding": {
     id: "finding",
     term: "Finding",
     short: "A short investigation result one session posts for others; it expires after about two weeks.",
@@ -145,7 +145,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["dossier", "agent_session"],
     since: 1,
   },
-  dossier: {
+  "dossier": {
     id: "dossier",
     term: "Dossier",
     short: "A durable, topic-keyed file for a problem that keeps recurring, collecting its occurrences across months.",
@@ -153,7 +153,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["finding"],
     since: 1,
   },
-  policy: {
+  "policy": {
     id: "policy",
     term: "Policy",
     short: "A versioned document of rules for how agents act in this tenant, made of individually cited clauses.",
@@ -161,7 +161,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["clause", "intent_document", "tier"],
     since: 1,
   },
-  clause: {
+  "clause": {
     id: "clause",
     term: "Clause",
     short: "One rule inside a policy, with a stable id, a status and a tier, that a session cites when it applies it.",
@@ -169,7 +169,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["policy", "tier"],
     since: 1,
   },
-  intent_document: {
+  "intent_document": {
     id: "intent_document",
     term: "Intent document",
     short: "A document saying what this tenant is building, for whom, and what better means; it steers which work is chosen next.",
@@ -177,7 +177,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["policy", "tenant"],
     since: 1,
   },
-  drain: {
+  "drain": {
     id: "drain",
     term: "Drain",
     short: "Either stopping new work being sent to a device (reversible), or preparing one runner for a planned restart (final).",
@@ -185,7 +185,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["restart_readiness", "device", "runner", "session_status"],
     since: 1,
   },
-  restart_readiness: {
+  "restart_readiness": {
     id: "restart_readiness",
     term: "Restart readiness",
     short: "The runner's answer to whether restarting it now would lose work, with each kind of live session counted separately.",
@@ -193,7 +193,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["drain", "session_status", "runner", "unknown"],
     since: 1,
   },
-  agent_session: {
+  "agent_session": {
     id: "agent_session",
     term: "Agent session",
     short: "One running AI agent conversation, tracked with a liveness state and a separate work status.",
@@ -201,7 +201,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["session_status", "continuation", "claim", "runner"],
     since: 1,
   },
-  session_status: {
+  "session_status": {
     id: "session_status",
     term: "Session status",
     short: "Two separate axes: liveness (active, stale, closed) and work (working, blocked, finished). Finished is not closed.",
@@ -209,7 +209,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["agent_session", "restart_readiness", "drain"],
     since: 1,
   },
-  rung: {
+  "rung": {
     id: "rung",
     term: "Rung",
     short: "Where the runner actually found a capability on this machine: built in, installed, fetched, cached, a developer checkout, or not found.",
@@ -217,7 +217,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["runner", "unknown"],
     since: 1,
   },
-  tenant: {
+  "tenant": {
     id: "tenant",
     term: "Tenant",
     short: "The isolation boundary that owns repositories, devices, gates, work units, policies and memory. Shown as a Project in the app.",
@@ -225,7 +225,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["device", "operator", "policy", "intent_document"],
     since: 1,
   },
-  device: {
+  "device": {
     id: "device",
     term: "Device",
     short: "A registered machine running the runner. Pairing links it to your account and issues the credential it uses.",
@@ -233,7 +233,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["tenant", "runner", "drain"],
     since: 1,
   },
-  runner: {
+  "runner": {
     id: "runner",
     term: "Runner",
     short: "The desktop application on a paired device that hosts agent sessions and automations and talks to the service for you.",
@@ -241,7 +241,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["device", "agent_session", "coord", "restart_readiness", "rung"],
     since: 1,
   },
-  coord: {
+  "coord": {
     id: "coord",
     term: "Coord",
     short: "The coordination service: claims, work units, gates, sessions, devices, tenants, policies and the merge train.",
@@ -249,7 +249,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["merge_train", "gate", "work_unit", "tenant", "runner"],
     since: 1,
   },
-  worktree_allocation: {
+  "worktree_allocation": {
     id: "worktree_allocation",
     term: "Worktree allocation",
     short: "Asking the service for an agent's own isolated working copy on a reserved branch, so parallel agents never share one.",
@@ -257,7 +257,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["claim", "agent_session", "device"],
     since: 1,
   },
-  operator: {
+  "operator": {
     id: "operator",
     term: "Operator",
     short: "The person who owns the tenant: approves operator gates, drains devices and writes the intent documents.",
@@ -265,7 +265,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     see_also: ["tenant", "attestation", "intent_document", "policy"],
     since: 1,
   },
-  unknown: {
+  "unknown": {
     id: "unknown",
     term: "UNKNOWN",
     short: "A first-class answer meaning the product could not observe the value. It is never shown as zero, none, idle or a default.",
