@@ -56,7 +56,22 @@ fn the_sentence_names_no_fleet_noun_unless_the_operator_set_that_variable() {
             // The display adds the input at fault only for an explicit input.
             let shown = err.to_string();
             let operator_set_a_variable = matches!(source, RootSource::Env | RootSource::EnvAlias);
-            if !operator_set_a_variable && !nouns.hits(&shown).is_empty() {
+            // Where the operator set the variable, only the `Cause:` clause may
+            // name it: everything before that clause is checked like any other.
+            let checked = if operator_set_a_variable {
+                match shown.split_once(" Cause: ") {
+                    Some((before, _)) => before.to_string(),
+                    None => {
+                        bad.push(format!(
+                            "display ({source:?}, {reason:?}) has no Cause: {shown}"
+                        ));
+                        continue;
+                    }
+                }
+            } else {
+                shown.clone()
+            };
+            if !nouns.hits(&checked).is_empty() {
                 bad.push(format!("display ({source:?}, {reason:?}): {shown}"));
             }
         }
