@@ -5,9 +5,10 @@ Typed Rust HTTP client for the [qontinui-runner](https://github.com/qontinui/qon
 [`qontinui-types::wire::placement`](https://docs.rs/qontinui-types) so the
 wire format is single-sourced.
 
-Its minor version moves with each `qontinui-types` major (0.3.x builds on
-`qontinui-types` 5.x), so a `^0.x` requirement never pulls in a new
-`qontinui-types` major unannounced.
+From 0.3.0 on, its minor version moves with each `qontinui-types` major
+(0.3.x builds on `qontinui-types` 5.x), so a `^0.3` requirement does not pull
+in a new `qontinui-types` major. The 0.2.x line spanned `qontinui-types`
+2.x to 4.x.
 
 Used by `qontinui-supervisor` and any future fleet-management UI to avoid
 duplicating URL building, the runner's `ApiResponse<T>` envelope unwrapping,
