@@ -86,7 +86,10 @@
 //! not only from the hint, because several codes carry a hint that
 //! understates them: `InvalidParam`, `MissingParam` and `InvalidRequest` are
 //! `fix_request`, and `InternalError` is `report_defect` (not
-//! `none_terminal` — "our bug" is not "nothing can be done").
+//! `none_terminal` — "our bug" is not "nothing can be done"). Its codes map
+//! onto the generic [`RefusalCode`]s: `InvalidParam` / `MissingParam` /
+//! `InvalidRequest` → [`RefusalCode::InvalidRequest`] and `InternalError` →
+//! [`RefusalCode::InternalError`].
 //!
 //! ## Wire format
 //!
