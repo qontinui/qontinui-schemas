@@ -412,7 +412,7 @@ pub struct NextAction {
     /// What the action applies to: the command to run, the page to open, the
     /// setting to set, the gate to wait for. Its meaning is fixed by `kind`.
     /// On [`NextActionKind::RetryLater`] it is what to re-check BEFORE
-    /// retrying, because the earlier attempt may already have taken effect (an
+    /// retrying, because the earlier attempt may already have taken effect (a
     /// [`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then
     /// says so. Omit it on a retry that is safe to repeat blindly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
