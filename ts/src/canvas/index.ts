@@ -47,9 +47,10 @@ export type CanvasPanelSize = "compact" | "normal" | "large";
  *
  * Generated from `qontinui-schemas/rust/src/app_events.rs` `CanvasPanel` (the
  * wire mirror of the runner's `StoredPanel`); do not edit its fields by hand.
- * The Rust struct types `component`, `size` and `data` as free strings / JSON
- * because the runner validates them against an allowlist at runtime; the
- * intersection below narrows them to the vocabulary this module owns.
+ * The Rust struct types `component` and `size` as free strings because the
+ * runner validates them against an allowlist at runtime, and `data` as JSON
+ * because each component has its own shape (the `*Data` interfaces below);
+ * the intersection narrows them to the vocabulary this module owns.
  */
 export type CanvasPanel = GeneratedCanvasPanel & {
   component: CanvasComponentType;
