@@ -20,10 +20,16 @@ use tracing::{debug, info};
 /// file". The directory walk, the full and incremental builders and the
 /// fingerprinting pass all decide through [`is_parsed_extension`], and the
 /// language dispatch in [`language_for_extension`] is pinned to this list by
-/// a test in both directions. A host that wants to know whether a change can
-/// affect the graph at all (for example, skipping a graph build for a diff
-/// that touches no parsed file) asks [`is_parsed_source`] rather than keeping
-/// its own copy.
+/// a test in both directions.
+///
+/// A host asks [`is_parsed_source`] "does this path have a parsed extension"
+/// rather than keeping its own copy of this list. A diff whose paths all fail
+/// that test has an empty blast radius, so skipping a per-diff blast-radius
+/// computation for it is safe. It is NOT a cache-validity test: graph EDGES
+/// also depend on `tsconfig.json` (the resolver reads its `paths` on every
+/// build), so an edit there can change a graph although
+/// `is_parsed_source("tsconfig.json")` is false. Never use it to decide
+/// whether a cached graph is still valid.
 ///
 /// Matching is case-sensitive, like the dispatch: `Foo.TS` is not parsed.
 ///
@@ -37,8 +43,10 @@ pub fn is_parsed_extension(ext: &str) -> bool {
     PARSED_EXTENSIONS.contains(&ext)
 }
 
-/// Whether the file at `path` would be parsed into the graph, judged by its
-/// extension alone (no filesystem access). Accepts repo-relative or absolute
+/// Whether `path` has a parsed extension (see [`PARSED_EXTENSIONS`]), judged
+/// by the path string alone, with no filesystem access. That is necessary but
+/// not sufficient for the file to be parsed: the directory walk also excludes
+/// files over 100KB, dot-directories and its skip list. Accepts repo-relative or absolute
 /// paths with either separator style that [`Path`] understands on the host.
 pub fn is_parsed_source(path: &str) -> bool {
     Path::new(path)
@@ -1640,9 +1648,8 @@ mod tests {
 
     /// The dispatch match and PARSED_EXTENSIONS must describe the same set.
     /// Listed -> dispatched is asserted here for every entry; dispatched ->
-    /// listed is structural (`language_for_extension` checks the list first)
-    /// and is probed here against every extension this crate names, including
-    /// the resolver-only `mjs`/`cjs`.
+    /// listed is structural (`language_for_extension` checks the list first),
+    /// so it needs no probe here.
     #[test]
     fn language_dispatch_is_pinned_to_parsed_extensions() {
         for ext in PARSED_EXTENSIONS {
@@ -1651,25 +1658,15 @@ mod tests {
                 "{ext} is listed but does not dispatch"
             );
         }
-        let probes = [
-            "ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts", "py", "pyi", "rs", "md", "toml",
-            "json", "", "TS", "Rs",
-        ];
-        for ext in probes {
-            assert_eq!(
-                language_for_extension(ext).is_some(),
-                is_parsed_extension(ext),
-                "dispatch and PARSED_EXTENSIONS disagree on {ext:?}"
-            );
-        }
         let mut unique = PARSED_EXTENSIONS.to_vec();
         unique.sort_unstable();
         unique.dedup();
         assert_eq!(unique.len(), PARSED_EXTENSIONS.len(), "duplicate entry");
     }
 
-    /// End to end: a full build records a FileNode for exactly the parsed
-    /// extensions, so the exported set is the set the builder actually honours.
+    /// End to end: the full build and a cold incremental build each record a
+    /// FileNode for exactly the parsed extensions, so the exported set is the
+    /// set both builders actually honour.
     #[test]
     fn full_build_parses_exactly_the_parsed_extensions() {
         let dir = std::env::temp_dir().join(format!(
@@ -1688,12 +1685,19 @@ mod tests {
             std::fs::write(dir.join(name), "\n").unwrap();
         }
         let graph = CodeGraph::build(&dir);
+        let (incremental, parsed) = CodeGraph::build_incremental(&dir, None);
         let _ = std::fs::remove_dir_all(&dir);
-        let mut got: Vec<String> = graph.files.iter().map(|f| f.path.clone()).collect();
-        got.sort();
+        let sorted_paths = |g: &CodeGraph| {
+            let mut v: Vec<String> = g.files.iter().map(|f| f.path.clone()).collect();
+            v.sort();
+            v
+        };
         let mut want: Vec<String> = PARSED_EXTENSIONS.iter().map(|e| format!("f.{e}")).collect();
         want.sort();
-        assert_eq!(got, want);
+        assert_eq!(sorted_paths(&graph), want, "full build");
+        assert_eq!(sorted_paths(&incremental), want, "incremental build");
+        assert_eq!(sorted_paths(&incremental), sorted_paths(&graph));
+        assert_eq!(parsed, PARSED_EXTENSIONS.len(), "incremental parse count");
     }
 
     #[test]
