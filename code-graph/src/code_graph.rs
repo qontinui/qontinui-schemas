@@ -26,8 +26,8 @@ use tracing::{debug, info};
 /// rather than keeping its own copy of this list. A diff whose paths all fail
 /// that test has an empty blast radius, so skipping a per-diff blast-radius
 /// computation for it is safe. It is NOT a cache-validity test: graph EDGES
-/// also depend on `tsconfig.json` (the resolver reads its `paths` on every
-/// build), so an edit there can change a graph although
+/// also depend on `tsconfig.json` (the resolver reads its `paths` and
+/// `baseUrl` on every build), so an edit there can change a graph although
 /// `is_parsed_source("tsconfig.json")` is false. Never use it to decide
 /// whether a cached graph is still valid.
 ///
@@ -46,7 +46,8 @@ pub fn is_parsed_extension(ext: &str) -> bool {
 /// Whether `path` has a parsed extension (see [`PARSED_EXTENSIONS`]), judged
 /// by the path string alone, with no filesystem access. That is necessary but
 /// not sufficient for the file to be parsed: the directory walk also excludes
-/// files over 100KB, dot-directories and its skip list. Accepts repo-relative or absolute
+/// files over 100KB, dot-directories, its skip list, and anything more than 10
+/// directory levels deep. Accepts repo-relative or absolute
 /// paths with either separator style that [`Path`] understands on the host.
 pub fn is_parsed_source(path: &str) -> bool {
     Path::new(path)
@@ -1656,6 +1657,14 @@ mod tests {
             assert!(
                 language_for_extension(ext).is_some(),
                 "{ext} is listed but does not dispatch"
+            );
+        }
+        // The guard in `language_for_extension` is what keeps an arm for an
+        // unlisted extension unreachable; pin it so removing the guard fails.
+        for ext in ["mjs", "cjs", "TS", "md", ""] {
+            assert!(
+                language_for_extension(ext).is_none(),
+                "{ext:?} is not listed but dispatches"
             );
         }
         let mut unique = PARSED_EXTENSIONS.to_vec();
