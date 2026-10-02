@@ -15,5 +15,4 @@ export interface CreatePatternTemplateRequest {
   detection_type: string;
   name: string;
   parameters?: string | null;
-  [k: string]: unknown;
 }

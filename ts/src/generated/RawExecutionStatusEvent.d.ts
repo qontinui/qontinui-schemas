@@ -18,119 +18,76 @@ import type { TaskComplexity } from "./TaskComplexity";
  * One event on the `execution-status` Tauri channel, tagged by `type`.
  */
 export type RawExecutionStatusEvent =
-  | (RoutingDecisionEvent & {
+  | {
+      decision: RawRoutingDecisionPayload;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
       type: "routing_decision";
-    })
-  | (RetryAttemptEvent & {
+    }
+  | {
+      attempt: RawRetryAttemptPayload;
+      exhausted: boolean;
+      next_retry_delay_ms: number | null;
+      state: RawRetryStatePayload;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
       type: "retry_attempt";
-    })
-  | (CompressionEvent & {
+    }
+  | {
+      current_token_count: RawTokenCountPayload;
+      result: RawCompressionResultPayload;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
       type: "compression";
-    })
-  | (TokenCountUpdateEvent & {
+    }
+  | {
+      compression_imminent: boolean;
+      task_run_id: string;
+      threshold_percentage: number;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
+      token_count: RawTokenCountPayload;
       type: "token_count_update";
-    })
-  | (HookExecutionEvent & {
+    }
+  | {
+      result: RawHookExecutionPayload;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
       type: "hook_execution";
-    })
-  | (HookStartedEvent & {
+    }
+  | {
+      hook_id: string;
+      hook_name: string;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
+      trigger: HookTrigger;
       type: "hook_started";
-    })
-  | (StatusChangeEvent & {
+    }
+  | {
+      iteration: number;
+      status: string;
+      task_name: string | null;
+      task_run_id: string;
+      /**
+       * Unix timestamp in milliseconds
+       */
+      timestamp: number;
       type: "status_change";
-    });
-
-/**
- * `routing_decision` event body.
- */
-export interface RoutingDecisionEvent {
-  decision: RawRoutingDecisionPayload;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  [k: string]: unknown;
-}
-/**
- * `retry_attempt` event body.
- */
-export interface RetryAttemptEvent {
-  attempt: RawRetryAttemptPayload;
-  exhausted: boolean;
-  next_retry_delay_ms: number | null;
-  state: RawRetryStatePayload;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  [k: string]: unknown;
-}
-/**
- * `compression` event body.
- */
-export interface CompressionEvent {
-  current_token_count: RawTokenCountPayload;
-  result: RawCompressionResultPayload;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  [k: string]: unknown;
-}
-/**
- * `token_count_update` event body.
- */
-export interface TokenCountUpdateEvent {
-  compression_imminent: boolean;
-  task_run_id: string;
-  threshold_percentage: number;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  token_count: RawTokenCountPayload;
-  [k: string]: unknown;
-}
-/**
- * `hook_execution` event body.
- */
-export interface HookExecutionEvent {
-  result: RawHookExecutionPayload;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  [k: string]: unknown;
-}
-/**
- * `hook_started` event body.
- */
-export interface HookStartedEvent {
-  hook_id: string;
-  hook_name: string;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  trigger: HookTrigger;
-  [k: string]: unknown;
-}
-/**
- * `status_change` event body.
- */
-export interface StatusChangeEvent {
-  iteration: number;
-  status: string;
-  task_name: string | null;
-  task_run_id: string;
-  /**
-   * Unix timestamp in milliseconds
-   */
-  timestamp: number;
-  [k: string]: unknown;
-}
+    };

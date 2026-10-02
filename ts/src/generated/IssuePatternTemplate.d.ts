@@ -25,5 +25,4 @@ export interface IssuePatternTemplate {
     [k: string]: unknown;
   } | null;
   updated_at: string;
-  [k: string]: unknown;
 }

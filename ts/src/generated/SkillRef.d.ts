@@ -10,5 +10,4 @@ export interface SkillRef {
     [k: string]: unknown;
   };
   skill_id: string;
-  [k: string]: unknown;
 }

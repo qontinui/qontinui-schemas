@@ -24,5 +24,4 @@ import type { SkillTemplate } from "./SkillTemplate";
 export interface SkillExport {
   manifest: SkillExportManifest;
   skills: SkillDefinition[];
-  [k: string]: unknown;
 }

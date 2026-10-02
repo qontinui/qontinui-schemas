@@ -11,5 +11,4 @@ export interface SkillImportResult {
   overwritten: number;
   skipped: number;
   warnings?: string[];
-  [k: string]: unknown;
 }

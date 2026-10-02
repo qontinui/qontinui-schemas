@@ -8,5 +8,4 @@
 export interface SkillParameterOption {
   label: string;
   value: string;
-  [k: string]: unknown;
 }

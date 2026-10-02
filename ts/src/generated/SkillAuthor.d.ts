@@ -9,5 +9,4 @@ export interface SkillAuthor {
   email?: string;
   name: string;
   url?: string;
-  [k: string]: unknown;
 }

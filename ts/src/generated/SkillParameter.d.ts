@@ -32,5 +32,4 @@ export interface SkillParameter {
   placeholder?: string;
   required: boolean;
   type: SkillParameterType;
-  [k: string]: unknown;
 }

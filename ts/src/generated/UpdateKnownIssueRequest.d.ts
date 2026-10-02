@@ -35,5 +35,4 @@ export interface UpdateKnownIssueRequest {
   verification_step_template?: {
     [k: string]: unknown;
   } | null;
-  [k: string]: unknown;
 }

@@ -14,5 +14,4 @@ export interface SkillExportManifest {
   exported_at: string;
   skill_count: number;
   version: string;
-  [k: string]: unknown;
 }

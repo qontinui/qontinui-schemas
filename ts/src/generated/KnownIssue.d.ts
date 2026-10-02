@@ -47,5 +47,4 @@ export interface KnownIssue {
   verification_step_template: {
     [k: string]: unknown;
   } | null;
-  [k: string]: unknown;
 }

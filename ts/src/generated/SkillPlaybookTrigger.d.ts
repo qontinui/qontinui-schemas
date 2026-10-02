@@ -20,5 +20,4 @@ export interface SkillPlaybookTrigger {
    * Value to match against (exact match for app_name, glob for url_pattern).
    */
   value: string;
-  [k: string]: unknown;
 }

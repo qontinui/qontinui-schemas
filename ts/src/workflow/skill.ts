@@ -23,7 +23,9 @@
 // the Rust fields stay lenient strings on the way in, the schema names what
 // the runner produces.
 
+import type { SkillAllowedPhase } from "../generated/SkillAllowedPhase";
 import type { SkillTemplate } from "../generated/SkillTemplate";
+import type { WorkflowPhase } from "./_api";
 
 export type { SkillCategory } from "../generated/SkillCategory";
 export type { SkillAuthor } from "../generated/SkillAuthor";
@@ -43,3 +45,12 @@ export type MultiStepTemplate = Extract<SkillTemplate, { kind: "multi_step" }>;
 export type CompositionTemplate = Extract<SkillTemplate, { kind: "composition" }>;
 /** Markdown playbook with domain knowledge injected into AI prompts. */
 export type PlaybookTemplate = Extract<SkillTemplate, { kind: "playbook" }>;
+
+// `SkillAllowedPhase` (the runner's schema-only vocabulary for
+// `allowed_phases`) must name exactly the workflow phases. Compile-time only:
+// adding a phase on either side without the other fails `tsc` here. Unused
+// on purpose — instantiating `Assert` is the check.
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Assert<T extends true> = T;
+type SkillAllowedPhaseIsWorkflowPhase = Assert<Equal<SkillAllowedPhase, WorkflowPhase>>;

@@ -39,5 +39,4 @@ export interface RawRoutingDecisionPayload {
    * The model selected
    */
   selected_model: string;
-  [k: string]: unknown;
 }

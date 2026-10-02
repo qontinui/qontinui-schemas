@@ -18,5 +18,4 @@ export interface ListKnownIssuesQuery {
    */
   spec_id?: string | null;
   status?: string | null;
-  [k: string]: unknown;
 }

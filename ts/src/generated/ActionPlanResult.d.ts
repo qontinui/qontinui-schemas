@@ -22,5 +22,4 @@ export interface ActionPlanResult {
   skippedCount: number;
   success: boolean;
   totalDurationMs: number;
-  [k: string]: unknown;
 }

@@ -15,5 +15,4 @@ export interface RawCompressionResultPayload {
   original_tokens: number;
   summary_entries_created: number;
   timestamp: string;
-  [k: string]: unknown;
 }

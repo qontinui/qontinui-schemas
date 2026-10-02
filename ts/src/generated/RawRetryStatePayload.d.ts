@@ -16,5 +16,4 @@ export interface RawRetryStatePayload {
   last_attempt_at: string | null;
   last_error: string | null;
   total_delay_ms: number;
-  [k: string]: unknown;
 }

@@ -19,5 +19,4 @@ export interface RawHookExecutionPayload {
   success: boolean;
   timestamp: string;
   trigger: HookTrigger;
-  [k: string]: unknown;
 }

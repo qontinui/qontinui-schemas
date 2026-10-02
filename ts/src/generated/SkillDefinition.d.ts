@@ -19,10 +19,10 @@ import type { SkillSource } from "./SkillSource";
 import type { SkillTemplate } from "./SkillTemplate";
 
 export interface SkillDefinition {
-  allowed_phases: SkillAllowedPhase[];
+  allowed_phases: (SkillAllowedPhase | string)[];
   approval_status?: SkillApprovalStatus;
   author?: SkillAuthor;
-  category: SkillCategory;
+  category: SkillCategory | string;
   checksum?: string;
   color: string;
   depends_on?: string[];
@@ -36,10 +36,9 @@ export interface SkillDefinition {
   /**
    * Provenance. Typed rather than free text — see [`SkillSource`].
    */
-  source: SkillSource;
+  source: SkillSource | string;
   tags: string[];
   template: SkillTemplate;
   usage_count?: number;
   version?: string;
-  [k: string]: unknown;
 }

@@ -16,5 +16,4 @@ export interface RawTokenCountPayload {
   other: number;
   solutions: number;
   total: number;
-  [k: string]: unknown;
 }

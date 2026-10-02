@@ -14,5 +14,4 @@ export interface SkillOrigin {
   };
   skill_id: string;
   skill_slug: string;
-  [k: string]: unknown;
 }

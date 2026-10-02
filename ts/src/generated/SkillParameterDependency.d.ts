@@ -8,5 +8,4 @@
 export interface SkillParameterDependency {
   param: string;
   value: unknown;
-  [k: string]: unknown;
 }

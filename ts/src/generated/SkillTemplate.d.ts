@@ -14,19 +14,16 @@ export type SkillTemplate =
       step: {
         [k: string]: unknown;
       };
-      [k: string]: unknown;
     }
   | {
       kind: "multi_step";
       steps: {
         [k: string]: unknown;
       }[];
-      [k: string]: unknown;
     }
   | {
       kind: "composition";
       skill_refs: SkillRef[];
-      [k: string]: unknown;
     }
   | {
       /**
@@ -38,5 +35,4 @@ export type SkillTemplate =
        * Trigger conditions for when this playbook should be included.
        */
       triggers: SkillPlaybookTrigger[];
-      [k: string]: unknown;
     };

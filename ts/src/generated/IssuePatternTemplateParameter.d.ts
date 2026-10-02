@@ -10,5 +10,4 @@ export interface IssuePatternTemplateParameter {
   description: string;
   name: string;
   type: string;
-  [k: string]: unknown;
 }

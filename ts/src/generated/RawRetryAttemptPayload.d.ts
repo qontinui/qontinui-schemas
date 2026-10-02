@@ -14,5 +14,4 @@ export interface RawRetryAttemptPayload {
   delay_ms: number;
   error: string;
   feedback_injected: boolean;
-  [k: string]: unknown;
 }
