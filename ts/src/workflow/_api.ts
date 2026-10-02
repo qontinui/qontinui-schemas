@@ -90,6 +90,13 @@ export type WorkflowPhase = "setup" | "verification" | "agentic" | "completion";
 
 export type {
   SkillCategory,
+  SkillAllowedPhase,
+  SkillParameterType,
+  SkillSource,
+  SkillApprovalStatus,
+  SkillExportContentType,
+  SkillParameterDependency,
+  SkillPlaybookTrigger,
   SkillAuthor,
   SkillParameterOption,
   SkillParameter,

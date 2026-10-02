@@ -18,9 +18,10 @@ export interface PlannedActionResult {
   action: string;
   durationMs: number;
   /**
-   * The UI Bridge's post-action `elementState` object. The handler keeps it
-   * only when it IS an object, so the schema's `Record<string, unknown>`
-   * is a guarantee, not a hope.
+   * The UI Bridge's post-action `elementState` object. Typed as a map so
+   * the schema's `Record<string, unknown>` is enforced by the type: a
+   * non-object value from the bridge (including `null`) is omitted rather
+   * than forwarded.
    */
   elementState?: {
     [k: string]: unknown;

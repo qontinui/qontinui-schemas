@@ -31,5 +31,5 @@ export interface SkillParameter {
   pattern?: string;
   placeholder?: string;
   required: boolean;
-  type: SkillParameterType;
+  type: SkillParameterType | string;
 }

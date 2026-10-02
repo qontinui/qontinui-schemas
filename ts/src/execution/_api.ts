@@ -184,7 +184,8 @@ export type { ExecutionRunComplete } from "../generated/ExecutionRunComplete";
 export type { ExecutionRunCompleteResponse } from "../generated/ExecutionRunCompleteResponse";
 
 // ============================================================================
-// Execution Status Types (real-time display) — Tier 3, hand-authored
+// Execution Status Types (real-time display) — Tier 3: Raw* wire events
+// generated from the runner, camelCase display state hand-authored
 // ============================================================================
 
 // Generated from the runner's `TaskComplexity` / `HookTrigger` enums — the

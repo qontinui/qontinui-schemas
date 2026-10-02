@@ -6,6 +6,9 @@
  * in the dashboard during workflow execution.
  */
 
+import type { CanvasPanel as GeneratedCanvasPanel } from "../generated/CanvasPanel";
+import type { AppEvent } from "../generated/AppEvent";
+
 /**
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
@@ -35,9 +38,6 @@ export type CanvasComponentType =
   | "CostBreakdown"
   | "MissionBrief"
   | "AcceptanceCriteria";
-
-import type { CanvasPanel as GeneratedCanvasPanel } from "../generated/CanvasPanel";
-import type { AppEvent } from "../generated/AppEvent";
 
 /** Display size of a canvas panel. */
 export type CanvasPanelSize = "compact" | "normal" | "large";

@@ -20,7 +20,7 @@ import type { SkillTemplate } from "./SkillTemplate";
 
 export interface SkillDefinition {
   allowed_phases: (SkillAllowedPhase | string)[];
-  approval_status?: SkillApprovalStatus;
+  approval_status?: SkillApprovalStatus | string;
   author?: SkillAuthor;
   category: SkillCategory | string;
   checksum?: string;

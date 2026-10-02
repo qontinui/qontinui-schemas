@@ -9,10 +9,13 @@
  * Schema-only: `SkillDefinition.category`.
  */
 export type SkillCategory =
-  | "code-quality"
-  | "testing"
-  | "monitoring"
-  | "ai-task"
-  | "deployment"
-  | "composition"
-  | "custom";
+  | (
+      | "code-quality"
+      | "testing"
+      | "monitoring"
+      | "ai-task"
+      | "deployment"
+      | "composition"
+      | "custom"
+    )
+  | "domain-knowledge";
