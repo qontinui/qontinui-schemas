@@ -1648,9 +1648,9 @@ mod tests {
     }
 
     /// The dispatch match and PARSED_EXTENSIONS must describe the same set.
-    /// Listed -> dispatched is asserted here for every entry; dispatched ->
-    /// listed is structural (`language_for_extension` checks the list first),
-    /// so it needs no probe here.
+    /// Listed -> dispatched is asserted here for every entry. Dispatched ->
+    /// listed is enforced by the guard in `language_for_extension`, which
+    /// checks the list first; the samples below only spot-check that.
     #[test]
     fn language_dispatch_is_pinned_to_parsed_extensions() {
         for ext in PARSED_EXTENSIONS {
@@ -1659,8 +1659,10 @@ mod tests {
                 "{ext} is listed but does not dispatch"
             );
         }
-        // The guard in `language_for_extension` is what keeps an arm for an
-        // unlisted extension unreachable; pin it so removing the guard fails.
+        // Spot-check: these unlisted extensions must not dispatch. This fails
+        // if the guard is removed AND an arm is added for one of these
+        // samples; removing the guard alone, or an arm for some other
+        // unlisted extension, is not caught here.
         for ext in ["mjs", "cjs", "TS", "md", ""] {
             assert!(
                 language_for_extension(ext).is_none(),
