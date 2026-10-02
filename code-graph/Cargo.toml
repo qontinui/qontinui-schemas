@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-code-graph"
-version = "0.2.0"
+version = "0.1.0"
 description = "Pure tree-sitter codebase knowledge graph (functions, classes, imports, exports) + deterministic import resolution and blast-radius analysis. No filesystem persistence — computation only."
 edition.workspace = true
 license.workspace = true
