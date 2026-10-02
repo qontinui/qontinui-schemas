@@ -11,6 +11,61 @@ use std::time::SystemTime;
 use tracing::{debug, info};
 
 // ============================================================================
+// Parse set — the ONE definition of which files this crate parses
+// ============================================================================
+
+/// File extensions this crate parses into the graph, without the leading dot.
+///
+/// This is the single source of truth for "does the code graph parse this
+/// file". The directory walk, the full and incremental builders and the
+/// fingerprinting pass all decide through [`is_parsed_extension`], and the
+/// language dispatch in [`language_for_extension`] is pinned to this list by
+/// a test in both directions. A host that wants to know whether a change can
+/// affect the graph at all (for example, skipping a graph build for a diff
+/// that touches no parsed file) asks [`is_parsed_source`] rather than keeping
+/// its own copy.
+///
+/// Matching is case-sensitive, like the dispatch: `Foo.TS` is not parsed.
+///
+/// This is NOT the import-resolution candidate list: the resolver also probes
+/// `mjs`/`cjs` when binding a specifier (`import_resolver::TS_EXTS`), but no
+/// file with those extensions is ever parsed into the graph.
+pub const PARSED_EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "py", "rs"];
+
+/// Whether `ext` (no leading dot, case-sensitive) is in [`PARSED_EXTENSIONS`].
+pub fn is_parsed_extension(ext: &str) -> bool {
+    PARSED_EXTENSIONS.contains(&ext)
+}
+
+/// Whether the file at `path` would be parsed into the graph, judged by its
+/// extension alone (no filesystem access). Accepts repo-relative or absolute
+/// paths with either separator style that [`Path`] understands on the host.
+pub fn is_parsed_source(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(is_parsed_extension)
+}
+
+/// The language a parsed extension dispatches to, or `None` for an extension
+/// outside [`PARSED_EXTENSIONS`]. The list is checked first, so a match arm
+/// for an unlisted extension is unreachable and can never widen the parse set;
+/// `language_dispatch_is_pinned_to_parsed_extensions` covers the other
+/// direction (every listed extension has an arm).
+pub fn language_for_extension(ext: &str) -> Option<&'static str> {
+    if !is_parsed_extension(ext) {
+        return None;
+    }
+    match ext {
+        "ts" | "tsx" => Some("typescript"),
+        "js" | "jsx" => Some("javascript"),
+        "py" => Some("python"),
+        "rs" => Some("rust"),
+        _ => None,
+    }
+}
+
+// ============================================================================
 // Graph types
 // ============================================================================
 
@@ -171,43 +226,12 @@ impl CodeGraph {
                 .to_string_lossy()
                 .replace('\\', "/");
 
-            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-
             let content = match std::fs::read_to_string(file_path) {
                 Ok(c) => c,
                 Err(_) => continue,
             };
 
-            let line_count = content.lines().count();
-            let language = match ext {
-                "ts" | "tsx" => "typescript",
-                "js" | "jsx" => "javascript",
-                "py" => "python",
-                "rs" => "rust",
-                _ => continue,
-            };
-
-            graph.files.push(FileNode {
-                path: rel_path.clone(),
-                language: language.to_string(),
-                line_count,
-            });
-
-            match (language, ext) {
-                ("typescript", "tsx") | ("javascript", "jsx") => {
-                    parse_typescript(&content, &rel_path, &mut graph, true);
-                }
-                ("typescript" | "javascript", _) => {
-                    parse_typescript(&content, &rel_path, &mut graph, false);
-                }
-                ("python", _) => {
-                    parse_python(&content, &rel_path, &mut graph);
-                }
-                ("rust", _) => {
-                    parse_rust(&content, &rel_path, &mut graph);
-                }
-                _ => {}
-            }
+            parse_file_into(&mut graph, &rel_path, file_path, &content);
         }
 
         // Resolve imports once over the fully-walked graph (the import map).
@@ -703,8 +727,6 @@ impl CachedCodeGraph {
 
         for rel_path in &files_to_parse {
             let full_path = self.project_path.join(rel_path);
-            let ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-
             let content = match std::fs::read_to_string(&full_path) {
                 Ok(c) => c,
                 Err(_) => continue,
@@ -715,35 +737,9 @@ impl CachedCodeGraph {
                 continue;
             }
 
-            let line_count = content.lines().count();
-            let language = match ext {
-                "ts" | "tsx" => "typescript",
-                "js" | "jsx" => "javascript",
-                "py" => "python",
-                "rs" => "rust",
-                _ => continue,
-            };
-
-            self.graph.files.push(FileNode {
-                path: rel_path.clone(),
-                language: language.to_string(),
-                line_count,
-            });
-
-            match (language, ext) {
-                ("typescript", "tsx") | ("javascript", "jsx") => {
-                    parse_typescript(&content, rel_path, &mut self.graph, true);
-                }
-                ("typescript" | "javascript", _) => {
-                    parse_typescript(&content, rel_path, &mut self.graph, false);
-                }
-                ("python", _) => {
-                    parse_python(&content, rel_path, &mut self.graph);
-                }
-                ("rust", _) => {
-                    parse_rust(&content, rel_path, &mut self.graph);
-                }
-                _ => {}
+            // An unparsed extension records no mtime, as before.
+            if !parse_file_into(&mut self.graph, rel_path, &full_path, &content) {
+                continue;
             }
 
             // Update mtime
@@ -917,7 +913,7 @@ impl CodeGraph {
                 .to_string_lossy()
                 .replace('\\', "/");
             let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if !matches!(ext, "ts" | "tsx" | "js" | "jsx" | "py" | "rs") {
+            if !is_parsed_extension(ext) {
                 continue;
             }
             let content = match std::fs::read_to_string(file_path) {
@@ -1039,16 +1035,14 @@ impl CodeGraph {
 
 /// Parse a single source file into the graph (language dispatch shared by the
 /// full and incremental builders). Adds the FileNode and all parsed entities.
-fn parse_file_into(graph: &mut CodeGraph, rel_path: &str, full_path: &Path, content: &str) {
+/// Returns `false`, adding nothing, when the extension is not in
+/// [`PARSED_EXTENSIONS`].
+fn parse_file_into(graph: &mut CodeGraph, rel_path: &str, full_path: &Path, content: &str) -> bool {
     let ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let line_count = content.lines().count();
-    let language = match ext {
-        "ts" | "tsx" => "typescript",
-        "js" | "jsx" => "javascript",
-        "py" => "python",
-        "rs" => "rust",
-        _ => return,
+    let Some(language) = language_for_extension(ext) else {
+        return false;
     };
+    let line_count = content.lines().count();
 
     graph.files.push(FileNode {
         path: rel_path.to_string(),
@@ -1071,6 +1065,7 @@ fn parse_file_into(graph: &mut CodeGraph, rel_path: &str, full_path: &Path, cont
         }
         _ => {}
     }
+    true
 }
 
 // ============================================================================
@@ -1105,7 +1100,7 @@ fn collect_files_recursive(dir: &Path, skip_dirs: &[&str], files: &mut Vec<PathB
             collect_files_recursive(&path, skip_dirs, files, depth + 1);
         } else {
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if matches!(ext, "ts" | "tsx" | "js" | "jsx" | "py" | "rs") {
+            if is_parsed_extension(ext) {
                 // Skip very large files (>100KB) to avoid slow parsing
                 if let Ok(meta) = std::fs::metadata(&path) {
                     if meta.len() > 100_000 {
@@ -1594,6 +1589,112 @@ fn parse_rust(content: &str, file_path: &str, graph: &mut CodeGraph) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_parsed_source_accepts_every_listed_extension() {
+        for ext in PARSED_EXTENSIONS {
+            assert!(is_parsed_source(&format!("file.{ext}")), "{ext}");
+            assert!(is_parsed_extension(ext), "{ext}");
+        }
+    }
+
+    #[test]
+    fn is_parsed_source_rejects_unparsed_files() {
+        for path in [
+            "README.md",
+            "Cargo.toml",
+            "package.json",
+            "Makefile",
+            "LICENSE",
+            ".gitignore",
+            "dir.ts/file",
+            "mod.mjs",
+            "mod.cjs",
+            "style.css",
+            "",
+        ] {
+            assert!(!is_parsed_source(path), "{path:?}");
+        }
+    }
+
+    #[test]
+    fn is_parsed_source_is_case_sensitive() {
+        assert!(!is_parsed_source("App.TS"));
+        assert!(!is_parsed_source("main.RS"));
+        assert!(!is_parsed_source("x.Py"));
+    }
+
+    #[test]
+    fn is_parsed_source_handles_nested_paths() {
+        assert!(is_parsed_source(
+            "crates/coord/src/pr_merge/train_health.rs"
+        ));
+        assert!(is_parsed_source("frontend/src/app/page.tsx"));
+        assert!(is_parsed_source("backend/app/api/v1/endpoints/memory.py"));
+        assert!(is_parsed_source("/abs/path/to/index.js"));
+        assert!(is_parsed_source("a.b/c.d/e.jsx"));
+        assert!(!is_parsed_source("docs/plans/2026-09-28-plan.md"));
+        assert!(!is_parsed_source("code-graph/Cargo.toml"));
+        assert!(!is_parsed_source(".github/workflows/rust-ci.yml"));
+    }
+
+    /// The dispatch match and PARSED_EXTENSIONS must describe the same set.
+    /// Listed -> dispatched is asserted here for every entry; dispatched ->
+    /// listed is structural (`language_for_extension` checks the list first)
+    /// and is probed here against every extension this crate names, including
+    /// the resolver-only `mjs`/`cjs`.
+    #[test]
+    fn language_dispatch_is_pinned_to_parsed_extensions() {
+        for ext in PARSED_EXTENSIONS {
+            assert!(
+                language_for_extension(ext).is_some(),
+                "{ext} is listed but does not dispatch"
+            );
+        }
+        let probes = [
+            "ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts", "py", "pyi", "rs", "md", "toml",
+            "json", "", "TS", "Rs",
+        ];
+        for ext in probes {
+            assert_eq!(
+                language_for_extension(ext).is_some(),
+                is_parsed_extension(ext),
+                "dispatch and PARSED_EXTENSIONS disagree on {ext:?}"
+            );
+        }
+        let mut unique = PARSED_EXTENSIONS.to_vec();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), PARSED_EXTENSIONS.len(), "duplicate entry");
+    }
+
+    /// End to end: a full build records a FileNode for exactly the parsed
+    /// extensions, so the exported set is the set the builder actually honours.
+    #[test]
+    fn full_build_parses_exactly_the_parsed_extensions() {
+        let dir = std::env::temp_dir().join(format!(
+            "code-graph-parse-set-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        for ext in PARSED_EXTENSIONS {
+            std::fs::write(dir.join(format!("f.{ext}")), "\n").unwrap();
+        }
+        for name in ["f.md", "f.toml", "f.json", "f.mjs", "noext"] {
+            std::fs::write(dir.join(name), "\n").unwrap();
+        }
+        let graph = CodeGraph::build(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut got: Vec<String> = graph.files.iter().map(|f| f.path.clone()).collect();
+        got.sort();
+        let mut want: Vec<String> = PARSED_EXTENSIONS.iter().map(|e| format!("f.{e}")).collect();
+        want.sort();
+        assert_eq!(got, want);
+    }
 
     #[test]
     fn test_parse_typescript() {
