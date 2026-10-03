@@ -317,20 +317,34 @@ impl NavigationTriggerKind {
 /// Which runner action choke point captured the edge. Every transport an
 /// agent can act through is one of these; an edge from a transport not listed
 /// here is a producer defect, not a new variant to tolerate.
+///
+/// A variant names the action's KIND. Every variant except `ElementAction` /
+/// `SdkElementAction` covers the SDK and the control transports alike: the
+/// transport is not recorded for those kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum ChokePoint {
     /// `/ui-bridge/control/element/{id}/action`.
     ElementAction,
-    /// `/ui-bridge/control/batch-actions`, `/control/actions/batch`.
+    /// One trigger for a whole batch: the control batch routes
+    /// (`/ui-bridge/control/batch-actions`, `/control/actions/batch`), the SDK
+    /// batch routes, and compound actions (action plans, transitions,
+    /// `ai/execute`, `fill-form`).
     BatchAction,
-    /// `/control/component/{id}/action/{action_id}`.
+    /// A component action: `/control/component/{id}/action/{action_id}` and
+    /// its SDK twin.
     ComponentAction,
     /// The SDK/WebSocket element action.
     SdkElementAction,
     /// Any execute-with-diff route (runner routes and the SDK twin).
     ExecuteWithDiff,
+    /// An agent-driven navigation (the SDK and control `page/navigate` /
+    /// `page/navigate-to` routes): no affordance was activated, so
+    /// `targetFingerprint` is absent and the edge's `navigationTrigger` is
+    /// never `affordance` (typically `push`/`replace`). These are the arrivals
+    /// `requires_prior_knowledge` reads.
+    Navigation,
 }
 
 impl ChokePoint {
@@ -342,6 +356,7 @@ impl ChokePoint {
             Self::ComponentAction => "component_action",
             Self::SdkElementAction => "sdk_element_action",
             Self::ExecuteWithDiff => "execute_with_diff",
+            Self::Navigation => "navigation",
         }
     }
 }
@@ -991,6 +1006,7 @@ mod tests {
                 (ComponentAction, "component_action"),
                 (SdkElementAction, "sdk_element_action"),
                 (ExecuteWithDiff, "execute_with_diff"),
+                (Navigation, "navigation"),
             ],
             ChokePoint::as_str,
         );
