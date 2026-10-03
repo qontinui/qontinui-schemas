@@ -214,6 +214,12 @@ fn scheduled_task_fully_populated_roundtrips() {
         conditions: Some(ScheduleConditions {
             require_idle: Some(IdleCondition { enabled: true }),
             require_repo_inactive: None,
+            require_probe: Some(ProbeCondition {
+                enabled: true,
+                command: vec!["true".to_string()],
+                poll_seconds: 300,
+                timeout_seconds: 60,
+            }),
             timeout_minutes: Some(30),
         }),
         condition_status: None,
@@ -9534,4 +9540,61 @@ fn full_runner_step_snake_aliases_match_camel_keys() {
         // Every snake key landed in a field: nothing was silently dropped.
         assert_eq!(serde_json::to_value(&from_snake).unwrap(), camel);
     }
+}
+
+#[test]
+fn schedule_conditions_require_probe_is_camel_case_and_accepts_snake_case() {
+    // Canonical camelCase wire form.
+    let camel = json!({
+        "requireProbe": {
+            "enabled": true,
+            "command": ["sh", "-c", "exit 0"],
+            "pollSeconds": 300,
+            "timeoutSeconds": 45
+        }
+    });
+    let parsed: ScheduleConditions = serde_json::from_value(camel.clone()).unwrap();
+    let probe = parsed.require_probe.clone().expect("requireProbe parsed");
+    assert_eq!(
+        probe,
+        ProbeCondition {
+            enabled: true,
+            command: vec!["sh".into(), "-c".into(), "exit 0".into()],
+            poll_seconds: 300,
+            timeout_seconds: 45,
+        }
+    );
+    assert_eq!(serde_json::to_value(&parsed).unwrap(), camel);
+
+    // snake_case alias on every level, the form hand-written clients send.
+    let snake = json!({
+        "require_probe": {
+            "enabled": true,
+            "command": ["sh", "-c", "exit 0"],
+            "poll_seconds": 300,
+            "timeout_seconds": 45
+        }
+    });
+    let parsed_snake: ScheduleConditions = serde_json::from_value(snake).unwrap();
+    assert_eq!(parsed_snake.require_probe, Some(probe));
+}
+
+#[test]
+fn condition_status_probe_fields_default_to_none_for_rows_that_predate_them() {
+    let old_row = json!({ "waitingSince": "2026-09-29T07:20:00Z", "timedOut": false });
+    let status: ConditionStatus = serde_json::from_value(old_row).unwrap();
+    assert_eq!(status.probe_met, None);
+    assert_eq!(status.probe_detail, None);
+}
+
+#[test]
+fn probe_condition_schema_declares_the_poll_floor() {
+    let schema = serde_json::to_value(schemars::schema_for!(ProbeCondition)).unwrap();
+    assert_eq!(schema["properties"]["pollSeconds"]["minimum"], json!(60));
+    assert_eq!(schema["properties"]["timeoutSeconds"]["minimum"], json!(1));
+    assert_eq!(
+        schema["properties"]["timeoutSeconds"]["maximum"],
+        json!(3600)
+    );
+    assert_eq!(schema["additionalProperties"], json!(false));
 }
