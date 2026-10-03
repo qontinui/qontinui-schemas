@@ -86,7 +86,10 @@
 //! not only from the hint, because several codes carry a hint that
 //! understates them: `InvalidParam`, `MissingParam` and `InvalidRequest` are
 //! `fix_request`, and `InternalError` is `report_defect` (not
-//! `none_terminal` — "our bug" is not "nothing can be done").
+//! `none_terminal` — "our bug" is not "nothing can be done"). Its codes map
+//! onto the generic [`RefusalCode`]s: `InvalidParam` / `MissingParam` /
+//! `InvalidRequest` → [`RefusalCode::InvalidRequest`] and `InternalError` →
+//! [`RefusalCode::InternalError`].
 //!
 //! ## Wire format
 //!
@@ -129,6 +132,41 @@ pub enum RefusalCode {
     /// A glossary id was asked for that this version's glossary does not
     /// define.
     GlossaryTermUnknown,
+    /// The request carried no sign-in.
+    AuthenticationRequired,
+    /// A credential was presented and not accepted: expired, malformed,
+    /// issued by a different service, or missing a claim the route needs.
+    CredentialRejected,
+    /// The caller is known but may not do this.
+    PermissionDenied,
+    /// The thing the request names does not exist, or is not visible to the
+    /// caller.
+    NotFound,
+    /// The request conflicts with the current state of what it acts on.
+    Conflict,
+    /// The request itself is malformed or names an invalid value.
+    InvalidRequest,
+    /// Too many requests in a window; the same request later will succeed.
+    RateLimited,
+    /// A usage limit of the account or plan has been reached.
+    QuotaExceeded,
+    /// A service this operation calls could not be reached, so it never saw
+    /// the request. Only a CONNECT-phase failure qualifies (name resolution,
+    /// connection refused); a failure after the request was sent is
+    /// [`RefusalCode::UpstreamTimeout`], because the request may have been
+    /// applied.
+    UpstreamUnavailable,
+    /// A service this operation calls did not answer in time, or its answer
+    /// was lost. The request may have been applied: re-read before retrying a
+    /// write.
+    UpstreamTimeout,
+    /// The device the operation must reach has no live connection.
+    DeviceNotConnected,
+    /// The answering service itself cannot serve the request right now.
+    ServiceUnavailable,
+    /// The answering service failed in a way it did not anticipate — a
+    /// defect, not a condition the reader caused.
+    InternalError,
     /// The cause is not in the enumerated set. The raw reason belongs in
     /// [`Refusal::detail`]. Also what a reader decodes a code it does not
     /// know into (see [`Refusal::unrecognised_code`]).
@@ -144,6 +182,19 @@ impl RefusalCode {
         RefusalCode::SiblingCheckoutAbsent,
         RefusalCode::EndpointUnresolved,
         RefusalCode::GlossaryTermUnknown,
+        RefusalCode::AuthenticationRequired,
+        RefusalCode::CredentialRejected,
+        RefusalCode::PermissionDenied,
+        RefusalCode::NotFound,
+        RefusalCode::Conflict,
+        RefusalCode::InvalidRequest,
+        RefusalCode::RateLimited,
+        RefusalCode::QuotaExceeded,
+        RefusalCode::UpstreamUnavailable,
+        RefusalCode::UpstreamTimeout,
+        RefusalCode::DeviceNotConnected,
+        RefusalCode::ServiceUnavailable,
+        RefusalCode::InternalError,
         RefusalCode::Unknown,
     ];
 
@@ -154,6 +205,19 @@ impl RefusalCode {
             RefusalCode::SiblingCheckoutAbsent => "sibling_checkout_absent",
             RefusalCode::EndpointUnresolved => "endpoint_unresolved",
             RefusalCode::GlossaryTermUnknown => "glossary_term_unknown",
+            RefusalCode::AuthenticationRequired => "authentication_required",
+            RefusalCode::CredentialRejected => "credential_rejected",
+            RefusalCode::PermissionDenied => "permission_denied",
+            RefusalCode::NotFound => "not_found",
+            RefusalCode::Conflict => "conflict",
+            RefusalCode::InvalidRequest => "invalid_request",
+            RefusalCode::RateLimited => "rate_limited",
+            RefusalCode::QuotaExceeded => "quota_exceeded",
+            RefusalCode::UpstreamUnavailable => "upstream_unavailable",
+            RefusalCode::UpstreamTimeout => "upstream_timeout",
+            RefusalCode::DeviceNotConnected => "device_not_connected",
+            RefusalCode::ServiceUnavailable => "service_unavailable",
+            RefusalCode::InternalError => "internal_error",
             RefusalCode::Unknown => "unknown",
         }
     }
@@ -178,6 +242,27 @@ impl RefusalCode {
                 "The address of a service this operation needs is not configured"
             }
             RefusalCode::GlossaryTermUnknown => "That term is not in this version's glossary",
+            RefusalCode::AuthenticationRequired => "This needs you to be signed in",
+            RefusalCode::CredentialRejected => {
+                "The credential this request presented was not accepted"
+            }
+            RefusalCode::PermissionDenied => "You do not have permission to do this",
+            RefusalCode::NotFound => "The requested item was not found",
+            RefusalCode::Conflict => "The request conflicts with the current state",
+            RefusalCode::InvalidRequest => "The request was not valid",
+            RefusalCode::RateLimited => "Too many requests were made",
+            RefusalCode::QuotaExceeded => "A usage limit has been reached",
+            RefusalCode::UpstreamUnavailable => {
+                "A service this operation depends on could not be reached"
+            }
+            RefusalCode::UpstreamTimeout => {
+                "A service this operation depends on did not answer in time"
+            }
+            RefusalCode::DeviceNotConnected => "The device this operation needs is not connected",
+            RefusalCode::ServiceUnavailable => {
+                "The service handling this request is unavailable right now"
+            }
+            RefusalCode::InternalError => "The service hit an unexpected error",
             RefusalCode::Unknown => {
                 "The request was refused for a reason this version does not recognise"
             }
@@ -190,7 +275,8 @@ impl RefusalCode {
 #[serde(rename_all = "snake_case")]
 pub enum NextActionKind {
     /// Try the same thing again later; [`NextAction::retry_after_s`] says when,
-    /// when it is known.
+    /// when it is known, and [`NextAction::target`] (when present) names what
+    /// to re-check first because the earlier attempt may already have applied.
     RetryLater,
     /// Run the command named in [`NextAction::target`].
     RunCommand,
@@ -325,6 +411,10 @@ pub struct NextAction {
     pub kind: NextActionKind,
     /// What the action applies to: the command to run, the page to open, the
     /// setting to set, the gate to wait for. Its meaning is fixed by `kind`.
+    /// On [`NextActionKind::RetryLater`] it is what to re-check BEFORE
+    /// retrying, because the earlier attempt may already have taken effect (a
+    /// [`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then
+    /// says so. Omit it on a retry that is safe to repeat blindly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// For [`NextActionKind::RetryLater`]: the earliest useful retry, in whole
@@ -437,14 +527,25 @@ impl NextAction {
         const UNNAMED: &str = "(it did not name one, which is itself a defect worth reporting)";
         let target = quotable(self.target.as_deref());
         match (self.kind, target) {
-            (NextActionKind::RetryLater, _) => match self.retry_after_s {
-                Some(0) => "Try again now".to_string(),
-                Some(s) if s > RETRY_RENDER_CEILING_S => {
-                    "Try again later; the suggested wait is more than two days".to_string()
+            (NextActionKind::RetryLater, target) => {
+                let when = match self.retry_after_s {
+                    Some(0) => "Try again now".to_string(),
+                    Some(s) if s > RETRY_RENDER_CEILING_S => {
+                        "Try again later; the suggested wait is more than two days".to_string()
+                    }
+                    Some(s) => format!("Try again in {}", humanise_delay(s)),
+                    None => "Try again later".to_string(),
+                };
+                match target {
+                    // A target on `retry_later` is what to re-check first: the
+                    // earlier attempt may already have taken effect, and a
+                    // blind retry of a write can apply it twice.
+                    Some(t) => format!(
+                        "{when}, but first check \"{t}\": the earlier attempt may already have taken effect"
+                    ),
+                    None => when,
                 }
-                Some(s) => format!("Try again in {}", humanise_delay(s)),
-                None => "Try again later".to_string(),
-            },
+            }
             (NextActionKind::RunCommand, Some(t)) => format!("Run the command \"{t}\""),
             (NextActionKind::RunCommand, None) => {
                 format!("Run the command this refusal refers to {UNNAMED}")
@@ -748,9 +849,25 @@ mod tests {
             | RefusalCode::SiblingCheckoutAbsent
             | RefusalCode::EndpointUnresolved
             | RefusalCode::GlossaryTermUnknown
+            | RefusalCode::AuthenticationRequired
+            | RefusalCode::CredentialRejected
+            | RefusalCode::PermissionDenied
+            | RefusalCode::NotFound
+            | RefusalCode::Conflict
+            | RefusalCode::InvalidRequest
+            | RefusalCode::RateLimited
+            | RefusalCode::QuotaExceeded
+            | RefusalCode::UpstreamUnavailable
+            | RefusalCode::UpstreamTimeout
+            | RefusalCode::DeviceNotConnected
+            | RefusalCode::ServiceUnavailable
+            | RefusalCode::InternalError
             | RefusalCode::Unknown => 1,
         };
-        assert_eq!(RefusalCode::ALL.iter().map(|c| count(*c)).sum::<usize>(), 5);
+        assert_eq!(
+            RefusalCode::ALL.iter().map(|c| count(*c)).sum::<usize>(),
+            18
+        );
         for c in RefusalCode::ALL {
             assert_eq!(serde_json::to_value(c).unwrap(), c.as_str());
             assert_eq!(RefusalCode::from_wire(c.as_str()), Some(*c));
@@ -1041,6 +1158,27 @@ mod tests {
             "Try again later; the suggested wait is more than two days"
         );
         assert_eq!(r(u32::MAX), r(RETRY_RENDER_CEILING_S + 1));
+    }
+
+    /// A retry that may repeat an already-applied write says what to re-check
+    /// first; a blank target is no target, and a bare retry is unchanged.
+    #[test]
+    fn retry_later_with_a_target_warns_the_attempt_may_have_applied() {
+        assert_eq!(
+            NextAction::retry_later(Some(30))
+                .with_target("the saved workflow")
+                .render(),
+            "Try again in 30 seconds, but first check \"the saved workflow\": \
+             the earlier attempt may already have taken effect"
+        );
+        assert_eq!(
+            NextAction::retry_later(None).with_target("x").render(),
+            "Try again later, but first check \"x\": the earlier attempt may already have taken effect"
+        );
+        assert_eq!(
+            NextAction::retry_later(None).with_target("  ").render(),
+            "Try again later"
+        );
     }
 
     #[test]

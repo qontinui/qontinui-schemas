@@ -59,8 +59,11 @@ on:
       - ".github/scripts/fleet-nouns-portability.*"
       # Not a workspace member either: rust/tests/glossary_source.rs is the
       # glossary source's only validator (invariants, fleet nouns, the version
-      # guard, and drift of the generated rust/src/glossary/generated.rs).
+      # guard, and drift of BOTH generated tables — rust/src/glossary/generated.rs
+      # and ts/src/glossary/generated.ts), so an edit to either generated file
+      # alone must still run it on main.
       - "glossary/**"
+      - "ts/src/glossary/**"
       - ".github/workflows/rust-ci.yml"
   workflow_dispatch:
   workflow_call:

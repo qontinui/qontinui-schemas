@@ -9,7 +9,10 @@
 //! The source is the repo-root `glossary/terms.toml`. [`GlossaryTerm`] and
 //! [`GLOSSARY`] live in `generated.rs`, which is **generated** from that file
 //! and checked against it by the repo test `tests/glossary_source.rs` — edit
-//! the TOML, never the generated Rust. That test also enforces the file's
+//! the TOML, never the generated Rust. The same test generates the
+//! TypeScript table `ts/src/glossary/generated.ts`, published as
+//! `@qontinui/shared-types/glossary`, so a web surface renders the identical
+//! definition without a request. That test also enforces the file's
 //! invariants (stable snake_case ids, `short` ≤ 160 chars, `long` ≤ 1200,
 //! no dangling `see_also`, no fleet noun in any text) and the version guard:
 //! a content change without a raised `version` fails.

@@ -79,6 +79,19 @@ class RefusalCode(StrEnum):
     sibling_checkout_absent = 'sibling_checkout_absent'
     endpoint_unresolved = 'endpoint_unresolved'
     glossary_term_unknown = 'glossary_term_unknown'
+    authentication_required = 'authentication_required'
+    credential_rejected = 'credential_rejected'
+    permission_denied = 'permission_denied'
+    not_found = 'not_found'
+    conflict = 'conflict'
+    invalid_request = 'invalid_request'
+    rate_limited = 'rate_limited'
+    quota_exceeded = 'quota_exceeded'
+    upstream_unavailable = 'upstream_unavailable'
+    upstream_timeout = 'upstream_timeout'
+    device_not_connected = 'device_not_connected'
+    service_unavailable = 'service_unavailable'
+    internal_error = 'internal_error'
     unknown = 'unknown'
 
 
@@ -111,7 +124,7 @@ class NextAction(BaseModel):
     target: Annotated[
         str | None,
         Field(
-            description='What the action applies to: the command to run, the page to open, the\nsetting to set, the gate to wait for. Its meaning is fixed by `kind`.'
+            description='What the action applies to: the command to run, the page to open, the\nsetting to set, the gate to wait for. Its meaning is fixed by `kind`.\nOn [`NextActionKind::RetryLater`] it is what to re-check BEFORE\nretrying, because the earlier attempt may already have taken effect (a\n[`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then\nsays so. Omit it on a retry that is safe to repeat blindly.'
         ),
     ] = None
     unrecognised_kind: Annotated[
