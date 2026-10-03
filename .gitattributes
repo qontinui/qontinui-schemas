@@ -32,3 +32,12 @@ src/qontinui_schemas/generated/** text eol=lf
 # them to CRLF and fail the digest test locally. `-text` stores and checks them
 # out byte-for-byte; the committed blobs are LF already.
 rust/tests/fixtures/ui_bridge_sdk/*.json -text
+
+# The glossary source and the Rust table generated from it
+# (rust/tests/glossary_source.rs). The test normalises CRLF before hashing and
+# comparing, so this is belt and braces: it keeps blob == working tree on every
+# platform so the generated file never reads as modified for a line-ending
+# reason alone.
+glossary/terms.toml text eol=lf
+glossary/versions.lock text eol=lf
+rust/src/glossary/generated.rs text eol=lf

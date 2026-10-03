@@ -57,6 +57,13 @@ on:
       # its only validator: a data-only edit must still run it on main.
       - "fleet-nouns.toml"
       - ".github/scripts/fleet-nouns-portability.*"
+      # Not a workspace member either: rust/tests/glossary_source.rs is the
+      # glossary source's only validator (invariants, fleet nouns, the version
+      # guard, and drift of BOTH generated tables — rust/src/glossary/generated.rs
+      # and ts/src/glossary/generated.ts), so an edit to either generated file
+      # alone must still run it on main.
+      - "glossary/**"
+      - "ts/src/glossary/**"
       - ".github/workflows/rust-ci.yml"
   workflow_dispatch:
   workflow_call:
@@ -143,7 +150,7 @@ jobs:
           # Correct target selection (--workspace), no floor until now: a lost
           # --workspace, or a member dropping out of the workspace, collapses
           # this to a fraction and still exits 0. Measured 2026-09-06: 887 tests
-          # across 15 crate targets.
+          # across 15 crate targets (re-measured below for the target floor).
           set +e
           cargo test --workspace 2>&1 | tee /tmp/cargo-test.out
           SUBRC=${PIPESTATUS[0]}
@@ -166,18 +173,61 @@ jobs:
           RAN=${VACUITY%% *}
           SUMMARIES=${VACUITY##* }
           MIN_TESTS=500
-          echo "schemas cargo test --workspace: ${RAN} tests ran across ${SUMMARIES} summary line(s) (floor ${MIN_TESTS})"
+
+          # ── CRATE-TARGET FLOOR ──────────────────────────────────────────
+          # SUMMARIES is the number of crate targets that printed a summary,
+          # and the test floor above cannot see it shrink: a fail-fast abort
+          # after the biggest targets, or a selection that keeps them and drops
+          # the rest, still clears 500 tests. Measured on run 36449139416
+          # (main 02fdbb97, 2026-09-29): 940 tests across 18 targets (15 on
+          # 2026-09-06); the floor is half, the same ratio as the test floor.
+          # Plan
+          # 2026-09-20-rust-verification-residuals-cached-green-straddles-the-edit-target-count-unfloored-and-source-pins-scan-themselves,
+          # Phase 3.
+          MIN_TARGETS=9
+
+          # ── A RED RUN IS STILL A READING ────────────────────────────────
+          # Both floors are evaluated whatever cargo exited, and both facts are
+          # printed, so a red run's log says how much of the suite it reached
+          # rather than stopping at cargo's first error. A failing floor exits
+          # with cargo's own status when that was already non-zero, so the
+          # step's exit code is never laundered into a different one; and no
+          # line here calls a red run's reading a pass.
+          FAIL_RC=${SUBRC}
+          [ "${FAIL_RC}" -ne 0 ] || FAIL_RC=1
+          echo "schemas cargo test --workspace: cargo exited ${SUBRC}; ${RAN} tests ran across ${SUMMARIES} summary line(s)" \
+               "(floors: ${MIN_TESTS} tests, ${MIN_TARGETS} crate targets)"
           if [ "${SUMMARIES}" -eq 0 ]; then
             echo "::error::No test summary of either format was found in this run's output." \
                  "The command exited ${SUBRC} but produced no evidence that any test executed." \
                  "That is UNKNOWN, not a pass."
-            exit 1
+            exit "${FAIL_RC}"
           fi
+          if [ "${SUBRC}" -eq 0 ]; then
+            WHY="cargo exited 0, so this is a collapse, not a crash"
+          else
+            WHY="cargo exited ${SUBRC}, so the run is RED and stopped early; cargo's own error above is the cause, and this line records how much of the suite that run reached"
+          fi
+          FLOOR_MISSED=0
           if [ "${RAN}" -lt "${MIN_TESTS}" ]; then
-            echo "::error::Only ${RAN} tests ran (floor ${MIN_TESTS}). The step exited 0 but the" \
-                 "suite collapsed — almost certainly a target-selection change rather than" \
+            echo "::error::Only ${RAN} tests ran (floor ${MIN_TESTS}). ${WHY}." \
+                 "On a green exit it is almost certainly a target-selection change rather than" \
                  "deleted tests. Do NOT lower the floor to make this pass."
-            exit 1
+            FLOOR_MISSED=1
+          fi
+          if [ "${SUMMARIES}" -lt "${MIN_TARGETS}" ]; then
+            echo "::error::Only ${SUMMARIES} of the suite's crate targets reported a summary" \
+                 "(floor ${MIN_TARGETS}). ${WHY}. Fewer targets than the floor is a fail-fast" \
+                 "abort or a target-selection collapse. Do NOT lower the floor."
+            FLOOR_MISSED=1
+          fi
+          if [ "${FLOOR_MISSED}" -ne 0 ]; then
+            exit "${FAIL_RC}"
+          fi
+          if [ "${SUBRC}" -ne 0 ]; then
+            echo "::error::cargo test exited ${SUBRC}: this run is RED. It reached ${RAN} tests" \
+                 "across ${SUMMARIES} crate targets, at or above both floors — which says how much" \
+                 "of the suite ran, never that it passed. cargo's own error above is the cause."
           fi
           exit "${SUBRC}"
 

@@ -6,6 +6,7 @@
  */
 
 import type { IdleCondition } from "./IdleCondition";
+import type { ProbeCondition } from "./ProbeCondition";
 import type { RepositoryInactiveCondition } from "./RepositoryInactiveCondition";
 import type { RepositoryWatch } from "./RepositoryWatch";
 
@@ -17,6 +18,10 @@ export interface ScheduleConditions {
    * Require the runner to be idle.
    */
   requireIdle?: IdleCondition | null;
+  /**
+   * Require an external probe command to exit 0 (see [`ProbeCondition`]).
+   */
+  requireProbe?: ProbeCondition | null;
   /**
    * Require repository file inactivity across one or more paths.
    */

@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.0.0...ts-v2.1.0) (2026-10-02)
+
+
+### Features
+
+* add require_probe scheduler condition (ProbeCondition) ([9374ddc](https://github.com/qontinui/qontinui-schemas/commit/9374ddc1ea11cd9995b09bbaa18739469dc99f21))
+* generated TS and Python bindings for GlossaryTerm and Refusal ([3e4b7e2](https://github.com/qontinui/qontinui-schemas/commit/3e4b7e29a67d1746e714afa77620f9c4496c81a1))
+* **ts:** export RunnerInstance and RunnerInstanceRole from the runner entry ([947e6d1](https://github.com/qontinui/qontinui-schemas/commit/947e6d13a2ecb075e5c89cb76de410cac350803a))
+* **ts:** publish the glossary table and refusal types to TypeScript ([c0af6ca](https://github.com/qontinui/qontinui-schemas/commit/c0af6ca8ebad89295a6060db1c4f5da86d6d52c4))
+
+
+### Bug Fixes
+
+* regenerate bindings for unrecognised_kind and unrecognised_source ([db5facc](https://github.com/qontinui/qontinui-schemas/commit/db5facc2ff06299084f1cf85bc619b5ffe959364))
+* regenerate Refusal bindings for the lenient envelope ([201d6ea](https://github.com/qontinui/qontinui-schemas/commit/201d6ea8bf0539729168c28524be310dfed9e8a7))
+* **ts:** quote glossary table keys so the generator does not lean on the id invariant ([6564c0f](https://github.com/qontinui/qontinui-schemas/commit/6564c0f7f4850016205b822777acf8097904ab86))
+
+## [2.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v1.1.0...ts-v2.0.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* UiBridgeAction's #[default] moves from Navigate to Snapshot. An action-less ui_bridge step is displayed as `snapshot` by both step editors and run as one by the runner's handler; only the typed view said `navigate`. Code that relied on UiBridgeAction::default() (or on UiBridgeStep::default().action) being Navigate now gets Snapshot.
+* FullRunnerStep and UiBridgeAction are public, non-#[non_exhaustive] enums and gain variants, so an exhaustive match on either no longer compiles.
+
+### Features
+
+* FullRunnerStep covers all 20 registered handlers and parses every live step shape ([8502266](https://github.com/qontinui/qontinui-schemas/commit/8502266f3894f5c0c2c7d0485f751ea1835c6ab6))
+* UiBridgeAction defaults to snapshot and gains component_action ([f733c88](https://github.com/qontinui/qontinui-schemas/commit/f733c88910dd559f9618e54098964d9c3c5430bb))
+
 ## [1.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v1.0.0...ts-v1.1.0) (2026-09-23)
 
 

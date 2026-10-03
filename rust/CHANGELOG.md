@@ -1,5 +1,41 @@
 # Changelog
 
+## [4.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.0.0...rust-v4.1.0) (2026-10-02)
+
+
+### Features
+
+* add require_probe scheduler condition (ProbeCondition) ([9374ddc](https://github.com/qontinui/qontinui-schemas/commit/9374ddc1ea11cd9995b09bbaa18739469dc99f21))
+* compiled-in product glossary and the Refusal next-action envelope ([030c749](https://github.com/qontinui/qontinui-schemas/commit/030c7494c84727c7489aa9a678d7ad43528a9cc8))
+* **ts:** publish the glossary table and refusal types to TypeScript ([c0af6ca](https://github.com/qontinui/qontinui-schemas/commit/c0af6ca8ebad89295a6060db1c4f5da86d6d52c4))
+
+
+### Bug Fixes
+
+* continuation deploy/migrate wording, newest-row ledger, relay fidelity ([8f651dd](https://github.com/qontinui/qontinui-schemas/commit/8f651dda78b918d7ee83546de72ae66ba6b57a3b))
+* refusal decodes a newer producer's envelope; glossary text matches coord ([a66c34e](https://github.com/qontinui/qontinui-schemas/commit/a66c34e204298225bf48e9f77b38733ac690eb09))
+* **ts:** quote glossary table keys so the generator does not lean on the id invariant ([6564c0f](https://github.com/qontinui/qontinui-schemas/commit/6564c0f7f4850016205b822777acf8097904ab86))
+
+## [4.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v3.1.0...rust-v4.0.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* UiBridgeAction's #[default] moves from Navigate to Snapshot. An action-less ui_bridge step is displayed as `snapshot` by both step editors and run as one by the runner's handler; only the typed view said `navigate`. Code that relied on UiBridgeAction::default() (or on UiBridgeStep::default().action) being Navigate now gets Snapshot.
+* FullRunnerStep and UiBridgeAction are public, non-#[non_exhaustive] enums and gain variants, so an exhaustive match on either no longer compiles.
+
+### Features
+
+* FullRunnerStep covers all 20 registered handlers and parses every live step shape ([8502266](https://github.com/qontinui/qontinui-schemas/commit/8502266f3894f5c0c2c7d0485f751ea1835c6ab6))
+* **journey:** journey-twin edge-observation and frontier wire types ([273592f](https://github.com/qontinui/qontinui-schemas/commit/273592f7f29c0a3b48651d074e974ae8d1ebd556))
+* UiBridgeAction defaults to snapshot and gains component_action ([f733c88](https://github.com/qontinui/qontinui-schemas/commit/f733c88910dd559f9618e54098964d9c3c5430bb))
+
+
+### Bug Fixes
+
+* **journey:** close review findings on the journey wire types ([a6ab9e1](https://github.com/qontinui/qontinui-schemas/commit/a6ab9e13a4b78cd0bef146d484b7d6cb6fff81b9))
+* **journey:** no concrete URL path in a node; changed may join equal keys ([9e98bca](https://github.com/qontinui/qontinui-schemas/commit/9e98bca6334675ee5ab2ba679eddf9a01b20a902))
+
 ## [3.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v3.0.0...rust-v3.1.0) (2026-09-23)
 
 
