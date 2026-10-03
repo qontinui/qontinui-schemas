@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.1.0...rust-v4.2.0) (2026-10-03)
+
+
+### Features
+
+* **refusal:** generic HTTP-class refusal codes every producer can share ([3db4fba](https://github.com/qontinui/qontinui-schemas/commit/3db4fba446afa07774cd04991ce93cd29e5e0ae5))
+* **rust:** commit the refusal render fixture generator ([d9e7fd4](https://github.com/qontinui/qontinui-schemas/commit/d9e7fd4c1ddbc30c7adb634520c9d02dc519faf8))
+
+
+### Bug Fixes
+
+* **refusal:** a retry_later target says what to re-check before retrying ([ccf7b86](https://github.com/qontinui/qontinui-schemas/commit/ccf7b86f4e9b22c0f61f07e79ad68994e92848aa))
+* **refusal:** carry the retry_later target doc into the generated bindings ([c1be97a](https://github.com/qontinui/qontinui-schemas/commit/c1be97a259900ff8bb56bad8840bb98e7c1d00c2))
+
 ## [4.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.0.0...rust-v4.1.0) (2026-10-02)
 
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.1.0...ts-v2.2.0) (2026-10-03)
+
+
+### Features
+
+* **refusal:** generic HTTP-class refusal codes every producer can share ([3db4fba](https://github.com/qontinui/qontinui-schemas/commit/3db4fba446afa07774cd04991ce93cd29e5e0ae5))
+
+
+### Bug Fixes
+
+* **refusal:** carry the retry_later target doc into the generated bindings ([c1be97a](https://github.com/qontinui/qontinui-schemas/commit/c1be97a259900ff8bb56bad8840bb98e7c1d00c2))
+
 ## [2.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.0.0...ts-v2.1.0) (2026-10-02)
 
 
