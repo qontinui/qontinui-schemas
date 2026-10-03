@@ -165,12 +165,19 @@ fn scheduled_task_type_script_roundtrips() {
     assert_eq!(v["task_type"], "Script");
     assert_eq!(v["command"], "bash scripts/x.sh --flag");
     assert_eq!(v["timeout_seconds"], 900);
+    assert_eq!(v["working_directory"], "/repo");
     let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 
     // Optional fields omitted on the wire deserialize to None.
     let min: ScheduledTaskType =
         serde_json::from_str(r#"{"task_type":"Script","command":"true"}"#).unwrap();
+    // ...and None fields are left off the wire (skip_serializing_if).
+    let min_wire = serde_json::to_value(&min).unwrap();
+    assert!(min_wire.get("working_directory").is_none());
+    assert!(min_wire.get("timeout_seconds").is_none());
+    // `command` is required.
+    assert!(serde_json::from_str::<ScheduledTaskType>(r#"{"task_type":"Script"}"#).is_err());
     match min {
         ScheduledTaskType::Script {
             working_directory,
