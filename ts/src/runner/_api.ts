@@ -12,3 +12,5 @@ export type { Runner } from "../generated/Runner";
 export type { RunnerStatus } from "../generated/RunnerStatus";
 export type { RunnerUiError } from "../generated/RunnerUiError";
 export type { RunnerCrash } from "../generated/RunnerCrash";
+export type { RunnerInstance } from "../generated/RunnerInstance";
+export type { RunnerInstanceRole } from "../generated/RunnerInstanceRole";

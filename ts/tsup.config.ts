@@ -20,6 +20,8 @@ export default defineConfig({
     rag: "src/rag/index.ts",
     "ui-bridge-ir": "src/ui-bridge-ir/index.ts",
     "tauri-events": "src/tauri-events/index.ts",
+    glossary: "src/glossary/index.ts",
+    refusal: "src/refusal/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
