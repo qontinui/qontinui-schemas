@@ -15,6 +15,18 @@ export interface ConditionStatus {
    */
   idleMet?: boolean | null;
   /**
+   * Human-readable outcome of the last probe evaluation — e.g. `exit 0`,
+   * `exit 3`, `timed out after 30s`, `spawn failed: ...`, `probe running;
+   * awaiting its result`, `not run: another condition is not met` — with a
+   * bounded stderr tail appended when the probe wrote one.
+   */
+  probeDetail?: string | null;
+  /**
+   * Current probe-condition result. `None` if no probe is configured or
+   * none has been evaluated yet, `Some(true)` if the last probe exited 0.
+   */
+  probeMet?: boolean | null;
+  /**
    * Current repository-inactive status per repository: `(path, is_inactive)`.
    */
   repoInactiveMet?: [unknown, unknown][] | null;

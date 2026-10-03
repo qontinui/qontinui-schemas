@@ -5,6 +5,7 @@ export type { ScheduleExpression } from "../generated/ScheduleExpression";
 export type { ConditionScheduleConfig } from "../generated/ConditionScheduleConfig";
 export type { ScheduleConditions } from "../generated/ScheduleConditions";
 export type { IdleCondition } from "../generated/IdleCondition";
+export type { ProbeCondition } from "../generated/ProbeCondition";
 export type { RepositoryInactiveCondition } from "../generated/RepositoryInactiveCondition";
 export type { RepositoryWatch } from "../generated/RepositoryWatch";
 export type { ConditionStatus } from "../generated/ConditionStatus";

@@ -104,6 +104,43 @@ pub struct RepositoryInactiveCondition {
     pub repositories: Vec<RepositoryWatch>,
 }
 
+/// Condition that runs an external command and is met iff it exits 0.
+///
+/// The runner execs `command` directly — argv, never a shell — so `command[0]`
+/// is the program and the rest are its arguments; wrap it in `sh -c` yourself
+/// if you want shell syntax. The condition is **NOT met** on a non-zero exit,
+/// on a timeout (the probe is killed at `timeout_seconds`) and on a spawn
+/// failure (including an empty `command`); each is logged distinctly. An
+/// unobserved or failed probe never reads as met.
+///
+/// The probe is rate-limited to one run per `poll_seconds` per task: between
+/// polls the runner reuses the last result. `poll_seconds` is floored at 60
+/// because the scheduler re-evaluates conditions once per 60 s tick — a shorter
+/// interval could not be honoured. The runner's create/update API REFUSES a
+/// value below the floor (and an empty `command`, and a `timeout_seconds` of
+/// 0 or above 3600) rather than silently rewriting it; a stored row that
+/// predates that validation is clamped up to 60 at evaluation time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct ProbeCondition {
+    /// Whether this condition is active.
+    #[serde(alias = "enabled")]
+    pub enabled: bool,
+    /// Program and arguments to exec (no shell). Must be non-empty.
+    #[serde(alias = "command")]
+    pub command: Vec<String>,
+    /// Minimum seconds between two probe runs for the same task. Minimum 60.
+    #[serde(alias = "poll_seconds")]
+    #[schemars(range(min = 60))]
+    pub poll_seconds: u32,
+    /// Seconds a single probe run may take before it is killed and counted as
+    /// NOT met. 1..=3600.
+    #[serde(alias = "timeout_seconds")]
+    #[schemars(range(min = 1, max = 3600))]
+    pub timeout_seconds: u32,
+}
+
 /// Conditions that must ALL be met before task execution.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +160,13 @@ pub struct ScheduleConditions {
         alias = "require_repo_inactive"
     )]
     pub require_repo_inactive: Option<RepositoryInactiveCondition>,
+    /// Require an external probe command to exit 0 (see [`ProbeCondition`]).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "require_probe"
+    )]
+    pub require_probe: Option<ProbeCondition>,
     /// Maximum time to wait for conditions (minutes). `None` = wait
     /// indefinitely.
     #[serde(
@@ -152,6 +196,20 @@ pub struct ConditionStatus {
         alias = "repo_inactive_met"
     )]
     pub repo_inactive_met: Option<Vec<(String, bool)>>,
+    /// Current probe-condition result. `None` if no probe is configured or
+    /// none has been evaluated yet, `Some(true)` if the last probe exited 0.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "probe_met")]
+    pub probe_met: Option<bool>,
+    /// Human-readable outcome of the last probe evaluation — e.g. `exit 0`,
+    /// `exit 3`, `timed out after 30s`, `spawn failed: ...`, `probe running;
+    /// awaiting its result`, `not run: another condition is not met` — with a
+    /// bounded stderr tail appended when the probe wrote one.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "probe_detail"
+    )]
+    pub probe_detail: Option<String>,
     /// Whether the overall condition-wait timeout has been exceeded.
     #[serde(default, alias = "timed_out")]
     pub timed_out: bool,

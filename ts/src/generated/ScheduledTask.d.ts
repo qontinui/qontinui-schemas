@@ -10,6 +10,7 @@ import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
 import type { ConditionStatus } from "./ConditionStatus";
 import type { IdleCondition } from "./IdleCondition";
 import type { McpConnectionRef } from "./McpConnectionRef";
+import type { ProbeCondition } from "./ProbeCondition";
 import type { RepositoryInactiveCondition } from "./RepositoryInactiveCondition";
 import type { RepositoryWatch } from "./RepositoryWatch";
 import type { ScheduleConditions } from "./ScheduleConditions";

@@ -53,7 +53,7 @@ A PR is ready to merge when every required workflow is green on the PR's HEAD co
 These must be green on your PR before merge:
 
 - `commitlint.yml` — runs on every PR (`commitlint`). Hard-enforces conventional-commits via `@commitlint/config-conventional`. PRs with non-conforming commit messages must rewrite history before merge. (The *why* — release-please derives version bumps from these — lives in [`## Releasing`](#releasing).)
-- `rust-ci.yml` — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` on `ubuntu-latest` (`rust-ci`). **Runs on every PR.** Its `pull_request:` trigger carries no path filter, deliberately: branch protection matches check-runs created by the `pull_request` event, so a path-filtered trigger that doesn't fire leaves the required check permanently "missing" and unsatisfiable short of admin bypass. The `paths:` list in that file (`Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, `rust-vision-core/**`, `code-graph/**`, `fleet-nouns.toml` and `.github/scripts/fleet-nouns-portability.*` (validated only by a `rust/tests` test and this workflow's cross-engine step), and the workflow file) filters the **push-to-`main`** trigger only — and it enumerates the whole cargo workspace, because a version that omitted two members once let a break land on `main` uncompiled.
+- `rust-ci.yml` — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build --workspace --all-targets`, `cargo test --workspace` on `ubuntu-latest` (`rust-ci`). **Runs on every PR.** Its `pull_request:` trigger carries no path filter, deliberately: branch protection matches check-runs created by the `pull_request` event, so a path-filtered trigger that doesn't fire leaves the required check permanently "missing" and unsatisfiable short of admin bypass. The `paths:` list in that file (`Cargo.toml`, `Cargo.lock`, `rust/**`, `rust-runner-client/**`, `rust-vision-core/**`, `code-graph/**`, `fleet-nouns.toml` and `.github/scripts/fleet-nouns-portability.*` (validated only by a `rust/tests` test and this workflow's cross-engine step), `glossary/**` (validated only by `rust/tests/glossary_source.rs`), and the workflow file) filters the **push-to-`main`** trigger only — and it enumerates the whole cargo workspace, because a version that omitted two members once let a break land on `main` uncompiled.
 - `schema-drift.yml` — regenerates the TS + Python bindings via the qontinui-runner codegen script and fails on drift (`check-drift`). **Also runs on every PR** — same no-path-filter reasoning. Its `paths:` list — `rust/src/**`, the workflow file, **and both generated directories** (`ts/src/generated/**`, `src/qontinui_schemas/generated/**`) — likewise filters only the push-to-`main` trigger. The generated directories are load-bearing there rather than tidiness: a bindings-only PR (the whole class the sibling resolver exists to unblock) touches neither of the other two entries, and since `candidate-ci.yml` excludes `check-drift` from candidate refs, that push run is the only post-merge measurement this gate ever gets. If it goes red, regenerate locally via the qontinui-runner sibling checkout (or download the `regenerated-bindings` artifact that the failing run uploads) and commit the result.
 
   **If the bindings you are committing belong to a type that does not exist on qontinui-runner `main` yet, regenerating cannot help you** — and that is the common case for a "regenerate bindings for `<type>`" PR, because the Rust type is authored in qontinui-runner and this repo carries only the generated output. Regenerating against runner `main` *deletes* the very files your PR adds, so `check-drift` reds no matter what you push here. The missing input is in the other repo.
@@ -114,6 +114,30 @@ git -C qontinui-schemas diff --exit-code -I '^#   timestamp:' \
 ```
 
 The version pin matters — unpinned upstream releases tweak Pydantic output and surface as spurious drift. If you don't have qontinui-runner cloned, the CI run is your check.
+
+### Editing `fleet-nouns.toml`
+
+[`fleet-nouns.toml`](fleet-nouns.toml) is data read by lints in **other** repos, so a green PR here is only half the change. Pre-flight it locally, from the repo root, with the same two commands `rust-ci`'s cross-engine step runs (needs `python3` and `node` on PATH):
+
+```bash
+FLEET_NOUNS_MATRIX_OUT=/tmp/fleet-nouns-rust.json \
+  cargo test -p qontinui-types --test fleet_nouns_vocabulary \
+  hit_matrix_for_the_cross_engine_check
+python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json
+```
+
+(`cargo test --workspace` runs the Rust half, `rust/tests/fleet_nouns_vocabulary.rs`, on its own.)
+
+**Merging here changes no consumer's CI verdict.** Each consumer's CI reads the file at a *pinned* schemas commit, not at this repo's `main`, and the two pin shapes behave differently:
+
+- **sha256-pinned** consumers pin the file itself by ref **and** digest. A digest mismatch is red; they read the pinned blob locally as well as in CI, and an advisory drift step warns when schemas `main` has moved away from the pin.
+- **Sibling-pinned** consumers read `../qontinui-schemas/fleet-nouns.toml` from the SHA-pinned sibling checkout they already build against. That pin covers CI only: locally they read whatever commit your sibling checkout is on, and nothing warns them that `main` has moved.
+
+An edit therefore reaches a consumer's CI only when that consumer bumps its pin, in its own PR, where its own ratchet re-counts against the new patterns. So:
+
+- A pattern fix or a new class is **not live** until every consumer that should see it has bumped. Find them with `gh search code --owner qontinui fleet-nouns` rather than from a list here — it searches default branches only, so a consumer still adopting the file in an open PR will not show, and it also returns non-consumers (plans, docs) — and open (or declare, via `coord:upstream-of=<repo>#<n>`) the bump PRs. Some sibling-pinned consumers bump on their own (coord's `schemas-pin-bump.yml` opens its pin + lock bump PR on a schedule and on each schemas release), so check for an open bump PR before opening one by hand.
+- The digest covers the **whole file**, comments included. Existing pins stay valid (they name an immutable ref), but a comment-only edit fires every drift warning and forces each consumer's next bump to re-pin the `sha256` — batch header edits with a substantive change rather than landing them alone.
+- Renaming or removing a class `id` breaks any consumer that keys an allowance or a disposition on it, and widening a `pattern` raises their counts. Either one reds or re-baselines the consumer at bump time, which is the intended place to settle it — say in this PR which consumers will need re-baselining.
 
 ### Active workstream awareness
 
