@@ -153,6 +153,37 @@ fn scheduled_task_type_background_capture_roundtrips() {
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 
+#[test]
+fn scheduled_task_type_script_roundtrips() {
+    let t = ScheduledTaskType::Script {
+        command: "bash scripts/x.sh --flag".to_string(),
+        working_directory: Some("/repo".to_string()),
+        timeout_seconds: Some(900),
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["task_type"], "Script");
+    assert_eq!(v["command"], "bash scripts/x.sh --flag");
+    assert_eq!(v["timeout_seconds"], 900);
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+
+    // Optional fields omitted on the wire deserialize to None.
+    let min: ScheduledTaskType =
+        serde_json::from_str(r#"{"task_type":"Script","command":"true"}"#).unwrap();
+    match min {
+        ScheduledTaskType::Script {
+            working_directory,
+            timeout_seconds,
+            ..
+        } => {
+            assert!(working_directory.is_none());
+            assert!(timeout_seconds.is_none());
+        }
+        _ => panic!("wrong variant"),
+    }
+}
+
 // ============================================================================
 // Scheduler — ScheduledTaskStatus (snake_case)
 // ============================================================================
