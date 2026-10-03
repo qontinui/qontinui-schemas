@@ -54,6 +54,10 @@ pub struct Resolution {
     pub resolution: ResolutionKind,
 }
 
+/// Extensions probed when RESOLVING a JS/TS import specifier to a file — a
+/// module-resolution candidate list, NOT the parse set. It deliberately
+/// includes `mjs`/`cjs`, which no builder parses; whether a file is parsed into
+/// the graph is decided only by [`crate::code_graph::PARSED_EXTENSIONS`].
 const TS_EXTS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
 impl ImportResolver {
@@ -676,6 +680,8 @@ fn crate_root_dir(from_file: &str) -> String {
 }
 
 /// Strip a known source extension from a path, returning the stem-with-dirs.
+/// Like [`TS_EXTS`], a resolution list (it names `mjs`/`cjs`), not the parse
+/// set — see [`crate::code_graph::PARSED_EXTENSIONS`].
 fn strip_known_ext(path: &str) -> Option<String> {
     for ext in ["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs"] {
         let suffix = format!(".{}", ext);
@@ -707,6 +713,8 @@ fn normalize_join(base: &str, rel: &str) -> String {
 }
 
 /// Infer a language string from a file extension when not present in the graph map.
+/// Labels resolution targets, so it also names `mjs`/`cjs`; it is not the parse
+/// dispatch (that is [`crate::code_graph::language_for_extension`]).
 fn language_from_path(path: &str) -> String {
     let ext = path.rsplit('.').next().unwrap_or("");
     match ext {

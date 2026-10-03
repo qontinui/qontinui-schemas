@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.0.0...rust-v4.1.0) (2026-10-02)
+
+
+### Features
+
+* add require_probe scheduler condition (ProbeCondition) ([9374ddc](https://github.com/qontinui/qontinui-schemas/commit/9374ddc1ea11cd9995b09bbaa18739469dc99f21))
+* compiled-in product glossary and the Refusal next-action envelope ([030c749](https://github.com/qontinui/qontinui-schemas/commit/030c7494c84727c7489aa9a678d7ad43528a9cc8))
+* **ts:** publish the glossary table and refusal types to TypeScript ([c0af6ca](https://github.com/qontinui/qontinui-schemas/commit/c0af6ca8ebad89295a6060db1c4f5da86d6d52c4))
+
+
+### Bug Fixes
+
+* continuation deploy/migrate wording, newest-row ledger, relay fidelity ([8f651dd](https://github.com/qontinui/qontinui-schemas/commit/8f651dda78b918d7ee83546de72ae66ba6b57a3b))
+* refusal decodes a newer producer's envelope; glossary text matches coord ([a66c34e](https://github.com/qontinui/qontinui-schemas/commit/a66c34e204298225bf48e9f77b38733ac690eb09))
+* **ts:** quote glossary table keys so the generator does not lean on the id invariant ([6564c0f](https://github.com/qontinui/qontinui-schemas/commit/6564c0f7f4850016205b822777acf8097904ab86))
+
 ## [4.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v3.1.0...rust-v4.0.0) (2026-09-30)
 
 
