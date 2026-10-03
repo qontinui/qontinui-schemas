@@ -10,7 +10,13 @@
  * those sections by hand — regenerate via
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  *
- * Tier 3 (UI display / live-status-stream types) remains hand-authored below.
+ * Tier 3 splits in two. The snake_case `Raw*` wire events of the
+ * `execution-status` Tauri channel, plus the `TaskComplexity` / `HookTrigger`
+ * vocabularies, are generated from the runner (source of truth:
+ * qontinui-runner/src-tauri/src/tauri_event_payloads.rs). The camelCase
+ * display-state types, which the frontend builds from those events and no Rust
+ * code produces, stay hand-authored — as do the two sub-step events, whose
+ * producers build ad-hoc `json!` objects (see the note on them below).
  */
 
 // ============================================================================
@@ -178,10 +184,15 @@ export type { ExecutionRunComplete } from "../generated/ExecutionRunComplete";
 export type { ExecutionRunCompleteResponse } from "../generated/ExecutionRunCompleteResponse";
 
 // ============================================================================
-// Execution Status Types (real-time display) — Tier 3, hand-authored
+// Execution Status Types (real-time display) — Tier 3: Raw* wire events
+// generated from the runner, camelCase display state hand-authored
 // ============================================================================
 
-export type TaskComplexity = "simple" | "medium" | "complex";
+// Generated from the runner's `TaskComplexity` / `HookTrigger` enums — the
+// vocabularies the raw events below carry.
+import type { TaskComplexity } from "../generated/TaskComplexity";
+import type { HookTrigger } from "../generated/HookTrigger";
+export type { TaskComplexity, HookTrigger };
 
 export interface RoutingFactor {
   description: string;
@@ -264,15 +275,6 @@ export interface CompressionStatus {
   compressionImminent: boolean;
 }
 
-export type HookTrigger =
-  | "pre_execution"
-  | "post_execution"
-  | "on_error"
-  | "on_verification_fail"
-  | "on_complete"
-  | "pre_iteration"
-  | "post_iteration";
-
 export interface HookExecutionResult {
   hookId: string;
   hookName: string;
@@ -342,115 +344,77 @@ export interface ExecutionStatus {
 }
 
 // ============================================================================
-// Raw Event Types (snake_case from backend) — Tier 3, hand-authored
+// Raw Event Types (snake_case wire) — Tier 3, generated
 // ============================================================================
+//
+// One internally-tagged enum in Rust (`ExecutionStatusEvent`, published as
+// `RawExecutionStatusEvent`); each per-event name below is its `type` variant.
 
+import type { RawExecutionStatusEvent } from "../generated/RawExecutionStatusEvent";
+export type { RawExecutionStatusEvent };
+
+export type { RawRoutingDecisionPayload } from "../generated/RawRoutingDecisionPayload";
+export type { RawRetryAttemptPayload } from "../generated/RawRetryAttemptPayload";
+export type { RawRetryStatePayload } from "../generated/RawRetryStatePayload";
+export type { RawTokenCountPayload } from "../generated/RawTokenCountPayload";
+export type { RawCompressionResultPayload } from "../generated/RawCompressionResultPayload";
+export type { RawHookExecutionPayload } from "../generated/RawHookExecutionPayload";
+
+/**
+ * Fields every `execution-status` event carries. Hand-kept as the loose
+ * supertype handlers that do not care which event arrived can accept; the
+ * discriminated union above is the precise type.
+ */
 export interface RawExecutionStatusEventBase {
   type: string;
   task_run_id: string;
   timestamp: number;
 }
 
-export interface RawRoutingDecisionPayload {
-  complexity: string;
-  confidence: number;
-  factors: string[];
-  selected_model: string;
-  prompt_preview?: string;
-  file_count?: number;
-  criteria_count?: number;
-}
+export type RawRoutingDecisionEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "routing_decision" }
+>;
+export type RawRetryAttemptEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "retry_attempt" }
+>;
+export type RawCompressionEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "compression" }
+>;
+export type RawTokenCountUpdateEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "token_count_update" }
+>;
+export type RawHookExecutionEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "hook_execution" }
+>;
+export type RawHookStartedEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "hook_started" }
+>;
+export type RawStatusChangeEvent = Extract<
+  RawExecutionStatusEvent,
+  { type: "status_change" }
+>;
 
-export interface RawRetryAttemptPayload {
-  attempt_number: number;
-  error: string;
-  attempt_timestamp: string;
-  delay_ms: number;
-  feedback_injected: boolean;
-}
-
-export interface RawRetryStatePayload {
-  attempt: number;
-  last_error: string | null;
-  last_attempt_at: string | null;
-  total_delay_ms: number;
-  error_history: RawRetryAttemptPayload[];
-}
-
-export interface RawTokenCountPayload {
-  total: number;
-  findings: number;
-  observations: number;
-  feedback: number;
-  solutions: number;
-  other: number;
-  entry_count: number;
-}
-
-export interface RawCompressionResultPayload {
-  original_tokens: number;
-  compressed_tokens: number;
-  items_summarized: number;
-  summary_entries_created: number;
-  compressed_categories: string[];
-  timestamp: string;
-}
-
-export interface RawHookExecutionPayload {
-  hook_id: string;
-  hook_name: string;
-  trigger: string;
-  success: boolean;
-  output: string | null;
-  error: string | null;
-  duration_ms: number;
-  timestamp: string;
-}
-
-export interface RawRoutingDecisionEvent extends RawExecutionStatusEventBase {
-  type: "routing_decision";
-  decision: RawRoutingDecisionPayload;
-}
-
-export interface RawRetryAttemptEvent extends RawExecutionStatusEventBase {
-  type: "retry_attempt";
-  attempt: RawRetryAttemptPayload;
-  state: RawRetryStatePayload;
-  exhausted: boolean;
-  next_retry_delay_ms: number | null;
-}
-
-export interface RawCompressionEvent extends RawExecutionStatusEventBase {
-  type: "compression";
-  result: RawCompressionResultPayload;
-  current_token_count: RawTokenCountPayload;
-}
-
-export interface RawTokenCountUpdateEvent extends RawExecutionStatusEventBase {
-  type: "token_count_update";
-  token_count: RawTokenCountPayload;
-  threshold_percentage: number;
-  compression_imminent: boolean;
-}
-
-export interface RawHookExecutionEvent extends RawExecutionStatusEventBase {
-  type: "hook_execution";
-  result: RawHookExecutionPayload;
-}
-
-export interface RawHookStartedEvent extends RawExecutionStatusEventBase {
-  type: "hook_started";
-  hook_id: string;
-  hook_name: string;
-  trigger: string;
-}
-
-export interface RawStatusChangeEvent extends RawExecutionStatusEventBase {
-  type: "status_change";
-  status: string;
-  iteration: number;
-  task_name: string | null;
-}
+// ============================================================================
+// Sub-step events — Tier 3, hand-authored
+// ============================================================================
+//
+// NOT aliased, deliberately: these two go out on their own Tauri channels
+// (`sub_step_started`, `sub_step_complete`) as ad-hoc `serde_json::json!`
+// objects (runner `unified_ai_session.rs`, `claude_session/runner.rs`), so
+// there is no Rust type to generate from. They also DIFFER from what those
+// producers emit today: neither sends a `type` field, `sub_step_started` sends
+// `step_name` rather than `description`, and `sub_step_complete` sends no
+// `timestamp`. Recorded as drift rather than papered over here: closing it
+// means either changing the producers to emit these shapes (a wire change) or
+// reshaping these interfaces to the wire (which breaks the runner's
+// `useExecutionStatus` / `useSubStepProgress` handlers that read them), and
+// either is a decision beyond a type-aliasing pass.
 
 export interface RawSubStepCompleteEvent {
   type: "sub_step_complete";
@@ -472,12 +436,3 @@ export interface RawSubStepStartedEvent {
   phase: string | null;
   timestamp: number;
 }
-
-export type RawExecutionStatusEvent =
-  | RawRoutingDecisionEvent
-  | RawRetryAttemptEvent
-  | RawCompressionEvent
-  | RawTokenCountUpdateEvent
-  | RawHookExecutionEvent
-  | RawHookStartedEvent
-  | RawStatusChangeEvent;

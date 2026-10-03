@@ -15,6 +15,7 @@ from .per_type.action_execution_batch_response import ActionExecutionBatchRespon
 from .per_type.action_execution_create import ActionExecutionCreate
 from .per_type.action_execution_list_response import ActionExecutionListResponse
 from .per_type.action_execution_response import ActionExecutionResponse
+from .per_type.action_plan_result import ActionPlanResult
 from .per_type.action_reliability_stats import ActionReliabilityStats
 from .per_type.action_response import ActionResponse
 from .per_type.action_status import ActionStatus
@@ -99,9 +100,11 @@ from .per_type.cost_trend_data_point import CostTrendDataPoint
 from .per_type.cost_trend_response import CostTrendResponse
 from .per_type.coverage_data import CoverageData
 from .per_type.coverage_gap import CoverageGap
+from .per_type.create_known_issue_request import CreateKnownIssueRequest
 from .per_type.create_mcp_call_input import CreateMcpCallInput
 from .per_type.create_mcp_server_input import CreateMcpServerInput
 from .per_type.create_ol_config_request import CreateOlConfigRequest
+from .per_type.create_pattern_template_request import CreatePatternTemplateRequest
 from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
 from .per_type.criterion_override import CriterionOverride
@@ -213,6 +216,7 @@ from .per_type.helper_task_status import HelperTaskStatus
 from .per_type.helper_verdict import HelperVerdict
 from .per_type.historical_action_query import HistoricalActionQuery
 from .per_type.historical_action_result import HistoricalActionResult
+from .per_type.hook_trigger import HookTrigger
 from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
@@ -233,6 +237,8 @@ from .per_type.ir_state_condition import IrStateCondition
 from .per_type.ir_transition import IrTransition
 from .per_type.ir_transition_action import IrTransitionAction
 from .per_type.ir_wait_spec import IrWaitSpec
+from .per_type.issue_pattern_template import IssuePatternTemplate
+from .per_type.issue_pattern_template_parameter import IssuePatternTemplateParameter
 from .per_type.issue_severity import IssueSeverity
 from .per_type.issue_source import IssueSource
 from .per_type.issue_status import IssueStatus
@@ -243,6 +249,13 @@ from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.known_issue import KnownIssue
+from .per_type.known_issue_category import KnownIssueCategory
+from .per_type.known_issue_detection_method import KnownIssueDetectionMethod
+from .per_type.known_issue_provenance import KnownIssueProvenance
+from .per_type.known_issue_scope_type import KnownIssueScopeType
+from .per_type.known_issue_severity import KnownIssueSeverity
+from .per_type.known_issue_status import KnownIssueStatus
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.legacy_assertion import LegacyAssertion
@@ -253,6 +266,7 @@ from .per_type.legacy_spec import LegacySpec
 from .per_type.legacy_state_machine import LegacyStateMachine
 from .per_type.legacy_state_machine_state import LegacyStateMachineState
 from .per_type.legacy_transition import LegacyTransition
+from .per_type.list_known_issues_query import ListKnownIssuesQuery
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.loop_instance_status import LoopInstanceStatus
 from .per_type.loop_phase import LoopPhase
@@ -316,6 +330,7 @@ from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
 from .per_type.pending_question import PendingQuestion
 from .per_type.pipeline_config import PipelineConfig
+from .per_type.planned_action_result import PlannedActionResult
 from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
@@ -338,6 +353,13 @@ from .per_type.rag_dashboard_stats import RAGDashboardStats
 from .per_type.rag_completion_event import RagCompletionEvent
 from .per_type.rag_processing_status import RagProcessingStatus
 from .per_type.rag_progress_event import RagProgressEvent
+from .per_type.raw_compression_result_payload import RawCompressionResultPayload
+from .per_type.raw_execution_status_event import RawExecutionStatusEvent
+from .per_type.raw_hook_execution_payload import RawHookExecutionPayload
+from .per_type.raw_retry_attempt_payload import RawRetryAttemptPayload
+from .per_type.raw_retry_state_payload import RawRetryStatePayload
+from .per_type.raw_routing_decision_payload import RawRoutingDecisionPayload
+from .per_type.raw_token_count_payload import RawTokenCountPayload
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommended_state import RecommendedState
 from .per_type.record_git_op_request import RecordGitOpRequest
@@ -399,6 +421,24 @@ from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.session_lite import SessionLite
 from .per_type.session_source import SessionSource
+from .per_type.skill_allowed_phase import SkillAllowedPhase
+from .per_type.skill_approval_status import SkillApprovalStatus
+from .per_type.skill_author import SkillAuthor
+from .per_type.skill_category import SkillCategory
+from .per_type.skill_definition import SkillDefinition
+from .per_type.skill_export import SkillExport
+from .per_type.skill_export_content_type import SkillExportContentType
+from .per_type.skill_export_manifest import SkillExportManifest
+from .per_type.skill_import_result import SkillImportResult
+from .per_type.skill_origin import SkillOrigin
+from .per_type.skill_parameter import SkillParameter
+from .per_type.skill_parameter_dependency import SkillParameterDependency
+from .per_type.skill_parameter_option import SkillParameterOption
+from .per_type.skill_parameter_type import SkillParameterType
+from .per_type.skill_playbook_trigger import SkillPlaybookTrigger
+from .per_type.skill_ref import SkillRef
+from .per_type.skill_source import SkillSource
+from .per_type.skill_template import SkillTemplate
 from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
@@ -448,6 +488,7 @@ from .per_type.success_criterion import SuccessCriterion
 from .per_type.summarization_config import SummarizationConfig
 from .per_type.target_config import TargetConfig
 from .per_type.task_completion_result import TaskCompletionResult
+from .per_type.task_complexity import TaskComplexity
 from .per_type.task_execution_record import TaskExecutionRecord
 from .per_type.task_run import TaskRun
 from .per_type.task_run_backend import TaskRunBackend
@@ -520,6 +561,7 @@ from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionSte
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
 from .per_type.update_app_request import UpdateAppRequest
+from .per_type.update_known_issue_request import UpdateKnownIssueRequest
 from .per_type.update_mcp_server_input import UpdateMcpServerInput
 from .per_type.update_ol_config_request import UpdateOlConfigRequest
 from .per_type.update_scheduled_task_request import UpdateScheduledTaskRequest
@@ -578,6 +620,7 @@ __all__ = [
     "ActionExecutionCreate",
     "ActionExecutionListResponse",
     "ActionExecutionResponse",
+    "ActionPlanResult",
     "ActionReliabilityStats",
     "ActionResponse",
     "ActionStatus",
@@ -662,9 +705,11 @@ __all__ = [
     "CostTrendResponse",
     "CoverageData",
     "CoverageGap",
+    "CreateKnownIssueRequest",
     "CreateMcpCallInput",
     "CreateMcpServerInput",
     "CreateOlConfigRequest",
+    "CreatePatternTemplateRequest",
     "CreateScheduledTaskRequest",
     "CreateTaskRunRequest",
     "CriterionOverride",
@@ -776,6 +821,7 @@ __all__ = [
     "HelperVerdict",
     "HistoricalActionQuery",
     "HistoricalActionResult",
+    "HookTrigger",
     "HttpConfig",
     "HttpMethod",
     "IdleCondition",
@@ -796,6 +842,8 @@ __all__ = [
     "IrTransition",
     "IrTransitionAction",
     "IrWaitSpec",
+    "IssuePatternTemplate",
+    "IssuePatternTemplateParameter",
     "IssueSeverity",
     "IssueSource",
     "IssueStatus",
@@ -806,6 +854,13 @@ __all__ = [
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "KnownIssue",
+    "KnownIssueCategory",
+    "KnownIssueDetectionMethod",
+    "KnownIssueProvenance",
+    "KnownIssueScopeType",
+    "KnownIssueSeverity",
+    "KnownIssueStatus",
     "LLMCostSummary",
     "LLMMetrics",
     "LegacyAssertion",
@@ -816,6 +871,7 @@ __all__ = [
     "LegacyStateMachine",
     "LegacyStateMachineState",
     "LegacyTransition",
+    "ListKnownIssuesQuery",
     "LogSourceSelection",
     "LoopInstanceStatus",
     "LoopPhase",
@@ -879,6 +935,7 @@ __all__ = [
     "PatternOptions",
     "PendingQuestion",
     "PipelineConfig",
+    "PlannedActionResult",
     "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
     "Point",
@@ -901,6 +958,13 @@ __all__ = [
     "RagCompletionEvent",
     "RagProcessingStatus",
     "RagProgressEvent",
+    "RawCompressionResultPayload",
+    "RawExecutionStatusEvent",
+    "RawHookExecutionPayload",
+    "RawRetryAttemptPayload",
+    "RawRetryStatePayload",
+    "RawRoutingDecisionPayload",
+    "RawTokenCountPayload",
     "ReadConfigResponse",
     "RecommendedState",
     "RecordGitOpRequest",
@@ -962,6 +1026,24 @@ __all__ = [
     "SemanticSearchResponse",
     "SessionLite",
     "SessionSource",
+    "SkillAllowedPhase",
+    "SkillApprovalStatus",
+    "SkillAuthor",
+    "SkillCategory",
+    "SkillDefinition",
+    "SkillExport",
+    "SkillExportContentType",
+    "SkillExportManifest",
+    "SkillImportResult",
+    "SkillOrigin",
+    "SkillParameter",
+    "SkillParameterDependency",
+    "SkillParameterOption",
+    "SkillParameterType",
+    "SkillPlaybookTrigger",
+    "SkillRef",
+    "SkillSource",
+    "SkillTemplate",
     "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
@@ -1011,6 +1093,7 @@ __all__ = [
     "SummarizationConfig",
     "TargetConfig",
     "TaskCompletionResult",
+    "TaskComplexity",
     "TaskExecutionRecord",
     "TaskRun",
     "TaskRunBackend",
@@ -1083,6 +1166,7 @@ __all__ = [
     "UnifiedStep",
     "UnifiedWorkflow",
     "UpdateAppRequest",
+    "UpdateKnownIssueRequest",
     "UpdateMcpServerInput",
     "UpdateOlConfigRequest",
     "UpdateScheduledTaskRequest",

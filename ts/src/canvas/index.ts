@@ -6,6 +6,9 @@
  * in the dashboard during workflow execution.
  */
 
+import type { CanvasPanel as GeneratedCanvasPanel } from "../generated/CanvasPanel";
+import type { AppEvent } from "../generated/AppEvent";
+
 /**
  * Supported canvas component types.
  * These are validated server-side against an allowlist.
@@ -36,31 +39,38 @@ export type CanvasComponentType =
   | "MissionBrief"
   | "AcceptanceCriteria";
 
+/** Display size of a canvas panel. */
+export type CanvasPanelSize = "compact" | "normal" | "large";
+
 /**
  * A canvas panel rendered in the dashboard.
+ *
+ * Generated from `qontinui-schemas/rust/src/app_events.rs` `CanvasPanel` (the
+ * wire mirror of the runner's `StoredPanel`); do not edit its fields by hand.
+ * The Rust struct types `component` and `size` as free strings because the
+ * runner validates them against an allowlist at runtime, and `data` as JSON
+ * because each component has its own shape (the `*Data` interfaces below);
+ * the intersection narrows them to the vocabulary this module owns.
  */
-export interface CanvasPanel {
-  panel_id: string;
+export type CanvasPanel = GeneratedCanvasPanel & {
   component: CanvasComponentType;
-  title: string;
+  size: CanvasPanelSize;
   data: Record<string, unknown>;
-  priority?: number;
-  size?: "compact" | "normal" | "large";
-  group?: string;
-  task_run_id?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+};
 
 /**
  * Event emitted when a canvas panel is created, updated, or deleted.
+ *
+ * The `data` body of the generated `AppEvent` `CanvasUpdate` variant, with
+ * `action` and `panel` narrowed as above.
  */
-export interface CanvasUpdateEvent {
+export type CanvasUpdateEvent = Extract<
+  AppEvent,
+  { event_type: "CanvasUpdate" }
+>["data"] & {
   action: "create" | "update" | "delete" | "clear";
-  panel_id: string;
-  panel?: CanvasPanel;
-  task_run_id?: string;
-}
+  panel?: CanvasPanel | null;
+};
 
 // ============================================================================
 // Component-specific data schemas

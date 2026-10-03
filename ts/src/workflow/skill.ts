@@ -15,138 +15,54 @@
  * they do NOT add new runtime behavior.
  */
 
-import type { WorkflowPhase } from "./index";
+// Every type here is generated from the runner's `src-tauri/src/skill_types.rs`
+// (the skill registry's wire); do not edit by hand — regenerate via
+// `qontinui-runner/src-tauri/scripts/generate_types.sh`.
+//
+// The vocabularies (`SkillCategory`, `SkillParameterType`, `SkillAllowedPhase`,
+// `SkillSource`, `SkillApprovalStatus`, `SkillExportContentType`) are
+// schema-only enums there, exported here so consumers can narrow against
+// them. Only manifest `content_type` is CLOSED on the wire. `category`,
+// parameter `type`, `allowed_phases`, `source` and `approval_status` are
+// `Vocab | string` — which TypeScript widens to `string` — because the runner
+// reads them back from frontmatter, user rows and imported payloads without
+// validating them, so the binding says what the wire can carry.
 
-// =============================================================================
-// Skill Categories
-// =============================================================================
+import type { SkillAllowedPhase } from "../generated/SkillAllowedPhase";
+import type { SkillTemplate } from "../generated/SkillTemplate";
+import type { WorkflowPhase } from "./_api";
 
-export type SkillCategory =
-  | "code-quality"
-  | "testing"
-  | "monitoring"
-  | "ai-task"
-  | "deployment"
-  | "composition"
-  | "custom";
+export type { SkillCategory } from "../generated/SkillCategory";
+export type { SkillAllowedPhase };
+export type { SkillParameterType } from "../generated/SkillParameterType";
+export type { SkillSource } from "../generated/SkillSource";
+export type { SkillApprovalStatus } from "../generated/SkillApprovalStatus";
+export type { SkillExportContentType } from "../generated/SkillExportContentType";
+export type { SkillParameterDependency } from "../generated/SkillParameterDependency";
+export type { SkillPlaybookTrigger } from "../generated/SkillPlaybookTrigger";
+export type { SkillAuthor } from "../generated/SkillAuthor";
+export type { SkillParameterOption } from "../generated/SkillParameterOption";
+export type { SkillParameter } from "../generated/SkillParameter";
+export type { SkillRef } from "../generated/SkillRef";
+export type { SkillTemplate };
+export type { SkillDefinition } from "../generated/SkillDefinition";
+export type { SkillOrigin } from "../generated/SkillOrigin";
+export type { SkillExportManifest } from "../generated/SkillExportManifest";
+export type { SkillExport } from "../generated/SkillExport";
+export type { SkillImportResult } from "../generated/SkillImportResult";
 
-// =============================================================================
-// Skill Author
-// =============================================================================
+// Per-variant names for the `kind`-tagged template union.
+export type SingleStepTemplate = Extract<SkillTemplate, { kind: "single_step" }>;
+export type MultiStepTemplate = Extract<SkillTemplate, { kind: "multi_step" }>;
+export type CompositionTemplate = Extract<SkillTemplate, { kind: "composition" }>;
+/** Markdown playbook with domain knowledge injected into AI prompts. */
+export type PlaybookTemplate = Extract<SkillTemplate, { kind: "playbook" }>;
 
-export interface SkillAuthor {
-  name: string;
-  email?: string;
-  url?: string;
-}
-
-// =============================================================================
-// Skill Parameters
-// =============================================================================
-
-export interface SkillParameterOption {
-  label: string;
-  value: string;
-}
-
-export interface SkillParameter {
-  name: string;
-  type: "string" | "number" | "boolean" | "select";
-  label: string;
-  description: string;
-  required: boolean;
-  default?: unknown;
-  options?: SkillParameterOption[];
-  placeholder?: string;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  depends_on?: { param: string; value: unknown };
-}
-
-// =============================================================================
-// Skill Templates
-// =============================================================================
-
-export interface SingleStepTemplate {
-  kind: "single_step";
-  step: Record<string, unknown>;
-}
-
-export interface MultiStepTemplate {
-  kind: "multi_step";
-  steps: Record<string, unknown>[];
-}
-
-export interface CompositionTemplate {
-  kind: "composition";
-  skill_refs: SkillRef[];
-}
-
-export interface SkillRef {
-  skill_id: string;
-  parameter_overrides?: Record<string, unknown>;
-}
-
-export type SkillTemplate = SingleStepTemplate | MultiStepTemplate | CompositionTemplate;
-
-// =============================================================================
-// Skill Definition
-// =============================================================================
-
-export interface SkillDefinition {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  category: SkillCategory;
-  tags: string[];
-  icon: string;
-  color: string;
-  allowed_phases: WorkflowPhase[];
-  parameters: SkillParameter[];
-  template: SkillTemplate;
-  source: "builtin" | "user" | "community";
-  version?: string;
-  author?: SkillAuthor;
-  checksum?: string;
-  depends_on?: string[];
-  usage_count?: number;
-  approval_status?: "pending" | "approved" | "rejected";
-  forked_from?: string;
-}
-
-// =============================================================================
-// Skill Origin (attached to steps created from skills)
-// =============================================================================
-
-export interface SkillOrigin {
-  skill_id: string;
-  skill_slug: string;
-  parameter_values: Record<string, unknown>;
-}
-
-// =============================================================================
-// Export / Import
-// =============================================================================
-
-export interface SkillExportManifest {
-  version: string;
-  exported_at: string;
-  app_version: string;
-  content_type: "skills";
-  skill_count: number;
-  checksum?: string;  // SHA-256 of all skill content
-}
-
-export interface SkillExport {
-  manifest: SkillExportManifest;
-  skills: SkillDefinition[];
-}
-
-export interface SkillImportResult {
-  imported: number;
-  skipped: number;
-  overwritten: number;
-  errors: string[];
-}
+// `SkillAllowedPhase` (the runner's schema-only vocabulary for
+// `allowed_phases`) must name exactly the workflow phases. Compile-time only:
+// adding a phase on either side without the other fails `tsc` here. Unused
+// on purpose — instantiating `Assert` is the check.
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Assert<T extends true> = T;
+type SkillAllowedPhaseIsWorkflowPhase = Assert<Equal<SkillAllowedPhase, WorkflowPhase>>;

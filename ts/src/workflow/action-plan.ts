@@ -142,59 +142,22 @@ export interface ActionPlan {
 // Action Plan Result
 // =============================================================================
 
+// The RESPONSE side is generated from the runner's
+// `src-tauri/src/ui_bridge_action_plan.rs` (what the action-plan endpoint
+// serializes); do not edit by hand. `action` is the request's action string
+// echoed back, so it is a plain `string` there, and the defaulted
+// `skippedLowConfidence` / `cached` are always present on the wire.
+//
+// The REQUEST side above stays hand-authored: the runner's request structs are
+// deserialize-only with `#[serde(default)]` on every optional field, and the
+// codegen promotes a defaulted field to required — correct for a value the
+// runner emits, wrong for one a caller (or an LLM) writes.
+
 /** Result of executing a single planned action */
-export interface PlannedActionResult {
-  /** Index of the action in the plan */
-  index: number;
-
-  /** Whether the action succeeded */
-  success: boolean;
-
-  /** The action that was executed */
-  action: PlannedActionType;
-
-  /** Element ID that was resolved and acted upon */
-  resolvedElementId?: string;
-
-  /** Error message if the action failed */
-  error?: string;
-
-  /** Whether the action was skipped due to low confidence */
-  skippedLowConfidence?: boolean;
-
-  /** Duration in milliseconds */
-  durationMs: number;
-
-  /** Post-action element state (if available) */
-  elementState?: Record<string, unknown>;
-}
+export type { PlannedActionResult } from "../generated/PlannedActionResult";
 
 /** Aggregated result of executing a full action plan */
-export interface ActionPlanResult {
-  /** Whether all executed actions succeeded */
-  success: boolean;
-
-  /** The goal from the action plan */
-  goal?: string;
-
-  /** Per-action results */
-  results: PlannedActionResult[];
-
-  /** Count of actions executed (excludes skipped) */
-  executedCount: number;
-
-  /** Count of actions skipped due to low confidence */
-  skippedCount: number;
-
-  /** Count of actions that failed */
-  failedCount: number;
-
-  /** Total duration in milliseconds */
-  totalDurationMs: number;
-
-  /** Whether this plan was stored in the cache for future reuse */
-  cached?: boolean;
-}
+export type { ActionPlanResult } from "../generated/ActionPlanResult";
 
 /**
  * Extended action plan request with caching fields.
