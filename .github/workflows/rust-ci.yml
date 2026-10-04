@@ -53,6 +53,7 @@ on:
       - "rust-runner-client/**"
       - "rust-vision-core/**"
       - "code-graph/**"
+      - "ci-exec/**"
       # Not a workspace member, but rust/tests/fleet_nouns_vocabulary.rs is
       # its only validator: a data-only edit must still run it on main.
       - "fleet-nouns.toml"
