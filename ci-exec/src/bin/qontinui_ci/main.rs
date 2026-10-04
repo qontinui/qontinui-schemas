@@ -45,7 +45,11 @@ run       run one job against a fresh checkout of the repo's committed HEAD
                         run WRITES under it: .ci-worktrees/<run id>/ (the job's
                         checkout and its siblings, removed when the run ends),
                         .ci-target/<repo>/ (a warm cargo target dir, kept), and
-                        .ci-tools/ (the version-keyed tool cache, kept)
+                        .ci-tools/ (the version-keyed tool cache, kept).
+                        It also registers a git worktree admin entry under
+                        <root>/<repo>/.git (and may fetch the dispatched
+                        commit there); the entry is removed and pruned when
+                        the run ends
 list      print the manifest's jobs and the check-run contexts they produce
 validate  parse and validate the manifest; exit 0 when it is valid";
 
@@ -264,10 +268,9 @@ fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
         let cancel = tokio_util::sync::CancellationToken::new();
         let on_signal = cancel.clone();
         tokio::spawn(async move {
-            if tokio::signal::ctrl_c().await.is_ok() {
-                eprintln!("qontinui-ci: interrupted — cancelling the job and cleaning up");
-                on_signal.cancel();
-            }
+            let signal = interrupted().await;
+            eprintln!("qontinui-ci: {signal} — cancelling the job and cleaning up");
+            on_signal.cancel();
         });
         // A lone CLI run is the only dispatch on this host: N = 1.
         executor::run_dispatch(&host, Box::new(Terminal), payload, cancel, capacity, 1).await
@@ -277,6 +280,35 @@ fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
         Conclusion::Failure => ExitCode::from(1),
         Conclusion::Cancelled => ExitCode::from(3),
     })
+}
+
+/// Resolves on the first terminating signal, naming it. SIGTERM and SIGHUP
+/// matter as much as Ctrl-C: armed git children lead their own process
+/// groups, so a closed terminal or a `kill` that ends this process without a
+/// cancellation would leave them running.
+#[cfg(unix)]
+async fn interrupted() -> &'static str {
+    use tokio::signal::unix::{signal, SignalKind};
+    let (Ok(mut term), Ok(mut hup)) = (
+        signal(SignalKind::terminate()),
+        signal(SignalKind::hangup()),
+    ) else {
+        // No handler could be installed: Ctrl-C alone still cancels.
+        let _ = tokio::signal::ctrl_c().await;
+        return "interrupted";
+    };
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => "interrupted",
+        _ = term.recv() => "terminated (SIGTERM)",
+        _ = hup.recv() => "hung up (SIGHUP)",
+    }
+}
+
+/// Resolves on Ctrl-C (Windows has no SIGTERM/SIGHUP to catch).
+#[cfg(not(unix))]
+async fn interrupted() -> &'static str {
+    let _ = tokio::signal::ctrl_c().await;
+    "interrupted"
 }
 
 /// Prints the run's log to stdout and its verdict as a summary.

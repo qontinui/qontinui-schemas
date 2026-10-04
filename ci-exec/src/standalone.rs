@@ -109,8 +109,10 @@ fn program_is_git(program: &str) -> bool {
 /// `git-remote-https` / `index-pack` helpers down with it. On Windows only the
 /// direct child is killed (`kill_on_drop`); the helpers die when they notice
 /// their parent is gone. There is no per-dispatch step containment on either
-/// OS — a CLI run is the only thing on its process tree and ends with its
-/// terminal.
+/// OS. An armed child leads its OWN process group, so it does not die with
+/// the terminal: `qontinui-ci` turns SIGINT, SIGTERM and SIGHUP into a
+/// cancellation so these guards run (a SIGKILL of the CLI still orphans an
+/// in-flight git group).
 pub struct PlainSpawn;
 
 /// Kills the child's process group on drop unless disarmed (Unix).
@@ -134,7 +136,11 @@ impl Drop for GroupGuard {
         #[cfg(unix)]
         if let Some(pgid) = self.pgid.take() {
             // SAFETY: plain syscall on a pid we created as a group leader;
-            // ESRCH (already gone) is the outcome we wanted anyway.
+            // ESRCH (already gone) is the outcome we wanted anyway. It assumes
+            // the group has not been reaped and its id reused — which is why
+            // every caller disarms as soon as its wait returns, and only a
+            // future dropped mid-wait (whose child is still unreaped) fires
+            // this.
             unsafe { libc::killpg(pgid, libc::SIGKILL) };
         }
     }
