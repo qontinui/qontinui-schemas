@@ -1038,14 +1038,32 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
     if script.contains("${{") {
         return Err("uses a `${{ … }}` expression".to_string());
     }
+    // Comments: a whole-line comment is fine; a `#` anywhere else is not
+    // modelled (it may or may not start a comment, depending on position).
+    // (`str::lines` strips a trailing `\r`, so look for it in the script.)
+    if script.contains('\r') {
+        return Err("contains a carriage return".to_string());
+    }
+    for line in script.lines() {
+        let t = line.trim_start();
+        if !t.starts_with('#') && t.contains('#') {
+            return Err("has a `#` after a command (a trailing comment or a literal `#`)".to_string());
+        }
+        if line.chars().any(|c| c != ' ' && c != '\t' && c.is_whitespace()) {
+            return Err("contains non-ASCII whitespace".to_string());
+        }
+    }
     let toks = tokenize(script);
-    let mut stmts: Vec<Vec<Tok>> = vec![Vec::new()];
+    // Each statement, and whether it follows an `&&`.
+    let mut stmts: Vec<(Vec<Tok>, bool)> = vec![(Vec::new(), false)];
     for t in toks {
         match t {
-            Tok::Newline | Tok::Op(";") | Tok::Op("&&") => stmts.push(Vec::new()),
+            Tok::Newline | Tok::Op(";") => stmts.push((Vec::new(), false)),
+            // `true`: the statement follows an `&&` (it is not the chain's first).
+            Tok::Op("&&") => stmts.push((Vec::new(), true)),
             other => {
                 if let Some(s) = stmts.last_mut() {
-                    s.push(other);
+                    s.0.push(other);
                 }
             }
         }
@@ -1055,8 +1073,9 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
         "builtin", "time", "stdbuf", "export", "declare", "typeset", "local", "readonly",
         "source", ".", "eval", "pushd", "popd", "unset", "alias", "trap", "shopt", "ulimit",
         "umask", "read", "mapfile", "readarray", "exit", "return", "shift", "let", "wait",
+        "hash", "enable", "getopts", "coproc", "disown", "suspend", "fc", "history",
     ];
-    for stmt in stmts.into_iter().filter(|s| !s.is_empty()) {
+    for (stmt, chained) in stmts.into_iter().filter(|s| !s.0.is_empty()) {
         // An optional trailing `|| true` / `|| :`.
         let body: &[Tok] = match stmt.iter().position(|t| matches!(t, Tok::Op("||"))) {
             Some(p) => {
@@ -1082,6 +1101,15 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
             return Err("an empty command".to_string());
         };
         for w in &words {
+            // bash removes quotes and backslashes BEFORE it looks a word up,
+            // so `"export"`, `\export` and `ex''port` are all `export`. A
+            // quoted or escaped word is therefore not understood.
+            if w.quote_at.is_some() || w.quoted {
+                return Err(format!("has a quoted or escaped word ({:?})", w.text));
+            }
+            if w.text.contains('~') {
+                return Err(format!("has a `~` in {:?}", w.text));
+            }
             if !w.vars.is_empty() || w.subst || w.text.contains('$') || w.text.contains(ROOT) {
                 return Err(format!("expands a variable or substitution in {:?}", w.text.replace(ROOT, "$GITHUB_WORKSPACE")));
             }
@@ -1098,8 +1126,32 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
         if let Some(wr) = WRAPPERS_AND_STATE.iter().find(|k| first.is(k)) {
             return Err(format!("uses `{wr}`, which the report does not model"));
         }
+        if first.is("echo") {
+            if let Some(f) = words[1..]
+                .iter()
+                .take_while(|w| w.text.starts_with('-'))
+                .find(|w| !matches!(w.text.as_str(), "-n" | "-e" | "-ne" | "-en"))
+            {
+                return Err(format!("`echo {}` uses a flag other than -n/-e", f.text));
+            }
+            continue;
+        }
+        if first.is("printf") {
+            if words.iter().any(|w| w.text == "-v") {
+                return Err("`printf -v` assigns a variable".to_string());
+            }
+            continue;
+        }
         if first.is("cd") {
-            if words.len() != 2 || cd_target(words[1], "").is_none() || words[1].text == "-" {
+            // `cd dir && cmd` is understood; a `cd` after an `&&` (`make && cd
+            // sub`) is not.
+            if chained {
+                return Err("a `cd` after an `&&`".to_string());
+            }
+            if words.len() != 2
+                || words[1].text.starts_with('-')
+                || cd_target(words[1], "").is_none()
+            {
                 return Err("a `cd` that is not to one literal path inside the repository".to_string());
             }
             continue;
@@ -1490,6 +1542,25 @@ mod tests {
             "set -euo pipefail\ncd frontend && npm ci\nnpm run lint || true\necho done\n",
             "make a; make b\n",
         ] {
+            assert!(report_grammar(ok).is_ok(), "{ok}: {:?}", report_grammar(ok));
+        }
+        for bad in [
+            "make check && cd sub\n",
+            "\"export\" A=1\n",
+            "\\export A=1\n",
+            "ex''port A=1\n",
+            "make DESTDIR=~/x\n",
+            "cd --\n",
+            "cd -P sub\n",
+            "make check # && rm -rf x\n",
+            "printf -v PATH %s x\n",
+            "echo -E x\n",
+            "hash -p x make\n",
+            "make check\r\n",
+        ] {
+            assert!(report_grammar(bad).is_err(), "{bad:?} should be outside the grammar");
+        }
+        for ok in ["echo -n done\n", "# a comment\nmake check\n"] {
             assert!(report_grammar(ok).is_ok(), "{ok}: {:?}", report_grammar(ok));
         }
         for bad in [

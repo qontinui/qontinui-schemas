@@ -268,7 +268,16 @@ fn web_report_finds_the_uncovered_backend_suite() {
         .find(|j| j.job_id == "web-boundary-lint")
         .unwrap();
     assert!(wbl.missing.is_empty());
-    assert!(wbl.caveats.iter().all(|c| c.contains("limited to 300s")), "{:#?}", wbl.caveats);
+    // Its review reasons: the 5-minute timeout, and the paths filter on
+    // both of its triggers.
+    assert!(
+        wbl.caveats
+            .iter()
+            .all(|c| c.contains("limited to 300s") || c.contains("paths-filtered")),
+        "{:#?}",
+        wbl.caveats
+    );
+    assert!(wbl.caveats.iter().any(|c| c.contains("limited to 300s")));
     // The manifest runs count_alembic_heads.py without the workflow's
     // `--baseline-ref origin/main`: a different command, so not covered.
     assert_eq!(verdict("alembic-graph-pr.yml", "alembic-heads-pr"), Coverage::Uncovered);

@@ -1781,7 +1781,14 @@ relative path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e
 Anything else in any step (an assignment or `KEY=value` prefix; an env/timeout/nice/xargs/sudo \
 wrapper; any redirect, pipe, here-document, subshell, pushd/popd; control flow; `$( )`; \
 export/declare/source/eval/set -a; `cd -` or a non-literal `cd`) makes the job NEEDS-REVIEW. A \
-`continue-on-error: true` step is not a gate but goes through every one of these checks. \
+`continue-on-error: true` step is not a gate but goes through every one of these checks. Every \
+word must be unquoted and unescaped (bash strips quotes before it looks a word up, so a quoted \
+`export` IS `export`), with no `~` and no `#` after a command; `echo` takes only -n/-e, `printf` never -v; \
+`cd` takes one non-option path and may not follow an `&&`; the shell must be the default, `bash` \
+or `sh`. A command under `|| true`, or in a continue-on-error step, other than \
+`echo`/`printf`/`:`/`true` is NEEDS-REVIEW, never silently dropped. A known action with an input \
+off its explicit safe list (setup-node registry-url, a cache path inside the checkout, \
+rust-cache, …), a trigger filtered by paths, and a non-integer timeout-minutes are NEEDS-REVIEW. \
 CONSIDERED JOBS: those whose workflow runs on `pull_request` / `pull_request_target` into the \
 default branch, on `merge_group`, or on a `push` to the default branch. Zero considered jobs is \
 NOT MET. \
@@ -2235,6 +2242,77 @@ fn action_pins(step: &Step, uses: &str) -> Vec<VersionPin> {
     out
 }
 
+/// Inputs of a known non-gate action outside that action's explicit
+/// safe-input list (or a safe input with an unsafe value): each one is a
+/// NEEDS-REVIEW reason.
+fn action_input_review(action_l: &str, step: &Step) -> Vec<String> {
+    let safe: &[&str] = match action_l {
+        "actions/checkout" => &["fetch-depth", "persist-credentials", "path"],
+        "actions/setup-node" => &["node-version", "node-version-file", "cache", "cache-dependency-path"],
+        "actions/setup-python" => &["python-version", "python-version-file", "cache", "cache-dependency-path"],
+        "dtolnay/rust-toolchain" | "actions-rs/toolchain" => &["toolchain"],
+        "actions/cache" | "actions/cache/restore" | "actions/cache/save" => &["path", "key", "restore-keys"],
+        "actions/upload-artifact" => &[
+            "name", "path", "retention-days", "if-no-files-found", "compression-level",
+            "overwrite", "include-hidden-files",
+        ],
+        "codecov/codecov-action" => &[
+            "token", "files", "file", "flags", "name", "verbose", "directory", "disable_search",
+            "fail_ci_if_error", "codecov_yml_path", "os", "slug", "use_oidc",
+        ],
+        "github/codeql-action/upload-sarif" => &["sarif_file", "category", "wait-for-processing"],
+        "jlumbroso/free-disk-space" => &[
+            "android", "dotnet", "haskell", "large-packages", "docker-images", "swap-storage",
+        ],
+        "swatinem/rust-cache" => {
+            return vec![
+                "Swatinem/rust-cache restores build output into the checkout's target dir"
+                    .to_string(),
+            ]
+        }
+        _ => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    // Input names are case-insensitive in GitHub Actions.
+    for (k, v) in &step.with {
+        let kl = k.to_ascii_lowercase();
+        if !safe.contains(&kl.as_str()) {
+            out.push(format!("{action_l} with input {k}: {v}, which the report does not model"));
+        }
+    }
+    if action_l.starts_with("actions/cache") {
+        for p in with_val(step, "path").unwrap_or("").lines().map(str::trim).filter(|p| !p.is_empty()) {
+            let outside = p.starts_with('~') || p.starts_with('/') || p.starts_with('$') || p.starts_with('!');
+            if !outside {
+                out.push(format!(
+                    "{action_l} restores {p:?} inside the repository checkout, which can change \
+                     what the build sees"
+                ));
+            }
+        }
+    }
+    if action_l == "jlumbroso/free-disk-space"
+        && with_val(step, "tool-cache").is_some()
+    {
+        out.push("free-disk-space with tool-cache can remove hosted toolchains".to_string());
+    }
+    out
+}
+
+/// A command with no effect beyond printing: the only kind a `|| true`
+/// fallback or a `continue-on-error` step may drop without review.
+fn no_effect_command(argv: &[String]) -> bool {
+    match argv.first().map(String::as_str) {
+        Some(":") | Some("true") => true,
+        Some("echo") => argv[1..]
+            .iter()
+            .take_while(|a| a.starts_with('-'))
+            .all(|a| matches!(a.as_str(), "-n" | "-e" | "-ne" | "-en")),
+        Some("printf") => !argv.iter().any(|a| a == "-v"),
+        _ => false,
+    }
+}
+
 /// The gates, unmodeled conditions and version pins of one workflow job (see
 /// [`COVERAGE_RULE`]).
 pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
@@ -2299,8 +2377,8 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         // must not be allowed longer.
         let timeout_limit = match step.timeout_minutes.as_ref().or(job_timeout.as_ref()) {
             None => None,
-            Some(t) => match t.0.trim().parse::<f64>() {
-                Ok(m) if !t.is_expression() => Some((m * 60.0).round().max(0.0) as u64),
+            Some(t) => match t.0.trim().parse::<u64>() {
+                Ok(m) if !t.is_expression() => Some(m * 60),
                 _ => {
                     jg.unmodeled.push(format!(
                         "step \"{}\" has timeout-minutes {} the report cannot read",
@@ -2314,20 +2392,7 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         if let Some(uses) = &step.uses {
             let action_l = uses.split('@').next().unwrap_or(uses).to_ascii_lowercase();
             jg.pins.extend(action_pins(step, uses));
-            if action_l == "actions/checkout" {
-                let extra: Vec<String> = step
-                    .with
-                    .iter()
-                    .filter(|(k, _)| !matches!(k.as_str(), "fetch-depth" | "persist-credentials" | "path"))
-                    .map(|(k, v)| format!("{k}: {v}"))
-                    .collect();
-                if !extra.is_empty() {
-                    jg.unmodeled.push(format!(
-                        "actions/checkout with {} — not the dispatched commit's plain checkout",
-                        extra.join(", ")
-                    ));
-                }
-            }
+            jg.unmodeled.extend(action_input_review(&action_l, step));
             let fails_job = (action_l.starts_with("codecov/") && with_val(step, "fail_ci_if_error").is_some_and(|v| v.trim() == "true"))
                 || (action_l == "actions/upload-artifact" && with_val(step, "if-no-files-found").is_some_and(|v| v.trim() == "error"))
                 || (action_l.starts_with("actions/cache") && with_val(step, "fail-on-cache-miss").is_some_and(|v| v.trim() == "true"));
@@ -2353,6 +2418,14 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
             ));
         }
         let shell_name = step.shell.clone().or_else(|| default_shell.clone());
+        if let Some(sh) = shell_name.as_deref() {
+            if !matches!(sh.trim(), "bash" | "sh") {
+                jg.unmodeled.push(format!(
+                    "step \"{}\" runs under `shell: {sh}`, not GitHub's fail-fast bash/sh",
+                    step.label()
+                ));
+            }
+        }
         if !default_shell_ok(shell_name.as_deref()) || (on_windows && shell_name.is_none()) {
             push(
                 &mut *target,
@@ -2394,6 +2467,14 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
                     tool: None,
                     version: cmd.argv.last().cloned().unwrap_or_default(),
                 });
+            }
+            if (cmd.guarded || advisory) && !no_effect_command(&cmd.argv) {
+                jg.unmodeled.push(format!(
+                    "step \"{}\" runs `{}` {}, whose effects can change later steps",
+                    step.label(),
+                    cmd.argv.join(" ").chars().take(80).collect::<String>(),
+                    if advisory { "in a continue-on-error step" } else { "under `|| true`" }
+                ));
             }
             if cmd.guarded || !is_gate_program(&cmd.argv) {
                 continue;
@@ -2654,6 +2735,12 @@ pub fn coverage_report(
             let mut matched_cmds: Vec<&ManifestCommand> = Vec::new();
             let mut missing = Vec::new();
             let mut caveats = jg.unmodeled.clone();
+            for t in triggers.iter().filter(|t| t.contains("paths-filtered")) {
+                caveats.push(format!(
+                    "{t}: the workflow runs only for some paths (a `paths-ignore: ['**']` runs for \
+                     none); confirm the job runs at all"
+                ));
+            }
             for g in &jg.gates {
                 match best_match(&mcmds, &g.working_dir, &g.key, &oses) {
                     Some(m) => {
@@ -3290,6 +3377,97 @@ jobs:
             V1_MAKE,
         );
         assert_eq!(verdict_of(&r, "p"), Coverage::Partial);
+    }
+
+    /// Round 4 of the Phase 8 review: every probe from the reviewer's probe
+    /// crate (quoting bypasses, guarded side effects, unsafe action inputs,
+    /// path-ignored triggers, …) reads NOT covered. Two controls — a plain
+    /// `make check`, and the same with a tab separator — stay COVERED.
+    #[test]
+    fn round4_reviewer_probes_are_never_covered() {
+        const MAKE: &str = "version = 1\n[[steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\n";
+        fn job(steps: &str) -> String {
+            format!("on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n{steps}")
+        }
+        fn verdict(wf: &str, manifest: &str) -> Coverage {
+            let r = report_one(wf, manifest);
+            r.jobs.first().map(|j| j.verdict).unwrap_or(Coverage::Uncovered)
+        }
+    let wfs: Vec<(&str, String)> = vec![
+        ("matrix include macos", "on: pull_request\njobs:\n  j:\n    strategy:\n      matrix:\n        include:\n          - os: macos-14\n    runs-on: ${{ matrix.os }}\n    steps:\n      - run: make check\n".into()),
+        ("matrix os list + include", "on: pull_request\njobs:\n  j:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n        include:\n          - os: macos-14\n    runs-on: ${{ matrix.os }}\n    steps:\n      - run: make check\n".into()),
+        ("container expr", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    container: ${{ vars.IMG }}\n    steps:\n      - run: make check\n".into()),
+        ("services", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    services:\n      pg:\n        image: postgres\n    steps:\n      - run: make check\n".into()),
+        ("step env expr", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n        env:\n          X: ${{ secrets.X }}\n".into()),
+        ("download-artifact", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/download-artifact@v4\n      - run: make check\n".into()),
+        ("cache restore into tree", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/cache@v4\n        with:\n          path: generated/\n          key: k\n      - run: make check\n".into()),
+        ("setup-node no version", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          registry-url: https://evil\n      - run: make check\n".into()),
+        ("setup-python cache-dep", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-python@v5\n        with:\n          python-version-file: .python-version\n      - run: make check\n".into()),
+        ("checkout path + self", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          path: other\n      - run: make check\n".into()),
+        ("checkout uppercase", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: Actions/Checkout@v4\n        with:\n          REF: other\n      - run: make check\n".into()),
+        ("windows-latest bash", "on: pull_request\njobs:\n  j:\n    runs-on: windows-latest\n    defaults:\n      run:\n        shell: bash\n    steps:\n      - run: make check\n".into()),
+        ("job timeout float", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    timeout-minutes: 60.4\n    steps:\n      - run: make check\n".into()),
+        ("push tags only", "on:\n  push:\n    branches: [main]\n    paths-ignore: ['**']\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n".into()),
+    ];
+        for (name, wf) in &wfs {
+            assert_ne!(verdict(wf, MAKE), Coverage::Covered, "{name}");
+        }
+    let lit = |s: &str| format!("      - run: |\n{}", s.lines().map(|l| format!("          {l}\n")).collect::<String>());
+    let probes: Vec<(&str, String, &str)> = vec![
+        ("control: plain", lit("make check"), MAKE),
+        ("quoted export", lit("\"export\" MAKEFLAGS=-k\nmake check"), MAKE),
+        ("backslash export", lit("\\export MAKEFLAGS=-k\nmake check"), MAKE),
+        ("split-quote export", lit("ex''port MAKEFLAGS=-k\nmake check"), MAKE),
+        ("quoted declare -x", lit("'declare' -x MAKEFLAGS=-k\nmake check"), MAKE),
+        ("quoted cd", lit("\"cd\" sub\nmake check"), MAKE),
+        ("quoted pushd", lit("'pushd' sub\nmake check"), MAKE),
+        ("quoted env wrapper", lit("\"env\" MAKEFLAGS=-k make check"), MAKE),
+        ("quoted env --chdir", lit("\\env --chdir=sub make check"), MAKE),
+        ("quoted timeout", lit("\"timeout\" 5 make check"), MAKE),
+        ("quoted sudo", lit("\"sudo\" make check"), MAKE),
+        ("quoted set -a + source", lit("\"set\" -a\nmake check"), MAKE),
+        ("quoted unset", lit("\"unset\" CI\nmake check"), MAKE),
+        ("quoted trap", lit("\"trap\" 'make extra' EXIT\nmake check"), MAKE),
+        ("quoted shopt/umask", lit("\"umask\" 077\nmake check"), MAKE),
+        ("hash -p", lit("hash -p ./ci/strict-make make\nmake check"), MAKE),
+        ("printf -v PATH", lit("printf -v PATH %s ./ci/bin:/usr/bin:/bin\nmake check"), MAKE),
+        ("guarded side effect", lit("cp ci/strict.mk local.mk || true\nmake check"), MAKE),
+        ("advisory step side effect", "      - run: cp ci/strict.mk local.mk\n        continue-on-error: true\n      - run: make check\n".into(), MAKE),
+        ("tilde after =", lit("make check DESTDIR=~/x"), "version = 1\n[[steps]]\nname = \"m\"\ncommand = [\"make\", \"check\", \"DESTDIR=~/x\"]\n"),
+        ("cd --", lit("cd --\nmake check"), "version = 1\n[[steps]]\nname = \"m\"\nworking_dir = \"--\"\ncommand = [\"make\", \"check\"]\n"),
+        ("background &", lit("make check &"), MAKE),
+        ("line-cont export", lit("ex\\\nport A=1\nmake check"), MAKE),
+        ("$'..'", lit("make $'check'"), MAKE),
+        ("comment w/ ops", lit("make check # && rm -rf x"), MAKE),
+        ("&& chain then cd", lit("make check && cd sub"), MAKE),
+        ("glob", lit("make check*"), MAKE),
+        ("brace", lit("make {check,lint}"), MAKE),
+        ("tilde", lit("make ~/check"), MAKE),
+        ("here-string", lit("make check <<< x"), MAKE),
+        ("! negation", lit("! make check"), MAKE),
+        ("time", lit("time make check"), MAKE),
+        ("exec", lit("exec make check"), MAKE),
+        ("command", lit("command make check"), MAKE),
+        ("builtin", lit("builtin cd sub\nmake check"), MAKE),
+        ("coproc", lit("coproc make check"), MAKE),
+        ("quoted semicolon", lit("make 'check;' check"), MAKE),
+        ("crlf", "      - run: \"make check\\r\\ncd sub\\r\\nmake check\\r\\n\"\n".into(), MAKE),
+        ("folded >", "      - run: >\n          cd sub\n          make check\n".into(), MAKE),
+        ("bash {0} no -e", "      - run: make check\n        shell: bash {0}\n".into(), MAKE),
+        ("unicode lookalike cd", lit("cd\u{00a0}sub\nmake check"), MAKE),
+        ("tab sep", lit("make\tcheck"), MAKE),
+        ("quoted exec", lit("make check\n'exec' true"), MAKE),
+        ("quoted cd -", lit("cd sub\n\"cd\" -\nmake check"), "version = 1\n[[steps]]\nname = \"m\"\nworking_dir = \"sub\"\ncommand = [\"make\", \"check\"]\n"),
+
+    ];
+        for (name, steps, m) in probes {
+            let v = verdict(&job(&steps), m);
+            if name == "control: plain" || name == "tab sep" {
+                assert_eq!(v, Coverage::Covered, "{name}");
+            } else {
+                assert_ne!(v, Coverage::Covered, "{name}");
+            }
+        }
     }
 
     #[test]
