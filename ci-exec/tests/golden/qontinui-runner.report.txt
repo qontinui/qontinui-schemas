@@ -37,19 +37,18 @@ qontinui-ci import --report
         non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
         request) runs the same command in the same working directory, on a job whose `os` includes
         every OS the workflow job runs on — a manifest `os = any` job covers NOTHING, only an
-        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the
-        whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = python,
-        pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are
-        NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest
-        step with a word containing `$` matches nothing (the executor passes it literally).
-        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
-        prefix, the matched step does not set identically (any key; an expression value never
-        matches); a `cargo +toolchain` the step lacks; a version pinned by
-        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
-        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
-        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
-        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the argv
+        is byte-identical after dequoting — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding, and package managers and their verbs are not unified
+        (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a
+        word containing `$` matches nothing (the executor passes it literally). NEEDS-REVIEW, even
+        when everything matched: any workflow/job/step env key, or `KEY=value` prefix, the matched
+        step does not set identically (any key; an expression value never matches); a `cargo
+        +toolchain` the step lacks; a version pinned by setup-node/setup-python/rust-toolchain or
+        `rustup default|override|set` that the manifest's [[tools]] does not pin identically;
+        `export`, `declare -x`, `set -a`, `source`/`.`, or any use of
+        $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label, or ANY
+        macOS label (architecture is not modeled); `actions/checkout` with inputs other than
         fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
         run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
         step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
@@ -69,7 +68,19 @@ qontinui-ci import --report
         services that differ either way, versions included; any [limits]; any cargo command (the
         executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a
         manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs
-        commands with no actions/checkout step. upload-sarif is an opaque gate. COVERED is
+        commands with no actions/checkout step. upload-sarif is an opaque gate. ENVIRONMENT
+        (`[environment]` caveats): the executor exports host-sized CARGO_BUILD_JOBS /
+        RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and
+        does not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner
+        image's toolset) for any program that is not a script in the repository. So NO job reads
+        COVERED until the executor stops forcing those caps (or the workflow mirrors them) — that is
+        the honest answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip,
+        poetry, uv, node, npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's
+        [[tools]] provisions it at a version the workflow pins identically; a checkout fetch-depth
+        other than 1, or a gate naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a
+        second checkout after any command; a job timeout below the chosen manifest job's total step
+        timeouts, or a step timeout below the manifest steps its commands map to. When several
+        manifest jobs could match, one whose OS covers the workflow job is preferred. COVERED is
         necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
         agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
@@ -84,6 +95,8 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash scripts/tests/test_schedule_red_streak_detector.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       atlas-schema-check.yml › check [pull_request (paths-filtered)] 0/10 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
@@ -97,6 +110,7 @@ JOBS ON pull_request / push:main (41):
       missing: bash atlas/scripts/check_schema.sh
       review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it has a quoted or escaped word ("branch=$BRANCH")
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-web (sibling)") after commands have run
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
       review:  actions/checkout with input ref: ${{ steps.resolve_ref.outputs.ref }}, which the report does not model
       review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}")
@@ -107,6 +121,17 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `<outside the repository>/: grep -q .` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash atlas/scripts/check_schema.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/32 gate command(s) matched
       missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[] | .filename, (.previous_filename /
@@ -151,6 +176,18 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `wc -l` runs `wc` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sed s/^/  - /` runs `sed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep -q ^!PARSE` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep ^!PARSE` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cut -f2` runs `cut` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep -q ^!ALIAS` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep ^!ALIAS` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep -qxF ci:gate-change=declared` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep -qxF ci:gate-change=alters-a-gate` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/84 gate command(s) matched
       missing: note
       missing: note ### ci-rerun-on-declaration
@@ -249,6 +286,30 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `note` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ### ci-rerun-on-declaration` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note created after the label reads it on its first attempt.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .id` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .status` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .run_started_at // .created_at` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `head -1` runs `head` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note Run started after the label landed — it already resolved the sibling` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note against the current label set. No re-run.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_head` runs `pr_head` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note run reads labels live. Nothing to cancel or re-run.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `seq 1 60` runs `seq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ⚠️ Cancel requested but not settled within 10 min; not re-running it.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note superseded run, which would cancel the current head's CI via ci.yml's` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note per-PR concurrency group. The current head's run reads labels live.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note This job cancelled nothing, so it re-runs nothing. Re-run the PR's` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note rather than leave that head red. If the head DID move, this re-run may cancel` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ⚠️ PR head could not be confirmed after the re-run. If it moved, this re-run` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ### ci-rerun-on-declaration — base retarget` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note ⚠️ **This retarget cannot be re-verified automatically.**` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `note branch here to dispatch against.` runs `note` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       ci-timeout-marker-selftest.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python3 scripts/tests/test_ci_timeout_marker.py
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
@@ -257,6 +318,9 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python3 scripts/tests/test_ci_timeout_marker.py` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/tests/test_ci_timeout_marker.py` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       ci.yml › test [pull_request, push:main] 0/63 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: uses: pnpm/action-setup
@@ -374,7 +438,39 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `cargo metadata --locked --format-version` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `powershell -File scripts/tests/test-effect-probe.ps1` runs `powershell` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `rand_uuid` runs `rand_uuid` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `command -v uuidgen` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `uuidgen` runs `uuidgen` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr A-Z a-z` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `command -v python3` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 -c import uuid; print(uuid.uuid4())` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 -c import uuid; print(uuid.uuid4())` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `command -v python` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python -c import uuid; print(uuid.uuid4())` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python -c import uuid; print(uuid.uuid4())` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `od -An -N16 -tx1 /dev/urandom` runs `od` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr -d  \n` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `hostname` runs `hostname` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `homes+=` runs `homes+=` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cat` runs `cat` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `free -h` runs `free` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `df -h` runs `df` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `powershell -NoProfile -Command Get-CimInstance Win32_PageFileUsage | Format-List *; Get-CimInstance ` runs `powershell` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sysctl -n hw.memsize` runs `sysctl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `vm_stat` runs `vm_stat` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: cargo test --no-run --verbose` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: tee ../cargo-test-build.log` runs `tee` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: BINS+=` runs `BINS+=` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: run_all` runs `run_all` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: tee ../cargo-test-output.log` runs `tee` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `powershell -File scripts/tests/test-smoke-summary.ps1` runs `powershell` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash scripts/tests/ci-integrity/run-scenarios.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 scripts/tests/ci-integrity/test-surface.py` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/tests/ci-integrity/test-surface.py` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `powershell -File scripts/contract-smoke.ps1 -DirectExe target/debug/qontinui-runner.exe -Profile ci ` runs `powershell` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
@@ -391,6 +487,7 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
@@ -405,6 +502,7 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   PARTIAL         ci.yml › frontend-tests [pull_request, push:main] 2/3 gate command(s) matched
@@ -415,6 +513,11 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `pnpm install --frozen-lockfile` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm install --frozen-lockfile` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm test` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm test` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › seam-gate [pull_request, push:main] 0/5 gate command(s) matched
       missing: grep -m1 -vE ^\s*(//|$) $tf
@@ -427,6 +530,7 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       ci.yml › security [pull_request, push:main] 0/4 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: cargo install cargo-audit --locked
@@ -437,7 +541,9 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `cargo install cargo-audit --locked` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cargo audit --file Cargo.lock --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   PARTIAL         clippy-tiers.yml › clippy-nightly-unscoped [pull_request] 2/13 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-web.git
@@ -465,7 +571,18 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo fallocate -l 12G /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo chmod 600 /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo mkswap /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo swapon /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm install --frozen-lockfile` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm install --frozen-lockfile` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm run build` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm run build` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: cargo clippy --all-targets` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
@@ -500,6 +617,18 @@ JOBS ON pull_request / push:main (41):
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo fallocate -l 12G /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo chmod 600 /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo mkswap /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo swapon /swapfile` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm install --frozen-lockfile` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm install --frozen-lockfile` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm run build` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm run build` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: reviewdog -f=clippy -name=clippy-diff -filter-mode=diff_context -reporter=github-pr-check -fail-on-e` runs `reviewdog` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
@@ -513,12 +642,15 @@ JOBS ON pull_request / push:main (41):
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
       review:  job key `outputs` is not modeled
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Detect Clorinde-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect Clorinde-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  the manifest sets [limits] (thread/job caps GitHub-hosted runs do not have)
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/24 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
@@ -545,10 +677,12 @@ JOBS ON pull_request / push:main (41):
       missing: git push origin HEAD:$BRANCH
       missing: uses: actions/upload-artifact
       review:  job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — whether the job runs is not modeled
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  actions/checkout with input ref: ${{ github.head_ref || github.ref }}, which the report does not model
       review:  actions/checkout with input token: ${{ secrets.CLORINDE_AUTOCOMMIT_TOKEN || secrets.GITHUB_TOKEN }}, which the report does not model
       review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it has a quoted or escaped word ("branch=$BRANCH")
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-web (sibling)") after commands have run
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
       review:  actions/checkout with input ref: ${{ steps.resolve_ref.outputs.ref }}, which the report does not model
       review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}")
@@ -576,7 +710,28 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `<outside the repository>/: grep -q .` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: cargo install clorinde --locked` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: clorinde live --search-path project,public` runs `clorinde` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: grep ^pub mod  clorinde/src/queries.rs` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: mv clorinde/src/queries.rs.sorted clorinde/src/queries.rs` runs `mv` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --quiet -- src-tauri/clorinde/` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --stat -- src-tauri/clorinde/` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.name github-actions[bot]` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.email 41898282+github-actions[bot]@users.noreply.github.com` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git add src-tauri/clorinde/` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git commit -m chore(clorinde): regenerate bindings against current schema` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — considered as running
@@ -591,6 +746,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always()` — considered as running
   UNCOVERED       flake-escalation.yml › unit-tests [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: node --version
@@ -601,6 +757,11 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `node --version` resolves through node, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `node --version` runs `node` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `node --test scripts/__tests__/ci-flake-escalate.test.mjs` resolves through node, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `node --test scripts/__tests__/ci-flake-escalate.test.mjs` runs `node` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       flake-escalation.yml › escalate [pull_request (paths-filtered)] 0/10 gate command(s) matched
       missing: --repo $REPO --run-url $RUN_URL
@@ -621,6 +782,9 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `args+=` runs `args+=` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `--dry-run` runs `--dry-run` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       forbid-runner-schema.yml › forbid-runner-schema [pull_request, push:main] 0/8 gate command(s) matched
       missing: :!*.md
@@ -636,6 +800,8 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `:!*.md` runs `:!*.md` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       forbid-sibling-clone.yml › forbid-sibling-clone [pull_request (paths-filtered), push:main (paths-filtered)] 0/3 gate command(s) matched
       missing: :!.github/actions/checkout-sibling/
       missing: :!.github/workflows/forbid-sibling-clone.yml
@@ -647,6 +813,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       forbid-untimed-subprocess.yml › forbid-untimed-subprocess [pull_request, push:main] 0/17 gate command(s) matched
       missing: [ -z ${BASE_REF} ]
       missing: [ ${BASE_REF} = null ]
@@ -665,6 +832,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       missing: [ ${GITHUB_EVENT_NAME} != pull_request ]
       missing: python3 scripts/check_untimed_subprocess.py --list-roots
       missing: python3 scripts/check_untimed_subprocess.py --ci
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  actions/checkout with input filter: blob:none, which the report does not model
       review:  step "Re-derive this PR's merge state against the current base" runs only `if: github.event_name == 'pull_request'` — whether it runs is not modeled
       review:  step "Re-derive this PR's merge state against the current base" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
@@ -674,6 +842,17 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `git rev-parse refs/qontinui/base` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git rev-parse refs/qontinui/pr-head` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git checkout --quiet --detach refs/qontinui/pr-head` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --name-only --diff-filter=U` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git rev-parse HEAD` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 scripts/check_untimed_subprocess.py --list-roots` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/check_untimed_subprocess.py --list-roots` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 scripts/check_untimed_subprocess.py --ci` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/check_untimed_subprocess.py --ci` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/10 gate command(s) matched
       missing: date -u +%s
@@ -689,6 +868,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-runner") after commands have run
       review:  step "Warn if the job is approaching its budget" runs only `if: success()` — whether it runs is not modeled
       review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
@@ -696,6 +876,12 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `pnpm install --frozen-lockfile` resolves through pnpm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `pnpm install --frozen-lockfile` runs `pnpm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `node scripts/export-test-coverage.mjs` resolves through node, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `node scripts/export-test-coverage.mjs` runs `node` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       onboarding-doc-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
@@ -706,12 +892,15 @@ github.event.pull_request.head.repo.full_name == github.repository
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
       review:  job key `outputs` is not modeled
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Detect onboarding-doc-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect onboarding-doc-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  the manifest sets [limits] (thread/job caps GitHub-hosted runs do not have)
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-verify [pull_request] 0/5 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: sudo apt-get update
@@ -727,7 +916,11 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: cargo run --quiet --bin coord_doctor -- --onboarding-doc` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --exit-code docs/runner-onboarding.md` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.doc_relevant == 'true'` — considered as running
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-fresh [pull_request] 0/3 gate command(s) matched
@@ -741,6 +934,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always()` — considered as running
   UNCOVERED       page-spec-paths.yml › publish [push:main] 0/1 gate command(s) matched
       missing: node --version
@@ -750,6 +944,9 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `node --version` resolves through node, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `node --version` runs `node` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
       review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" is outside the report's command grammar: it expands a variable or substitution in "$ErrorActionPreference"
@@ -758,6 +955,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       qontinui-types-drift.yml › check-drift [pull_request (paths-filtered), push:main (paths-filtered)] 0/9 gate command(s) matched
       missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
       missing: <outside the repository>/: sudo apt-get update
@@ -778,6 +976,17 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `<outside the repository>/: sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-schemas: npm install` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-schemas: npm install` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/: pip install datamodel-code-generator==0.57.0` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/: pip install datamodel-code-generator==0.57.0` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: mkdir -p qontinui-runner/dist` runs `mkdir` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --preflight` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: bash qontinui-runner/src-tauri/scripts/generate_types.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --verify` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
@@ -790,12 +999,15 @@ github.event.pull_request.head.repo.full_name == github.repository
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
       review:  job key `outputs` is not modeled
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Detect schema-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect schema-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  the manifest sets [limits] (thread/job caps GitHub-hosted runs do not have)
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/20 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
@@ -820,6 +1032,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  job condition `if: needs.detect.outputs.schema_changed == 'true'` — whether the job runs is not modeled
       review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it has a quoted or escaped word ("branch=$BRANCH")
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-web (sibling)") after commands have run
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
       review:  actions/checkout with input ref: ${{ steps.resolve_ref.outputs.ref }}, which the report does not model
       review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}")
@@ -832,6 +1045,26 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `<outside the repository>/: grep -q .` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: sudo apt-get install -y postgresql-client-16` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: cp schema.pg.sql.generated /tmp/schema.checked-in.sql` runs `cp` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash src-tauri/scripts/regenerate_schema_pg_sql.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: grep -v ^-- Dumped by pg_dump version /tmp/schema.checked-in.sql` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: grep -v ^-- Dumped by pg_dump version schema.pg.sql.generated` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: diff -q /tmp/schema.checked-in.normalized.sql /tmp/schema.generated.normalized.sql` runs `diff` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: diff -u /tmp/schema.checked-in.sql schema.pg.sql.generated` runs `diff` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `src-tauri: head -80` runs `head` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.schema_changed == 'true'` — considered as running
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh [pull_request] 0/3 gate command(s) matched
@@ -845,6 +1078,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always()` — considered as running
   UNCOVERED       schema-pg-sql-freshness-nightly.yml › selftest [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: bash scripts/tests/test_schema_pr_step_guards.sh
@@ -855,6 +1089,9 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash scripts/tests/test_schema_pr_step_guards.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash scripts/tests/test_ready_bot_draft_pr.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/93 gate command(s) matched
       missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
@@ -971,6 +1208,37 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `<outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/backend: poetry run alembic upgrade head` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `<outside the repository>/: sudo apt-get install -y postgresql-client-16` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash src-tauri/scripts/regenerate_schema_pg_sql.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `wc -l` runs `wc` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `strip` runs `strip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr -d  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_op_failed` runs `pr_op_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.name github-actions[bot]` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.email 41898282+github-actions[bot]@users.noreply.github.com` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sha256sum` runs `sha256sum` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cut -c1-16` runs `cut` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git add -- src-tauri/schema.pg.sql.generated` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --cached --quiet` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git rev-parse HEAD` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cat` runs `cat` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_op_failed create` runs `pr_op_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_op_failed create (URL read-back)` runs `pr_op_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_op_failed ready-for-review (scripts/ci/ready-bot-draft-pr.sh)` runs `pr_op_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `extra_args+=` runs `extra_args+=` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `--close-if-obsolete` runs `--close-if-obsolete` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow-tests.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
@@ -983,6 +1251,10 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash scripts/tests/schemas-pair-follow/run.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       schemas-pair-follow.yml › detect [pull_request] 0/2 gate command(s) matched
       missing: [[ ! $LABEL_NAME =~ $re ]]
       missing: gh workflow run schemas-pair-follow.yml -R $REPO --ref main -f pr=$PR_NUMBER -f partner=$partner
@@ -994,6 +1266,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/10 gate command(s) matched
       missing: [ -n ${INPUT_PR:-} ]
@@ -1015,6 +1288,11 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash scripts/schemas-pair-follow.sh scan` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .[] | "| #\(.pr) | qontinui-schemas#\(.partner) | \(.action) | \(.mode) | \(.reason) |"` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -c [.[] | select(.action == "FOLLOW")]` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq [.[] | select(.action == "UNKNOWN")] | length` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › compute [pull_request] 0/8 gate command(s) matched
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh merge-and-pin runner $RUNNER_TEMP/decide.json
@@ -1027,6 +1305,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       missing: uses: actions/upload-artifact
       review:  job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — whether the job runs is not modeled
       review:  actions/checkout with input ref: ${{ github.event.repository.default_branch }}, which the report does not model
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  actions/checkout with input ref: ${{ matrix.item.head_sha }}, which the report does not model
       review:  step "Merge main and move the pin" is outside the report's command grammar: it uses an output redirect
       review:  step "Merge main and move the pin" touches $GITHUB_OUTPUT, which changes what later steps see
@@ -1041,6 +1320,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › push [pull_request] 0/1 gate command(s) matched
@@ -1056,6 +1336,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.followups != '[]' }}` — considered as running
   UNCOVERED       schemas-pair-follow.yml › verdict [pull_request] 0/3 gate command(s) matched
@@ -1069,6 +1350,7 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always() && github.event_name != 'pull_request'` — considered as running
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/5 gate command(s) matched
       missing: curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors https://github.com/gitleaks/gitleaks/release
@@ -1076,11 +1358,15 @@ github.event.pull_request.head.repo.full_name == github.repository
       missing: test -x ./gitleaks
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  the manifest sets [limits] (thread/job caps GitHub-hosted runs do not have)
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `tar -xz gitleaks` runs `tar` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `test -x ./gitleaks` runs `test` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/112 gate command(s) matched
       missing: bash scripts/tests/test_pin_bump_pr_step.sh
       missing: [ ! -f $MANIFEST ]
@@ -1213,7 +1499,32 @@ github.event.pull_request.head.repo.full_name == github.repository
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-web beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/ui-bridge beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash scripts/tests/test_pin_bump_pr_step.sh` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr -d \r` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .status` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .ahead_by` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `grep -qxF .github/workflows/ci.yml` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `read_pin` runs `read_pin` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cargo metadata --format-version` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cargo metadata --locked --format-version` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git status --porcelain` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.name github-actions[bot]` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git config user.email 41898282+github-actions[bot]@users.noreply.github.com` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_write_failed` runs `pr_write_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cut -c1-16` runs `cut` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git status --porcelain -- Cargo.lock` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git add -- Cargo.lock` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --cached --quiet` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git rev-parse HEAD` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cat` runs `cat` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `bash scripts/ci/ready-bot-draft-pr.sh --print-close-marker` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_write_failed gh pr create` runs `pr_write_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `pr_write_failed Marking the bump PR ready for review (scripts/ci/ready-bot-draft-pr.sh; its ::error:` runs `pr_write_failed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `extra_args+=` runs `extra_args+=` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `--close-if-obsolete` runs `--close-if-obsolete` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
 
 NOT CONSIDERED — not on pull_request or a push to main (6 workflow(s)):
   build-python-executor.yml (jobs: build, combine) — its other triggers ["workflow_dispatch", "workflow_call"] are not gates

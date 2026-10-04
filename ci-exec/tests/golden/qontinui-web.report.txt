@@ -37,19 +37,18 @@ qontinui-ci import --report
         non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
         request) runs the same command in the same working directory, on a job whose `os` includes
         every OS the workflow job runs on — a manifest `os = any` job covers NOTHING, only an
-        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the
-        whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = python,
-        pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are
-        NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest
-        step with a word containing `$` matches nothing (the executor passes it literally).
-        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
-        prefix, the matched step does not set identically (any key; an expression value never
-        matches); a `cargo +toolchain` the step lacks; a version pinned by
-        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
-        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
-        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
-        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the argv
+        is byte-identical after dequoting — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding, and package managers and their verbs are not unified
+        (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a
+        word containing `$` matches nothing (the executor passes it literally). NEEDS-REVIEW, even
+        when everything matched: any workflow/job/step env key, or `KEY=value` prefix, the matched
+        step does not set identically (any key; an expression value never matches); a `cargo
+        +toolchain` the step lacks; a version pinned by setup-node/setup-python/rust-toolchain or
+        `rustup default|override|set` that the manifest's [[tools]] does not pin identically;
+        `export`, `declare -x`, `set -a`, `source`/`.`, or any use of
+        $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label, or ANY
+        macOS label (architecture is not modeled); `actions/checkout` with inputs other than
         fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
         run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
         step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
@@ -69,7 +68,19 @@ qontinui-ci import --report
         services that differ either way, versions included; any [limits]; any cargo command (the
         executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a
         manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs
-        commands with no actions/checkout step. upload-sarif is an opaque gate. COVERED is
+        commands with no actions/checkout step. upload-sarif is an opaque gate. ENVIRONMENT
+        (`[environment]` caveats): the executor exports host-sized CARGO_BUILD_JOBS /
+        RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and
+        does not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner
+        image's toolset) for any program that is not a script in the repository. So NO job reads
+        COVERED until the executor stops forcing those caps (or the workflow mirrors them) — that is
+        the honest answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip,
+        poetry, uv, node, npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's
+        [[tools]] provisions it at a version the workflow pins identically; a checkout fetch-depth
+        other than 1, or a gate naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a
+        second checkout after any command; a job timeout below the chosen manifest job's total step
+        timeouts, or a step timeout below the manifest steps its commands map to. When several
+        manifest jobs could match, one whose OS covers the workflow job is preferred. COVERED is
         necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
         agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
@@ -93,6 +104,15 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `backend: python ../scripts/ci/count_alembic_heads.py --report-only --baseline-ref HEAD` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python ../scripts/ci/count_alembic_heads.py --report-only --baseline-ref HEAD` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: tee heads.txt` runs `tee` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: grep ^HEAD= heads.txt` runs `grep` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: sed s/^HEAD=//` runs `sed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python scripts/ci/notify_forked_open_prs.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/notify_forked_open_prs.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/2 gate command(s) matched
       missing: uses: actions/checkout
@@ -100,6 +120,10 @@ JOBS ON pull_request / push:main (39):
       review:  step "Fetch the baseline for the remediation message" runs `git fetch --depth=1 origin +refs/heads/main:refs/remotes/origin/main` in a continue-on-error step, whose effects can change later steps
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/count_alembic_heads.py --baseline-ref origin/main` names a remote ref, which the executor (fetching only the dispatched commit) does not have
+      review:  `python scripts/ci/count_alembic_heads.py --baseline-ref origin/main` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/count_alembic_heads.py --baseline-ref origin/main` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 5/12 gate command(s) matched
       missing: uses: actions/checkout
       missing: (unresolvable directory) rm -rf qontinui-schemas qontinui qontinui-cloud-control
@@ -120,6 +144,20 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `backend: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install -e ../../qontinui-cloud-control` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run ruff check .` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run ruff check .` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run ruff format --check .` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run ruff format --check .` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run mypy app/ --ignore-missing-imports` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run mypy app/ --ignore-missing-imports` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/35 gate command(s) matched
       missing: date -u +%s
@@ -160,6 +198,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09") after commands have run
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
       review:  free-disk-space with tool-cache can remove hosted toolchains
       review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
@@ -179,6 +218,30 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install -e ../../qontinui-cloud-control` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run python scripts/export_openapi.py` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run python scripts/export_openapi.py` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run python scripts/export_openapi.py --base` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run python scripts/export_openapi.py --base` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: command -v psql` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: sudo apt-get install -y postgresql-client` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT` runs `psql` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pytest tests/ --collect-only -q -o addopts= --no-cov` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pytest tests/ --collect-only -q -o addopts= --no-cov` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: cat collected-nodeids.txt` runs `cat` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: wc -l` runs `wc` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: find tests -name test_*.py -type f` runs `find` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: tail -20 collected-nodeids.txt` runs `tail` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs shard = ["1", "2", "3", "4", "5", "6"] — the manifest runs one leg
   PARTIAL         backend-ci.yml › security-scan [pull_request (paths-filtered)] 2/10 gate command(s) matched
@@ -204,6 +267,16 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `backend: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install -e ../../qontinui-cloud-control` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install safety` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install safety` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/8 gate command(s) matched
       missing: uses: actions/checkout
@@ -222,6 +295,12 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `[ -d junit ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `find junit -name *.xml -type f` runs `find` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `wc -l` runs `wc` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
@@ -252,6 +331,10 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `head -n1` runs `head` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr -d [:space:]` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: docker run --rm qontinui-backend:test python -c import app; print('Import successful')` runs `docker` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
@@ -263,6 +346,7 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/23 gate command(s) matched
       missing: date -u +%s
@@ -291,6 +375,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09") after commands have run
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
       review:  free-disk-space with tool-cache can remove hosted toolchains
       review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
@@ -305,6 +390,25 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install -e ../../qontinui-cloud-control` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: command -v psql` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: sudo apt-get install -y postgresql-client` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT` runs `psql` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pytest tests/ -v --cov=app --cov-context=test --cov-report=xml --cov-report=html --cov-re` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pytest tests/ -v --cov=app --cov-context=test --cov-report=xml --cov-report=html --cov-re` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python scripts/export_test_coverage.py --self-test` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python scripts/export_test_coverage.py --self-test` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/6 gate command(s) matched
       missing: uses: actions/checkout
@@ -313,11 +417,13 @@ JOBS ON pull_request / push:main (39):
       missing: [ $before != 0000000000000000000000000000000000000000 ]
       missing: git cat-file -e ${before}^{commit}
       missing: python scripts/ci/check_coord_column_drops.py --base-ref ${BASE_REF}
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Choose the base to diff against" is outside the report's command grammar: it has a quoted or escaped word ("${GITHUB_EVENT_NAME}")
       review:  step "Choose the base to diff against" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  step "Check coord.* drops against coord's read contract" is outside the report's command grammar: it has a quoted or escaped word ("${BASE_REF}")
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: python scripts/check_dev_credentials_drift.py
@@ -325,6 +431,9 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/check_dev_credentials_drift.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/check_dev_credentials_drift.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       e2e-tests.yml › backend-tests [pull_request, push:main] 0/11 gate command(s) matched
       missing: uses: actions/checkout
@@ -344,6 +453,23 @@ JOBS ON pull_request / push:main (39):
       review:  step "Upload backend test results" runs only `if: always()` — whether it runs is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `backend: python -m pip install --upgrade pip` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python -m pip install --upgrade pip` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install pytest pytest-cov pytest-asyncio` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install pytest pytest-cov pytest-asyncio` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: [ -f requirements.txt ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -r requirements.txt` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -r requirements.txt` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install --no-cache-dir -e ../../qontinui-schemas` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install --no-cache-dir -e ../../qontinui-schemas` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: [ -f pyproject.toml ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -e . --no-deps` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -e . --no-deps` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -e ../../qontinui-cloud-control` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -e ../../qontinui-cloud-control` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te` resolves through pytest, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te` runs `pytest` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
   UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
@@ -352,6 +478,7 @@ JOBS ON pull_request / push:main (39):
       review:  job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — whether the job runs is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  matrix legs shard = ["1", "2", "3", "4"] — the manifest runs one leg
       note:    job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — considered as running
       note:    runs-on names no OS — no manifest job can be shown to cover it
@@ -369,6 +496,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "List the E2E spec files this PR changed" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       e2e-tests.yml › frontend-e2e-changed-specs [pull_request, push:main] 0/1 gate command(s) matched
@@ -377,6 +505,7 @@ JOBS ON pull_request / push:main (39):
       review:  job condition `if: needs.changed-specs.outputs.any == 'true'` — whether the job runs is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       review:  matrix legs group = ["${{ fromJson(needs.changed-specs.outputs.groups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.changed-specs.outputs.any == 'true'` — considered as running
       note:    runs-on names no OS — no manifest job can be shown to cover it
@@ -389,18 +518,25 @@ JOBS ON pull_request / push:main (39):
       review:  step "Fail if any needed job failed" is outside the report's command grammar: it has a quoted or escaped word ("backend-tests:  ${BACKEND_RESULT}")
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always()` — considered as running
   PARTIAL         forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_fixed_sleeps_in_e2e.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_fixed_sleeps_in_e2e.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_forbidden_public_schema.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_forbidden_public_schema.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 4/6 gate command(s) matched
       missing: uses: actions/checkout
       missing: uses: ./.github/actions/fleet-nouns-vocab
@@ -421,6 +557,15 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run lint` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run lint` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run type-check` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run type-check` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm test` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm test` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/16 gate command(s) matched
       missing: uses: actions/checkout
@@ -449,6 +594,19 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `bash frontend/scripts/vercel-install.sh --config-source ci` runs `bash` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `test -f frontend/node_modules/@qontinui/cloud-control/frontend/src/index.ts` runs `test` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `head -n 1` runs `head` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr -d [:space:]` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `.sibling/qontinui-cloud-control: git rev-parse HEAD` runs `git` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run type-check` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run type-check` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `rm -rf frontend/node_modules/@qontinui/cloud-control` runs `rm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `rm -f frontend/public/composed-build.json` runs `rm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cp frontend/cloud-control.pin /tmp/pin.bak` runs `cp` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `cp /tmp/pin.bak frontend/cloud-control.pin` runs `cp` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `[ -f frontend/public/composed-build.json ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 6/8 gate command(s) matched
       missing: uses: actions/checkout
@@ -465,6 +623,19 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run cloud:install` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run cloud:install` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run lint` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run lint` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run type-check` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run type-check` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm test` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm test` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run build` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run build` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/4 gate command(s) matched
       missing: uses: actions/checkout
@@ -475,17 +646,28 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: node scripts/export-test-coverage.mjs` resolves through node, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: node scripts/export-test-coverage.mjs` runs `node` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_tracked_ignored.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_tracked_ignored.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   PARTIAL         global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_global_state_assertions.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_global_state_assertions.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 2/12 gate command(s) matched
       missing: uses: actions/checkout
@@ -515,17 +697,31 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `backend: curl -sSL https://install.python-poetry.org` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python3 -` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python3 -` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install --no-interaction --no-root` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install --no-interaction --no-root` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pip install -e ../../qontinui-cloud-control` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pytest tests/test_memory_recall_scorer.py -q --no-cov` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pytest tests/test_memory_recall_scorer.py -q --no-cov` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run pytest tests/test_memory_recall_eval_db.py -q --no-cov` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run pytest tests/test_memory_recall_eval_db.py -q --no-cov` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: git diff --name-only $base...HEAD
       missing: grep -qE ^backend/alembic/versions/.*\.py$
       review:  job key `outputs` is not modeled
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Detect alembic migration changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect alembic migration changes" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/20 gate command(s) matched
       missing: date -u +%s
       missing: uses: actions/checkout
@@ -551,6 +747,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09") after commands have run
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
       review:  free-disk-space with tool-cache can remove hosted toolchains
       review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
@@ -562,6 +759,27 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install poetry` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install poetry` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry install` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry install` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `command -v psql` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get install -y postgresql-client` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT` runs `psql` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run alembic --version` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run alembic --version` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run alembic heads` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run alembic heads` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: rm -f heads.err` runs `rm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run python -c from alembic.config import Config; from alembic.script import ScriptDirectory; ` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run python -c from alembic.config import Config; from alembic.script import ScriptDirectory; ` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run alembic upgrade head` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run alembic upgrade head` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: poetry run alembic downgrade -1` resolves through poetry, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: poetry run alembic downgrade -1` runs `poetry` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
   UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/2 gate command(s) matched
@@ -573,12 +791,16 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
       note:    job condition `if: always()` — considered as running
   PARTIAL         path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_path_case_collisions.py  ←  ci/path-case-collisions
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_path_case_collisions.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_path_case_collisions.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
@@ -586,6 +808,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" runs under `shell: pwsh`, not GitHub's fail-fast bash/sh
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
   UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: python -m pip install pytest>=9,<10
@@ -595,12 +818,20 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python -m pip install pytest>=9,<10` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python -m pip install pytest>=9,<10` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python -m pytest .pre-commit-hooks -rA` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python -m pytest .pre-commit-hooks -rA` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_ruff_version_parity.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_ruff_version_parity.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/8 gate command(s) matched
       missing: uses: actions/checkout
@@ -611,10 +842,15 @@ JOBS ON pull_request / push:main (39):
       missing: rm -f gitleaks.tar.gz
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" runs `grep -oP "tag_name":\s*"v\K[^"]+` under `|| true`, whose effects can change later steps
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `tar -xzf gitleaks.tar.gz gitleaks` runs `tar` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `[ ! -x ./gitleaks ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `rm -f gitleaks.tar.gz` runs `rm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 2/54 gate command(s) matched
       missing: date -u +%s
       missing: uses: actions/checkout
@@ -676,6 +912,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-web") after commands have run
       review:  step "Clone backend Python sibling deps" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Install backend dependencies" is outside the report's command grammar: it relies on shell expansion of "["
       review:  working-directory "./backend" has `.`/`..` components — it must name a directory that exists, which the report does not check
@@ -721,14 +958,70 @@ JOBS ON pull_request / push:main (39):
       review:  step "Summarize" runs `jq -r .crawl.routes[]? | select(((.unwaivedConsoleErrors // []) | length > 0) or` under `|| true`, whose effects can change later steps
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python -m pip install --upgrade pip` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python -m pip install --upgrade pip` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: [ -f requirements.txt ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -r requirements.txt` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -r requirements.txt` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install --no-cache-dir -e ../../qontinui-schemas` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install --no-cache-dir -e ../../qontinui-schemas` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: [ -f pyproject.toml ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -e . --no-deps` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -e . --no-deps` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: pip install -e ../../qontinui-cloud-control` resolves through pip, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: pip install -e ../../qontinui-cloud-control` runs `pip` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `command -v psql` runs `command` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get update` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sudo apt-get install -y postgresql-client` runs `sudo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `psql -h localhost -U test_user -d test_db -c CREATE SCHEMA IF NOT EXISTS runner;` runs `psql` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: alembic upgrade heads` runs `alembic` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `backend: python -m uvicorn app.main:app --host 127.0.0.1 --port` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `backend: python -m uvicorn app.main:app --host 127.0.0.1 --port` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: seq 1 60` runs `seq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: curl -s -o /dev/null -w %{http_code} http://127.0.0.1:8000/health` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `backend: curl -s -o /dev/null -w backend status: %{http_code}\n http://127.0.0.1:8000/health` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `psql -h localhost -U test_user -d test_db -c UPDATE auth.users SET is_superuser = true WHERE email =` runs `psql` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `frontend: sha256sum package-lock.json` runs `sha256sum` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx playwright install-deps chromium` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx playwright install-deps chromium` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sha256sum` runs `sha256sum` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `id -u` runs `id` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `id -g` runs `id` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort -rn` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx playwright install chromium` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx playwright install chromium` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm run build` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm run build` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx next start -p 3001 -H 0.0.0.0` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx next start -p 3001 -H 0.0.0.0` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `frontend: seq 1 30` runs `seq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `frontend: curl -s -o /dev/null -w %{http_code} http://localhost:3001/login` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `frontend: curl -s -o /dev/null -w frontend status: %{http_code}\n http://localhost:3001/login` runs `curl` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx tsx tests/spec-ci/run-spec-ci.ts --base-url http://localhost:3001 --api-base http://localhost:80` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx tsx tests/spec-ci/run-spec-ci.ts --base-url http://localhost:3001 --api-base http://localhost:80` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `[ -f frontend/spec-ci-report.json ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r 
+    "- specs: \(.specCount)",
+    "- full_match: \(.summary.fullMatch)",
+    "- partial_match` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       sql-through-alembic.yml › sql-through-alembic [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD
+      review:  actions/checkout fetch-depth 0 — the executor fetches only the dispatched commit
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD` names a remote ref, which the executor (fetching only the dispatched commit) does not have
+      review:  `python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         style-gate.yml › style-gate [pull_request (paths-filtered)] 1/50 gate command(s) matched
       missing: date -u +%s
@@ -784,10 +1077,12 @@ JOBS ON pull_request / push:main (39):
       review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout qontinui-web") after commands have run
       review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  step "Resolve enforce mode" is outside the report's command grammar: it has a quoted or escaped word ("ENFORCE=0")
       review:  step "Resolve enforce mode" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  a second actions/checkout (step "Checkout pinned qontinui-schemas (analyzer source)") after commands have run
       review:  actions/checkout with input repository: qontinui/qontinui-schemas, which the report does not model
       review:  actions/checkout with input ref: ${{ steps.lock.outputs.schemas_sha }}, which the report does not model
       review:  actions/cache restores "qontinui-schemas/target" inside the repository checkout, which can change what the build sees
@@ -855,7 +1150,28 @@ JOBS ON pull_request / push:main (39):
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
-      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  [environment] `date -u +%s` runs `date` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `[ ! -f style-gate.lock ]` runs `[` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .qontinui_schemas_sha style-gate.lock` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .crate style-gate.lock` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `jq -r .bin style-gate.lock` runs `jq` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `qontinui-schemas: cargo build --release --manifest-path rust-vision-core/Cargo.toml --bin vision-audit` runs `cargo` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `frontend: sha256sum package-lock.json` runs `sha256sum` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx playwright install-deps chromium` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx playwright install-deps chromium` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sha256sum` runs `sha256sum` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `id -u` runs `id` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `id -g` runs `id` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sort -rn` runs `sort` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `frontend: npx playwright install chromium` resolves through npx, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `frontend: npx playwright install chromium` runs `npx` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `fold_result` runs `fold_result` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `tr \n  ` runs `tr` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `sed s/|/\\|/g` runs `sed` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 with toolchain stable (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
@@ -867,6 +1183,9 @@ JOBS ON pull_request / push:main (39):
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python scripts/ci/check_web_boundary.py` resolves through python, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python scripts/ci/check_web_boundary.py` runs `python` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
   UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
       review:  runs on several runner images ["public-pool", "self-hosted"]; a manifest `os` runs one host per OS
       review:  runs on `self-hosted`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host

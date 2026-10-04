@@ -37,19 +37,18 @@ qontinui-ci import --report
         non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
         request) runs the same command in the same working directory, on a job whose `os` includes
         every OS the workflow job runs on — a manifest `os = any` job covers NOTHING, only an
-        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the
-        whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = python,
-        pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are
-        NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest
-        step with a word containing `$` matches nothing (the executor passes it literally).
-        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
-        prefix, the matched step does not set identically (any key; an expression value never
-        matches); a `cargo +toolchain` the step lacks; a version pinned by
-        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
-        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
-        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
-        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the argv
+        is byte-identical after dequoting — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding, and package managers and their verbs are not unified
+        (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a
+        word containing `$` matches nothing (the executor passes it literally). NEEDS-REVIEW, even
+        when everything matched: any workflow/job/step env key, or `KEY=value` prefix, the matched
+        step does not set identically (any key; an expression value never matches); a `cargo
+        +toolchain` the step lacks; a version pinned by setup-node/setup-python/rust-toolchain or
+        `rustup default|override|set` that the manifest's [[tools]] does not pin identically;
+        `export`, `declare -x`, `set -a`, `source`/`.`, or any use of
+        $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label, or ANY
+        macOS label (architecture is not modeled); `actions/checkout` with inputs other than
         fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
         run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
         step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
@@ -69,7 +68,19 @@ qontinui-ci import --report
         services that differ either way, versions included; any [limits]; any cargo command (the
         executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a
         manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs
-        commands with no actions/checkout step. upload-sarif is an opaque gate. COVERED is
+        commands with no actions/checkout step. upload-sarif is an opaque gate. ENVIRONMENT
+        (`[environment]` caveats): the executor exports host-sized CARGO_BUILD_JOBS /
+        RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and
+        does not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner
+        image's toolset) for any program that is not a script in the repository. So NO job reads
+        COVERED until the executor stops forcing those caps (or the workflow mirrors them) — that is
+        the honest answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip,
+        poetry, uv, node, npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's
+        [[tools]] provisions it at a version the workflow pins identically; a checkout fetch-depth
+        other than 1, or a gate naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a
+        second checkout after any command; a job timeout below the chosen manifest job's total step
+        timeouts, or a step timeout below the manifest steps its commands map to. When several
+        manifest jobs could match, one whose OS covers the workflow job is preferred. COVERED is
         necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
         agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
@@ -78,11 +89,19 @@ qontinui-ci import --report
 JOBS ON pull_request / push:main (4):
   UNCOVERED       boundary-guard.yml › no-coord-import [pull_request, push:main] 0/1 gate command(s) matched
       missing: python3 scripts/check_no_coord_import.py
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python3 scripts/check_no_coord_import.py` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/check_no_coord_import.py` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › repo-checks [pull_request, push:main] 0/2 gate command(s) matched
       missing: python3 scripts/check_frontend_imports.py
       missing: python3 -m unittest discover -s scripts -p test_*.py -v
       review:  step "gate self-tests" is outside the report's command grammar: it has a quoted or escaped word ("test_*.py")
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python3 scripts/check_frontend_imports.py` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 scripts/check_frontend_imports.py` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `python3 -m unittest discover -s scripts -p test_*.py -v` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 -m unittest discover -s scripts -p test_*.py -v` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › python-lint [pull_request, push:main] 0/4 gate command(s) matched
       missing: python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11
@@ -90,6 +109,12 @@ JOBS ON pull_request / push:main (4):
       missing: ruff format --check backend/ scripts/
       missing: mypy backend/qontinui_cloud_control scripts
       review:  step "Install gate tooling" is outside the report's command grammar: it has a quoted or escaped word ("ruff~=0.6")
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11` resolves through python3, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11` runs `python3` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `ruff check backend/ scripts/` runs `ruff` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `ruff format --check backend/ scripts/` runs `ruff` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  [environment] `mypy backend/qontinui_cloud_control scripts` runs `mypy` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › composed-typecheck [pull_request, push:main] 0/4 gate command(s) matched
       missing: <outside the repository>/qontinui-web/frontend: npm ci
@@ -97,6 +122,15 @@ JOBS ON pull_request / push:main (4):
       missing: <outside the repository>/qontinui-web/frontend: npm run type-check
       missing: <outside the repository>/qontinui-web/frontend: npm test
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
+      review:  [environment] every step runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; the workflow sets none of them identically
+      review:  `<outside the repository>/qontinui-web/frontend: npm ci` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/frontend: npm ci` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/frontend: npm run cloud:install` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/frontend: npm run cloud:install` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/frontend: npm run type-check` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/frontend: npm run type-check` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
+      review:  `<outside the repository>/qontinui-web/frontend: npm test` resolves through npm, which the manifest does not provision via [[tools]] at a version the workflow pins identically
+      review:  [environment] `<outside the repository>/qontinui-web/frontend: npm test` runs `npm` from the host, under GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does not reproduce
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
 
 NOT CONSIDERED — not on pull_request or a push to main (0 workflow(s)):

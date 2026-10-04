@@ -2132,6 +2132,7 @@ command = ["true"]
             ("RUST_TEST_THREADS", "[limits].test_threads"),
             ("NEXTEST_TEST_THREADS", "[limits].test_threads"),
             ("CARGO_TARGET_DIR", "per-repo CI target dir"),
+            ("CI", "always exports CI=true"),
         ] {
             let text = format!(
                 "version = 1\n[[steps]]\nname = \"x\"\ncommand = [\"true\"]\nenv = {{ {key} = \"4\" }}\n"

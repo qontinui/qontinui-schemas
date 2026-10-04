@@ -40,12 +40,11 @@
 //!
 //! # The coverage rule (`import --report`)
 //!
-//! See [`COVERAGE_RULE`]. In short: a workflow job is COVERED when every one of
-//! its *gate commands* has a manifest step running the same command in the
-//! same directory. Command identity is a normalized *signature*, so
-//! `poetry run pytest` and `pytest`, `npm run lint` and `pnpm lint`,
-//! `./scripts/x.sh` and `bash scripts/x.sh`, `python3 -m mypy` and `mypy` are
-//! the same command, while arguments after the first flag are ignored.
+//! See [`COVERAGE_RULE`], which is deny-by-default: a workflow job is COVERED
+//! only when one manifest job runs its full ordered sequence of gate
+//! commands, byte-identical, and nothing about the job is left unmodeled.
+//! Today the executor's own environment (host-sized thread caps, no GitHub
+//! implicit env) keeps every job at NEEDS-REVIEW at best.
 
 use std::collections::BTreeMap;
 
@@ -1946,10 +1945,9 @@ and a command whose working directory cannot be resolved (an expression in `work
 MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull request) runs the same \
 command in the same working directory, on a job whose `os` includes every OS the workflow job \
 runs on — a manifest `os = any` job covers NOTHING, only an explicit OS does; a workflow job of unknown OS is matched \
-by nothing. SAME COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/\
-hatch run, npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = \
-python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are \
-NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest step \
+by nothing. SAME COMMAND: the argv is byte-identical after dequoting — no wrapper or option stripping, no \
+`./` removal, no interpreter-version or bash/sh folding, and package managers and their verbs \
+are not unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest step \
 with a word containing `$` matches nothing (the executor passes it literally). \
 NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value` prefix, \
 the matched step does not set identically (any key; an expression value never matches); a \
@@ -1977,6 +1975,18 @@ version; services that differ either way, versions included; any [limits]; any c
 (the executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a \
 manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs \
 commands with no actions/checkout step. upload-sarif is an opaque gate. \
+ENVIRONMENT (`[environment]` caveats): the executor exports host-sized CARGO_BUILD_JOBS / \
+RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and does \
+not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's \
+toolset) for any program that is not a script in the repository. So NO job reads COVERED until \
+the executor stops forcing those caps (or the workflow mirrors them) — that is the honest \
+answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip, poetry, uv, node, \
+npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's [[tools]] provisions it \
+at a version the workflow pins identically; a checkout fetch-depth other than 1, or a gate \
+naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a second checkout after any \
+command; a job timeout below the chosen manifest job's total step timeouts, or a step timeout \
+below the manifest steps its commands map to. When several manifest jobs could match, one whose \
+OS covers the workflow job is preferred. \
 COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow \
 agreement >= 97% with zero false greens. \
 VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job carries the \
@@ -2104,6 +2114,8 @@ pub struct GateCommand {
     /// The step's (else the job's) `timeout-minutes`, in seconds: a matched
     /// manifest step allowed longer is NEEDS-REVIEW.
     pub timeout_limit: Option<u64>,
+    /// The workflow step the command came from (its position in the job).
+    pub step_index: usize,
 }
 
 /// A runtime/toolchain version a workflow job pins through a setup action or
@@ -2534,6 +2546,7 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         env: Vec::new(),
         toolchain: None,
         timeout_limit: None,
+        step_index: usize::MAX,
     };
     // Every gate, in order, repeats included: the match runs over the full
     // ordered sequence (dedup is for display only, in the report).
@@ -2576,9 +2589,28 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         .default_shell
         .clone()
         .or_else(|| wf.default_shell.clone());
+    if (job.default_working_dir.is_some() || job.default_shell.is_some())
+        && (wf.default_working_dir.is_some() || wf.default_shell.is_some())
+    {
+        jg.unmodeled.push(
+            "both the workflow and the job set `defaults.run`; how GitHub combines them is not \
+             modeled"
+                .to_string(),
+        );
+    }
     let self_path = self_checkout_path(job);
     let on_windows = job_oses(job).0.contains(&Os::Windows);
-    let job_timeout = job.timeout_minutes.clone();
+    if let Some(t) = &job.timeout_minutes {
+        if t.is_expression() || t.0.trim().parse::<u64>().is_err() {
+            jg.unmodeled.push(format!(
+                "job timeout-minutes {} the report cannot read",
+                t.0
+            ));
+        }
+    }
+    // A second checkout after any command, and the checkout's fetch depth:
+    // the executor checks out ONE commit, once, with no history beyond it.
+    let mut ran_something = false;
     // A job that runs commands before any actions/checkout runs them in an
     // empty directory; the executor always checks out first.
     let mut checked_out = false;
@@ -2620,7 +2652,7 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         }
         // timeout-minutes on the step (else the job): a matched manifest step
         // must not be allowed longer.
-        let timeout_limit = match step.timeout_minutes.as_ref().or(job_timeout.as_ref()) {
+        let timeout_limit = match step.timeout_minutes.as_ref() {
             None => None,
             Some(t) => match t.0.trim().parse::<u64>() {
                 Ok(m) if !t.is_expression() => Some(m * 60),
@@ -2638,6 +2670,30 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
             let action_l = uses.split('@').next().unwrap_or(uses).to_ascii_lowercase();
             if action_l == "actions/checkout" {
                 checked_out = true;
+                if ran_something {
+                    jg.unmodeled.push(format!(
+                        "a second actions/checkout (step \"{}\") after commands have run",
+                        step.label()
+                    ));
+                }
+                if let Some(d) = with_val_ci(step, "fetch-depth") {
+                    if d.trim() != "1" {
+                        jg.unmodeled.push(format!(
+                            "actions/checkout fetch-depth {d} — the executor fetches only the \
+                             dispatched commit"
+                        ));
+                    }
+                }
+                if let Some(p) = with_val_ci(step, "path") {
+                    if normalize_wd(p).is_err() {
+                        push(
+                            &mut *target,
+                            opaque(format!("checkout into an unresolvable path {p:?}")),
+                        );
+                    }
+                }
+            } else {
+                ran_something = true;
             }
             jg.pins.extend(action_pins(step, uses));
             jg.unmodeled.extend(action_input_review(&action_l, step));
@@ -2689,6 +2745,12 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
                 );
             }
             continue;
+        }
+        if step.run.is_some() {
+            ran_something = true;
+        }
+        if step.run.is_some() {
+            ran_something = true;
         }
         let Some(script) = &step.run else {
             if step.unreadable.is_empty() {
@@ -2841,6 +2903,7 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
                     env: env.into_iter().collect(),
                     toolchain: toolchain_of(&cmd.argv),
                     timeout_limit,
+                    step_index: step.index,
                 },
             );
         }
@@ -2915,16 +2978,98 @@ fn command_caveats(g: &GateCommand, m: &ManifestCommand) -> Vec<String> {
             m.toolchain.as_deref().unwrap_or("(default)")
         ));
     }
-    if let Some(limit) = g.timeout_limit {
-        if m.timeout_secs > limit {
+    out
+}
+
+/// What every gate carries regardless of the manifest: history it may read
+/// that the executor does not fetch, and the runtime it resolves through.
+fn gate_caveats(g: &GateCommand, manifest: &CiManifest, pins: &[VersionPin]) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(prog) = g.key.argv.first() else {
+        return out;
+    };
+    if g.key.argv.iter().any(|a| {
+        a.contains("origin/")
+            || a.contains("refs/remotes/")
+            || a.contains("FETCH_HEAD")
+            || a.contains("@{u")
+    }) {
+        out.push(format!(
+            "`{}` names a remote ref, which the executor (fetching only the dispatched commit) \
+             does not have",
+            g.display
+        ));
+    }
+    // A runtime or package manager the manifest does not provision at the
+    // version the workflow pins.
+    const RUNTIMES: &[(&str, Option<&str>)] = &[
+        ("python", None),
+        ("python3", None),
+        ("pip", None),
+        ("pip3", None),
+        ("pytest", None),
+        ("poetry", Some("poetry")),
+        ("uv", None),
+        ("uvx", None),
+        ("node", Some("node")),
+        ("npm", Some("node")),
+        ("npx", Some("node")),
+        ("pnpm", None),
+        ("yarn", None),
+        ("corepack", None),
+        ("ruby", None),
+        ("gem", None),
+        ("bundle", None),
+        ("go", None),
+        ("java", None),
+        ("javac", None),
+        ("mvn", None),
+        ("gradle", None),
+        ("dotnet", None),
+        ("deno", None),
+        ("bun", None),
+    ];
+    let base = prog.rsplit('/').next().unwrap_or(prog);
+    let runtime = RUNTIMES
+        .iter()
+        .find(|(n, _)| *n == base || (base.starts_with("python3.") && *n == "python3"));
+    if let Some((name, tool)) = runtime {
+        let provisioned = tool.is_some_and(|t| {
+            manifest.tools.iter().any(|mt| {
+                mt.name == t
+                    && pins
+                        .iter()
+                        .any(|p| p.tool == Some(t) && p.version == mt.version)
+            })
+        });
+        if !provisioned {
             out.push(format!(
-                "`{}` is limited to {limit}s; {} allows {}s",
-                g.display, m.label, m.timeout_secs
+                "`{}` resolves through {name}, which the manifest does not provision via \
+                 [[tools]] at a version the workflow pins identically",
+                g.display
             ));
         }
     }
+    // GitHub's implicit environment (GITHUB_ACTIONS, the runner's TZ and
+    // locale, its preinstalled toolset) is not reproduced; only a script that
+    // lives in the repository is judged on its own.
+    let repo_local = prog.contains('/') && !prog.starts_with('/') && !prog.starts_with('~');
+    if !repo_local {
+        out.push(format!(
+            "{ENV_CAVEAT} `{}` runs `{base}` from the host, under GitHub's implicit environment \
+             (GITHUB_ACTIONS, TZ, locale, the runner image's toolset), which the executor does \
+             not reproduce",
+            g.display
+        ));
+    }
     out
 }
+
+/// Prefix of the caveats that come from the executor's environment itself
+/// rather than from anything in the workflow or manifest. Today at least one
+/// applies to EVERY job (the host-sized caps), so nothing reads COVERED
+/// until the executor stops forcing them or the workflow mirrors them.
+pub const ENV_CAVEAT: &str = "[environment]";
 
 /// A job's coverage verdict. Only [`Coverage::Covered`] counts as covered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3154,7 +3299,11 @@ pub fn coverage_report(
             // is not the same check.
             let mut chosen: Option<(&crate::manifest::CiJob, Vec<&ManifestCommand>)> = None;
             if missing.is_empty() && !jg.gates.is_empty() {
-                for mj in manifest.gate_jobs() {
+                // Jobs whose OS covers this workflow job are tried first, so
+                // declaration order never decides the verdict.
+                let mut order: Vec<&crate::manifest::CiJob> = manifest.gate_jobs().collect();
+                order.sort_by_key(|mj| !os_covers(&mj.os, &oses));
+                for mj in order {
                     let steps: Vec<&ManifestCommand> =
                         mcmds.iter().filter(|m| m.job == mj.name).collect();
                     let mut ptr = 0;
@@ -3219,6 +3368,49 @@ pub fn coverage_report(
                                 st.name,
                                 st.command.join(" ").chars().take(60).collect::<String>()
                             ));
+                        }
+                    }
+                    // Timeouts: the job's against the chosen manifest job's
+                    // total, and each step's against the manifest steps its
+                    // commands map to.
+                    let total: u64 = mj.steps.iter().map(|st| st.effective_timeout_secs()).sum();
+                    if let Some(m) = job
+                        .timeout_minutes
+                        .as_ref()
+                        .and_then(|t| t.0.trim().parse::<u64>().ok())
+                    {
+                        if total > m * 60 {
+                            caveats.push(format!(
+                                "the workflow job is limited to {}s; manifest job {} allows {total}s \
+                                 in all",
+                                m * 60,
+                                mj.name
+                            ));
+                        }
+                    }
+                    let mut by_step: Vec<(usize, Option<u64>, Vec<usize>)> = Vec::new();
+                    for (g, m) in jg.gates.iter().zip(picked) {
+                        match by_step.iter_mut().find(|(i, _, _)| *i == g.step_index) {
+                            Some((_, _, v)) => {
+                                if !v.contains(&m.index) {
+                                    v.push(m.index);
+                                }
+                            }
+                            None => by_step.push((g.step_index, g.timeout_limit, vec![m.index])),
+                        }
+                    }
+                    for (_, limit, idxs) in &by_step {
+                        if let Some(limit) = limit {
+                            let sum: u64 = idxs
+                                .iter()
+                                .map(|i| mj.steps[*i].effective_timeout_secs())
+                                .sum();
+                            if sum > *limit {
+                                caveats.push(format!(
+                                    "a workflow step is limited to {limit}s; the manifest steps \
+                                     it maps to allow {sum}s"
+                                ));
+                            }
                         }
                     }
                     if !mj.needs.is_empty() {
@@ -3314,18 +3506,20 @@ pub fn coverage_report(
                     ));
                 }
             }
-            if jg.gates.iter().any(|g| {
-                matches!(
-                    g.key.argv.first().map(String::as_str),
-                    Some("cargo") | Some("cargo-nextest")
-                )
-            }) {
-                caveats.push(
-                    "cargo runs under the executor's host-sized CARGO_BUILD_JOBS / \
-                     RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a \
-                     GitHub-hosted run sets none of them"
-                        .to_string(),
-                );
+            // The executor exports host-sized CARGO_BUILD_JOBS /
+            // RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own
+            // CARGO_TARGET_DIR to EVERY step (executor.rs `DispatchEnv`); a
+            // GitHub-hosted run sets none of them, and any step (make, just, a
+            // script) may reach cargo.
+            if !jg.gates.is_empty() {
+                caveats.push(format!(
+                    "{ENV_CAVEAT} every step runs under the executor's host-sized \
+                     CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own \
+                     CARGO_TARGET_DIR; the workflow sets none of them identically"
+                ));
+            }
+            for g in &jg.gates {
+                caveats.extend(gate_caveats(g, manifest, &jg.pins));
             }
             for pin in &jg.pins {
                 let pinned = pin.tool.is_some_and(|t| {
@@ -3767,13 +3961,14 @@ jobs:
         // An `os = any` manifest covers nothing.
         let r = report_one(&strengthen_wf(wf), v1);
         for j in ["lin", "win", "mac"] {
-            assert_ne!(verdict_of(&r, j), Coverage::Covered, "{j}");
+            assert!(own_rule_job(&r, j), "{j}");
         }
-        // An explicit linux job covers the ubuntu job only.
+        // An explicit linux job matches the ubuntu job only (blocked then by
+        // the executor's environment alone).
         let r = report_one(&strengthen_wf(wf), &strengthen_manifest(v1));
-        assert_eq!(verdict_of(&r, "lin"), Coverage::Covered, "{:#?}", r.jobs);
-        assert_ne!(verdict_of(&r, "win"), Coverage::Covered);
-        assert_ne!(verdict_of(&r, "mac"), Coverage::Covered);
+        assert!(env_only_job(&r, "lin"), "{:#?}", r.jobs);
+        assert!(own_rule_job(&r, "win"));
+        assert!(own_rule_job(&r, "mac"));
         assert!(!r.all_covered());
     }
 
@@ -3978,8 +4173,8 @@ jobs:
             &strengthen_wf("on: merge_group\njobs:\n  q:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n"),
             &strengthen_manifest(V1_MAKE),
         );
-        assert_eq!(verdict_of(&r, "q"), Coverage::Covered);
-        assert!(r.all_covered());
+        assert!(env_only_job(&r, "q"), "{:#?}", r.jobs);
+        assert!(!r.all_covered());
 
         // H5: zero considered jobs is NOT MET.
         let r = report_one(
@@ -4038,17 +4233,12 @@ jobs:
             &strengthen_wf(&wf_of(&jobs)),
             &strengthen_manifest(manifest),
         );
-        assert_eq!(
-            verdict_of(&rs, "plain"),
-            Coverage::Covered,
-            "{:#?}",
-            rs.jobs
-        );
+        assert!(env_only_job(&rs, "plain"), "{:#?}", rs.jobs);
         for j in [
             "pushd", "envwrap", "redirect", "assign", "stdin", "twrap", "advisory", "ref",
             "expr-env", "tight", "mac",
         ] {
-            assert_ne!(verdict_of(&rs, j), Coverage::Covered, "{j}");
+            assert!(own_rule_job(&rs, j), "{j}");
         }
 
         // H5: env compared both ways — a manifest-only env key is a difference.
@@ -4071,6 +4261,41 @@ jobs:
             V1_MAKE,
         );
         assert_eq!(verdict_of(&r, "p"), Coverage::Partial);
+    }
+
+    /// A job blocked ONLY by the executor's own environment (`[environment]`
+    /// caveats, which today apply to every job): the matcher found it
+    /// otherwise equivalent. This is as close to COVERED as anything gets
+    /// until the executor stops forcing host-sized caps.
+    fn env_only(jc: &JobCoverage) -> bool {
+        jc.verdict == Coverage::NeedsReview
+            && jc.missing.is_empty()
+            && !jc.caveats.is_empty()
+            && jc.caveats.iter().all(|c| c.starts_with(ENV_CAVEAT))
+    }
+
+    fn env_only_job(r: &CoverageReport, job: &str) -> bool {
+        r.jobs
+            .iter()
+            .find(|j| j.job_id == job)
+            .is_some_and(env_only)
+    }
+
+    fn all_env_only(r: &CoverageReport) -> bool {
+        !r.jobs.is_empty() && r.jobs.iter().all(env_only)
+    }
+
+    /// Not covered, and blocked by something beyond the environment: the
+    /// probe's own rule fired.
+    fn own_rule(jc: &JobCoverage) -> bool {
+        jc.verdict != Coverage::Covered && !env_only(jc)
+    }
+
+    fn own_rule_job(r: &CoverageReport, job: &str) -> bool {
+        r.jobs
+            .iter()
+            .find(|j| j.job_id == job)
+            .is_some_and(own_rule)
     }
 
     /// A probe workflow made "otherwise equivalent": an `actions/checkout@v4`
@@ -4122,7 +4347,8 @@ jobs:
     /// Round 4 of the Phase 8 review: every probe from the reviewer's probe
     /// crate (quoting bypasses, guarded side effects, unsafe action inputs,
     /// path-ignored triggers, …) reads NOT covered. Two controls — a plain
-    /// `make check`, and the same with a tab separator — stay COVERED.
+    /// `make check`, and the same with a tab separator — made otherwise
+    /// equivalent, are blocked only by the executor's environment.
     #[test]
     fn round4_reviewer_probes_are_never_covered() {
         const MAKE: &str =
@@ -4157,6 +4383,8 @@ jobs:
     ];
         for (name, wf) in &wfs {
             assert_ne!(verdict(wf, MAKE), Coverage::Covered, "{name}");
+            let rs = report_one(&strengthen_wf(wf), &strengthen_manifest(MAKE));
+            assert!(rs.jobs.iter().all(own_rule), "{name}: {:#?}", rs.jobs);
         }
         let lit = |s: &str| {
             format!(
@@ -4215,11 +4443,14 @@ jobs:
     ];
         for (name, steps, m) in probes {
             // As written (no checkout, an `os = any` manifest) nothing is
-            // covered; the two controls are COVERED once otherwise equivalent.
+            // covered; the two controls, made otherwise equivalent, are
+            // blocked only by the executor's environment.
             assert_ne!(verdict(&job(&steps), m), Coverage::Covered, "{name}");
+            let rs = report_one(&strengthen_wf(&job(&steps)), &strengthen_manifest(m));
             if name == "control: plain" || name == "tab sep" {
-                let v = verdict(&strengthen_wf(&job(&steps)), &strengthen_manifest(m));
-                assert_eq!(v, Coverage::Covered, "{name}");
+                assert!(all_env_only(&rs), "{name}: {:#?}", rs.jobs);
+            } else {
+                assert!(rs.jobs.iter().all(own_rule), "{name}: {:#?}", rs.jobs);
             }
         }
     }
@@ -4228,7 +4459,8 @@ jobs:
     /// `probe2` crate. Each normalization bypass (wrapper options, `env`,
     /// interpreter versions, bash/sh, `./`), each manifest-side sabotage, each
     /// unreadable section and each unmodeled trigger pattern reads NOT
-    /// covered. The probes that stay COVERED are listed in `equivalent`: the
+    /// covered. The probes listed in `equivalent` — blocked, once made otherwise
+    /// equivalent, only by the executor's environment — are the
     /// two controls, plus probes whose workflow job is genuinely the
     /// manifest's command and nothing else (the same job under `on: push`, a
     /// branch filter that admits main, a YAML alias, `set -x`, passive
@@ -4423,14 +4655,14 @@ jobs:
             assert!(!r.all_covered(), "{name}");
             let strong = report(&strengthen_wf(wf), &strengthen_manifest(manifest_text)).unwrap();
             if *name == "needs chain gate" {
-                assert_eq!(verdict_of(&strong, "b"), Coverage::Covered, "{name}");
-                assert_ne!(verdict_of(&strong, "a"), Coverage::Covered, "{name}");
+                assert!(env_only_job(&strong, "b"), "{name}");
+                assert!(own_rule_job(&strong, "a"), "{name}");
             } else if equivalent.contains(name) {
-                assert!(strong.all_covered(), "{name}: {:#?}", strong.jobs);
+                assert!(all_env_only(&strong), "{name}: {:#?}", strong.jobs);
             } else if *name != "no checkout" {
                 // ("no checkout" made equivalent IS the control.)
                 assert!(
-                    strong.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                    strong.jobs.iter().all(own_rule),
                     "{name} (with a checkout and a linux manifest): {:#?}",
                     strong.jobs
                 );
@@ -4507,12 +4739,12 @@ jobs:
         ("AE exit status 0 after (exit allowed?)", job("      - run: |\n          make check\n          true\n"), make.clone()),
     ];
         let equivalent = [
-            "O npm ci then npm test split",
             "R set -e under sh",
             "T push only to main",
-            "W checkout ref input",
             "X checkout persist-cred false",
             "Y runs-on list [ubuntu-latest]",
+            "AA cache path ~/.cargo (registry) ",
+            "S set -x then cargo",
             "AB cache path ~/.npm then npm ci",
             "AC timeout-minutes step 600 manifest default",
             "AD manifest scheduled job also",
@@ -4535,9 +4767,14 @@ jobs:
         };
         for (name, wf, manifest_text) in &cases {
             let Some(r) = report(wf, manifest_text) else {
-                // A manifest may not set CI at all (the executor exports
-                // CI=true itself).
+                // A manifest may not set CI at all: the executor exports
+                // CI=true itself, and the manifest parser says so.
                 assert!(name.starts_with("D "), "{name}: manifest rejected");
+                let err = manifest::parse_and_validate(manifest_text).unwrap_err();
+                assert!(
+                    err.contains("\"CI\"") && err.contains("exported by the executor"),
+                    "{err}"
+                );
                 continue;
             };
             assert!(
@@ -4547,10 +4784,10 @@ jobs:
             );
             let strong = report(&strengthen_wf(wf), &strengthen_manifest(manifest_text)).unwrap();
             if equivalent.contains(name) {
-                assert!(strong.all_covered(), "{name}: {:#?}", strong.jobs);
+                assert!(all_env_only(&strong), "{name}: {:#?}", strong.jobs);
             } else {
                 assert!(
-                    strong.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                    strong.jobs.iter().all(own_rule),
                     "{name} (with a checkout and a linux manifest): {:#?}",
                     strong.jobs
                 );
@@ -4564,6 +4801,103 @@ jobs:
         )
         .unwrap();
         assert_eq!(verdict_of(&r, "j"), Coverage::NeedsReview);
+    }
+
+    /// Round 7 of the Phase 8 review: every probe from the reviewer's
+    /// `probe4` crate (the E-series and the P-series). None is COVERED. A
+    /// probe whose workflow job is otherwise equivalent is blocked ONLY by
+    /// the executor's environment (`[environment]` caveats: host-sized caps,
+    /// GitHub's implicit env); every other probe is blocked by its own rule
+    /// (fetch depth, remote refs, unprovisioned runtimes, timeout sums, a
+    /// second checkout, an unresolvable checkout path, merged `defaults`, …).
+    #[test]
+    fn round7_reviewer_probes_are_never_covered() {
+        fn job(steps: &str) -> String {
+            format!(
+                "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n{steps}"
+            )
+        }
+        fn lin(steps: &str) -> String {
+            format!("version = 2\n[[jobs]]\nname = \"ci\"\nos = \"linux\"\n{steps}")
+        }
+        fn st(name: &str, argv: &str, extra: &str) -> String {
+            format!("[[jobs.steps]]\nname = \"{name}\"\ncommand = {argv}\n{extra}")
+        }
+        fn jobc(steps: &str) -> String {
+            job(&format!("      - uses: actions/checkout@v4\n{steps}"))
+        }
+        let e_cases: Vec<(&str, String, String)> = vec![
+        ("E1 exit 1 after gate", jobc("      - run: |\n          make check\n          exit 1\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E2 wait/read noise", jobc("      - run: |\n          make check\n          read x\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E3 env GITHUB_ACTIONS-dependent: TZ set in wf", "on: pull_request\nenv:\n  TZ: UTC\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E4 two jobs same manifest job", "on: pull_request\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E5 checkout after gate (gate before checkout of other path)", job("      - uses: actions/checkout@v4\n        with:\n          path: sub\n      - run: make check\n        working-directory: sub\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E6 checkout fetch-depth expression", job("      - uses: actions/checkout@v4\n        with:\n          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}\n      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("E7 checkout path ../x", job("      - uses: actions/checkout@v4\n        with:\n          path: ../x\n      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+    ];
+        let p_cases: Vec<(&str, String, String)> = vec![
+        ("ctl make check", jobc("      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P1 python implicit interpreter", jobc("      - run: python -m pytest\n"), lin(&st("m", "[\"python\",\"-m\",\"pytest\"]", ""))),
+        ("P2 pip install then pytest (host site-packages persist)", jobc("      - run: |\n          pip install -r requirements.txt\n          pytest\n"), lin(&format!("{}{}", st("i", "[\"pip\",\"install\",\"-r\",\"requirements.txt\"]", ""), st("t", "[\"pytest\"]", "")))),
+        ("P3 npm ci + npm test implicit node", jobc("      - run: |\n          npm ci\n          npm test\n"), lin(&format!("{}{}", st("i", "[\"npm\",\"ci\"]", ""), st("t", "[\"npm\",\"test\"]", "")))),
+        ("P4 make test (cargo inside make)", jobc("      - run: make test\n"), lin(&st("m", "[\"make\",\"test\"]", ""))),
+        ("P5 just test", jobc("      - run: just test\n"), lin(&st("m", "[\"just\",\"test\"]", ""))),
+        ("P6 rustup run stable cargo test", jobc("      - run: rustup run stable cargo test\n"), lin(&st("m", "[\"rustup\",\"run\",\"stable\",\"cargo\",\"test\"]", ""))),
+        ("P7 bash ./ci.sh (script runs cargo)", jobc("      - run: bash ci.sh\n"), lin(&st("m", "[\"bash\",\"ci.sh\"]", ""))),
+        ("P8 fetch-depth 0 + git diff origin/main", job("      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - run: git diff --exit-code origin/main -- schema.lock\n"), lin(&st("m", "[\"git\",\"diff\",\"--exit-code\",\"origin/main\",\"--\",\"schema.lock\"]", ""))),
+        ("P9 fetch-depth 0 + make check (git describe inside)", job("      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - run: make version-check\n"), lin(&st("m", "[\"make\",\"version-check\"]", ""))),
+        ("P10 default depth + git log -1", jobc("      - run: git log --oneline -1\n"), lin(&st("m", "[\"git\",\"log\",\"--oneline\",\"-1\"]", ""))),
+        ("P11 job timeout 5 vs 3 manifest steps of 300s", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@v4\n      - run: |\n          make a\n          make b\n          make c\n".into(), lin(&format!("{}{}{}", st("a", "[\"make\",\"a\"]", "timeout_secs = 300\n"), st("b", "[\"make\",\"b\"]", "timeout_secs = 300\n"), st("c", "[\"make\",\"c\"]", "timeout_secs = 300\n")))),
+        ("P12 job timeout 5, manifest default 3600", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@v4\n      - run: make a\n".into(), lin(&st("a", "[\"make\",\"a\"]", ""))),
+        ("P13 defaults wd sub + step wd other (override)", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: sub\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n        working-directory: other\n".into(), lin(&st("m", "[\"make\",\"check\"]", "working_dir = \"other\"\n"))),
+        ("P13b same, manifest sub/other", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: sub\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n        working-directory: other\n".into(), lin(&st("m", "[\"make\",\"check\"]", "working_dir = \"sub/other\"\n"))),
+        ("P14 wf-level defaults wd sub", "on: pull_request\ndefaults:\n  run:\n    working-directory: sub\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", "working_dir = \"sub\"\n"))),
+        ("P14b wf-level wd sub, job-level wd other", "on: pull_request\ndefaults:\n  run:\n    working-directory: sub\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: other\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", "working_dir = \"other\"\n"))),
+        ("P14c job defaults shell only, wf defaults wd sub (merge?)", "on: pull_request\ndefaults:\n  run:\n    working-directory: sub\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: bash\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", "working_dir = \"sub\"\n"))),
+        ("P14d job defaults shell only, wf wd sub, manifest root", "on: pull_request\ndefaults:\n  run:\n    working-directory: sub\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: bash\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P15 job env PATH", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    env:\n      PATH: /opt/x:/usr/bin:/bin\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P16 step env NODE_PATH", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm test\n        env:\n          NODE_PATH: ./lib\n".into(), lin(&st("m", "[\"npm\",\"test\"]", ""))),
+        ("P17 setup-node 22.11.0 + tools node 22.11.0, implicit python too", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22.11.0\n      - run: |\n          npm ci\n          python scripts/gen.py\n".into(), format!("version = 2\n[[tools]]\nname = \"node\"\nversion = \"22.11.0\"\n{}", &lin(&format!("{}{}", st("i", "[\"npm\",\"ci\"]", ""), st("g", "[\"python\",\"scripts/gen.py\"]", ""))) ["version = 2\n".len()..])),
+        ("P18 setup-node 22 (range) + tools 22.11.0", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n      - run: npm test\n".into(), format!("version = 2\n[[tools]]\nname = \"node\"\nversion = \"22.11.0\"\n{}", &lin(&st("t", "[\"npm\",\"test\"]", ""))["version = 2\n".len()..])),
+        ("P19 checkout submodules", job("      - uses: actions/checkout@v4\n        with:\n          submodules: recursive\n      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P20 checkout lfs", job("      - uses: actions/checkout@v4\n        with:\n          lfs: true\n      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P21 checkout fetch-depth 2 + git diff HEAD~1", job("      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: git diff --exit-code HEAD~1 -- api.lock\n"), lin(&st("m", "[\"git\",\"diff\",\"--exit-code\",\"HEAD~1\",\"--\",\"api.lock\"]", ""))),
+        ("P22 two checkouts (second overwrites?)", job("      - uses: actions/checkout@v4\n      - run: make gen\n      - uses: actions/checkout@v4\n      - run: make check\n"), lin(&format!("{}{}", st("g", "[\"make\",\"gen\"]", ""), st("c", "[\"make\",\"check\"]", "")))),
+        ("P23 checkout clean false", job("      - uses: actions/checkout@v4\n        with:\n          clean: false\n      - run: make check\n"), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P24 poetry install + run pytest, implicit poetry", jobc("      - run: |\n          poetry install\n          poetry run pytest\n"), lin(&format!("{}{}", st("i", "[\"poetry\",\"install\"]", ""), st("t", "[\"poetry\",\"run\",\"pytest\"]", "")))),
+        ("P25 wf job matrix python [3.11,3.12] no setup", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        py: ['3.11','3.12']\n    steps:\n      - uses: actions/checkout@v4\n      - run: pytest\n".into(), lin(&st("t", "[\"pytest\"]", ""))),
+        ("P26 python3 vs python", jobc("      - run: python3 -m pytest\n"), lin(&st("m", "[\"python\",\"-m\",\"pytest\"]", ""))),
+        ("P27 pnpm via corepack implicit", jobc("      - run: |\n          corepack enable\n          pnpm install --frozen-lockfile\n          pnpm test\n"), lin(&format!("{}{}{}", st("c", "[\"corepack\",\"enable\"]", ""), st("i", "[\"pnpm\",\"install\",\"--frozen-lockfile\"]", ""), st("t", "[\"pnpm\",\"test\"]", "")))),
+        ("P28 step wd ./ + defaults sub", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: sub\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n        working-directory: ./\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+        ("P29 runs-on ubuntu-22.04", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-22.04\n    steps:\n      - uses: actions/checkout@v4\n      - run: python -m pytest\n".into(), lin(&st("m", "[\"python\",\"-m\",\"pytest\"]", ""))),
+        ("P30 self-hosted label", "on: pull_request\njobs:\n  j:\n    runs-on: [self-hosted, linux, gpu]\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), lin(&st("m", "[\"make\",\"check\"]", ""))),
+    ];
+        let env_only_cases = [
+            "ctl make check",
+            "E4 two jobs same manifest job",
+            "E5 checkout after gate (gate before checkout of other path)",
+            "P4 make test (cargo inside make)",
+            "P5 just test",
+            "P6 rustup run stable cargo test",
+            "P7 bash ./ci.sh (script runs cargo)",
+            "P10 default depth + git log -1",
+            "P13 defaults wd sub + step wd other (override)",
+            "P14 wf-level defaults wd sub",
+        ];
+        for (name, wf, manifest_text) in e_cases.iter().chain(&p_cases) {
+            let r = report_one(wf, manifest_text);
+            assert!(!r.jobs.is_empty(), "{name}");
+            assert!(
+                r.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                "{name}: {:#?}",
+                r.jobs
+            );
+            if env_only_cases.contains(name) {
+                assert!(all_env_only(&r), "{name}: {:#?}", r.jobs);
+            } else {
+                assert!(r.jobs.iter().all(own_rule), "{name}: {:#?}", r.jobs);
+            }
+        }
     }
 
     #[test]
