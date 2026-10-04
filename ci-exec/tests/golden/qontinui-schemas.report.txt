@@ -2,32 +2,40 @@ qontinui-ci import --report
   manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
   workflows:      11 file(s)
   default branch: main
-  rule: A workflow job is considered when its workflow runs on `pull_request` /
-        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
-        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
-        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
-        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
-        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
-        `cancelled()`, steps with a literal `continue-on-error: true`, and known
-        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
-        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
-        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
-        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
-        runs the same command in the same working directory, on a job whose `os` includes every OS
-        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
-        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
-        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
-        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
-        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
-        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
-        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
-        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
-        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
-        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
-        COVERED counts toward the precondition.
+  rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
+        every gate command matched, with no unresolved directory, toolchain, environment change or
+        unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
+        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
+        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
+        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
+        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
+        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
+        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
+        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
+        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
+        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
+        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
+        PowerShell), a command whose program is a variable or expression, and a command whose
+        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
+        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) runs the same command in the same working directory, on a job whose `os` includes
+        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
+        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
+        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
+        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
+        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
+        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
+        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
+        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
+        identically (any key; an expression value never matches); a `cargo +toolchain` the step
+        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
+        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
+        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
+        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
+        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
+        counts toward the precondition.
 
 JOBS ON pull_request / push:main (10):
   UNCOVERED       commitlint.yml › commitlint [pull_request] 0/1 gate command(s) matched
@@ -38,12 +46,12 @@ JOBS ON pull_request / push:main (10):
   UNCOVERED       release-pr-sanity.yml › release-pr-sanity [pull_request] 0/1 gate command(s) matched
       missing: bash .github/scripts/release-pr-sanity.sh
       note:    job condition `if: startsWith(github.head_ref, 'release-please--')` — considered as running
-  UNCOVERED       runner-consumer-check.yml › consumer-check [pull_request] 0/50 gate command(s) matched
+  UNCOVERED       runner-consumer-check.yml › consumer-check [pull_request] 0/51 gate command(s) matched
       missing: git diff --name-only $BASE_SHA $HEAD_SHA
       missing: grep -qE ^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$|\.githu
       missing: [ -n $changed ]
       missing: sed s/^/  changed: /
-      missing: <outside the repository>/: git rev-parse HEAD
+      missing: run in an unresolvable directory (working-directory "${{ matrix.workdir }}" is an expression): Record resolved ${{ matrix.consumer }} main SHA
       missing: <outside the repository>/: sudo apt-get update
       missing: <outside the repository>/: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
       missing: <outside the repository>/: sudo fallocate -l 12G /swapfile
@@ -82,6 +90,7 @@ JOBS ON pull_request / push:main (10):
       missing: <outside the repository>/: jq -r [.statuses[]?] | .[]
              | [ .context,
                  (if .state == "success" then 
+      missing: <outside the repository>/: [ -n $ctx ]
       missing: <outside the repository>/: awk -F\t -v c=$ctx $1 == c { print $2; exit }
       missing: <outside the repository>/: [ -n $red_list ]
       missing: <outside the repository>/: [ -n $pending_list ]
@@ -94,6 +103,9 @@ JOBS ON pull_request / push:main (10):
       missing: <outside the repository>/: [ -n $checks_case ]
       missing: <outside the repository>/: [ $DECLARE_REASON = declared-pr-checks-red ]
       missing: <outside the repository>/: [ $DECLARED != true ]
+      review:  step "Decide whether the consumer gate must run" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Record resolved ${{ matrix.consumer }} main SHA" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Leg 2: resolve the declared adaptation PR" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  matrix legs include = ["consumer: qontinui-runner repo: qontinui/qontinui-runner workdir: qontinui-runner needs_dist_stub: 'true' heavy: 'true'", "consumer: qontinui-supervisor repo: qontinui/qontinui-supervisor workdir: qontinui-supervisor needs_dist_stub: 'false' heavy: 'false'"] — the manifest runs one leg
   UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/5 gate command(s) matched
       missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file
@@ -105,7 +117,7 @@ JOBS ON pull_request / push:main (10):
   UNCOVERED       runner-consumer-check.yml › consumer-gate [pull_request] 0/0 gate command(s) matched
       note:    job condition `if: always()` — considered as running
       note:    no gate command found
-  PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 5/22 gate command(s) matched
+  PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 5/23 gate command(s) matched
       missing: sed -n s/^# source-sha256:[[:space:]]*//p $F
       missing: head -1
       missing: [ -n $WANT ]
@@ -115,6 +127,7 @@ JOBS ON pull_request / push:main (10):
       missing: [ $WANT = $GOT ]
       missing: tee /tmp/cargo-test.out
       missing: awk -f .github/scripts/cargo-vacuity-count.awk /tmp/cargo-test.out
+      missing: [ ${FAIL_RC} -ne 0 ]
       missing: [ ${SUMMARIES} -eq 0 ]
       missing: [ ${SUBRC} -eq 0 ]
       missing: [ ${RAN} -lt ${MIN_TESTS} ]
@@ -138,6 +151,8 @@ JOBS ON pull_request / push:main (10):
       missing: bash scripts/check-generated-drift.sh --preflight
       missing: <outside the repository>/: bash $GENERATE_TYPES_SH
       missing: bash scripts/check-generated-drift.sh --verify
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/3 gate command(s) matched
       missing: curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v${GL}/gitleaks_${GL}_linux_x64.tar
       missing: tar -xz gitleaks
@@ -146,6 +161,7 @@ JOBS ON pull_request / push:main (10):
       missing: ts: npm ci
       missing: ts: npm run typecheck
       missing: ts: npm test
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
 
 NOT CONSIDERED — not on pull_request or a push to main (3 workflow(s)):
   candidate-ci.yml (jobs: rust-ci) — triggers ["push"]

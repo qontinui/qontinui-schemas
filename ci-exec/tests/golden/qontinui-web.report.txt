@@ -2,32 +2,40 @@ qontinui-ci import --report
   manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
   workflows:      27 file(s)
   default branch: main
-  rule: A workflow job is considered when its workflow runs on `pull_request` /
-        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
-        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
-        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
-        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
-        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
-        `cancelled()`, steps with a literal `continue-on-error: true`, and known
-        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
-        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
-        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
-        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
-        runs the same command in the same working directory, on a job whose `os` includes every OS
-        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
-        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
-        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
-        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
-        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
-        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
-        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
-        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
-        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
-        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
-        COVERED counts toward the precondition.
+  rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
+        every gate command matched, with no unresolved directory, toolchain, environment change or
+        unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
+        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
+        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
+        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
+        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
+        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
+        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
+        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
+        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
+        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
+        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
+        PowerShell), a command whose program is a variable or expression, and a command whose
+        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
+        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) runs the same command in the same working directory, on a job whose `os` includes
+        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
+        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
+        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
+        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
+        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
+        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
+        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
+        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
+        identically (any key; an expression value never matches); a `cargo +toolchain` the step
+        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
+        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
+        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
+        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
+        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
+        counts toward the precondition.
 
 JOBS ON pull_request / push:main (39):
   UNCOVERED       alembic-graph-check.yml › alembic-heads [push:main (paths-filtered)] 0/8 gate command(s) matched
@@ -39,13 +47,15 @@ JOBS ON pull_request / push:main (39):
       missing: backend: tr \n  
       missing: uses: actions/github-script
       missing: python scripts/ci/notify_forked_open_prs.py
+      review:  step "Count heads" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/1 gate command(s) matched
       missing: python scripts/ci/count_alembic_heads.py --baseline-ref origin/main
   PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 5/11 gate command(s) matched
-      missing: backend: rm -rf qontinui-schemas qontinui qontinui-cloud-control
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) rm -rf qontinui-schemas qontinui qontinui-cloud-control
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
@@ -53,11 +63,18 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry run ruff check .  ←  ci/backend-ruff-check
       matched: backend: poetry run ruff format --check .  ←  ci/backend-ruff-format
       matched: backend: poetry run mypy app/ --ignore-missing-imports  ←  ci/backend-mypy
-  PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/30 gate command(s) matched
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run ruff check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-check does not set it identically
+      review:  `backend: poetry run ruff format --check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-format does not set it identically
+      review:  `backend: poetry run mypy app/ --ignore-missing-imports` runs with PYTHON_VERSION=3.12; ci/backend-mypy does not set it identically
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
+  PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/34 gate command(s) matched
       missing: date -u +%s
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: uses: ./.github/actions/fleet-nouns-vocab
       missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
@@ -69,12 +86,16 @@ JOBS ON pull_request / push:main (39):
       missing: backend: cat collected-nodeids.txt
       missing: backend: wc -l
       missing: backend: find tests -name test_*.py -type f
+      missing: backend: [ -z ${expected_files} ]
+      missing: backend: [ -n ${expected_files//[0-9]/} ]
       missing: backend: [ ${expected_files} -lt 100 ]
       missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --count-only --min-files
       missing: backend: tail -20 collected-nodeids.txt
       missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --shards 6 --shard $EXPR
       missing: backend: [ ${#SHARD_FILES[@]} -eq 0 ]
       missing: backend: poetry run pytest ${SHARD_FILES[@]} -v --cov=app --cov-context=test --cov-report=xml --cov-report=ht
+      missing: backend: [ -z $start ]
+      missing: backend: [ -n ${start//[0-9]/} ]
       missing: backend: [ ${#start} -gt 11 ]
       missing: backend: [ $start -lt 1600000000 ]
       missing: backend: [ $elapsed_min -lt 0 ]
@@ -84,31 +105,54 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry run python scripts/export_openapi.py  ←  ci/openapi-export-extended
       matched: backend: poetry run python scripts/export_openapi.py --base  ←  ci/openapi-export-base
       matched: git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope  ←  ci/openapi-snapshot-drift
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with ENVIRONMENT=development; ci/openapi-export-extended does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with REDIS_ENABLED=false; ci/openapi-export-extended does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-extended does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with TESTING=1; ci/openapi-export-extended does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with ENVIRONMENT=development; ci/openapi-export-base does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with REDIS_ENABLED=false; ci/openapi-export-base does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-base does not set it
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with TESTING=1; ci/openapi-export-base does not set it
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with ENVIRONMENT=development; ci/openapi-snapshot-drift does not set it
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with REDIS_ENABLED=false; ci/openapi-snapshot-drift does not set it
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-snapshot-drift does not set it
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with TESTING=1; ci/openapi-snapshot-drift does not set it
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with ENVIRONMENT=development; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with PYTHON_VERSION=3.12; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with REDIS_ENABLED=false; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with TESTING=1; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with ENVIRONMENT=development; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with PYTHON_VERSION=3.12; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with REDIS_ENABLED=false; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with TESTING=1; ci/openapi-export-base does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with ENVIRONMENT=development; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with PYTHON_VERSION=3.12; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with REDIS_ENABLED=false; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with TESTING=1; ci/openapi-snapshot-drift does not set it identically
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs shard = ["1", "2", "3", "4", "5", "6"] — the manifest runs one leg
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
-      review:  uses service redis (redis), which no matched manifest job declares
+      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/openapi-export-extended's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/openapi-export-base's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/openapi-snapshot-drift's job does not declare it
+      review:  uses service redis (redis); ci/backend-install's job does not declare it
+      review:  uses service redis (redis); ci/backend-install-cloud-control's job does not declare it
+      review:  uses service redis (redis); ci/openapi-export-extended's job does not declare it
+      review:  uses service redis (redis); ci/openapi-export-base's job does not declare it
+      review:  uses service redis (redis); ci/openapi-snapshot-drift's job does not declare it
   PARTIAL         backend-ci.yml › security-scan [pull_request (paths-filtered)] 2/9 gate command(s) matched
       missing: uses: aquasecurity/trivy-action
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
       missing: backend: poetry run pip install safety
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/7 gate command(s) matched
       missing: [ -d junit ]
       missing: find junit -name *.xml -type f
@@ -117,6 +161,8 @@ JOBS ON pull_request / push:main (39):
       missing: [ ${found} != ${EXPECTED_SHARDS} ]
       missing: python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso
       missing: tee -a ${GITHUB_STEP_SUMMARY:-/dev/null}
+      review:  step "Build shard-durations-proposed.json" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
       note:    job condition `if: always()` — considered as running
@@ -129,15 +175,16 @@ JOBS ON pull_request / push:main (39):
       missing: [ -z $SHA ]
       missing: backend: docker build --build-arg CLOUD_CONTROL_SHA=${CLOUD_CONTROL_SHA} -t qontinui-backend:test .
       missing: backend: docker run --rm qontinui-backend:test python -c import app; print('Import successful')
+      review:  step "Resolve qontinui-cloud-control pin" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
       missing: tee -a $GITHUB_STEP_SUMMARY
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
-  PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/20 gate command(s) matched
+  PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/22 gate command(s) matched
       missing: date -u +%s
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: uses: ./.github/actions/fleet-nouns-vocab
       missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
@@ -146,6 +193,8 @@ JOBS ON pull_request / push:main (39):
       missing: backend: sudo apt-get install -y postgresql-client
       missing: backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
       missing: backend: poetry run pytest tests/ -v --cov=app --cov-context=test --cov-report=xml --cov-report=html --cov-re
+      missing: backend: [ -z $start ]
+      missing: backend: [ -n ${start//[0-9]/} ]
       missing: backend: [ ${#start} -gt 11 ]
       missing: backend: [ $start -lt 1600000000 ]
       missing: backend: [ $elapsed_min -lt 0 ]
@@ -154,16 +203,25 @@ JOBS ON pull_request / push:main (39):
       missing: backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
-      review:  uses service redis (redis), which no matched manifest job declares
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
+      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
+      review:  uses service redis (redis); ci/backend-install's job does not declare it
+      review:  uses service redis (redis); ci/backend-install-cloud-control's job does not declare it
   UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/5 gate command(s) matched
       missing: [ ${GITHUB_REF} = refs/heads/main ]
       missing: [ -n $before ]
       missing: [ $before != 0000000000000000000000000000000000000000 ]
       missing: git cat-file -e ${before}^{commit}
       missing: python scripts/ci/check_coord_column_drops.py --base-ref ${BASE_REF}
+      review:  step "Choose the base to diff against" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python scripts/check_dev_credentials_drift.py
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         e2e-tests.yml › backend-tests [pull_request, push:main] 1/10 gate command(s) matched
       missing: git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/${spec}.git ../${repo_name}
       missing: backend: python -m pip install --upgrade pip
@@ -175,6 +233,7 @@ JOBS ON pull_request / push:main (39):
       missing: backend: pip install -e . --no-deps
       missing: backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te
       matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
   UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
@@ -186,17 +245,21 @@ JOBS ON pull_request / push:main (39):
       missing: git fetch --no-tags --depth=1 origin refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF
       missing: git rev-parse refs/remotes/origin/$BASE_REF
       missing: python scripts/ci/list_changed_e2e_specs.py --base $E2E_BASE_SHA --head HEAD --github-output $GITHUB
+      review:  step "Fetch the PR base commit" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "List the E2E spec files this PR changed" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       e2e-tests.yml › frontend-e2e-changed-specs [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
       review:  matrix legs group = ["${{ fromJson(needs.changed-specs.outputs.groups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.changed-specs.outputs.any == 'true'` — considered as running
       note:    runs-on names no OS — no manifest job can be shown to cover it
-  UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/0 gate command(s) matched
+  UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/1 gate command(s) matched
+      missing: uses: actions/download-artifact
       note:    job condition `if: always()` — considered as running
-      note:    no gate command found
-  COVERED         forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/1 gate command(s) matched
+  NEEDS-REVIEW    forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   COVERED         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
   PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 4/5 gate command(s) matched
@@ -205,6 +268,7 @@ JOBS ON pull_request / push:main (39):
       matched: frontend: npm run lint  ←  ci/frontend-lint
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/15 gate command(s) matched
       missing: bash frontend/scripts/vercel-install.sh --config-source ci
       missing: test -f frontend/node_modules/@qontinui/cloud-control/frontend/src/index.ts
@@ -224,6 +288,7 @@ JOBS ON pull_request / push:main (39):
       missing: [ $rc -eq 0 ]
       missing: [ -f frontend/public/composed-build.json ]
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 6/7 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
       matched: frontend: npm ci  ←  ci/frontend-install
@@ -232,18 +297,23 @@ JOBS ON pull_request / push:main (39):
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
       matched: frontend: npm run build  ←  ci/composed-build
+      review:  `frontend: npm run cloud:install` runs with QONTINUI_CLOUD_CONTROL_PATH=${{ github.workspace }}/.sibling/qontinui-cloud-control; ci/composed-cloud-install does not set it identically
+      review:  `frontend: npm test` runs with QONTINUI_COMPOSED_BUILD=1; ci/frontend-test does not set it identically
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/3 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
       missing: frontend: node scripts/export-test-coverage.mjs
       matched: frontend: npm ci  ←  ci/frontend-install
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   COVERED         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
-  COVERED         global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/1 gate command(s) matched
+  NEEDS-REVIEW    global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 2/11 gate command(s) matched
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
       missing: backend: poetry run pytest tests/test_memory_recall_scorer.py -q --no-cov
@@ -252,15 +322,23 @@ JOBS ON pull_request / push:main (39):
       missing: uses: actions/github-script
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Run the recall harness" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Assert the harness actually ran" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
+      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
   UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: git diff --name-only $base...HEAD
       missing: grep -qE ^backend/alembic/versions/.*\.py$
+      review:  step "Detect alembic migration changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/19 gate command(s) matched
       missing: date -u +%s
-      missing: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
-      missing: git clone --depth 1 https://github.com/jspinak/qontinui.git
-      missing: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: backend: pip install poetry
       missing: backend: poetry install
       missing: command -v psql
@@ -276,7 +354,8 @@ JOBS ON pull_request / push:main (39):
       missing: backend: [ $MERGE_HEAD = 1 ]
       missing: backend: poetry run alembic upgrade head
       missing: backend: poetry run alembic downgrade -1
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
   UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: [ $relevant = true ]
@@ -289,8 +368,10 @@ JOBS ON pull_request / push:main (39):
   UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: python -m pip install pytest>=9,<10
       missing: python -m pytest .pre-commit-hooks -rA
-  COVERED         ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/1 gate command(s) matched
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+  NEEDS-REVIEW    ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/7 gate command(s) matched
       missing: curl -sSL -H Authorization: Bearer $EXPR{{ github.token }} https://api.github.com/repos/gitleaks/git
       missing: curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors -o gitleaks.tar.gz https://github.com/gitlea
@@ -314,9 +395,9 @@ JOBS ON pull_request / push:main (39):
       missing: psql -h localhost -U test_user -d test_db -c CREATE SCHEMA IF NOT EXISTS runner;
       missing: backend: alembic upgrade heads
       missing: backend: python scripts/spec_ci_local_idp.py --issuer $COGNITO_ISSUER --audience spec-ci-local --email spec-c
-      missing: backend: python -m http.server 8770 --bind 127.0.0.1
-      missing: backend: seq 1 15
-      missing: backend: curl -fsS http://127.0.0.1:8770/.well-known/jwks.json
+      missing: (unresolvable directory) python -m http.server 8770 --bind 127.0.0.1
+      missing: (unresolvable directory) seq 1 15
+      missing: (unresolvable directory) curl -fsS http://127.0.0.1:8770/.well-known/jwks.json
       missing: backend: python -m uvicorn app.main:app --host 127.0.0.1 --port
       missing: backend: seq 1 60
       missing: backend: curl -s -o /dev/null -w %{http_code} http://127.0.0.1:8000/health
@@ -356,25 +437,75 @@ JOBS ON pull_request / push:main (39):
       matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
       matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run build  ←  ci/composed-build
-      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with ENVIRONMENT=development; ci/backend-install-cloud-control does not set it
-      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_ENABLED=true; ci/backend-install-cloud-control does not set it
-      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/backend-install-cloud-control does not set it
-      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it
-      review:  `frontend: npm ci` runs with REDIS_ENABLED=true; ci/frontend-install does not set it
-      review:  `frontend: npm ci` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it
-      review:  `frontend: npm run build` runs with ENVIRONMENT=development; ci/composed-build does not set it
-      review:  `frontend: npm run build` runs with REDIS_ENABLED=true; ci/composed-build does not set it
-      review:  `frontend: npm run build` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/composed-build does not set it
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
-      review:  uses service redis (redis), which no matched manifest job declares
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Mint local id token + serve JWKS" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Start backend (uvicorn)" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Resolve Playwright apt cache key" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Stage apt archives for cache" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Start frontend (next start)" touches $GITHUB_ENV, which changes what later steps see
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with BACKEND_URL=http://localhost:8000; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with COGNITO_USER_POOL_ID=spec-ci-local-pool; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with ENVIRONMENT=development; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with NEXT_PUBLIC_API_URL=; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with NEXT_PUBLIC_ENABLE_SPEC_CI=1; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_ENABLED=true; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_HOST=localhost; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_PORT=6379; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with STORAGE_BACKEND=local; ci/backend-install-cloud-control does not set it identically
+      review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_USER_POOL_ID=spec-ci-local-pool; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with NEXT_PUBLIC_API_URL=; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with NEXT_PUBLIC_ENABLE_SPEC_CI=1; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with REDIS_ENABLED=true; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with REDIS_HOST=localhost; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with REDIS_PORT=6379; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with STORAGE_BACKEND=local; ci/frontend-install does not set it identically
+      review:  `frontend: npm run build` runs with BACKEND_URL=http://localhost:8000; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with COGNITO_USER_POOL_ID=spec-ci-local-pool; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with ENVIRONMENT=development; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with NEXT_PUBLIC_API_URL=; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with NEXT_PUBLIC_ENABLE_SPEC_CI=1; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with REDIS_ENABLED=true; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with REDIS_HOST=localhost; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with REDIS_PORT=6379; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` runs with STORAGE_BACKEND=local; ci/composed-build does not set it identically
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
+      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/frontend-install's job does not declare it
+      review:  uses service postgres (postgres-pgvector); ci/composed-build's job does not declare it
+      review:  uses service redis (redis); ci/backend-install-cloud-control's job does not declare it
+      review:  uses service redis (redis); ci/frontend-install's job does not declare it
+      review:  uses service redis (redis); ci/composed-build's job does not declare it
   UNCOVERED       sql-through-alembic.yml › sql-through-alembic [pull_request (paths-filtered)] 0/1 gate command(s) matched
       missing: python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD
-  PARTIAL         style-gate.yml › style-gate [pull_request (paths-filtered)] 1/45 gate command(s) matched
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+  PARTIAL         style-gate.yml › style-gate [pull_request (paths-filtered)] 1/50 gate command(s) matched
       missing: date -u +%s
       missing: [ ! -f style-gate.lock ]
       missing: jq -r .qontinui_schemas_sha style-gate.lock
       missing: jq -r .crate style-gate.lock
       missing: jq -r .bin style-gate.lock
+      missing: [ -z $SHA ]
       missing: [ $SHA = null ]
       missing: [ ${DISPATCH_ENFORCE:-} = 1 ]
       missing: [ ${VAR_ENFORCE:-} = 1 ]
@@ -403,7 +534,10 @@ JOBS ON pull_request / push:main (39):
       missing: tr \n  
       missing: sed s/|/\\|/g
       missing: [ -z $summary ]
+      missing: [ ! -f $snap ]
       missing: [ ! -f $frame ]
+      missing: [ -f $snap ]
+      missing: [ -f $frame ]
       missing: $VISION_AUDIT analyze --snapshot $snap --frame $frame --analyzer all --fail-on critical
       missing: fold_result analyze $an_rc $an_err
       missing: [ ! -f $spec ]
@@ -413,14 +547,33 @@ JOBS ON pull_request / push:main (39):
       missing: [ $EXPR{{ steps.capture.outcome }} != success ]
       missing: [ $any_infra = 1 ]
       missing: [ $any_capture_missing = 1 ]
+      missing: [ $ENFORCE = 1 ]
       missing: [ $any_gate2 = 1 ]
       matched: frontend: npm ci  ←  ci/frontend-install
-      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it
-      review:  `frontend: npm ci` runs with SECRET_KEY=style-gate-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Resolve enforce mode" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Build vision-audit" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Resolve Playwright apt cache key" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Stage apt archives for cache" touches $GITHUB_ENV, which changes what later steps see
+      review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=style-gate-local; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with COGNITO_USER_POOL_ID=style-gate-local-pool; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with NEXT_PUBLIC_API_URL=; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` runs with SECRET_KEY=style-gate-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
+      review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+      review:  uses service postgres (postgres-pgvector); ci/frontend-install's job does not declare it
   COVERED         web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/1 gate command(s) matched
       matched: python scripts/ci/check_web_boundary.py  ←  ci/web-boundary-lint
   UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
+      review:  runs on `self-hosted`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host
+      review:  runs on `public-pool`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host
       note:    runs-on names no OS — no manifest job can be shown to cover it
       note:    no gate command found
 
@@ -1348,4 +1501,4 @@ NO-OPS (139) — accounted for; nothing to declare:
   - web-boundary-lint.yml › web-boundary-lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
       — the executor checks out the dispatched commit itself
 
-summary: 7 covered, 0 needs-review, 0 name-only, 12 partial, 20 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 4 covered, 3 needs-review, 0 name-only, 12 partial, 20 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET

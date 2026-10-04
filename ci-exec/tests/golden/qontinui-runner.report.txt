@@ -2,32 +2,40 @@ qontinui-ci import --report
   manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
   workflows:      29 file(s)
   default branch: main
-  rule: A workflow job is considered when its workflow runs on `pull_request` /
-        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
-        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
-        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
-        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
-        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
-        `cancelled()`, steps with a literal `continue-on-error: true`, and known
-        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
-        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
-        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
-        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
-        runs the same command in the same working directory, on a job whose `os` includes every OS
-        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
-        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
-        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
-        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
-        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
-        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
-        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
-        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
-        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
-        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
-        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
-        COVERED counts toward the precondition.
+  rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
+        every gate command matched, with no unresolved directory, toolchain, environment change or
+        unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
+        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
+        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
+        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
+        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
+        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
+        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
+        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
+        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
+        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
+        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
+        PowerShell), a command whose program is a variable or expression, and a command whose
+        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
+        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) runs the same command in the same working directory, on a job whose `os` includes
+        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
+        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
+        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
+        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
+        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
+        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
+        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
+        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
+        identically (any key; an expression value never matches); a `cargo +toolchain` the step
+        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
+        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
+        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
+        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
+        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
+        counts toward the precondition.
 
 JOBS ON pull_request / push:main (41):
   UNCOVERED       advisory-red-detector.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
@@ -43,8 +51,10 @@ JOBS ON pull_request / push:main (41):
       missing: <outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root
       missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
       missing: bash atlas/scripts/check_schema.sh
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
-  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/31 gate command(s) matched
+      review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/32 gate command(s) matched
       missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[] | .filename, (.previous_filename /
       missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .changed_files
       missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[].filename
@@ -72,11 +82,13 @@ JOBS ON pull_request / push:main (41):
       missing: [ -z ${tok:-} ]
       missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .body // ""
       missing: grep -qxF ${directive}: ${tok}
+      missing: [ ${DECLARED} != alters-a-gate ]
       missing: [ -n ${MISSING} ]
       missing: sed s/^/- `/;s/$/`/
       missing: cat ${RUNNER_TEMP}/notice.md
       missing: gh pr comment ${PR_NUMBER} --repo ${REPO} --body-file ${RUNNER_TEMP}/notice.md
-  UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/82 gate command(s) matched
+      review:  step "Verify and record gating-workflow changes" changes the environment of later commands: `export HIT_PATHS MERGE_BASE`
+  UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/87 gate command(s) matched
       missing: note
       missing: note ### ci-rerun-on-declaration
       missing: note 
@@ -108,6 +120,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ ${run_status} != completed ]
       missing: note Run is `${run_status}` and raced the label — cancelling before re-run.
       missing: seq 1 60
+      missing: gh api repos/${REPO}/actions/runs/${run_id} -q .status
       missing: [ ${run_status} = completed ]
       missing: note ⚠️ Cancel requested but not settled within 10 min; not re-running it.
       missing: note Re-run `ci.yml` by hand on this PR to act on `${LABEL_NAME}`.
@@ -137,9 +150,13 @@ JOBS ON pull_request / push:main (41):
       missing: note may have cancelled that head's `ci.yml` run — check the PR's latest run.
       missing: note ⚠️ Could not re-run `ci.yml` run `${run_id}`.
       missing: note Re-run it by hand so `${LABEL_NAME}` is acted on.
+      missing: note
       missing: note ### ci-rerun-on-declaration — base retarget
+      missing: note 
+      missing: note - PR: `${REPO}#${PR_NUMBER}` @ `${HEAD_SHA}`
       missing: note - Base retargeted: `${OLD_BASE_REF}` → `${BASE_REF}`
       missing: note - Head branch: `${HEAD_REPO:-<unknown>}:${HEAD_REF}`
+      missing: [ -z ${HEAD_REPO:-} ]
       missing: [ ${HEAD_REPO:-} != ${REPO} ]
       missing: note ⚠️ **This retarget cannot be re-verified automatically.**
       missing: note The head lives in a fork (`${HEAD_REPO:-<deleted or inaccessible>}`), and
@@ -161,8 +178,9 @@ JOBS ON pull_request / push:main (41):
       missing: note `branches:` filter, so it already reported on this head.
   UNCOVERED       ci-timeout-marker-selftest.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python3 scripts/tests/test_ci_timeout_marker.py
-  UNCOVERED       ci.yml › test [pull_request, push:main] 0/60 gate command(s) matched
+  UNCOVERED       ci.yml › test [pull_request, push:main] 0/63 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
+      missing: uses: pnpm/action-setup
       missing: run (pwsh script): Run CI-tooling unit tests (ci-flake-analyze, ci-test-results-ingest, ci-expiry-phase-summary)
       missing: cargo metadata --locked --format-version
       missing: run (pwsh script): Install dependencies (Ubuntu)
@@ -186,6 +204,7 @@ JOBS ON pull_request / push:main (41):
       missing: command -v python
       missing: od -An -N16 -tx1 /dev/urandom
       missing: tr -d  \n
+      missing: hostname
       missing: $HOME
       missing: [ $RUNNER_OS = Windows ]
       missing: cygpath -u $USERPROFILE
@@ -215,6 +234,7 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: sed -n s/^[[:space:]]*Executable `\(.*\)`[[:space:]]*$/\1/p
       missing: src-tauri: [ ${#BINS[@]} -eq 0 ]
       missing: src-tauri: run_all
+      missing: src-tauri: $exe
       missing: src-tauri: tee ../cargo-test-output.log
       missing: rm -f $h/.qontinui/$f
       missing: run (pwsh script): Build Tauri app (development)
@@ -222,35 +242,49 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/tests/ci-integrity/run-scenarios.sh
       missing: python3 scripts/tests/ci-integrity/test-surface.py
       missing: powershell -File scripts/contract-smoke.ps1 -DirectExe target/debug/qontinui-runner.exe -Profile ci 
-  UNCOVERED       ci.yml › clippy-windows [pull_request, push:main] 0/5 gate command(s) matched
+      review:  step "Poison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Unpoison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
+  UNCOVERED       ci.yml › clippy-windows [pull_request, push:main] 0/6 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
+      missing: uses: pnpm/action-setup
       missing: uses: al-cheb/configure-pagefile-action
       missing: run (pwsh script): Install frontend dependencies
       missing: run (pwsh script): Build frontend
       missing: run (pwsh script): Clippy check
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › holder-crates [pull_request, push:main] 0/3 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: run (pwsh script): Test holder crates
       missing: run (pwsh script): Clippy holder crates
-  NEEDS-REVIEW    ci.yml › frontend-tests [pull_request, push:main] 2/2 gate command(s) matched
+      review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
+  PARTIAL         ci.yml › frontend-tests [pull_request, push:main] 2/3 gate command(s) matched
+      missing: uses: pnpm/action-setup
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm test  ←  ci/frontend-test
-      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it
-      review:  `pnpm test` runs with CARGO_TERM_COLOR=always; ci/frontend-test does not set it
+      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
+      review:  `pnpm install --frozen-lockfile` runs with GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}; ci/frontend-install does not set it identically
+      review:  `pnpm test` runs with CARGO_TERM_COLOR=always; ci/frontend-test does not set it identically
+      review:  `pnpm test` runs with GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}; ci/frontend-test does not set it identically
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › seam-gate [pull_request, push:main] 0/5 gate command(s) matched
       missing: grep -m1 -vE ^\s*(//|$) $tf
       missing: [ $first != #![cfg(any(debug_assertions, feature = "test-fixtures"))] ]
       missing: grep -Pzo $gate_outer\r?\n\s*pub mod test_fixtures; src-tauri/src/mcp/mod.rs
       missing: grep -Pzo $gate_outer\r?\n\s*let base_router = base_router.merge\(crate::mcp::test_fixtures::routes\
       missing: [ $fail -ne 0 ]
-  UNCOVERED       ci.yml › security [pull_request, push:main] 0/3 gate command(s) matched
+  UNCOVERED       ci.yml › security [pull_request, push:main] 0/4 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: cargo install cargo-audit --locked
       missing: cargo audit --file Cargo.lock --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC
-  PARTIAL         clippy-tiers.yml › clippy-nightly-unscoped [pull_request] 2/12 gate command(s) matched
+      missing: uses: pnpm/action-setup
+  PARTIAL         clippy-tiers.yml › clippy-nightly-unscoped [pull_request] 2/13 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
-      missing: git clone --depth 1 https://github.com/qontinui/qontinui-web.git
-      missing: git clone --depth 1 https://github.com/qontinui/ui-bridge.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-web.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/ui-bridge.git
+      missing: uses: pnpm/action-setup
       missing: sudo apt-get update
       missing: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
       missing: sudo fallocate -l 12G /swapfile
@@ -260,13 +294,16 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: cargo clippy --all-targets
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
-      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it
-      review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it
+      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
+      review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'` — considered as running
-  PARTIAL         clippy-tiers.yml › clippy-diff [pull_request] 2/13 gate command(s) matched
+  PARTIAL         clippy-tiers.yml › clippy-diff [pull_request] 2/14 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
-      missing: git clone --depth 1 https://github.com/qontinui/qontinui-web.git
-      missing: git clone --depth 1 https://github.com/qontinui/ui-bridge.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-web.git
+      missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/ui-bridge.git
+      missing: uses: pnpm/action-setup
       missing: uses: reviewdog/action-setup
       missing: sudo apt-get update
       missing: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
@@ -277,8 +314,10 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: reviewdog -f=clippy -name=clippy-diff -filter-mode=diff_context -reporter=github-pr-check -fail-on-e
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
-      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it
-      review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it
+      review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
+      review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       clorinde-bindings-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
@@ -288,6 +327,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/clorinde.toml src-tauri/c
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect Clorinde-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/23 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
@@ -312,7 +352,11 @@ JOBS ON pull_request / push:main (41):
       missing: git commit -m chore(clorinde): regenerate bindings against current schema
       missing: [ $PAT_AVAILABLE = true ]
       missing: git push origin HEAD:$BRANCH
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Detect drift" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Auto-commit regenerated bindings" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — considered as running
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
@@ -348,7 +392,8 @@ JOBS ON pull_request / push:main (41):
       missing: :!.github/actions/checkout-sibling/
       missing: :!.github/workflows/forbid-sibling-clone.yml
       missing: git grep -nE $PATTERN -- .github/ ${EXCLUDES[@]}
-  UNCOVERED       forbid-untimed-subprocess.yml › forbid-untimed-subprocess [pull_request, push:main] 0/16 gate command(s) matched
+  UNCOVERED       forbid-untimed-subprocess.yml › forbid-untimed-subprocess [pull_request, push:main] 0/18 gate command(s) matched
+      missing: [ -z ${BASE_REF} ]
       missing: [ ${BASE_REF} = null ]
       missing: [ ${BASE_REF} != ${PAYLOAD_BASE_REF} ]
       missing: git fetch --no-tags origin +refs/pull/${PR_NUMBER}/head:refs/qontinui/pr-head +refs/heads/${BASE_REF
@@ -363,16 +408,23 @@ JOBS ON pull_request / push:main (41):
       missing: [ ${CONFLICT_LIST_OK} = 0 ]
       missing: git rev-parse HEAD
       missing: [ ${GITHUB_EVENT_NAME} != pull_request ]
+      missing: git rev-parse HEAD
       missing: python3 scripts/check_untimed_subprocess.py --list-roots
       missing: python3 scripts/check_untimed_subprocess.py --ci
-  PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/7 gate command(s) matched
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+  PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/10 gate command(s) matched
       missing: date -u +%s
+      missing: uses: pnpm/action-setup
       missing: node scripts/export-test-coverage.mjs
+      missing: [ -z $start ]
+      missing: [ -n ${start//[0-9]/} ]
       missing: [ ${#start} -gt 11 ]
       missing: [ $start -lt 1600000000 ]
       missing: [ $elapsed_min -lt 0 ]
       missing: [ $elapsed_min -ge $SOFT_BUDGET_MINUTES ]
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
+      review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       onboarding-doc-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
       missing: git merge-base --all $base_sha $head_sha
@@ -381,6 +433,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/src/coord_doctor.rs src-tauri/src/bin/coord_
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect onboarding-doc-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-verify [pull_request] 0/5 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: sudo apt-get update
@@ -407,6 +460,8 @@ JOBS ON pull_request / push:main (41):
       missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --preflight
       missing: <outside the repository>/: bash qontinui-runner/src-tauri/scripts/generate_types.sh
       missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --verify
+      review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       schema-pg-sql-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
       missing: git merge-base --all $base_sha $head_sha
@@ -415,6 +470,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/schema.pg.sql.generated s
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect schema-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/19 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
@@ -435,7 +491,9 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: diff -q /tmp/schema.checked-in.normalized.sql /tmp/schema.generated.normalized.sql
       missing: src-tauri: diff -u /tmp/schema.checked-in.sql schema.pg.sql.generated
       missing: src-tauri: head -80
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.schema_changed == 'true'` — considered as running
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
@@ -446,7 +504,7 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/tests/test_schema_pr_step_guards.sh
       missing: bash scripts/tests/test_ready_bot_draft_pr.sh
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
-  UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/93 gate command(s) matched
+  UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/94 gate command(s) matched
       missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
       missing: <outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git
       missing: <outside the repository>/: curl -sSL https://install.python-poetry.org
@@ -494,6 +552,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ $existing_draft = false ]
       missing: gh pr view $existing_num --repo $REPO --json mergeable,mergeStateStatus --jq .mergeable + " " + .mer
       missing: pr_op_failed view #$existing_num (mergeable)
+      missing: [ $mergeable = CONFLICTING ]
       missing: [ ${merge_status:-} = DIRTY ]
       missing: gh pr view $existing_num --repo $REPO --json id --jq .id
       missing: pr_op_failed view #$existing_num (id)
@@ -540,7 +599,9 @@ JOBS ON pull_request / push:main (41):
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
       missing: cat $sweep_log
-      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Check schema.pg.sql.generated is fresh" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow-tests.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: bash scripts/tests/schemas-pair-follow/run.sh
@@ -549,15 +610,18 @@ JOBS ON pull_request / push:main (41):
       missing: [[ ! $LABEL_NAME =~ $re ]]
       missing: gh workflow run schemas-pair-follow.yml -R $REPO --ref main -f pr=$PR_NUMBER -f partner=$partner
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
-  UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/8 gate command(s) matched
+  UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/10 gate command(s) matched
       missing: [ -n ${INPUT_PR:-} ]
       missing: [[ $INPUT_PR =~ ^[0-9]+$
+      missing: ${INPUT_PARTNER:-} =~ ^[0-9]+$ ]]
       missing: bash scripts/schemas-pair-follow.sh scan
+      missing: [ -n ${m:-} ]
       missing: bash scripts/schemas-pair-follow.sh decide $m $n
       missing: jq -c --argjson r $r . + [$r]
       missing: jq -r .[] | "| #\(.pr) | qontinui-schemas#\(.partner) | \(.action) | \(.mode) | \(.reason) |"
       missing: jq -c [.[] | select(.action == "FOLLOW")]
       missing: jq [.[] | select(.action == "UNKNOWN")] | length
+      review:  step "Scan and decide" touches $GITHUB_OUTPUT, which changes what later steps see
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › compute [pull_request] 0/7 gate command(s) matched
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh merge-and-pin runner $RUNNER_TEMP/decide.json
@@ -567,6 +631,8 @@ JOBS ON pull_request / push:main (41):
       missing: [ -n $chan ]
       missing: rustup toolchain install $chan --profile minimal
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh lock-and-commit runner $RUNNER_TEMP/decide.json $RUNNER_TEM
+      review:  step "Merge main and move the pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install main's Rust toolchain" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › push [pull_request] 0/1 gate command(s) matched
@@ -584,7 +650,7 @@ JOBS ON pull_request / push:main (41):
       missing: test -x ./gitleaks
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
-  UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/108 gate command(s) matched
+  UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/114 gate command(s) matched
       missing: bash scripts/tests/test_pin_bump_pr_step.sh
       missing: [ ! -f $MANIFEST ]
       missing: tr -d \r
@@ -620,6 +686,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ $GITHUB_REF = refs/heads/${DEFAULT_BRANCH} ]
       missing: [ $self_heal != true ]
       missing: read_pin
+      missing: tr -d \r
       missing: awk { sub(/#.*/, "") } $1 == "qontinui/qontinui-schemas" && NF == 2 { print $2 }
       missing: read_pin $MANIFEST
       missing: read_pin $RUNNER_TEMP/sibling-pins.fresh.conf
@@ -647,6 +714,7 @@ JOBS ON pull_request / push:main (41):
       missing: gh pr view $existing_num --repo $REPO --json isDraft --jq .isDraft
       missing: [ $existing_draft = false ]
       missing: gh pr view $existing_num --repo $REPO --json mergeable,mergeStateStatus --jq .mergeable + " " + .mer
+      missing: [ $mergeable = CONFLICTING ]
       missing: [ ${merge_status:-} = DIRTY ]
       missing: [ ${REFRESH_SKIPPED_FOR_READY:-} = true ]
       missing: gh pr view $existing_num --repo $REPO --json id --jq .id
@@ -658,8 +726,10 @@ JOBS ON pull_request / push:main (41):
       missing: gh api --paginate repos/$REPO/issues/$existing_num/comments --jq .[].body
       missing: grep -qF sibling-pin-drift:$status_sha $RUNNER_TEMP/pr-comments.txt
       missing: cat $RUNNER_TEMP/sibling-pins.report.txt
+      missing: gh pr comment $existing_num --repo $REPO --body-file $RUNNER_TEMP/pr-comment.md
       missing: pr_write_failed gh pr comment on #$existing_num
       missing: git checkout -B $BRANCH $GITHUB_SHA
+      missing: cp $RUNNER_TEMP/sibling-pins.fresh.conf $MANIFEST
       missing: git add -- $MANIFEST
       missing: git status --porcelain -- Cargo.lock
       missing: [ -n $(git status --porcelain -- Cargo.lock) ]
@@ -675,7 +745,9 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/ci/ready-bot-draft-pr.sh --print-close-marker
       missing: pr_write_failed reading the comments of closed bump PR #$existing_num
       missing: grep -qF $close_marker $RUNNER_TEMP/closed-pr-comments.txt
+      missing: gh pr reopen $existing_num --repo $REPO
       missing: pr_write_failed gh pr reopen #$existing_num
+      missing: gh pr edit $existing_num --repo $REPO --title $TITLE --body-file $body
       missing: pr_write_failed gh pr edit #$existing_num
       missing: gh pr view $existing_num --repo $REPO --json url --jq .url
       missing: gh pr create --repo $REPO --base main --head $BRANCH --draft --title $TITLE --body-file $body
@@ -693,6 +765,8 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --max-age-hours 48 ${extra_args[
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
+      review:  step "Resolve each pinned sibling's current default-branch head" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Detect a moving qontinui-schemas pin" touches $GITHUB_OUTPUT, which changes what later steps see
 
 NOT CONSIDERED — not on pull_request or a push to main (6 workflow(s)):
   build-python-executor.yml (jobs: build, combine) — triggers ["workflow_dispatch", "workflow_call"]
@@ -1838,4 +1912,4 @@ NO-OPS (151) — accounted for; nothing to declare:
   - stacked-pr-fastlane.yml › frontend-fast › step "Setup Node.js": setup-node cache — a dependency
       cache, not a gate
 
-summary: 0 covered, 1 needs-review, 0 name-only, 3 partial, 37 uncovered of 41 job(s); 274 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 0 covered, 0 needs-review, 0 name-only, 4 partial, 37 uncovered of 41 job(s); 274 untranslated construct(s) — the Phase 9 precondition is NOT MET

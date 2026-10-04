@@ -56,9 +56,25 @@ pub struct LooseCommand {
     pub working_dir: String,
     /// Literal `KEY=value` words written before the command.
     pub assignments: Vec<(String, String)>,
-    /// Followed by `||` and a fallback that is not `exit` / `{ …; exit N; }`
-    /// (`cmd || true`, `cmd || echo …`): its failure cannot fail the step.
+    /// Followed by exactly `|| true` or `|| :` — the only fallbacks that
+    /// make a failure harmless. Any other fallback (`|| rc=$?`, `|| ( … )`,
+    /// `|| { … }`) leaves the command a gate.
     pub guarded: bool,
+    /// The working directory could not be resolved (a `cd` to a variable or
+    /// an unresolvable `git -C`): `working_dir` is then meaningless.
+    pub wd_known: bool,
+    /// The command changes the environment of what follows (`export`,
+    /// `declare -x`, `set -a`, `source`/`.`): a description, else `None`.
+    pub env_effect: Option<String>,
+}
+
+/// `$GITHUB_ENV` / `$GITHUB_PATH` / `$GITHUB_OUTPUT` named anywhere in a
+/// script: a write there changes what later steps see.
+pub fn github_file_writes(script: &str) -> Vec<&'static str> {
+    ["GITHUB_ENV", "GITHUB_PATH", "GITHUB_OUTPUT", "GITHUB_STATE"]
+        .into_iter()
+        .filter(|f| script.contains(f))
+        .collect()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1046,10 +1062,16 @@ fn drop_case_patterns(toks: Vec<Tok>) -> Vec<Tok> {
 /// checks only. Control keywords, assignments and redirects are skipped; `cd`
 /// is followed when its target is literal; unexpanded variables stay as text.
 pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
+    extract_loose_in(script, Some(start_wd.to_string()))
+}
+
+/// [`extract_loose`] from a working directory that may already be unknown.
+fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand> {
     let script = substitute_workspace_expr(script).replace("${{", "$EXPR{{");
     let toks = drop_case_patterns(tokenize(&script));
     let mut out = Vec::new();
-    let mut wd = start_wd.to_string();
+    // `None`: the directory is no longer known.
+    let mut wd: Option<String> = start_wd;
     let mut seg: Vec<Tok> = Vec::new();
     // Each segment with the operator that ended it.
     let mut segments: Vec<(Vec<Tok>, &'static str)> = Vec::new();
@@ -1063,25 +1085,29 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
         }
     }
     segments.push((seg, "\n"));
-    let first_word_of = |seg: &[Tok]| -> Option<String> {
-        seg.iter().find_map(|t| match t {
-            Tok::Word(w) => Some(w.text.clone()),
-            _ => None,
-        })
+    let harmless_fallback = |seg: &[Tok]| -> bool {
+        let words: Vec<&Word> = seg
+            .iter()
+            .filter_map(|t| match t {
+                Tok::Word(w) => Some(w),
+                _ => None,
+            })
+            .collect();
+        seg.len() == 1 && words.len() == 1 && (words[0].is("true") || words[0].is(":"))
     };
+    let unknown = "<unknown directory>".to_string();
     for (si, (seg, term)) in segments.iter().enumerate() {
         let guarded = *term == "||"
-            && !matches!(
-                segments.get(si + 1).and_then(|(n, _)| first_word_of(n)).as_deref(),
-                Some("exit") | Some("{")
-            );
+            && segments
+                .get(si + 1)
+                .is_some_and(|(n, _)| harmless_fallback(n));
         let seg = seg.clone();
         // Commands inside `$( … )` run too: `out="$(zizmor …)"` is a gate.
         for t in &seg {
             if let Tok::Word(w) = t {
                 if w.subst {
                     for inner in substitutions(&w.text) {
-                        out.extend(extract_loose(&inner, &wd));
+                        out.extend(extract_loose_in(&inner, wd.clone()));
                     }
                 }
             }
@@ -1133,7 +1159,40 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
         let Some(first) = words.first() else {
             continue;
         };
-        if ["for", "case", "function", "export", "local", "readonly", "declare"]
+        let text = |w: &Word| w.text.replace(ROOT, "$GITHUB_WORKSPACE");
+        let env_effect: Option<String> = if first.is("export") {
+            Some(format!("`export {}`", words[1..].iter().map(text).collect::<Vec<_>>().join(" ")))
+        } else if (first.is("declare") || first.is("typeset"))
+            && words[1..].iter().any(|w| w.text.starts_with('-') && w.text.contains('x'))
+        {
+            Some(format!("`{} -x …`", first.text))
+        } else if first.is("set")
+            && words[1..].iter().any(|w| {
+                (w.text.starts_with('-') && w.text.contains('a')) || w.text == "allexport"
+            })
+        {
+            Some("`set -a` (exports every later assignment)".to_string())
+        } else if first.is("source") || first.is(".") {
+            Some(format!(
+                "`{} {}` (reads an environment file)",
+                first.text,
+                words.get(1).map(text).unwrap_or_default()
+            ))
+        } else {
+            None
+        };
+        if env_effect.is_some() && !(first.is("source") || first.is(".")) {
+            out.push(LooseCommand {
+                argv: words.iter().map(text).collect(),
+                working_dir: wd.clone().unwrap_or_else(|| unknown.clone()),
+                assignments,
+                guarded,
+                wd_known: wd.is_some(),
+                env_effect,
+            });
+            continue;
+        }
+        if ["for", "case", "function", "local", "readonly", "declare", "typeset"]
             .iter()
             .any(|kw| first.is(kw))
             || first.text.ends_with(')')
@@ -1141,28 +1200,41 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
             continue;
         }
         if first.is("cd") {
-            if let Some(t) = words.get(1).and_then(|w| cd_target(w, &wd)) {
-                wd = t;
-            }
+            // A target that is not a literal (a variable, `cd -`, no argument)
+            // makes every later directory unknown.
+            wd = match (&wd, words.get(1)) {
+                (_, Some(w)) if w.text.starts_with(ROOT) => cd_target(w, ""),
+                (Some(cur), Some(w)) => cd_target(w, cur),
+                _ => None,
+            };
             continue;
         }
         // Same order as the translator: `git -C` moves the command first, then
         // `$GITHUB_WORKSPACE` resolves against where it runs.
         let git_c = words.len() >= 3 && words[0].is("git") && words[1].is("-C");
-        let (cmd_wd, from) = match git_c.then(|| cd_target(&words[2], &wd)).flatten() {
-            Some(t) => (t, 3),
-            None => (wd.clone(), 0),
+        let (cmd_wd, from): (Option<String>, usize) = if git_c {
+            let target = match &wd {
+                _ if words[2].text.starts_with(ROOT) => cd_target(&words[2], ""),
+                Some(cur) => cd_target(&words[2], cur),
+                None => None,
+            };
+            (target, 3)
+        } else {
+            (wd.clone(), 0)
         };
+        let resolve_in = cmd_wd.clone().unwrap_or_default();
         let mut argv: Vec<String> = Vec::with_capacity(words.len());
         if from == 3 {
             argv.push("git".to_string());
         }
-        argv.extend(words[from..].iter().map(|w| resolve_root(&w.text, &cmd_wd)));
+        argv.extend(words[from..].iter().map(|w| resolve_root(&w.text, &resolve_in)));
         out.push(LooseCommand {
             argv,
-            working_dir: cmd_wd,
+            working_dir: cmd_wd.clone().unwrap_or_else(|| unknown.clone()),
             assignments,
             guarded,
+            wd_known: cmd_wd.is_some(),
+            env_effect,
         });
     }
     out
@@ -1287,6 +1359,14 @@ mod tests {
         let g = extract_loose("make lint || true\nmake check || exit 1\nRUSTFLAGS=-Dwarnings cargo build\n", "");
         assert!(g[0].guarded);
         assert!(!g[2].guarded, "make check || exit 1 is a gate");
+        for script in ["make a || rc=$?\n", "make a || ( echo x )\n", "make a || { echo x; }\n", "make a || echo x\n"] {
+            assert!(!extract_loose(script, "")[0].guarded, "{script}");
+        }
+        let u = extract_loose("cd \"$DIR\"\nmake check\ncd sub\nmake x\n", "");
+        assert!(u.iter().all(|c| !c.wd_known), "{u:#?}");
+        let e = extract_loose("export A=1\nset -a\nsource .env\ndeclare -x B=2\n", "");
+        assert_eq!(e.iter().filter(|c| c.env_effect.is_some()).count(), 4, "{e:#?}");
+        assert_eq!(github_file_writes("echo x >> \"$GITHUB_ENV\""), vec!["GITHUB_ENV"]);
         let cb = g.iter().find(|c| c.argv[0] == "cargo").unwrap();
         assert_eq!(cb.assignments, vec![("RUSTFLAGS".to_string(), "-Dwarnings".to_string())]);
     }

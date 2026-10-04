@@ -124,6 +124,11 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import -- -D warnings
 
+      # The library as its consumers (runner, coord) build it: WITHOUT the
+      # `import` feature, so dead code behind the feature gate is caught.
+      - name: cargo clippy ci-exec without the import feature
+        run: cargo clippy -p qontinui-ci-exec --all-targets -- -D warnings
+
       - name: cargo build
         run: cargo build --workspace --all-targets --features qontinui-ci-exec/import
 

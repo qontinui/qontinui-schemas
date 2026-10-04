@@ -240,6 +240,13 @@ command = ["cargo", "clippy", "--workspace", "--all-targets", "--features", "qon
 timeout_secs = 7200
 
 [[steps]]
+name = "rust-clippy-ci-exec-no-import"
+# rust-ci.yml "cargo clippy ci-exec without the import feature": the library as
+# its consumers build it.
+command = ["cargo", "clippy", "-p", "qontinui-ci-exec", "--all-targets", "--", "-D", "warnings"]
+timeout_secs = 7200
+
+[[steps]]
 name = "rust-build"
 # rust-ci.yml "cargo build". `--all-targets` is load-bearing: it is what pulls
 # rust-vision-core's `vision-audit` bin, the examples and the test targets into
