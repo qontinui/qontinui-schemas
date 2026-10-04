@@ -201,7 +201,7 @@ pub async fn run_dispatch(
             sink,
             &mut steps_summary,
             Instant::now(),
-            "unsafe_identifier",
+            crate::checkout::UNSAFE_IDENTIFIER_REASON,
         )
         .await;
     }
@@ -291,7 +291,8 @@ pub async fn run_dispatch(
             // did not earn. The reason says which: `head_sha_unavailable`
             // (the mirror lacks the commit), `fetch_failed` (the fetch failed
             // otherwise), `checkout_deadline` (the deadline ran out in a local
-            // step), or none (the dispatch was cancelled). Only a genuine
+            // step), `unsafe_identifier` (unreachable here: both identifier
+            // gates above run first), or none (the dispatch was cancelled). Only a genuine
             // setup fault (`CheckoutError::Failed`) reports `failure`.
             let (conclusion, reason) = e.result_disposition();
             sink.push(&format!("{} {e}", e.log_prefix()));
