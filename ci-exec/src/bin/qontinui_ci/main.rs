@@ -38,9 +38,9 @@ use std::sync::Arc;
 
 use qontinui_ci_exec::dispatch::DispatchPayload;
 use qontinui_ci_exec::host::BoxFuture;
+use qontinui_ci_exec::import::{self, ItemKind, WorkflowSource};
 use qontinui_ci_exec::manifest::{self, CiManifest};
 use qontinui_ci_exec::report::{Conclusion, LogSink, Reporter, Verdict};
-use qontinui_ci_exec::import::{self, ItemKind, WorkflowSource};
 use qontinui_ci_exec::{executor, gen_workflow, host_sizing, standalone};
 
 /// `println!` that cannot panic. A run's output goes to a terminal that may
@@ -239,7 +239,11 @@ fn read_workflows(paths: &[String]) -> Result<Vec<WorkflowSource>, String> {
 }
 
 fn import_cmd(rest: &[String]) -> Result<ExitCode, String> {
-    let args = parse_args(rest, &["--out", "--report", "--default-branch"], &["--force"])?;
+    let args = parse_args(
+        rest,
+        &["--out", "--report", "--default-branch"],
+        &["--force"],
+    )?;
     let sources = read_workflows(&args.positionals)?;
     if let Some(manifest_path) = flag(&args.valued, "--report") {
         if flag(&args.valued, "--out").is_some() || args.switches.iter().any(|s| s == "--force") {
@@ -268,7 +272,8 @@ fn import_cmd(rest: &[String]) -> Result<ExitCode, String> {
                 ));
             }
             if let Some(dir) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
-                std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+                std::fs::create_dir_all(dir)
+                    .map_err(|e| format!("create {}: {e}", dir.display()))?;
             }
             std::fs::write(p, &outcome.manifest_toml).map_err(|e| format!("write {path}: {e}"))?;
             err!("qontinui-ci import: wrote {path}");
@@ -284,7 +289,11 @@ fn import_cmd(rest: &[String]) -> Result<ExitCode, String> {
         outcome.count(ItemKind::Changed),
         outcome.count(ItemKind::NoOp)
     );
-    for item in outcome.items.iter().filter(|i| i.kind == ItemKind::Untranslated) {
+    for item in outcome
+        .items
+        .iter()
+        .filter(|i| i.kind == ItemKind::Untranslated)
+    {
         err!("  UNTRANSLATED {}: {}", item.location, item.detail);
     }
     if outcome.manifest.is_none() {
@@ -315,7 +324,11 @@ fn repo_layout(manifest: &Path) -> (Option<PathBuf>, String) {
 }
 
 fn gen_workflow_cmd(rest: &[String]) -> Result<ExitCode, String> {
-    let args = parse_args(rest, &["--manifest", "--out", "--executor-rev"], &["--force", "--check"])?;
+    let args = parse_args(
+        rest,
+        &["--manifest", "--out", "--executor-rev"],
+        &["--force", "--check"],
+    )?;
     if let Some(p) = args.positionals.first() {
         return Err(format!("unexpected argument {p:?}\n\n{USAGE}"));
     }
@@ -331,7 +344,10 @@ fn gen_workflow_cmd(rest: &[String]) -> Result<ExitCode, String> {
     let out_path = match flag(&args.valued, "--out") {
         Some(p) => p.to_string(),
         None => match &root {
-            Some(r) => r.join(gen_workflow::WORKFLOW_PATH).to_string_lossy().to_string(),
+            Some(r) => r
+                .join(gen_workflow::WORKFLOW_PATH)
+                .to_string_lossy()
+                .to_string(),
             None => gen_workflow::WORKFLOW_PATH.to_string(),
         },
     };

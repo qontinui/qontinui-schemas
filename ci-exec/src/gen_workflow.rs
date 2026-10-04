@@ -131,7 +131,9 @@ fn recorded_hash(text: &str) -> Option<&str> {
 
 /// Whether `text` is a generated workflow (by its first line).
 pub fn is_generated(text: &str) -> bool {
-    text.lines().next().is_some_and(|l| l.starts_with(GENERATED_MARKER))
+    text.lines()
+        .next()
+        .is_some_and(|l| l.starts_with(GENERATED_MARKER))
 }
 
 /// Whether `s` is safe to write unquoted into the generated YAML and its
@@ -140,12 +142,15 @@ pub fn plain_token(s: &str) -> bool {
     !s.is_empty()
         && !s.starts_with('/')
         && !s.starts_with('-')
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'))
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'))
 }
 
 /// A full, lowercase 40-hex commit sha — the only executor pin accepted.
 pub fn pinned_rev(s: &str) -> bool {
-    s.len() == 40 && s.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+    s.len() == 40
+        && s.chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
 }
 
 /// Generate the workflow for `manifest`.
@@ -216,7 +221,11 @@ pub fn generate(manifest: &CiManifest, opts: &GenOptions) -> String {
         let minutes = (limits_minutes + PROVISIONING_MINUTES).min(MAX_JOB_MINUTES);
         s.push_str(&format!("  {}:\n", job.name));
         let display = if job.os.len() > 1 {
-            format!("{} / {} (${{{{ matrix.os }}}})", crate::manifest::CHECK_CONTEXT_PREFIX, job.name)
+            format!(
+                "{} / {} (${{{{ matrix.os }}}})",
+                crate::manifest::CHECK_CONTEXT_PREFIX,
+                job.name
+            )
         } else {
             format!("{} / {}", crate::manifest::CHECK_CONTEXT_PREFIX, job.name)
         };
@@ -397,8 +406,14 @@ command = ["cargo", "test", "--", "--ignored"]
         let jobs = y.get("jobs").unwrap().as_mapping().unwrap();
         assert_eq!(jobs.len(), 2, "the scheduled job is not generated");
         let test = jobs.get("test").unwrap();
-        assert_eq!(test.get("name").unwrap().as_str(), Some("qontinui-ci / test (${{ matrix.os }})"));
-        assert_eq!(test.get("runs-on").unwrap().as_str(), Some("${{ matrix.runner }}"));
+        assert_eq!(
+            test.get("name").unwrap().as_str(),
+            Some("qontinui-ci / test (${{ matrix.os }})")
+        );
+        assert_eq!(
+            test.get("runs-on").unwrap().as_str(),
+            Some("${{ matrix.runner }}")
+        );
         assert_eq!(
             jobs.get("lint").unwrap().get("name").unwrap().as_str(),
             Some("qontinui-ci / lint")
@@ -409,7 +424,11 @@ command = ["cargo", "test", "--", "--ignored"]
         assert!(text.contains("not part of the GitHub leg: nightly"));
         // lint: 600s of steps + 30 provisioning.
         assert_eq!(
-            jobs.get("lint").unwrap().get("timeout-minutes").unwrap().as_u64(),
+            jobs.get("lint")
+                .unwrap()
+                .get("timeout-minutes")
+                .unwrap()
+                .as_u64(),
             Some(40)
         );
     }
@@ -419,9 +438,15 @@ command = ["cargo", "test", "--", "--ignored"]
         let m = crate::manifest::parse_and_validate(V2).unwrap();
         let text = generate(&m, &opts());
         assert_eq!(check(Some(&text), &text), CheckVerdict::UpToDate);
-        assert_eq!(check(Some(&text.replace('\n', "\r\n")), &text), CheckVerdict::UpToDate);
+        assert_eq!(
+            check(Some(&text.replace('\n', "\r\n")), &text),
+            CheckVerdict::UpToDate
+        );
         assert_eq!(check(None, &text), CheckVerdict::Missing);
-        assert_eq!(check(Some("name: hand\non: push\n"), &text), CheckVerdict::NotGenerated);
+        assert_eq!(
+            check(Some("name: hand\non: push\n"), &text),
+            CheckVerdict::NotGenerated
+        );
         let edited = text.replace("timeout-minutes: 40", "timeout-minutes: 41");
         assert_eq!(check(Some(&edited), &text), CheckVerdict::HandEdited);
         let other = generate(

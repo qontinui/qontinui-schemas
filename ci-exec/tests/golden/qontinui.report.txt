@@ -54,9 +54,15 @@ qontinui-ci import --report
         and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
         step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
         declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY
-        (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only
-        COVERED counts toward the precondition.
+        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
+        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
+        a command of the workflow job, in the same relative order; a section the parser cannot read
+        (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
+        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
+        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
+        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (8):
   PARTIAL         ci.yml › lint [pull_request, push:main] 2/6 gate command(s) matched
@@ -72,6 +78,8 @@ JOBS ON pull_request / push:main (8):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
+      review:  manifest step ci/typecheck (`poetry run mypy src/qontinui --ignore-missing-imports`) is not a command of this workflow job
+      review:  manifest step ci/build-package (`poetry build`) is not a command of this workflow job
   PARTIAL         ci.yml › typecheck [pull_request, push:main] 2/6 gate command(s) matched
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/multistate.git
@@ -85,6 +93,8 @@ JOBS ON pull_request / push:main (8):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
+      review:  manifest step ci/lint (`poetry run ruff check .`) is not a command of this workflow job
+      review:  manifest step ci/build-package (`poetry build`) is not a command of this workflow job
   PARTIAL         ci.yml › tests [pull_request, push:main] 1/11 gate command(s) matched
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/multistate.git
@@ -104,6 +114,9 @@ JOBS ON pull_request / push:main (8):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
+      review:  manifest step ci/lint (`poetry run ruff check .`) is not a command of this workflow job
+      review:  manifest step ci/typecheck (`poetry run mypy src/qontinui --ignore-missing-imports`) is not a command of this workflow job
+      review:  manifest step ci/build-package (`poetry build`) is not a command of this workflow job
   UNCOVERED       ci.yml › tests-ml [pull_request, push:main] 0/11 gate command(s) matched
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/multistate.git
@@ -137,8 +150,12 @@ JOBS ON pull_request / push:main (8):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  step "Check package" is outside the report's command grammar: it relies on shell expansion of "dist/*"
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/install (`poetry install --no-interaction --no-ansi`) is not a command of this workflow job
+      review:  manifest step ci/lint (`poetry run ruff check .`) is not a command of this workflow job
+      review:  manifest step ci/typecheck (`poetry run mypy src/qontinui --ignore-missing-imports`) is not a command of this workflow job
   UNCOVERED       ci.yml › security [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: aquasecurity/trivy-action
+      review:  step "Upload Trivy results to GitHub Security" runs only `if: always()` — whether it runs is not modeled
   UNCOVERED       eval-desktop.yml › eval [pull_request (paths-filtered), push:main (paths-filtered)] 0/7 gate command(s) matched
       missing: uses: docker/setup-buildx-action
       missing: uses: docker/build-push-action
@@ -158,9 +175,12 @@ JOBS ON pull_request / push:main (8):
       review:  advisory step "Run grounding eval against internal benchmark" sets env the manifest does not model
       review:  step "Run grounding eval against internal benchmark" runs `mkdir -p eval-out` in a continue-on-error step, whose effects can change later steps
       review:  step "Run grounding eval against internal benchmark" runs `python qontinui-train/evaluation/grounding_eval.py --benchmark=internal --baseli` in a continue-on-error step, whose effects can change later steps
+      review:  step "Capture container logs" runs only `if: always()` — whether it runs is not modeled
       review:  step "Capture container logs" is outside the report's command grammar: it uses an output redirect
       review:  step "Capture container logs" runs `docker logs eval-desktop` under `|| true`, whose effects can change later steps
       review:  step "Capture container logs" runs `docker inspect eval-desktop` under `|| true`, whose effects can change later steps
+      review:  step "Upload eval artifacts" runs only `if: always()` — whether it runs is not modeled
+      review:  step "Tear down container" runs only `if: always()` — whether it runs is not modeled
       review:  step "Tear down container" runs `docker rm -f eval-desktop` under `|| true`, whose effects can change later steps
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
@@ -357,3 +377,4 @@ NO-OPS (22) — accounted for; nothing to declare:
       out the dispatched commit itself
 
 summary: 0 covered, 0 needs-review, 0 name-only, 4 partial, 4 uncovered of 8 job(s); 42 untranslated construct(s) — the Phase 9 precondition is NOT MET
+COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false greens.

@@ -54,24 +54,30 @@ qontinui-ci import --report
         and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
         step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
         declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY
-        (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only
-        COVERED counts toward the precondition.
+        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
+        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
+        a command of the workflow job, in the same relative order; a section the parser cannot read
+        (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
+        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
+        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
+        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (4):
-  NEEDS-REVIEW    boundary-guard.yml › no-coord-import [pull_request, push:main] 1/1 gate command(s) matched
-      matched: python3 scripts/check_no_coord_import.py  ←  ci/no-coord-import
+  UNCOVERED       boundary-guard.yml › no-coord-import [pull_request, push:main] 0/1 gate command(s) matched
+      missing: python3 scripts/check_no_coord_import.py
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-  PARTIAL         ci.yml › repo-checks [pull_request, push:main] 1/2 gate command(s) matched
+  UNCOVERED       ci.yml › repo-checks [pull_request, push:main] 0/2 gate command(s) matched
+      missing: python3 scripts/check_frontend_imports.py
       missing: python3 -m unittest discover -s scripts -p test_*.py -v
-      matched: python3 scripts/check_frontend_imports.py  ←  ci/frontend-imports
       review:  step "gate self-tests" is outside the report's command grammar: it has a quoted or escaped word ("test_*.py")
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-  NEEDS-REVIEW    ci.yml › python-lint [pull_request, push:main] 4/4 gate command(s) matched
-      matched: python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11  ←  ci/install-gate-tooling
-      matched: ruff check backend/ scripts/  ←  ci/ruff-check
-      matched: ruff format --check backend/ scripts/  ←  ci/ruff-format
-      matched: mypy backend/qontinui_cloud_control scripts  ←  ci/mypy
+  UNCOVERED       ci.yml › python-lint [pull_request, push:main] 0/4 gate command(s) matched
+      missing: python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11
+      missing: ruff check backend/ scripts/
+      missing: ruff format --check backend/ scripts/
+      missing: mypy backend/qontinui_cloud_control scripts
       review:  step "Install gate tooling" is outside the report's command grammar: it has a quoted or escaped word ("ruff~=0.6")
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › composed-typecheck [pull_request, push:main] 0/4 gate command(s) matched
@@ -146,4 +152,5 @@ NO-OPS (8) — accounted for; nothing to declare:
   - ci.yml › composed-typecheck › step "Setup Node.js": setup-node cache — a dependency cache, not a
       gate
 
-summary: 0 covered, 2 needs-review, 0 name-only, 1 partial, 1 uncovered of 4 job(s); 6 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 0 covered, 0 needs-review, 0 name-only, 0 partial, 4 uncovered of 4 job(s); 6 untranslated construct(s) — the Phase 9 precondition is NOT MET
+COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false greens.

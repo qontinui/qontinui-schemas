@@ -54,12 +54,18 @@ qontinui-ci import --report
         and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
         step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
         declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY
-        (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only
-        COVERED counts toward the precondition.
+        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
+        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
+        a command of the workflow job, in the same relative order; a section the parser cannot read
+        (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
+        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
+        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
+        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (1):
-  PARTIAL         qontinui-ci.yml › test [pull_request, push:main] 1/8 gate command(s) matched
+  UNCOVERED       qontinui-ci.yml › test [pull_request, push:main] 0/8 gate command(s) matched
       missing: python -m pip install --upgrade pip
       missing: [ -f requirements.txt ]
       missing: pip install -r requirements.txt
@@ -67,7 +73,7 @@ JOBS ON pull_request / push:main (1):
       missing: pip install -e .
       missing: pip install .
       missing: pip install pytest
-      matched: pytest  ←  ci/test
+      missing: pytest
       review:  step "Install dependencies" is outside the report's command grammar: it relies on shell expansion of "["
       review:  pins setup-python python-version 3.x — the manifest's [[tools]] does not pin the same version
 
@@ -91,4 +97,5 @@ NO-OPS (2) — accounted for; nothing to declare:
       provisions no python; the host's python runs the steps (declare [canonical] toolchains =
       ["python"] to require the host's canonical one)
 
-summary: 0 covered, 0 needs-review, 0 name-only, 1 partial, 0 uncovered of 1 job(s); 1 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 0 covered, 0 needs-review, 0 name-only, 0 partial, 1 uncovered of 1 job(s); 1 untranslated construct(s) — the Phase 9 precondition is NOT MET
+COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false greens.

@@ -54,9 +54,15 @@ qontinui-ci import --report
         and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
         step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
         declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY
-        (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only
-        COVERED counts toward the precondition.
+        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
+        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
+        a command of the workflow job, in the same relative order; a section the parser cannot read
+        (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
+        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
+        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
+        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (12):
   UNCOVERED       ci-integrity-selftest.yml › guard-tests [pull_request, push:main] 0/2 gate command(s) matched
@@ -113,6 +119,9 @@ JOBS ON pull_request / push:main (12):
       matched: npm run test  ←  ci/test
       review:  pins setup-node node-version ${{ matrix.node-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs node-version = ["22.x"] — the manifest runs one leg
+      review:  manifest step ci/build-again (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/docs-install (`npm ci`) is not a command of this workflow job
+      review:  manifest step ci/docs-build (`npm run build`) is not a command of this workflow job
   UNCOVERED       ci.yml › python-tests [pull_request, push:main] 0/5 gate command(s) matched
       missing: packages/ui-bridge-python: python -m pip install --upgrade pip
       missing: packages/ui-bridge-python: pip install -e .[dev]
@@ -126,6 +135,18 @@ JOBS ON pull_request / push:main (12):
       matched: docs-site: npm ci  ←  ci/docs-install
       matched: docs-site: npm run build  ←  ci/docs-build
       review:  pins setup-node node-version 20.x — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/install (`npm ci`) is not a command of this workflow job
+      review:  manifest step ci/diagnostics-check (`npm run diagnostics:check`) is not a command of this workflow job
+      review:  manifest step ci/redaction-surface-ratchet (`npm run redaction:check-surface`) is not a command of this workflow job
+      review:  manifest step ci/dep-range-ratchet (`npm run deps:check-ranges`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet-self-test (`npm run docs:check-symbols:test`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet (`npm run docs:check-symbols`) is not a command of this workflow job
+      review:  manifest step ci/ci-manifest-ratchet (`npm run ci:check-manifest`) is not a command of this workflow job
+      review:  manifest step ci/lint (`npm run lint`) is not a command of this workflow job
+      review:  manifest step ci/build (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/build-again (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/typecheck (`npm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/test (`npm run test`) is not a command of this workflow job
   UNCOVERED       dependency-twin-resolver.yml › resolve [push:main (paths-filtered)] 0/5 gate command(s) matched
       missing: node --version
       missing: node scripts/dependency-twin-resolver.mjs
@@ -137,6 +158,7 @@ JOBS ON pull_request / push:main (12):
       review:  step "Ingest into coord (tolerant)" is outside the report's command grammar: it `set +e` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Ingest into coord (tolerant)" runs `curl -sS -o /tmp/ingest-resp.txt -w %{http_code} --max-time 30 -X POST $endpoint` under `|| true`, whose effects can change later steps
       review:  step "Ingest into coord (tolerant)" runs `cat /tmp/ingest-resp.txt` under `|| true`, whose effects can change later steps
+      review:  step "Upload observations artifact" runs only `if: always()` — whether it runs is not modeled
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   PARTIAL         docs.yml › build [push:main (paths-filtered)] 2/4 gate command(s) matched
@@ -146,6 +168,18 @@ JOBS ON pull_request / push:main (12):
       matched: docs-site: npm run build  ←  ci/docs-build
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  pins setup-node node-version 20.x — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/install (`npm ci`) is not a command of this workflow job
+      review:  manifest step ci/diagnostics-check (`npm run diagnostics:check`) is not a command of this workflow job
+      review:  manifest step ci/redaction-surface-ratchet (`npm run redaction:check-surface`) is not a command of this workflow job
+      review:  manifest step ci/dep-range-ratchet (`npm run deps:check-ranges`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet-self-test (`npm run docs:check-symbols:test`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet (`npm run docs:check-symbols`) is not a command of this workflow job
+      review:  manifest step ci/ci-manifest-ratchet (`npm run ci:check-manifest`) is not a command of this workflow job
+      review:  manifest step ci/lint (`npm run lint`) is not a command of this workflow job
+      review:  manifest step ci/build (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/build-again (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/typecheck (`npm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/test (`npm run test`) is not a command of this workflow job
   UNCOVERED       docs.yml › deploy [push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: uses: actions/deploy-pages
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
@@ -161,6 +195,19 @@ JOBS ON pull_request / push:main (12):
       review:  step "Install dependencies" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
       review:  step "Type check" is outside the report's command grammar: it relies on shell expansion of "["
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/diagnostics-check (`npm run diagnostics:check`) is not a command of this workflow job
+      review:  manifest step ci/redaction-surface-ratchet (`npm run redaction:check-surface`) is not a command of this workflow job
+      review:  manifest step ci/dep-range-ratchet (`npm run deps:check-ranges`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet-self-test (`npm run docs:check-symbols:test`) is not a command of this workflow job
+      review:  manifest step ci/docs-symbol-ratchet (`npm run docs:check-symbols`) is not a command of this workflow job
+      review:  manifest step ci/ci-manifest-ratchet (`npm run ci:check-manifest`) is not a command of this workflow job
+      review:  manifest step ci/lint (`npm run lint`) is not a command of this workflow job
+      review:  manifest step ci/build (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/build-again (`npm run build`) is not a command of this workflow job
+      review:  manifest step ci/typecheck (`npm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/test (`npm run test`) is not a command of this workflow job
+      review:  manifest step ci/docs-install (`npm ci`) is not a command of this workflow job
+      review:  manifest step ci/docs-build (`npm run build`) is not a command of this workflow job
   UNCOVERED       runner-contract.yml › contract [pull_request, push:main] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} = schedule ]
       missing: [ $EXPR{{ github.event_name }} = workflow_dispatch ]
@@ -189,8 +236,8 @@ JOBS ON pull_request / push:main (12):
       review:  step "Verify npm script is wired up" is outside the report's command grammar: it has a quoted or escaped word ("const p=require('./package.json'); if (!p.scripts || !p.scripts['smoke-test:runner']) { console.error('Missing scripts.smoke-test:runner in package.json'); process.exit(1); } console.log('Found:', p.scripts['smoke-test:runner']);")
 
 NOT CONSIDERED — not on pull_request or a push to main (2 workflow(s)):
-  publish-pypi.yml (jobs: publish) — triggers ["push"]
-  publish.yml (jobs: publish) — triggers ["push"]
+  publish-pypi.yml (jobs: publish) — its push filters exclude main
+  publish.yml (jobs: publish) — its push filters exclude main
 
 WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
 UNTRANSLATED (29) — not represented in the manifest — each must be handled by hand:
@@ -344,3 +391,4 @@ NO-OPS (28) — accounted for; nothing to declare:
       checks out the dispatched commit itself
 
 summary: 0 covered, 2 needs-review, 0 name-only, 2 partial, 8 uncovered of 12 job(s); 29 untranslated construct(s) — the Phase 9 precondition is NOT MET
+COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false greens.

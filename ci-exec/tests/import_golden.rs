@@ -129,7 +129,10 @@ fn import_over_web_backend_and_frontend_ci_covers_web_ci_toml() {
         workflow("qontinui-web", "frontend-ci.yml"),
     ])
     .expect("import");
-    let generated = outcome.manifest.as_ref().expect("a valid generated manifest");
+    let generated = outcome
+        .manifest
+        .as_ref()
+        .expect("a valid generated manifest");
     // The generated manifest is itself a valid v2 manifest with these jobs.
     let names: Vec<&str> = generated.jobs.iter().map(|j| j.name.as_str()).collect();
     for want in ["lint", "test", "lint-and-typecheck", "composed-cloud-build"] {
@@ -178,13 +181,20 @@ fn import_over_web_backend_and_frontend_ci_covers_web_ci_toml() {
         "ci/openapi-export-base",
         "ci/openapi-snapshot-drift",
     ] {
-        let hit = coverage.iter().find(|(s, _)| s == step).and_then(|(_, h)| h.clone());
+        let hit = coverage
+            .iter()
+            .find(|(s, _)| s == step)
+            .and_then(|(_, h)| h.clone());
         assert!(hit.is_some(), "{step} is not covered: {coverage:#?}");
     }
     // Nothing was dropped silently: what the import could not carry is listed
     // in the generated header.
     assert!(outcome.count(ItemKind::Untranslated) > 0);
-    for item in outcome.items.iter().filter(|i| i.kind == ItemKind::Untranslated) {
+    for item in outcome
+        .items
+        .iter()
+        .filter(|i| i.kind == ItemKind::Untranslated)
+    {
         assert!(
             outcome.manifest_toml.contains(&item.location),
             "item at {} missing from the header",
@@ -231,11 +241,17 @@ fn import_over_every_web_source_workflow_covers_all_but_named_steps() {
     //   lists that step as untranslated instead of guessing a ref.
     assert_eq!(
         uncovered,
-        vec!["ci/alembic-single-head".to_string(), "ci/coord-column-drop-guard".to_string()]
+        vec![
+            "ci/alembic-single-head".to_string(),
+            "ci/coord-column-drop-guard".to_string()
+        ]
     );
-    assert!(outcome.items.iter().any(|i| i.kind == ItemKind::Untranslated
-        && i.location.starts_with("coord-column-drop-guard.yml")
-        && i.detail.contains("BASE_REF")));
+    assert!(outcome
+        .items
+        .iter()
+        .any(|i| i.kind == ItemKind::Untranslated
+            && i.location.starts_with("coord-column-drop-guard.yml")
+            && i.detail.contains("BASE_REF")));
 }
 
 /// `import --report` over web's real manifest and every fixture workflow:
@@ -258,33 +274,43 @@ fn web_report_finds_the_uncovered_backend_suite() {
             .unwrap_or_else(|| panic!("{wf} › {job} not considered"))
             .verdict
     };
-    // The command fits the report's grammar and matches web's manifest
-    // exactly, but the workflow job has `timeout-minutes: 5` while the
-    // manifest step runs under the 3600s default — NEEDS-REVIEW, not COVERED.
-    assert_eq!(verdict("web-boundary-lint.yml", "web-boundary-lint"), Coverage::NeedsReview);
+    // The python command matches web's manifest exactly, but the job checks
+    // out with a sha-pinned actions/checkout — not an action the report
+    // models, so an opaque gate (PARTIAL) — and it also carries review
+    // reasons: the 5-minute timeout, the paths filter, and the other steps
+    // of web's single `ci` manifest job, none of which this workflow runs.
+    assert_eq!(
+        verdict("web-boundary-lint.yml", "web-boundary-lint"),
+        Coverage::Partial
+    );
     let wbl = report
         .jobs
         .iter()
         .find(|j| j.job_id == "web-boundary-lint")
         .unwrap();
-    assert!(wbl.missing.is_empty());
-    // Its review reasons: the 5-minute timeout, and the paths filter on
-    // both of its triggers.
-    assert!(
-        wbl.caveats
-            .iter()
-            .all(|c| c.contains("limited to 300s") || c.contains("paths-filtered")),
-        "{:#?}",
-        wbl.caveats
-    );
+    assert_eq!(wbl.missing, vec!["uses: actions/checkout".to_string()]);
+    assert_eq!(wbl.matched.len(), 1);
     assert!(wbl.caveats.iter().any(|c| c.contains("limited to 300s")));
+    assert!(wbl
+        .caveats
+        .iter()
+        .any(|c| c.contains("is not a command of this workflow job")));
     // The manifest runs count_alembic_heads.py without the workflow's
     // `--baseline-ref origin/main`: a different command, so not covered.
-    assert_eq!(verdict("alembic-graph-pr.yml", "alembic-heads-pr"), Coverage::Uncovered);
-    assert_eq!(verdict("forbid-public-schema.yml", "forbid-public-schema"), Coverage::NeedsReview);
+    assert_eq!(
+        verdict("alembic-graph-pr.yml", "alembic-heads-pr"),
+        Coverage::Uncovered
+    );
+    assert_eq!(
+        verdict("forbid-public-schema.yml", "forbid-public-schema"),
+        Coverage::Partial
+    );
     assert_eq!(verdict("backend-ci.yml", "test"), Coverage::Partial);
     // Its installs match the manifest's; Trivy and `safety check` do not.
-    assert_eq!(verdict("backend-ci.yml", "security-scan"), Coverage::Partial);
+    assert_eq!(
+        verdict("backend-ci.yml", "security-scan"),
+        Coverage::Partial
+    );
     assert!(!report.all_covered());
     let test = report
         .jobs
@@ -292,7 +318,9 @@ fn web_report_finds_the_uncovered_backend_suite() {
         .find(|j| j.workflow == "backend-ci.yml" && j.job_id == "test")
         .unwrap();
     assert!(
-        test.missing.iter().any(|m| m.contains("pytest") && m.contains("--cov")),
+        test.missing
+            .iter()
+            .any(|m| m.contains("pytest") && m.contains("--cov")),
         "{:#?}",
         test.missing
     );
@@ -315,7 +343,8 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
         for item in &outcome.items {
             let first_word = item.detail.split_whitespace().next().unwrap_or("");
             assert!(
-                outcome.manifest_toml.contains(&item.location) && outcome.manifest_toml.contains(first_word),
+                outcome.manifest_toml.contains(&item.location)
+                    && outcome.manifest_toml.contains(first_word),
                 "{repo}: item {item:?} missing from the header"
             );
         }
@@ -330,7 +359,10 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
         let m = repo_manifest(repo);
         let report = import::coverage_report(".qontinui/ci.toml", &m, &sources, "main")
             .unwrap_or_else(|e| panic!("{repo}: report failed: {e}"));
-        golden(&format!("{repo}.report.txt"), &import::render_report(&report));
+        golden(
+            &format!("{repo}.report.txt"),
+            &import::render_report(&report),
+        );
 
         let generated = gen_workflow::generate(
             &m,
@@ -339,7 +371,10 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
                 executor_rev: EXECUTOR_REV.to_string(),
             },
         );
-        assert_eq!(gen_workflow::check(Some(&generated), &generated), CheckVerdict::UpToDate);
+        assert_eq!(
+            gen_workflow::check(Some(&generated), &generated),
+            CheckVerdict::UpToDate
+        );
         let y: serde_yaml_ng::Value = serde_yaml_ng::from_str(&generated)
             .unwrap_or_else(|e| panic!("{repo}: generated workflow is not YAML: {e}"));
         let jobs = y.get("jobs").and_then(|j| j.as_mapping()).unwrap();
@@ -347,13 +382,23 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
         if gate.is_empty() {
             assert_eq!(jobs.len(), 1);
         } else {
-            assert_eq!(jobs.len(), gate.len(), "{repo}: one generated job per gate job");
+            assert_eq!(
+                jobs.len(),
+                gate.len(),
+                "{repo}: one generated job per gate job"
+            );
             for name in &gate {
-                let job = jobs.get(*name).unwrap_or_else(|| panic!("{repo}: no job {name}"));
+                let job = jobs
+                    .get(*name)
+                    .unwrap_or_else(|| panic!("{repo}: no job {name}"));
                 let steps = job.get("steps").unwrap().as_sequence().unwrap();
-                let runs: Vec<&str> = steps.iter().filter_map(|s| s.get("run")?.as_str()).collect();
+                let runs: Vec<&str> = steps
+                    .iter()
+                    .filter_map(|s| s.get("run")?.as_str())
+                    .collect();
                 assert!(
-                    runs.iter().any(|r| r.starts_with(&format!("qontinui-ci run --job {name} "))),
+                    runs.iter()
+                        .any(|r| r.starts_with(&format!("qontinui-ci run --job {name} "))),
                     "{repo}: job {name} does not run qontinui-ci run --job {name}"
                 );
             }
@@ -368,7 +413,8 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
 #[test]
 fn hand_written_qontinui_ci_yml_is_not_generated() {
     for repo in ["multistate", "ui-bridge", "qontinui-inspect"] {
-        let existing = std::fs::read_to_string(fixture(repo).join("workflows/qontinui-ci.yml")).unwrap();
+        let existing =
+            std::fs::read_to_string(fixture(repo).join("workflows/qontinui-ci.yml")).unwrap();
         // qontinui-inspect's manifest is siblings-only (see SIBLINGS_ONLY), so
         // there is nothing to generate for it; the header check decides first
         // either way.
@@ -383,7 +429,10 @@ fn hand_written_qontinui_ci_yml_is_not_generated() {
                 },
             )
         };
-        assert_eq!(gen_workflow::check(Some(&existing), &generated), CheckVerdict::NotGenerated);
+        assert_eq!(
+            gen_workflow::check(Some(&existing), &generated),
+            CheckVerdict::NotGenerated
+        );
     }
 }
 
@@ -404,7 +453,11 @@ fn write(dir: &Path, rel: &str, text: &str) {
 fn cli_gen_workflow_check_and_import_refusals() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    write(root, ".qontinui/ci.toml", &std::fs::read_to_string(fixture("qontinui-runner").join("ci.toml")).unwrap());
+    write(
+        root,
+        ".qontinui/ci.toml",
+        &std::fs::read_to_string(fixture("qontinui-runner").join("ci.toml")).unwrap(),
+    );
 
     let check = |root: &Path| {
         cli()
@@ -417,24 +470,48 @@ fn cli_gen_workflow_check_and_import_refusals() {
     assert_eq!(out.status.code(), Some(1), "missing file must fail --check");
 
     // No pin, or a movable one, is refused.
-    let out = cli().current_dir(root).args(["gen-workflow"]).output().unwrap();
+    let out = cli()
+        .current_dir(root)
+        .args(["gen-workflow"])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stderr).contains("--executor-rev"));
-    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", "main"]).output().unwrap();
+    let out = cli()
+        .current_dir(root)
+        .args(["gen-workflow", "--executor-rev", "main"])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", EXECUTOR_REV]).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = cli()
+        .current_dir(root)
+        .args(["gen-workflow", "--executor-rev", EXECUTOR_REV])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(check(root).status.code(), Some(0));
 
     let wf = root.join(gen_workflow::WORKFLOW_PATH);
     let text = std::fs::read_to_string(&wf).unwrap();
-    std::fs::write(&wf, text.replacen("runs-on: ubuntu-latest", "runs-on: ubuntu-22.04", 1)).unwrap();
+    std::fs::write(
+        &wf,
+        text.replacen("runs-on: ubuntu-latest", "runs-on: ubuntu-22.04", 1),
+    )
+    .unwrap();
     let out = check(root);
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("hand-edited"));
 
     std::fs::write(&wf, "name: hand written\non: push\njobs: {}\n").unwrap();
-    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", EXECUTOR_REV]).output().unwrap();
+    let out = cli()
+        .current_dir(root)
+        .args(["gen-workflow", "--executor-rev", EXECUTOR_REV])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stderr).contains("not a generated file"));
     let out = cli()
@@ -456,7 +533,12 @@ fn cli_gen_workflow_check_and_import_refusals() {
     assert!(stdout.contains("version = 2"));
     assert!(String::from_utf8_lossy(&out.stderr).contains("UNTRANSLATED"));
     let out = cli()
-        .args(["import", "--out", root.join(".qontinui/ci.toml").to_str().unwrap(), backend.to_str().unwrap()])
+        .args([
+            "import",
+            "--out",
+            root.join(".qontinui/ci.toml").to_str().unwrap(),
+            backend.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));

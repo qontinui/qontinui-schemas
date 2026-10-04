@@ -138,7 +138,12 @@ fn tokenize(script: &str) -> Vec<Tok> {
     let mut i = 0;
     let n = chars.len();
 
-    fn flush(cur: &mut Option<Word>, toks: &mut Vec<Tok>, expect: &mut Option<bool>, heredocs: &mut Vec<(String, bool)>) {
+    fn flush(
+        cur: &mut Option<Word>,
+        toks: &mut Vec<Tok>,
+        expect: &mut Option<bool>,
+        heredocs: &mut Vec<(String, bool)>,
+    ) {
         if let Some(w) = cur.take() {
             if let Some(strip) = expect.take() {
                 heredocs.push((w.text.clone(), strip));
@@ -196,7 +201,8 @@ fn tokenize(script: &str) -> Vec<Tok> {
             if name == "GITHUB_WORKSPACE" && inner == name {
                 w.text.push(ROOT);
             } else {
-                w.vars.push(if name.is_empty() { inner.clone() } else { name });
+                w.vars
+                    .push(if name.is_empty() { inner.clone() } else { name });
                 w.text.push_str("${");
                 w.text.push_str(&inner);
                 w.text.push('}');
@@ -245,11 +251,21 @@ fn tokenize(script: &str) -> Vec<Tok> {
                 i += 2;
             }
             ' ' | '\t' | '\r' => {
-                flush(&mut cur, &mut toks, &mut expect_heredoc_delim, &mut heredocs);
+                flush(
+                    &mut cur,
+                    &mut toks,
+                    &mut expect_heredoc_delim,
+                    &mut heredocs,
+                );
                 i += 1;
             }
             '\n' => {
-                flush(&mut cur, &mut toks, &mut expect_heredoc_delim, &mut heredocs);
+                flush(
+                    &mut cur,
+                    &mut toks,
+                    &mut expect_heredoc_delim,
+                    &mut heredocs,
+                );
                 toks.push(Tok::Newline);
                 i += 1;
                 // Skip any here-document bodies that start on this line.
@@ -258,10 +274,18 @@ fn tokenize(script: &str) -> Vec<Tok> {
                         if i >= n {
                             break;
                         }
-                        let end = chars[i..].iter().position(|&ch| ch == '\n').map(|p| i + p).unwrap_or(n);
+                        let end = chars[i..]
+                            .iter()
+                            .position(|&ch| ch == '\n')
+                            .map(|p| i + p)
+                            .unwrap_or(n);
                         let line: String = chars[i..end].iter().collect();
                         i = end + 1;
-                        let cmp = if strip { line.trim_start_matches('\t') } else { line.as_str() };
+                        let cmp = if strip {
+                            line.trim_start_matches('\t')
+                        } else {
+                            line.as_str()
+                        };
                         if cmp == delim {
                             break;
                         }
@@ -327,7 +351,12 @@ fn tokenize(script: &str) -> Vec<Tok> {
                 i += 1;
             }
             '|' | '&' | ';' | '<' | '>' | '(' | ')' => {
-                flush(&mut cur, &mut toks, &mut expect_heredoc_delim, &mut heredocs);
+                flush(
+                    &mut cur,
+                    &mut toks,
+                    &mut expect_heredoc_delim,
+                    &mut heredocs,
+                );
                 let next = chars.get(i + 1).copied();
                 let next2 = chars.get(i + 2).copied();
                 let (op, len): (&'static str, usize) = match (c, next, next2) {
@@ -381,7 +410,12 @@ fn tokenize(script: &str) -> Vec<Tok> {
             }
         }
     }
-    flush(&mut cur, &mut toks, &mut expect_heredoc_delim, &mut heredocs);
+    flush(
+        &mut cur,
+        &mut toks,
+        &mut expect_heredoc_delim,
+        &mut heredocs,
+    );
     toks
 }
 
@@ -486,10 +520,7 @@ fn droppable_output_line(stmt: &[Tok]) -> Result<bool, String> {
     if !(w.is("echo") || w.is("printf")) {
         return Ok(false);
     }
-    if stmt
-        .iter()
-        .any(|t| matches!(t, Tok::Word(x) if x.subst))
-    {
+    if stmt.iter().any(|t| matches!(t, Tok::Word(x) if x.subst)) {
         return Err(
             "its `echo`/`printf` line runs a command substitution, which is more than output"
                 .to_string(),
@@ -523,7 +554,12 @@ fn droppable_output_line(stmt: &[Tok]) -> Result<bool, String> {
                         ));
                     }
                 }
-                other => return Err(format!("its `echo`/`printf` line uses {}", describe_op(other))),
+                other => {
+                    return Err(format!(
+                        "its `echo`/`printf` line uses {}",
+                        describe_op(other)
+                    ))
+                }
             }
         }
         i += 1;
@@ -551,9 +587,36 @@ const CONTROL_WORDS: &[&str] = &[
 /// Builtins that act on the shell process itself; as an argv program they
 /// would fail or silently do nothing.
 const BUILTINS: &[&str] = &[
-    "source", ".", "pushd", "popd", "ulimit", "umask", "trap", "unset", "shopt", "eval", "exec",
-    "command", ":", "alias", "readonly", "declare", "typeset", "local", "wait", "shift", "return",
-    "break", "continue", "hash", "builtin", "enable", "let", "read", "mapfile", "readarray",
+    "source",
+    ".",
+    "pushd",
+    "popd",
+    "ulimit",
+    "umask",
+    "trap",
+    "unset",
+    "shopt",
+    "eval",
+    "exec",
+    "command",
+    ":",
+    "alias",
+    "readonly",
+    "declare",
+    "typeset",
+    "local",
+    "wait",
+    "shift",
+    "return",
+    "break",
+    "continue",
+    "hash",
+    "builtin",
+    "enable",
+    "let",
+    "read",
+    "mapfile",
+    "readarray",
 ];
 
 /// Translate a `run:` script that starts in working directory `start_wd`.
@@ -671,9 +734,12 @@ pub fn translate(script: &str, start_wd: &str) -> Result<Translation, String> {
                             )
                         }
                     }
-                } else if !droppable_output_line(body)? && !(first_word(body).is_some_and(|w| w.is(":") || w.is("true"))) {
+                } else if !droppable_output_line(body)?
+                    && !(first_word(body).is_some_and(|w| w.is(":") || w.is("true")))
+                {
                     return Err(
-                        "its `if ! …` guard runs commands other than messages and `exit`".to_string()
+                        "its `if ! …` guard runs commands other than messages and `exit`"
+                            .to_string(),
                     );
                 } else {
                     dropped_messages += 1;
@@ -681,7 +747,10 @@ pub fn translate(script: &str, start_wd: &str) -> Result<Translation, String> {
                 j += 1;
             }
             if !exits_nonzero {
-                return Err("its `if ! …` guard never exits non-zero, which swallows the failure".to_string());
+                return Err(
+                    "its `if ! …` guard never exits non-zero, which swallows the failure"
+                        .to_string(),
+                );
             }
             let cmds = simple_commands(&cond, &mut wd, &exported)?;
             out.commands.extend(cmds);
@@ -697,21 +766,17 @@ pub fn translate(script: &str, start_wd: &str) -> Result<Translation, String> {
             }
             let mut j = i;
             match first_word(right) {
-                Some(w) if w.is("exit") && right.len() != 2 => {
-                    return Err(
-                        "has words or operators after its `|| exit N` — only a bare `cmd || exit N` \
+                Some(w) if w.is("exit") && right.len() != 2 => return Err(
+                    "has words or operators after its `|| exit N` — only a bare `cmd || exit N` \
                          has an argv form"
-                            .to_string(),
-                    )
-                }
+                        .to_string(),
+                ),
                 Some(w) if w.is("exit") => match exit_status(right) {
                     Some(Some(n)) if n != 0 && n != -1 => {}
-                    _ => {
-                        return Err(
-                            "an `|| exit` without a literal non-zero status may swallow the failure"
-                                .to_string(),
-                        )
-                    }
+                    _ => return Err(
+                        "an `|| exit` without a literal non-zero status may swallow the failure"
+                            .to_string(),
+                    ),
                 },
                 Some(w) if w.is("true") || w.is(":") => {
                     return Err(
@@ -819,7 +884,11 @@ pub fn translate(script: &str, start_wd: &str) -> Result<Translation, String> {
     Ok(out)
 }
 
-fn check_guard_line(body: &[Tok], exits_nonzero: &mut bool, dropped: &mut usize) -> Result<(), String> {
+fn check_guard_line(
+    body: &[Tok],
+    exits_nonzero: &mut bool,
+    dropped: &mut usize,
+) -> Result<(), String> {
     if let Some(status) = exit_status(body) {
         match status {
             Some(n) if n != 0 && n != -1 => {
@@ -844,7 +913,9 @@ fn check_guard_line(body: &[Tok], exits_nonzero: &mut bool, dropped: &mut usize)
 fn looks_like_assignment(w: &Word) -> bool {
     w.text.split_once('=').is_some_and(|(k, _)| {
         !k.is_empty()
-            && k.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && k.chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
             && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
     })
 }
@@ -859,7 +930,9 @@ fn assignment(w: &Word) -> Option<(String, String)> {
         return None;
     }
     let ok_key = !k.is_empty()
-        && k.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && k.chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
     if !ok_key || !w.vars.is_empty() || w.subst || v.contains(ROOT) {
         return None;
@@ -868,7 +941,11 @@ fn assignment(w: &Word) -> Option<(String, String)> {
 }
 
 /// One statement of `&&`-joined plain commands (and `cd`s).
-fn simple_commands(stmt: &[Tok], wd: &mut String, exported: &[(String, String)]) -> Result<Vec<Command>, String> {
+fn simple_commands(
+    stmt: &[Tok],
+    wd: &mut String,
+    exported: &[(String, String)],
+) -> Result<Vec<Command>, String> {
     let mut out = Vec::new();
     for part in stmt.split(|t| matches!(t, Tok::Op("&&"))) {
         if part.is_empty() {
@@ -956,13 +1033,18 @@ fn simple_commands(stmt: &[Tok], wd: &mut String, exported: &[(String, String)])
                 continue;
             }
             if let Some(v) = w.vars.first() {
-                return Err(format!("expands ${v} at run time — a manifest argument is a literal"));
+                return Err(format!(
+                    "expands ${v} at run time — a manifest argument is a literal"
+                ));
             }
             if w.subst {
                 return Err("uses a command substitution (`$(…)` or backticks)".to_string());
             }
             if w.glob {
-                return Err(format!("relies on shell glob or brace expansion of {:?}", w.text));
+                return Err(format!(
+                    "relies on shell glob or brace expansion of {:?}",
+                    w.text
+                ));
             }
             if w.tilde {
                 return Err(format!("relies on `~` expansion in {:?}", w.text));
@@ -1047,9 +1129,14 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
     for line in script.lines() {
         let t = line.trim_start();
         if !t.starts_with('#') && t.contains('#') {
-            return Err("has a `#` after a command (a trailing comment or a literal `#`)".to_string());
+            return Err(
+                "has a `#` after a command (a trailing comment or a literal `#`)".to_string(),
+            );
         }
-        if line.chars().any(|c| c != ' ' && c != '\t' && c.is_whitespace()) {
+        if line
+            .chars()
+            .any(|c| c != ' ' && c != '\t' && c.is_whitespace())
+        {
             return Err("contains non-ASCII whitespace".to_string());
         }
     }
@@ -1069,14 +1156,60 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
         }
     }
     const WRAPPERS_AND_STATE: &[&str] = &[
-        "env", "timeout", "nice", "nohup", "xargs", "sudo", "doas", "tee", "exec", "command",
-        "builtin", "time", "stdbuf", "export", "declare", "typeset", "local", "readonly",
-        "source", ".", "eval", "pushd", "popd", "unset", "alias", "trap", "shopt", "ulimit",
-        "umask", "read", "mapfile", "readarray", "exit", "return", "shift", "let", "wait",
-        "hash", "enable", "getopts", "coproc", "disown", "suspend", "fc", "history",
+        "env",
+        "timeout",
+        "nice",
+        "nohup",
+        "xargs",
+        "sudo",
+        "doas",
+        "tee",
+        "exec",
+        "command",
+        "builtin",
+        "time",
+        "stdbuf",
+        "export",
+        "declare",
+        "typeset",
+        "local",
+        "readonly",
+        "source",
+        ".",
+        "eval",
+        "pushd",
+        "popd",
+        "unset",
+        "alias",
+        "trap",
+        "shopt",
+        "ulimit",
+        "umask",
+        "read",
+        "mapfile",
+        "readarray",
+        "exit",
+        "return",
+        "shift",
+        "let",
+        "wait",
+        "hash",
+        "enable",
+        "getopts",
+        "coproc",
+        "disown",
+        "suspend",
+        "fc",
+        "history",
     ];
     for (stmt, chained) in stmts.into_iter().filter(|s| !s.0.is_empty()) {
         // An optional trailing `|| true` / `|| :`.
+        let has_fallback = stmt.iter().any(|t| matches!(t, Tok::Op("||")));
+        if has_fallback && matches!(stmt.first(), Some(Tok::Word(w)) if w.is("cd")) {
+            return Err(
+                "a `cd` with a fallback (if it fails, later commands run elsewhere)".to_string(),
+            );
+        }
         let body: &[Tok] = match stmt.iter().position(|t| matches!(t, Tok::Op("||"))) {
             Some(p) => {
                 let fallback = &stmt[p + 1..];
@@ -1111,13 +1244,20 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
                 return Err(format!("has a `~` in {:?}", w.text));
             }
             if !w.vars.is_empty() || w.subst || w.text.contains('$') || w.text.contains(ROOT) {
-                return Err(format!("expands a variable or substitution in {:?}", w.text.replace(ROOT, "$GITHUB_WORKSPACE")));
+                return Err(format!(
+                    "expands a variable or substitution in {:?}",
+                    w.text.replace(ROOT, "$GITHUB_WORKSPACE")
+                ));
             }
             if w.glob || w.tilde {
                 return Err(format!("relies on shell expansion of {:?}", w.text));
             }
         }
-        if looks_like_assignment(first) && first.quote_at.is_none_or(|q| first.text.find('=').is_some_and(|e| q > e)) {
+        if looks_like_assignment(first)
+            && first
+                .quote_at
+                .is_none_or(|q| first.text.find('=').is_some_and(|e| q > e))
+        {
             return Err(format!("assigns a variable ({:?})", first.text));
         }
         if CONTROL_WORDS.iter().any(|k| first.is(k)) {
@@ -1150,9 +1290,12 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
             }
             if words.len() != 2
                 || words[1].text.starts_with('-')
+                || words[1].text.split('/').any(|c| c == ".." || c == ".")
                 || cd_target(words[1], "").is_none()
             {
-                return Err("a `cd` that is not to one literal path inside the repository".to_string());
+                return Err(
+                    "a `cd` that is not to one literal path inside the repository".to_string(),
+                );
             }
             continue;
         }
@@ -1163,7 +1306,10 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
                 ["-e"] | ["-eu"] | ["-euo", "pipefail"] | ["-x"]
             );
             if !ok {
-                return Err(format!("`set {}` is not one of set -e / -eu / -euo pipefail / -x", args.join(" ")));
+                return Err(format!(
+                    "`set {}` is not one of set -e / -eu / -euo pipefail / -x",
+                    args.join(" ")
+                ));
             }
             continue;
         }
@@ -1274,7 +1420,10 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
             match t {
                 Tok::Op(_) => {
                     if let Some(last) = words.last() {
-                        if !last.quoted && last.text.chars().all(|c| c.is_ascii_digit()) && !last.text.is_empty() {
+                        if !last.quoted
+                            && last.text.chars().all(|c| c.is_ascii_digit())
+                            && !last.text.is_empty()
+                        {
                             words.pop();
                         }
                     }
@@ -1294,9 +1443,12 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
         let mut assignments = Vec::new();
         while k < words.len() {
             let w = &words[k];
-            if ["if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "{", "}", "time", "esac"]
-                .iter()
-                .any(|kw| w.is(kw))
+            if [
+                "if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "{", "}",
+                "time", "esac",
+            ]
+            .iter()
+            .any(|kw| w.is(kw))
             {
                 k += 1;
                 continue;
@@ -1316,15 +1468,20 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
         };
         let text = |w: &Word| w.text.replace(ROOT, "$GITHUB_WORKSPACE");
         let env_effect: Option<String> = if first.is("export") {
-            Some(format!("`export {}`", words[1..].iter().map(text).collect::<Vec<_>>().join(" ")))
+            Some(format!(
+                "`export {}`",
+                words[1..].iter().map(text).collect::<Vec<_>>().join(" ")
+            ))
         } else if (first.is("declare") || first.is("typeset"))
-            && words[1..].iter().any(|w| w.text.starts_with('-') && w.text.contains('x'))
+            && words[1..]
+                .iter()
+                .any(|w| w.text.starts_with('-') && w.text.contains('x'))
         {
             Some(format!("`{} -x …`", first.text))
         } else if first.is("set")
-            && words[1..].iter().any(|w| {
-                (w.text.starts_with('-') && w.text.contains('a')) || w.text == "allexport"
-            })
+            && words[1..]
+                .iter()
+                .any(|w| (w.text.starts_with('-') && w.text.contains('a')) || w.text == "allexport")
         {
             Some("`set -a` (exports every later assignment)".to_string())
         } else if first.is("source") || first.is(".") {
@@ -1347,9 +1504,11 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
             });
             continue;
         }
-        if ["for", "case", "function", "local", "readonly", "declare", "typeset"]
-            .iter()
-            .any(|kw| first.is(kw))
+        if [
+            "for", "case", "function", "local", "readonly", "declare", "typeset",
+        ]
+        .iter()
+        .any(|kw| first.is(kw))
             || first.text.ends_with(')')
         {
             continue;
@@ -1384,7 +1543,11 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
         if from == 3 {
             argv.push("git".to_string());
         }
-        argv.extend(words[from..].iter().map(|w| resolve_root(&w.text, &resolve_in)));
+        argv.extend(
+            words[from..]
+                .iter()
+                .map(|w| resolve_root(&w.text, &resolve_in)),
+        );
         out.push(LooseCommand {
             argv,
             working_dir: cmd_wd.clone().unwrap_or_else(|| unknown.clone()),
@@ -1408,15 +1571,24 @@ mod tests {
     #[test]
     fn plain_lines_become_commands() {
         let t = translate("npm ci\nnpm run lint\n", "frontend").unwrap();
-        assert_eq!(argvs(&t), vec![vec!["npm", "ci"], vec!["npm", "run", "lint"]]);
+        assert_eq!(
+            argvs(&t),
+            vec![vec!["npm", "ci"], vec!["npm", "run", "lint"]]
+        );
         assert!(t.commands.iter().all(|c| c.working_dir == "frontend"));
     }
 
     #[test]
     fn quotes_continuations_and_env_prefixes() {
         let t = translate("RUST_LOG=debug cargo test \\\n  --workspace -- 'a b'\n", "").unwrap();
-        assert_eq!(t.commands[0].argv, vec!["cargo", "test", "--workspace", "--", "a b"]);
-        assert_eq!(t.commands[0].env, vec![("RUST_LOG".to_string(), "debug".to_string())]);
+        assert_eq!(
+            t.commands[0].argv,
+            vec!["cargo", "test", "--workspace", "--", "a b"]
+        );
+        assert_eq!(
+            t.commands[0].env,
+            vec![("RUST_LOG".to_string(), "debug".to_string())]
+        );
     }
 
     #[test]
@@ -1435,7 +1607,10 @@ mod tests {
                       echo \"::error::stale $X\"\n  exit 1\nfi\n";
         let t = translate(script, "backend").unwrap();
         assert_eq!(t.commands.len(), 2);
-        assert_eq!(t.commands[1].argv, vec!["git", "diff", "--exit-code", "a.json", "b.json"]);
+        assert_eq!(
+            t.commands[1].argv,
+            vec!["git", "diff", "--exit-code", "a.json", "b.json"]
+        );
         assert_eq!(t.commands[1].working_dir, "");
         assert!(t.notes.iter().any(|n| n.contains("failure-message")));
     }
@@ -1446,17 +1621,27 @@ mod tests {
         assert_eq!(t.commands[0].argv, vec!["cargo", "fmt", "--check"]);
         let t = translate("make lint || { echo bad >&2; exit 2; }\n", "").unwrap();
         assert_eq!(t.commands[0].argv, vec!["make", "lint"]);
-        assert!(translate("make lint || true\n", "").unwrap_err().contains("|| true"));
+        assert!(translate("make lint || true\n", "")
+            .unwrap_err()
+            .contains("|| true"));
     }
 
     #[test]
     fn refuses_what_argv_cannot_say() {
         assert!(translate("curl x | sh\n", "").unwrap_err().contains("pipe"));
-        assert!(translate("echo X=1 >> $GITHUB_ENV\n", "").unwrap_err().contains("GITHUB_ENV"));
-        assert!(translate("pytest $ARGS\n", "").unwrap_err().contains("$ARGS"));
-        assert!(translate("twine check dist/*\n", "").unwrap_err().contains("glob"));
+        assert!(translate("echo X=1 >> $GITHUB_ENV\n", "")
+            .unwrap_err()
+            .contains("GITHUB_ENV"));
+        assert!(translate("pytest $ARGS\n", "")
+            .unwrap_err()
+            .contains("$ARGS"));
+        assert!(translate("twine check dist/*\n", "")
+            .unwrap_err()
+            .contains("glob"));
         assert!(translate("for f in a b; do x $f; done\n", "").is_err());
-        assert!(translate("echo ${{ secrets.TOKEN }}\n", "").unwrap_err().contains("secrets.TOKEN"));
+        assert!(translate("echo ${{ secrets.TOKEN }}\n", "")
+            .unwrap_err()
+            .contains("secrets.TOKEN"));
         assert!(translate("if [ -f x ]; then y; fi\n", "").is_err());
         assert!(translate("echo only\n", "").is_err());
         assert!(translate("date +%s\n", "").unwrap_err().contains("bans"));
@@ -1468,26 +1653,45 @@ mod tests {
         assert!(translate("if ! a && b; then\n exit 1\nfi\n", "").is_err());
         assert!(translate("echo \"$(./gen.sh)\"\nmake\n", "").is_err());
         assert!(translate("echo X=1 >& out.env\nmake\n", "").is_err());
-        assert!(translate("twine check \"$GITHUB_WORKSPACE\"/dist/*\n", "").unwrap_err().contains("glob"));
-        assert!(translate("mkdir -p out/{debug,release}\n", "").unwrap_err().contains("brace"));
-        assert!(translate("source .venv/bin/activate\npytest\n", "").unwrap_err().contains("builtin"));
+        assert!(translate("twine check \"$GITHUB_WORKSPACE\"/dist/*\n", "")
+            .unwrap_err()
+            .contains("glob"));
+        assert!(translate("mkdir -p out/{debug,release}\n", "")
+            .unwrap_err()
+            .contains("brace"));
+        assert!(translate("source .venv/bin/activate\npytest\n", "")
+            .unwrap_err()
+            .contains("builtin"));
         assert!(translate("ulimit -n 4096\n", "").is_err());
         assert!(translate("printf $'a\\tb'\nmake\n", "").is_err());
         assert!(translate("tool $'a\\tb'\n", "").is_err());
         assert!(translate("CARGO_HOME=~/.cargo cargo build\n", "").is_err());
         assert!(translate("set +e\nmake\n", "").is_err());
         assert!(translate("set +o errexit\nmake\n", "").is_err());
-        let loose = extract_loose("git -C frontend diff --exit-code \"$GITHUB_WORKSPACE/openapi.json\"\n", "");
-        assert_eq!(loose[0].argv, vec!["git", "diff", "--exit-code", "../openapi.json"]);
+        let loose = extract_loose(
+            "git -C frontend diff --exit-code \"$GITHUB_WORKSPACE/openapi.json\"\n",
+            "",
+        );
+        assert_eq!(
+            loose[0].argv,
+            vec!["git", "diff", "--exit-code", "../openapi.json"]
+        );
         assert_eq!(loose[0].working_dir, "frontend");
         let t = translate("\"FOO=1\" cmd\n", "").unwrap();
         assert_eq!(t.commands[0].argv, vec!["FOO=1", "cmd"]);
         let t = translate("test -f a && cp a b\nmake\n", "").unwrap();
         assert!(t.notes.iter().any(|n| n.contains("stricter")));
         // git -C resolves the workspace root against its own directory.
-        let t = translate("git -C frontend diff --exit-code \"$GITHUB_WORKSPACE/openapi.json\"\n", "").unwrap();
+        let t = translate(
+            "git -C frontend diff --exit-code \"$GITHUB_WORKSPACE/openapi.json\"\n",
+            "",
+        )
+        .unwrap();
         assert_eq!(t.commands[0].working_dir, "frontend");
-        assert_eq!(t.commands[0].argv, vec!["git", "diff", "--exit-code", "../openapi.json"]);
+        assert_eq!(
+            t.commands[0].argv,
+            vec!["git", "diff", "--exit-code", "../openapi.json"]
+        );
     }
 
     #[test]
@@ -1498,7 +1702,10 @@ mod tests {
 
     #[test]
     fn heredoc_bodies_are_skipped_loosely() {
-        let cmds = extract_loose("python3 - <<'EOF'\nimport os\nprint(1)\nEOF\nnpm test\n", "");
+        let cmds = extract_loose(
+            "python3 - <<'EOF'\nimport os\nprint(1)\nEOF\nnpm test\n",
+            "",
+        );
         let names: Vec<&str> = cmds.iter().map(|c| c.argv[0].as_str()).collect();
         assert_eq!(names, vec!["python3", "npm"]);
     }
@@ -1509,23 +1716,44 @@ mod tests {
             "set -e\nif ! poetry run pytest -q; then\n  echo fail >&2\n  exit 1\nfi\ncd sub && make check 2>&1 | tee log\n",
             "",
         );
-        let lines: Vec<String> = cmds.iter().map(|c| format!("{}:{}", c.working_dir, c.argv.join(" "))).collect();
+        let lines: Vec<String> = cmds
+            .iter()
+            .map(|c| format!("{}:{}", c.working_dir, c.argv.join(" ")))
+            .collect();
         assert!(lines.contains(&":poetry run pytest -q".to_string()));
         assert!(lines.contains(&"sub:make check".to_string()));
         assert!(lines.contains(&"sub:tee log".to_string()));
-        let g = extract_loose("make lint || true\nmake check || exit 1\nRUSTFLAGS=-Dwarnings cargo build\n", "");
+        let g = extract_loose(
+            "make lint || true\nmake check || exit 1\nRUSTFLAGS=-Dwarnings cargo build\n",
+            "",
+        );
         assert!(g[0].guarded);
         assert!(!g[2].guarded, "make check || exit 1 is a gate");
-        for script in ["make a || rc=$?\n", "make a || ( echo x )\n", "make a || { echo x; }\n", "make a || echo x\n"] {
+        for script in [
+            "make a || rc=$?\n",
+            "make a || ( echo x )\n",
+            "make a || { echo x; }\n",
+            "make a || echo x\n",
+        ] {
             assert!(!extract_loose(script, "")[0].guarded, "{script}");
         }
         let u = extract_loose("cd \"$DIR\"\nmake check\ncd sub\nmake x\n", "");
         assert!(u.iter().all(|c| !c.wd_known), "{u:#?}");
         let e = extract_loose("export A=1\nset -a\nsource .env\ndeclare -x B=2\n", "");
-        assert_eq!(e.iter().filter(|c| c.env_effect.is_some()).count(), 4, "{e:#?}");
-        assert_eq!(github_file_writes("echo x >> \"$GITHUB_ENV\""), vec!["GITHUB_ENV"]);
+        assert_eq!(
+            e.iter().filter(|c| c.env_effect.is_some()).count(),
+            4,
+            "{e:#?}"
+        );
+        assert_eq!(
+            github_file_writes("echo x >> \"$GITHUB_ENV\""),
+            vec!["GITHUB_ENV"]
+        );
         let cb = g.iter().find(|c| c.argv[0] == "cargo").unwrap();
-        assert_eq!(cb.assignments, vec![("RUSTFLAGS".to_string(), "-Dwarnings".to_string())]);
+        assert_eq!(
+            cb.assignments,
+            vec![("RUSTFLAGS".to_string(), "-Dwarnings".to_string())]
+        );
     }
 
     #[test]
@@ -1558,7 +1786,10 @@ mod tests {
             "hash -p x make\n",
             "make check\r\n",
         ] {
-            assert!(report_grammar(bad).is_err(), "{bad:?} should be outside the grammar");
+            assert!(
+                report_grammar(bad).is_err(),
+                "{bad:?} should be outside the grammar"
+            );
         }
         for ok in ["echo -n done\n", "# a comment\nmake check\n"] {
             assert!(report_grammar(ok).is_ok(), "{ok}: {:?}", report_grammar(ok));
@@ -1591,7 +1822,10 @@ mod tests {
             "echo x >&2\n",
             "python ${{ github.workspace }}/x.py\n",
         ] {
-            assert!(report_grammar(bad).is_err(), "{bad} should be outside the grammar");
+            assert!(
+                report_grammar(bad).is_err(),
+                "{bad} should be outside the grammar"
+            );
         }
     }
 

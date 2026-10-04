@@ -54,9 +54,15 @@ qontinui-ci import --report
         and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
         step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
         declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY
-        (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only
-        COVERED counts toward the precondition.
+        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
+        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
+        a command of the workflow job, in the same relative order; a section the parser cannot read
+        (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
+        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
+        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
+        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (41):
   UNCOVERED       advisory-red-detector.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
@@ -120,7 +126,7 @@ JOBS ON pull_request / push:main (41):
       review:  step "Verify and record gating-workflow changes" runs `read -r -d  NON_GATING` under `|| true`, whose effects can change later steps
       review:  step "Verify and record gating-workflow changes" changes the environment of later commands: `export HIT_PATHS MERGE_BASE`
       review:  pull_request_target (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-  UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/87 gate command(s) matched
+  UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/86 gate command(s) matched
       missing: note
       missing: note ### ci-rerun-on-declaration
       missing: note 
@@ -185,7 +191,6 @@ JOBS ON pull_request / push:main (41):
       missing: note
       missing: note ### ci-rerun-on-declaration — base retarget
       missing: note 
-      missing: note - PR: `${REPO}#${PR_NUMBER}` @ `${HEAD_SHA}`
       missing: note - Base retargeted: `${OLD_BASE_REF}` → `${BASE_REF}`
       missing: note - Head branch: `${HEAD_REPO:-<unknown>}:${HEAD_REF}`
       missing: [ -z ${HEAD_REPO:-} ]
@@ -208,9 +213,11 @@ JOBS ON pull_request / push:main (41):
       missing: note   branch `${HEAD_REF}`, or push to the branch to fire it via `synchronize`.
       missing: note `Gitleaks Secret Detection` is not listed: `secret-scan.yml` has no
       missing: note `branches:` filter, so it already reported on this head.
+      review:  step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling" runs only `if: startsWith(github.event.label.name, 'coord:downstream-of=') || startsWith(github.event.label.name, 'coord:upstream-of=')` — whether it runs is not modeled
       review:  step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling" runs `gh api repos/${REPO}/pulls/${PR_NUMBER} -q .head.sha` under `|| true`, whose effects can change later steps
       review:  step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling" runs `gh api -X POST repos/${REPO}/actions/runs/${run_id}/cancel` under `|| true`, whose effects can change later steps
+      review:  step "Dispatch base-filtered required workflows after a retarget" runs only `if: github.event.action == 'edited' && github.event.changes.base != null` — whether it runs is not modeled
       review:  step "Dispatch base-filtered required workflows after a retarget" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Dispatch base-filtered required workflows after a retarget" runs `gh api repos/${REPO}/actions/workflows/${wf}/runs?head_sha=${HEAD_SHA}&per_page=` under `|| true`, whose effects can change later steps
   UNCOVERED       ci-timeout-marker-selftest.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
@@ -241,6 +248,7 @@ JOBS ON pull_request / push:main (41):
       missing: command -v python3
       missing: python3 -c import uuid; print(uuid.uuid4())
       missing: command -v python
+      missing: python -c import uuid; print(uuid.uuid4())
       missing: od -An -N16 -tx1 /dev/urandom
       missing: tr -d  \n
       missing: hostname
@@ -259,7 +267,6 @@ JOBS ON pull_request / push:main (41):
       missing: [ $RUNNER_OS = Linux ]
       missing: free -h
       missing: df -h
-      missing: [ $RUNNER_OS = Windows ]
       missing: powershell -NoProfile -Command Get-CimInstance Win32_PageFileUsage | Format-List *; Get-CimInstance 
       missing: [ $RUNNER_OS = macOS ]
       missing: sysctl -n hw.memsize
@@ -281,31 +288,56 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/tests/ci-integrity/run-scenarios.sh
       missing: python3 scripts/tests/ci-integrity/test-surface.py
       missing: powershell -File scripts/contract-smoke.ps1 -DirectExe target/debug/qontinui-runner.exe -Profile ci 
+      review:  runs on several runner images ["ubuntu-22.04", "windows-latest"]; a manifest `os` runs one host per OS
       review:  dtolnay/rust-toolchain with input components: rustfmt, clippy, which the report does not model
       review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" is outside the report's command grammar: it uses an output redirect
+      review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" runs `cargo metadata --format-version` under `|| true`, whose effects can change later steps
       review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" runs `git --no-pager diff -- Cargo.lock` under `|| true`, whose effects can change later steps
       review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" runs `git checkout -- Cargo.lock` under `|| true`, whose effects can change later steps
+      review:  step "Install dependencies (Ubuntu)" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
       review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Free disk space (Ubuntu)" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
       review:  free-disk-space with tool-cache can remove hosted toolchains
+      review:  step "Add swapfile (Ubuntu — guard against link-time OOM)" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
       review:  step "Add swapfile (Ubuntu — guard against link-time OOM)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Configure pagefile (Windows — guard against link-time OOM)" runs only `if: matrix.platform == 'windows-latest'` — whether it runs is not modeled
       review:  Swatinem/rust-cache restores build output into the checkout's target dir
+      review:  step "Contract-smoke effect-probe verdict (PS 5.1)" runs only `if: matrix.platform == 'windows-latest'` — whether it runs is not modeled
+      review:  step "Contract-smoke effect-probe verdict (PS 5.1)" runs bash/sh on a Windows runner (Git Bash), which the report does not model
+      review:  step "Clippy check" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
       review:  step "Poison ambient state" is outside the report's command grammar: it uses a subshell
       review:  step "Poison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Poison ambient state" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Build Rust tests" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Build Rust tests" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Run Rust tests" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
+      review:  step "Run Rust tests" runs bash/sh on a Windows runner (Git Bash), which the report does not model
+      review:  step "Windows memory peak after the Rust test steps" runs only `if: always() && matrix.platform == 'windows-latest'` — whether it runs is not modeled
       review:  step "Windows memory peak after the Rust test steps" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Windows memory peak after the Rust test steps" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Windows memory peak after the Rust test steps" runs `powershell -NoProfile -Command Get-CimInstance Win32_PageFileUsage | Select-Obje` in a continue-on-error step, whose effects can change later steps
+      review:  step "Report test results to coord (best-effort)" runs only `if: always()` — whether it runs is not modeled
       review:  advisory step "Report test results to coord (best-effort)" sets env the manifest does not model
       review:  step "Report test results to coord (best-effort)" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Report test results to coord (best-effort)" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Report test results to coord (best-effort)" runs `node scripts/ci-test-results-ingest.mjs --log ./cargo-test-output.log --repo $EX` in a continue-on-error step, whose effects can change later steps
       review:  step "Unpoison ambient state" is outside the report's command grammar: it `set -u` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Unpoison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Unpoison ambient state" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  step "Unpoison ambient state" runs `rmdir $h/.qontinui` under `|| true`, whose effects can change later steps
+      review:  step "Live AI extractor smoke" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
       review:  advisory step "Live AI extractor smoke" sets env the manifest does not model
       review:  step "Live AI extractor smoke" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Contract-smoke summary invariants (PS 5.1)" runs only `if: matrix.platform == 'windows-latest'` — whether it runs is not modeled
+      review:  step "Contract-smoke summary invariants (PS 5.1)" runs bash/sh on a Windows runner (Git Bash), which the report does not model
+      review:  step "CI-integrity guard policy" runs only `if: matrix.platform == 'ubuntu-22.04'` — whether it runs is not modeled
+      review:  step "CI-integrity guard policy" runs bash/sh on a Windows runner (Git Bash), which the report does not model
+      review:  step "SDK↔runner contract smoke (direct-exe)" runs only `if: matrix.platform == 'windows-latest'` — whether it runs is not modeled
+      review:  step "SDK↔runner contract smoke (direct-exe)" runs bash/sh on a Windows runner (Git Bash), which the report does not model
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › clippy-windows [pull_request, push:main] 0/6 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
@@ -317,13 +349,16 @@ JOBS ON pull_request / push:main (41):
       review:  dtolnay/rust-toolchain with input components: rustfmt, clippy, which the report does not model
       review:  Swatinem/rust-cache restores build output into the checkout's target dir
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › holder-crates [pull_request, push:main] 0/3 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: run (pwsh script): Test holder crates
       missing: run (pwsh script): Clippy holder crates
+      review:  runs on several runner images ["ubuntu-latest", "windows-latest"]; a manifest `os` runs one host per OS
       review:  dtolnay/rust-toolchain with input components: clippy, which the report does not model
       review:  Swatinem/rust-cache restores build output into the checkout's target dir
+      review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   PARTIAL         ci.yml › frontend-tests [pull_request, push:main] 2/3 gate command(s) matched
       missing: uses: pnpm/action-setup
@@ -336,6 +371,16 @@ JOBS ON pull_request / push:main (41):
       review:  `pnpm test` runs with GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}; ci/frontend-test does not set it identically
       review:  `pnpm test` is limited to 900s; ci/frontend-test allows 3600s
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/ci-tooling-node-tests (`node --test scripts/__tests__/ci-flake-analyze.test.mjs scri`) is not a command of this workflow job
+      review:  manifest step ci/frontend-lint (`pnpm run lint`) is not a command of this workflow job
+      review:  manifest step ci/effect-fixture-check (`pnpm run effect:fixture:check`) is not a command of this workflow job
+      review:  manifest step ci/frontend-typecheck (`pnpm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/frontend-build (`pnpm run build`) is not a command of this workflow job
+      review:  manifest step ci/rust-fmt (`cargo fmt -- --check`) is not a command of this workflow job
+      review:  manifest step ci/rust-clippy (`cargo clippy`) is not a command of this workflow job
+      review:  manifest step ci/rust-test (`cargo test`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-test (`cargo test -p qontinui-pty-holder -p qontinui-runner-win32`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-clippy (`cargo clippy -p qontinui-pty-holder --all-targets`) is not a command of this workflow job
   UNCOVERED       ci.yml › seam-gate [pull_request, push:main] 0/5 gate command(s) matched
       missing: grep -m1 -vE ^\s*(//|$) $tf
       missing: [ $first != #![cfg(any(debug_assertions, feature = "test-fixtures"))] ]
@@ -363,6 +408,7 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: cargo clippy --all-targets
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
+      review:  job condition `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'` — whether the job runs is not modeled
       review:  step "Checkout sibling repos" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
       review:  dtolnay/rust-toolchain with input components: rustfmt, clippy, which the report does not model
       review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
@@ -374,7 +420,18 @@ JOBS ON pull_request / push:main (41):
       review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
       review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/ci-tooling-node-tests (`node --test scripts/__tests__/ci-flake-analyze.test.mjs scri`) is not a command of this workflow job
+      review:  manifest step ci/frontend-lint (`pnpm run lint`) is not a command of this workflow job
+      review:  manifest step ci/effect-fixture-check (`pnpm run effect:fixture:check`) is not a command of this workflow job
+      review:  manifest step ci/frontend-typecheck (`pnpm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/frontend-test (`pnpm test`) is not a command of this workflow job
+      review:  manifest step ci/rust-fmt (`cargo fmt -- --check`) is not a command of this workflow job
+      review:  manifest step ci/rust-clippy (`cargo clippy`) is not a command of this workflow job
+      review:  manifest step ci/rust-test (`cargo test`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-test (`cargo test -p qontinui-pty-holder -p qontinui-runner-win32`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-clippy (`cargo clippy -p qontinui-pty-holder --all-targets`) is not a command of this workflow job
       note:    job condition `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'` — considered as running
   PARTIAL         clippy-tiers.yml › clippy-diff [pull_request] 2/14 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
@@ -391,6 +448,7 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: reviewdog -f=clippy -name=clippy-diff -filter-mode=diff_context -reporter=github-pr-check -fail-on-e
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
+      review:  job condition `if: github.event_name == 'pull_request'` — whether the job runs is not modeled
       review:  step "Checkout sibling repos" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
       review:  dtolnay/rust-toolchain with input components: rustfmt, clippy, which the report does not model
       review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
@@ -404,7 +462,18 @@ JOBS ON pull_request / push:main (41):
       review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
       review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain@master with toolchain 1.95.0 (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/ci-tooling-node-tests (`node --test scripts/__tests__/ci-flake-analyze.test.mjs scri`) is not a command of this workflow job
+      review:  manifest step ci/frontend-lint (`pnpm run lint`) is not a command of this workflow job
+      review:  manifest step ci/effect-fixture-check (`pnpm run effect:fixture:check`) is not a command of this workflow job
+      review:  manifest step ci/frontend-typecheck (`pnpm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/frontend-test (`pnpm test`) is not a command of this workflow job
+      review:  manifest step ci/rust-fmt (`cargo fmt -- --check`) is not a command of this workflow job
+      review:  manifest step ci/rust-clippy (`cargo clippy`) is not a command of this workflow job
+      review:  manifest step ci/rust-test (`cargo test`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-test (`cargo test -p qontinui-pty-holder -p qontinui-runner-win32`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-clippy (`cargo clippy -p qontinui-pty-holder --all-targets`) is not a command of this workflow job
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       clorinde-bindings-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
@@ -414,6 +483,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/clorinde.toml src-tauri/c
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  job key `outputs` is not modeled
       review:  step "Detect Clorinde-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect Clorinde-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/24 gate command(s) matched
@@ -441,6 +511,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ $PAT_AVAILABLE = true ]
       missing: git push origin HEAD:$BRANCH
       missing: uses: actions/upload-artifact
+      review:  job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — whether the job runs is not modeled
       review:  actions/checkout with input ref: ${{ github.head_ref || github.ref }}, which the report does not model
       review:  actions/checkout with input token: ${{ secrets.CLORINDE_AUTOCOMMIT_TOKEN || secrets.GITHUB_TOKEN }}, which the report does not model
       review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it has a quoted or escaped word ("branch=$BRANCH")
@@ -450,26 +521,38 @@ JOBS ON pull_request / push:main (41):
       review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}")
       review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Install clorinde CLI" runs only `if: steps.cache-clorinde.outputs.cache-hit != 'true'` — whether it runs is not modeled
       review:  step "Show clorinde live --help" runs `clorinde live --help` under `|| true`, whose effects can change later steps
       review:  step "Run Clorinde codegen" is outside the report's command grammar: it has a quoted or escaped word ("project,public")
       review:  step "Stabilize clorinde module ordering" is outside the report's command grammar: it uses the shell construct `{`
       review:  step "Detect drift" is outside the report's command grammar: it uses the shell construct `if`
       review:  step "Detect drift" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Auto-commit regenerated bindings" runs only `if: steps.drift.outputs.drift == 'true' &&
+github.event.pull_request.head.repo.full_name == github.repository
+` — whether it runs is not modeled
       review:  step "Auto-commit regenerated bindings" is outside the report's command grammar: it has a quoted or escaped word ("github-actions[bot]")
       review:  step "Auto-commit regenerated bindings" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Upload regenerated bindings on push failure" runs only `if: steps.drift.outputs.drift == 'true' &&
+(steps.autocommit.outputs.pushed != 'true')
+` — whether it runs is not modeled
+      review:  step "Surface auto-commit as a check failure" runs only `if: steps.autocommit.outputs.pushed == 'true'` — whether it runs is not modeled
       review:  step "Surface auto-commit as a check failure" is outside the report's command grammar: it has a quoted or escaped word ("::error::Clorinde bindings were regenerated and auto-committed.")
+      review:  step "Confirm no drift" runs only `if: steps.drift.outputs.drift == 'false'` — whether it runs is not modeled
       review:  step "Confirm no drift" is outside the report's command grammar: it has a quoted or escaped word ("Clorinde bindings verified fresh; no action taken.")
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
+      review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — considered as running
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $BINDINGS_RELEVANT = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  job condition `if: always()` — whether the job runs is not modeled
       review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       flake-escalation.yml › unit-tests [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: node --version
       missing: node --test scripts/__tests__/ci-flake-escalate.test.mjs
+      review:  job condition `if: github.event_name == 'pull_request'` — whether the job runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       flake-escalation.yml › escalate [pull_request (paths-filtered)] 0/10 gate command(s) matched
@@ -483,6 +566,8 @@ JOBS ON pull_request / push:main (41):
       missing: [ -n ${MIN_OCCURRENCES:-} ]
       missing: --min-occurrences ${MIN_OCCURRENCES}
       missing: node scripts/ci-flake-escalate.mjs ${args[@]}
+      review:  job condition `if: github.event_name != 'pull_request'` — whether the job runs is not modeled
+      review:  step "Read coord's flake history and upsert escalation issues" runs only `if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'push'` — whether it runs is not modeled
       review:  step "Read coord's flake history and upsert escalation issues" is outside the report's command grammar: it uses a subshell
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
@@ -523,6 +608,7 @@ JOBS ON pull_request / push:main (41):
       missing: python3 scripts/check_untimed_subprocess.py --list-roots
       missing: python3 scripts/check_untimed_subprocess.py --ci
       review:  actions/checkout with input filter: blob:none, which the report does not model
+      review:  step "Re-derive this PR's merge state against the current base" runs only `if: github.event_name == 'pull_request'` — whether it runs is not modeled
       review:  step "Re-derive this PR's merge state against the current base" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Re-derive this PR's merge state against the current base" runs `gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .base.ref` under `|| true`, whose effects can change later steps
       review:  step "Scan the runner's Rust crates for unbounded blocking subprocess waits" is outside the report's command grammar: it relies on shell expansion of "["
@@ -540,9 +626,21 @@ JOBS ON pull_request / push:main (41):
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Warn if the job is approaching its budget" runs only `if: success()` — whether it runs is not modeled
       review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
+      review:  manifest step ci/ci-tooling-node-tests (`node --test scripts/__tests__/ci-flake-analyze.test.mjs scri`) is not a command of this workflow job
+      review:  manifest step ci/frontend-lint (`pnpm run lint`) is not a command of this workflow job
+      review:  manifest step ci/effect-fixture-check (`pnpm run effect:fixture:check`) is not a command of this workflow job
+      review:  manifest step ci/frontend-typecheck (`pnpm run typecheck`) is not a command of this workflow job
+      review:  manifest step ci/frontend-test (`pnpm test`) is not a command of this workflow job
+      review:  manifest step ci/frontend-build (`pnpm run build`) is not a command of this workflow job
+      review:  manifest step ci/rust-fmt (`cargo fmt -- --check`) is not a command of this workflow job
+      review:  manifest step ci/rust-clippy (`cargo clippy`) is not a command of this workflow job
+      review:  manifest step ci/rust-test (`cargo test`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-test (`cargo test -p qontinui-pty-holder -p qontinui-runner-win32`) is not a command of this workflow job
+      review:  manifest step ci/holder-crates-clippy (`cargo clippy -p qontinui-pty-holder --all-targets`) is not a command of this workflow job
   UNCOVERED       onboarding-doc-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
       missing: git merge-base --all $base_sha $head_sha
@@ -551,6 +649,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/src/coord_doctor.rs src-tauri/src/bin/coord_
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  job key `outputs` is not modeled
       review:  step "Detect onboarding-doc-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect onboarding-doc-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-verify [pull_request] 0/5 gate command(s) matched
@@ -559,15 +658,18 @@ JOBS ON pull_request / push:main (41):
       missing: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
       missing: src-tauri: cargo run --quiet --bin coord_doctor -- --onboarding-doc
       missing: git diff --exit-code docs/runner-onboarding.md
+      review:  job condition `if: needs.detect.outputs.doc_relevant == 'true'` — whether the job runs is not modeled
       review:  step "Install Tauri system dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
       review:  actions/cache restores "src-tauri/target" inside the repository checkout, which can change what the build sees
       review:  step "Regenerate onboarding doc" is outside the report's command grammar: it uses an output redirect
       review:  step "Verify docs/runner-onboarding.md is fresh" is outside the report's command grammar: it uses the shell construct `if`
+      review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.doc_relevant == 'true'` — considered as running
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $DOC_RELEVANT = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  job condition `if: always()` — whether the job runs is not modeled
       review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       page-spec-paths.yml › publish [push:main] 0/1 gate command(s) matched
@@ -591,8 +693,10 @@ JOBS ON pull_request / push:main (41):
       review:  step "Install Tauri Linux system deps" is outside the report's command grammar: it uses `sudo`, which the report does not model
       review:  step "Install datamodel-code-generator" is outside the report's command grammar: it has a quoted or escaped word ("datamodel-code-generator==0.57.0")
       review:  step "Stub qontinui-runner frontend dist" is outside the report's command grammar: it uses an output redirect
+      review:  step "Upload regenerated bindings" runs only `if: ${{ !cancelled() }}` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       schema-pg-sql-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
@@ -603,6 +707,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/schema.pg.sql.generated s
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  job key `outputs` is not modeled
       review:  step "Detect schema-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect schema-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/20 gate command(s) matched
@@ -626,6 +731,7 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: diff -u /tmp/schema.checked-in.sql schema.pg.sql.generated
       missing: src-tauri: head -80
       missing: uses: actions/upload-artifact
+      review:  job condition `if: needs.detect.outputs.schema_changed == 'true'` — whether the job runs is not modeled
       review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it has a quoted or escaped word ("branch=$BRANCH")
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
@@ -635,20 +741,23 @@ JOBS ON pull_request / push:main (41):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  step "Install Postgres client (for pg_dump)" is outside the report's command grammar: it uses `sudo`, which the report does not model
       review:  step "Diff against checked-in" is outside the report's command grammar: it uses an output redirect
+      review:  step "Upload regenerated schema (on diff failure)" runs only `if: failure() && steps.diff_check.conclusion == 'failure'` — whether it runs is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.schema_changed == 'true'` — considered as running
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $SCHEMA_CHANGED = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  job condition `if: always()` — whether the job runs is not modeled
       review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       schema-pg-sql-freshness-nightly.yml › selftest [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: bash scripts/tests/test_schema_pr_step_guards.sh
       missing: bash scripts/tests/test_ready_bot_draft_pr.sh
+      review:  job condition `if: github.event_name == 'pull_request'` — whether the job runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
-  UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/94 gate command(s) matched
+  UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/93 gate command(s) matched
       missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
       missing: <outside the repository>/: git clone --depth 1 https://github.com/qontinui/qontinui.git
       missing: <outside the repository>/: curl -sSL https://install.python-poetry.org
@@ -726,7 +835,6 @@ JOBS ON pull_request / push:main (41):
       missing: [ -z $url ]
       missing: [ -n ${PAT_TOKEN:-} ]
       missing: gh pr create --repo $REPO --base main --head $BRANCH --draft --title $TITLE --body-file $body
-      missing: gh pr create --repo $REPO --base main --head $BRANCH --draft --title $TITLE --body-file $body
       missing: pr_op_failed create
       missing: pr_op_failed create (URL read-back)
       missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --wait-for-checks-seconds 180 --
@@ -743,6 +851,7 @@ JOBS ON pull_request / push:main (41):
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
       missing: cat $sweep_log
+      review:  job condition `if: github.event_name != 'pull_request'` — whether the job runs is not modeled
       review:  actions/checkout with input token: ${{ (github.ref == 'refs/heads/main' && secrets.CLORINDE_AUTOCOMMIT_TOKEN) || secrets.GITHUB_TOKEN }}, which the report does not model
       review:  actions/checkout with input repository: qontinui/qontinui-web, which the report does not model
       review:  actions/checkout with input ref: main, which the report does not model
@@ -753,8 +862,11 @@ JOBS ON pull_request / push:main (41):
       review:  step "Check schema.pg.sql.generated is fresh" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Check schema.pg.sql.generated is fresh" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  step "Check schema.pg.sql.generated is fresh" runs `head -80` under `|| true`, whose effects can change later steps
+      review:  step "Open or update the schema refresh PR" runs only `if: steps.fresh_check.outputs.drift == 'true' && steps.fresh_check.outputs.self_heal == 'true'` — whether it runs is not modeled
       review:  step "Open or update the schema refresh PR" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
+      review:  step "Sweep the refresh PR (ready it once it carries checks; page if parked)" runs only `if: ${{ !cancelled() && steps.fresh_check.outputs.self_heal == 'true' }}` — whether it runs is not modeled
       review:  step "Sweep the refresh PR (ready it once it carries checks; page if parked)" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
+      review:  step "Upload regenerated schema (on drift)" runs only `if: ${{ !cancelled() && steps.fresh_check.outputs.drift == 'true' }}` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
@@ -767,6 +879,8 @@ JOBS ON pull_request / push:main (41):
   UNCOVERED       schemas-pair-follow.yml › detect [pull_request] 0/2 gate command(s) matched
       missing: [[ ! $LABEL_NAME =~ $re ]]
       missing: gh workflow run schemas-pair-follow.yml -R $REPO --ref main -f pr=$PR_NUMBER -f partner=$partner
+      review:  job condition `if: github.event_name == 'pull_request'` — whether the job runs is not modeled
+      review:  step "Dispatch the follow run from main" runs only `if: startsWith(github.event.label.name, 'coord:downstream-of=') && github.event.sender.login == 'qontinui-merge-orchestrator[bot]' && github.event.pull_request.head.repo.full_name == github.repository && vars.SCHEMAS_PAIR_FOLLOW != 'off'` — whether it runs is not modeled
       review:  step "Dispatch the follow run from main" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/10 gate command(s) matched
@@ -780,6 +894,8 @@ JOBS ON pull_request / push:main (41):
       missing: jq -r .[] | "| #\(.pr) | qontinui-schemas#\(.partner) | \(.action) | \(.mode) | \(.reason) |"
       missing: jq -c [.[] | select(.action == "FOLLOW")]
       missing: jq [.[] | select(.action == "UNKNOWN")] | length
+      review:  job key `outputs` is not modeled
+      review:  job condition `if: github.event_name != 'pull_request'` — whether the job runs is not modeled
       review:  actions/checkout with input ref: ${{ github.event.repository.default_branch }}, which the report does not model
       review:  step "Scan and decide" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Scan and decide" touches $GITHUB_OUTPUT, which changes what later steps see
@@ -793,20 +909,28 @@ JOBS ON pull_request / push:main (41):
       missing: rustup toolchain install $chan --profile minimal
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh lock-and-commit runner $RUNNER_TEMP/decide.json $RUNNER_TEM
       missing: uses: actions/upload-artifact
+      review:  job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — whether the job runs is not modeled
       review:  actions/checkout with input ref: ${{ github.event.repository.default_branch }}, which the report does not model
       review:  actions/checkout with input ref: ${{ matrix.item.head_sha }}, which the report does not model
       review:  step "Merge main and move the pin" is outside the report's command grammar: it uses an output redirect
       review:  step "Merge main and move the pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Check out the new qontinui-schemas pin" runs only `if: steps.pin.outputs.MODE == 'FOLLOW'` — whether it runs is not modeled
+      review:  step "Install main's Rust toolchain" runs only `if: steps.pin.outputs.MODE == 'FOLLOW'` — whether it runs is not modeled
       review:  step "Install main's Rust toolchain" is outside the report's command grammar: it has a quoted or escaped word ("chan=$(sed -n 's/^channel = \"\\(.*\\)\"$/\\1/p' rust-toolchain.toml)")
       review:  step "Install main's Rust toolchain" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Refresh Cargo.lock and commit" runs only `if: steps.pin.outputs.MODE == 'FOLLOW' || steps.pin.outputs.MODE == 'MERGE_ONLY'` — whether it runs is not modeled
       review:  step "Refresh Cargo.lock and commit" is outside the report's command grammar: it has a quoted or escaped word ("$RUNNER_TEMP/decide.json")
+      review:  step "Upload the pair-follow bundle" runs only `if: steps.pin.outputs.MODE == 'FOLLOW' || steps.pin.outputs.MODE == 'MERGE_ONLY'` — whether it runs is not modeled
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › push [pull_request] 0/1 gate command(s) matched
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh push $RUNNER_TEMP/plan-item.json $RUNNER_TEMP/out $RUNNER_T
+      review:  job condition `if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.followups != '[]' }}` — whether the job runs is not modeled
       review:  actions/checkout with input ref: ${{ github.event.repository.default_branch }}, which the report does not model
       review:  advisory step uses actions/download-artifact@v4, which the report does not model
+      review:  step "Verify, re-read the head, push" runs only `if: steps.dl.outcome == 'success'` — whether it runs is not modeled
       review:  step "Verify, re-read the head, push" is outside the report's command grammar: it uses an output redirect
+      review:  step "No bundle for this PR" runs only `if: steps.dl.outcome != 'success'` — whether it runs is not modeled
       review:  step "No bundle for this PR" is outside the report's command grammar: it has a quoted or escaped word ("No pair-follow bundle for")
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.followups != '[]' }}` — considered as running
@@ -814,6 +938,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ $PLAN = success ]
       missing: [ ${UNKNOWNS:-0} = 0 ]
       missing: [ $r = failure ]
+      review:  job condition `if: always() && github.event_name != 'pull_request'` — whether the job runs is not modeled
       review:  step "Red on UNKNOWN or a failed leg" is outside the report's command grammar: it has a quoted or escaped word ("plan=$PLAN compute=$COMPUTE push=$PUSH unknowns=${UNKNOWNS:-?}")
       note:    job condition `if: always() && github.event_name != 'pull_request'` — considered as running
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/5 gate command(s) matched
@@ -823,7 +948,7 @@ JOBS ON pull_request / push:main (41):
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
-  UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/114 gate command(s) matched
+  UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/113 gate command(s) matched
       missing: bash scripts/tests/test_pin_bump_pr_step.sh
       missing: [ ! -f $MANIFEST ]
       missing: tr -d \r
@@ -902,7 +1027,6 @@ JOBS ON pull_request / push:main (41):
       missing: gh pr comment $existing_num --repo $REPO --body-file $RUNNER_TEMP/pr-comment.md
       missing: pr_write_failed gh pr comment on #$existing_num
       missing: git checkout -B $BRANCH $GITHUB_SHA
-      missing: cp $RUNNER_TEMP/sibling-pins.fresh.conf $MANIFEST
       missing: git add -- $MANIFEST
       missing: git status --porcelain -- Cargo.lock
       missing: [ -n $(git status --porcelain -- Cargo.lock) ]
@@ -939,22 +1063,28 @@ JOBS ON pull_request / push:main (41):
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
       review:  actions/checkout with input token: ${{ (github.event_name != 'pull_request' && secrets.CLORINDE_AUTOCOMMIT_TOKEN) || secrets.GITHUB_TOKEN }}, which the report does not model
+      review:  step "Test the bump-PR step (stubbed gh, no network)" runs only `if: github.event_name == 'pull_request'` — whether it runs is not modeled
       review:  step "Resolve each pinned sibling's current default-branch head" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Resolve each pinned sibling's current default-branch head" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Detect a moving qontinui-schemas pin" runs only `if: steps.scan.outputs.self_heal == 'true'` — whether it runs is not modeled
       review:  step "Detect a moving qontinui-schemas pin" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Detect a moving qontinui-schemas pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Check out the new qontinui-schemas pin" runs only `if: steps.schemas.outputs.moved == 'true'` — whether it runs is not modeled
+      review:  step "Refresh Cargo.lock against the new qontinui-schemas pin" runs only `if: steps.schemas.outputs.moved == 'true'` — whether it runs is not modeled
       review:  step "Refresh Cargo.lock against the new qontinui-schemas pin" is outside the report's command grammar: it has a quoted or escaped word ("$(sed -n 's/^channel = \"\\(.*\\)\"$/\\1/p' rust-toolchain.toml)")
+      review:  step "Open or update the pin bump PR" runs only `if: steps.scan.outputs.self_heal == 'true'` — whether it runs is not modeled
       review:  step "Open or update the pin bump PR" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
+      review:  step "Sweep the bump PR (ready it once it carries checks; page if parked)" runs only `if: ${{ !cancelled() && steps.scan.outputs.sweep == 'true' }}` — whether it runs is not modeled
       review:  step "Sweep the bump PR (ready it once it carries checks; page if parked)" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
 
 NOT CONSIDERED — not on pull_request or a push to main (6 workflow(s)):
-  build-python-executor.yml (jobs: build, combine) — triggers ["workflow_dispatch", "workflow_call"]
-  published-parity.yml (jobs: published-parity) — triggers ["schedule", "workflow_dispatch", "release"]
-  release.yml (jobs: build-python-executor, create-release, build, publish-update-json) — triggers ["push", "workflow_dispatch"]
-  reproducibility-gate.yml (jobs: repro-build) — triggers ["schedule", "workflow_dispatch"]
-  stacked-pr-fastlane.yml (jobs: scope, rust-fast, frontend-fast) — triggers ["pull_request"]
-  toolcache-probe.yml (jobs: probe) — triggers ["workflow_dispatch"]
+  build-python-executor.yml (jobs: build, combine) — its other triggers ["workflow_dispatch", "workflow_call"] are not gates
+  published-parity.yml (jobs: published-parity) — its other triggers ["schedule", "workflow_dispatch", "release"] are not gates
+  release.yml (jobs: build-python-executor, create-release, build, publish-update-json) — its push filters exclude main; its other triggers ["workflow_dispatch"] are not gates
+  reproducibility-gate.yml (jobs: repro-build) — its other triggers ["schedule", "workflow_dispatch"] are not gates
+  stacked-pr-fastlane.yml (jobs: scope, rust-fast, frontend-fast) — its pull_request filters exclude main
+  toolcache-probe.yml (jobs: probe) — its other triggers ["workflow_dispatch"] are not gates
 
 WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
 UNTRANSLATED (274) — not represented in the manifest — each must be handled by hand:
@@ -2093,3 +2223,4 @@ NO-OPS (151) — accounted for; nothing to declare:
       cache, not a gate
 
 summary: 0 covered, 0 needs-review, 0 name-only, 4 partial, 37 uncovered of 41 job(s); 274 untranslated construct(s) — the Phase 9 precondition is NOT MET
+COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false greens.

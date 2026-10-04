@@ -27,6 +27,10 @@ pub struct Workflow {
     /// Top-level keys other than `name`, `on`, `env`, `defaults`, `jobs`
     /// (`permissions`, `concurrency`, `run-name`, …).
     pub other_keys: Vec<String>,
+    /// Sections given in a shape the model cannot read (an `env:` that is an
+    /// expression, `on` given twice, …). Never silently empty: each entry
+    /// says what could not be read.
+    pub unreadable: Vec<String>,
     pub jobs: Vec<Job>,
 }
 
@@ -58,35 +62,39 @@ pub struct EventFilter {
 }
 
 impl EventFilter {
-    /// Whether this event fires for a ref on `branch`. A `push` filtered only
-    /// by `tags` fires for no branch at all.
-    pub fn fires_for_branch(&self, branch: &str) -> bool {
+    /// Whether this event fires for a ref on `branch`: `None` when a filter
+    /// pattern uses syntax the matcher does not model — the caller must then
+    /// treat the workflow as firing (CONSIDERED), never as excluded. A `push`
+    /// filtered only by `tags` fires for no branch at all.
+    pub fn fires_for_branch(&self, branch: &str) -> Option<bool> {
         if self.branches.is_none()
             && self.branches_ignore.is_none()
             && (self.tags.is_some() || self.tags_ignore.is_some())
         {
-            return false;
+            return Some(false);
         }
         if let Some(ignore) = &self.branches_ignore {
-            if ignore.iter().any(|p| glob_match(p, branch)) {
-                return false;
+            for p in ignore {
+                if glob_match(p, branch)? {
+                    return Some(false);
+                }
             }
         }
         match &self.branches {
-            None => true,
+            None => Some(true),
             Some(patterns) => {
                 // GitHub evaluates the list in order; a `!pattern` re-excludes.
                 let mut included = false;
                 for p in patterns {
                     if let Some(neg) = p.strip_prefix('!') {
-                        if glob_match(neg, branch) {
+                        if glob_match(neg, branch)? {
                             included = false;
                         }
-                    } else if glob_match(p, branch) {
+                    } else if glob_match(p, branch)? {
                         included = true;
                     }
                 }
-                included
+                Some(included)
             }
         }
     }
@@ -100,38 +108,143 @@ impl EventFilter {
     }
 }
 
-/// GitHub's filter-pattern subset: `*` matches within one path segment, `**`
-/// across segments, `?` one character. Character classes are matched
-/// literally — no branch name in a filter we read uses one.
-pub fn glob_match(pattern: &str, text: &str) -> bool {
-    fn go(p: &[char], t: &[char]) -> bool {
-        match p.first() {
-            None => t.is_empty(),
-            Some('*') => {
-                if p.get(1) == Some(&'*') {
-                    let rest = &p[2..];
-                    (0..=t.len()).any(|i| go(rest, &t[i..]))
+/// One element of a filter pattern.
+#[derive(Debug, Clone)]
+enum PTok {
+    Lit(char),
+    /// `*`: any run of characters except `/`.
+    Star,
+    /// `**`: any run of characters.
+    DStar,
+    /// `[…]`: a character class of inclusive ranges.
+    Class(Vec<(char, char)>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Quant {
+    One,
+    /// `?` after a character: zero or one of it.
+    ZeroOrOne,
+    /// `+` after a character: one or more of it.
+    OneOrMore,
+}
+
+/// Parse GitHub's filter-pattern syntax: `*`, `**`, `?` (zero or one of the
+/// preceding character), `+` (one or more of it), `[…]` classes with ranges,
+/// and backslash escapes. `None` for anything this does not model (a
+/// quantifier with nothing to apply to, an unclosed or negated class).
+fn parse_pattern(p: &str) -> Option<Vec<(PTok, Quant)>> {
+    let chars: Vec<char> = p.chars().collect();
+    let mut out: Vec<(PTok, Quant)> = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '*' if chars.get(i + 1) == Some(&'*') => {
+                out.push((PTok::DStar, Quant::One));
+                i += 2;
+            }
+            '*' => {
+                out.push((PTok::Star, Quant::One));
+                i += 1;
+            }
+            q @ ('?' | '+') => {
+                let last = out.last_mut()?;
+                if !matches!(last.0, PTok::Lit(_) | PTok::Class(_)) || last.1 != Quant::One {
+                    return None;
+                }
+                last.1 = if q == '?' {
+                    Quant::ZeroOrOne
                 } else {
-                    let rest = &p[1..];
-                    let mut i = 0;
-                    loop {
-                        if go(rest, &t[i..]) {
-                            return true;
-                        }
-                        if i == t.len() || t[i] == '/' {
-                            return false;
-                        }
-                        i += 1;
+                    Quant::OneOrMore
+                };
+                i += 1;
+            }
+            '[' => {
+                let close = chars[i + 1..].iter().position(|c| *c == ']')? + i + 1;
+                let body = &chars[i + 1..close];
+                if body.is_empty() || body[0] == '!' || body[0] == '^' {
+                    return None;
+                }
+                let mut ranges = Vec::new();
+                let mut k = 0;
+                while k < body.len() {
+                    if k + 2 < body.len() && body[k + 1] == '-' {
+                        ranges.push((body[k], body[k + 2]));
+                        k += 3;
+                    } else {
+                        ranges.push((body[k], body[k]));
+                        k += 1;
                     }
                 }
+                out.push((PTok::Class(ranges), Quant::One));
+                i = close + 1;
             }
-            Some('?') => !t.is_empty() && t[0] != '/' && go(&p[1..], &t[1..]),
-            Some(c) => t.first() == Some(c) && go(&p[1..], &t[1..]),
+            '\\' => {
+                out.push((PTok::Lit(*chars.get(i + 1)?), Quant::One));
+                i += 2;
+            }
+            ']' => return None,
+            c => {
+                out.push((PTok::Lit(c), Quant::One));
+                i += 1;
+            }
         }
     }
-    let p: Vec<char> = pattern.chars().collect();
+    Some(out)
+}
+
+fn tok_matches(t: &PTok, c: char) -> bool {
+    match t {
+        PTok::Lit(l) => *l == c,
+        PTok::Class(r) => r.iter().any(|(a, b)| *a <= c && c <= *b),
+        PTok::Star | PTok::DStar => false,
+    }
+}
+
+fn match_pieces(p: &[(PTok, Quant)], t: &[char]) -> bool {
+    let Some(((tok, q), rest)) = p.split_first() else {
+        return t.is_empty();
+    };
+    match tok {
+        PTok::DStar => (0..=t.len()).any(|i| match_pieces(rest, &t[i..])),
+        PTok::Star => {
+            let mut i = 0;
+            loop {
+                if match_pieces(rest, &t[i..]) {
+                    return true;
+                }
+                if i == t.len() || t[i] == '/' {
+                    return false;
+                }
+                i += 1;
+            }
+        }
+        _ => match q {
+            Quant::One => !t.is_empty() && tok_matches(tok, t[0]) && match_pieces(rest, &t[1..]),
+            Quant::ZeroOrOne => {
+                match_pieces(rest, t)
+                    || (!t.is_empty() && tok_matches(tok, t[0]) && match_pieces(rest, &t[1..]))
+            }
+            Quant::OneOrMore => {
+                let mut i = 0;
+                while i < t.len() && tok_matches(tok, t[i]) {
+                    i += 1;
+                    if match_pieces(rest, &t[i..]) {
+                        return true;
+                    }
+                }
+                false
+            }
+        },
+    }
+}
+
+/// Match a GitHub branch filter pattern. `None` when the pattern uses syntax
+/// [`parse_pattern`] does not model.
+pub fn glob_match(pattern: &str, text: &str) -> Option<bool> {
+    let pieces = parse_pattern(pattern)?;
     let t: Vec<char> = text.chars().collect();
-    go(&p, &t)
+    Some(match_pieces(&pieces, &t))
 }
 
 /// One job.
@@ -159,6 +272,8 @@ pub struct Job {
     /// Keys other than the ones above (`permissions`, `concurrency`,
     /// `outputs`, …).
     pub other_keys: Vec<String>,
+    /// Sections the model cannot read (see [`Workflow::unreadable`]).
+    pub unreadable: Vec<String>,
     pub steps: Vec<Step>,
 }
 
@@ -221,6 +336,9 @@ pub struct Step {
     pub timeout_minutes: Option<Scalar>,
     /// Keys the model does not interpret.
     pub other_keys: Vec<String>,
+    /// Sections the model cannot read (a `run:` that is not a string, a
+    /// `with:` that is an expression, …).
+    pub unreadable: Vec<String>,
 }
 
 impl Step {
@@ -234,7 +352,11 @@ impl Step {
             return u.clone();
         }
         if let Some(r) = &self.run {
-            let first = r.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+            let first = r
+                .lines()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("")
+                .trim();
             let mut s: String = first.chars().take(60).collect();
             if first.chars().count() > 60 {
                 s.push('…');
@@ -260,9 +382,11 @@ pub fn parse_workflow(file: &str, text: &str) -> Result<Workflow, String> {
         default_working_dir: None,
         default_shell: None,
         other_keys: Vec::new(),
+        unreadable: Vec::new(),
         jobs: Vec::new(),
     };
     let mut saw_jobs = false;
+    let mut saw_on = false;
     for (k, v) in map {
         // YAML 1.1 readers turn a bare `on` into `true`; accept either.
         let key = match k {
@@ -271,10 +395,21 @@ pub fn parse_workflow(file: &str, text: &str) -> Result<Workflow, String> {
         };
         match key.as_str() {
             "name" => wf.name = scalar_string(v),
-            "on" => wf.triggers = parse_triggers(v),
-            "env" => wf.env = string_map(v),
+            "on" => {
+                if saw_on {
+                    wf.unreadable.push(
+                        "`on` is given twice (as `on` and as a YAML 1.1 `true` key)".to_string(),
+                    );
+                }
+                saw_on = true;
+                if !matches!(v, Value::String(_) | Value::Sequence(_) | Value::Mapping(_)) {
+                    wf.unreadable.push(format!("`on` is {}", render(v)));
+                }
+                wf.triggers = parse_triggers(v);
+            }
+            "env" => wf.env = string_map(v, "workflow `env`", &mut wf.unreadable),
             "defaults" => {
-                let (wd, shell) = run_defaults(v);
+                let (wd, shell) = run_defaults(v, "workflow", &mut wf.unreadable);
                 wf.default_working_dir = wd;
                 wf.default_shell = shell;
             }
@@ -377,9 +512,12 @@ fn parse_job(id: &str, v: &Value) -> Job {
         environment: None,
         continue_on_error: None,
         other_keys: Vec::new(),
+        unreadable: Vec::new(),
         steps: Vec::new(),
     };
     let Value::Mapping(m) = v else {
+        job.unreadable
+            .push(format!("the job is {}, not a mapping", render(v)));
         return job;
     };
     for (k, val) in m {
@@ -396,8 +534,25 @@ fn parse_job(id: &str, v: &Value) -> Job {
                 }
             }
             "needs" => job.needs = string_list(val),
-            "if" => job.if_expr = scalar_string(val),
+            "if" => {
+                job.if_expr = scalar_string(val);
+                if job.if_expr.is_none() {
+                    job.unreadable.push(format!("job `if` is {}", render(val)));
+                }
+            }
             "strategy" => {
+                match val {
+                    Value::Mapping(sm) => {
+                        for sk in sm.keys().filter_map(scalar_string) {
+                            if !matches!(sk.as_str(), "matrix" | "fail-fast" | "max-parallel") {
+                                job.unreadable.push(format!("`strategy` key `{sk}`"));
+                            }
+                        }
+                    }
+                    other => job
+                        .unreadable
+                        .push(format!("`strategy` is {}", render(other))),
+                }
                 if let Value::Mapping(sm) = val {
                     if let Some(mx) = sm.get("matrix") {
                         job.matrix = Some(match mx {
@@ -406,7 +561,9 @@ fn parse_job(id: &str, v: &Value) -> Job {
                                     .map(|(dk, dv)| {
                                         let name = scalar_string(dk).unwrap_or_default();
                                         let values = match dv {
-                                            Value::Sequence(seq) => seq.iter().map(render).collect(),
+                                            Value::Sequence(seq) => {
+                                                seq.iter().map(render).collect()
+                                            }
                                             other => vec![render(other)],
                                         };
                                         (name, values)
@@ -419,6 +576,10 @@ fn parse_job(id: &str, v: &Value) -> Job {
                 }
             }
             "services" => {
+                if !matches!(val, Value::Mapping(_) | Value::Null) {
+                    job.unreadable
+                        .push(format!("`services` is {}", render(val)));
+                }
                 if let Value::Mapping(sm) = val {
                     for (sk, sv) in sm {
                         let key = scalar_string(sk).unwrap_or_default();
@@ -430,7 +591,12 @@ fn parse_job(id: &str, v: &Value) -> Job {
                                     .filter(|k| k != "image")
                                     .collect(),
                             ),
-                            other => (scalar_string(other), Vec::new()),
+                            Value::String(s) => (Some(s.clone()), Vec::new()),
+                            other => {
+                                job.unreadable
+                                    .push(format!("service `{key}` is {}", render(other)));
+                                (None, Vec::new())
+                            }
                         };
                         job.services.push(Service {
                             key,
@@ -440,9 +606,9 @@ fn parse_job(id: &str, v: &Value) -> Job {
                     }
                 }
             }
-            "env" => job.env = string_map(val),
+            "env" => job.env = string_map(val, "job `env`", &mut job.unreadable),
             "defaults" => {
-                let (wd, shell) = run_defaults(val);
+                let (wd, shell) = run_defaults(val, "job", &mut job.unreadable);
                 job.default_working_dir = wd;
                 job.default_shell = shell;
             }
@@ -467,13 +633,14 @@ fn parse_job(id: &str, v: &Value) -> Job {
                 })
             }
             "continue-on-error" => job.continue_on_error = scalar_string(val).map(Scalar),
-            "steps" => {
-                if let Value::Sequence(seq) = val {
+            "steps" => match val {
+                Value::Sequence(seq) => {
                     for (i, sv) in seq.iter().enumerate() {
                         job.steps.push(parse_step(i, sv));
                     }
                 }
-            }
+                other => job.unreadable.push(format!("`steps` is {}", render(other))),
+            },
             other => job.other_keys.push(other.to_string()),
         }
     }
@@ -495,8 +662,14 @@ fn parse_step(index: usize, v: &Value) -> Step {
         continue_on_error: None,
         timeout_minutes: None,
         other_keys: Vec::new(),
+        unreadable: Vec::new(),
     };
     let Value::Mapping(m) = v else {
+        step.unreadable.push(format!(
+            "step {} is {}, not a mapping",
+            index + 1,
+            render(v)
+        ));
         return step;
     };
     for (k, val) in m {
@@ -504,13 +677,27 @@ fn parse_step(index: usize, v: &Value) -> Step {
         match key.as_str() {
             "name" => step.name = scalar_string(val),
             "id" => step.id = scalar_string(val),
-            "uses" => step.uses = scalar_string(val),
-            "with" => step.with = string_map(val),
-            "run" => step.run = scalar_string(val),
+            "uses" => match val {
+                Value::String(u) => step.uses = Some(u.clone()),
+                other => step.unreadable.push(format!("`uses` is {}", render(other))),
+            },
+            "with" => step.with = string_map(val, "`with`", &mut step.unreadable),
+            "run" => match val {
+                Value::String(r) => step.run = Some(r.clone()),
+                other => step
+                    .unreadable
+                    .push(format!("`run` is {}, not a string", render(other))),
+            },
             "shell" => step.shell = scalar_string(val),
             "working-directory" => step.working_dir = scalar_string(val),
-            "env" => step.env = string_map(val),
-            "if" => step.if_expr = scalar_string(val),
+            "env" => step.env = string_map(val, "step `env`", &mut step.unreadable),
+            "if" => {
+                step.if_expr = scalar_string(val);
+                if step.if_expr.is_none() {
+                    step.unreadable
+                        .push(format!("step `if` is {}", render(val)));
+                }
+            }
             "continue-on-error" => step.continue_on_error = scalar_string(val).map(Scalar),
             "timeout-minutes" => step.timeout_minutes = scalar_string(val).map(Scalar),
             other => step.other_keys.push(other.to_string()),
@@ -519,13 +706,27 @@ fn parse_step(index: usize, v: &Value) -> Step {
     step
 }
 
-fn run_defaults(v: &Value) -> (Option<String>, Option<String>) {
+fn run_defaults(v: &Value, scope: &str, bad: &mut Vec<String>) -> (Option<String>, Option<String>) {
     let Value::Mapping(m) = v else {
+        bad.push(format!("{scope} `defaults` is {}", render(v)));
         return (None, None);
     };
-    let Some(Value::Mapping(run)) = m.get("run") else {
-        return (None, None);
+    for k in m.keys().filter_map(scalar_string).filter(|k| k != "run") {
+        bad.push(format!("{scope} `defaults` key `{k}`"));
+    }
+    let run = match m.get("run") {
+        None => return (None, None),
+        Some(Value::Mapping(run)) => run,
+        Some(other) => {
+            bad.push(format!("{scope} `defaults.run` is {}", render(other)));
+            return (None, None);
+        }
     };
+    for k in run.keys().filter_map(scalar_string) {
+        if !matches!(k.as_str(), "working-directory" | "shell") {
+            bad.push(format!("{scope} `defaults.run` key `{k}`"));
+        }
+    }
     (
         run.get("working-directory").and_then(scalar_string),
         run.get("shell").and_then(scalar_string),
@@ -559,13 +760,29 @@ fn string_list(v: &Value) -> Vec<String> {
     }
 }
 
-fn string_map(v: &Value) -> Vec<(String, String)> {
-    let Value::Mapping(m) = v else {
-        return Vec::new();
+/// A `KEY: value` mapping. Anything else — an expression, a list, a
+/// non-scalar value, a tagged value — is recorded in `bad` (never silently
+/// read as empty). `null` is an empty mapping.
+fn string_map(v: &Value, what: &str, bad: &mut Vec<String>) -> Vec<(String, String)> {
+    let m = match v {
+        Value::Mapping(m) => m,
+        Value::Null => return Vec::new(),
+        other => {
+            bad.push(format!("{what} is {}, not a mapping", render(other)));
+            return Vec::new();
+        }
     };
-    m.iter()
-        .filter_map(|(k, val)| Some((scalar_string(k)?, scalar_string(val).unwrap_or_else(|| render(val)))))
-        .collect()
+    let mut out = Vec::new();
+    for (k, val) in m {
+        match (k, val) {
+            (Value::String(k), Value::String(_) | Value::Number(_) | Value::Bool(_)) => {
+                out.push((k.clone(), scalar_string(val).unwrap_or_default()))
+            }
+            (Value::String(k), Value::Null) => out.push((k.clone(), String::new())),
+            _ => bad.push(format!("{what} entry {} = {}", render(k), render(val))),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -574,13 +791,22 @@ mod tests {
 
     #[test]
     fn glob_matches_github_filter_semantics() {
-        assert!(glob_match("main", "main"));
-        assert!(!glob_match("main", "maint"));
-        assert!(glob_match("release/*", "release/1"));
-        assert!(!glob_match("release/*", "release/1/2"));
-        assert!(glob_match("merge-candidate/**", "merge-candidate/a/b"));
-        assert!(glob_match("*", "main"));
-        assert!(glob_match("ma?n", "main"));
+        let g = |p: &str, t: &str| glob_match(p, t);
+        assert_eq!(g("main", "main"), Some(true));
+        assert_eq!(g("main", "maint"), Some(false));
+        assert_eq!(g("release/*", "release/1"), Some(true));
+        assert_eq!(g("release/*", "release/1/2"), Some(false));
+        assert_eq!(g("merge-candidate/**", "merge-candidate/a/b"), Some(true));
+        assert_eq!(g("*", "main"), Some(true));
+        // `?` is zero-or-one of the PRECEDING character, not "any character".
+        assert_eq!(g("mainn?", "main"), Some(true));
+        assert_eq!(g("ma?n", "main"), Some(false));
+        assert_eq!(g("ma+in", "maaain"), Some(true));
+        assert_eq!(g("ma+in", "main"), Some(true));
+        assert_eq!(g("mai[n]", "main"), Some(true));
+        assert_eq!(g("v[0-9]", "v7"), Some(true));
+        assert_eq!(g("[!x]", "y"), None);
+        assert_eq!(g("a[", "a"), None);
     }
 
     #[test]
@@ -589,25 +815,30 @@ mod tests {
             branches: Some(vec!["main".into(), "merge-candidate/**".into()]),
             ..Default::default()
         };
-        assert!(f.fires_for_branch("main"));
-        assert!(!f.fires_for_branch("develop"));
+        assert_eq!(f.fires_for_branch("main"), Some(true));
+        assert_eq!(f.fires_for_branch("develop"), Some(false));
         let tags_only = EventFilter {
             tags: Some(vec!["v*".into()]),
             ..Default::default()
         };
-        assert!(!tags_only.fires_for_branch("main"));
+        assert_eq!(tags_only.fires_for_branch("main"), Some(false));
         assert!(!tags_only.fires_for_some_branch());
         let negated = EventFilter {
             branches: Some(vec!["**".into(), "!main".into()]),
             ..Default::default()
         };
-        assert!(!negated.fires_for_branch("main"));
+        assert_eq!(negated.fires_for_branch("main"), Some(false));
         let ignored = EventFilter {
             branches_ignore: Some(vec!["main".into()]),
             ..Default::default()
         };
-        assert!(!ignored.fires_for_branch("main"));
-        assert!(EventFilter::default().fires_for_branch("main"));
+        assert_eq!(ignored.fires_for_branch("main"), Some(false));
+        assert_eq!(EventFilter::default().fires_for_branch("main"), Some(true));
+        let unknown = EventFilter {
+            branches: Some(vec!["[!x]".into()]),
+            ..Default::default()
+        };
+        assert_eq!(unknown.fires_for_branch("main"), None);
     }
 
     #[test]
