@@ -150,6 +150,12 @@
 #    python3 and node on PATH, which this lane cannot provision (gap 7). The
 #    Rust half — rust/tests/fleet_nouns_vocabulary.rs, including the lexical
 #    portable-subset guard — does run here, inside `rust-test`.
+#
+# 10. rust-ci.yml's `ci-exec-windows` job (`cargo test --locked -p
+#    qontinui-ci-exec` on windows-latest) is NOT mirrored. This manifest is
+#    version 1, whose one job runs on whatever OS the dispatched host has, so it
+#    cannot pin a Windows leg. A version 2 manifest can (`os = "windows"` on a
+#    job) once this repo's executors all understand v2.
 # ===========================================================================
 
 version = 1

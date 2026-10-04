@@ -171,12 +171,21 @@ pub async fn run_dispatch(
     // writes (`.ci-worktrees/<id>/<repo>`, `.ci-target/<repo>`). A host's
     // admission may already have gated them, but the executor relies on no
     // admission — so an unsafe one is refused here, with nothing written.
-    if !crate::dispatch::dispatch_id_is_safe(&payload.dispatch_id)
-        || !crate::dispatch::repo_slug_is_safe(&payload.repo)
-    {
+    //
+    // An unsafe dispatch_id cannot even be REPORTED: a reporter addresses the
+    // verdict by it (coord's `/coord/ci/dispatches/{id}/result`). So it is
+    // logged and dropped with no verdict — exactly the runner admission's
+    // rule — and the reporter is dropped unused.
+    if !crate::dispatch::dispatch_id_is_safe(&payload.dispatch_id) {
         sink.push(&format!(
-            "[ci-node] refusing dispatch: unsafe dispatch_id (len {}) or repo slug {:?}",
-            payload.dispatch_id.len(),
+            "[ci-node] dropping dispatch: unsafe dispatch_id (len {}) — not reportable",
+            payload.dispatch_id.len()
+        ));
+        return Conclusion::Cancelled;
+    }
+    if !crate::dispatch::repo_slug_is_safe(&payload.repo) {
+        sink.push(&format!(
+            "[ci-node] refusing dispatch: unsafe repo slug {:?}",
             payload.repo
         ));
         return refuse_before_checkout(
@@ -1541,11 +1550,24 @@ command = ["git", "--version"]
     #[tokio::test]
     async fn unsafe_identifiers_are_refused_with_nothing_written() {
         let (_tmp, root, head) = repo_with(TWO_JOBS);
-        for (id, repo) in [("../../escape", "local/demo"), ("ok-id", "owner/../demo")] {
-            let (conclusion, rec) = run_as(&root, &head, Some("green"), id, repo).await;
-            assert_eq!(conclusion, Conclusion::Cancelled, "{id} {repo}");
+        // An unsafe dispatch id is dropped UNREPORTED: the verdict would be
+        // addressed by that very id.
+        let (conclusion, rec) =
+            run_as(&root, &head, Some("green"), "../../escape", "local/demo").await;
+        assert_eq!(conclusion, Conclusion::Cancelled);
+        assert!(rec.filed.lock().unwrap().is_empty(), "nothing may be filed");
+        assert!(rec
+            .lines
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|l| l.contains("not reportable")));
+        // An unsafe repo slug with a safe id is refused WITH a verdict.
+        for repo in ["owner/../demo", "/", "/tmp/x/"] {
+            let (conclusion, rec) = run_as(&root, &head, Some("green"), "ok-id", repo).await;
+            assert_eq!(conclusion, Conclusion::Cancelled, "{repo}");
             let filed = rec.filed.lock().unwrap().clone();
-            assert_eq!(filed.len(), 1);
+            assert_eq!(filed.len(), 1, "{repo}");
             assert_eq!(filed[0].1, ["[setup] host=cancelled"]);
             assert_eq!(filed[0].2.as_deref(), Some("unsafe_identifier"));
         }

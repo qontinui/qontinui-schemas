@@ -58,8 +58,9 @@ pub struct DispatchPayload {
     /// as an `Option` rather than defaulted at parse time because the
     /// executor must know whether the job was NAMED: a defaulted job a v2
     /// manifest does not declare is a non-verdict (`job_not_declared`), while
-    /// a named job it does not declare is the manifest's fault.
-    #[serde(default)]
+    /// a named job it does not declare is the manifest's fault. An empty or
+    /// all-whitespace `job` names nothing, so it reads as `None`.
+    #[serde(default, deserialize_with = "blank_is_none")]
     pub job: Option<String>,
     /// Check-run context coord will publish the verdict under. The executor
     /// only logs it (the verdict write is coord-side, keyed by dispatch_id).
@@ -69,6 +70,12 @@ pub struct DispatchPayload {
     /// back to its own configured coord base.
     #[serde(default)]
     pub coord_http_url: String,
+}
+
+/// `""` / whitespace-only → `None`; anything else is kept as sent.
+fn blank_is_none<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let raw = Option::<String>::deserialize(d)?;
+    Ok(raw.filter(|s| !s.trim().is_empty()))
 }
 
 impl DispatchPayload {
@@ -95,8 +102,12 @@ pub fn dispatch_id_is_safe(id: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// The repo slug is joined into local paths via its basename; require plain
-/// `owner/name`-style tokens so a hostile slug can't traverse.
+/// The repo slug is joined into local paths via its basename
+/// ([`crate::local_repo_name`]); require plain `owner/name`-style tokens so a
+/// hostile slug can't traverse. Every `/`-separated segment must be non-empty
+/// and not `.`: a leading or trailing `/` (`"/"`, `"/tmp/x/"`) or a `//` would
+/// make the basename empty or the whole slug, and an absolute or empty name
+/// handed to `Path::join` REPLACES or IS the CI root.
 pub fn repo_slug_is_safe(repo: &str) -> bool {
     !repo.is_empty()
         && repo.len() <= 200
@@ -104,6 +115,7 @@ pub fn repo_slug_is_safe(repo: &str) -> bool {
         && repo
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+        && repo.split('/').all(|seg| !seg.is_empty() && seg != ".")
 }
 
 /// A host's gate between "coord sent a dispatch" and "the executor runs it".
@@ -169,6 +181,19 @@ mod tests {
         assert!(!repo_slug_is_safe("owner/../secret"));
         assert!(!repo_slug_is_safe("repo name"));
         assert!(!repo_slug_is_safe("repo\\name"));
+        // Leading/trailing `/`, empty segments and `.` segments: the basename
+        // would be empty, absolute, or `.` — each one the CI root itself.
+        for bad in [
+            "/",
+            "/tmp/x/",
+            "/abs",
+            "owner/",
+            "owner//name",
+            ".",
+            "owner/.",
+        ] {
+            assert!(!repo_slug_is_safe(bad), "{bad}");
+        }
     }
 
     /// The dispatch payload parses from the pinned wire contract, and the
@@ -266,5 +291,27 @@ mod tests {
         );
         assert_eq!(seen.submitted.lock().unwrap().as_slice(), ["d1"]);
         assert_eq!(seen.cancelled.lock().unwrap().as_slice(), ["d2"]);
+    }
+
+    /// A blank `job` names nothing: it is the defaulted job, not a job named
+    /// "" that no manifest could declare.
+    #[test]
+    fn a_blank_job_reads_as_defaulted() {
+        for blank in ["", "   ", "\t"] {
+            let p: DispatchPayload = serde_json::from_value(serde_json::json!({
+                "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+                "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x",
+                "job": blank,
+            }))
+            .unwrap();
+            assert_eq!(p.job, None, "{blank:?}");
+            assert_eq!(p.job_name(), DEFAULT_JOB);
+        }
+        let null: DispatchPayload = serde_json::from_value(serde_json::json!({
+            "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+            "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x", "job": null,
+        }))
+        .unwrap();
+        assert_eq!(null.job, None);
     }
 }

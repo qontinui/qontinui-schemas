@@ -75,11 +75,14 @@ pub(crate) async fn run_git(
             .spawn()
             .map_err(|e| format!("spawn git {}: {e}", args.join(" ")))?;
         let tree = process.attach_tree(&child);
-        let out = child
-            .wait_with_output()
-            .await
-            .map_err(|e| format!("wait for git {}: {e}", args.join(" ")))?;
+        let waited = child.wait_with_output().await;
+        // Disarm on BOTH arms once the wait returned: an Err here means the
+        // wait itself failed, and the child may already have been reaped — a
+        // guard left armed would then signal a process group whose id the OS
+        // is free to reuse. Only a call DROPPED mid-wait (timeout, cancel)
+        // keeps the guard armed, and that is the case it exists for.
         tree.disarm();
+        let out = waited.map_err(|e| format!("wait for git {}: {e}", args.join(" ")))?;
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
         if out.status.success() {
@@ -703,6 +706,16 @@ async fn prepare_worktree_with(
     after_attempt: &mut (dyn FnMut(usize, &Bounds<'_>) + Send),
 ) -> Result<PathBuf, CheckoutError> {
     validate_fetch_args(fetch_url, candidate_ref, head_sha)?;
+    // The slug and the id become path components below (`<root>/<repo>`,
+    // `.ci-worktrees/<id>/<repo>`), and this is a public entry point: gate them
+    // here too, not only in `run_dispatch`.
+    if !crate::dispatch::repo_slug_is_safe(repo)
+        || !crate::dispatch::dispatch_id_is_safe(dispatch_id)
+    {
+        return Err(CheckoutError::Failed(format!(
+            "refusing checkout: unsafe repo slug {repo:?} or dispatch id"
+        )));
+    }
     let bounds = Bounds::new(
         process,
         tokio::time::Instant::now() + policy.deadline,
@@ -1569,6 +1582,38 @@ mod tests {
         assert_eq!(
             CheckoutError::Failed("no .git".into()).result_disposition(),
             (Conclusion::Failure, None)
+        );
+    }
+
+    /// The public checkout refuses a slug or id that would escape the root,
+    /// before any git runs.
+    #[tokio::test]
+    async fn an_unsafe_slug_or_id_is_refused_before_any_git() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cancel = CancellationToken::new();
+        for (repo, id) in [("/", "d-1"), ("/tmp/x/", "d-1"), (REPO, "../up")] {
+            let err = prepare_worktree(
+                &PlainSpawn,
+                tmp.path(),
+                repo,
+                id,
+                "https://example.invalid/r.git",
+                CANDIDATE,
+                GHOST,
+                &cancel,
+                &mut |_| {},
+            )
+            .await
+            .expect_err("unsafe identifiers must be refused");
+            assert!(
+                matches!(err, CheckoutError::Failed(ref m) if m.contains("unsafe")),
+                "{err:?}"
+            );
+        }
+        assert_eq!(
+            std::fs::read_dir(tmp.path()).unwrap().count(),
+            0,
+            "nothing written"
         );
     }
 }
