@@ -94,6 +94,37 @@ pub trait ProcessSpawn: Send + Sync {
     /// uses to bound their memory and to reap stragglers when the dispatch
     /// ends. Dropped at dispatch end.
     fn step_containment(&self) -> Box<dyn StepContainment>;
+    /// Run CPU-bound blocking work (archive extraction) off the async
+    /// workers. `Err` means the task did not complete (it panicked or was
+    /// cancelled). The default is plain [`tokio::task::spawn_blocking`]; a host
+    /// that accounts for its blocking pool (the runner's tracked lanes)
+    /// overrides it so this work lands in the same books.
+    fn run_blocking(
+        &self,
+        job: Box<dyn FnOnce() + Send>,
+    ) -> BoxFuture<'static, Result<(), String>> {
+        Box::pin(async move {
+            tokio::task::spawn_blocking(job)
+                .await
+                .map_err(|e| e.to_string())
+        })
+    }
+}
+
+/// Run `f` through `process`'s [`ProcessSpawn::run_blocking`] and hand back its
+/// value.
+pub(crate) async fn run_blocking<R: Send + 'static>(
+    process: &dyn ProcessSpawn,
+    f: impl FnOnce() -> R + Send + 'static,
+) -> Result<R, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    process
+        .run_blocking(Box::new(move || {
+            let _ = tx.send(f());
+        }))
+        .await?;
+    rx.await
+        .map_err(|_| "the blocking task ended without a result".to_string())
 }
 
 /// Kills a child's process tree on drop unless disarmed.

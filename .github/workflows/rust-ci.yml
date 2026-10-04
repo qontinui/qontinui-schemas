@@ -245,3 +245,24 @@ jobs:
             cargo test -p qontinui-types --test fleet_nouns_vocabulary \
             hit_matrix_for_the_cross_engine_check
           python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json
+
+  ci-exec-windows:
+    # The CI executor (ci-exec) runs on Windows CI nodes too — the runner's
+    # desktop lane is mostly Windows — and its tests carry Windows-only arms
+    # (the `cmd.exe /C` shim fallback, drive-letter path gates, `.exe` tool
+    # resolution). Before the executor moved here those tests ran on the
+    # runner's windows-latest leg; this job keeps that coverage.
+    #
+    # NOT mirrored in .qontinui/ci.toml: that manifest is v1, whose one job
+    # runs on any OS, so it cannot pin a Windows leg. A v2 `os = "windows"`
+    # job can, once this repo's manifest moves to v2.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test -p qontinui-ci-exec
+        run: cargo test --locked -p qontinui-ci-exec

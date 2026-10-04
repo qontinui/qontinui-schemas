@@ -7,9 +7,9 @@
 //!
 //! - a GitHub token from `GITHUB_TOKEN` / `GH_TOKEN` or `gh auth token`, and no
 //!   ETag cache or request-budget meter (nothing outlives the process);
-//! - plain process spawning, with no tree reaper and no per-dispatch
-//!   containment — `kill_on_drop` still kills each direct child, and a CLI run
-//!   ends with its terminal;
+//! - plain process spawning with the prompt-proof git environment, a real
+//!   child-tree reaper on Unix (process group + `killpg`), and no per-dispatch
+//!   containment — see [`PlainSpawn`];
 //! - no declared removable volumes;
 //! - no canonical-configuration source, so a manifest that declares
 //!   `[canonical]` is REFUSED here rather than run unchecked.
@@ -78,12 +78,66 @@ impl GithubAccess for EnvGithub {
     fn record_transport_error(&self, _url: &str) {}
 }
 
-/// Plain `Command::new`, no tree reaper, no containment.
+/// The prompt-proof git environment: every layer that can make a `git`
+/// child block on a credential prompt is closed, so a sibling fetch in a
+/// non-interactive shell fails fast instead of hanging. The same keys and
+/// values the Qontinui runner applies to every `git` it spawns (its
+/// `git_posture::prompt_proof_git_env`): Git Credential Manager's UI
+/// (`GCM_INTERACTIVE`), git's own terminal prompt (`GIT_TERMINAL_PROMPT`), and
+/// the askpass chain (`GIT_ASKPASS`, pointed at a path that does not exist —
+/// never empty, which a mingw git may read as unset).
+pub const PROMPT_PROOF_GIT_ENV: &[(&str, &str)] = &[
+    ("GCM_INTERACTIVE", "never"),
+    ("GIT_TERMINAL_PROMPT", "0"),
+    ("GIT_ASKPASS", "/qontinui-runner/askpass-disabled"),
+];
+
+/// Is `program` git? Matched on the final path component, case-insensitively
+/// and with an optional `.exe`, splitting on BOTH separators so a Windows git
+/// path is recognised wherever this runs.
+fn program_is_git(program: &str) -> bool {
+    let base = program.rsplit(['/', '\\']).next().unwrap_or(program);
+    let lower = base.to_ascii_lowercase();
+    lower == "git" || lower == "git.exe"
+}
+
+/// Plain spawning with the prompt-proof git posture.
+///
+/// The child-TREE reaper is real on Unix: [`ProcessSpawn::arm_tree`] makes the
+/// child the leader of its own process group, and dropping the guard
+/// `killpg`s that group, so a timed-out or cancelled `git fetch` takes its
+/// `git-remote-https` / `index-pack` helpers down with it. On Windows only the
+/// direct child is killed (`kill_on_drop`); the helpers die when they notice
+/// their parent is gone. There is no per-dispatch step containment on either
+/// OS — a CLI run is the only thing on its process tree and ends with its
+/// terminal.
 pub struct PlainSpawn;
 
-struct NoTree;
-impl TreeGuard for NoTree {
-    fn disarm(self: Box<Self>) {}
+/// Kills the child's process group on drop unless disarmed (Unix).
+struct GroupGuard {
+    #[cfg(unix)]
+    pgid: Option<i32>,
+}
+
+impl TreeGuard for GroupGuard {
+    fn disarm(self: Box<Self>) {
+        #[cfg(unix)]
+        {
+            let mut guard = self;
+            guard.pgid = None;
+        }
+    }
+}
+
+impl Drop for GroupGuard {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        if let Some(pgid) = self.pgid.take() {
+            // SAFETY: plain syscall on a pid we created as a group leader;
+            // ESRCH (already gone) is the outcome we wanted anyway.
+            unsafe { libc::killpg(pgid, libc::SIGKILL) };
+        }
+    }
 }
 
 struct NoContainment;
@@ -93,14 +147,36 @@ impl StepContainment for NoContainment {
 
 impl ProcessSpawn for PlainSpawn {
     fn command(&self, program: &str) -> tokio::process::Command {
-        tokio::process::Command::new(program)
+        let mut cmd = tokio::process::Command::new(program);
+        if program_is_git(program) {
+            cmd.envs(PROMPT_PROOF_GIT_ENV.iter().copied());
+        }
+        cmd
     }
     fn std_command(&self, program: &str) -> std::process::Command {
-        std::process::Command::new(program)
+        let mut cmd = std::process::Command::new(program);
+        if program_is_git(program) {
+            cmd.envs(PROMPT_PROOF_GIT_ENV.iter().copied());
+        }
+        cmd
     }
-    fn arm_tree(&self, _cmd: &mut tokio::process::Command) {}
-    fn attach_tree(&self, _child: &tokio::process::Child) -> Box<dyn TreeGuard> {
-        Box::new(NoTree)
+    #[cfg_attr(not(unix), allow(unused_variables))]
+    fn arm_tree(&self, cmd: &mut tokio::process::Command) {
+        #[cfg(unix)]
+        cmd.process_group(0);
+    }
+    #[cfg_attr(not(unix), allow(unused_variables))]
+    fn attach_tree(&self, child: &tokio::process::Child) -> Box<dyn TreeGuard> {
+        Box::new(GroupGuard {
+            // The armed child IS its group leader, so its pid is the pgid. A
+            // child already reaped (`id()` is `None`) attaches nothing, and
+            // pid 0/1 are never signalled.
+            #[cfg(unix)]
+            pgid: child
+                .id()
+                .and_then(|pid| i32::try_from(pid).ok())
+                .filter(|pgid| *pgid > 1),
+        })
     }
     fn step_containment(&self) -> Box<dyn StepContainment> {
         Box::new(NoContainment)
@@ -197,5 +273,84 @@ mod tests {
         assert!(h.volume.refusal_reason(&root).is_none());
         assert_eq!(h.identity.ci_root().unwrap(), root);
         assert_eq!(h.identity.label(), "box");
+    }
+
+    #[test]
+    fn git_children_get_the_prompt_proof_env_and_others_do_not() {
+        for git in ["git", "/usr/bin/git", r"C:\Program Files\Git\cmd\GIT.EXE"] {
+            assert!(program_is_git(git), "{git}");
+        }
+        for other in ["git-lfs", "gitk", "cargo", "/opt/git/bin/node"] {
+            assert!(!program_is_git(other), "{other}");
+        }
+        let cmd = PlainSpawn.std_command("git");
+        let envs: Vec<(String, String)> = cmd
+            .get_envs()
+            .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v?.to_str()?.to_string())))
+            .collect();
+        for (k, v) in PROMPT_PROOF_GIT_ENV {
+            assert!(
+                envs.contains(&(k.to_string(), v.to_string())),
+                "{k} missing"
+            );
+        }
+        assert_eq!(PlainSpawn.std_command("cargo").get_envs().count(), 0);
+    }
+
+    /// Dropping an armed guard kills the child's GRANDCHILDREN too — the
+    /// property a cancelled `git fetch` relies on to release its helpers.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dropping_the_tree_guard_kills_the_whole_process_group() {
+        use tokio::io::AsyncBufReadExt;
+        let mut cmd = PlainSpawn.command("sh");
+        cmd.args(["-c", "sleep 300 & echo $!; wait"])
+            .stdout(std::process::Stdio::piped())
+            .kill_on_drop(true);
+        PlainSpawn.arm_tree(&mut cmd);
+        let mut child = cmd.spawn().expect("sh spawns");
+        let guard = PlainSpawn.attach_tree(&child);
+        let mut lines = tokio::io::BufReader::new(child.stdout.take().unwrap()).lines();
+        let grandchild: i32 = lines
+            .next_line()
+            .await
+            .unwrap()
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        let alive = |pid: i32| unsafe { libc::kill(pid, 0) } == 0;
+        assert!(alive(grandchild));
+        drop(guard);
+        let _ = child.wait().await;
+        let mut gone = false;
+        for _ in 0..100 {
+            // A killed grandchild may linger briefly as a zombie until its new
+            // parent reaps it; `ps` state Z counts as gone.
+            let state = std::process::Command::new("ps")
+                .args(["-o", "stat=", "-p", &grandchild.to_string()])
+                .output()
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .unwrap_or_default();
+            if state.is_empty() || state.starts_with('Z') {
+                gone = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(gone, "the grandchild {grandchild} survived the group kill");
+    }
+
+    /// A disarmed guard leaves the group alone.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_disarmed_tree_guard_kills_nothing() {
+        let mut cmd = PlainSpawn.command("sleep");
+        cmd.arg("300").kill_on_drop(true);
+        PlainSpawn.arm_tree(&mut cmd);
+        let mut child = cmd.spawn().expect("sleep spawns");
+        PlainSpawn.attach_tree(&child).disarm();
+        assert!(child.try_wait().unwrap().is_none(), "disarm must not kill");
+        let _ = child.kill().await;
     }
 }

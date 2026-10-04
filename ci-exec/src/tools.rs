@@ -885,11 +885,11 @@ async fn install(
             let wanted = basename.clone();
             let url = asset.url.clone();
             // Decompression is CPU-bound and blocking.
-            tokio::task::spawn_blocking(move || {
+            crate::host::run_blocking(process, move || {
                 extract_one_file(&bytes, kind, &wanted, &dest, &url)
             })
             .await
-            .map_err(|e| format!("extract task panicked: {e}"))??;
+            .map_err(|e| format!("extract task did not complete: {e}"))??;
         }
         Source::ArchiveTree {
             asset,
@@ -901,9 +901,11 @@ async fn install(
             let kind = asset.kind;
             let root_dir = root_dir.clone();
             let url = asset.url.clone();
-            tokio::task::spawn_blocking(move || extract_tree(&bytes, kind, &root_dir, &dest, &url))
-                .await
-                .map_err(|e| format!("extract task panicked: {e}"))??;
+            crate::host::run_blocking(process, move || {
+                extract_tree(&bytes, kind, &root_dir, &dest, &url)
+            })
+            .await
+            .map_err(|e| format!("extract task did not complete: {e}"))??;
         }
         Source::PythonPackage {
             requirement,
