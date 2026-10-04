@@ -108,14 +108,14 @@ pub(crate) async fn run_git(
 
 /// The dispatch-scoped parent: the dispatched worktree and every provisioned
 /// sibling live under it, and it is the one directory cleanup removes.
-pub fn ci_dispatch_root(root: &Path, dispatch_id: &str) -> PathBuf {
+pub(crate) fn ci_dispatch_root(root: &Path, dispatch_id: &str) -> PathBuf {
     root.join(".ci-worktrees").join(dispatch_id)
 }
 
 /// The CI worktree path for a dispatch — a child of [`ci_dispatch_root`]
 /// named after the repo, so `../<sibling>` from inside it resolves to a
 /// sibling of the worktree.
-pub fn ci_worktree_path(root: &Path, dispatch_id: &str, repo: &str) -> PathBuf {
+pub(crate) fn ci_worktree_path(root: &Path, dispatch_id: &str, repo: &str) -> PathBuf {
     ci_dispatch_root(root, dispatch_id).join(crate::local_repo_name(repo))
 }
 
@@ -241,7 +241,13 @@ pub enum CheckoutError {
     /// A genuine setup fault (an invalid payload, no primary checkout, an I/O
     /// error creating the dispatch dir, a git error from `worktree add`…).
     Failed(String),
+    /// The repo slug or dispatch id would escape the CI root as a path
+    /// component. Refused before any git runs; a non-verdict about the code.
+    UnsafeIdentifier(String),
 }
+
+/// The disposition reason for [`CheckoutError::UnsafeIdentifier`].
+pub const UNSAFE_IDENTIFIER_REASON: &str = "unsafe_identifier";
 
 impl std::fmt::Display for CheckoutError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -259,6 +265,7 @@ impl std::fmt::Display for CheckoutError {
             CheckoutError::DeadlineExhausted(e) => f.write_str(e),
             CheckoutError::Cancelled => write!(f, "dispatch cancelled during checkout"),
             CheckoutError::Failed(e) => f.write_str(e),
+            CheckoutError::UnsafeIdentifier(e) => f.write_str(e),
         }
     }
 }
@@ -282,6 +289,9 @@ impl CheckoutError {
             }
             CheckoutError::Cancelled => (Conclusion::Cancelled, None),
             CheckoutError::Failed(_) => (Conclusion::Failure, None),
+            CheckoutError::UnsafeIdentifier(_) => {
+                (Conclusion::Cancelled, Some(UNSAFE_IDENTIFIER_REASON))
+            }
         }
     }
 
@@ -294,6 +304,7 @@ impl CheckoutError {
             CheckoutError::DeadlineExhausted(_) => "[ci-node] checkout: deadline exhausted:",
             CheckoutError::Cancelled => "[ci-node] checkout cancelled:",
             CheckoutError::Failed(_) => "[ci-node] checkout failed:",
+            CheckoutError::UnsafeIdentifier(_) => "[ci-node] checkout refused:",
         }
     }
 }
@@ -712,7 +723,7 @@ async fn prepare_worktree_with(
     if !crate::dispatch::repo_slug_is_safe(repo)
         || !crate::dispatch::dispatch_id_is_safe(dispatch_id)
     {
-        return Err(CheckoutError::Failed(format!(
+        return Err(CheckoutError::UnsafeIdentifier(format!(
             "refusing checkout: unsafe repo slug {repo:?} or dispatch id"
         )));
     }
@@ -1605,8 +1616,13 @@ mod tests {
             )
             .await
             .expect_err("unsafe identifiers must be refused");
+            assert_eq!(
+                err.result_disposition(),
+                (Conclusion::Cancelled, Some(UNSAFE_IDENTIFIER_REASON)),
+                "{err:?}"
+            );
             assert!(
-                matches!(err, CheckoutError::Failed(ref m) if m.contains("unsafe")),
+                matches!(err, CheckoutError::UnsafeIdentifier(ref m) if m.contains("unsafe")),
                 "{err:?}"
             );
         }

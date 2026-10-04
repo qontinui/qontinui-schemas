@@ -112,7 +112,9 @@ fn program_is_git(program: &str) -> bool {
 /// OS. An armed child leads its OWN process group, so it does not die with
 /// the terminal: `qontinui-ci` turns SIGINT, SIGTERM and SIGHUP into a
 /// cancellation so these guards run (a SIGKILL of the CLI still orphans an
-/// in-flight git group).
+/// in-flight git group). Once those handlers are installed a second SIGTERM
+/// does not kill the CLI either — it is already cancelling and cleaning up;
+/// only SIGKILL stops it outright.
 pub struct PlainSpawn;
 
 /// Kills the child's process group on drop unless disarmed (Unix).

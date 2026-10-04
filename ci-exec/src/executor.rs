@@ -55,7 +55,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::dispatch::DispatchPayload;
 use crate::host::{Host, ProcessSpawn, StepContainment};
@@ -147,9 +147,17 @@ fn setup_row(name: &str, conclusion: Conclusion, started: Instant) -> StepSummar
     }
 }
 
-/// Run one job of one dispatch end-to-end. Never panics; always files exactly
-/// one verdict through `reporter`, and always cleans up the worktree it
-/// created. Returns the conclusion it filed.
+/// Run one job of one dispatch end-to-end. Never panics; files exactly one
+/// verdict through `reporter` — with ONE exception: a dispatch whose id fails
+/// [`crate::dispatch::dispatch_id_is_safe`] files nothing (the verdict would be
+/// addressed by that id) and returns `Cancelled` after a `tracing` warning,
+/// without touching the reporter or its sink. Always cleans up the worktree it
+/// created. Returns the conclusion it reached.
+///
+/// A host must therefore gate `dispatch_id_is_safe` BEFORE it builds a
+/// reporter addressed by the id (the runner's admission does): this function
+/// never pushes a line into such a reporter, but constructing one may already
+/// have bound the unsafe id into a URL.
 ///
 /// `capacity` and `max_concurrent` are the host probe and the number of
 /// dispatches the host runs side by side (its admission's N, or 1 for a lone
@@ -162,9 +170,6 @@ pub async fn run_dispatch(
     capacity: host_sizing::HostCapacity,
     max_concurrent: u32,
 ) -> Conclusion {
-    let sink: Arc<dyn LogSink> = reporter.sink();
-    let mut steps_summary: Vec<StepSummary> = Vec::new();
-
     // ── Identifiers (before either touches a path or a URL) ──
     //
     // The dispatch id and the repo slug are joined into every path this run
@@ -173,16 +178,19 @@ pub async fn run_dispatch(
     // admission — so an unsafe one is refused here, with nothing written.
     //
     // An unsafe dispatch_id cannot even be REPORTED: a reporter addresses the
-    // verdict by it (coord's `/coord/ci/dispatches/{id}/result`). So it is
-    // logged and dropped with no verdict — exactly the runner admission's
-    // rule — and the reporter is dropped unused.
+    // verdict AND its progress lines by it (coord's
+    // `/coord/ci/dispatches/{id}/progress|result`). So it is logged locally and
+    // dropped with no verdict — exactly the runner admission's rule — and the
+    // reporter is dropped without its sink ever being taken.
     if !crate::dispatch::dispatch_id_is_safe(&payload.dispatch_id) {
-        sink.push(&format!(
-            "[ci-node] dropping dispatch: unsafe dispatch_id (len {}) — not reportable",
+        warn!(
+            "ci: dropping dispatch with unsafe dispatch_id (len {}) — not reportable",
             payload.dispatch_id.len()
-        ));
+        );
         return Conclusion::Cancelled;
     }
+    let sink: Arc<dyn LogSink> = reporter.sink();
+    let mut steps_summary: Vec<StepSummary> = Vec::new();
     if !crate::dispatch::repo_slug_is_safe(&payload.repo) {
         sink.push(&format!(
             "[ci-node] refusing dispatch: unsafe repo slug {:?}",
@@ -1556,12 +1564,10 @@ command = ["git", "--version"]
             run_as(&root, &head, Some("green"), "../../escape", "local/demo").await;
         assert_eq!(conclusion, Conclusion::Cancelled);
         assert!(rec.filed.lock().unwrap().is_empty(), "nothing may be filed");
-        assert!(rec
-            .lines
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|l| l.contains("not reportable")));
+        assert!(
+            rec.lines.lock().unwrap().is_empty(),
+            "not one line may reach a sink addressed by an unsafe id"
+        );
         // An unsafe repo slug with a safe id is refused WITH a verdict.
         for repo in ["owner/../demo", "/", "/tmp/x/"] {
             let (conclusion, rec) = run_as(&root, &head, Some("green"), "ok-id", repo).await;

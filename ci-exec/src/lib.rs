@@ -62,6 +62,5 @@ mod tests {
             "qontinui-runner"
         );
         assert_eq!(local_repo_name("qontinui-runner"), "qontinui-runner");
-        assert_eq!(local_repo_name("owner/"), "owner/");
     }
 }

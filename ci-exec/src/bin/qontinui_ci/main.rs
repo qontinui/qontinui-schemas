@@ -28,6 +28,25 @@ use qontinui_ci_exec::manifest::{self, CiManifest};
 use qontinui_ci_exec::report::{Conclusion, LogSink, Reporter, Verdict};
 use qontinui_ci_exec::{executor, host_sizing, standalone};
 
+/// `println!` that cannot panic. A run's output goes to a terminal that may
+/// close mid-run (SIGHUP, a closed pipe); `println!` panics on a failed write,
+/// which would abort the run before its cleanup. Output is best-effort; the
+/// cleanup is not.
+macro_rules! out {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stdout(), $($arg)*);
+    }};
+}
+
+/// `eprintln!` that cannot panic — see [`out!`].
+macro_rules! err {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stderr(), $($arg)*);
+    }};
+}
+
 const DEFAULT_MANIFEST: &str = ".qontinui/ci.toml";
 
 const USAGE: &str = "\
@@ -65,7 +84,7 @@ fn main() -> ExitCode {
     match dispatch(&args) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("qontinui-ci: {e}");
+            err!("qontinui-ci: {e}");
             ExitCode::from(2)
         }
     }
@@ -107,7 +126,7 @@ fn dispatch(args: &[String]) -> Result<ExitCode, String> {
         "list" => list(&flags(rest, &["--manifest"])?),
         "validate" => validate(&flags(rest, &["--manifest"])?),
         "-h" | "--help" | "help" => {
-            println!("{USAGE}");
+            out!("{USAGE}");
             Ok(ExitCode::SUCCESS)
         }
         other => Err(format!("unknown subcommand {other:?}\n\n{USAGE}")),
@@ -125,7 +144,7 @@ fn validate(flags: &[(String, String)]) -> Result<ExitCode, String> {
     match read_manifest(&path) {
         Ok(m) => {
             let names: Vec<&str> = m.jobs.iter().map(|j| j.name.as_str()).collect();
-            println!(
+            out!(
                 "ok: {} — schema v{}, {} job(s): {}",
                 path.display(),
                 m.schema_version,
@@ -135,7 +154,7 @@ fn validate(flags: &[(String, String)]) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         Err(e) => {
-            eprintln!("invalid: {e}");
+            err!("invalid: {e}");
             Ok(ExitCode::from(1))
         }
     }
@@ -144,7 +163,7 @@ fn validate(flags: &[(String, String)]) -> Result<ExitCode, String> {
 fn list(flags: &[(String, String)]) -> Result<ExitCode, String> {
     let path = PathBuf::from(flag(flags, "--manifest").unwrap_or(DEFAULT_MANIFEST));
     let m = read_manifest(&path)?;
-    println!("{} (schema v{})", path.display(), m.schema_version);
+    out!("{} (schema v{})", path.display(), m.schema_version);
     for job in &m.jobs {
         let os: Vec<&str> = job.os.iter().map(|o| o.as_str()).collect();
         let mut line = format!(
@@ -163,9 +182,9 @@ fn list(flags: &[(String, String)]) -> Result<ExitCode, String> {
             )),
             None => line.push_str(&format!(" checks: {}", job.check_contexts().join("; "))),
         }
-        println!("{line}");
+        out!("{line}");
     }
-    println!(
+    out!(
         "  gate jobs: {}",
         m.gate_jobs()
             .map(|j| j.name.as_str())
@@ -224,7 +243,7 @@ fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
     }
     let head = git(&toplevel, &["rev-parse", "HEAD"])?;
     if !git(&toplevel, &["status", "--porcelain"])?.is_empty() {
-        eprintln!(
+        err!(
             "qontinui-ci: note — the working tree has uncommitted changes; this run checks out \
              the committed HEAD {head} and does not include them"
         );
@@ -269,8 +288,11 @@ fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
         let on_signal = cancel.clone();
         tokio::spawn(async move {
             let signal = interrupted().await;
-            eprintln!("qontinui-ci: {signal} — cancelling the job and cleaning up");
+            // Cancel FIRST: after a SIGHUP the terminal is gone and a stderr
+            // write may fail — nothing may stand between the signal and the
+            // cancellation that lets the tree guards and cleanup run.
             on_signal.cancel();
+            err!("qontinui-ci: {signal} — cancelling the job and cleaning up");
         });
         // A lone CLI run is the only dispatch on this host: N = 1.
         executor::run_dispatch(&host, Box::new(Terminal), payload, cancel, capacity, 1).await
@@ -318,7 +340,7 @@ struct Stdout;
 
 impl LogSink for Stdout {
     fn push(&self, line: &str) {
-        println!("{line}");
+        out!("{line}");
     }
 }
 
@@ -332,27 +354,29 @@ impl Reporter for Terminal {
         Self: 'a,
     {
         Box::pin(async move {
-            println!();
-            println!("── qontinui-ci: {} ──", verdict.conclusion.as_str());
+            out!();
+            out!("── qontinui-ci: {} ──", verdict.conclusion.as_str());
             for step in verdict.steps {
-                println!(
+                out!(
                     "  {:<9} {:>6}s  {}",
-                    step.conclusion, step.duration_secs, step.name
+                    step.conclusion,
+                    step.duration_secs,
+                    step.name
                 );
             }
             if let Some(reason) = verdict.reason {
-                println!("  reason: {reason}");
+                out!("  reason: {reason}");
             }
             if let Some(canonical) = verdict.canonical {
-                println!("  {}", canonical.summary_line());
+                out!("  {}", canonical.summary_line());
             }
             match verdict.test_results {
-                Some(artifact) => println!(
+                Some(artifact) => out!(
                     "  test report captured ({} bytes, {})",
                     artifact.raw.len(),
                     artifact.format
                 ),
-                None => println!("  no test report captured"),
+                None => out!("  no test report captured"),
             }
         })
     }
