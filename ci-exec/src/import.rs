@@ -1979,12 +1979,12 @@ ENVIRONMENT (`[environment]` caveats): the executor exports host-sized CARGO_BUI
 RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and does \
 not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner image's \
 toolset) for any program that is not a script in the repository. So NO job reads COVERED until \
-the executor stops forcing those caps (or the workflow mirrors them) — that is the honest \
+the executor stops forcing those host-sized caps (the caveat is unconditional) — that is the honest \
 answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip, poetry, uv, node, \
 npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's [[tools]] provisions it \
 at a version the workflow pins identically; a checkout fetch-depth other than 1, or a gate \
 naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a second checkout after any \
-command; a job timeout below the chosen manifest job's total step timeouts, or a step timeout \
+`run:` step; a job timeout below the chosen manifest job's total step timeouts, or a step timeout \
 below the manifest steps its commands map to. When several manifest jobs could match, one whose \
 OS covers the workflow job is preferred. \
 COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow \
@@ -2692,8 +2692,6 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
                         );
                     }
                 }
-            } else {
-                ran_something = true;
             }
             jg.pins.extend(action_pins(step, uses));
             jg.unmodeled.extend(action_input_review(&action_l, step));
@@ -2746,9 +2744,8 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
             }
             continue;
         }
-        if step.run.is_some() {
-            ran_something = true;
-        }
+        // Only a `run:` step counts as "something ran" (a setup-* action
+        // before the first checkout does not).
         if step.run.is_some() {
             ran_something = true;
         }
@@ -3053,7 +3050,12 @@ fn gate_caveats(g: &GateCommand, manifest: &CiManifest, pins: &[VersionPin]) -> 
     // GitHub's implicit environment (GITHUB_ACTIONS, the runner's TZ and
     // locale, its preinstalled toolset) is not reproduced; only a script that
     // lives in the repository is judged on its own.
-    let repo_local = prog.contains('/') && !prog.starts_with('/') && !prog.starts_with('~');
+    // A script inside the repository: a relative path that does not climb
+    // out of it (`../x.sh` is not repo-local).
+    let repo_local = prog.contains('/')
+        && !prog.starts_with('/')
+        && !prog.starts_with('~')
+        && !prog.split('/').any(|c| c == "..");
     if !repo_local {
         out.push(format!(
             "{ENV_CAVEAT} `{}` runs `{base}` from the host, under GitHub's implicit environment \
@@ -3068,7 +3070,8 @@ fn gate_caveats(g: &GateCommand, manifest: &CiManifest, pins: &[VersionPin]) -> 
 /// Prefix of the caveats that come from the executor's environment itself
 /// rather than from anything in the workflow or manifest. Today at least one
 /// applies to EVERY job (the host-sized caps), so nothing reads COVERED
-/// until the executor stops forcing them or the workflow mirrors them.
+/// until the executor stops forcing host-sized caps; the caveat is
+/// unconditional, so nothing in a workflow can lift it.
 pub const ENV_CAVEAT: &str = "[environment]";
 
 /// A job's coverage verdict. Only [`Coverage::Covered`] counts as covered.
@@ -3947,6 +3950,15 @@ jobs:
         .unwrap()
     }
 
+    /// The job carries a caveat containing `needle` — the specific reason,
+    /// not just any reason (the environment caveats are on every job).
+    fn has_caveat(r: &CoverageReport, job: &str, needle: &str) -> bool {
+        r.jobs
+            .iter()
+            .find(|j| j.job_id == job)
+            .is_some_and(|j| j.caveats.iter().any(|c| c.contains(needle)))
+    }
+
     fn verdict_of(r: &CoverageReport, job: &str) -> Coverage {
         r.jobs.iter().find(|j| j.job_id == job).unwrap().verdict
     }
@@ -3998,24 +4010,32 @@ jobs:
     fn matched_commands_under_other_conditions_need_review() {
         let manifest = "version = 1\n[[steps]]\nname = \"t\"\ncommand = [\"cargo\", \"test\"]\n[[steps]]\nname = \"r\"\ncommand = [\"cargo\", \"test\"]\nworking_dir = \"sub\"\n[steps.env]\nRUSTFLAGS = \"-Dwarnings\"\n";
         let wf = "on: pull_request\njobs:\n  prefix:\n    runs-on: ubuntu-latest\n    steps:\n      - run: RUSTFLAGS=-Dwarnings cargo test\n  prefix-ok:\n    runs-on: ubuntu-latest\n    steps:\n      - run: RUSTFLAGS=-Dwarnings cargo test\n        working-directory: sub\n  toolchain:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo +nightly test\n  jobenv:\n    runs-on: ubuntu-latest\n    env:\n      RUST_BACKTRACE: full\n    steps:\n      - run: cargo test\n  matrix:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        feature: [a, b]\n    steps:\n      - run: cargo test\n  svc:\n    runs-on: ubuntu-latest\n    services:\n      db:\n        image: postgres:16\n    steps:\n      - run: cargo test\n  box:\n    runs-on: ubuntu-latest\n    container: rust:1.80\n    steps:\n      - run: cargo test\n  plain:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo test\n";
-        let r = report_one(wf, manifest);
-        for job in ["prefix", "jobenv", "matrix", "svc", "box"] {
-            assert_eq!(
-                verdict_of(&r, job),
-                Coverage::NeedsReview,
-                "{job}: {:#?}",
-                r.jobs
-            );
+        let r = report_one(&strengthen_wf(wf), &strengthen_manifest(manifest));
+        for (job, needle) in [
+            ("prefix", "assigns a variable"),
+            ("jobenv", "RUST_BACKTRACE=full"),
+            ("matrix", "matrix legs"),
+            ("svc", "runs service postgres:16"),
+            ("box", "runs inside container"),
+        ] {
+            assert!(own_rule_job(&r, job), "{job}: {:#?}", r.jobs);
+            assert!(has_caveat(&r, job, needle), "{job}: {:#?}", r.jobs);
         }
         // `cargo +nightly test` is not byte-identical to `cargo test`: the
         // gate is simply unmatched.
         assert_eq!(verdict_of(&r, "toolchain"), Coverage::Uncovered);
         // Even an identical env, when set by a `KEY=value` prefix, is outside
         // the report's grammar: NEEDS-REVIEW, never COVERED.
-        assert_eq!(verdict_of(&r, "prefix-ok"), Coverage::NeedsReview);
+        assert!(own_rule_job(&r, "prefix-ok"));
+        assert!(has_caveat(&r, "prefix-ok", "assigns a variable"));
         // `plain` matches step `t`, but the manifest job also runs step `r`,
         // which is not a command of the `plain` workflow job.
-        assert_eq!(verdict_of(&r, "plain"), Coverage::NeedsReview);
+        assert!(own_rule_job(&r, "plain"));
+        assert!(has_caveat(
+            &r,
+            "plain",
+            "is not one of this workflow job's gate commands"
+        ));
         assert!(!r.all_covered());
     }
 
@@ -4117,27 +4137,30 @@ jobs:
             .caveats
             .iter()
             .any(|c| c.contains("rustup default nightly")));
-        for j in [
-            "export",
-            "ghenv",
-            "source",
-            "anyenv",
-            "py",
-            "rust",
-            "arm",
-            "selfhosted",
+        for (j, needle) in [
+            ("export", "changes the environment of later commands"),
+            ("ghenv", "touches $GITHUB_ENV"),
+            ("source", "`source .env`"),
+            ("anyenv", "PYTHON_VERSION=3.12"),
+            ("py", "setup-python python-version 3.12"),
+            ("rust", "toolchain 1.80.0"),
+            ("arm", "runs on `ubuntu-24.04-arm`"),
+            ("selfhosted", "runs on `self-hosted`"),
         ] {
-            assert_eq!(
-                verdict_of(&r, j),
-                Coverage::NeedsReview,
+            assert_ne!(verdict_of(&r, j), Coverage::Covered, "{j}");
+            assert!(
+                has_caveat(&r, j, needle),
                 "{j}: {:#?}",
                 r.jobs.iter().find(|x| x.job_id == j)
             );
         }
         // The manifest job also runs `source .env`, which neither workflow job
         // runs: NEEDS-REVIEW for both, even though node is pinned identically.
-        assert_eq!(verdict_of(&r, "node-pinned"), Coverage::NeedsReview);
-        assert_eq!(verdict_of(&r, "plain"), Coverage::NeedsReview);
+        assert!(has_caveat(
+            &r,
+            "plain",
+            "is not one of this workflow job's gate commands"
+        ));
         let np = r.jobs.iter().find(|x| x.job_id == "node-pinned").unwrap();
         assert!(
             np.caveats
@@ -4154,9 +4177,10 @@ jobs:
         )]);
         let manifest = "version = 2\n[[jobs]]\nname = \"with-db\"\n[[jobs.services]]\nname = \"postgres\"\nversion = \"16\"\n[[jobs.steps]]\nname = \"a\"\ncommand = [\"make\", \"a\"]\n[[jobs]]\nname = \"no-db\"\n[[jobs.steps]]\nname = \"b\"\ncommand = [\"make\", \"b\"]\n";
         let r = report_one(&wf, manifest);
-        assert_eq!(
-            verdict_of(&r, "svc"),
-            Coverage::NeedsReview,
+        // (With one-job matching, the gates being split across the two
+        // manifest jobs is itself the reason.)
+        assert!(
+            has_caveat(&r, "svc", "no single manifest job"),
             "{:#?}",
             r.jobs
         );
@@ -4216,19 +4240,26 @@ jobs:
         let r = report_one(&wf_of(&jobs), manifest);
         // Each is NEEDS-REVIEW, or stricter (an unmatched wrapper command
         // leaves the job PARTIAL); never COVERED, and always with the reason.
-        for j in [
-            "pushd", "envwrap", "redirect", "assign", "stdin", "twrap", "advisory", "ref",
-            "expr-env", "tight", "mac",
+        for (j, needle) in [
+            ("pushd", "uses `pushd`"),
+            ("envwrap", "uses `env`"),
+            ("redirect", "output redirect"),
+            ("assign", "assigns a variable"),
+            ("stdin", "input redirect"),
+            ("twrap", "uses `timeout`"),
+            ("advisory", "GITHUB_ENV"),
+            ("ref", "with input ref"),
+            ("expr-env", "T=${{"),
+            ("tight", "limited to 300s"),
+            ("mac", "macOS"),
         ] {
             let jc = r.jobs.iter().find(|x| x.job_id == j).unwrap();
-            assert!(
-                matches!(jc.verdict, Coverage::NeedsReview | Coverage::Partial)
-                    && !jc.caveats.is_empty(),
-                "{j}: {jc:#?}"
-            );
+            assert_ne!(jc.verdict, Coverage::Covered, "{j}");
+            assert!(has_caveat(&r, j, needle), "{j}: {jc:#?}");
         }
         // Made otherwise equivalent (a checkout, linux manifest jobs), the
-        // plain job is COVERED and every other job is still not.
+        // plain job is blocked only by the executor's environment, and every
+        // other job still by its own rule.
         let rs = report_one(
             &strengthen_wf(&wf_of(&jobs)),
             &strengthen_manifest(manifest),
@@ -4246,7 +4277,7 @@ jobs:
             &wf_of(&[job_yaml("p", "    steps:\n      - run: make check\n")]),
             "version = 1\n[[steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\n[steps.env]\nRUST_LOG = \"debug\"\n",
         );
-        assert_eq!(verdict_of(&r, "p"), Coverage::NeedsReview);
+        assert!(has_caveat(&r, "p", "sets RUST_LOG=debug"), "{:#?}", r.jobs);
 
         // L1: a manifest word CONTAINING `$` matches nothing.
         let r = report_one(
@@ -4325,7 +4356,9 @@ jobs:
             let (top, steps) = rest.split_at(at);
             return format!(
                 "version = 2\n{top}[[jobs]]\nname = \"ci\"\nos = \"linux\"\n{}",
-                steps.replace("[[steps]]", "[[jobs.steps]]")
+                steps
+                    .replace("[[steps]]", "[[jobs.steps]]")
+                    .replace("[steps.env]", "[jobs.steps.env]")
             );
         }
         let lines: Vec<&str> = m.lines().collect();
@@ -4800,7 +4833,7 @@ jobs:
             &strengthen_manifest(&make),
         )
         .unwrap();
-        assert_eq!(verdict_of(&r, "j"), Coverage::NeedsReview);
+        assert!(has_caveat(&r, "j", "runs with CI=false"), "{:#?}", r.jobs);
     }
 
     /// Round 7 of the Phase 8 review: every probe from the reviewer's
@@ -4901,6 +4934,25 @@ jobs:
     }
 
     #[test]
+    fn a_setup_action_before_the_checkout_is_not_a_second_checkout() {
+        let wf = "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-python@v5\n        with:\n          python-version: '3.12'\n      - uses: actions/checkout@v4\n      - run: make check\n";
+        let r = report_one(wf, &strengthen_manifest(V1_MAKE));
+        assert!(
+            !has_caveat(&r, "j", "second actions/checkout"),
+            "{:#?}",
+            r.jobs
+        );
+        // A checkout after a `run:` step still is.
+        let wf = "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make gen\n      - uses: actions/checkout@v4\n      - run: make check\n";
+        let r = report_one(wf, &strengthen_manifest(V1_MAKE));
+        assert!(
+            has_caveat(&r, "j", "second actions/checkout"),
+            "{:#?}",
+            r.jobs
+        );
+    }
+
+    #[test]
     fn report_says_what_is_and_is_not_covered() {
         let manifest = manifest::parse_and_validate(
             r#"
@@ -4934,6 +4986,10 @@ CARGO_TERM_COLOR = "always"
         // Every gate matched, but the workflow sets SOME_TOKEN (a secret
         // expression) and pins node 22 — neither reproduced by the manifest.
         assert_eq!(lint.verdict, Coverage::NeedsReview, "{lint:#?}");
+        assert!(
+            lint.caveats.iter().any(|c| c.contains("SOME_TOKEN")),
+            "{lint:#?}"
+        );
         assert!(lint.missing.is_empty());
         let test = r.jobs.iter().find(|j| j.job_id == "test").unwrap();
         assert_eq!(test.verdict, Coverage::Uncovered);

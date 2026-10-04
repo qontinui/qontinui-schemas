@@ -73,18 +73,18 @@ qontinui-ci import --report
         RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR to every step, and
         does not reproduce GitHub's implicit environment (GITHUB_ACTIONS, TZ, locale, the runner
         image's toolset) for any program that is not a script in the repository. So NO job reads
-        COVERED until the executor stops forcing those caps (or the workflow mirrors them) — that is
-        the honest answer, not a defect. Also NEEDS-REVIEW: a gate resolving through python, pip,
-        poetry, uv, node, npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the manifest's
-        [[tools]] provisions it at a version the workflow pins identically; a checkout fetch-depth
-        other than 1, or a gate naming a remote ref (origin/…, refs/remotes/…, FETCH_HEAD, @{u}); a
-        second checkout after any command; a job timeout below the chosen manifest job's total step
-        timeouts, or a step timeout below the manifest steps its commands map to. When several
-        manifest jobs could match, one whose OS covers the workflow job is preferred. COVERED is
-        necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
-        agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
-        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
-        counts toward the precondition.
+        COVERED until the executor stops forcing those host-sized caps (the caveat is unconditional)
+        — that is the honest answer, not a defect. Also NEEDS-REVIEW: a gate resolving through
+        python, pip, poetry, uv, node, npm, npx, pnpm, yarn, corepack, ruby, go, java, … unless the
+        manifest's [[tools]] provisions it at a version the workflow pins identically; a checkout
+        fetch-depth other than 1, or a gate naming a remote ref (origin/…, refs/remotes/…,
+        FETCH_HEAD, @{u}); a second checkout after any `run:` step; a job timeout below the chosen
+        manifest job's total step timeouts, or a step timeout below the manifest steps its commands
+        map to. When several manifest jobs could match, one whose OS covers the workflow job is
+        preferred. COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one
+        week of shadow agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW,
+        NAME-ONLY (no gate command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED.
+        Only COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (10):
   UNCOVERED       commitlint.yml › commitlint [pull_request] 0/1 gate command(s) matched
