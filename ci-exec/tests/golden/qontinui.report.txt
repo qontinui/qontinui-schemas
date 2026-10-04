@@ -5,35 +5,49 @@ qontinui-ci import --report
   rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
         every gate command matched, with no unresolved directory, toolchain, environment change or
         unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
-        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
-        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
-        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
-        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
-        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
-        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
-        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
-        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
-        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
-        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
-        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
-        PowerShell), a command whose program is a variable or expression, and a command whose
-        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
-        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
-        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
-        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
+        (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
+        segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
+        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
+        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
+        Anything else in any step (an assignment or `KEY=value` prefix; an
+        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
+        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
+        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
+        through every one of these checks. CONSIDERED JOBS: those whose workflow runs on
+        `pull_request` / `pull_request_target` into the default branch, on `merge_group`, or on a
+        `push` to the default branch. Zero considered jobs is NOT MET. GATE COMMANDS: every command
+        a step runs whose exit status can fail the step (GitHub runs bash with -e), read from `run:`
+        scripts through any control flow and inside `$(…)` — installs, tests, greps, `jq` assertions
+        and `source` included. Not gates: output, navigation and shell-state builtins (echo, cd,
+        set, export, exit, …), a command followed by exactly `|| true` or `|| :` (any other fallback
+        leaves it a gate), steps whose condition is only `failure()`/`cancelled()`, steps with a
+        literal `continue-on-error: true`, and checkout/cache/upload actions. OPAQUE gates, which no
+        manifest step matches: every other `uses:` action, a non-bash script (a `run:` on a Windows
+        runner with no `shell: bash` is PowerShell), a command whose program is a variable or
+        expression, and a command whose working directory cannot be resolved (an expression in
+        `working-directory`, a `cd` to a non-literal). MATCHED: a step of a manifest GATE job
+        (scheduled jobs never run for a pull request) runs the same command in the same working
+        directory, on a job whose `os` includes every OS the workflow job runs on — a manifest `os =
+        any` job counts as Linux only; a workflow job of unknown OS is matched by nothing. SAME
+        COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run,
+        npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 =
+        python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their
+        verbs are NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A
+        manifest step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
         counts toward the precondition.
 
@@ -45,6 +59,9 @@ JOBS ON pull_request / push:main (8):
       missing: python3 -
       matched: poetry install --no-interaction --no-ansi  ←  ci/install
       matched: poetry run ruff check .  ←  ci/lint
+      review:  step "Checkout sibling repo (qontinui-schemas)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Checkout sibling repo (multistate)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
@@ -55,6 +72,9 @@ JOBS ON pull_request / push:main (8):
       missing: python3 -
       matched: poetry install --no-interaction --no-ansi  ←  ci/install
       matched: poetry run mypy src/qontinui --ignore-missing-imports  ←  ci/typecheck
+      review:  step "Checkout sibling repo (qontinui-schemas)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Checkout sibling repo (multistate)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
@@ -70,6 +90,10 @@ JOBS ON pull_request / push:main (8):
       missing: poetry run playwright install --with-deps chromium
       missing: xvfb-run -a poetry run pytest --cov=src/qontinui --cov-report=xml --cov-report=term
       matched: poetry install --no-interaction --no-ansi  ←  ci/install
+      review:  step "Checkout sibling repo (qontinui-schemas)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Checkout sibling repo (multistate)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install system dependencies" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
@@ -85,6 +109,10 @@ JOBS ON pull_request / push:main (8):
       missing: poetry install --no-interaction --no-ansi --extras ml
       missing: poetry run playwright install --with-deps chromium
       missing: xvfb-run -a poetry run pytest
+      review:  step "Checkout sibling repo (qontinui-schemas)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Checkout sibling repo (multistate)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install system dependencies" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
@@ -96,7 +124,11 @@ JOBS ON pull_request / push:main (8):
       missing: pip install twine
       missing: twine check dist/*
       matched: poetry build  ←  ci/build-package
+      review:  step "Checkout sibling repo (qontinui-schemas)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Checkout sibling repo (multistate)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Check package" is outside the report's command grammar: it relies on shell expansion of "dist/*"
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › security [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: aquasecurity/trivy-action
@@ -108,7 +140,11 @@ JOBS ON pull_request / push:main (8):
       missing: python -m pip install --upgrade pip
       missing: pip install -e qontinui-train
       missing: mkdir -p eval-out
+      review:  step "Start eval-desktop container" is outside the report's command grammar: it expands a variable or substitution in "CID=$(docker run -d \\\n  --name eval-desktop \\\n  --shm-size=1g \\\n  -p ${HAL_MCP_PORT}:${HAL_MCP_PORT} \\\n  -e QONTINUI_HAL_MCP_TOKEN=\"${QONTINUI_HAL_MCP_TOKEN}\" \\\n  \"${IMAGE_TAG}\")"
       review:  step "Start eval-desktop container" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Wait for hal-mcp health" is outside the report's command grammar: it expands a variable or substitution in "$(seq 1 30)"
+      review:  advisory step "Run grounding eval against internal benchmark" sets env the manifest does not model
+      review:  step "Capture container logs" is outside the report's command grammar: it uses an output redirect
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/5 gate command(s) matched
       missing: curl -sSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest
@@ -116,6 +152,7 @@ JOBS ON pull_request / push:main (8):
       missing: curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v${GL}/gitleaks_${GL}_linux_x64.tar
       missing: tar -xz gitleaks
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
 
 NOT CONSIDERED — not on pull_request or a push to main (0 workflow(s)):
   (none)

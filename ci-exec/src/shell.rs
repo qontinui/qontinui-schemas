@@ -425,7 +425,8 @@ fn resolve_root(text: &str, wd: &str) -> String {
 /// A `cd` target as a new working directory. `None` when it leaves the repo
 /// or cannot be known.
 fn cd_target(w: &Word, wd: &str) -> Option<String> {
-    if !w.vars.is_empty() || w.subst || w.glob || w.tilde {
+    // `cd -` is the PREVIOUS directory, which nothing here tracks.
+    if !w.vars.is_empty() || w.subst || w.glob || w.tilde || w.text == "-" || w.text.is_empty() {
         return None;
     }
     if let Some(rest) = w.text.strip_prefix(ROOT) {
@@ -1016,6 +1017,108 @@ fn substitutions(text: &str) -> Vec<String> {
     out
 }
 
+/// The report's ALLOWLIST grammar: `Ok` only when every segment of the script
+/// is one of
+///
+/// * a simple command `prog args…` whose words are literal (no `$`, no
+///   expansion, no glob, no `~`) and whose program is not an assignment, a
+///   wrapper (`env`, `timeout`, `nice`, `xargs`, `sudo`, `tee`, `exec`,
+///   `command`, …) or a shell-state builtin (`export`, `declare`, `source`,
+///   `.`, `eval`, `pushd`, `popd`, …);
+/// * `cd <literal relative path>` inside the repository;
+/// * `echo` / `printf` / `:` / `true`;
+/// * exactly `set -e`, `set -eu`, `set -euo pipefail` or `set -x`;
+///
+/// joined by newlines, `;` or `&&`, each optionally ending in `|| true` or
+/// `|| :`. Any operator other than those (a pipe, any redirect, a
+/// here-document, a subshell, a background job) and any control flow fails.
+/// `Err` names the first thing outside the grammar. Deliberately not a
+/// blocklist: what is not listed here is not understood.
+pub fn report_grammar(script: &str) -> Result<(), String> {
+    if script.contains("${{") {
+        return Err("uses a `${{ … }}` expression".to_string());
+    }
+    let toks = tokenize(script);
+    let mut stmts: Vec<Vec<Tok>> = vec![Vec::new()];
+    for t in toks {
+        match t {
+            Tok::Newline | Tok::Op(";") | Tok::Op("&&") => stmts.push(Vec::new()),
+            other => {
+                if let Some(s) = stmts.last_mut() {
+                    s.push(other);
+                }
+            }
+        }
+    }
+    const WRAPPERS_AND_STATE: &[&str] = &[
+        "env", "timeout", "nice", "nohup", "xargs", "sudo", "doas", "tee", "exec", "command",
+        "builtin", "time", "stdbuf", "export", "declare", "typeset", "local", "readonly",
+        "source", ".", "eval", "pushd", "popd", "unset", "alias", "trap", "shopt", "ulimit",
+        "umask", "read", "mapfile", "readarray", "exit", "return", "shift", "let", "wait",
+    ];
+    for stmt in stmts.into_iter().filter(|s| !s.is_empty()) {
+        // An optional trailing `|| true` / `|| :`.
+        let body: &[Tok] = match stmt.iter().position(|t| matches!(t, Tok::Op("||"))) {
+            Some(p) => {
+                let fallback = &stmt[p + 1..];
+                let ok = fallback.len() == 1
+                    && matches!(&fallback[0], Tok::Word(w) if w.is("true") || w.is(":"));
+                if !ok {
+                    return Err("an `||` fallback other than `|| true` / `|| :`".to_string());
+                }
+                &stmt[..p]
+            }
+            None => &stmt,
+        };
+        let mut words: Vec<&Word> = Vec::new();
+        for t in body {
+            match t {
+                Tok::Word(w) => words.push(w),
+                Tok::Op(op) => return Err(format!("uses {}", describe_op(op))),
+                Tok::Newline => {}
+            }
+        }
+        let Some(first) = words.first() else {
+            return Err("an empty command".to_string());
+        };
+        for w in &words {
+            if !w.vars.is_empty() || w.subst || w.text.contains('$') || w.text.contains(ROOT) {
+                return Err(format!("expands a variable or substitution in {:?}", w.text.replace(ROOT, "$GITHUB_WORKSPACE")));
+            }
+            if w.glob || w.tilde {
+                return Err(format!("relies on shell expansion of {:?}", w.text));
+            }
+        }
+        if looks_like_assignment(first) && first.quote_at.is_none_or(|q| first.text.find('=').is_some_and(|e| q > e)) {
+            return Err(format!("assigns a variable ({:?})", first.text));
+        }
+        if CONTROL_WORDS.iter().any(|k| first.is(k)) {
+            return Err(format!("uses the shell construct `{}`", first.text));
+        }
+        if let Some(wr) = WRAPPERS_AND_STATE.iter().find(|k| first.is(k)) {
+            return Err(format!("uses `{wr}`, which the report does not model"));
+        }
+        if first.is("cd") {
+            if words.len() != 2 || cd_target(words[1], "").is_none() || words[1].text == "-" {
+                return Err("a `cd` that is not to one literal path inside the repository".to_string());
+            }
+            continue;
+        }
+        if first.is("set") {
+            let args: Vec<&str> = words[1..].iter().map(|w| w.text.as_str()).collect();
+            let ok = matches!(
+                args.as_slice(),
+                ["-e"] | ["-eu"] | ["-euo", "pipefail"] | ["-x"]
+            );
+            if !ok {
+                return Err(format!("`set {}` is not one of set -e / -eu / -euo pipefail / -x", args.join(" ")));
+            }
+            continue;
+        }
+    }
+    Ok(())
+}
+
 /// Remove the `pattern)` labels of `case … esac` arms, which would otherwise
 /// read as commands named after the patterns.
 fn drop_case_patterns(toks: Vec<Tok>) -> Vec<Tok> {
@@ -1200,9 +1303,11 @@ fn extract_loose_in(script: &str, start_wd: Option<String>) -> Vec<LooseCommand>
             continue;
         }
         if first.is("cd") {
-            // A target that is not a literal (a variable, `cd -`, no argument)
-            // makes every later directory unknown.
+            // A target that is not a literal — a variable, `cd -` (the
+            // previous directory, which is not tracked), no argument, or a
+            // second argument — makes every later directory unknown.
             wd = match (&wd, words.get(1)) {
+                _ if words.len() != 2 => None,
                 (_, Some(w)) if w.text.starts_with(ROOT) => cd_target(w, ""),
                 (Some(cur), Some(w)) => cd_target(w, cur),
                 _ => None,
@@ -1376,6 +1481,47 @@ mod tests {
         let cmds = extract_loose("out=\"$(zizmor --format github .)\"\nn=$((1+2))\n", "");
         let names: Vec<&str> = cmds.iter().map(|c| c.argv[0].as_str()).collect();
         assert_eq!(names, vec!["zizmor"]);
+    }
+
+    #[test]
+    fn report_grammar_is_an_allowlist() {
+        for ok in [
+            "python scripts/ci/check.py\n",
+            "set -euo pipefail\ncd frontend && npm ci\nnpm run lint || true\necho done\n",
+            "make a; make b\n",
+        ] {
+            assert!(report_grammar(ok).is_ok(), "{ok}: {:?}", report_grammar(ok));
+        }
+        for bad in [
+            "pushd sub\nmake\n",
+            "env FOO=1 make\n",
+            "FOO=1 make\n",
+            "FOO=1\n",
+            "make > out.txt\n",
+            "make < in.txt\n",
+            "cat <<EOF\nx\nEOF\n",
+            "make | tee log\n",
+            "tee log\n",
+            "( make )\n",
+            "if true; then make; fi\n",
+            "for f in a; do make; done\n",
+            "echo $(date)\n",
+            "export A=1\n",
+            "source .env\n",
+            ". .env\n",
+            "eval make\n",
+            "set -a\n",
+            "cd -\n",
+            "cd \"$DIR\"\n",
+            "cd ..\n",
+            "timeout 60 make\n",
+            "make || rc=$?\n",
+            "make $TARGET\n",
+            "echo x >&2\n",
+            "python ${{ github.workspace }}/x.py\n",
+        ] {
+            assert!(report_grammar(bad).is_err(), "{bad} should be outside the grammar");
+        }
     }
 
     #[test]

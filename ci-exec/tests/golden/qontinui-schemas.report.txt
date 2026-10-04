@@ -5,35 +5,49 @@ qontinui-ci import --report
   rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
         every gate command matched, with no unresolved directory, toolchain, environment change or
         unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
-        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
-        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
-        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
-        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
-        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
-        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
-        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
-        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
-        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
-        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
-        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
-        PowerShell), a command whose program is a variable or expression, and a command whose
-        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
-        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
-        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
-        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
+        (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
+        segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
+        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
+        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
+        Anything else in any step (an assignment or `KEY=value` prefix; an
+        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
+        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
+        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
+        through every one of these checks. CONSIDERED JOBS: those whose workflow runs on
+        `pull_request` / `pull_request_target` into the default branch, on `merge_group`, or on a
+        `push` to the default branch. Zero considered jobs is NOT MET. GATE COMMANDS: every command
+        a step runs whose exit status can fail the step (GitHub runs bash with -e), read from `run:`
+        scripts through any control flow and inside `$(…)` — installs, tests, greps, `jq` assertions
+        and `source` included. Not gates: output, navigation and shell-state builtins (echo, cd,
+        set, export, exit, …), a command followed by exactly `|| true` or `|| :` (any other fallback
+        leaves it a gate), steps whose condition is only `failure()`/`cancelled()`, steps with a
+        literal `continue-on-error: true`, and checkout/cache/upload actions. OPAQUE gates, which no
+        manifest step matches: every other `uses:` action, a non-bash script (a `run:` on a Windows
+        runner with no `shell: bash` is PowerShell), a command whose program is a variable or
+        expression, and a command whose working directory cannot be resolved (an expression in
+        `working-directory`, a `cd` to a non-literal). MATCHED: a step of a manifest GATE job
+        (scheduled jobs never run for a pull request) runs the same command in the same working
+        directory, on a job whose `os` includes every OS the workflow job runs on — a manifest `os =
+        any` job counts as Linux only; a workflow job of unknown OS is matched by nothing. SAME
+        COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run,
+        npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 =
+        python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their
+        verbs are NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A
+        manifest step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
         counts toward the precondition.
 
@@ -103,9 +117,21 @@ JOBS ON pull_request / push:main (10):
       missing: <outside the repository>/: [ -n $checks_case ]
       missing: <outside the repository>/: [ $DECLARE_REASON = declared-pr-checks-red ]
       missing: <outside the repository>/: [ $DECLARED != true ]
+      review:  step "Decide whether the consumer gate must run" is outside the report's command grammar: it assigns a variable ("run_gate=false")
       review:  step "Decide whether the consumer gate must run" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: ${{ matrix.repo }} — not the dispatched commit's plain checkout
+      review:  step "Record resolved ${{ matrix.consumer }} main SHA" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Record resolved ${{ matrix.consumer }} main SHA" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install Tauri Linux system deps" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Add swapfile (guard against link-time OOM)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Stub ${{ matrix.consumer }} frontend dist" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  advisory step "Leg 1: cargo check ${{ matrix.consumer }} main against PR schemas" sets env the manifest does not model
+      review:  step "Leg 2: resolve the declared adaptation PR" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Leg 2: resolve the declared adaptation PR" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: ${{ matrix.repo }}, ref: ${{ steps.declare.outputs.sha }} — not the dispatched commit's plain checkout
+      review:  step "Leg 2: re-stub ${{ matrix.consumer }} frontend dist" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  advisory step "Leg 2: cargo check the declared adaptation against PR schemas" sets env the manifest does not model
+      review:  step "Verdict for ${{ matrix.consumer }}" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  matrix legs include = ["consumer: qontinui-runner repo: qontinui/qontinui-runner workdir: qontinui-runner needs_dist_stub: 'true' heavy: 'true'", "consumer: qontinui-supervisor repo: qontinui/qontinui-supervisor workdir: qontinui-supervisor needs_dist_stub: 'false' heavy: 'false'"] — the manifest runs one leg
   UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/5 gate command(s) matched
       missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file
@@ -113,8 +139,11 @@ JOBS ON pull_request / push:main (10):
       missing: gh api --paginate repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
       missing: [ $rc -ne 0 ]
       missing: grep -qxF wire-gate:override
+      review:  step "SDK wire gate is append-only" is outside the report's command grammar: it assigns a variable ("fixtures=rust/tests/fixtures/ui_bridge_sdk/")
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       runner-consumer-check.yml › consumer-gate [pull_request] 0/0 gate command(s) matched
+      review:  step "SDK wire gate verdict" is outside the report's command grammar: it expands a variable or substitution in "wire-gate-guard result: $RESULT"
+      review:  step "Aggregate consumer verdicts" is outside the report's command grammar: it expands a variable or substitution in "consumer-check aggregate result: $RESULT"
       note:    job condition `if: always()` — considered as running
       note:    no gate command found
   PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 5/23 gate command(s) matched
@@ -141,6 +170,9 @@ JOBS ON pull_request / push:main (10):
       matched: cargo clippy --workspace --all-targets -- -D warnings  ←  ci/rust-clippy
       matched: cargo build --workspace --all-targets  ←  ci/rust-build
       matched: cargo test --workspace  ←  ci/rust-test
+      review:  step "The vacuity parser copy matches its declared digest" is outside the report's command grammar: it assigns a variable ("F=.github/scripts/cargo-vacuity-count.awk")
+      review:  step "cargo test" is outside the report's command grammar: it `set +e` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "fleet-nouns.toml patterns agree across Rust, Python and JS" is outside the report's command grammar: it assigns a variable ("FLEET_NOUNS_MATRIX_OUT=/tmp/fleet-nouns-rust.json")
   UNCOVERED       schema-drift.yml › check-drift [pull_request, push:main (paths-filtered)] 0/9 gate command(s) matched
       missing: uses: qontinui/qontinui-runner/.github/actions/checkout-sibling
       missing: <outside the repository>/: sudo apt-get update
@@ -151,12 +183,17 @@ JOBS ON pull_request / push:main (10):
       missing: bash scripts/check-generated-drift.sh --preflight
       missing: <outside the repository>/: bash $GENERATE_TYPES_SH
       missing: bash scripts/check-generated-drift.sh --verify
+      review:  step "Report which qontinui-runner tree this regenerated against" is outside the report's command grammar: it expands a variable or substitution in "SIB_REF=${SIB_REF//|/\\\\|}"
+      review:  step "Install Tauri Linux system deps" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Stub qontinui-runner frontend dist" is outside the report's command grammar: it uses an output redirect
+      review:  step "Regenerate types" is outside the report's command grammar: it expands a variable or substitution in "$GENERATE_TYPES_SH"
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/3 gate command(s) matched
       missing: curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v${GL}/gitleaks_${GL}_linux_x64.tar
       missing: tar -xz gitleaks
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
   UNCOVERED       ts-typecheck.yml › typecheck [pull_request, push:main] 0/3 gate command(s) matched
       missing: ts: npm ci
       missing: ts: npm run typecheck

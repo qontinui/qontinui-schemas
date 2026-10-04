@@ -258,11 +258,21 @@ fn web_report_finds_the_uncovered_backend_suite() {
             .unwrap_or_else(|| panic!("{wf} › {job} not considered"))
             .verdict
     };
-    assert_eq!(verdict("web-boundary-lint.yml", "web-boundary-lint"), Coverage::Covered);
+    // The command fits the report's grammar and matches web's manifest
+    // exactly, but the workflow job has `timeout-minutes: 5` while the
+    // manifest step runs under the 3600s default — NEEDS-REVIEW, not COVERED.
+    assert_eq!(verdict("web-boundary-lint.yml", "web-boundary-lint"), Coverage::NeedsReview);
+    let wbl = report
+        .jobs
+        .iter()
+        .find(|j| j.job_id == "web-boundary-lint")
+        .unwrap();
+    assert!(wbl.missing.is_empty());
+    assert!(wbl.caveats.iter().all(|c| c.contains("limited to 300s")), "{:#?}", wbl.caveats);
     // The manifest runs count_alembic_heads.py without the workflow's
     // `--baseline-ref origin/main`: a different command, so not covered.
     assert_eq!(verdict("alembic-graph-pr.yml", "alembic-heads-pr"), Coverage::Uncovered);
-    assert_eq!(verdict("forbid-public-schema.yml", "forbid-public-schema"), Coverage::Covered);
+    assert_eq!(verdict("forbid-public-schema.yml", "forbid-public-schema"), Coverage::NeedsReview);
     assert_eq!(verdict("backend-ci.yml", "test"), Coverage::Partial);
     // Its installs match the manifest's; Trivy and `safety check` do not.
     assert_eq!(verdict("backend-ci.yml", "security-scan"), Coverage::Partial);

@@ -5,35 +5,49 @@ qontinui-ci import --report
   rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
         every gate command matched, with no unresolved directory, toolchain, environment change or
         unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
-        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
-        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
-        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
-        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
-        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
-        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
-        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
-        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
-        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
-        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
-        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
-        PowerShell), a command whose program is a variable or expression, and a command whose
-        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
-        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
-        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
-        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
+        (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
+        segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
+        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
+        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
+        Anything else in any step (an assignment or `KEY=value` prefix; an
+        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
+        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
+        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
+        through every one of these checks. CONSIDERED JOBS: those whose workflow runs on
+        `pull_request` / `pull_request_target` into the default branch, on `merge_group`, or on a
+        `push` to the default branch. Zero considered jobs is NOT MET. GATE COMMANDS: every command
+        a step runs whose exit status can fail the step (GitHub runs bash with -e), read from `run:`
+        scripts through any control flow and inside `$(…)` — installs, tests, greps, `jq` assertions
+        and `source` included. Not gates: output, navigation and shell-state builtins (echo, cd,
+        set, export, exit, …), a command followed by exactly `|| true` or `|| :` (any other fallback
+        leaves it a gate), steps whose condition is only `failure()`/`cancelled()`, steps with a
+        literal `continue-on-error: true`, and checkout/cache/upload actions. OPAQUE gates, which no
+        manifest step matches: every other `uses:` action, a non-bash script (a `run:` on a Windows
+        runner with no `shell: bash` is PowerShell), a command whose program is a variable or
+        expression, and a command whose working directory cannot be resolved (an expression in
+        `working-directory`, a `cd` to a non-literal). MATCHED: a step of a manifest GATE job
+        (scheduled jobs never run for a pull request) runs the same command in the same working
+        directory, on a job whose `os` includes every OS the workflow job runs on — a manifest `os =
+        any` job counts as Linux only; a workflow job of unknown OS is matched by nothing. SAME
+        COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run,
+        npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 =
+        python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their
+        verbs are NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A
+        manifest step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
         counts toward the precondition.
 
@@ -51,7 +65,11 @@ JOBS ON pull_request / push:main (41):
       missing: <outside the repository>/qontinui-web/backend: poetry install --no-interaction --no-root
       missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
       missing: bash atlas/scripts/check_schema.sh
+      review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it expands a variable or substitution in "branch=$BRANCH"
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: qontinui/qontinui-web, ref: ${{ steps.resolve_ref.outputs.ref }} — not the dispatched commit's plain checkout
+      review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE"
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/32 gate command(s) matched
@@ -87,6 +105,7 @@ JOBS ON pull_request / push:main (41):
       missing: sed s/^/- `/;s/$/`/
       missing: cat ${RUNNER_TEMP}/notice.md
       missing: gh pr comment ${PR_NUMBER} --repo ${REPO} --body-file ${RUNNER_TEMP}/notice.md
+      review:  step "Verify and record gating-workflow changes" is outside the report's command grammar: it uses an input redirect or here-document
       review:  step "Verify and record gating-workflow changes" changes the environment of later commands: `export HIT_PATHS MERGE_BASE`
   UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/87 gate command(s) matched
       missing: note
@@ -176,6 +195,8 @@ JOBS ON pull_request / push:main (41):
       missing: note   branch `${HEAD_REF}`, or push to the branch to fire it via `synchronize`.
       missing: note `Gitleaks Secret Detection` is not listed: `secret-scan.yml` has no
       missing: note `branches:` filter, so it already reported on this head.
+      review:  step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling" is outside the report's command grammar: it uses a subshell
+      review:  step "Dispatch base-filtered required workflows after a retarget" is outside the report's command grammar: it uses a subshell
   UNCOVERED       ci-timeout-marker-selftest.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python3 scripts/tests/test_ci_timeout_marker.py
   UNCOVERED       ci.yml › test [pull_request, push:main] 0/63 gate command(s) matched
@@ -242,8 +263,20 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/tests/ci-integrity/run-scenarios.sh
       missing: python3 scripts/tests/ci-integrity/test-surface.py
       missing: powershell -File scripts/contract-smoke.ps1 -DirectExe target/debug/qontinui-runner.exe -Profile ci 
+      review:  step "Cargo.lock is in sync with the pinned qontinui-schemas" is outside the report's command grammar: it uses an output redirect
+      review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Add swapfile (Ubuntu — guard against link-time OOM)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Poison ambient state" is outside the report's command grammar: it uses a subshell
       review:  step "Poison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Build Rust tests" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Run Rust tests" is outside the report's command grammar: it `set -o pipefail` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "Windows memory peak after the Rust test steps" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  advisory step "Report test results to coord (best-effort)" sets env the manifest does not model
+      review:  step "Report test results to coord (best-effort)" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Unpoison ambient state" is outside the report's command grammar: it `set -u` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Unpoison ambient state" touches $GITHUB_ENV, which changes what later steps see
+      review:  advisory step "Live AI extractor smoke" sets env the manifest does not model
+      review:  step "Live AI extractor smoke" is outside the report's command grammar: it relies on shell expansion of "["
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain toolchain 1.95.0 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › clippy-windows [pull_request, push:main] 0/6 gate command(s) matched
@@ -266,8 +299,10 @@ JOBS ON pull_request / push:main (41):
       matched: pnpm test  ←  ci/frontend-test
       review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
       review:  `pnpm install --frozen-lockfile` runs with GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}; ci/frontend-install does not set it identically
+      review:  `pnpm install --frozen-lockfile` is limited to 900s; ci/frontend-install allows 3600s
       review:  `pnpm test` runs with CARGO_TERM_COLOR=always; ci/frontend-test does not set it identically
       review:  `pnpm test` runs with GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}; ci/frontend-test does not set it identically
+      review:  `pnpm test` is limited to 900s; ci/frontend-test allows 3600s
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       ci.yml › seam-gate [pull_request, push:main] 0/5 gate command(s) matched
       missing: grep -m1 -vE ^\s*(//|$) $tf
@@ -275,6 +310,7 @@ JOBS ON pull_request / push:main (41):
       missing: grep -Pzo $gate_outer\r?\n\s*pub mod test_fixtures; src-tauri/src/mcp/mod.rs
       missing: grep -Pzo $gate_outer\r?\n\s*let base_router = base_router.merge\(crate::mcp::test_fixtures::routes\
       missing: [ $fail -ne 0 ]
+      review:  step "Assert test-fixtures seam stays cfg-gated out of release builds" is outside the report's command grammar: it assigns a variable ("gate_outer=#\\[cfg\\(any\\(debug_assertions, feature = \"test-fixtures\"\\)\\)\\]")
   UNCOVERED       ci.yml › security [pull_request, push:main] 0/4 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
       missing: cargo install cargo-audit --locked
@@ -294,6 +330,9 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: cargo clippy --all-targets
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
+      review:  step "Checkout sibling repos" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Add swapfile (Ubuntu — guard against link-time OOM)" is outside the report's command grammar: it uses `sudo`, which the report does not model
       review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
       review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
@@ -314,6 +353,10 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: reviewdog -f=clippy -name=clippy-diff -filter-mode=diff_context -reporter=github-pr-check -fail-on-e
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
       matched: pnpm run build  ←  ci/frontend-build
+      review:  step "Checkout sibling repos" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Add swapfile (Ubuntu — guard against link-time OOM)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Clippy diff-scoped via reviewdog" is outside the report's command grammar: it uses an output redirect
       review:  `pnpm install --frozen-lockfile` runs with CARGO_TERM_COLOR=always; ci/frontend-install does not set it identically
       review:  `pnpm run build` runs with CARGO_TERM_COLOR=always; ci/frontend-build does not set it identically
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
@@ -327,8 +370,9 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/clorinde.toml src-tauri/c
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect Clorinde-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect Clorinde-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
-  UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/23 gate command(s) matched
+  UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/24 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
       missing: <outside the repository>/: grep -q .
@@ -352,16 +396,27 @@ JOBS ON pull_request / push:main (41):
       missing: git commit -m chore(clorinde): regenerate bindings against current schema
       missing: [ $PAT_AVAILABLE = true ]
       missing: git push origin HEAD:$BRANCH
+      missing: uses: actions/upload-artifact
+      review:  actions/checkout with ref: ${{ github.head_ref || github.ref }}, token: ${{ secrets.CLORINDE_AUTOCOMMIT_TOKEN || secrets.GITHUB_TOKEN }} — not the dispatched commit's plain checkout
+      review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it expands a variable or substitution in "branch=$BRANCH"
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: qontinui/qontinui-web, ref: ${{ steps.resolve_ref.outputs.ref }} — not the dispatched commit's plain checkout
+      review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE"
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Stabilize clorinde module ordering" is outside the report's command grammar: it uses the shell construct `{`
+      review:  step "Detect drift" is outside the report's command grammar: it uses the shell construct `if`
       review:  step "Detect drift" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Auto-commit regenerated bindings" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Auto-commit regenerated bindings" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Surface auto-commit as a check failure" is outside the report's command grammar: it uses `exit`, which the report does not model
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — considered as running
   UNCOVERED       clorinde-bindings-fresh.yml › clorinde-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $BINDINGS_RELEVANT = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       flake-escalation.yml › unit-tests [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: node --version
@@ -378,6 +433,7 @@ JOBS ON pull_request / push:main (41):
       missing: [ -n ${MIN_OCCURRENCES:-} ]
       missing: --min-occurrences ${MIN_OCCURRENCES}
       missing: node scripts/ci-flake-escalate.mjs ${args[@]}
+      review:  step "Read coord's flake history and upsert escalation issues" is outside the report's command grammar: it uses a subshell
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       forbid-runner-schema.yml › forbid-runner-schema [pull_request, push:main] 0/8 gate command(s) matched
       missing: :!*.md
@@ -388,10 +444,12 @@ JOBS ON pull_request / push:main (41):
       missing: git grep -nE $PATTERN_CS -- ${EXCLUDES[@]}
       missing: git grep -niE $PATTERN_CI -- ${EXCLUDES[@]}
       missing: [ $found_any = 1 ]
+      review:  step "Scan for forbidden runner.* references" is outside the report's command grammar: it assigns a variable ("PATTERN_CS=SCHEMA runner|FROM runner\\.|JOIN runner\\.|INTO runner\\.|UPDATE runner\\.|DELETE FROM runner\\.|ForeignKey\\([^)]*runner\\.|schema\\s*=\\s*[\"']runner[\"']")
   UNCOVERED       forbid-sibling-clone.yml › forbid-sibling-clone [pull_request (paths-filtered), push:main (paths-filtered)] 0/3 gate command(s) matched
       missing: :!.github/actions/checkout-sibling/
       missing: :!.github/workflows/forbid-sibling-clone.yml
       missing: git grep -nE $PATTERN -- .github/ ${EXCLUDES[@]}
+      review:  step "Scan .github for sibling checkouts that bypass the action" is outside the report's command grammar: it assigns a variable ("PATTERN=git clone[^|]*qontinui-schemas|repository:[[:space:]]*qontinui/qontinui-schemas")
   UNCOVERED       forbid-untimed-subprocess.yml › forbid-untimed-subprocess [pull_request, push:main] 0/18 gate command(s) matched
       missing: [ -z ${BASE_REF} ]
       missing: [ ${BASE_REF} = null ]
@@ -411,6 +469,9 @@ JOBS ON pull_request / push:main (41):
       missing: git rev-parse HEAD
       missing: python3 scripts/check_untimed_subprocess.py --list-roots
       missing: python3 scripts/check_untimed_subprocess.py --ci
+      review:  actions/checkout with filter: blob:none — not the dispatched commit's plain checkout
+      review:  step "Re-derive this PR's merge state against the current base" is outside the report's command grammar: it expands a variable or substitution in "${PR_NUMBER:?}"
+      review:  step "Scan the runner's Rust crates for unbounded blocking subprocess waits" is outside the report's command grammar: it relies on shell expansion of "["
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/10 gate command(s) matched
       missing: date -u +%s
@@ -423,7 +484,9 @@ JOBS ON pull_request / push:main (41):
       missing: [ $elapsed_min -lt 0 ]
       missing: [ $elapsed_min -ge $SOFT_BUDGET_MINUTES ]
       matched: pnpm install --frozen-lockfile  ←  ci/frontend-install
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       onboarding-doc-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
       missing: [ $EXPR{{ github.event_name }} != pull_request ]
@@ -433,6 +496,7 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/src/coord_doctor.rs src-tauri/src/bin/coord_
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect onboarding-doc-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect onboarding-doc-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-verify [pull_request] 0/5 gate command(s) matched
       missing: uses: ./.github/actions/checkout-sibling
@@ -440,16 +504,22 @@ JOBS ON pull_request / push:main (41):
       missing: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
       missing: src-tauri: cargo run --quiet --bin coord_doctor -- --onboarding-doc
       missing: git diff --exit-code docs/runner-onboarding.md
+      review:  step "Install Tauri system dependencies (Ubuntu)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Regenerate onboarding doc" is outside the report's command grammar: it uses an output redirect
+      review:  step "Verify docs/runner-onboarding.md is fresh" is outside the report's command grammar: it uses the shell construct `if`
       note:    job condition `if: needs.detect.outputs.doc_relevant == 'true'` — considered as running
   UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $DOC_RELEVANT = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       page-spec-paths.yml › publish [push:main] 0/1 gate command(s) matched
       missing: node --version
+      review:  advisory step "Publish page-spec path map to coord" sets env the manifest does not model
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
+      review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" is outside the report's command grammar: it expands a variable or substitution in "$ErrorActionPreference"
   UNCOVERED       qontinui-types-drift.yml › check-drift [pull_request (paths-filtered), push:main (paths-filtered)] 0/9 gate command(s) matched
       missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
       missing: <outside the repository>/: sudo apt-get update
@@ -460,6 +530,8 @@ JOBS ON pull_request / push:main (41):
       missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --preflight
       missing: <outside the repository>/: bash qontinui-runner/src-tauri/scripts/generate_types.sh
       missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --verify
+      review:  step "Install Tauri Linux system deps" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Stub qontinui-runner frontend dist" is outside the report's command grammar: it uses an output redirect
       review:  pins setup-node node-version 20 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.11 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       schema-pg-sql-fresh.yml › detect [pull_request] 0/7 gate command(s) matched
@@ -470,8 +542,9 @@ JOBS ON pull_request / push:main (41):
       missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/schema.pg.sql.generated s
       missing: [ -n $from_base ]
       missing: [ -n $changed ]
+      review:  step "Detect schema-relevant changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect schema-relevant changes" touches $GITHUB_OUTPUT, which changes what later steps see
-  UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/19 gate command(s) matched
+  UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/20 gate command(s) matched
       missing: <outside the repository>/: [ -n $branch ]
       missing: <outside the repository>/: git ls-remote --heads https://github.com/qontinui/qontinui-web.git $branch
       missing: <outside the repository>/: grep -q .
@@ -491,14 +564,22 @@ JOBS ON pull_request / push:main (41):
       missing: src-tauri: diff -q /tmp/schema.checked-in.normalized.sql /tmp/schema.generated.normalized.sql
       missing: src-tauri: diff -u /tmp/schema.checked-in.sql schema.pg.sql.generated
       missing: src-tauri: head -80
+      missing: uses: actions/upload-artifact
+      review:  step "Resolve qontinui-web ref" is outside the report's command grammar: it expands a variable or substitution in "branch=$BRANCH"
       review:  step "Resolve qontinui-web ref" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: qontinui/qontinui-web, ref: ${{ steps.resolve_ref.outputs.ref }} — not the dispatched commit's plain checkout
+      review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE"
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Install Postgres client (for pg_dump)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Diff against checked-in" is outside the report's command grammar: it uses an output redirect
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.schema_changed == 'true'` — considered as running
   UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh [pull_request] 0/3 gate command(s) matched
       missing: [ $DETECT_RESULT != success ]
       missing: [ $SCHEMA_CHANGED = true ]
       missing: [ $VERIFY_RESULT = success ]
+      review:  step "Aggregate verification result" is outside the report's command grammar: it relies on shell expansion of "["
       note:    job condition `if: always()` — considered as running
   UNCOVERED       schema-pg-sql-freshness-nightly.yml › selftest [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: bash scripts/tests/test_schema_pr_step_guards.sh
@@ -599,16 +680,26 @@ JOBS ON pull_request / push:main (41):
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
       missing: cat $sweep_log
+      review:  actions/checkout with token: ${{ (github.ref == 'refs/heads/main' && secrets.CLORINDE_AUTOCOMMIT_TOKEN) || secrets.GITHUB_TOKEN }} — not the dispatched commit's plain checkout
+      review:  actions/checkout with repository: qontinui/qontinui-web, ref: main — not the dispatched commit's plain checkout
+      review:  step "Checkout sibling repo (qontinui)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE"
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Install Postgres client (for pg_dump)" is outside the report's command grammar: it uses `sudo`, which the report does not model
+      review:  step "Check schema.pg.sql.generated is fresh" is outside the report's command grammar: it uses an output redirect
       review:  step "Check schema.pg.sql.generated is fresh" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Open or update the schema refresh PR" is outside the report's command grammar: it assigns a variable ("branch_pushed=0")
+      review:  step "Sweep the refresh PR (ready it once it carries checks; page if parked)" is outside the report's command grammar: it expands a variable or substitution in "sweep_log=$RUNNER_TEMP/ready-bot-draft-pr.sweep.log"
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow-tests.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: bash scripts/tests/schemas-pair-follow/run.sh
       missing: python3 -
+      review:  step "The PAT appears only under the push job" is outside the report's command grammar: it uses an input redirect or here-document
   UNCOVERED       schemas-pair-follow.yml › detect [pull_request] 0/2 gate command(s) matched
       missing: [[ ! $LABEL_NAME =~ $re ]]
       missing: gh workflow run schemas-pair-follow.yml -R $REPO --ref main -f pr=$PR_NUMBER -f partner=$partner
+      review:  step "Dispatch the follow run from main" is outside the report's command grammar: it expands a variable or substitution in "re=^coord:downstream-of=(qontinui/)?qontinui-schemas#([0-9]+)$"
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/10 gate command(s) matched
       missing: [ -n ${INPUT_PR:-} ]
@@ -621,9 +712,11 @@ JOBS ON pull_request / push:main (41):
       missing: jq -r .[] | "| #\(.pr) | qontinui-schemas#\(.partner) | \(.action) | \(.mode) | \(.reason) |"
       missing: jq -c [.[] | select(.action == "FOLLOW")]
       missing: jq [.[] | select(.action == "UNKNOWN")] | length
+      review:  actions/checkout with ref: ${{ github.event.repository.default_branch }} — not the dispatched commit's plain checkout
+      review:  step "Scan and decide" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Scan and decide" touches $GITHUB_OUTPUT, which changes what later steps see
       note:    job condition `if: github.event_name != 'pull_request'` — considered as running
-  UNCOVERED       schemas-pair-follow.yml › compute [pull_request] 0/7 gate command(s) matched
+  UNCOVERED       schemas-pair-follow.yml › compute [pull_request] 0/8 gate command(s) matched
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh merge-and-pin runner $RUNNER_TEMP/decide.json
       missing: <outside the repository>/: tee -a $GITHUB_OUTPUT
       missing: uses: ./main/.github/actions/checkout-sibling
@@ -631,18 +724,28 @@ JOBS ON pull_request / push:main (41):
       missing: [ -n $chan ]
       missing: rustup toolchain install $chan --profile minimal
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh lock-and-commit runner $RUNNER_TEMP/decide.json $RUNNER_TEM
+      missing: uses: actions/upload-artifact
+      review:  actions/checkout with ref: ${{ github.event.repository.default_branch }} — not the dispatched commit's plain checkout
+      review:  actions/checkout with ref: ${{ matrix.item.head_sha }} — not the dispatched commit's plain checkout
+      review:  step "Merge main and move the pin" is outside the report's command grammar: it uses an output redirect
       review:  step "Merge main and move the pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install main's Rust toolchain" is outside the report's command grammar: it expands a variable or substitution in "chan=$(sed -n 's/^channel = \"\\(.*\\)\"$/\\1/p' rust-toolchain.toml)"
       review:  step "Install main's Rust toolchain" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Refresh Cargo.lock and commit" is outside the report's command grammar: it expands a variable or substitution in "$RUNNER_TEMP/decide.json"
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — considered as running
   UNCOVERED       schemas-pair-follow.yml › push [pull_request] 0/1 gate command(s) matched
       missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh push $RUNNER_TEMP/plan-item.json $RUNNER_TEMP/out $RUNNER_T
+      review:  actions/checkout with ref: ${{ github.event.repository.default_branch }} — not the dispatched commit's plain checkout
+      review:  advisory step uses actions/download-artifact@v4, which the report does not model
+      review:  step "Verify, re-read the head, push" is outside the report's command grammar: it uses an output redirect
       review:  matrix legs item = ["${{ fromJSON(needs.plan.outputs.followups) }}"] — the manifest runs one leg
       note:    job condition `if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.followups != '[]' }}` — considered as running
   UNCOVERED       schemas-pair-follow.yml › verdict [pull_request] 0/3 gate command(s) matched
       missing: [ $PLAN = success ]
       missing: [ ${UNKNOWNS:-0} = 0 ]
       missing: [ $r = failure ]
+      review:  step "Red on UNKNOWN or a failed leg" is outside the report's command grammar: it expands a variable or substitution in "plan=$PLAN compute=$COMPUTE push=$PUSH unknowns=${UNKNOWNS:-?}"
       note:    job condition `if: always() && github.event_name != 'pull_request'` — considered as running
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/5 gate command(s) matched
       missing: curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors https://github.com/gitleaks/gitleaks/release
@@ -650,6 +753,7 @@ JOBS ON pull_request / push:main (41):
       missing: test -x ./gitleaks
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
   UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/114 gate command(s) matched
       missing: bash scripts/tests/test_pin_bump_pr_step.sh
       missing: [ ! -f $MANIFEST ]
@@ -765,8 +869,14 @@ JOBS ON pull_request / push:main (41):
       missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --max-age-hours 48 ${extra_args[
       missing: tee $sweep_log
       missing: tail -n1 $sweep_log
+      review:  actions/checkout with token: ${{ (github.event_name != 'pull_request' && secrets.CLORINDE_AUTOCOMMIT_TOKEN) || secrets.GITHUB_TOKEN }} — not the dispatched commit's plain checkout
+      review:  step "Resolve each pinned sibling's current default-branch head" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Resolve each pinned sibling's current default-branch head" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Detect a moving qontinui-schemas pin" is outside the report's command grammar: it uses a subshell
       review:  step "Detect a moving qontinui-schemas pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Refresh Cargo.lock against the new qontinui-schemas pin" is outside the report's command grammar: it expands a variable or substitution in "$(sed -n 's/^channel = \"\\(.*\\)\"$/\\1/p' rust-toolchain.toml)"
+      review:  step "Open or update the pin bump PR" is outside the report's command grammar: it uses a subshell
+      review:  step "Sweep the bump PR (ready it once it carries checks; page if parked)" is outside the report's command grammar: it expands a variable or substitution in "sweep_log=$RUNNER_TEMP/ready-bot-draft-pr.sweep.log"
 
 NOT CONSIDERED — not on pull_request or a push to main (6 workflow(s)):
   build-python-executor.yml (jobs: build, combine) — triggers ["workflow_dispatch", "workflow_call"]

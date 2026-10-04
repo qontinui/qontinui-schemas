@@ -5,35 +5,49 @@ qontinui-ci import --report
   rule: DENY BY DEFAULT: a workflow job is COVERED only when EVERY step is positively understood —
         every gate command matched, with no unresolved directory, toolchain, environment change or
         unknown action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or an
-        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. CONSIDERED JOBS:
-        those whose workflow runs on `pull_request` / `pull_request_target` into the default branch,
-        on `merge_group`, or on a `push` to the default branch. Zero considered jobs is NOT MET.
-        GATE COMMANDS: every command a step runs whose exit status can fail the step (GitHub runs
-        bash with -e), read from `run:` scripts through any control flow and inside `$(…)` —
-        installs, tests, greps, `jq` assertions and `source` included. Not gates: output, navigation
-        and shell-state builtins (echo, cd, set, export, exit, …), a command followed by exactly `||
-        true` or `|| :` (any other fallback leaves it a gate), steps whose condition is only
-        `failure()`/`cancelled()`, steps with a literal `continue-on-error: true`, and
-        checkout/cache/upload actions. OPAQUE gates, which no manifest step matches: every other
-        `uses:` action, a non-bash script (a `run:` on a Windows runner with no `shell: bash` is
-        PowerShell), a command whose program is a variable or expression, and a command whose
-        working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
-        non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a `$VARIABLE` word
-        matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label; a non-OS matrix; a container; a service the
-        matched step's own job does not declare. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
+        (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
+        segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
+        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
+        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
+        Anything else in any step (an assignment or `KEY=value` prefix; an
+        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
+        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
+        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
+        through every one of these checks. CONSIDERED JOBS: those whose workflow runs on
+        `pull_request` / `pull_request_target` into the default branch, on `merge_group`, or on a
+        `push` to the default branch. Zero considered jobs is NOT MET. GATE COMMANDS: every command
+        a step runs whose exit status can fail the step (GitHub runs bash with -e), read from `run:`
+        scripts through any control flow and inside `$(…)` — installs, tests, greps, `jq` assertions
+        and `source` included. Not gates: output, navigation and shell-state builtins (echo, cd,
+        set, export, exit, …), a command followed by exactly `|| true` or `|| :` (any other fallback
+        leaves it a gate), steps whose condition is only `failure()`/`cancelled()`, steps with a
+        literal `continue-on-error: true`, and checkout/cache/upload actions. OPAQUE gates, which no
+        manifest step matches: every other `uses:` action, a non-bash script (a `run:` on a Windows
+        runner with no `shell: bash` is PowerShell), a command whose program is a variable or
+        expression, and a command whose working directory cannot be resolved (an expression in
+        `working-directory`, a `cd` to a non-literal). MATCHED: a step of a manifest GATE job
+        (scheduled jobs never run for a pull request) runs the same command in the same working
+        directory, on a job whose `os` includes every OS the workflow job runs on — a manifest `os =
+        any` job counts as Linux only; a workflow job of unknown OS is matched by nothing. SAME
+        COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run,
+        npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 =
+        python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their
+        verbs are NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A
+        manifest step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
         command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
         counts toward the precondition.
 
@@ -47,6 +61,7 @@ JOBS ON pull_request / push:main (39):
       missing: backend: tr \n  
       missing: uses: actions/github-script
       missing: python scripts/ci/notify_forked_open_prs.py
+      review:  step "Count heads" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Count heads" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/1 gate command(s) matched
@@ -63,12 +78,19 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry run ruff check .  ←  ci/backend-ruff-check
       matched: backend: poetry run ruff format --check .  ←  ci/backend-ruff-format
       matched: backend: poetry run mypy app/ --ignore-missing-imports  ←  ci/backend-mypy
+      review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry install --no-interaction --no-root` is limited to 300s; ci/backend-install allows 3600s
       review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 300s; ci/backend-install-cloud-control allows 3600s
       review:  `backend: poetry run ruff check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-check does not set it identically
+      review:  `backend: poetry run ruff check .` is limited to 300s; ci/backend-ruff-check allows 3600s
       review:  `backend: poetry run ruff format --check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-format does not set it identically
+      review:  `backend: poetry run ruff format --check .` is limited to 300s; ci/backend-ruff-format allows 3600s
       review:  `backend: poetry run mypy app/ --ignore-missing-imports` runs with PYTHON_VERSION=3.12; ci/backend-mypy does not set it identically
+      review:  `backend: poetry run mypy app/ --ignore-missing-imports` is limited to 300s; ci/backend-mypy allows 3600s
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/34 gate command(s) matched
       missing: date -u +%s
@@ -105,28 +127,42 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry run python scripts/export_openapi.py  ←  ci/openapi-export-extended
       matched: backend: poetry run python scripts/export_openapi.py --base  ←  ci/openapi-export-base
       matched: git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope  ←  ci/openapi-snapshot-drift
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Check OpenAPI snapshot is up to date" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE"
+      review:  step "Install postgresql-client" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
+      review:  step "Collect the test suite" is outside the report's command grammar: it uses an output redirect
+      review:  step "Select this shard's test files" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Run tests with coverage" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry install --no-interaction --no-root` is limited to 2700s; ci/backend-install allows 3600s
       review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 2700s; ci/backend-install-cloud-control allows 3600s
       review:  `backend: poetry run python scripts/export_openapi.py` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-extended does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py` runs with ENVIRONMENT=development; ci/openapi-export-extended does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py` runs with PYTHON_VERSION=3.12; ci/openapi-export-extended does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py` runs with REDIS_ENABLED=false; ci/openapi-export-extended does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-extended does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py` runs with TESTING=1; ci/openapi-export-extended does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py` is limited to 2700s; ci/openapi-export-extended allows 3600s
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-base does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with ENVIRONMENT=development; ci/openapi-export-base does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with PYTHON_VERSION=3.12; ci/openapi-export-base does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with REDIS_ENABLED=false; ci/openapi-export-base does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-base does not set it identically
       review:  `backend: poetry run python scripts/export_openapi.py --base` runs with TESTING=1; ci/openapi-export-base does not set it identically
+      review:  `backend: poetry run python scripts/export_openapi.py --base` is limited to 2700s; ci/openapi-export-base allows 3600s
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-snapshot-drift does not set it identically
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with ENVIRONMENT=development; ci/openapi-snapshot-drift does not set it identically
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with PYTHON_VERSION=3.12; ci/openapi-snapshot-drift does not set it identically
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with REDIS_ENABLED=false; ci/openapi-snapshot-drift does not set it identically
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-snapshot-drift does not set it identically
       review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with TESTING=1; ci/openapi-snapshot-drift does not set it identically
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` is limited to 2700s; ci/openapi-snapshot-drift allows 3600s
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs shard = ["1", "2", "3", "4", "5", "6"] — the manifest runs one leg
       review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
@@ -149,9 +185,13 @@ JOBS ON pull_request / push:main (39):
       missing: backend: poetry run pip install safety
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry install --no-interaction --no-root` is limited to 900s; ci/backend-install allows 3600s
       review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 900s; ci/backend-install-cloud-control allows 3600s
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
   UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/7 gate command(s) matched
       missing: [ -d junit ]
@@ -161,10 +201,13 @@ JOBS ON pull_request / push:main (39):
       missing: [ ${found} != ${EXPECTED_SHARDS} ]
       missing: python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso
       missing: tee -a ${GITHUB_STEP_SUMMARY:-/dev/null}
+      review:  advisory step uses actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0, which the report does not model
+      review:  step "Build shard-durations-proposed.json" is outside the report's command grammar: it assigns a variable ("found=0")
       review:  step "Build shard-durations-proposed.json" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
+      review:  step "Assert every shard succeeded" is outside the report's command grammar: it expands a variable or substitution in "Run Tests shard matrix result: ${SHARDS_RESULT}"
       note:    job condition `if: always()` — considered as running
       note:    no gate command found
   UNCOVERED       backend-ci.yml › build-test [pull_request (paths-filtered)] 0/7 gate command(s) matched
@@ -175,10 +218,14 @@ JOBS ON pull_request / push:main (39):
       missing: [ -z $SHA ]
       missing: backend: docker build --build-arg CLOUD_CONTROL_SHA=${CLOUD_CONTROL_SHA} -t qontinui-backend:test .
       missing: backend: docker run --rm qontinui-backend:test python -c import app; print('Import successful')
+      review:  step "Resolve qontinui-cloud-control pin" is outside the report's command grammar: it assigns a variable ("PIN_FILE=frontend/cloud-control.pin")
       review:  step "Resolve qontinui-cloud-control pin" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Build Docker image" is outside the report's command grammar: it expands a variable or substitution in "CLOUD_CONTROL_SHA=${CLOUD_CONTROL_SHA}"
   UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
       missing: tee -a $GITHUB_STEP_SUMMARY
+      review:  actions/checkout with sparse-checkout: scripts/ci, sparse-checkout-cone-mode: true — not the dispatched commit's plain checkout
+      review:  step "Measure Run Tests shard headroom" is outside the report's command grammar: it `set -o pipefail` is not one of set -e / -eu / -euo pipefail / -x
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/22 gate command(s) matched
       missing: date -u +%s
@@ -203,8 +250,13 @@ JOBS ON pull_request / push:main (39):
       missing: backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Install postgresql-client" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
+      review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
       review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
@@ -218,7 +270,9 @@ JOBS ON pull_request / push:main (39):
       missing: [ $before != 0000000000000000000000000000000000000000 ]
       missing: git cat-file -e ${before}^{commit}
       missing: python scripts/ci/check_coord_column_drops.py --base-ref ${BASE_REF}
+      review:  step "Choose the base to diff against" is outside the report's command grammar: it expands a variable or substitution in "${GITHUB_EVENT_NAME}"
       review:  step "Choose the base to diff against" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Check coord.* drops against coord's read contract" is outside the report's command grammar: it expands a variable or substitution in "${BASE_REF}"
   UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python scripts/check_dev_credentials_drift.py
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
@@ -233,6 +287,9 @@ JOBS ON pull_request / push:main (39):
       missing: backend: pip install -e . --no-deps
       missing: backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te
       matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Clone backend Python sibling deps" is outside the report's command grammar: it uses the shell construct `for`
+      review:  step "Install dependencies" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  `backend: pip install -e ../../qontinui-cloud-control` is limited to 1200s; ci/backend-install-cloud-control allows 3600s
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
   UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
@@ -245,7 +302,9 @@ JOBS ON pull_request / push:main (39):
       missing: git fetch --no-tags --depth=1 origin refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF
       missing: git rev-parse refs/remotes/origin/$BASE_REF
       missing: python scripts/ci/list_changed_e2e_specs.py --base $E2E_BASE_SHA --head HEAD --github-output $GITHUB
+      review:  step "Fetch the PR base commit" is outside the report's command grammar: it expands a variable or substitution in "$BASE_SHA"
       review:  step "Fetch the PR base commit" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "List the E2E spec files this PR changed" is outside the report's command grammar: it expands a variable or substitution in "$E2E_BASE_SHA"
       review:  step "List the E2E spec files this PR changed" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
@@ -256,18 +315,27 @@ JOBS ON pull_request / push:main (39):
       note:    runs-on names no OS — no manifest job can be shown to cover it
   UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: actions/download-artifact
+      review:  step "Generate test summary" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Fail if any needed job failed" is outside the report's command grammar: it expands a variable or substitution in "backend-tests:  ${BACKEND_RESULT}"
       note:    job condition `if: always()` — considered as running
   NEEDS-REVIEW    forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
+      review:  `python scripts/ci/check_fixed_sleeps_in_e2e.py` is limited to 300s; ci/forbid-fixed-sleeps-in-e2e allows 3600s
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-  COVERED         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/1 gate command(s) matched
+  NEEDS-REVIEW    forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
+      review:  `python scripts/ci/check_forbidden_public_schema.py` is limited to 300s; ci/forbid-public-schema allows 3600s
   PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 4/5 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
       matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run lint  ←  ci/frontend-lint
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
+      review:  step "Fleet-noun vocabulary drift from schemas main (advisory)" is outside the report's command grammar: it uses an input redirect or here-document
+      review:  `frontend: npm ci` is limited to 1200s; ci/frontend-install allows 3600s
+      review:  `frontend: npm run lint` is limited to 1200s; ci/frontend-lint allows 3600s
+      review:  `frontend: npm run type-check` is limited to 1200s; ci/frontend-typecheck allows 3600s
+      review:  `frontend: npm test` is limited to 1200s; ci/frontend-test allows 3600s
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/15 gate command(s) matched
       missing: bash frontend/scripts/vercel-install.sh --config-source ci
@@ -288,6 +356,9 @@ JOBS ON pull_request / push:main (39):
       missing: [ $rc -eq 0 ]
       missing: [ -f frontend/public/composed-build.json ]
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
+      review:  step "Assert the overlay resolved and the marker is honest" is outside the report's command grammar: it expands a variable or substitution in "PIN=$(grep -vE '^[[:space:]]*(#|$)' frontend/cloud-control.pin | head -n 1 | tr -d '[:space:]')"
+      review:  step "Assert it refuses to fall back to the OSS shape" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
+      review:  `frontend: npm run type-check` is limited to 600s; ci/frontend-typecheck allows 3600s
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 6/7 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
@@ -297,18 +368,28 @@ JOBS ON pull_request / push:main (39):
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
       matched: frontend: npm run build  ←  ci/composed-build
+      review:  actions/checkout with repository: qontinui/qontinui-cloud-control — not the dispatched commit's plain checkout
+      review:  `frontend: npm ci` is limited to 1800s; ci/frontend-install allows 3600s
       review:  `frontend: npm run cloud:install` runs with QONTINUI_CLOUD_CONTROL_PATH=${{ github.workspace }}/.sibling/qontinui-cloud-control; ci/composed-cloud-install does not set it identically
+      review:  `frontend: npm run cloud:install` is limited to 1800s; ci/composed-cloud-install allows 3600s
+      review:  `frontend: npm run lint` is limited to 1800s; ci/frontend-lint allows 3600s
+      review:  `frontend: npm run type-check` is limited to 1800s; ci/frontend-typecheck allows 3600s
       review:  `frontend: npm test` runs with QONTINUI_COMPOSED_BUILD=1; ci/frontend-test does not set it identically
+      review:  `frontend: npm test` is limited to 1800s; ci/frontend-test allows 3600s
+      review:  `frontend: npm run build` is limited to 1800s; ci/composed-build allows 3600s
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/3 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
       missing: frontend: node scripts/export-test-coverage.mjs
       matched: frontend: npm ci  ←  ci/frontend-install
+      review:  `frontend: npm ci` is limited to 2700s; ci/frontend-install allows 3600s
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-  COVERED         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/1 gate command(s) matched
+  NEEDS-REVIEW    gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
+      review:  `python scripts/ci/check_tracked_ignored.py` is limited to 300s; ci/gitignore-tracked-files allows 3600s
   NEEDS-REVIEW    global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
+      review:  `python scripts/ci/check_global_state_assertions.py` is limited to 300s; ci/global-state-assertions allows 3600s
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 2/11 gate command(s) matched
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
@@ -322,17 +403,24 @@ JOBS ON pull_request / push:main (39):
       missing: uses: actions/github-script
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Checkout sibling repos" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Run the recall harness" is outside the report's command grammar: it uses the shell construct `if`
       review:  step "Run the recall harness" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Assert the harness actually ran" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Assert the harness actually ran" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
+      review:  `backend: poetry install --no-interaction --no-root` is limited to 900s; ci/backend-install allows 3600s
       review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 900s; ci/backend-install-cloud-control allows 3600s
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
       review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
   UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: git diff --name-only $base...HEAD
       missing: grep -qE ^backend/alembic/versions/.*\.py$
+      review:  step "Detect alembic migration changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect alembic migration changes" touches $GITHUB_OUTPUT, which changes what later steps see
   UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/19 gate command(s) matched
       missing: date -u +%s
@@ -354,23 +442,31 @@ JOBS ON pull_request / push:main (39):
       missing: backend: [ $MERGE_HEAD = 1 ]
       missing: backend: poetry run alembic upgrade head
       missing: backend: poetry run alembic downgrade -1
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it expands a variable or substitution in "$GITHUB_WORKSPACE/.."
+      review:  step "Install postgresql-client" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
+      review:  step "Reversibility test (upgrade → downgrade -1 → upgrade)" is outside the report's command grammar: it uses an output redirect
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
   UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: [ $relevant = true ]
       missing: [ $result != success ]
+      review:  step "Aggregate" is outside the report's command grammar: it uses a `${{ … }}` expression
       note:    job condition `if: always()` — considered as running
-  COVERED         path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/1 gate command(s) matched
+  NEEDS-REVIEW    path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_path_case_collisions.py  ←  ci/path-case-collisions
+      review:  `python scripts/ci/check_path_case_collisions.py` is limited to 300s; ci/path-case-collisions allows 3600s
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
+      review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" is outside the report's command grammar: it expands a variable or substitution in "$ErrorActionPreference"
   UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: python -m pip install pytest>=9,<10
       missing: python -m pytest .pre-commit-hooks -rA
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   NEEDS-REVIEW    ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
+      review:  `python scripts/ci/check_ruff_version_parity.py` is limited to 300s; ci/ruff-version-parity allows 3600s
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/7 gate command(s) matched
       missing: curl -sSL -H Authorization: Bearer $EXPR{{ github.token }} https://api.github.com/repos/gitleaks/git
@@ -380,6 +476,7 @@ JOBS ON pull_request / push:main (39):
       missing: rm -f gitleaks.tar.gz
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+      review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
   PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 3/53 gate command(s) matched
       missing: date -u +%s
       missing: git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/${spec}.git ../${repo_name}
@@ -437,12 +534,25 @@ JOBS ON pull_request / push:main (39):
       matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
       matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run build  ←  ci/composed-build
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Clone backend Python sibling deps" is outside the report's command grammar: it uses the shell construct `for`
+      review:  step "Install backend dependencies" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Install postgresql-client" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
+      review:  step "Mint local id token + serve JWKS" is outside the report's command grammar: it expands a variable or substitution in "TOKEN=$(python scripts/spec_ci_local_idp.py \\\n  --issuer \"$COGNITO_ISSUER\" \\\n  --audience spec-ci-local \\\n  --email spec-ci-bot@no-reply.qontinui.io \\\n  --out-dir /tmp/spec-ci-idp)"
       review:  step "Mint local id token + serve JWKS" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Start backend (uvicorn)" is outside the report's command grammar: it uses an output redirect
       review:  step "Start backend (uvicorn)" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Provision + elevate ci-bot (superuser parity with prod)" is outside the report's command grammar: it uses an output redirect
+      review:  step "Resolve Playwright apt cache key" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Resolve Playwright apt cache key" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Seed apt archives from cache" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "Stage apt archives for cache" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Stage apt archives for cache" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Start frontend (next start)" is outside the report's command grammar: it uses an output redirect
       review:  step "Start frontend (next start)" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Tear down frontend + backend" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Summarize" is outside the report's command grammar: it relies on shell expansion of "["
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with BACKEND_URL=http://localhost:8000; ci/backend-install-cloud-control does not set it identically
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/backend-install-cloud-control does not set it identically
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/backend-install-cloud-control does not set it identically
@@ -458,6 +568,7 @@ JOBS ON pull_request / push:main (39):
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_PORT=6379; ci/backend-install-cloud-control does not set it identically
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/backend-install-cloud-control does not set it identically
       review:  `backend: pip install -e ../../qontinui-cloud-control` runs with STORAGE_BACKEND=local; ci/backend-install-cloud-control does not set it identically
+      review:  `backend: pip install -e ../../qontinui-cloud-control` is limited to 2100s; ci/backend-install-cloud-control allows 3600s
       review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
@@ -473,6 +584,7 @@ JOBS ON pull_request / push:main (39):
       review:  `frontend: npm ci` runs with REDIS_PORT=6379; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with STORAGE_BACKEND=local; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` is limited to 2100s; ci/frontend-install allows 3600s
       review:  `frontend: npm run build` runs with BACKEND_URL=http://localhost:8000; ci/composed-build does not set it identically
       review:  `frontend: npm run build` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/composed-build does not set it identically
       review:  `frontend: npm run build` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/composed-build does not set it identically
@@ -488,6 +600,7 @@ JOBS ON pull_request / push:main (39):
       review:  `frontend: npm run build` runs with REDIS_PORT=6379; ci/composed-build does not set it identically
       review:  `frontend: npm run build` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/composed-build does not set it identically
       review:  `frontend: npm run build` runs with STORAGE_BACKEND=local; ci/composed-build does not set it identically
+      review:  `frontend: npm run build` is limited to 2100s; ci/composed-build allows 3600s
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
       review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
@@ -550,12 +663,30 @@ JOBS ON pull_request / push:main (39):
       missing: [ $ENFORCE = 1 ]
       missing: [ $any_gate2 = 1 ]
       matched: frontend: npm ci  ←  ci/frontend-install
+      review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" is outside the report's command grammar: it relies on shell expansion of "["
       review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Resolve enforce mode" is outside the report's command grammar: it assigns a variable ("ENFORCE=0")
       review:  step "Resolve enforce mode" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  actions/checkout with repository: qontinui/qontinui-schemas, ref: ${{ steps.lock.outputs.schemas_sha }} — not the dispatched commit's plain checkout
+      review:  step "Build vision-audit" is outside the report's command grammar: it assigns a variable ("attempt=0")
       review:  step "Build vision-audit" touches $GITHUB_ENV, which changes what later steps see
+      review:  step "Resolve Playwright apt cache key" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Resolve Playwright apt cache key" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Seed apt archives from cache" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "Stage apt archives for cache" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  step "Stage apt archives for cache" touches $GITHUB_ENV, which changes what later steps see
+      review:  advisory step "Clone backend Python sibling deps" sets env the manifest does not model
+      review:  step "Clone backend Python sibling deps" is outside the report's command grammar: it uses the shell construct `for`
+      review:  step "Install backend dependencies" is outside the report's command grammar: it relies on shell expansion of "["
+      review:  step "Install postgresql-client" is outside the report's command grammar: it an `||` fallback other than `|| true` / `|| :`
+      review:  advisory step "Create runner schema" sets env the manifest does not model
+      review:  advisory step "Run database migrations" sets env the manifest does not model
+      review:  step "Mint local id token + serve JWKS (hermetic auth)" is outside the report's command grammar: it expands a variable or substitution in "TOKEN=$(python scripts/spec_ci_local_idp.py \\\n  --issuer \"$COGNITO_ISSUER\" \\\n  --audience \"$COGNITO_ALLOWED_AUDIENCES\" \\\n  --email style-gate-bot@no-reply.qontinui.io \\\n  --out-dir /tmp/style-gate-idp)"
+      review:  step "Mint local id token + serve JWKS (hermetic auth)" touches $GITHUB_ENV, which changes what later steps see
+      review:  advisory step "Capture style snapshots + frames" sets env the manifest does not model
+      review:  step "Run vision-audit (analyze + assert) per route + summarize" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=style-gate-local; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
@@ -566,14 +697,28 @@ JOBS ON pull_request / push:main (39):
       review:  `frontend: npm ci` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/frontend-install does not set it identically
       review:  `frontend: npm ci` runs with SECRET_KEY=style-gate-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
+      review:  `frontend: npm ci` is limited to 1800s; ci/frontend-install allows 3600s
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       review:  uses service postgres (postgres-pgvector); ci/frontend-install's job does not declare it
-  COVERED         web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/1 gate command(s) matched
+  NEEDS-REVIEW    web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/1 gate command(s) matched
       matched: python scripts/ci/check_web_boundary.py  ←  ci/web-boundary-lint
+      review:  `python scripts/ci/check_web_boundary.py` is limited to 300s; ci/web-boundary-lint allows 3600s
   UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
       review:  runs on `self-hosted`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host
       review:  runs on `public-pool`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host
+      review:  step "Check host architecture (release tarballs below are x86_64)" is outside the report's command grammar: it expands a variable or substitution in "arch=$(uname -m)"
+      review:  step "Check host architecture (release tarballs below are x86_64)" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "Install zizmor and actionlint (pinned, sha256-verified)" is outside the report's command grammar: it `set -Eeuo pipefail` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "Install zizmor and actionlint (pinned, sha256-verified)" touches $GITHUB_PATH, which changes what later steps see
+      review:  step "Install zizmor and actionlint (pinned, sha256-verified)" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  advisory step "zizmor" sets env the manifest does not model
+      review:  step "zizmor" is outside the report's command grammar: it uses an input redirect or here-document
+      review:  step "zizmor" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  step "actionlint" is outside the report's command grammar: it `set +e` is not one of set -e / -eu / -euo pipefail / -x
+      review:  step "actionlint" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  advisory step "Record verdicts" sets env the manifest does not model
+      review:  step "Record verdicts" is outside the report's command grammar: it relies on shell expansion of "[["
       note:    runs-on names no OS — no manifest job can be shown to cover it
       note:    no gate command found
 
@@ -1501,4 +1646,4 @@ NO-OPS (139) — accounted for; nothing to declare:
   - web-boundary-lint.yml › web-boundary-lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
       — the executor checks out the dispatched commit itself
 
-summary: 4 covered, 3 needs-review, 0 name-only, 12 partial, 20 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 0 covered, 7 needs-review, 0 name-only, 12 partial, 20 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET
