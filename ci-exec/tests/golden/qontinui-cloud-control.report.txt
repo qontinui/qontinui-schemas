@@ -8,17 +8,17 @@ qontinui-ci import --report
         opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
         (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
         segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
-        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
-        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
-        Anything else in any step (an assignment or `KEY=value` prefix; an
-        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
-        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
-        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
-        through every one of these checks. Every word must be unquoted and unescaped (bash strips
-        quotes before it looks a word up, so a quoted `export` IS `export`), with no `~` and no `#`
-        after a command; `echo` takes only -n/-e, `printf` never -v; `cd` takes one non-option path
-        and may not follow an `&&`; the shell must be the default, `bash` or `sh`. A command under
-        `|| true`, or in a continue-on-error step, other than `echo`/`printf`/`:`/`true` is
+        path>`, `:`/`true`, `echo`/`printf` with exactly one plain literal (no flag, `%` or
+        backslash), or exactly `set -e`/`-eu`/`-euo pipefail`/`-x` — joined by newlines, `;` or
+        `&&`, optionally ending in `|| true`/`|| :`. Anything else in any step (an assignment or
+        `KEY=value` prefix; an env/timeout/nice/xargs/sudo wrapper; any redirect, pipe,
+        here-document, subshell, pushd/popd; control flow; `$( )`; export/declare/source/eval/set
+        -a; `cd -` or a non-literal `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true`
+        step is not a gate but goes through every one of these checks. Every word must be unquoted
+        and unescaped (bash strips quotes before it looks a word up, so a quoted `export` IS
+        `export`), with no `~` and no `#` after a command; `cd` takes one non-option path and may
+        not follow an `&&`; the shell must be the default, `bash` or `sh`. A command under `||
+        true`, or in a continue-on-error step, other than `echo`/`printf`/`:`/`true` is
         NEEDS-REVIEW, never silently dropped. A known action with an input off its explicit safe
         list (setup-node registry-url, a cache path inside the checkout, rust-cache, …), a trigger
         filtered by paths, and a non-integer timeout-minutes are NEEDS-REVIEW. CONSIDERED JOBS:
@@ -36,33 +36,44 @@ qontinui-ci import --report
         working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
         non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
         request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a word containing
-        `$` matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label, or ANY macOS label (architecture is not modeled);
-        `actions/checkout` with inputs other than fetch-depth/persist-credentials/path; a manifest
-        step env key the workflow command does not run with identically (env is compared both ways,
-        and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
-        step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
-        declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
-        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        every OS the workflow job runs on — a manifest `os = any` job covers NOTHING, only an
+        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the
+        whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = python,
+        pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are
+        NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest
+        step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must be
+        byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
         interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
         a command of the workflow job, in the same relative order; a section the parser cannot read
         (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
-        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
-        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
-        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
-        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. ONE JOB, FULL SEQUENCE: the workflow
+        job's gates, in order and with repeats, must be matched by steps of ONE manifest job
+        (manifest jobs share no workspace); a split across jobs is NEEDS-REVIEW. Also NEEDS-REVIEW:
+        a workflow env value for an executor-owned variable (CI other than `true`, CARGO_TARGET_DIR,
+        PATH, RUST_TEST_THREADS, NEXTEST_TEST_THREADS, CARGO_BUILD_JOBS, service connection
+        variables); a manifest [[tools]] entry the workflow does not pin to the same version;
+        services that differ either way, versions included; any [limits]; any cargo command (the
+        executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a
+        manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs
+        commands with no actions/checkout step. upload-sarif is an opaque gate. COVERED is
+        necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
+        agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
+        counts toward the precondition.
 
 JOBS ON pull_request / push:main (4):
   UNCOVERED       boundary-guard.yml › no-coord-import [pull_request, push:main] 0/1 gate command(s) matched

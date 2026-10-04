@@ -1266,19 +1266,18 @@ pub fn report_grammar(script: &str) -> Result<(), String> {
         if let Some(wr) = WRAPPERS_AND_STATE.iter().find(|k| first.is(k)) {
             return Err(format!("uses `{wr}`, which the report does not model"));
         }
-        if first.is("echo") {
-            if let Some(f) = words[1..]
-                .iter()
-                .take_while(|w| w.text.starts_with('-'))
-                .find(|w| !matches!(w.text.as_str(), "-n" | "-e" | "-ne" | "-en"))
-            {
-                return Err(format!("`echo {}` uses a flag other than -n/-e", f.text));
-            }
-            continue;
-        }
-        if first.is("printf") {
-            if words.iter().any(|w| w.text == "-v") {
-                return Err("`printf -v` assigns a variable".to_string());
+        // `echo`/`printf` are inert only with exactly one plain literal: no
+        // flags, no `%` (a printf format), no backslash (an escape).
+        if first.is("echo") || first.is("printf") {
+            let plain = words.len() == 2
+                && !words[1].text.starts_with('-')
+                && !words[1].text.contains(['%', '\\']);
+            if !plain {
+                return Err(format!(
+                    "`{}` with arguments other than one plain literal (no flags, `%` or \
+                     backslash)",
+                    first.text
+                ));
             }
             continue;
         }
@@ -1791,7 +1790,10 @@ mod tests {
                 "{bad:?} should be outside the grammar"
             );
         }
-        for ok in ["echo -n done\n", "# a comment\nmake check\n"] {
+        for bad in ["echo -n done\n", "printf %d x\n", "echo a b\n", "echo\n"] {
+            assert!(report_grammar(bad).is_err(), "{bad:?}");
+        }
+        for ok in ["echo done\n", "# a comment\nmake check\n"] {
             assert!(report_grammar(ok).is_ok(), "{ok}: {:?}", report_grammar(ok));
         }
         for bad in [

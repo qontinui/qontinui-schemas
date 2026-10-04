@@ -1917,14 +1917,14 @@ action. Anything the analyzer cannot fully model makes the job NEEDS-REVIEW, or 
 that leaves it PARTIAL/UNCOVERED; it never counts as covered. \
 UNDERSTOOD STEPS (an allowlist, `shell::report_grammar`): a `run:` script is understood only \
 when every segment is a simple command with literal words (no `$` anywhere), `cd <literal \
-relative path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/\
+relative path>`, `:`/`true`, `echo`/`printf` with exactly one plain literal (no flag, `%` or backslash), or exactly `set -e`/`-eu`/\
 `-euo pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`. \
 Anything else in any step (an assignment or `KEY=value` prefix; an env/timeout/nice/xargs/sudo \
 wrapper; any redirect, pipe, here-document, subshell, pushd/popd; control flow; `$( )`; \
 export/declare/source/eval/set -a; `cd -` or a non-literal `cd`) makes the job NEEDS-REVIEW. A \
 `continue-on-error: true` step is not a gate but goes through every one of these checks. Every \
 word must be unquoted and unescaped (bash strips quotes before it looks a word up, so a quoted \
-`export` IS `export`), with no `~` and no `#` after a command; `echo` takes only -n/-e, `printf` never -v; \
+`export` IS `export`), with no `~` and no `#` after a command; \
 `cd` takes one non-option path and may not follow an `&&`; the shell must be the default, `bash` \
 or `sh`. A command under `|| true`, or in a continue-on-error step, other than \
 `echo`/`printf`/`:`/`true` is NEEDS-REVIEW, never silently dropped. A known action with an input \
@@ -1945,7 +1945,7 @@ and a command whose working directory cannot be resolved (an expression in `work
 `cd` to a non-literal). \
 MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull request) runs the same \
 command in the same working directory, on a job whose `os` includes every OS the workflow job \
-runs on — a manifest `os = any` job counts as Linux only; a workflow job of unknown OS is matched \
+runs on — a manifest `os = any` job covers NOTHING, only an explicit OS does; a workflow job of unknown OS is matched \
 by nothing. SAME COMMAND: the whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/\
 hatch run, npx, pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = \
 python, pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are \
@@ -1968,6 +1968,15 @@ option stripping, no `./` removal, no interpreter-version or bash/sh folding. Ev
 matched manifest job must itself be a command of the workflow job, in the same relative order; \
 a section the parser cannot read (an `env:`/`with:`/`strategy:`/`services:` that is an \
 expression, a `run:` that is not a string, an unknown or `<<` merge key) is NEEDS-REVIEW. \
+ONE JOB, FULL SEQUENCE: the workflow job's gates, in order and with repeats, must be matched by \
+steps of ONE manifest job (manifest jobs share no workspace); a split across jobs is \
+NEEDS-REVIEW. Also NEEDS-REVIEW: a workflow env value for an executor-owned variable (CI other \
+than `true`, CARGO_TARGET_DIR, PATH, RUST_TEST_THREADS, NEXTEST_TEST_THREADS, CARGO_BUILD_JOBS, \
+service connection variables); a manifest [[tools]] entry the workflow does not pin to the same \
+version; services that differ either way, versions included; any [limits]; any cargo command \
+(the executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a \
+manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs \
+commands with no actions/checkout step. upload-sarif is an opaque gate. \
 COVERED is necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow \
 agreement >= 97% with zero false greens. \
 VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job carries the \
@@ -2072,7 +2081,6 @@ fn known_nongate_action(action_l: &str) -> bool {
             | "actions/cache/save"
             | "actions/upload-artifact"
             | "codecov/codecov-action"
-            | "github/codeql-action/upload-sarif"
             | "jlumbroso/free-disk-space"
     )
 }
@@ -2182,29 +2190,25 @@ pub fn manifest_commands(m: &CiManifest) -> Vec<ManifestCommand> {
     out
 }
 
-/// Whether a manifest job on `m_os` runs on every OS in `w_os`. A manifest
-/// `any` job is generated onto `ubuntu-latest` and a coord host of unknown
-/// OS, so for coverage it counts as LINUX ONLY; a workflow job whose OS is
-/// unknown (`any`) is covered by nothing.
+/// Whether a manifest job on `m_os` runs on every OS in `w_os`: only an
+/// explicit OS covers (`any` covers nothing), and a workflow job whose OS is
+/// unknown is covered by nothing.
 fn os_covers(m_os: &[Os], w_os: &[Os]) -> bool {
-    w_os.iter().all(|w| match w {
-        Os::Any => false,
-        Os::Linux => m_os.contains(&Os::Linux) || m_os.contains(&Os::Any),
-        other => m_os.contains(other),
-    })
+    // A manifest `os = "any"` job runs on whatever host takes it, so it covers
+    // nothing; only an explicit OS covers a workflow job on that OS.
+    !w_os.is_empty() && w_os.iter().all(|w| *w != Os::Any && m_os.contains(w))
 }
 
-/// The manifest command that runs `key` in `wd` on a job that runs on every
-/// OS in `oses`.
+/// The first manifest step that runs `key` in `wd` (OS is judged per
+/// manifest job, in `coverage_report`).
 fn best_match<'a>(
     mcmds: &'a [ManifestCommand],
     wd: &str,
     key: &CommandKey,
-    oses: &[Os],
 ) -> Option<&'a ManifestCommand> {
     mcmds
         .iter()
-        .find(|m| m.working_dir == wd && m.key.matches(key) && os_covers(&m.os, oses))
+        .find(|m| m.working_dir == wd && m.key.matches(key))
 }
 
 /// The OSes a workflow job runs on, as the importer maps them.
@@ -2309,6 +2313,31 @@ fn action_pins(step: &Step, uses: &str) -> Vec<VersionPin> {
                     tool: Some("node"),
                     version: v.to_string(),
                 });
+            }
+        }
+        "snok/install-poetry" => out.push(VersionPin {
+            what: format!(
+                "install-poetry {}",
+                with_val(step, "version").unwrap_or("(unpinned)")
+            ),
+            tool: Some("poetry"),
+            version: with_val(step, "version").unwrap_or("").to_string(),
+        }),
+        "taiki-e/install-action" => {
+            for t in with_val(step, "tool")
+                .unwrap_or(ref_)
+                .split([',', '\n'])
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+            {
+                let (name, ver) = t.split_once('@').unwrap_or((t, ""));
+                if name == "cargo-nextest" || name == "nextest" {
+                    out.push(VersionPin {
+                        what: format!("install-action {t}"),
+                        tool: Some("cargo-nextest"),
+                        version: ver.to_string(),
+                    });
+                }
             }
         }
         "actions/setup-python" => {
@@ -2484,12 +2513,12 @@ fn action_input_review(action_l: &str, step: &Step) -> Vec<String> {
 /// fallback or a `continue-on-error` step may drop without review.
 fn no_effect_command(argv: &[String]) -> bool {
     match argv.first().map(String::as_str) {
-        Some(":") | Some("true") => true,
-        Some("echo") => argv[1..]
-            .iter()
-            .take_while(|a| a.starts_with('-'))
-            .all(|a| matches!(a.as_str(), "-n" | "-e" | "-ne" | "-en")),
-        Some("printf") => !argv.iter().any(|a| a == "-v"),
+        Some(":") | Some("true") => argv.len() == 1,
+        // One literal argument with no `%` (a printf format) and no
+        // backslash (an echo -e escape): output only.
+        Some("echo") | Some("printf") => {
+            argv.len() == 2 && !argv[1].starts_with('-') && !argv[1].contains(['%', '\\'])
+        }
         _ => false,
     }
 }
@@ -2506,21 +2535,9 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         toolchain: None,
         timeout_limit: None,
     };
-    let push = |gates: &mut Vec<GateCommand>, g: GateCommand| {
-        let dup = gates.iter().any(|o| {
-            if g.key.argv.is_empty() {
-                o.key.argv.is_empty() && o.display == g.display
-            } else {
-                o.working_dir == g.working_dir
-                    && o.key.argv == g.key.argv
-                    && o.env == g.env
-                    && o.toolchain == g.toolchain
-            }
-        });
-        if !dup {
-            gates.push(g);
-        }
-    };
+    // Every gate, in order, repeats included: the match runs over the full
+    // ordered sequence (dedup is for display only, in the report).
+    let push = |gates: &mut Vec<GateCommand>, g: GateCommand| gates.push(g);
     jg.unmodeled.extend(runner_unmodeled(job));
     // Anything the parser could not read, or does not model, is never
     // silently dropped: it makes the job NEEDS-REVIEW.
@@ -2562,6 +2579,9 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
     let self_path = self_checkout_path(job);
     let on_windows = job_oses(job).0.contains(&Os::Windows);
     let job_timeout = job.timeout_minutes.clone();
+    // A job that runs commands before any actions/checkout runs them in an
+    // empty directory; the executor always checks out first.
+    let mut checked_out = false;
     for step in &job.steps {
         if step.if_expr.as_deref().is_some_and(diagnostic_condition) {
             continue;
@@ -2616,6 +2636,9 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
         };
         if let Some(uses) = &step.uses {
             let action_l = uses.split('@').next().unwrap_or(uses).to_ascii_lowercase();
+            if action_l == "actions/checkout" {
+                checked_out = true;
+            }
             jg.pins.extend(action_pins(step, uses));
             jg.unmodeled.extend(action_input_review(&action_l, step));
             // Inputs that make an otherwise passive action fail the job. Keys
@@ -2676,6 +2699,12 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
             }
             continue;
         };
+        if !checked_out {
+            jg.unmodeled.push(format!(
+                "step \"{}\" runs before any actions/checkout step",
+                step.label()
+            ));
+        }
         if let Err(why) = shell::report_grammar(script) {
             jg.unmodeled.push(format!(
                 "step \"{}\" is outside the report's command grammar: it {why}",
@@ -2689,6 +2718,12 @@ pub fn gate_commands(wf: &Workflow, job: &Job) -> JobGates {
             ));
         }
         let shell_name = step.shell.clone().or_else(|| default_shell.clone());
+        if shell_name.as_deref().map(str::trim) == Some("sh") && script.contains("pipefail") {
+            jg.unmodeled.push(format!(
+                "step \"{}\" uses `pipefail` under `shell: sh`, where it may not exist",
+                step.label()
+            ));
+        }
         if on_windows && shell_name.is_some() {
             jg.unmodeled.push(format!(
                 "step \"{}\" runs bash/sh on a Windows runner (Git Bash), which the report does \
@@ -2834,6 +2869,26 @@ fn command_caveats(g: &GateCommand, m: &ManifestCommand) -> Vec<String> {
         ));
     }
     for (k, v) in &g.env {
+        // Executor-owned variables (executor.rs `DispatchEnv`, and the
+        // service connection variables): the manifest cannot set them, so
+        // the workflow value must equal what the executor exports.
+        let owned = matches!(
+            k.as_str(),
+            "CI" | "CARGO_TARGET_DIR"
+                | "PATH"
+                | "RUST_TEST_THREADS"
+                | "NEXTEST_TEST_THREADS"
+                | "CARGO_BUILD_JOBS"
+        ) || crate::services::kind_exporting(k).is_some();
+        if owned {
+            if !(k == "CI" && v == "true") {
+                out.push(format!(
+                    "`{}` runs with {k}={v}, which the executor sets itself to its own value",
+                    g.display
+                ));
+            }
+            continue;
+        }
         // An expression never matches, even byte-identical: the manifest
         // would pass it literally.
         if v.contains("${{") || m.env.get(k) != Some(v) {
@@ -2977,7 +3032,7 @@ fn gate_triggers(wf: &Workflow, default_branch: &str) -> Vec<String> {
 
 /// Job-level conditions the matched manifest steps are not shown to
 /// reproduce: services are checked against each matched step's OWN job.
-fn job_caveats(job: &Job, consumed_dim: Option<&str>, matched: &[&ManifestCommand]) -> Vec<String> {
+fn job_caveats(job: &Job, consumed_dim: Option<&str>) -> Vec<String> {
     let mut out = Vec::new();
     match &job.matrix {
         Some(Matrix::Expression(e)) => out.push(format!("matrix {e} (not expanded)")),
@@ -2999,31 +3054,8 @@ fn job_caveats(job: &Job, consumed_dim: Option<&str>, matched: &[&ManifestComman
     if let Some(c) = &job.container {
         out.push(format!("runs inside container {c}"));
     }
-    let mut scratch = Ctx {
-        items: Vec::new(),
-        tools: Vec::new(),
-        siblings: Vec::new(),
-    };
-    let mut kinds = Vec::new();
-    for svc in &job.services {
-        match map_service(svc, "", &mut kinds, &mut scratch) {
-            Some((name, _, _)) => {
-                for m in matched {
-                    if !m.services.contains(&name) {
-                        out.push(format!(
-                            "uses service {} ({name}); {}'s job does not declare it",
-                            svc.key, m.label
-                        ));
-                    }
-                }
-            }
-            None => out.push(format!(
-                "uses service {} ({}), which the manifest cannot declare",
-                svc.key,
-                svc.image.as_deref().unwrap_or("no image")
-            )),
-        }
-    }
+    // Services are compared, both ways and with versions, against the
+    // chosen manifest job in `coverage_report`.
     out
 }
 
@@ -3089,9 +3121,8 @@ pub fn coverage_report(
                     "runs-on names no OS — no manifest job can be shown to cover it".to_string(),
                 );
             }
-            let mut matched = Vec::new();
-            let mut matched_cmds: Vec<&ManifestCommand> = Vec::new();
-            let mut missing = Vec::new();
+            let mut matched: Vec<(String, String)> = Vec::new();
+            let mut missing: Vec<String> = Vec::new();
             let mut caveats = jg.unmodeled.clone();
             for t in triggers.iter().filter(|t| t.contains("paths-filtered")) {
                 caveats.push(format!(
@@ -3099,15 +3130,202 @@ pub fn coverage_report(
                      none); confirm the job runs at all"
                 ));
             }
+            if triggers
+                .iter()
+                .any(|t| t.starts_with("pull_request_target"))
+            {
+                caveats.push(
+                    "pull_request_target runs the base branch's workflow and checks out the base \
+                     commit by default — not the dispatched commit"
+                        .to_string(),
+                );
+            }
+            // Gates with no exact counterpart anywhere in the manifest.
             for g in &jg.gates {
-                match best_match(&mcmds, &g.working_dir, &g.key, &oses) {
-                    Some(m) => {
-                        matched.push((g.display.clone(), m.label.clone()));
-                        caveats.extend(command_caveats(g, m));
-                        matched_cmds.push(m);
-                    }
-                    None => missing.push(g.display.clone()),
+                if best_match(&mcmds, &g.working_dir, &g.key).is_none()
+                    && !missing.contains(&g.display)
+                {
+                    missing.push(g.display.clone());
                 }
+            }
+            // ONE manifest job must run the FULL ordered gate sequence —
+            // repeated gates included — because manifest jobs share no
+            // workspace: `make generate` in one job and `git diff` in another
+            // is not the same check.
+            let mut chosen: Option<(&crate::manifest::CiJob, Vec<&ManifestCommand>)> = None;
+            if missing.is_empty() && !jg.gates.is_empty() {
+                for mj in manifest.gate_jobs() {
+                    let steps: Vec<&ManifestCommand> =
+                        mcmds.iter().filter(|m| m.job == mj.name).collect();
+                    let mut ptr = 0;
+                    let mut picked = Vec::new();
+                    let mut ok = true;
+                    for g in &jg.gates {
+                        match steps[ptr..]
+                            .iter()
+                            .position(|m| m.working_dir == g.working_dir && m.key.matches(&g.key))
+                        {
+                            Some(off) => {
+                                picked.push(steps[ptr + off]);
+                                ptr += off + 1;
+                            }
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    if ok {
+                        chosen = Some((mj, picked));
+                        break;
+                    }
+                }
+                if chosen.is_none() {
+                    caveats.push(
+                        "no single manifest job runs every gate command in the workflow's order \
+                         (manifest jobs share no workspace): the gates are split across jobs, out \
+                         of order, or a repeated gate has no repeated step"
+                            .to_string(),
+                    );
+                }
+            }
+            match &chosen {
+                Some((mj, picked)) => {
+                    if !os_covers(&mj.os, &oses) {
+                        caveats.push(format!(
+                            "manifest job {} runs on os {:?}, which does not cover this workflow \
+                             job's {:?} (`any` covers nothing; only an explicit OS does)",
+                            mj.name,
+                            mj.os.iter().map(|o| o.as_str()).collect::<Vec<_>>(),
+                            oses.iter().map(|o| o.as_str()).collect::<Vec<_>>()
+                        ));
+                    }
+                    for (g, m) in jg.gates.iter().zip(picked) {
+                        let pair = (g.display.clone(), m.label.clone());
+                        if !matched.contains(&pair) {
+                            matched.push(pair);
+                        }
+                        caveats.extend(command_caveats(g, m));
+                    }
+                    // Every step of the chosen manifest job must be one of
+                    // the workflow job's gates (an extra `rm -rf tests` or
+                    // `sed -i …` would change what the gates test).
+                    for (idx, st) in mj.steps.iter().enumerate() {
+                        if !picked.iter().any(|m| m.index == idx) {
+                            caveats.push(format!(
+                                "manifest step {}/{} (`{}`) is not one of this workflow job's \
+                                 gate commands",
+                                mj.name,
+                                st.name,
+                                st.command.join(" ").chars().take(60).collect::<String>()
+                            ));
+                        }
+                    }
+                    if !mj.needs.is_empty() {
+                        caveats.push(format!(
+                            "manifest job {} waits on {:?}, which this workflow job does not",
+                            mj.name, mj.needs
+                        ));
+                    }
+                    if mj.limits.is_some() {
+                        caveats.push(format!(
+                            "manifest job {} sets [limits] (thread/job caps GitHub-hosted runs \
+                             do not have)",
+                            mj.name
+                        ));
+                    }
+                    // Services, both ways, with their versions.
+                    let mut scratch = Ctx {
+                        items: Vec::new(),
+                        tools: Vec::new(),
+                        siblings: Vec::new(),
+                    };
+                    let mut kinds = Vec::new();
+                    let mut wf_svcs: Vec<(String, String, Option<String>)> = Vec::new();
+                    for svc in &job.services {
+                        match map_service(svc, "", &mut kinds, &mut scratch) {
+                            Some(t) => wf_svcs.push(t),
+                            None => caveats.push(format!(
+                                "uses service {} ({}), which the manifest cannot declare",
+                                svc.key,
+                                svc.image.as_deref().unwrap_or("no image")
+                            )),
+                        }
+                    }
+                    let m_svcs: Vec<(String, String, Option<String>)> = mj
+                        .services
+                        .iter()
+                        .map(|s| (s.name.clone(), s.version.clone(), s.digest.clone()))
+                        .collect();
+                    for w in &wf_svcs {
+                        if !m_svcs.contains(w) {
+                            caveats.push(format!(
+                                "the workflow job runs service {}:{}; manifest job {} does not \
+                                 run it identically",
+                                w.0, w.1, mj.name
+                            ));
+                        }
+                    }
+                    for m in &m_svcs {
+                        if !wf_svcs.contains(m) {
+                            caveats.push(format!(
+                                "manifest job {} runs service {}:{}; the workflow job does not",
+                                mj.name, m.0, m.1
+                            ));
+                        }
+                    }
+                }
+                None => {
+                    for g in &jg.gates {
+                        if let Some(m) = best_match(&mcmds, &g.working_dir, &g.key) {
+                            let pair = (g.display.clone(), m.label.clone());
+                            if !matched.contains(&pair) {
+                                matched.push(pair);
+                            }
+                        }
+                    }
+                }
+            }
+            // Manifest-wide settings every job inherits.
+            if manifest.limits.cargo_build_jobs.is_some() || manifest.limits.test_threads.is_some()
+            {
+                caveats.push(
+                    "the manifest sets [limits] (thread/job caps GitHub-hosted runs do not have)"
+                        .to_string(),
+                );
+            }
+            for sib in &manifest.siblings {
+                caveats.push(format!(
+                    "the manifest materialises sibling {} beside the checkout; an equivalent \
+                     workflow checkout of it is not modeled",
+                    sib.repo
+                ));
+            }
+            for t in &manifest.tools {
+                let pinned = jg
+                    .pins
+                    .iter()
+                    .any(|p| p.tool == Some(t.name.as_str()) && p.version == t.version);
+                if !pinned {
+                    caveats.push(format!(
+                        "the manifest provisions {} {}; the workflow job does not pin the same \
+                         version",
+                        t.name, t.version
+                    ));
+                }
+            }
+            if jg.gates.iter().any(|g| {
+                matches!(
+                    g.key.argv.first().map(String::as_str),
+                    Some("cargo") | Some("cargo-nextest")
+                )
+            }) {
+                caveats.push(
+                    "cargo runs under the executor's host-sized CARGO_BUILD_JOBS / \
+                     RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a \
+                     GitHub-hosted run sets none of them"
+                        .to_string(),
+                );
             }
             for pin in &jg.pins {
                 let pinned = pin.tool.is_some_and(|t| {
@@ -3123,38 +3341,7 @@ pub fn coverage_report(
                     ));
                 }
             }
-            caveats.extend(job_caveats(job, consumed.as_deref(), &matched_cmds));
-            // The manifest side: every step of a manifest job this workflow job
-            // matched must itself be one of the workflow job's commands (an
-            // extra `rm -rf tests` or `sed -i …` would change what the gates
-            // test), and the matched steps must run in the same order.
-            let mut touched: Vec<&str> = matched_cmds.iter().map(|m| m.job.as_str()).collect();
-            touched.sort();
-            touched.dedup();
-            for jname in touched {
-                let Some(mj) = manifest.job(jname) else {
-                    continue;
-                };
-                let order: Vec<usize> = matched_cmds
-                    .iter()
-                    .filter(|m| m.job == jname)
-                    .map(|m| m.index)
-                    .collect();
-                for (idx, st) in mj.steps.iter().enumerate() {
-                    if !order.contains(&idx) {
-                        caveats.push(format!(
-                            "manifest step {jname}/{} (`{}`) is not a command of this workflow job",
-                            st.name,
-                            st.command.join(" ").chars().take(60).collect::<String>()
-                        ));
-                    }
-                }
-                if order.windows(2).any(|w| w[1] < w[0]) {
-                    caveats.push(format!(
-                        "manifest job {jname} runs the matched steps in a different order"
-                    ));
-                }
-            }
+            caveats.extend(job_caveats(job, consumed.as_deref()));
             let mut seen = Vec::new();
             caveats.retain(|c| {
                 let fresh = !seen.contains(c);
@@ -3575,11 +3762,18 @@ jobs:
 
     #[test]
     fn any_os_manifest_does_not_cover_windows_or_macos() {
-        let wf = "on: pull_request\njobs:\n  lin:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo test\n  win:\n    runs-on: windows-latest\n    steps:\n      - run: cargo test\n        shell: bash\n  mac:\n    runs-on: macos-latest\n    steps:\n      - run: cargo test\n";
-        let r = report_one(wf, V1_CARGO_TEST);
-        assert_eq!(verdict_of(&r, "lin"), Coverage::Covered);
-        assert_eq!(verdict_of(&r, "win"), Coverage::Uncovered);
-        assert_eq!(verdict_of(&r, "mac"), Coverage::Uncovered);
+        let wf = "on: pull_request\njobs:\n  lin:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n  win:\n    runs-on: windows-latest\n    steps:\n      - run: make check\n        shell: bash\n  mac:\n    runs-on: macos-latest\n    steps:\n      - run: make check\n";
+        let v1 = "version = 1\n[[steps]]\nname = \"t\"\ncommand = [\"make\", \"check\"]\n";
+        // An `os = any` manifest covers nothing.
+        let r = report_one(&strengthen_wf(wf), v1);
+        for j in ["lin", "win", "mac"] {
+            assert_ne!(verdict_of(&r, j), Coverage::Covered, "{j}");
+        }
+        // An explicit linux job covers the ubuntu job only.
+        let r = report_one(&strengthen_wf(wf), &strengthen_manifest(v1));
+        assert_eq!(verdict_of(&r, "lin"), Coverage::Covered, "{:#?}", r.jobs);
+        assert_ne!(verdict_of(&r, "win"), Coverage::Covered);
+        assert_ne!(verdict_of(&r, "mac"), Coverage::Covered);
         assert!(!r.all_covered());
     }
 
@@ -3651,14 +3845,18 @@ jobs:
     }
 
     #[test]
-    fn gates_are_deduplicated_by_command_not_by_display() {
+    fn gates_keep_every_occurrence_in_order() {
         let long = "a".repeat(120);
         let wf = format!(
             "on: pull_request\njobs:\n  d:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          python {long} one\n          python {long} two\n          python {long} one\n"
         );
         let parsed = gha::parse_workflow("w.yml", &wf).unwrap();
         let gates = gate_commands(&parsed, &parsed.jobs[0]).gates;
-        assert_eq!(gates.len(), 2);
+        // Every gate is kept, in order (repeats included): dedup is display
+        // only.
+        assert_eq!(gates.len(), 3);
+        assert_eq!(gates[0].key, gates[2].key);
+        assert_ne!(gates[0].key, gates[1].key);
     }
 
     fn job_yaml(name: &str, body: &str) -> String {
@@ -3749,7 +3947,7 @@ jobs:
         assert!(
             np.caveats
                 .iter()
-                .all(|c| c.contains("is not a command of this workflow job")),
+                .any(|c| c.contains("is not one of this workflow job's gate commands")),
             "{np:#?}"
         );
         assert!(!r.all_covered());
@@ -3777,8 +3975,8 @@ jobs:
 
         // merge_group is considered.
         let r = report_one(
-            "on: merge_group\njobs:\n  q:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n",
-            V1_MAKE,
+            &strengthen_wf("on: merge_group\njobs:\n  q:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n"),
+            &strengthen_manifest(V1_MAKE),
         );
         assert_eq!(verdict_of(&r, "q"), Coverage::Covered);
         assert!(r.all_covered());
@@ -3834,7 +4032,24 @@ jobs:
                 "{j}: {jc:#?}"
             );
         }
-        assert_eq!(verdict_of(&r, "plain"), Coverage::Covered);
+        // Made otherwise equivalent (a checkout, linux manifest jobs), the
+        // plain job is COVERED and every other job is still not.
+        let rs = report_one(
+            &strengthen_wf(&wf_of(&jobs)),
+            &strengthen_manifest(manifest),
+        );
+        assert_eq!(
+            verdict_of(&rs, "plain"),
+            Coverage::Covered,
+            "{:#?}",
+            rs.jobs
+        );
+        for j in [
+            "pushd", "envwrap", "redirect", "assign", "stdin", "twrap", "advisory", "ref",
+            "expr-env", "tight", "mac",
+        ] {
+            assert_ne!(verdict_of(&rs, j), Coverage::Covered, "{j}");
+        }
 
         // H5: env compared both ways — a manifest-only env key is a difference.
         let r = report_one(
@@ -3856,6 +4071,52 @@ jobs:
             V1_MAKE,
         );
         assert_eq!(verdict_of(&r, "p"), Coverage::Partial);
+    }
+
+    /// A probe workflow made "otherwise equivalent": an `actions/checkout@v4`
+    /// first step in every job, so the only thing left for the report to
+    /// judge is what the probe is about.
+    fn strengthen_wf(wf: &str) -> String {
+        let lines: Vec<&str> = wf.lines().collect();
+        let mut out = String::new();
+        for (i, l) in lines.iter().enumerate() {
+            out.push_str(l);
+            out.push('\n');
+            if l.starts_with("    steps:")
+                && lines.get(i + 1).is_some_and(|n| n.starts_with("      - "))
+            {
+                out.push_str("      - uses: actions/checkout@v4\n");
+            }
+        }
+        out
+    }
+
+    /// A probe manifest made "otherwise equivalent": a v1 manifest becomes a
+    /// v2 job `ci` with `os = "linux"`, and a v2 job with no `os` gets
+    /// `os = "linux"` (an `os = "any"` job covers nothing).
+    fn strengthen_manifest(m: &str) -> String {
+        if let Some(rest) = m.strip_prefix("version = 1\n") {
+            let at = rest.find("[[steps]]").unwrap_or(rest.len());
+            let (top, steps) = rest.split_at(at);
+            return format!(
+                "version = 2\n{top}[[jobs]]\nname = \"ci\"\nos = \"linux\"\n{}",
+                steps.replace("[[steps]]", "[[jobs.steps]]")
+            );
+        }
+        let lines: Vec<&str> = m.lines().collect();
+        let mut out = String::new();
+        for (i, l) in lines.iter().enumerate() {
+            out.push_str(l);
+            out.push('\n');
+            if l.starts_with("name = ")
+                && i > 0
+                && lines[i - 1] == "[[jobs]]"
+                && !lines.get(i + 1).is_some_and(|n| n.starts_with("os = "))
+            {
+                out.push_str("os = \"linux\"\n");
+            }
+        }
+        out
     }
 
     /// Round 4 of the Phase 8 review: every probe from the reviewer's probe
@@ -3953,11 +4214,12 @@ jobs:
 
     ];
         for (name, steps, m) in probes {
-            let v = verdict(&job(&steps), m);
+            // As written (no checkout, an `os = any` manifest) nothing is
+            // covered; the two controls are COVERED once otherwise equivalent.
+            assert_ne!(verdict(&job(&steps), m), Coverage::Covered, "{name}");
             if name == "control: plain" || name == "tab sep" {
+                let v = verdict(&strengthen_wf(&job(&steps)), &strengthen_manifest(m));
                 assert_eq!(v, Coverage::Covered, "{name}");
-            } else {
-                assert_ne!(v, Coverage::Covered, "{name}");
             }
         }
     }
@@ -4116,9 +4378,10 @@ jobs:
         ("step neither run nor uses", job("      - name: x\n        shell: bash\n      - run: make check\n"), make.clone()),
         ("with as expression", job("      - uses: codecov/codecov-action@v4\n        with: ${{ fromJSON(vars.W) }}\n      - run: make check\n"), make.clone()),
     ];
+        // Genuinely equivalent once a checkout is added and the manifest
+        // names linux: the workflow job runs exactly the manifest command.
         let equivalent = [
             "ctl make",
-            "no checkout",
             "anchor alias steps",
             "on string push",
             "on pr branches-ignore other",
@@ -4127,20 +4390,22 @@ jobs:
             "set -x",
             "fd redirect-like word",
             "checkout path then cache ./",
-            "upload-sarif",
             "codecov default",
         ];
-        for (name, wf, manifest_text) in &cases {
+        let report = |wf: &str, manifest_text: &str| {
             let m = manifest::parse_and_validate(manifest_text).unwrap();
-            let r = match coverage_report(
+            coverage_report(
                 "ci.toml",
                 &m,
                 &[WorkflowSource {
                     label: "w.yml".into(),
-                    text: wf.clone(),
+                    text: wf.to_string(),
                 }],
                 "main",
-            ) {
+            )
+        };
+        for (name, wf, manifest_text) in &cases {
+            let r = match report(wf, manifest_text) {
                 Ok(r) => r,
                 Err(e) => {
                     // Duplicate keys: the YAML parser refuses the file outright.
@@ -4148,21 +4413,157 @@ jobs:
                     continue;
                 }
             };
+            // As written — no checkout step, an `os = any` manifest — no
+            // probe is covered.
+            assert!(
+                r.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                "{name}: {:#?}",
+                r.jobs
+            );
+            assert!(!r.all_covered(), "{name}");
+            let strong = report(&strengthen_wf(wf), &strengthen_manifest(manifest_text)).unwrap();
             if *name == "needs chain gate" {
-                assert_eq!(verdict_of(&r, "b"), Coverage::Covered, "{name}");
-                assert_ne!(verdict_of(&r, "a"), Coverage::Covered, "{name}");
-                assert!(!r.all_covered());
+                assert_eq!(verdict_of(&strong, "b"), Coverage::Covered, "{name}");
+                assert_ne!(verdict_of(&strong, "a"), Coverage::Covered, "{name}");
             } else if equivalent.contains(name) {
-                assert!(r.all_covered(), "{name}: {:#?}", r.jobs);
-            } else {
+                assert!(strong.all_covered(), "{name}: {:#?}", strong.jobs);
+            } else if *name != "no checkout" {
+                // ("no checkout" made equivalent IS the control.)
                 assert!(
-                    r.jobs.iter().all(|j| j.verdict != Coverage::Covered),
-                    "{name}: {:#?}",
-                    r.jobs
+                    strong.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                    "{name} (with a checkout and a linux manifest): {:#?}",
+                    strong.jobs
                 );
-                assert!(!r.all_covered(), "{name}");
             }
         }
+    }
+
+    /// Round 6 of the Phase 8 review: every probe from the reviewer's
+    /// `probe3` crate. As written none is covered; made otherwise equivalent
+    /// (a checkout step, a linux manifest), each still reads NOT covered for
+    /// its own reason — a gate split across manifest jobs, a repeated gate,
+    /// executor-owned env, an unpinned manifest tool, `[limits]`, services
+    /// either way, siblings, `os = any`, a non-inert echo/printf, `pipefail`
+    /// under sh, a manifest `needs`, cargo's executor exports,
+    /// pull_request_target, a `./` working directory — except the probes in
+    /// `equivalent`, which are genuinely the manifest's command and nothing
+    /// else.
+    #[test]
+    fn round6_reviewer_probes_are_never_covered() {
+        fn m1(cmd: &str) -> String {
+            format!("version = 1\n[[steps]]\nname = \"m\"\ncommand = {cmd}\n")
+        }
+        fn job(steps: &str) -> String {
+            format!(
+                "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n{steps}"
+            )
+        }
+        let make = m1("[\"make\", \"check\"]");
+        let v2 = |jobs: &str| format!("version = 2\n{jobs}");
+        let cases: Vec<(&str, String, String)> = vec![
+        ("A split gen/diff across jobs", job("      - run: |\n          make generate\n          git diff --exit-code\n"),
+            v2("[[jobs]]\nname = \"gen\"\n[[jobs.steps]]\nname = \"g\"\ncommand = [\"make\", \"generate\"]\n[[jobs]]\nname = \"diff\"\n[[jobs.steps]]\nname = \"d\"\ncommand = [\"git\", \"diff\", \"--exit-code\"]\n")),
+        ("B dedup drops 2nd diff", job("      - run: |\n          git diff --exit-code\n          make generate\n          git diff --exit-code\n"),
+            "version = 1\n[[steps]]\nname = \"d\"\ncommand = [\"git\", \"diff\", \"--exit-code\"]\n[[steps]]\nname = \"g\"\ncommand = [\"make\", \"generate\"]\n".into()),
+        ("C dedup across steps", job("      - run: make check\n      - run: make mutate\n      - run: make check\n"),
+            "version = 1\n[[steps]]\nname = \"c\"\ncommand = [\"make\", \"check\"]\n[[steps]]\nname = \"m\"\ncommand = [\"make\", \"mutate\"]\n".into()),
+        ("D CI=false both sides (executor forces CI=true)", "on: pull_request\nenv:\n  CI: 'false'\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n".into(),
+            "version = 1\n[[steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\nenv = { CI = \"false\" }\n".into()),
+        ("F manifest [[tools]] node, wf none", job("      - run: npm test\n"),
+            "version = 1\n[[tools]]\nname = \"node\"\nversion = \"18.20.4\"\n[[steps]]\nname = \"m\"\ncommand = [\"npm\", \"test\"]\n".into()),
+        ("G [limits] test_threads=1", job("      - run: cargo test\n"),
+            "version = 1\n[limits]\ntest_threads = 1\n[[steps]]\nname = \"m\"\ncommand = [\"cargo\", \"test\"]\n".into()),
+        ("H1 manifest service, wf none", job("      - run: pytest\n"),
+            "version = 2\n[[jobs]]\nname = \"ci\"\n[[jobs.services]]\nname = \"postgres\"\nversion = \"16\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"pytest\"]\n".into()),
+        ("H2 service version 13 vs 16", "on: pull_request\njobs:\n  j:\n    runs-on: ubuntu-latest\n    services:\n      pg:\n        image: postgres:13\n    steps:\n      - run: pytest\n".into(),
+            "version = 2\n[[jobs]]\nname = \"ci\"\n[[jobs.services]]\nname = \"postgres\"\nversion = \"16\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"pytest\"]\n".into()),
+        ("I manifest sibling, wf none", job("      - run: cargo test\n"),
+            "version = 1\n[[siblings]]\nrepo = \"qontinui/qontinui-schemas\"\npin = \"default-branch\"\n[[steps]]\nname = \"m\"\ncommand = [\"cargo\", \"test\"]\n".into()),
+        ("J shell sh + set -euo pipefail", job("      - run: |\n          set -euo pipefail\n          make check\n        shell: sh\n"), make.clone()),
+        ("K manifest os any vs ubuntu", job("      - run: make check\n"), v2("[[jobs]]\nname = \"ci\"\nos = \"any\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\n")),
+        ("L printf bad format", job("      - run: |\n          printf %d x\n          make check\n"), make.clone()),
+        ("M echo only + gate", job("      - run: |\n          echo -e x\n          make check\n"), make.clone()),
+        ("N two wf gates in two jobs, same job order rev", job("      - run: |\n          make a\n          make b\n"),
+            v2("[[jobs]]\nname = \"x\"\n[[jobs.steps]]\nname = \"b\"\ncommand = [\"make\", \"b\"]\n[[jobs]]\nname = \"y\"\n[[jobs.steps]]\nname = \"a\"\ncommand = [\"make\", \"a\"]\n")),
+        ("O npm ci then npm test split", job("      - run: |\n          npm ci\n          npm test\n"),
+            v2("[[jobs]]\nname = \"x\"\n[[jobs.steps]]\nname = \"i\"\ncommand = [\"npm\", \"ci\"]\n[[jobs]]\nname = \"y\"\n[[jobs.steps]]\nname = \"i\"\ncommand = [\"npm\", \"ci\"]\n[[jobs.steps]]\nname = \"t\"\ncommand = [\"npm\", \"test\"]\n")),
+        ("P manifest needs on matched job", job("      - run: make check\n"),
+            v2("[[jobs]]\nname = \"pre\"\n[[jobs.steps]]\nname = \"p\"\ncommand = [\"true\"]\n[[jobs]]\nname = \"ci\"\nneeds = [\"pre\"]\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\n")),
+        ("Q wf env RUST_TEST_THREADS=8 (manifest can't set)", "on: pull_request\nenv:\n  RUST_TEST_THREADS: '8'\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo test\n".into(), m1("[\"cargo\", \"test\"]")),
+        ("R set -e under sh", job("      - run: |\n          set -e\n          make check\n        shell: sh\n"), make.clone()),
+        ("S set -x then cargo", job("      - run: |\n          set -x\n          cargo test\n"), m1("[\"cargo\", \"test\"]")),
+        ("T push only to main", "on:\n  push:\n    branches: [main]\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n".into(), make.clone()),
+        ("U pull_request_target", "on: pull_request_target\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: make check\n".into(), make.clone()),
+        ("V wd: '.' explicit vs manifest wd '.'", job("      - run: make check\n        working-directory: ./\n"), make.clone()),
+        ("W checkout ref input", job("      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - run: make check\n"), make.clone()),
+        ("X checkout persist-cred false", job("      - uses: actions/checkout@v4.1.1\n      - run: make check\n"), make.clone()),
+        ("Y runs-on list [ubuntu-latest]", "on: pull_request\njobs:\n  j:\n    runs-on: [ubuntu-latest]\n    steps:\n      - run: make check\n".into(), make.clone()),
+        ("Z wf env-prefix assignment", job("      - run: FOO=1 make check\n"), make.clone()),
+        ("Z2 env prefix on manifest-allowed key", job("      - run: RUST_BACKTRACE=1 cargo test\n"), "version = 1\n[[steps]]\nname = \"m\"\ncommand = [\"cargo\", \"test\"]\nenv = { RUST_BACKTRACE = \"1\" }\n".into()),
+        ("AA cache path ~/.cargo (registry) ", job("      - uses: actions/cache@v4\n        with:\n          path: ~/.cargo/registry\n          key: k\n      - run: cargo test\n"), m1("[\"cargo\", \"test\"]")),
+        ("AB cache path ~/.npm then npm ci", job("      - uses: actions/cache@v4\n        with:\n          path: |\n            ~/.cache/pre-commit\n            /tmp/x\n          key: k\n      - run: make check\n"), make.clone()),
+        ("AC timeout-minutes step 600 manifest default", job("      - run: make check\n        timeout-minutes: 600\n"), make.clone()),
+        ("AD manifest scheduled job also", job("      - run: make check\n"), v2("[[jobs]]\nname = \"ci\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"make\", \"check\"]\n[[jobs]]\nname = \"nightly\"\nschedule = \"0 0 * * *\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"rm\", \"-rf\", \"x\"]\n")),
+        ("AE exit status 0 after (exit allowed?)", job("      - run: |\n          make check\n          true\n"), make.clone()),
+    ];
+        let equivalent = [
+            "O npm ci then npm test split",
+            "R set -e under sh",
+            "T push only to main",
+            "W checkout ref input",
+            "X checkout persist-cred false",
+            "Y runs-on list [ubuntu-latest]",
+            "AB cache path ~/.npm then npm ci",
+            "AC timeout-minutes step 600 manifest default",
+            "AD manifest scheduled job also",
+            "AE exit status 0 after (exit allowed?)",
+        ];
+        let report = |wf: &str, manifest_text: &str| -> Option<CoverageReport> {
+            let m = manifest::parse_and_validate(manifest_text).ok()?;
+            Some(
+                coverage_report(
+                    "ci.toml",
+                    &m,
+                    &[WorkflowSource {
+                        label: "w.yml".into(),
+                        text: wf.to_string(),
+                    }],
+                    "main",
+                )
+                .unwrap(),
+            )
+        };
+        for (name, wf, manifest_text) in &cases {
+            let Some(r) = report(wf, manifest_text) else {
+                // A manifest may not set CI at all (the executor exports
+                // CI=true itself).
+                assert!(name.starts_with("D "), "{name}: manifest rejected");
+                continue;
+            };
+            assert!(
+                r.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                "{name}: {:#?}",
+                r.jobs
+            );
+            let strong = report(&strengthen_wf(wf), &strengthen_manifest(manifest_text)).unwrap();
+            if equivalent.contains(name) {
+                assert!(strong.all_covered(), "{name}: {:#?}", strong.jobs);
+            } else {
+                assert!(
+                    strong.jobs.iter().all(|j| j.verdict != Coverage::Covered),
+                    "{name} (with a checkout and a linux manifest): {:#?}",
+                    strong.jobs
+                );
+            }
+        }
+        // D with the manifest's CI removed: the workflow's CI=false still
+        // differs from the executor's CI=true.
+        let r = report(
+            &strengthen_wf("on: pull_request\nenv:\n  CI: 'false'\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make check\n"),
+            &strengthen_manifest(&make),
+        )
+        .unwrap();
+        assert_eq!(verdict_of(&r, "j"), Coverage::NeedsReview);
     }
 
     #[test]

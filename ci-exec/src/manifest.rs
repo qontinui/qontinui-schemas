@@ -49,7 +49,9 @@ const ENV_ALLOWLIST: &[&str] = &[
     "CARGO_TERM_COLOR",
     "NODE_OPTIONS",
     "NODE_ENV",
-    "CI",
+    // NOT `CI`: the executor exports `CI=true` itself (executor.rs
+    // `DispatchEnv`), so a manifest value would be silently overridden — it
+    // is listed in EXECUTOR_OWNED_ENV instead.
     "QONTINUI_DISABLE_KEYCHAIN",
     // ── Added for Actions-lane parity. Each entry below is set by a LIVE
     // gate step in one of the two Actions workflows this lane must agree
@@ -162,6 +164,7 @@ const EXECUTOR_OWNED_ENV: &[(&str, &str)] = &[
         "CARGO_TARGET_DIR",
         "the executor's per-repo CI target dir (not settable)",
     ),
+    ("CI", "nothing: the executor always exports CI=true"),
     // NOTE: the SERVICE connection variables (`DATABASE_URL`, the libpq `PG*`
     // family, `REDIS_URL`/`REDIS_HOST`/`REDIS_PORT`) are executor-owned too,
     // but they are not restated here — they are derived from

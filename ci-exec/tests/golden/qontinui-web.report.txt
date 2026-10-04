@@ -8,17 +8,17 @@ qontinui-ci import --report
         opaque gate that leaves it PARTIAL/UNCOVERED; it never counts as covered. UNDERSTOOD STEPS
         (an allowlist, `shell::report_grammar`): a `run:` script is understood only when every
         segment is a simple command with literal words (no `$` anywhere), `cd <literal relative
-        path>`, `echo`/`printf`/`:`/`true` with no redirect, or exactly `set -e`/`-eu`/`-euo
-        pipefail`/`-x` — joined by newlines, `;` or `&&`, optionally ending in `|| true`/`|| :`.
-        Anything else in any step (an assignment or `KEY=value` prefix; an
-        env/timeout/nice/xargs/sudo wrapper; any redirect, pipe, here-document, subshell,
-        pushd/popd; control flow; `$( )`; export/declare/source/eval/set -a; `cd -` or a non-literal
-        `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true` step is not a gate but goes
-        through every one of these checks. Every word must be unquoted and unescaped (bash strips
-        quotes before it looks a word up, so a quoted `export` IS `export`), with no `~` and no `#`
-        after a command; `echo` takes only -n/-e, `printf` never -v; `cd` takes one non-option path
-        and may not follow an `&&`; the shell must be the default, `bash` or `sh`. A command under
-        `|| true`, or in a continue-on-error step, other than `echo`/`printf`/`:`/`true` is
+        path>`, `:`/`true`, `echo`/`printf` with exactly one plain literal (no flag, `%` or
+        backslash), or exactly `set -e`/`-eu`/`-euo pipefail`/`-x` — joined by newlines, `;` or
+        `&&`, optionally ending in `|| true`/`|| :`. Anything else in any step (an assignment or
+        `KEY=value` prefix; an env/timeout/nice/xargs/sudo wrapper; any redirect, pipe,
+        here-document, subshell, pushd/popd; control flow; `$( )`; export/declare/source/eval/set
+        -a; `cd -` or a non-literal `cd`) makes the job NEEDS-REVIEW. A `continue-on-error: true`
+        step is not a gate but goes through every one of these checks. Every word must be unquoted
+        and unescaped (bash strips quotes before it looks a word up, so a quoted `export` IS
+        `export`), with no `~` and no `#` after a command; `cd` takes one non-option path and may
+        not follow an `&&`; the shell must be the default, `bash` or `sh`. A command under `||
+        true`, or in a continue-on-error step, other than `echo`/`printf`/`:`/`true` is
         NEEDS-REVIEW, never silently dropped. A known action with an input off its explicit safe
         list (setup-node registry-url, a cache path inside the checkout, rust-cache, …), a trigger
         filtered by paths, and a non-integer timeout-minutes are NEEDS-REVIEW. CONSIDERED JOBS:
@@ -36,33 +36,44 @@ qontinui-ci import --report
         working directory cannot be resolved (an expression in `working-directory`, a `cd` to a
         non-literal). MATCHED: a step of a manifest GATE job (scheduled jobs never run for a pull
         request) runs the same command in the same working directory, on a job whose `os` includes
-        every OS the workflow job runs on — a manifest `os = any` job counts as Linux only; a
-        workflow job of unknown OS is matched by nothing. SAME COMMAND: the whole argv is equal
-        after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python
-        -m, env, sudo, timeout N, bash/sh <script>), python3 = python, pip3 = pip, and a leading ./
-        or trailing / per word. Package managers and their verbs are NOT unified (`npm ci` is not
-        `npm install`; `pnpm lint` is not `npm run lint`). A manifest step with a word containing
-        `$` matches nothing (the executor passes it literally). NEEDS-REVIEW, even when everything
-        matched: any workflow/job/step env key, or `KEY=value` prefix, the matched step does not set
-        identically (any key; an expression value never matches); a `cargo +toolchain` the step
-        lacks; a version pinned by setup-node/setup-python/rust-toolchain or `rustup
-        default|override|set` that the manifest's [[tools]] does not pin identically; `export`,
-        `declare -x`, `set -a`, `source`/`.`, or any use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT;
-        a self-hosted, ARM or custom runner label, or ANY macOS label (architecture is not modeled);
-        `actions/checkout` with inputs other than fetch-depth/persist-credentials/path; a manifest
-        step env key the workflow command does not run with identically (env is compared both ways,
-        and a `${{ … }}` value never matches); a step or job `timeout-minutes` below the matched
-        step's timeout; a non-OS matrix; a container; a service the matched step's own job does not
-        declare. Codecov with fail_ci_if_error, upload-artifact with if-no-files-found: error and a
-        cache with fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must
-        be byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
+        every OS the workflow job runs on — a manifest `os = any` job covers NOTHING, only an
+        explicit OS does; a workflow job of unknown OS is matched by nothing. SAME COMMAND: the
+        whole argv is equal after stripping wrappers (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), python3 = python,
+        pip3 = pip, and a leading ./ or trailing / per word. Package managers and their verbs are
+        NOT unified (`npm ci` is not `npm install`; `pnpm lint` is not `npm run lint`). A manifest
+        step with a word containing `$` matches nothing (the executor passes it literally).
+        NEEDS-REVIEW, even when everything matched: any workflow/job/step env key, or `KEY=value`
+        prefix, the matched step does not set identically (any key; an expression value never
+        matches); a `cargo +toolchain` the step lacks; a version pinned by
+        setup-node/setup-python/rust-toolchain or `rustup default|override|set` that the manifest's
+        [[tools]] does not pin identically; `export`, `declare -x`, `set -a`, `source`/`.`, or any
+        use of $GITHUB_ENV/$GITHUB_PATH/$GITHUB_OUTPUT; a self-hosted, ARM or custom runner label,
+        or ANY macOS label (architecture is not modeled); `actions/checkout` with inputs other than
+        fetch-depth/persist-credentials/path; a manifest step env key the workflow command does not
+        run with identically (env is compared both ways, and a `${{ … }}` value never matches); a
+        step or job `timeout-minutes` below the matched step's timeout; a non-OS matrix; a
+        container; a service the matched step's own job does not declare. Codecov with
+        fail_ci_if_error, upload-artifact with if-no-files-found: error and a cache with
+        fail-on-cache-miss are opaque gates. EXACT MATCH: workflow and manifest argv must be
+        byte-identical (after dequoting) — no wrapper or option stripping, no `./` removal, no
         interpreter-version or bash/sh folding. Every step of a matched manifest job must itself be
         a command of the workflow job, in the same relative order; a section the parser cannot read
         (an `env:`/`with:`/`strategy:`/`services:` that is an expression, a `run:` that is not a
-        string, an unknown or `<<` merge key) is NEEDS-REVIEW. COVERED is necessary, not sufficient:
-        the Phase 9 flip additionally requires one week of shadow agreement >= 97% with zero false
-        greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate command; a manifest gate job
-        carries the job's name), PARTIAL, UNCOVERED. Only COVERED counts toward the precondition.
+        string, an unknown or `<<` merge key) is NEEDS-REVIEW. ONE JOB, FULL SEQUENCE: the workflow
+        job's gates, in order and with repeats, must be matched by steps of ONE manifest job
+        (manifest jobs share no workspace); a split across jobs is NEEDS-REVIEW. Also NEEDS-REVIEW:
+        a workflow env value for an executor-owned variable (CI other than `true`, CARGO_TARGET_DIR,
+        PATH, RUST_TEST_THREADS, NEXTEST_TEST_THREADS, CARGO_BUILD_JOBS, service connection
+        variables); a manifest [[tools]] entry the workflow does not pin to the same version;
+        services that differ either way, versions included; any [limits]; any cargo command (the
+        executor exports host-sized thread/job caps and its own target dir); any [[siblings]]; a
+        manifest job `needs`; pull_request_target; `pipefail` under `shell: sh`; a job that runs
+        commands with no actions/checkout step. upload-sarif is an opaque gate. COVERED is
+        necessary, not sufficient: the Phase 9 flip additionally requires one week of shadow
+        agreement >= 97% with zero false greens. VERDICTS: COVERED, NEEDS-REVIEW, NAME-ONLY (no gate
+        command; a manifest gate job carries the job's name), PARTIAL, UNCOVERED. Only COVERED
+        counts toward the precondition.
 
 JOBS ON pull_request / push:main (39):
   UNCOVERED       alembic-graph-check.yml › alembic-heads [push:main (paths-filtered)] 0/9 gate command(s) matched
@@ -80,11 +91,15 @@ JOBS ON pull_request / push:main (39):
       review:  step "Count heads" runs `grep -c ^HEAD= heads.txt` under `|| true`, whose effects can change later steps
       review:  step "Comment on merging PR if forked" runs only `if: steps.heads.outputs.count > 1 && github.event.head_commit.message != ''` — whether it runs is not modeled
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: python scripts/ci/count_alembic_heads.py --baseline-ref origin/main
       review:  step "Fetch the baseline for the remediation message" runs `git fetch --depth=1 origin +refs/heads/main:refs/remotes/origin/main` in a continue-on-error step, whose effects can change later steps
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 5/12 gate command(s) matched
       missing: uses: actions/checkout
       missing: (unresolvable directory) rm -rf qontinui-schemas qontinui qontinui-cloud-control
@@ -103,38 +118,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Install Poetry" is outside the report's command grammar: it uses a pipe (`|`)
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
-      review:  `backend: poetry install --no-interaction --no-root` is limited to 300s; ci/backend-install allows 3600s
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 300s; ci/backend-install-cloud-control allows 3600s
-      review:  `backend: poetry run ruff check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-check does not set it identically
-      review:  `backend: poetry run ruff check .` is limited to 300s; ci/backend-ruff-check allows 3600s
-      review:  `backend: poetry run ruff format --check .` runs with PYTHON_VERSION=3.12; ci/backend-ruff-format does not set it identically
-      review:  `backend: poetry run ruff format --check .` is limited to 300s; ci/backend-ruff-format allows 3600s
-      review:  `backend: poetry run mypy app/ --ignore-missing-imports` runs with PYTHON_VERSION=3.12; ci/backend-mypy does not set it identically
-      review:  `backend: poetry run mypy app/ --ignore-missing-imports` is limited to 300s; ci/backend-mypy allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/35 gate command(s) matched
       missing: date -u +%s
       missing: uses: actions/checkout
@@ -171,6 +157,7 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry run python scripts/export_openapi.py  ←  ci/openapi-export-extended
       matched: backend: poetry run python scripts/export_openapi.py --base  ←  ci/openapi-export-base
       matched: git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope  ←  ci/openapi-snapshot-drift
+      review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
@@ -190,64 +177,10 @@ JOBS ON pull_request / push:main (39):
       review:  step "Upload coverage artifacts" runs only `if: always()` — whether it runs is not modeled
       review:  step "Upload junit results" runs only `if: always()` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
-      review:  `backend: poetry install --no-interaction --no-root` is limited to 2700s; ci/backend-install allows 3600s
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 2700s; ci/backend-install-cloud-control allows 3600s
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with ENVIRONMENT=development; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with PYTHON_VERSION=3.12; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with REDIS_ENABLED=false; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` runs with TESTING=1; ci/openapi-export-extended does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py` is limited to 2700s; ci/openapi-export-extended allows 3600s
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with ENVIRONMENT=development; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with PYTHON_VERSION=3.12; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with REDIS_ENABLED=false; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with TESTING=1; ci/openapi-export-base does not set it identically
-      review:  `backend: poetry run python scripts/export_openapi.py --base` is limited to 2700s; ci/openapi-export-base allows 3600s
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with DATABASE_URL=postgresql://qontinui_user:qontinui_dev_password@localhost:5432/qontinui_test; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with ENVIRONMENT=development; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with PYTHON_VERSION=3.12; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with REDIS_ENABLED=false; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with TESTING=1; ci/openapi-snapshot-drift does not set it identically
-      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` is limited to 2700s; ci/openapi-snapshot-drift allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs shard = ["1", "2", "3", "4", "5", "6"] — the manifest runs one leg
-      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/openapi-export-extended's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/openapi-export-base's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/openapi-snapshot-drift's job does not declare it
-      review:  uses service redis (redis); ci/backend-install's job does not declare it
-      review:  uses service redis (redis); ci/backend-install-cloud-control's job does not declare it
-      review:  uses service redis (redis); ci/openapi-export-extended's job does not declare it
-      review:  uses service redis (redis); ci/openapi-export-base's job does not declare it
-      review:  uses service redis (redis); ci/openapi-snapshot-drift's job does not declare it
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         backend-ci.yml › security-scan [pull_request (paths-filtered)] 2/10 gate command(s) matched
       missing: uses: actions/checkout
       missing: uses: aquasecurity/trivy-action
@@ -260,6 +193,7 @@ JOBS ON pull_request / push:main (39):
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
       review:  step "Upload Trivy results to GitHub Security" runs only `if: always()` — whether it runs is not modeled
+      review:  advisory step uses github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52, which the report does not model
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
       review:  free-disk-space with tool-cache can remove hosted toolchains
       review:  step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)" is outside the report's command grammar: it has a quoted or escaped word ("\u{1}/..")
@@ -268,35 +202,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Install Poetry" touches $GITHUB_PATH, which changes what later steps see
       review:  step "Run safety check (dependency vulnerabilities)" runs `poetry run safety check --json` under `|| true`, whose effects can change later steps
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
-      review:  `backend: poetry install --no-interaction --no-root` is limited to 900s; ci/backend-install allows 3600s
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 900s; ci/backend-install-cloud-control allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/8 gate command(s) matched
       missing: uses: actions/checkout
       missing: [ -d junit ]
@@ -312,12 +220,17 @@ JOBS ON pull_request / push:main (39):
       review:  step "Build shard-durations-proposed.json" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  step "Upload shard-durations-proposed.json" runs only `if: steps.build.outputs.proposed == 'true'` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
       review:  job condition `if: always()` — whether the job runs is not modeled
+      review:  step "Assert every shard succeeded" runs before any actions/checkout step
       review:  step "Assert every shard succeeded" is outside the report's command grammar: it has a quoted or escaped word ("Run Tests shard matrix result: ${SHARDS_RESULT}")
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       note:    job condition `if: always()` — considered as running
       note:    no gate command found
   UNCOVERED       backend-ci.yml › build-test [pull_request (paths-filtered)] 0/8 gate command(s) matched
@@ -337,6 +250,8 @@ JOBS ON pull_request / push:main (39):
       review:  working-directory "./backend" has `.`/`..` components — it must name a directory that exists, which the report does not check
       review:  step "Test Docker image" is outside the report's command grammar: it has a quoted or escaped word ("import app; print('Import successful')")
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
@@ -346,6 +261,8 @@ JOBS ON pull_request / push:main (39):
       review:  actions/checkout with input sparse-checkout-cone-mode: true, which the report does not model
       review:  step "Measure Run Tests shard headroom" is outside the report's command grammar: it `set -o pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/23 gate command(s) matched
       missing: date -u +%s
@@ -371,6 +288,7 @@ JOBS ON pull_request / push:main (39):
       missing: backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml
       matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
       matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
@@ -385,37 +303,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Warn if the job is approaching its budget" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
       review:  step "Export per-test coverage to coord (best-effort)" runs only `if: ${{ !cancelled() }}` — whether it runs is not modeled
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
-      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
-      review:  uses service redis (redis); ci/backend-install's job does not declare it
-      review:  uses service redis (redis); ci/backend-install-cloud-control's job does not declare it
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/6 gate command(s) matched
       missing: uses: actions/checkout
       missing: [ ${GITHUB_REF} = refs/heads/main ]
@@ -426,11 +316,15 @@ JOBS ON pull_request / push:main (39):
       review:  step "Choose the base to diff against" is outside the report's command grammar: it has a quoted or escaped word ("${GITHUB_EVENT_NAME}")
       review:  step "Choose the base to diff against" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  step "Check coord.* drops against coord's read contract" is outside the report's command grammar: it has a quoted or escaped word ("${BASE_REF}")
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: python scripts/check_dev_credentials_drift.py
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   UNCOVERED       e2e-tests.yml › backend-tests [pull_request, push:main] 0/11 gate command(s) matched
       missing: uses: actions/checkout
@@ -448,12 +342,16 @@ JOBS ON pull_request / push:main (39):
       review:  step "Install dependencies" is outside the report's command grammar: it relies on shell expansion of "["
       review:  working-directory "./backend" has `.`/`..` components — it must name a directory that exists, which the report does not check
       review:  step "Upload backend test results" runs only `if: always()` — whether it runs is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ matrix.python-version }} — the manifest's [[tools]] does not pin the same version
       review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
   UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
       review:  job key `with` is not modeled
       review:  job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — whether the job runs is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  matrix legs shard = ["1", "2", "3", "4"] — the manifest runs one leg
       note:    job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — considered as running
       note:    runs-on names no OS — no manifest job can be shown to cover it
@@ -469,80 +367,40 @@ JOBS ON pull_request / push:main (39):
       review:  step "Fetch the PR base commit" touches $GITHUB_ENV, which changes what later steps see
       review:  step "List the E2E spec files this PR changed" is outside the report's command grammar: it has a quoted or escaped word ("$E2E_BASE_SHA")
       review:  step "List the E2E spec files this PR changed" touches $GITHUB_OUTPUT, which changes what later steps see
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       e2e-tests.yml › frontend-e2e-changed-specs [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
       review:  job key `with` is not modeled
       review:  job condition `if: needs.changed-specs.outputs.any == 'true'` — whether the job runs is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  matrix legs group = ["${{ fromJson(needs.changed-specs.outputs.groups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.changed-specs.outputs.any == 'true'` — considered as running
       note:    runs-on names no OS — no manifest job can be shown to cover it
   UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: actions/download-artifact
       review:  job condition `if: always()` — whether the job runs is not modeled
+      review:  step "Generate test summary" runs before any actions/checkout step
       review:  step "Generate test summary" is outside the report's command grammar: it uses a `${{ … }}` expression
+      review:  step "Fail if any needed job failed" runs before any actions/checkout step
       review:  step "Fail if any needed job failed" is outside the report's command grammar: it has a quoted or escaped word ("backend-tests:  ${BACKEND_RESULT}")
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       note:    job condition `if: always()` — considered as running
   PARTIAL         forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
-      review:  `python scripts/ci/check_fixed_sleeps_in_e2e.py` is limited to 300s; ci/forbid-fixed-sleeps-in-e2e allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
-      review:  `python scripts/ci/check_forbidden_public_schema.py` is limited to 300s; ci/forbid-public-schema allows 3600s
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 4/6 gate command(s) matched
       missing: uses: actions/checkout
       missing: uses: ./.github/actions/fleet-nouns-vocab
@@ -561,33 +419,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Fleet-noun vocabulary drift from schemas main (advisory)" runs `[ $main_sha256 = $PIN_SHA256 ]` in a continue-on-error step, whose effects can change later steps
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `frontend: npm ci` is limited to 1200s; ci/frontend-install allows 3600s
-      review:  `frontend: npm run lint` is limited to 1200s; ci/frontend-lint allows 3600s
-      review:  `frontend: npm run type-check` is limited to 1200s; ci/frontend-typecheck allows 3600s
-      review:  `frontend: npm test` is limited to 1200s; ci/frontend-test allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/16 gate command(s) matched
       missing: uses: actions/checkout
       missing: bash frontend/scripts/vercel-install.sh --config-source ci
@@ -613,33 +447,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Assert it refuses to fall back to the OSS shape" is outside the report's command grammar: it `set -uo pipefail` is not one of set -e / -eu / -euo pipefail / -x
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `frontend: npm run type-check` is limited to 600s; ci/frontend-typecheck allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 6/8 gate command(s) matched
       missing: uses: actions/checkout
       missing: uses: ./.github/actions/fleet-nouns-vocab
@@ -653,36 +463,9 @@ JOBS ON pull_request / push:main (39):
       review:  working-directory "./frontend" has `.`/`..` components — it must name a directory that exists, which the report does not check
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `frontend: npm ci` is limited to 1800s; ci/frontend-install allows 3600s
-      review:  `frontend: npm run cloud:install` runs with QONTINUI_CLOUD_CONTROL_PATH=${{ github.workspace }}/.sibling/qontinui-cloud-control; ci/composed-cloud-install does not set it identically
-      review:  `frontend: npm run cloud:install` is limited to 1800s; ci/composed-cloud-install allows 3600s
-      review:  `frontend: npm run lint` is limited to 1800s; ci/frontend-lint allows 3600s
-      review:  `frontend: npm run type-check` is limited to 1800s; ci/frontend-typecheck allows 3600s
-      review:  `frontend: npm test` runs with QONTINUI_COMPOSED_BUILD=1; ci/frontend-test does not set it identically
-      review:  `frontend: npm test` is limited to 1800s; ci/frontend-test allows 3600s
-      review:  `frontend: npm run build` is limited to 1800s; ci/composed-build allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
-      review:  manifest job ci runs the matched steps in a different order
   PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/4 gate command(s) matched
       missing: uses: actions/checkout
       missing: uses: ./.github/actions/fleet-nouns-vocab
@@ -690,92 +473,20 @@ JOBS ON pull_request / push:main (39):
       matched: frontend: npm ci  ←  ci/frontend-install
       review:  working-directory "./frontend" has `.`/`..` components — it must name a directory that exists, which the report does not check
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `frontend: npm ci` is limited to 2700s; ci/frontend-install allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
-      review:  `python scripts/ci/check_tracked_ignored.py` is limited to 300s; ci/gitignore-tracked-files allows 3600s
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   PARTIAL         global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
-      review:  `python scripts/ci/check_global_state_assertions.py` is limited to 300s; ci/global-state-assertions allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
   PARTIAL         memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 2/12 gate command(s) matched
       missing: uses: actions/checkout
       missing: (unresolvable directory) git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
@@ -802,37 +513,9 @@ JOBS ON pull_request / push:main (39):
       review:  step "Upload the sealed holdout scores" runs only `if: always()` — whether it runs is not modeled
       review:  step "Comment the scores on the PR" runs only `if: always()` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `backend: poetry install --no-interaction --no-root` runs with PYTHON_VERSION=3.12; ci/backend-install does not set it identically
-      review:  `backend: poetry install --no-interaction --no-root` is limited to 900s; ci/backend-install allows 3600s
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` runs with PYTHON_VERSION=3.12; ci/backend-install-cloud-control does not set it identically
-      review:  `backend: poetry run pip install -e ../../qontinui-cloud-control` is limited to 900s; ci/backend-install-cloud-control allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version ${{ env.PYTHON_VERSION }} — the manifest's [[tools]] does not pin the same version
-      review:  uses service postgres (postgres-pgvector); ci/backend-install's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/backend-install-cloud-control's job does not declare it
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: git diff --name-only $base...HEAD
@@ -841,6 +524,8 @@ JOBS ON pull_request / push:main (39):
       review:  step "Detect alembic migration changes" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Detect alembic migration changes" touches $GITHUB_OUTPUT, which changes what later steps see
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/20 gate command(s) matched
       missing: date -u +%s
       missing: uses: actions/checkout
@@ -863,6 +548,7 @@ JOBS ON pull_request / push:main (39):
       missing: backend: poetry run alembic upgrade head
       missing: backend: poetry run alembic downgrade -1
       review:  job condition `if: needs.detect.outputs.relevant == 'true'` — whether the job runs is not modeled
+      review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
       review:  jlumbroso/free-disk-space with input tool-cache: false, which the report does not model
@@ -874,49 +560,32 @@ JOBS ON pull_request / push:main (39):
       review:  step "Reversibility test (upgrade → downgrade -1 → upgrade)" runs `cat heads.err` under `|| true`, whose effects can change later steps
       review:  step "Reversibility test (upgrade → downgrade -1 → upgrade)" runs `grep -c (head)` under `|| true`, whose effects can change later steps
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
   UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: [ $relevant = true ]
       missing: [ $result != success ]
       review:  job condition `if: always()` — whether the job runs is not modeled
+      review:  step "Aggregate" runs before any actions/checkout step
       review:  step "Aggregate" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       note:    job condition `if: always()` — considered as running
   PARTIAL         path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_path_case_collisions.py  ←  ci/path-case-collisions
-      review:  `python scripts/ci/check_path_case_collisions.py` is limited to 300s; ci/path-case-collisions allows 3600s
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
       review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" is outside the report's command grammar: it expands a variable or substitution in "$ErrorActionPreference"
       review:  step "Parse every .ps1 and .psm1 with the real PowerShell parser" runs under `shell: pwsh`, not GitHub's fail-fast bash/sh
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/3 gate command(s) matched
       missing: uses: actions/checkout
       missing: python -m pip install pytest>=9,<10
@@ -924,37 +593,15 @@ JOBS ON pull_request / push:main (39):
       review:  step "Install pytest" is outside the report's command grammar: it has a quoted or escaped word ("pytest>=9,<10")
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
-      review:  `python scripts/ci/check_ruff_version_parity.py` is limited to 300s; ci/ruff-version-parity allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/8 gate command(s) matched
       missing: uses: actions/checkout
       missing: curl -sSL -H Authorization: Bearer $EXPR{{ github.token }} https://api.github.com/repos/gitleaks/git
@@ -966,6 +613,8 @@ JOBS ON pull_request / push:main (39):
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Run gitleaks (binary — the marketplace action requires a paid org license)" runs `grep -oP "tag_name":\s*"v\K[^"]+` under `|| true`, whose effects can change later steps
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 2/54 gate command(s) matched
       missing: date -u +%s
       missing: uses: actions/checkout
@@ -1024,6 +673,7 @@ JOBS ON pull_request / push:main (39):
     "- partial_match
       matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run build  ←  ci/composed-build
+      review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
       review:  step "Clone backend Python sibling deps" is outside the report's command grammar: it has a `#` after a command (a trailing comment or a literal `#`)
@@ -1069,72 +719,16 @@ JOBS ON pull_request / push:main (39):
       review:  step "Summarize" runs `jq -r .specs[] | select((.serverErrors // []) | length > 0) | .specId as $s | .s` under `|| true`, whose effects can change later steps
       review:  step "Summarize" runs `jq -r .specs[] | select((.apiAssertions // []) | length > 0) | .specId as $s | .` under `|| true`, whose effects can change later steps
       review:  step "Summarize" runs `jq -r .crawl.routes[]? | select(((.unwaivedConsoleErrors // []) | length > 0) or` under `|| true`, whose effects can change later steps
-      review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_USER_POOL_ID=spec-ci-local-pool; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with NEXT_PUBLIC_API_URL=; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with NEXT_PUBLIC_ENABLE_SPEC_CI=1; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with REDIS_ENABLED=true; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with REDIS_HOST=localhost; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with REDIS_PORT=6379; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with STORAGE_BACKEND=local; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` is limited to 2100s; ci/frontend-install allows 3600s
-      review:  `frontend: npm run build` runs with BACKEND_URL=http://localhost:8000; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with COGNITO_ALLOWED_AUDIENCES=spec-ci-local; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with COGNITO_USER_POOL_ID=spec-ci-local-pool; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with ENVIRONMENT=development; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with NEXT_PUBLIC_API_URL=; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with NEXT_PUBLIC_ENABLE_SPEC_CI=1; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with REDIS_ENABLED=true; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with REDIS_HOST=localhost; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with REDIS_PORT=6379; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` runs with STORAGE_BACKEND=local; ci/composed-build does not set it identically
-      review:  `frontend: npm run build` is limited to 2100s; ci/composed-build allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
-      review:  uses service postgres (postgres-pgvector); ci/frontend-install's job does not declare it
-      review:  uses service postgres (postgres-pgvector); ci/composed-build's job does not declare it
-      review:  uses service redis (redis); ci/frontend-install's job does not declare it
-      review:  uses service redis (redis); ci/composed-build's job does not declare it
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   UNCOVERED       sql-through-alembic.yml › sql-through-alembic [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: uses: actions/checkout
       missing: python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
   PARTIAL         style-gate.yml › style-gate [pull_request (paths-filtered)] 1/50 gate command(s) matched
       missing: date -u +%s
@@ -1187,6 +781,7 @@ JOBS ON pull_request / push:main (39):
       missing: [ $any_capture_missing = 1 ]
       missing: [ $any_gate2 = 1 ]
       matched: frontend: npm ci  ←  ci/frontend-install
+      review:  step "Record job start time" runs before any actions/checkout step
       review:  step "Record job start time" is outside the report's command grammar: it uses an output redirect
       review:  step "Record job start time" touches $GITHUB_ENV, which changes what later steps see
       review:  step "Read pinned qontinui-schemas SHA from style-gate.lock" is outside the report's command grammar: it relies on shell expansion of "["
@@ -1258,78 +853,20 @@ JOBS ON pull_request / push:main (39):
       review:  step "Run vision-audit (analyze + assert) per route + summarize" is outside the report's command grammar: it uses a `${{ … }}` expression
       review:  step "Upload style-gate artifacts" runs only `if: always()` — whether it runs is not modeled
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `frontend: npm ci` runs with BACKEND_URL=http://localhost:8000; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_ALLOWED_AUDIENCES=style-gate-local; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_ISSUER=http://127.0.0.1:8770; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with COGNITO_USER_POOL_ID=style-gate-local-pool; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with NEXT_PUBLIC_API_URL=; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS=1; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with QONTINUI_API_BASE_URL=http://localhost:8000; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` runs with SECRET_KEY=style-gate-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it identically
-      review:  `frontend: npm ci` is limited to 1800s; ci/frontend-install allows 3600s
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  cargo runs under the executor's host-sized CARGO_BUILD_JOBS / RUST_TEST_THREADS / NEXTEST_TEST_THREADS and its own CARGO_TARGET_DIR; a GitHub-hosted run sets none of them
       review:  pins dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 with toolchain stable (two toolchains named) — the manifest's [[tools]] does not pin the same version
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       review:  pins setup-node node-version 22 — the manifest's [[tools]] does not pin the same version
       review:  pins setup-python python-version 3.12 — the manifest's [[tools]] does not pin the same version
-      review:  uses service postgres (postgres-pgvector); ci/frontend-install's job does not declare it
-      review:  manifest step ci/web-boundary-lint (`python scripts/ci/check_web_boundary.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
   PARTIAL         web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/2 gate command(s) matched
       missing: uses: actions/checkout
       matched: python scripts/ci/check_web_boundary.py  ←  ci/web-boundary-lint
       review:  pull_request (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
       review:  push:main (paths-filtered): the workflow runs only for some paths (a `paths-ignore: ['**']` runs for none); confirm the job runs at all
-      review:  `python scripts/ci/check_web_boundary.py` is limited to 300s; ci/web-boundary-lint allows 3600s
-      review:  manifest step ci/forbid-public-schema (`python scripts/ci/check_forbidden_public_schema.py`) is not a command of this workflow job
-      review:  manifest step ci/alembic-single-head (`python scripts/ci/count_alembic_heads.py`) is not a command of this workflow job
-      review:  manifest step ci/coord-column-drop-guard (`python scripts/ci/check_coord_column_drops.py`) is not a command of this workflow job
-      review:  manifest step ci/gitignore-tracked-files (`python scripts/ci/check_tracked_ignored.py`) is not a command of this workflow job
-      review:  manifest step ci/ruff-version-parity (`python scripts/ci/check_ruff_version_parity.py`) is not a command of this workflow job
-      review:  manifest step ci/path-case-collisions (`python scripts/ci/check_path_case_collisions.py`) is not a command of this workflow job
-      review:  manifest step ci/forbid-fixed-sleeps-in-e2e (`python scripts/ci/check_fixed_sleeps_in_e2e.py`) is not a command of this workflow job
-      review:  manifest step ci/frontend-install (`npm ci`) is not a command of this workflow job
-      review:  manifest step ci/frontend-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/frontend-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/frontend-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-cloud-install (`npm run cloud:install`) is not a command of this workflow job
-      review:  manifest step ci/composed-lint (`npm run lint`) is not a command of this workflow job
-      review:  manifest step ci/composed-typecheck (`npm run type-check`) is not a command of this workflow job
-      review:  manifest step ci/composed-test (`npm test`) is not a command of this workflow job
-      review:  manifest step ci/composed-build (`npm run build`) is not a command of this workflow job
-      review:  manifest step ci/backend-install (`poetry install --no-interaction --no-root`) is not a command of this workflow job
-      review:  manifest step ci/backend-install-cloud-control (`poetry run pip install -e ../../qontinui-cloud-control`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-check (`poetry run ruff check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-ruff-format (`poetry run ruff format --check .`) is not a command of this workflow job
-      review:  manifest step ci/backend-mypy (`poetry run mypy app/ --ignore-missing-imports`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-extended (`poetry run python scripts/export_openapi.py`) is not a command of this workflow job
-      review:  manifest step ci/openapi-export-base (`poetry run python scripts/export_openapi.py --base`) is not a command of this workflow job
-      review:  manifest step ci/openapi-snapshot-drift (`git diff --exit-code frontend/src/lib/api-client/openapi-sch`) is not a command of this workflow job
-      review:  manifest step ci/global-state-assertions (`python scripts/ci/check_global_state_assertions.py`) is not a command of this workflow job
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
   UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
       review:  runs on several runner images ["public-pool", "self-hosted"]; a manifest `os` runs one host per OS
       review:  runs on `self-hosted`, not a standard GitHub-hosted x86 runner — an `any`/linux manifest job cannot be shown to match that host
@@ -1370,6 +907,7 @@ JOBS ON pull_request / push:main (39):
       review:  step "zizmor" runs `set +e` in a continue-on-error step, whose effects can change later steps
       review:  step "zizmor" runs `zizmor --no-progress --format github --config .github/zizmor.yml ${files[@]}` in a continue-on-error step, whose effects can change later steps
       review:  step "zizmor" runs `set -e` in a continue-on-error step, whose effects can change later steps
+      review:  step "zizmor" runs `printf %s\n $out` in a continue-on-error step, whose effects can change later steps
       review:  step "zizmor" runs `grep -c ^::` in a continue-on-error step, whose effects can change later steps
       review:  step "zizmor" runs `[[ $rc -eq 0 ]]` in a continue-on-error step, whose effects can change later steps
       review:  step "zizmor" runs `[[ $rc -ge 11` in a continue-on-error step, whose effects can change later steps
@@ -1381,10 +919,12 @@ JOBS ON pull_request / push:main (39):
       review:  step "actionlint" runs `set +e` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `actionlint -shellcheck= -pyflakes= -format {{json .}}` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `set -e` in a continue-on-error step, whose effects can change later steps
+      review:  step "actionlint" runs `printf %s $json` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `python3 -c 
 import json, sys
 raw = sys.stdin.read().strip()
 errs = json.loads(ra` in a continue-on-error step, whose effects can change later steps
+      review:  step "actionlint" runs `printf %s\n $out` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `grep -c ^::warning` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `[[ $rc -eq 0 ]]` in a continue-on-error step, whose effects can change later steps
       review:  step "actionlint" runs `[[ $rc -eq 1 ]]` in a continue-on-error step, whose effects can change later steps
@@ -1395,6 +935,9 @@ errs = json.loads(ra` in a continue-on-error step, whose effects can change late
       review:  step "Record verdicts" runs `[[ $CHECKOUT_OUTCOME != success ]]` in a continue-on-error step, whose effects can change later steps
       review:  step "Record verdicts" runs `[[ $ARCH_OUTCOME != success ]]` in a continue-on-error step, whose effects can change later steps
       review:  step "Record verdicts" runs `[[ $INSTALL_OUTCOME != success ]]` in a continue-on-error step, whose effects can change later steps
+      review:  step "Record verdicts" runs `printf %s\n - zizmor: ${z} - actionlint: ${a}` in a continue-on-error step, whose effects can change later steps
+      review:  the manifest materialises sibling qontinui/qontinui-schemas beside the checkout; an equivalent workflow checkout of it is not modeled
+      review:  the manifest materialises sibling qontinui/qontinui-cloud-control beside the checkout; an equivalent workflow checkout of it is not modeled
       note:    runs-on names no OS — no manifest job can be shown to cover it
       note:    no gate command found
 

@@ -276,9 +276,9 @@ fn web_report_finds_the_uncovered_backend_suite() {
     };
     // The python command matches web's manifest exactly, but the job checks
     // out with a sha-pinned actions/checkout — not an action the report
-    // models, so an opaque gate (PARTIAL) — and it also carries review
-    // reasons: the 5-minute timeout, the paths filter, and the other steps
-    // of web's single `ci` manifest job, none of which this workflow runs.
+    // models, so an opaque gate: PARTIAL. (Its other blockers — the 5-minute
+    // timeout, the paths filter, web's `os = any` manifest job and its 25
+    // other steps — are judged once every gate has a counterpart.)
     assert_eq!(
         verdict("web-boundary-lint.yml", "web-boundary-lint"),
         Coverage::Partial
@@ -290,11 +290,7 @@ fn web_report_finds_the_uncovered_backend_suite() {
         .unwrap();
     assert_eq!(wbl.missing, vec!["uses: actions/checkout".to_string()]);
     assert_eq!(wbl.matched.len(), 1);
-    assert!(wbl.caveats.iter().any(|c| c.contains("limited to 300s")));
-    assert!(wbl
-        .caveats
-        .iter()
-        .any(|c| c.contains("is not a command of this workflow job")));
+    assert!(wbl.caveats.iter().any(|c| c.contains("paths-filtered")));
     // The manifest runs count_alembic_heads.py without the workflow's
     // `--baseline-ref origin/main`: a different command, so not covered.
     assert_eq!(
