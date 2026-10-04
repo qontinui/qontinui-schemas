@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use qontinui_ci_exec::dispatch::{DispatchPayload, DEFAULT_JOB};
+use qontinui_ci_exec::dispatch::DispatchPayload;
 use qontinui_ci_exec::host::BoxFuture;
 use qontinui_ci_exec::manifest::{self, CiManifest};
 use qontinui_ci_exec::report::{Conclusion, LogSink, Reporter, Verdict};
@@ -37,11 +37,15 @@ usage:
   qontinui-ci validate [--manifest <file>]
 
 run       run one job against a fresh checkout of the repo's committed HEAD
-            --job       the [[jobs]] name (default: ci — the one job of a v1 manifest)
+            --job       the [[jobs]] name (default: ci — the one job of a v1 manifest;
+                        a v2 manifest with no `ci` job reports cancelled)
             --repo-dir  any directory inside the repo (default: the current directory)
             --manifest  the manifest path inside the repo (default: .qontinui/ci.toml)
-            --root      where worktrees, the warm target dir and the tool cache live
-                        (default: the directory that contains the repo)
+            --root      the CI root (default: the directory that contains the repo).
+                        run WRITES under it: .ci-worktrees/<run id>/ (the job's
+                        checkout and its siblings, removed when the run ends),
+                        .ci-target/<repo>/ (a warm cargo target dir, kept), and
+                        .ci-tools/ (the version-keyed tool cache, kept)
 list      print the manifest's jobs and the check-run contexts they produce
 validate  parse and validate the manifest; exit 0 when it is valid";
 
@@ -185,7 +189,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
-    let job = flag(flags, "--job").unwrap_or(DEFAULT_JOB).to_string();
+    let job = flag(flags, "--job").map(str::to_string);
     let start_dir = match flag(flags, "--repo-dir") {
         Some(d) => PathBuf::from(d),
         None => std::env::current_dir().map_err(|e| format!("current directory: {e}"))?,

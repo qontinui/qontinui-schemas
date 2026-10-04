@@ -292,6 +292,13 @@ impl Default for OsSpec {
 /// a hard refusal on any executor built before v2 — a dispatch failure on a
 /// user's machine. Roll the executor out first and land v2 manifests after,
 /// exactly as `[canonical]`, `[[tools]]` and `[[siblings]]` each landed.
+///
+/// And a second precondition for a v2 manifest with no job named `ci`: coord
+/// must send `job` on its dispatches. A dispatch that names no job runs the
+/// default `ci` job; when a v2 manifest declares none, the executor reports
+/// `cancelled` (`job_not_declared`) rather than red, so such a manifest is
+/// safe to land early — but none of its jobs RUN on the coord lane until coord
+/// names them.
 #[derive(Debug, Clone)]
 pub struct CiManifest {
     /// `1` or `2`, kept for logs and reporting only.
@@ -359,9 +366,10 @@ impl CiManifest {
 pub const CHECK_CONTEXT_PREFIX: &str = "qontinui-ci";
 
 impl CiJob {
-    /// Whether this job runs on a host of OS `os`.
-    pub fn runs_on(&self, os: Os) -> bool {
-        self.os.iter().any(|o| *o == Os::Any || *o == os)
+    /// Whether this job runs on a host of OS `os` — `None` being a host OS no
+    /// job can name, which only an `any` job runs on.
+    pub fn runs_on(&self, os: Option<Os>) -> bool {
+        self.os.iter().any(|o| *o == Os::Any || Some(*o) == os)
     }
 
     /// The check-run contexts this job produces: `qontinui-ci / <name>`, or one
@@ -1554,7 +1562,11 @@ command = ["cargo", "fmt", "--check"]
             Some(1),
             "job limits win"
         );
-        assert!(test.runs_on(Os::Windows) && !test.runs_on(Os::Macos));
+        assert!(test.runs_on(Some(Os::Windows)) && !test.runs_on(Some(Os::Macos)));
+        assert!(
+            !test.runs_on(None),
+            "a named-OS job never runs on an unknown OS"
+        );
         assert_eq!(
             test.check_contexts(),
             vec![
@@ -1569,7 +1581,11 @@ command = ["cargo", "fmt", "--check"]
             Some(2),
             "top limits inherited"
         );
-        assert!(lint.runs_on(Os::Macos), "os defaults to any");
+        assert!(lint.runs_on(Some(Os::Macos)), "os defaults to any");
+        assert!(
+            lint.runs_on(None),
+            "`any` matches even an unrecognised host OS"
+        );
 
         // The scheduled job is not a gate job.
         let gates: Vec<&str> = m.gate_jobs().map(|j| j.name.as_str()).collect();

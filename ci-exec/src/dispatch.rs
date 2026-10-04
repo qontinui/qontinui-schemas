@@ -23,10 +23,6 @@ fn default_manifest_path() -> String {
 /// a job yet) runs the whole v1 step list, as before.
 pub const DEFAULT_JOB: &str = "ci";
 
-fn default_job() -> String {
-    DEFAULT_JOB.to_string()
-}
-
 /// A `events.ci.build_requested.<device_id>` dispatch payload. Unknown fields
 /// are tolerated (coord may grow the shape); `manifest_path`, `job` and
 /// `coord_http_url` degrade to sane defaults so a slightly-lean payload is
@@ -57,9 +53,14 @@ pub struct DispatchPayload {
     pub pr_number: Option<u64>,
     #[serde(default = "default_manifest_path")]
     pub manifest_path: String,
-    /// The manifest job to run (`[[jobs]].name`). Defaults to [`DEFAULT_JOB`].
-    #[serde(default = "default_job")]
-    pub job: String,
+    /// The manifest job to run (`[[jobs]].name`). `None` — what every coord
+    /// dispatch is today — runs [`DEFAULT_JOB`]; see [`Self::job_name`]. Kept
+    /// as an `Option` rather than defaulted at parse time because the
+    /// executor must know whether the job was NAMED: a defaulted job a v2
+    /// manifest does not declare is a non-verdict (`job_not_declared`), while
+    /// a named job it does not declare is the manifest's fault.
+    #[serde(default)]
+    pub job: Option<String>,
     /// Check-run context coord will publish the verdict under. The executor
     /// only logs it (the verdict write is coord-side, keyed by dispatch_id).
     #[serde(default)]
@@ -68,6 +69,13 @@ pub struct DispatchPayload {
     /// back to its own configured coord base.
     #[serde(default)]
     pub coord_http_url: String,
+}
+
+impl DispatchPayload {
+    /// The job this dispatch runs: the one it names, else [`DEFAULT_JOB`].
+    pub fn job_name(&self) -> &str {
+        self.job.as_deref().unwrap_or(DEFAULT_JOB)
+    }
 }
 
 /// A `events.ci.build_cancelled.<device_id>` payload.
@@ -182,7 +190,8 @@ mod tests {
         assert_eq!(full.manifest_path, ".qontinui/ci.toml");
         assert_eq!(full.check_name, "qontinui-ci-node");
         assert_eq!(full.pr_number, None);
-        assert_eq!(full.job, DEFAULT_JOB);
+        assert_eq!(full.job, None);
+        assert_eq!(full.job_name(), DEFAULT_JOB);
 
         // The sibling declaration key and a named job, when coord sends them.
         let with_pr: DispatchPayload = serde_json::from_value(serde_json::json!({
@@ -196,7 +205,8 @@ mod tests {
         }))
         .expect("pr_number and job must parse");
         assert_eq!(with_pr.pr_number, Some(1008));
-        assert_eq!(with_pr.job, "holder-crates");
+        assert_eq!(with_pr.job.as_deref(), Some("holder-crates"));
+        assert_eq!(with_pr.job_name(), "holder-crates");
 
         let lean: DispatchPayload = serde_json::from_value(serde_json::json!({
             "dispatch_id": "d1",

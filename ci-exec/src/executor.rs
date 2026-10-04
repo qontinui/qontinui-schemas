@@ -163,17 +163,42 @@ pub async fn run_dispatch(
     max_concurrent: u32,
 ) -> Conclusion {
     let sink: Arc<dyn LogSink> = reporter.sink();
+    let mut steps_summary: Vec<StepSummary> = Vec::new();
+
+    // ── Identifiers (before either touches a path or a URL) ──
+    //
+    // The dispatch id and the repo slug are joined into every path this run
+    // writes (`.ci-worktrees/<id>/<repo>`, `.ci-target/<repo>`). A host's
+    // admission may already have gated them, but the executor relies on no
+    // admission — so an unsafe one is refused here, with nothing written.
+    if !crate::dispatch::dispatch_id_is_safe(&payload.dispatch_id)
+        || !crate::dispatch::repo_slug_is_safe(&payload.repo)
+    {
+        sink.push(&format!(
+            "[ci-node] refusing dispatch: unsafe dispatch_id (len {}) or repo slug {:?}",
+            payload.dispatch_id.len(),
+            payload.repo
+        ));
+        return refuse_before_checkout(
+            reporter,
+            sink,
+            &mut steps_summary,
+            Instant::now(),
+            "unsafe_identifier",
+        )
+        .await;
+    }
+
     sink.push(&format!(
         "[ci-node] dispatch {} job={} repo={} sha={} check={} on {}",
         payload.dispatch_id,
-        payload.job,
+        payload.job_name(),
         payload.repo,
         payload.head_sha,
         payload.check_name,
         host.identity.label()
     ));
 
-    let mut steps_summary: Vec<StepSummary> = Vec::new();
     let started = Instant::now();
 
     // ── Host (before anything touches disk) ──
@@ -279,34 +304,54 @@ pub async fn run_dispatch(
 
     // ── Manifest (from the CHECKED-OUT tree, never coord) and the job ──
     let manifest_started = Instant::now();
-    let (manifest, job_at) = match load_manifest(&worktree, &payload.manifest_path)
-        .and_then(|m| job_index(&m, &payload.job).map(|i| (m, i)))
-    {
+    let selected = load_manifest(&worktree, &payload.manifest_path)
+        .map_err(|e| (e, false))
+        .and_then(|m| {
+            match job_index(&m, payload.job_name()) {
+                Ok(i) => Ok((m, i)),
+                // The dispatch named no job, so it asked for the default — and
+                // this manifest does not declare one. Nothing about the code was
+                // observed: a non-verdict, never a red. (Every coord dispatch
+                // omits `job` today, so without this a v2 manifest with no `ci`
+                // job would turn every merge candidate red.)
+                Err(e) if payload.job.is_none() => Err((e, true)),
+                Err(e) => Err((e, false)),
+            }
+        });
+    let (manifest, job_at) = match selected {
         Ok(selected) => selected,
-        Err(e) => {
-            sink.push(&format!("[ci-node] manifest rejected: {e}"));
-            steps_summary.push(setup_row("manifest", Conclusion::Failure, manifest_started));
+        Err((e, not_declared)) => {
+            let (conclusion, reason) = if not_declared {
+                sink.push(&format!(
+                    "[ci-node] the dispatch named no job and the manifest declares no default: {e}"
+                ));
+                (Conclusion::Cancelled, Some("job_not_declared"))
+            } else {
+                sink.push(&format!("[ci-node] manifest rejected: {e}"));
+                (Conclusion::Failure, None)
+            };
+            steps_summary.push(setup_row("manifest", conclusion, manifest_started));
             // No artifact: no step ever ran. Canonical: not evaluated.
             let reported = report::report(
                 reporter,
                 sink,
                 Verdict {
-                    conclusion: Conclusion::Failure,
+                    conclusion,
                     steps: &steps_summary,
-                    reason: None,
+                    reason,
                     test_results: None,
                     canonical: None,
                 },
             )
             .await;
             workspace.cleanup(reported).await;
-            return Conclusion::Failure;
+            return conclusion;
         }
     };
     let job = &manifest.jobs[job_at];
     // A job pinned to an OS this host is not: a non-verdict about the code
     // (whoever sent it to this host chose the wrong host), never a red.
-    if !Os::current().is_some_and(|os| job.runs_on(os)) {
+    if !job.runs_on(Os::current()) {
         sink.push(&format!(
             "[ci-node] job '{}' runs on {:?}; this host is {} — not running it here",
             job.name,
@@ -1313,7 +1358,17 @@ mod tests {
         (tmp, root, head)
     }
 
-    async fn run(root: &Path, head: &str, job: &str) -> (Conclusion, Recording) {
+    async fn run(root: &Path, head: &str, job: Option<&str>) -> (Conclusion, Recording) {
+        run_as(root, head, job, "e2e-1", "local/demo").await
+    }
+
+    async fn run_as(
+        root: &Path,
+        head: &str,
+        job: Option<&str>,
+        dispatch_id: &str,
+        repo: &str,
+    ) -> (Conclusion, Recording) {
         let host = crate::standalone::host(root.to_path_buf(), "test-host".to_string());
         let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
         let filed = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -1322,14 +1377,14 @@ mod tests {
             filed: filed.clone(),
         });
         let payload = DispatchPayload {
-            dispatch_id: "e2e-1".to_string(),
-            repo: "local/demo".to_string(),
+            dispatch_id: dispatch_id.to_string(),
+            repo: repo.to_string(),
             head_sha: head.to_string(),
             fetch_url: root.join("demo").to_string_lossy().replace('\\', "/"),
-            candidate_ref: "refs/ci-dispatch/local/e2e-1".to_string(),
+            candidate_ref: format!("refs/ci-dispatch/local/{dispatch_id}"),
             pr_number: None,
             manifest_path: ".qontinui/ci.toml".to_string(),
-            job: job.to_string(),
+            job: job.map(str::to_string),
             check_name: String::new(),
             coord_http_url: String::new(),
         };
@@ -1371,7 +1426,7 @@ command = ["git", "--version"]
     #[tokio::test]
     async fn a_green_job_runs_reports_once_and_cleans_up() {
         let (_tmp, root, head) = repo_with(TWO_JOBS);
-        let (conclusion, rec) = run(&root, &head, "green").await;
+        let (conclusion, rec) = run(&root, &head, Some("green")).await;
         assert_eq!(
             conclusion,
             Conclusion::Success,
@@ -1407,7 +1462,7 @@ command = ["git", "--version"]
     #[tokio::test]
     async fn a_failing_step_short_circuits_the_job() {
         let (_tmp, root, head) = repo_with(TWO_JOBS);
-        let (conclusion, rec) = run(&root, &head, "red").await;
+        let (conclusion, rec) = run(&root, &head, Some("red")).await;
         assert_eq!(conclusion, Conclusion::Failure);
         let filed = rec.filed.lock().unwrap().clone();
         assert_eq!(filed.len(), 1);
@@ -1424,17 +1479,20 @@ command = ["git", "--version"]
         assert!(!crate::checkout::ci_dispatch_root(&root, "e2e-1").exists());
     }
 
-    /// A job the manifest does not declare is a red manifest verdict, and a v1
-    /// manifest is reachable as job `ci`.
+    /// A job the dispatch NAMES that the manifest does not declare is a red
+    /// manifest verdict, and a v1 manifest is reachable as job `ci` — named
+    /// or defaulted.
     #[tokio::test]
     async fn job_selection_by_name() {
         let (_tmp, root, head) = repo_with(TWO_JOBS);
-        let (conclusion, rec) = run(&root, &head, "ci").await;
+        let (conclusion, rec) = run(&root, &head, Some("ci")).await;
         assert_eq!(conclusion, Conclusion::Failure);
+        let filed = rec.filed.lock().unwrap().clone();
         assert_eq!(
-            rec.filed.lock().unwrap()[0].1,
+            filed[0].1,
             ["[setup] checkout=success", "[setup] manifest=failure"]
         );
+        assert_eq!(filed[0].2, None);
         assert!(rec
             .lines
             .lock()
@@ -1444,8 +1502,62 @@ command = ["git", "--version"]
 
         let (_tmp1, root1, head1) =
             repo_with("version = 1\n[[steps]]\nname = \"v\"\ncommand = [\"git\", \"--version\"]\n");
-        let (conclusion, _) = run(&root1, &head1, crate::dispatch::DEFAULT_JOB).await;
-        assert_eq!(conclusion, Conclusion::Success);
+        let (conclusion, _) = run(&root1, &head1, None).await;
+        assert_eq!(
+            conclusion,
+            Conclusion::Success,
+            "a defaulted job runs a v1 manifest"
+        );
+        let (_tmp2, root2, head2) =
+            repo_with("version = 1\n[[steps]]\nname = \"v\"\ncommand = [\"git\", \"--version\"]\n");
+        let (conclusion, _) = run(&root2, &head2, Some("ci")).await;
+        assert_eq!(
+            conclusion,
+            Conclusion::Success,
+            "a named `ci` runs a v1 manifest"
+        );
+    }
+
+    /// A dispatch that names NO job against a v2 manifest with no `ci` job is
+    /// a non-verdict (`job_not_declared`), not a red: nothing about the code
+    /// was observed, and every coord dispatch omits `job` today.
+    #[tokio::test]
+    async fn a_defaulted_job_a_v2_manifest_does_not_declare_is_cancelled() {
+        let (_tmp, root, head) = repo_with(TWO_JOBS);
+        let (conclusion, rec) = run(&root, &head, None).await;
+        assert_eq!(conclusion, Conclusion::Cancelled);
+        let filed = rec.filed.lock().unwrap().clone();
+        assert_eq!(filed.len(), 1);
+        assert_eq!(
+            filed[0].1,
+            ["[setup] checkout=success", "[setup] manifest=cancelled"]
+        );
+        assert_eq!(filed[0].2.as_deref(), Some("job_not_declared"));
+        assert!(!crate::checkout::ci_dispatch_root(&root, "e2e-1").exists());
+    }
+
+    /// An unsafe dispatch id or repo slug is refused before anything is
+    /// written: no dispatch root, no target dir, no worktree.
+    #[tokio::test]
+    async fn unsafe_identifiers_are_refused_with_nothing_written() {
+        let (_tmp, root, head) = repo_with(TWO_JOBS);
+        for (id, repo) in [("../../escape", "local/demo"), ("ok-id", "owner/../demo")] {
+            let (conclusion, rec) = run_as(&root, &head, Some("green"), id, repo).await;
+            assert_eq!(conclusion, Conclusion::Cancelled, "{id} {repo}");
+            let filed = rec.filed.lock().unwrap().clone();
+            assert_eq!(filed.len(), 1);
+            assert_eq!(filed[0].1, ["[setup] host=cancelled"]);
+            assert_eq!(filed[0].2.as_deref(), Some("unsafe_identifier"));
+        }
+        let entries: Vec<_> = std::fs::read_dir(&root)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            entries,
+            ["demo"],
+            "nothing but the repo itself may exist under the root"
+        );
     }
 
     /// A job pinned to an OS this host is not is a non-verdict, not a red.
@@ -1456,7 +1568,7 @@ command = ["git", "--version"]
             "version = 2\n[[jobs]]\nname = \"elsewhere\"\nos = \"{other}\"\n[[jobs.steps]]\nname = \"s\"\ncommand = [\"git\", \"--version\"]\n"
         );
         let (_tmp, root, head) = repo_with(&manifest);
-        let (conclusion, rec) = run(&root, &head, "elsewhere").await;
+        let (conclusion, rec) = run(&root, &head, Some("elsewhere")).await;
         assert_eq!(conclusion, Conclusion::Cancelled);
         assert_eq!(
             rec.filed.lock().unwrap()[0].2.as_deref(),
