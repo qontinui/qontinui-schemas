@@ -75,6 +75,10 @@ validate  parse and validate the manifest; exit 0 when it is valid";
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        // A failed log write must never panic: after a SIGHUP or a closed pipe
+        // stderr returns EIO/EPIPE, and the default internal-error report is an
+        // `eprintln!` that would abort cleanup mid-way.
+        .log_internal_errors(false)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_env("QONTINUI_CI_LOG")
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
