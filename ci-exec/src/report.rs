@@ -80,6 +80,12 @@ pub struct Verdict<'a> {
 }
 
 /// Where one run reports. Created by the host before the run starts.
+///
+/// A reporter addressed by the dispatch id (coord's progress/result routes)
+/// must only be built for an id that passed
+/// [`crate::dispatch::dispatch_id_is_safe`]: gate the id first, then build the
+/// reporter. `run_dispatch` drops an unsafe id without touching the reporter,
+/// but it cannot un-bind an id the reporter already put in a URL.
 pub trait Reporter: Send {
     /// The sink this run's log lines go to. The executor holds the returned
     /// handle (and its clones) only until it files the verdict.
