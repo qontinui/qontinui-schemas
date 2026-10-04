@@ -4,23 +4,30 @@ qontinui-ci import --report
   default branch: main
   rule: A workflow job is considered when its workflow runs on `pull_request` /
         `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
-        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
-        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
-        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
-        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
-        and any non-bash script, is one opaque gate command no manifest step can match. A gate
-        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) whose `os` includes every OS the workflow job runs on runs the same command in the
-        same working directory. SAME COMMAND means the whole argv is equal after normalization:
-        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
-        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
-        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
-        dropped from each word. Every other word — every flag and argument — must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
-        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
-        command at all and a manifest gate job carries its imported name). A job name alone never
-        covers a job that runs commands.
+        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
+        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
+        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
+        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
+        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
+        `cancelled()`, steps with a literal `continue-on-error: true`, and known
+        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
+        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
+        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
+        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
+        runs the same command in the same working directory, on a job whose `os` includes every OS
+        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
+        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
+        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
+        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
+        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
+        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
+        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
+        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
+        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
+        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
+        COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (10):
   UNCOVERED       commitlint.yml › commitlint [pull_request] 0/1 gate command(s) matched
@@ -31,40 +38,112 @@ JOBS ON pull_request / push:main (10):
   UNCOVERED       release-pr-sanity.yml › release-pr-sanity [pull_request] 0/1 gate command(s) matched
       missing: bash .github/scripts/release-pr-sanity.sh
       note:    job condition `if: startsWith(github.head_ref, 'release-please--')` — considered as running
-  UNCOVERED       runner-consumer-check.yml › consumer-check [pull_request] 0/11 gate command(s) matched
+  UNCOVERED       runner-consumer-check.yml › consumer-check [pull_request] 0/50 gate command(s) matched
       missing: git diff --name-only $BASE_SHA $HEAD_SHA
-      missing: <outside the repository>/: sudo swapoff -a
+      missing: grep -qE ^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$|\.githu
+      missing: [ -n $changed ]
+      missing: sed s/^/  changed: /
+      missing: <outside the repository>/: git rev-parse HEAD
+      missing: <outside the repository>/: sudo apt-get update
+      missing: <outside the repository>/: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
       missing: <outside the repository>/: sudo fallocate -l 12G /swapfile
+      missing: <outside the repository>/: sudo chmod 600 /swapfile
       missing: <outside the repository>/: sudo mkswap /swapfile
       missing: <outside the repository>/: sudo swapon /swapfile
+      missing: <outside the repository>/: free -h
+      missing: <outside the repository>/: mkdir -p $EXPR{{ matrix.workdir }}/dist
+      missing: <outside the repository>/: [ -z ${PR_NUMBER:-} ]
       missing: <outside the repository>/: gh api repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: <outside the repository>/: [ $rc -ne 0 ]
+      missing: <outside the repository>/: sed s/^/  /
+      missing: <outside the repository>/: [ $repo_short = $consumer_short ]
+      missing: <outside the repository>/: [ -z $target ]
       missing: <outside the repository>/: gh api --paginate repos/${CONSUMER_REPO}/pulls?state=open&per_page=100 --jq [.[] | select(any(.label
+      missing: <outside the repository>/: [ -n $mirror ]
       missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/pulls/${target} --jq .head.sha + " " + .head.ref + " " + .state + " " 
+      missing: <outside the repository>/: cut -d  -f1
+      missing: <outside the repository>/: cut -d  -f2
+      missing: <outside the repository>/: cut -d  -f3
+      missing: <outside the repository>/: cut -d  -f4
+      missing: <outside the repository>/: [ $state != open ]
+      missing: <outside the repository>/: [ $base != main ]
       missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/rules/branches/main
+      missing: <outside the repository>/: jq -r [.[] | select(.type == "required_status_checks")
+                | .parameters.required_status
+      missing: <outside the repository>/: tr -d \r
+      missing: <outside the repository>/: [ -z $required ]
+      missing: <outside the repository>/: tr \n ,
+      missing: <outside the repository>/: sed s/,$//
       missing: <outside the repository>/: gh api --paginate repos/${CONSUMER_REPO}/commits/${sha}/check-runs?per_page=100
       missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/commits/${sha}/status?per_page=100
-      note:    matrix job — considered once
-  UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/2 gate command(s) matched
+      missing: <outside the repository>/: jq -rs [.[].check_runs[]] | group_by(.name) | map(max_by(.id))
+             | .[]
+             | [ .
+      missing: <outside the repository>/: jq -r [.statuses[]?] | .[]
+             | [ .context,
+                 (if .state == "success" then 
+      missing: <outside the repository>/: awk -F\t -v c=$ctx $1 == c { print $2; exit }
+      missing: <outside the repository>/: [ -n $red_list ]
+      missing: <outside the repository>/: [ -n $pending_list ]
+      missing: <outside the repository>/: [ ${RUN_GATE:-false} != true ]
+      missing: <outside the repository>/: [ $LEG1 != success ]
+      missing: <outside the repository>/: [ $LEG1 != failure ]
+      missing: <outside the repository>/: [ $LEG1 = success ]
+      missing: <outside the repository>/: [ $DECLARED = true ]
+      missing: <outside the repository>/: [ $LEG2 = success ]
+      missing: <outside the repository>/: [ -n $checks_case ]
+      missing: <outside the repository>/: [ $DECLARE_REASON = declared-pr-checks-red ]
+      missing: <outside the repository>/: [ $DECLARED != true ]
+      review:  matrix legs include = ["consumer: qontinui-runner repo: qontinui/qontinui-runner workdir: qontinui-runner needs_dist_stub: 'true' heavy: 'true'", "consumer: qontinui-supervisor repo: qontinui/qontinui-supervisor workdir: qontinui-supervisor needs_dist_stub: 'false' heavy: 'false'"] — the manifest runs one leg
+  UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/5 gate command(s) matched
       missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file
+      missing: [ ${#violations[@]} -eq 0 ]
       missing: gh api --paginate repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: [ $rc -ne 0 ]
+      missing: grep -qxF wire-gate:override
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       runner-consumer-check.yml › consumer-gate [pull_request] 0/0 gate command(s) matched
       note:    job condition `if: always()` — considered as running
-      note:    no gate command found (only setup, glue or diagnostics)
-  PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 4/6 gate command(s) matched
+      note:    no gate command found
+  PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 5/22 gate command(s) matched
+      missing: sed -n s/^# source-sha256:[[:space:]]*//p $F
+      missing: head -1
+      missing: [ -n $WANT ]
+      missing: awk /^# >>> CARGO_VACUITY_AWK /{f=1;next} /^# <<< CARGO_VACUITY_AWK /{f=0} f $F
+      missing: sha256sum
+      missing: cut -d  -f1
+      missing: [ $WANT = $GOT ]
+      missing: tee /tmp/cargo-test.out
+      missing: awk -f .github/scripts/cargo-vacuity-count.awk /tmp/cargo-test.out
+      missing: [ ${SUMMARIES} -eq 0 ]
+      missing: [ ${SUBRC} -eq 0 ]
+      missing: [ ${RAN} -lt ${MIN_TESTS} ]
+      missing: [ ${SUMMARIES} -lt ${MIN_TARGETS} ]
+      missing: [ ${FLOOR_MISSED} -ne 0 ]
+      missing: [ ${SUBRC} -ne 0 ]
       missing: cargo test -p qontinui-types --test fleet_nouns_vocabulary hit_matrix_for_the_cross_engine_check
       missing: python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json
+      matched: cargo fetch --locked  ←  ci/rust-lock
       matched: cargo fmt --all -- --check  ←  ci/rust-fmt
       matched: cargo clippy --workspace --all-targets -- -D warnings  ←  ci/rust-clippy
       matched: cargo build --workspace --all-targets  ←  ci/rust-build
       matched: cargo test --workspace  ←  ci/rust-test
-  UNCOVERED       schema-drift.yml › check-drift [pull_request, push:main (paths-filtered)] 0/3 gate command(s) matched
+  UNCOVERED       schema-drift.yml › check-drift [pull_request, push:main (paths-filtered)] 0/9 gate command(s) matched
       missing: uses: qontinui/qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/: sudo apt-get update
+      missing: <outside the repository>/: sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-a
+      missing: npm install
+      missing: <outside the repository>/: pip install datamodel-code-generator==0.57.0
+      missing: <outside the repository>/: mkdir -p qontinui-runner/dist
       missing: bash scripts/check-generated-drift.sh --preflight
+      missing: <outside the repository>/: bash $GENERATE_TYPES_SH
       missing: bash scripts/check-generated-drift.sh --verify
-  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/1 gate command(s) matched
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/3 gate command(s) matched
+      missing: curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v${GL}/gitleaks_${GL}_linux_x64.tar
+      missing: tar -xz gitleaks
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
-  UNCOVERED       ts-typecheck.yml › typecheck [pull_request, push:main] 0/2 gate command(s) matched
+  UNCOVERED       ts-typecheck.yml › typecheck [pull_request, push:main] 0/3 gate command(s) matched
+      missing: ts: npm ci
       missing: ts: npm run typecheck
       missing: ts: npm test
 
@@ -289,4 +368,4 @@ NO-OPS (28) — accounted for; nothing to declare:
   - ts-typecheck.yml › typecheck › step "actions/setup-node@v5": setup-node cache — a dependency
       cache, not a gate
 
-summary: 0 covered, 0 covered by name, 1 partial, 9 uncovered of 10 job(s); 54 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 0 covered, 0 needs-review, 0 name-only, 1 partial, 9 uncovered of 10 job(s); 54 untranslated construct(s) — the Phase 9 precondition is NOT MET

@@ -25,24 +25,28 @@
 //! | [`report`] | the [`report::Reporter`] seam and the capture-before-cleanup receipt |
 //! | [`host`] | the traits a host implements |
 //! | [`standalone`] | the host implementations for a plain shell (`qontinui-ci`) |
-//! | [`import`] | `qontinui-ci import`: GitHub workflows → a v2 manifest, and the `--report` coverage check |
-//! | [`gen_workflow`] | `qontinui-ci gen-workflow`: the generated hybrid-mode GitHub workflow and its `--check` |
-//! | [`gha`] | the read-only GitHub workflow model the importer reads |
-//! | [`shell`] | the argv subset of shell a `run:` script must stay inside to be imported |
+//! | [`import`] (feature `import`) | `qontinui-ci import`: GitHub workflows → a v2 manifest, and the `--report` coverage check |
+//! | [`gen_workflow`] (feature `import`) | `qontinui-ci gen-workflow`: the generated hybrid-mode GitHub workflow and its `--check` |
+//! | [`gha`] (feature `import`) | the read-only GitHub workflow model the importer reads |
+//! | [`shell`] (feature `import`) | the argv subset of shell a `run:` script must stay inside to be imported |
 
 pub mod canonical;
 pub mod checkout;
 pub mod dispatch;
 pub mod executor;
+#[cfg(feature = "import")]
 pub mod gen_workflow;
+#[cfg(feature = "import")]
 pub mod gha;
 pub mod host;
 pub mod host_sizing;
+#[cfg(feature = "import")]
 pub mod import;
 pub mod junit;
 pub mod manifest;
 pub mod report;
 pub mod services;
+#[cfg(feature = "import")]
 pub mod shell;
 pub mod sibling;
 pub mod standalone;

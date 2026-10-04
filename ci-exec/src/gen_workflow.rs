@@ -14,6 +14,10 @@
 //! * Scheduled manifest jobs are not generated: they run only on coord's
 //!   schedule, and a dispatch is a gate run.
 //! * The header marks the file GENERATED and records a content hash.
+//! * The executor is installed from a pinned qontinui-schemas commit (a full
+//!   sha, required): generation refuses a branch or a tag. `--check` takes the
+//!   EXPECTED pin from its own `--executor-rev`, never from the committed
+//!   file, so a hand-edited pin with a recomputed hash is still caught.
 //!
 //! # A hand-edit fails CI
 //!
@@ -26,14 +30,14 @@
 //! ```toml
 //! [[jobs.steps]]
 //! name = "generated workflow is current"
-//! command = ["qontinui-ci", "gen-workflow", "--check"]
+//! command = ["qontinui-ci", "gen-workflow", "--check", "--executor-rev", "<the pinned 40-hex sha>"]
 //! ```
 //!
 //! or, in a GitHub workflow that still exists beside it:
 //!
 //! ```yaml
 //! - name: The generated hybrid workflow is not hand-edited
-//!   run: qontinui-ci gen-workflow --check
+//!   run: qontinui-ci gen-workflow --check --executor-rev <the pinned 40-hex sha>
 //! ```
 //!
 //! (qontinui-schemas itself commits no generated workflow, so it wires
@@ -77,8 +81,10 @@ const PROVISIONING_MINUTES: u64 = 30;
 pub struct GenOptions {
     /// The manifest's repo-relative path (passed to `qontinui-ci run`).
     pub manifest_path: String,
-    /// Install the executor at this commit; `None` installs `main`.
-    pub executor_rev: Option<String>,
+    /// The qontinui-schemas commit the executor is installed from: a full
+    /// 40-hex sha ([`pinned_rev`]). A branch or tag would let the GitHub leg
+    /// run a different executor than the one the workflow was generated for.
+    pub executor_rev: String,
 }
 
 fn runner_label(os: Os) -> &'static str {
@@ -137,14 +143,9 @@ pub fn plain_token(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'))
 }
 
-/// The `--rev` a generated file installs the executor at, if any — so
-/// `--check` regenerates with the same pin the file was written with.
-pub fn recorded_executor_rev(text: &str) -> Option<String> {
-    text.lines()
-        .find(|l| l.contains("cargo install --locked --git ") && l.contains(" --rev "))
-        .and_then(|l| l.split(" --rev ").nth(1))
-        .and_then(|r| r.split_whitespace().next())
-        .map(str::to_string)
+/// A full, lowercase 40-hex commit sha — the only executor pin accepted.
+pub fn pinned_rev(s: &str) -> bool {
+    s.len() == 40 && s.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
 }
 
 /// Generate the workflow for `manifest`.
@@ -196,14 +197,10 @@ pub fn generate(manifest: &CiManifest, opts: &GenOptions) -> String {
            contents: read\n\
          jobs:\n",
     );
-    let install = match &opts.executor_rev {
-        Some(rev) => format!(
-            "cargo install --locked --git {EXECUTOR_REPO} --rev {rev} qontinui-ci-exec --bin qontinui-ci"
-        ),
-        None => format!(
-            "cargo install --locked --git {EXECUTOR_REPO} --branch main qontinui-ci-exec --bin qontinui-ci"
-        ),
-    };
+    let install = format!(
+        "cargo install --locked --git {EXECUTOR_REPO} --rev {} qontinui-ci-exec --features import --bin qontinui-ci",
+        opts.executor_rev
+    );
     let mut first = true;
     for job in manifest.gate_jobs() {
         if !first {
@@ -382,9 +379,11 @@ command = ["cargo", "test", "--", "--ignored"]
     fn opts() -> GenOptions {
         GenOptions {
             manifest_path: ".qontinui/ci.toml".to_string(),
-            executor_rev: None,
+            executor_rev: REV.to_string(),
         }
     }
+
+    const REV: &str = "84b13b0de3dd322f48e9f472a84c9ba490e88a3d";
 
     #[test]
     fn one_job_per_gate_job_dispatch_only() {
@@ -429,12 +428,22 @@ command = ["cargo", "test", "--", "--ignored"]
             &m,
             &GenOptions {
                 manifest_path: ".qontinui/ci.toml".into(),
-                executor_rev: Some("abc123".into()),
+                executor_rev: "0123456789abcdef0123456789abcdef01234567".into(),
             },
         );
         assert_eq!(check(Some(&other), &text), CheckVerdict::Stale);
-        assert_eq!(recorded_executor_rev(&other).as_deref(), Some("abc123"));
-        assert_eq!(recorded_executor_rev(&text), None);
+        // A hand-edited pin with a recomputed hash is still stale against the
+        // expected pin.
+        let forged = {
+            let swapped = text.replace(REV, "0123456789abcdef0123456789abcdef01234567");
+            let h = content_hash(&swapped).unwrap();
+            let old = recorded_hash(&swapped).unwrap().to_string();
+            swapped.replace(&old, &h)
+        };
+        assert_eq!(check(Some(&forged), &text), CheckVerdict::Stale);
+        assert!(pinned_rev(REV));
+        assert!(!pinned_rev("main"));
+        assert!(!pinned_rev("v1.0.0"));
         assert!(plain_token(".qontinui/ci.toml"));
         assert!(!plain_token("my ci.toml"));
         assert!(!plain_token("/abs/ci.toml"));

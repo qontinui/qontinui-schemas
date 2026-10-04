@@ -236,7 +236,7 @@ name = "rust-clippy"
 # than through a tiered [lints.clippy] table, so dropping it would silently
 # weaken the gate (the opposite of coord's manifest, where ADDING it would
 # strengthen the gate past what CI enforces).
-command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--features", "qontinui-ci-exec/import", "--", "-D", "warnings"]
 timeout_secs = 7200
 
 [[steps]]
@@ -245,7 +245,7 @@ name = "rust-build"
 # rust-vision-core's `vision-audit` bin, the examples and the test targets into
 # the compile, so a break confined to a non-lib target is caught here rather
 # than at publish time.
-command = ["cargo", "build", "--workspace", "--all-targets"]
+command = ["cargo", "build", "--workspace", "--all-targets", "--features", "qontinui-ci-exec/import"]
 timeout_secs = 7200
 
 [[steps]]
@@ -268,5 +268,5 @@ name = "rust-test"
 # its tests stands up a tokio runtime in its own process at ~1 GiB; these four
 # crates are serde types, tree-sitter bindings and an image pipeline sharing a
 # single test process. Revisit if a dispatch on a real host says otherwise.
-command = ["cargo", "test", "--workspace"]
+command = ["cargo", "test", "--workspace", "--features", "qontinui-ci-exec/import"]
 timeout_secs = 7200

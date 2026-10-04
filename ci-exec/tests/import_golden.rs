@@ -52,6 +52,9 @@ const REPOS: &[&str] = &[
     "ui-bridge",
 ];
 
+/// A fixed executor pin for generation (any full sha; the goldens embed it).
+const EXECUTOR_REV: &str = "84b13b0de3dd322f48e9f472a84c9ba490e88a3d";
+
 fn crate_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -261,7 +264,8 @@ fn web_report_finds_the_uncovered_backend_suite() {
     assert_eq!(verdict("alembic-graph-pr.yml", "alembic-heads-pr"), Coverage::Uncovered);
     assert_eq!(verdict("forbid-public-schema.yml", "forbid-public-schema"), Coverage::Covered);
     assert_eq!(verdict("backend-ci.yml", "test"), Coverage::Partial);
-    assert_eq!(verdict("backend-ci.yml", "security-scan"), Coverage::Uncovered);
+    // Its installs match the manifest's; Trivy and `safety check` do not.
+    assert_eq!(verdict("backend-ci.yml", "security-scan"), Coverage::Partial);
     assert!(!report.all_covered());
     let test = report
         .jobs
@@ -313,7 +317,7 @@ fn golden_import_report_and_gen_workflow_for_every_repo() {
             &m,
             &GenOptions {
                 manifest_path: ".qontinui/ci.toml".to_string(),
-                executor_rev: None,
+                executor_rev: EXECUTOR_REV.to_string(),
             },
         );
         assert_eq!(gen_workflow::check(Some(&generated), &generated), CheckVerdict::UpToDate);
@@ -356,7 +360,7 @@ fn hand_written_qontinui_ci_yml_is_not_generated() {
                 &repo_manifest(repo),
                 &GenOptions {
                     manifest_path: ".qontinui/ci.toml".to_string(),
-                    executor_rev: None,
+                    executor_rev: EXECUTOR_REV.to_string(),
                 },
             )
         };
@@ -383,11 +387,23 @@ fn cli_gen_workflow_check_and_import_refusals() {
     let root = dir.path();
     write(root, ".qontinui/ci.toml", &std::fs::read_to_string(fixture("qontinui-runner").join("ci.toml")).unwrap());
 
-    let check = |root: &Path| cli().current_dir(root).args(["gen-workflow", "--check"]).output().unwrap();
+    let check = |root: &Path| {
+        cli()
+            .current_dir(root)
+            .args(["gen-workflow", "--check", "--executor-rev", EXECUTOR_REV])
+            .output()
+            .unwrap()
+    };
     let out = check(root);
     assert_eq!(out.status.code(), Some(1), "missing file must fail --check");
 
+    // No pin, or a movable one, is refused.
     let out = cli().current_dir(root).args(["gen-workflow"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--executor-rev"));
+    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", "main"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", EXECUTOR_REV]).output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(check(root).status.code(), Some(0));
 
@@ -399,10 +415,14 @@ fn cli_gen_workflow_check_and_import_refusals() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("hand-edited"));
 
     std::fs::write(&wf, "name: hand written\non: push\njobs: {}\n").unwrap();
-    let out = cli().current_dir(root).args(["gen-workflow"]).output().unwrap();
+    let out = cli().current_dir(root).args(["gen-workflow", "--executor-rev", EXECUTOR_REV]).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stderr).contains("not a generated file"));
-    let out = cli().current_dir(root).args(["gen-workflow", "--force"]).output().unwrap();
+    let out = cli()
+        .current_dir(root)
+        .args(["gen-workflow", "--executor-rev", EXECUTOR_REV, "--force"])
+        .output()
+        .unwrap();
     assert!(out.status.success());
     assert_eq!(check(root).status.code(), Some(0));
 

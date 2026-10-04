@@ -15,6 +15,18 @@ name = "qontinui_ci_exec"
 [[bin]]
 name = "qontinui-ci"
 path = "src/bin/qontinui_ci/main.rs"
+# The CLI carries `import` and `gen-workflow`; library consumers (the runner,
+# coord) build without the feature and never compile libyaml.
+required-features = ["import"]
+
+[[test]]
+name = "import_golden"
+path = "tests/import_golden.rs"
+required-features = ["import"]
+
+[features]
+# The GitHub-workflow importer and the hybrid workflow generator.
+import = ["dep:serde_yaml_ng"]
 
 [dependencies]
 bytes = "1"
@@ -24,9 +36,9 @@ rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# GitHub workflow YAML for `qontinui-ci import`. serde_yaml itself is
-# deprecated upstream; this is its maintained continuation.
-serde_yaml_ng = "0.10"
+# GitHub workflow YAML for `qontinui-ci import` (feature `import`).
+# serde_yaml itself is deprecated upstream; this is a maintained fork.
+serde_yaml_ng = { version = "0.10", optional = true }
 sha2 = "0.10"
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 tar = "0.4"

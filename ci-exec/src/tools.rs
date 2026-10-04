@@ -502,6 +502,7 @@ pub(crate) fn known_tool_names() -> Vec<&'static str> {
     KNOWN_TOOLS.iter().map(|t| t.name).collect()
 }
 
+#[cfg(feature = "import")]
 /// The node versions the registry can provision — those with reviewed
 /// digests — ascending, each once. The workflow importer resolves an
 /// `actions/setup-node` `node-version` against this list rather than guessing

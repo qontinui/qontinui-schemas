@@ -122,10 +122,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import -- -D warnings
 
       - name: cargo build
-        run: cargo build --workspace --all-targets
+        run: cargo build --workspace --all-targets --features qontinui-ci-exec/import
 
       # The vacuity parser below is a COPY. Its source of record is
       # qontinui-claude-config/scripts/lib/cargo-vacuity.sh, which this runner
@@ -153,7 +153,10 @@ jobs:
           # this to a fraction and still exits 0. Measured 2026-09-06: 887 tests
           # across 15 crate targets (re-measured below for the target floor).
           set +e
-          cargo test --workspace 2>&1 | tee /tmp/cargo-test.out
+          # --features qontinui-ci-exec/import: the `qontinui-ci` binary, the
+          # workflow importer/generator and their golden tests sit behind that
+          # non-default feature (library consumers do not pull in libyaml).
+          cargo test --workspace --features qontinui-ci-exec/import 2>&1 | tee /tmp/cargo-test.out
           SUBRC=${PIPESTATUS[0]}
           set -e
 
@@ -264,5 +267,5 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: cargo test -p qontinui-ci-exec
-        run: cargo test --locked -p qontinui-ci-exec
+      - name: cargo test -p qontinui-ci-exec --features import
+        run: cargo test --locked -p qontinui-ci-exec --features import

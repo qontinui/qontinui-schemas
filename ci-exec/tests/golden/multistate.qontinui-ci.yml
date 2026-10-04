@@ -11,7 +11,7 @@
 #
 # Scheduled manifest jobs are not part of the GitHub leg: none.
 #
-# qontinui-ci-content-sha256: 250dc4a41c8763d2ffbb19a4dbc566599a12d935f5eb278f4ae4cadfc459ff7e
+# qontinui-ci-content-sha256: 5deb90d78ea5da4e69036da51a55b49c29b61765de024eace01a79dd89f89f83
 
 name: qontinui-ci
 on:
@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false
       - name: Install qontinui-ci
         shell: bash
-        run: cargo install --locked --git https://github.com/qontinui/qontinui-schemas --branch main qontinui-ci-exec --bin qontinui-ci
+        run: cargo install --locked --git https://github.com/qontinui/qontinui-schemas --rev 84b13b0de3dd322f48e9f472a84c9ba490e88a3d qontinui-ci-exec --features import --bin qontinui-ci
       - name: "qontinui-ci run --job ci"
         shell: bash
         env:

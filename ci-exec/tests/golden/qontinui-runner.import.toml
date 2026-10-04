@@ -33,7 +33,7 @@
 # definition only once every UNTRANSLATED item below is handled by hand; check with
 # `qontinui-ci import --report .qontinui/ci.toml <the workflows>`.
 #
-# UNTRANSLATED (253) — not represented in the manifest — each must be handled by hand:
+# UNTRANSLATED (274) — not represented in the manifest — each must be handled by hand:
 #   - build-python-executor.yml: trigger `workflow_call` is not carried — a manifest job runs for
 #       pull requests, merge candidates and pushes, or on its schedule
 #   - flake-escalation.yml: trigger `workflow_run` is not carried — a manifest job runs for pull
@@ -93,6 +93,8 @@
 #       manifest runs commands only, so translate its effect by hand
 #   - ci.yml › test › step "Setup Node.js": node-version "20" resolves to no node release the tool
 #       registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+#   - ci.yml › test › step "Run CI-tooling unit tests (ci-flake-analyze, ci-test-results-ingest, ci-expiry-phase-summary)": run
+#       script not imported — on a Windows runner a `run:` with no `shell:` is PowerShell, not bash
 #   - ci.yml › test › step "Cargo.lock is in sync with the pinned qontinui-schemas": run script not
 #       imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard
 #       has an argv form)
@@ -105,8 +107,22 @@
 #   - ci.yml › test › step "Configure pagefile (Windows — guard against link-time OOM)": runs only
 #       `if: matrix.platform == 'windows-latest'` — the manifest has no step conditions; not
 #       imported
+#   - ci.yml › test › step "Install frontend dependencies": run script not imported — on a Windows
+#       runner a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › test › step "Lint frontend code": run script not imported — on a Windows runner a
+#       `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › test › step "Verify component-action effect fixture": run script not imported — on a
+#       Windows runner a `run:` with no `shell:` is PowerShell, not bash
 #   - ci.yml › test › step "Contract-smoke effect-probe verdict (PS 5.1)": runs only `if:
 #       matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
+#   - ci.yml › test › step "Typecheck frontend code": run script not imported — on a Windows runner
+#       a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › test › step "Run frontend unit tests": run script not imported — on a Windows runner
+#       a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › test › step "Build frontend": run script not imported — on a Windows runner a `run:`
+#       with no `shell:` is PowerShell, not bash
+#   - ci.yml › test › step "Format Rust code check": run script not imported — on a Windows runner a
+#       `run:` with no `shell:` is PowerShell, not bash
 #   - ci.yml › test › step "Clippy check": runs only `if: matrix.platform == 'ubuntu-22.04'` — the
 #       manifest has no step conditions; not imported
 #   - ci.yml › test › step "Poison ambient state": run script not imported — uses a subshell
@@ -124,12 +140,15 @@
 #   - ci.yml › test › step "Unpoison ambient state": run script not imported — uses a subshell
 #   - ci.yml › test › step "Live AI extractor smoke": runs only `if: matrix.platform ==
 #       'ubuntu-22.04'` — the manifest has no step conditions; not imported
+#   - ci.yml › test › step "Build Tauri app (development)": run script not imported — on a Windows
+#       runner a `run:` with no `shell:` is PowerShell, not bash
 #   - ci.yml › test › step "Contract-smoke summary invariants (PS 5.1)": runs only `if:
 #       matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
 #   - ci.yml › test › step "CI-integrity guard policy": runs only `if: matrix.platform ==
 #       'ubuntu-22.04'` — the manifest has no step conditions; not imported
 #   - ci.yml › test › step "SDK↔runner contract smoke (direct-exe)": runs only `if: matrix.platform
 #       == 'windows-latest'` — the manifest has no step conditions; not imported
+#   - ci.yml › test: no step could be translated — the job is not imported
 #   - ci.yml › clippy-windows › step "Check out sibling qontinui-schemas": local action
 #       ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
 #       hand
@@ -146,9 +165,21 @@
 #   - ci.yml › clippy-windows › step "Configure pagefile (Windows — guard against link-time OOM)": uses
 #       al-cheb/configure-pagefile-action@v1.4 — an arbitrary action; the manifest runs commands
 #       only, so translate its effect by hand
+#   - ci.yml › clippy-windows › step "Install frontend dependencies": run script not imported — on a
+#       Windows runner a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › clippy-windows › step "Build frontend": run script not imported — on a Windows runner
+#       a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › clippy-windows › step "Clippy check": run script not imported — on a Windows runner a
+#       `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › clippy-windows: no step could be translated — the job is not imported
 #   - ci.yml › holder-crates › step "Check out sibling qontinui-schemas": local action
 #       ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
 #       hand
+#   - ci.yml › holder-crates › step "Test holder crates": run script not imported — on a Windows
+#       runner a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › holder-crates › step "Clippy holder crates": run script not imported — on a Windows
+#       runner a `run:` with no `shell:` is PowerShell, not bash
+#   - ci.yml › holder-crates: no step could be translated — the job is not imported
 #   - ci.yml › frontend-tests › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary action;
 #       the manifest runs commands only, so translate its effect by hand
 #   - ci.yml › frontend-tests › step "Setup Node.js": node-version "20" resolves to no node release
@@ -360,6 +391,10 @@
 #   - published-parity.yml › published-parity › step "Setup Node.js": node-version "20" resolves to
 #       no node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]]
 #       node by hand
+#   - published-parity.yml › published-parity › step "Install frontend dependencies": run script not
+#       imported — on a Windows runner a `run:` with no `shell:` is PowerShell, not bash
+#   - published-parity.yml › published-parity › step "Build Tauri app (development)": run script not
+#       imported — on a Windows runner a `run:` with no `shell:` is PowerShell, not bash
 #   - published-parity.yml › published-parity › step "Resolve the release to compare against": run
 #       script not imported — uses the expression ${{ github.repository }} — a manifest command is a
 #       literal, evaluated by no one
@@ -450,6 +485,10 @@
 #   - reproducibility-gate.yml › repro-build › step "Setup Node.js": node-version "20" resolves to
 #       no node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]]
 #       node by hand
+#   - reproducibility-gate.yml › repro-build › step "Install frontend dependencies": run script not
+#       imported — on a Windows runner a `run:` with no `shell:` is PowerShell, not bash
+#   - reproducibility-gate.yml › repro-build › step "Build frontend (creates dist/ for tauri::generate_context!)": run
+#       script not imported — on a Windows runner a `run:` with no `shell:` is PowerShell, not bash
 #   - reproducibility-gate.yml › repro-build › step "Build": env CARGO_BUILD_JOBS is set by the
 #       executor — express it as [limits].cargo_build_jobs; not imported
 #   - reproducibility-gate.yml › repro-build › step "Hash build": run script not imported — uses an
@@ -650,7 +689,7 @@
 #   - stacked-pr-fastlane.yml › frontend-fast: needs scope, which was not imported — dependency edge
 #       dropped
 #
-# TRANSLATED WITH A CHANGE (83) — represented, but not literally:
+# TRANSLATED WITH A CHANGE (80) — represented, but not literally:
 #   - advisory-red-detector.yml: pull_request, push filtered by paths — a manifest job runs for
 #       every change
 #   - advisory-red-detector.yml: trigger filters not carried (pull_request branches ["main"]; push
@@ -758,12 +797,6 @@
 #   - ci-timeout-marker-selftest.yml › selftest: job timeout-minutes applied to each imported step
 #       without its own — the manifest has per-step timeouts only
 #   - ci.yml › test: job timeout-minutes 150 exceeds the manifest's per-step cap; clamped to 7200s
-#   - ci.yml › test: job timeout-minutes applied to each imported step without its own — the
-#       manifest has per-step timeouts only
-#   - ci.yml › clippy-windows: job timeout-minutes applied to each imported step without its own —
-#       the manifest has per-step timeouts only
-#   - ci.yml › holder-crates: job timeout-minutes applied to each imported step without its own —
-#       the manifest has per-step timeouts only
 #   - ci.yml › frontend-tests: job timeout-minutes applied to each imported step without its own —
 #       the manifest has per-step timeouts only
 #   - clippy-tiers.yml › clippy-nightly-unscoped › step "Checkout sibling repos": the script clones
@@ -1203,149 +1236,6 @@ command = ["python3", "scripts/tests/test_ci_timeout_marker.py"]
 timeout_secs = 300
 
 [[jobs]]
-# from ci.yml › test
-name = "test"
-os = ["linux", "windows"]
-
-[[jobs.steps]]
-# from step "Run CI-tooling unit tests (ci-flake-analyze, ci-test-results-ingest, ci-expiry-phase-summary)"
-name = "Run CI-tooling unit tests (ci-flake-analyze, ci-test-results-ingest, ci-expiry-phase-summary)"
-command = ["node", "--test", "scripts/__tests__/ci-flake-analyze.test.mjs", "scripts/__tests__/ci-test-results-ingest.test.mjs", "scripts/__tests__/ci-expiry-phase-summary.test.mjs"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Install frontend dependencies"
-name = "Install frontend dependencies"
-command = ["pnpm", "install", "--frozen-lockfile"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Lint frontend code"
-name = "Lint frontend code"
-command = ["pnpm", "run", "lint"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Verify component-action effect fixture"
-name = "Verify component-action effect fixture"
-command = ["pnpm", "run", "effect:fixture:check"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Typecheck frontend code"
-name = "Typecheck frontend code"
-command = ["pnpm", "run", "typecheck"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Run frontend unit tests"
-name = "Run frontend unit tests"
-command = ["pnpm", "test"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Build frontend"
-name = "Build frontend"
-command = ["pnpm", "run", "build"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Format Rust code check"
-name = "Format Rust code check"
-command = ["cargo", "fmt", "--", "--check"]
-working_dir = "src-tauri"
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Build Tauri app (development)"
-name = "Build Tauri app (development)"
-command = ["pnpm", "run", "tauri", "build", "--debug", "--no-bundle"]
-timeout_secs = 7200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs]]
-# from ci.yml › clippy-windows ("Clippy (windows)")
-name = "clippy-windows"
-os = "windows"
-
-[[jobs.steps]]
-# from step "Install frontend dependencies"
-name = "Install frontend dependencies"
-command = ["pnpm", "install", "--frozen-lockfile"]
-timeout_secs = 2700
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Build frontend"
-name = "Build frontend"
-command = ["pnpm", "run", "build"]
-timeout_secs = 2700
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Clippy check"
-name = "Clippy check"
-command = ["cargo", "clippy"]
-working_dir = "src-tauri"
-timeout_secs = 2700
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs]]
-# from ci.yml › holder-crates ("Holder crates (${{ matrix.platform }})")
-name = "holder-crates"
-os = ["linux", "windows"]
-
-[[jobs.steps]]
-# from step "Test holder crates"
-name = "Test holder crates"
-command = ["cargo", "test", "-p", "qontinui-pty-holder", "-p", "qontinui-runner-win32"]
-timeout_secs = 1200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Clippy holder crates"
-name = "Clippy holder crates"
-command = ["cargo", "clippy", "-p", "qontinui-pty-holder", "--all-targets"]
-timeout_secs = 1200
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs]]
 # from ci.yml › frontend-tests ("Frontend unit tests (vitest)")
 name = "frontend-tests"
 os = "linux"
@@ -1523,39 +1413,11 @@ name = "Parity comparator unit tests (PS 5.1) (3/3)"
 command = ["powershell", "-File", "scripts/tests/test-installed-runner.ps1"]
 timeout_secs = 7200
 
-[[jobs.steps]]
-# from step "Install frontend dependencies"
-name = "Install frontend dependencies"
-command = ["pnpm", "install", "--frozen-lockfile"]
-timeout_secs = 7200
-
-[[jobs.steps]]
-# from step "Build Tauri app (development)"
-name = "Build Tauri app (development)"
-command = ["pnpm", "run", "tauri", "build", "--debug", "--no-bundle"]
-timeout_secs = 3600
-
 [[jobs]]
 # from reproducibility-gate.yml › repro-build
 name = "repro-build"
 os = ["linux", "windows"]
 schedule = "17 3 * * *"
-
-[[jobs.steps]]
-# from step "Install frontend dependencies"
-name = "Install frontend dependencies"
-command = ["pnpm", "install", "--frozen-lockfile"]
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
-
-[[jobs.steps]]
-# from step "Build frontend (creates dist/ for tauri::generate_context!)"
-name = "Build frontend (creates dist/ for tauri::generate_context!)"
-command = ["pnpm", "run", "build"]
-
-[jobs.steps.env]
-CARGO_TERM_COLOR = "always"
 
 [[jobs.steps]]
 # from step "Build"

@@ -4,38 +4,69 @@ qontinui-ci import --report
   default branch: main
   rule: A workflow job is considered when its workflow runs on `pull_request` /
         `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
-        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
-        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
-        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
-        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
-        and any non-bash script, is one opaque gate command no manifest step can match. A gate
-        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) whose `os` includes every OS the workflow job runs on runs the same command in the
-        same working directory. SAME COMMAND means the whole argv is equal after normalization:
-        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
-        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
-        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
-        dropped from each word. Every other word — every flag and argument — must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
-        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
-        command at all and a manifest gate job carries its imported name). A job name alone never
-        covers a job that runs commands.
+        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
+        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
+        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
+        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
+        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
+        `cancelled()`, steps with a literal `continue-on-error: true`, and known
+        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
+        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
+        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
+        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
+        runs the same command in the same working directory, on a job whose `os` includes every OS
+        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
+        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
+        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
+        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
+        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
+        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
+        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
+        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
+        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
+        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
+        COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (12):
   UNCOVERED       ci-integrity-selftest.yml › guard-tests [pull_request, push:main] 0/2 gate command(s) matched
       missing: bash scripts/tests/ci-integrity/run-scenarios.sh
       missing: python3 scripts/tests/ci-integrity/test-surface.py
-  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/8 gate command(s) matched
+  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/31 gate command(s) matched
       missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[] | .filename, (.previous_filename /
       missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .changed_files
       missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[].filename
+      missing: wc -l
+      missing: [ ${BAD} -ne 0 ]
+      missing: [ ${SEEN_COUNT} -lt ${DECLARED_COUNT} ]
+      missing: [ -z ${f} ]
+      missing: grep -qxF ${f}
+      missing: [ -z ${HIT_PATHS} ]
+      missing: sed s/^/  - /
       missing: gh api repos/${REPO}/compare/${BASE_SHA}...${HEAD_SHA} --jq .merge_base_commit.sha
+      missing: [ -z ${MERGE_BASE} ]
       missing: python3 -
+      missing: cat ${RUNNER_TEMP}/findings.tsv
+      missing: grep -q ^!PARSE
+      missing: grep ^!PARSE
+      missing: cut -f2
+      missing: grep -q ^!ALIAS
+      missing: grep ^!ALIAS
       missing: gh api --paginate repos/${REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: grep -qxF ci:gate-change=declared
+      missing: grep -qxF ci:gate-change=alters-a-gate
+      missing: [ -z ${DECLARED} ]
+      missing: [ -n ${FINDINGS} ]
+      missing: [ -z ${tok:-} ]
       missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .body // ""
+      missing: grep -qxF ${directive}: ${tok}
+      missing: [ -n ${MISSING} ]
+      missing: sed s/^/- `/;s/$/`/
+      missing: cat ${RUNNER_TEMP}/notice.md
       missing: gh pr comment ${PR_NUMBER} --repo ${REPO} --body-file ${RUNNER_TEMP}/notice.md
-  COVERED         ci.yml › lint-and-test [pull_request, push:main] 10/10 gate command(s) matched
+  NEEDS-REVIEW    ci.yml › lint-and-test [pull_request, push:main] 11/11 gate command(s) matched
+      matched: npm ci  ←  ci/install
       matched: npm run diagnostics:check  ←  ci/diagnostics-check
       matched: npm run redaction:check-surface  ←  ci/redaction-surface-ratchet
       matched: npm run deps:check-ranges  ←  ci/dep-range-ratchet
@@ -46,41 +77,55 @@ JOBS ON pull_request / push:main (12):
       matched: npm run build  ←  ci/build
       matched: npm run typecheck  ←  ci/typecheck
       matched: npm run test  ←  ci/test
-      note:    matrix job — considered once
-  UNCOVERED       ci.yml › python-tests [pull_request, push:main] 0/3 gate command(s) matched
+      review:  matrix legs node-version = ["22.x"] — the manifest runs one leg
+  UNCOVERED       ci.yml › python-tests [pull_request, push:main] 0/5 gate command(s) matched
+      missing: packages/ui-bridge-python: python -m pip install --upgrade pip
+      missing: packages/ui-bridge-python: pip install -e .[dev]
       missing: packages/ui-bridge-python: ruff check .
       missing: packages/ui-bridge-python: mypy ui_bridge
       missing: packages/ui-bridge-python: pytest
-      note:    matrix job — considered once
-  COVERED         ci.yml › docs [pull_request, push:main] 1/1 gate command(s) matched
+      review:  matrix legs python-version = ["3.10", "3.11", "3.12"] — the manifest runs one leg
+  COVERED         ci.yml › docs [pull_request, push:main] 2/2 gate command(s) matched
+      matched: docs-site: npm ci  ←  ci/docs-install
       matched: docs-site: npm run build  ←  ci/docs-build
-  UNCOVERED       dependency-twin-resolver.yml › resolve [push:main (paths-filtered)] 0/3 gate command(s) matched
+  UNCOVERED       dependency-twin-resolver.yml › resolve [push:main (paths-filtered)] 0/5 gate command(s) matched
       missing: node --version
       missing: node scripts/dependency-twin-resolver.mjs
+      missing: [ ! -f $payload_file ]
       missing: node -e 
   const fs = require("fs");
   const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8")
-  PARTIAL         docs.yml › build [push:main (paths-filtered)] 1/3 gate command(s) matched
+      missing: wc -c
+  PARTIAL         docs.yml › build [push:main (paths-filtered)] 2/4 gate command(s) matched
       missing: uses: actions/configure-pages
       missing: uses: actions/upload-pages-artifact
+      matched: docs-site: npm ci  ←  ci/docs-install
       matched: docs-site: npm run build  ←  ci/docs-build
   UNCOVERED       docs.yml › deploy [push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: uses: actions/deploy-pages
-  UNCOVERED       qontinui-ci.yml › build [pull_request, push:main] 0/5 gate command(s) matched
+  PARTIAL         qontinui-ci.yml › build [pull_request, push:main] 1/7 gate command(s) matched
+      missing: [ -f tsconfig.json ]
       missing: npx --yes tsc --noEmit
       missing: npm run redaction:check-surface --if-present
       missing: npm run lint --if-present
       missing: npm run build --if-present
       missing: npm test --if-present
-  UNCOVERED       runner-contract.yml › contract [pull_request, push:main] 0/3 gate command(s) matched
+      matched: npm install  ←  ci/install
+  UNCOVERED       runner-contract.yml › contract [pull_request, push:main] 0/5 gate command(s) matched
+      missing: [ $EXPR{{ github.event_name }} = workflow_dispatch ]
       missing: node scripts/check-runner-contract.test.mjs
       missing: uses: qontinui/qontinui-runner/.github/actions/checkout-sibling
       missing: node scripts/check-runner-contract.mjs --runner ./qontinui-runner --expect-sibling $EXPR{{ steps.mod
-  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/2 gate command(s) matched
+      missing:  }}
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/5 gate command(s) matched
+      missing: curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors https://github.com/gitleaks/gitleaks/release
+      missing: tar -xz gitleaks
+      missing: test -x ./gitleaks
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
-  UNCOVERED       smoke-test.yml › lint-smoke-script [pull_request, push:main] 0/3 gate command(s) matched
+  UNCOVERED       smoke-test.yml › lint-smoke-script [pull_request, push:main] 0/4 gate command(s) matched
       missing: bash -n scripts/smoke-test-runner.sh
+      missing: command -v shellcheck
       missing: shellcheck scripts/smoke-test-runner.sh
       missing: node -e const p=require('./package.json'); if (!p.scripts || !p.scripts['smoke-test:runner']) { cons
 
@@ -239,4 +284,4 @@ NO-OPS (28) — accounted for; nothing to declare:
   - smoke-test.yml › lint-smoke-script › step "actions/checkout@v5": actions/checkout — the executor
       checks out the dispatched commit itself
 
-summary: 2 covered, 0 covered by name, 1 partial, 9 uncovered of 12 job(s); 29 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 1 covered, 1 needs-review, 0 name-only, 2 partial, 8 uncovered of 12 job(s); 29 untranslated construct(s) — the Phase 9 precondition is NOT MET

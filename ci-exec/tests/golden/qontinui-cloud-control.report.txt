@@ -4,23 +4,30 @@ qontinui-ci import --report
   default branch: main
   rule: A workflow job is considered when its workflow runs on `pull_request` /
         `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
-        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
-        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
-        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
-        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
-        and any non-bash script, is one opaque gate command no manifest step can match. A gate
-        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) whose `os` includes every OS the workflow job runs on runs the same command in the
-        same working directory. SAME COMMAND means the whole argv is equal after normalization:
-        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
-        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
-        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
-        dropped from each word. Every other word — every flag and argument — must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
-        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
-        command at all and a manifest gate job carries its imported name). A job name alone never
-        covers a job that runs commands.
+        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
+        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
+        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
+        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
+        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
+        `cancelled()`, steps with a literal `continue-on-error: true`, and known
+        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
+        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
+        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
+        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
+        runs the same command in the same working directory, on a job whose `os` includes every OS
+        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
+        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
+        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
+        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
+        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
+        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
+        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
+        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
+        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
+        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
+        COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (4):
   COVERED         boundary-guard.yml › no-coord-import [pull_request, push:main] 1/1 gate command(s) matched
@@ -28,11 +35,13 @@ JOBS ON pull_request / push:main (4):
   PARTIAL         ci.yml › repo-checks [pull_request, push:main] 1/2 gate command(s) matched
       missing: python3 -m unittest discover -s scripts -p test_*.py -v
       matched: python3 scripts/check_frontend_imports.py  ←  ci/frontend-imports
-  COVERED         ci.yml › python-lint [pull_request, push:main] 3/3 gate command(s) matched
+  COVERED         ci.yml › python-lint [pull_request, push:main] 4/4 gate command(s) matched
+      matched: python3 -m pip install --upgrade ruff~=0.6 mypy~=1.11  ←  ci/install-gate-tooling
       matched: ruff check backend/ scripts/  ←  ci/ruff-check
       matched: ruff format --check backend/ scripts/  ←  ci/ruff-format
       matched: mypy backend/qontinui_cloud_control scripts  ←  ci/mypy
-  UNCOVERED       ci.yml › composed-typecheck [pull_request, push:main] 0/3 gate command(s) matched
+  UNCOVERED       ci.yml › composed-typecheck [pull_request, push:main] 0/4 gate command(s) matched
+      missing: <outside the repository>/qontinui-web/frontend: npm ci
       missing: <outside the repository>/qontinui-web/frontend: npm run cloud:install
       missing: <outside the repository>/qontinui-web/frontend: npm run type-check
       missing: <outside the repository>/qontinui-web/frontend: npm test
@@ -101,4 +110,4 @@ NO-OPS (8) — accounted for; nothing to declare:
   - ci.yml › composed-typecheck › step "Setup Node.js": setup-node cache — a dependency cache, not a
       gate
 
-summary: 2 covered, 0 covered by name, 1 partial, 1 uncovered of 4 job(s); 6 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 2 covered, 0 needs-review, 0 name-only, 1 partial, 1 uncovered of 4 job(s); 6 untranslated construct(s) — the Phase 9 precondition is NOT MET

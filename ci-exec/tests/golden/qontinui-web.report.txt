@@ -4,186 +4,425 @@ qontinui-ci import --report
   default branch: main
   rule: A workflow job is considered when its workflow runs on `pull_request` /
         `pull_request_target` into the default branch, or on a `push` to the default branch. Its
-        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
-        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
-        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
-        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
-        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
-        and any non-bash script, is one opaque gate command no manifest step can match. A gate
-        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
-        request) whose `os` includes every OS the workflow job runs on runs the same command in the
-        same working directory. SAME COMMAND means the whole argv is equal after normalization:
-        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
-        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
-        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
-        dropped from each word. Every other word — every flag and argument — must be equal, so
-        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
-        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
-        command at all and a manifest gate job carries its imported name). A job name alone never
-        covers a job that runs commands.
+        GATE COMMANDS are every command its steps run whose exit status can fail the step (GitHub
+        runs bash with -e): read from `run:` scripts tolerantly, through any shell control flow and
+        inside `$(…)` — installs, tests, greps and `jq` assertions included. Only terminal output,
+        navigation and shell-state builtins (echo, cd, set, export, exit, …), commands guarded by an
+        `||` fallback that is not `exit`, steps whose condition is only `failure()` and/or
+        `cancelled()`, steps with a literal `continue-on-error: true`, and known
+        setup/cache/artifact actions are not gates. Any other `uses:` action, a non-bash script (a
+        `run:` on a Windows runner with no `shell: bash` is PowerShell), and a command whose program
+        is a variable or expression are OPAQUE gates no manifest step can match. A gate command is
+        MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull request)
+        runs the same command in the same working directory, on a job whose `os` includes every OS
+        the workflow job runs on — a manifest `os = any` job counts as Linux only, and a workflow
+        job whose OS is unknown is matched by nothing. SAME COMMAND means the whole argv is equal
+        after normalization: wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx,
+        pnpm/npm/yarn exec, python -m, env, sudo, timeout N, bash/sh <script>), package-script
+        runners are unified (npm run X = npm X = pnpm X = yarn X), python3 = python, pip3 = pip, and
+        a leading ./ or trailing / is dropped from each word; every other word must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdicts: COVERED (every gate
+        command matched, nothing to review); NEEDS-REVIEW (every gate command matched, but the job
+        runs them under something the matched steps do not reproduce: a `KEY=value` prefix, an
+        allowlisted workflow/job/step env value or a `cargo +toolchain` the step lacks, a non-OS
+        matrix, a container, or a service no matched job declares); NAME-ONLY (no gate command; a
+        manifest gate job carries the job's name); PARTIAL (some matched); UNCOVERED (none). Only
+        COVERED counts toward the precondition.
 
 JOBS ON pull_request / push:main (39):
-  UNCOVERED       alembic-graph-check.yml › alembic-heads [push:main (paths-filtered)] 0/3 gate command(s) matched
+  UNCOVERED       alembic-graph-check.yml › alembic-heads [push:main (paths-filtered)] 0/8 gate command(s) matched
       missing: backend: python ../scripts/ci/count_alembic_heads.py --report-only --baseline-ref HEAD
+      missing: backend: tee heads.txt
+      missing: backend: [ $count -gt 1 ]
+      missing: backend: grep ^HEAD= heads.txt
+      missing: backend: sed s/^HEAD=//
+      missing: backend: tr \n  
       missing: uses: actions/github-script
       missing: python scripts/ci/notify_forked_open_prs.py
   UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/1 gate command(s) matched
       missing: python scripts/ci/count_alembic_heads.py --baseline-ref origin/main
-  PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 3/4 gate command(s) matched
+  PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 5/11 gate command(s) matched
+      missing: backend: rm -rf qontinui-schemas qontinui qontinui-cloud-control
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
+      matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
+      matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
       matched: backend: poetry run ruff check .  ←  ci/backend-ruff-check
       matched: backend: poetry run ruff format --check .  ←  ci/backend-ruff-format
       matched: backend: poetry run mypy app/ --ignore-missing-imports  ←  ci/backend-mypy
-  PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 3/11 gate command(s) matched
+  PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 5/30 gate command(s) matched
+      missing: date -u +%s
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: uses: ./.github/actions/fleet-nouns-vocab
+      missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
+      missing: backend: command -v psql
+      missing: backend: sudo apt-get update
+      missing: backend: sudo apt-get install -y postgresql-client
       missing: backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
       missing: backend: poetry run pytest tests/ --collect-only -q -o addopts= --no-cov
+      missing: backend: cat collected-nodeids.txt
+      missing: backend: wc -l
       missing: backend: find tests -name test_*.py -type f
+      missing: backend: [ ${expected_files} -lt 100 ]
       missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --count-only --min-files
+      missing: backend: tail -20 collected-nodeids.txt
       missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --shards 6 --shard $EXPR
+      missing: backend: [ ${#SHARD_FILES[@]} -eq 0 ]
       missing: backend: poetry run pytest ${SHARD_FILES[@]} -v --cov=app --cov-context=test --cov-report=xml --cov-report=ht
+      missing: backend: [ ${#start} -gt 11 ]
+      missing: backend: [ $start -lt 1600000000 ]
+      missing: backend: [ $elapsed_min -lt 0 ]
+      missing: backend: [ $elapsed_min -ge $SOFT_BUDGET_MINUTES ]
+      matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
+      matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
       matched: backend: poetry run python scripts/export_openapi.py  ←  ci/openapi-export-extended
       matched: backend: poetry run python scripts/export_openapi.py --base  ←  ci/openapi-export-base
       matched: git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope  ←  ci/openapi-snapshot-drift
-      note:    matrix job — considered once
-  UNCOVERED       backend-ci.yml › security-scan [pull_request (paths-filtered)] 0/3 gate command(s) matched
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with ENVIRONMENT=development; ci/openapi-export-extended does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with REDIS_ENABLED=false; ci/openapi-export-extended does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-extended does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py` runs with TESTING=1; ci/openapi-export-extended does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with ENVIRONMENT=development; ci/openapi-export-base does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with REDIS_ENABLED=false; ci/openapi-export-base does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-export-base does not set it
+      review:  `backend: poetry run python scripts/export_openapi.py --base` runs with TESTING=1; ci/openapi-export-base does not set it
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with ENVIRONMENT=development; ci/openapi-snapshot-drift does not set it
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with REDIS_ENABLED=false; ci/openapi-snapshot-drift does not set it
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with SECRET_KEY=test-secret-key-for-testing-only-minimum-32-characters-long; ci/openapi-snapshot-drift does not set it
+      review:  `git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope` runs with TESTING=1; ci/openapi-snapshot-drift does not set it
+      review:  matrix legs shard = ["1", "2", "3", "4", "5", "6"] — the manifest runs one leg
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  uses service redis (redis), which no matched manifest job declares
+  PARTIAL         backend-ci.yml › security-scan [pull_request (paths-filtered)] 2/9 gate command(s) matched
       missing: uses: aquasecurity/trivy-action
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
-      missing: backend: poetry run safety check --json
-  UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: backend: poetry run pip install safety
+      matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
+      matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+  UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/7 gate command(s) matched
+      missing: [ -d junit ]
       missing: find junit -name *.xml -type f
+      missing: wc -l
+      missing: [ ${found} = 0 ]
+      missing: [ ${found} != ${EXPECTED_SHARDS} ]
       missing: python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso
+      missing: tee -a ${GITHUB_STEP_SUMMARY:-/dev/null}
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
   UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
       note:    job condition `if: always()` — considered as running
-      note:    no gate command found (only setup, glue or diagnostics)
-  UNCOVERED       backend-ci.yml › build-test [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      note:    no gate command found
+  UNCOVERED       backend-ci.yml › build-test [pull_request (paths-filtered)] 0/7 gate command(s) matched
+      missing: [ ! -f $PIN_FILE ]
+      missing: grep -vE ^\s*(#|$) $PIN_FILE
+      missing: head -n1
+      missing: tr -d [:space:]
+      missing: [ -z $SHA ]
       missing: backend: docker build --build-arg CLOUD_CONTROL_SHA=${CLOUD_CONTROL_SHA} -t qontinui-backend:test .
       missing: backend: docker run --rm qontinui-backend:test python -c import app; print('Import successful')
-  UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/1 gate command(s) matched
+  UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
+      missing: tee -a $GITHUB_STEP_SUMMARY
       note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
-  UNCOVERED       backend-coverage-producer.yml › produce [push:main (paths-filtered)] 0/6 gate command(s) matched
+  PARTIAL         backend-coverage-producer.yml › produce [push:main (paths-filtered)] 2/20 gate command(s) matched
+      missing: date -u +%s
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
       missing: uses: ./.github/actions/fleet-nouns-vocab
+      missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
+      missing: backend: command -v psql
+      missing: backend: sudo apt-get update
+      missing: backend: sudo apt-get install -y postgresql-client
       missing: backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
       missing: backend: poetry run pytest tests/ -v --cov=app --cov-context=test --cov-report=xml --cov-report=html --cov-re
+      missing: backend: [ ${#start} -gt 11 ]
+      missing: backend: [ $start -lt 1600000000 ]
+      missing: backend: [ $elapsed_min -lt 0 ]
+      missing: backend: [ $elapsed_min -ge $SOFT_BUDGET_MINUTES ]
       missing: backend: python scripts/export_test_coverage.py --self-test
       missing: backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml
-  UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/1 gate command(s) matched
+      matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
+      matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  uses service redis (redis), which no matched manifest job declares
+  UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/5 gate command(s) matched
+      missing: [ ${GITHUB_REF} = refs/heads/main ]
+      missing: [ -n $before ]
+      missing: [ $before != 0000000000000000000000000000000000000000 ]
+      missing: git cat-file -e ${before}^{commit}
       missing: python scripts/ci/check_coord_column_drops.py --base-ref ${BASE_REF}
   UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
       missing: python scripts/check_dev_credentials_drift.py
-  UNCOVERED       e2e-tests.yml › backend-tests [pull_request, push:main] 0/1 gate command(s) matched
+  PARTIAL         e2e-tests.yml › backend-tests [pull_request, push:main] 1/10 gate command(s) matched
+      missing: git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/${spec}.git ../${repo_name}
+      missing: backend: python -m pip install --upgrade pip
+      missing: backend: pip install pytest pytest-cov pytest-asyncio
+      missing: backend: [ -f requirements.txt ]
+      missing: backend: pip install -r requirements.txt
+      missing: backend: pip install --no-cache-dir -e ../../qontinui-schemas
+      missing: backend: [ -f pyproject.toml ]
+      missing: backend: pip install -e . --no-deps
       missing: backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te
-      note:    matrix job — considered once
+      matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  matrix legs python-version = ["3.12"] — the manifest runs one leg
   UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
+      review:  matrix legs shard = ["1", "2", "3", "4"] — the manifest runs one leg
       note:    job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — considered as running
-      note:    matrix job — considered once
-  UNCOVERED       e2e-tests.yml › changed-specs [pull_request, push:main] 0/1 gate command(s) matched
+      note:    runs-on names no OS — no manifest job can be shown to cover it
+  UNCOVERED       e2e-tests.yml › changed-specs [pull_request, push:main] 0/4 gate command(s) matched
+      missing: git fetch --no-tags --depth=1 origin $BASE_SHA
+      missing: git fetch --no-tags --depth=1 origin refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF
+      missing: git rev-parse refs/remotes/origin/$BASE_REF
       missing: python scripts/ci/list_changed_e2e_specs.py --base $E2E_BASE_SHA --head HEAD --github-output $GITHUB
       note:    job condition `if: github.event_name == 'pull_request'` — considered as running
   UNCOVERED       e2e-tests.yml › frontend-e2e-changed-specs [pull_request, push:main] 0/1 gate command(s) matched
       missing: uses: ./.github/workflows/e2e-playwright-stack.yml
+      review:  matrix legs group = ["${{ fromJson(needs.changed-specs.outputs.groups) }}"] — the manifest runs one leg
       note:    job condition `if: needs.changed-specs.outputs.any == 'true'` — considered as running
-      note:    matrix job — considered once
+      note:    runs-on names no OS — no manifest job can be shown to cover it
   UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/0 gate command(s) matched
       note:    job condition `if: always()` — considered as running
-      note:    no gate command found (only setup, glue or diagnostics)
+      note:    no gate command found
   COVERED         forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
   COVERED         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
-  PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 3/4 gate command(s) matched
+  PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 4/5 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
+      matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run lint  ←  ci/frontend-lint
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
-  PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/3 gate command(s) matched
+  PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/15 gate command(s) matched
       missing: bash frontend/scripts/vercel-install.sh --config-source ci
+      missing: test -f frontend/node_modules/@qontinui/cloud-control/frontend/src/index.ts
+      missing: grep -vE ^[[:space:]]*(#|$) frontend/cloud-control.pin
+      missing: head -n 1
+      missing: tr -d [:space:]
+      missing: .sibling/qontinui-cloud-control: git rev-parse HEAD
+      missing: [ $SIBLING_HEAD = $PIN ]
       missing: node -e 
   const fs = require("node:fs");
   const pin = process.argv[1];
   const m = JSON.parse(fs.r
+      missing: rm -rf frontend/node_modules/@qontinui/cloud-control
+      missing: rm -f frontend/public/composed-build.json
+      missing: cp frontend/cloud-control.pin /tmp/pin.bak
+      missing: cp /tmp/pin.bak frontend/cloud-control.pin
+      missing: [ $rc -eq 0 ]
+      missing: [ -f frontend/public/composed-build.json ]
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
-  PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 5/6 gate command(s) matched
+  PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 6/7 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
+      matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run cloud:install  ←  ci/composed-cloud-install
       matched: frontend: npm run lint  ←  ci/frontend-lint
       matched: frontend: npm run type-check  ←  ci/frontend-typecheck
       matched: frontend: npm test  ←  ci/frontend-test
       matched: frontend: npm run build  ←  ci/composed-build
-  UNCOVERED       frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 0/2 gate command(s) matched
+  PARTIAL         frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 1/3 gate command(s) matched
       missing: uses: ./.github/actions/fleet-nouns-vocab
       missing: frontend: node scripts/export-test-coverage.mjs
+      matched: frontend: npm ci  ←  ci/frontend-install
   COVERED         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
   COVERED         global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
-  UNCOVERED       memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 0/4 gate command(s) matched
+  PARTIAL         memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 2/11 gate command(s) matched
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: backend: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: backend: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: backend: curl -sSL https://install.python-poetry.org
       missing: backend: python3 -
       missing: backend: poetry run pytest tests/test_memory_recall_scorer.py -q --no-cov
       missing: backend: poetry run pytest tests/test_memory_recall_eval_db.py -q --no-cov
+      missing: backend: [ -f $report ]
       missing: uses: actions/github-script
-  UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/1 gate command(s) matched
+      matched: backend: poetry install --no-interaction --no-root  ←  ci/backend-install
+      matched: backend: poetry run pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+  UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/2 gate command(s) matched
       missing: git diff --name-only $base...HEAD
-  UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/6 gate command(s) matched
+      missing: grep -qE ^backend/alembic/versions/.*\.py$
+  UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/19 gate command(s) matched
+      missing: date -u +%s
+      missing: git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+      missing: git clone --depth 1 https://github.com/jspinak/qontinui.git
+      missing: git clone --depth 1 https://github.com/qontinui/qontinui-cloud-control.git
+      missing: backend: pip install poetry
+      missing: backend: poetry install
+      missing: command -v psql
+      missing: sudo apt-get update
+      missing: sudo apt-get install -y postgresql-client
       missing: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
       missing: backend: poetry run alembic --version
       missing: backend: poetry run alembic heads
+      missing: backend: rm -f heads.err
+      missing: backend: [ $HEADS_RC -ne 0 ]
+      missing: backend: [ $HEADS -gt 1 ]
       missing: backend: poetry run python -c from alembic.config import Config; from alembic.script import ScriptDirectory; 
+      missing: backend: [ $MERGE_HEAD = 1 ]
       missing: backend: poetry run alembic upgrade head
       missing: backend: poetry run alembic downgrade -1
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
       note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
-  UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
+  UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: [ $relevant = true ]
+      missing: [ $result != success ]
       note:    job condition `if: always()` — considered as running
-      note:    no gate command found (only setup, glue or diagnostics)
   COVERED         path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_path_case_collisions.py  ←  ci/path-case-collisions
   UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
       missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
-  UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
+  UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
+      missing: python -m pip install pytest>=9,<10
       missing: python -m pytest .pre-commit-hooks -rA
   COVERED         ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/1 gate command(s) matched
       matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
-  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/2 gate command(s) matched
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/7 gate command(s) matched
+      missing: curl -sSL -H Authorization: Bearer $EXPR{{ github.token }} https://api.github.com/repos/gitleaks/git
+      missing: curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors -o gitleaks.tar.gz https://github.com/gitlea
+      missing: tar -xzf gitleaks.tar.gz gitleaks
+      missing: [ ! -x ./gitleaks ]
+      missing: rm -f gitleaks.tar.gz
       missing: ./gitleaks version
       missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
-  PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 1/15 gate command(s) matched
+  PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 3/53 gate command(s) matched
+      missing: date -u +%s
+      missing: git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/${spec}.git ../${repo_name}
+      missing: backend: python -m pip install --upgrade pip
+      missing: backend: [ -f requirements.txt ]
+      missing: backend: pip install -r requirements.txt
+      missing: backend: pip install --no-cache-dir -e ../../qontinui-schemas
+      missing: backend: [ -f pyproject.toml ]
+      missing: backend: pip install -e . --no-deps
+      missing: command -v psql
+      missing: sudo apt-get update
+      missing: sudo apt-get install -y postgresql-client
       missing: psql -h localhost -U test_user -d test_db -c CREATE SCHEMA IF NOT EXISTS runner;
       missing: backend: alembic upgrade heads
       missing: backend: python scripts/spec_ci_local_idp.py --issuer $COGNITO_ISSUER --audience spec-ci-local --email spec-c
       missing: backend: python -m http.server 8770 --bind 127.0.0.1
+      missing: backend: seq 1 15
+      missing: backend: curl -fsS http://127.0.0.1:8770/.well-known/jwks.json
       missing: backend: python -m uvicorn app.main:app --host 127.0.0.1 --port
+      missing: backend: seq 1 60
+      missing: backend: curl -s -o /dev/null -w %{http_code} http://127.0.0.1:8000/health
+      missing: backend: grep -q ^200$
+      missing: backend: curl -s -o /dev/null -w backend status: %{http_code}\n http://127.0.0.1:8000/health
+      missing: curl -fsS -H Authorization: Bearer $QONTINUI_TEST_ID_TOKEN http://127.0.0.1:8000/api/v1/auth/users/m
       missing: psql -h localhost -U test_user -d test_db -c UPDATE auth.users SET is_superuser = true WHERE email =
-      missing: frontend: node -p require('./package-lock.json').packages['node_modules/@playwright/test'].version
+      missing: frontend: [ -z $pw ]
+      missing: frontend: sha256sum package-lock.json
+      missing: [ -d $cache_dir ]
       missing: find $cache_dir -maxdepth 1 -name *.deb
+      missing: [ $n -gt 0 ]
       missing: frontend: npx playwright install-deps chromium
       missing: find $cache_dir -maxdepth 1 -name *.deb -printf %f\n
+      missing: sort
+      missing: sha256sum
+      missing: id -u
+      missing: id -g
       missing: find $cache_dir -maxdepth 1 -name *.deb -printf %T@ %f\n
+      missing: sort -rn
+      missing: awk { n = $2; sub(/_.*/, "", n); if (seen[n]++) print $2 }
+      missing: [ $before = $after ]
       missing: frontend: npx playwright install chromium
       missing: frontend: npx next start -p 3001 -H 0.0.0.0
+      missing: frontend: seq 1 30
+      missing: frontend: curl -s -o /dev/null -w %{http_code} http://localhost:3001/login
+      missing: frontend: grep -qE ^(200|307)$
+      missing: frontend: curl -s -o /dev/null -w frontend status: %{http_code}\n http://localhost:3001/login
       missing: frontend: npx tsx tests/spec-ci/run-spec-ci.ts --base-url http://localhost:3001 --api-base http://localhost:80
+      missing: [ -n ${FRONTEND_PID:-} ]
+      missing: [ -n ${BACKEND_PID:-} ]
+      missing: [ -f frontend/spec-ci-report.json ]
+      missing: jq -r 
+    "- specs: \(.specCount)",
+    "- full_match: \(.summary.fullMatch)",
+    "- partial_match
+      matched: backend: pip install -e ../../qontinui-cloud-control  ←  ci/backend-install-cloud-control
+      matched: frontend: npm ci  ←  ci/frontend-install
       matched: frontend: npm run build  ←  ci/composed-build
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with ENVIRONMENT=development; ci/backend-install-cloud-control does not set it
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with REDIS_ENABLED=true; ci/backend-install-cloud-control does not set it
+      review:  `backend: pip install -e ../../qontinui-cloud-control` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/backend-install-cloud-control does not set it
+      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it
+      review:  `frontend: npm ci` runs with REDIS_ENABLED=true; ci/frontend-install does not set it
+      review:  `frontend: npm ci` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it
+      review:  `frontend: npm run build` runs with ENVIRONMENT=development; ci/composed-build does not set it
+      review:  `frontend: npm run build` runs with REDIS_ENABLED=true; ci/composed-build does not set it
+      review:  `frontend: npm run build` runs with SECRET_KEY=spec-ci-secret-key-for-ci-only-minimum-32-chars-long; ci/composed-build does not set it
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
+      review:  uses service redis (redis), which no matched manifest job declares
   UNCOVERED       sql-through-alembic.yml › sql-through-alembic [pull_request (paths-filtered)] 0/1 gate command(s) matched
       missing: python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD
-  UNCOVERED       style-gate.yml › style-gate [pull_request (paths-filtered)] 0/10 gate command(s) matched
+  PARTIAL         style-gate.yml › style-gate [pull_request (paths-filtered)] 1/45 gate command(s) matched
+      missing: date -u +%s
+      missing: [ ! -f style-gate.lock ]
+      missing: jq -r .qontinui_schemas_sha style-gate.lock
+      missing: jq -r .crate style-gate.lock
+      missing: jq -r .bin style-gate.lock
+      missing: [ $SHA = null ]
+      missing: [ ${DISPATCH_ENFORCE:-} = 1 ]
+      missing: [ ${VAR_ENFORCE:-} = 1 ]
+      missing: [ $ENFORCE = 1 ]
       missing: qontinui-schemas: cargo build --release --manifest-path rust-vision-core/Cargo.toml --bin vision-audit
-      missing: frontend: node -p require('./package-lock.json').packages['node_modules/@playwright/test'].version
+      missing: qontinui-schemas: [ $attempt -ge $max ]
+      missing: qontinui-schemas: [ ! -x $BIN_PATH ]
+      missing: frontend: [ -z $pw ]
+      missing: frontend: sha256sum package-lock.json
+      missing: [ -d $cache_dir ]
       missing: find $cache_dir -maxdepth 1 -name *.deb
+      missing: [ $n -gt 0 ]
       missing: frontend: npx playwright install-deps chromium
       missing: find $cache_dir -maxdepth 1 -name *.deb -printf %f\n
+      missing: sort
+      missing: sha256sum
+      missing: id -u
+      missing: id -g
       missing: find $cache_dir -maxdepth 1 -name *.deb -printf %T@ %f\n
+      missing: sort -rn
+      missing: awk { n = $2; sub(/_.*/, "", n); if (seen[n]++) print $2 }
+      missing: [ $before = $after ]
       missing: frontend: npx playwright install chromium
+      missing: mkdir -p $FINDINGS_DIR
       missing: fold_result
+      missing: tr \n  
+      missing: sed s/|/\\|/g
+      missing: [ -z $summary ]
+      missing: [ ! -f $frame ]
+      missing: $VISION_AUDIT analyze --snapshot $snap --frame $frame --analyzer all --fail-on critical
       missing: fold_result analyze $an_rc $an_err
+      missing: [ ! -f $spec ]
+      missing: [ -f $BASELINE_DIR/$id.json ]
+      missing: $VISION_AUDIT assert --snapshot $snap --frame $frame --assertions $spec $baseline_args
       missing: fold_result assert $as_rc $as_err
+      missing: [ $EXPR{{ steps.capture.outcome }} != success ]
+      missing: [ $any_infra = 1 ]
+      missing: [ $any_capture_missing = 1 ]
+      missing: [ $any_gate2 = 1 ]
+      matched: frontend: npm ci  ←  ci/frontend-install
+      review:  `frontend: npm ci` runs with ENVIRONMENT=development; ci/frontend-install does not set it
+      review:  `frontend: npm ci` runs with SECRET_KEY=style-gate-secret-key-for-ci-only-minimum-32-chars-long; ci/frontend-install does not set it
+      review:  uses service postgres (postgres-pgvector), which no matched manifest job declares
   COVERED         web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/1 gate command(s) matched
       matched: python scripts/ci/check_web_boundary.py  ←  ci/web-boundary-lint
   UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
-      note:    no gate command found (only setup, glue or diagnostics)
+      note:    runs-on names no OS — no manifest job can be shown to cover it
+      note:    no gate command found
 
 NOT CONSIDERED — not on pull_request or a push to main (2 workflow(s)):
   cross-browser-survey.yml (jobs: cross-browser-survey) — triggers ["schedule", "workflow_dispatch"]
@@ -1109,4 +1348,4 @@ NO-OPS (139) — accounted for; nothing to declare:
   - web-boundary-lint.yml › web-boundary-lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
       — the executor checks out the dispatched commit itself
 
-summary: 7 covered, 0 covered by name, 6 partial, 26 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET
+summary: 7 covered, 0 needs-review, 0 name-only, 12 partial, 20 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET

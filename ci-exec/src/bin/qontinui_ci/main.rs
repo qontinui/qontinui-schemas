@@ -6,8 +6,8 @@
 //! qontinui-ci validate [--manifest <file>]
 //! qontinui-ci import       [--out <file> [--force]] <workflow.yml>...
 //! qontinui-ci import       --report <ci.toml> [--default-branch <name>] <workflow.yml>...
-//! qontinui-ci gen-workflow [--manifest <file>] [--out <file>|-] [--executor-rev <sha>] [--force]
-//! qontinui-ci gen-workflow --check [--manifest <file>] [--out <file>] [--executor-rev <sha>]
+//! qontinui-ci gen-workflow --executor-rev <sha> [--manifest <file>] [--out <file>|-] [--force]
+//! qontinui-ci gen-workflow --executor-rev <sha> --check [--manifest <file>] [--out <file>]
 //! ```
 //!
 //! `run` executes one job of `.qontinui/ci.toml` exactly as a CI node would:
@@ -71,8 +71,8 @@ usage:
   qontinui-ci validate [--manifest <file>]
   qontinui-ci import       [--out <file> [--force]] <workflow.yml>...
   qontinui-ci import       --report <ci.toml> [--default-branch <name>] <workflow.yml>...
-  qontinui-ci gen-workflow [--manifest <file>] [--out <file>|-] [--executor-rev <sha>] [--force]
-  qontinui-ci gen-workflow --check [--manifest <file>] [--out <file>] [--executor-rev <sha>]
+  qontinui-ci gen-workflow --executor-rev <sha> [--manifest <file>] [--out <file>|-] [--force]
+  qontinui-ci gen-workflow --executor-rev <sha> --check [--manifest <file>] [--out <file>]
 
 run       run one job against a fresh checkout of the repo's committed HEAD
             --job       the [[jobs]] name (default: ci — the one job of a v1 manifest;
@@ -108,14 +108,13 @@ gen-workflow  write .github/workflows/qontinui-ci.yml, the hybrid-mode GitHub le
             --manifest      the manifest (default: .qontinui/ci.toml)
             --out           the file to write (default: the repo's
                             .github/workflows/qontinui-ci.yml; - for stdout)
-            --executor-rev  install the executor at this qontinui-schemas commit
-                            (default: main)
+            --executor-rev  REQUIRED: the full 40-hex qontinui-schemas commit the
+                            executor is installed from
             --force         overwrite a file that is not a generated one
             --check         write nothing; exit 1 when the committed file is missing,
-                            hand-written, hand-edited or stale (it regenerates with
-                            the --rev the committed file records, unless
-                            --executor-rev is given). Wire it into the repo's CI so
-                            a hand-edit fails";
+                            hand-written, hand-edited or stale against the
+                            --executor-rev given (never the pin the file records).
+                            Wire it into the repo's CI so a hand-edit fails";
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
@@ -344,16 +343,21 @@ fn gen_workflow_cmd(rest: &[String]) -> Result<ExitCode, String> {
     let existing = existing_bytes
         .as_ref()
         .map(|b| String::from_utf8_lossy(b).to_string());
-    let executor_rev = match flag(&args.valued, "--executor-rev") {
-        Some(r) => Some(r.to_string()),
-        // --check regenerates with the pin the committed file was written with.
-        None if check => existing.as_deref().and_then(gen_workflow::recorded_executor_rev),
-        None => None,
-    };
-    if let Some(r) = &executor_rev {
-        if !gen_workflow::plain_token(r) {
-            return Err(format!("--executor-rev {r:?} must be a plain commit-ish"));
-        }
+    // The pin is required in BOTH modes, and --check never reads it from the
+    // committed file: a hand-edited pin plus a recomputed hash must fail.
+    let executor_rev = flag(&args.valued, "--executor-rev")
+        .ok_or_else(|| {
+            format!(
+                "gen-workflow needs --executor-rev <40-hex qontinui-schemas sha>: the GitHub leg \
+                 installs the executor from a pinned commit\n\n{USAGE}"
+            )
+        })?
+        .to_string();
+    if !gen_workflow::pinned_rev(&executor_rev) {
+        return Err(format!(
+            "--executor-rev {executor_rev:?} must be a full 40-hex commit sha (a branch or tag can \
+             move)"
+        ));
     }
     let text = gen_workflow::generate(
         &manifest,

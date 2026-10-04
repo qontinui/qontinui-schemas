@@ -54,6 +54,11 @@ pub struct LooseCommand {
     /// Words as written; an unexpanded `$VAR` stays as text.
     pub argv: Vec<String>,
     pub working_dir: String,
+    /// Literal `KEY=value` words written before the command.
+    pub assignments: Vec<(String, String)>,
+    /// Followed by `||` and a fallback that is not `exit` / `{ …; exit N; }`
+    /// (`cmd || true`, `cmd || echo …`): its failure cannot fail the step.
+    pub guarded: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1046,18 +1051,31 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
     let mut out = Vec::new();
     let mut wd = start_wd.to_string();
     let mut seg: Vec<Tok> = Vec::new();
-    let mut segments: Vec<Vec<Tok>> = Vec::new();
+    // Each segment with the operator that ended it.
+    let mut segments: Vec<(Vec<Tok>, &'static str)> = Vec::new();
     for t in toks {
         match &t {
-            Tok::Newline => segments.push(std::mem::take(&mut seg)),
+            Tok::Newline => segments.push((std::mem::take(&mut seg), "\n")),
             Tok::Op(op) if matches!(*op, ";" | "&&" | "||" | "|" | "&" | "(" | ")" | ";;") => {
-                segments.push(std::mem::take(&mut seg))
+                segments.push((std::mem::take(&mut seg), op))
             }
             _ => seg.push(t),
         }
     }
-    segments.push(seg);
-    for seg in segments {
+    segments.push((seg, "\n"));
+    let first_word_of = |seg: &[Tok]| -> Option<String> {
+        seg.iter().find_map(|t| match t {
+            Tok::Word(w) => Some(w.text.clone()),
+            _ => None,
+        })
+    };
+    for (si, (seg, term)) in segments.iter().enumerate() {
+        let guarded = *term == "||"
+            && !matches!(
+                segments.get(si + 1).and_then(|(n, _)| first_word_of(n)).as_deref(),
+                Some("exit") | Some("{")
+            );
+        let seg = seg.clone();
         // Commands inside `$( … )` run too: `out="$(zizmor …)"` is a gate.
         for t in &seg {
             if let Tok::Word(w) = t {
@@ -1092,13 +1110,20 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
             }
         }
         let mut k = 0;
+        let mut assignments = Vec::new();
         while k < words.len() {
             let w = &words[k];
             if ["if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "{", "}", "time", "esac"]
                 .iter()
                 .any(|kw| w.is(kw))
-                || looks_like_assignment(w)
             {
+                k += 1;
+                continue;
+            }
+            if looks_like_assignment(w) {
+                if let Some((key, val)) = w.text.split_once('=') {
+                    assignments.push((key.to_string(), val.to_string()));
+                }
                 k += 1;
                 continue;
             }
@@ -1108,7 +1133,7 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
         let Some(first) = words.first() else {
             continue;
         };
-        if ["for", "case", "function", "export", "local", "readonly", "declare", "[", "[["]
+        if ["for", "case", "function", "export", "local", "readonly", "declare"]
             .iter()
             .any(|kw| first.is(kw))
             || first.text.ends_with(')')
@@ -1136,6 +1161,8 @@ pub fn extract_loose(script: &str, start_wd: &str) -> Vec<LooseCommand> {
         out.push(LooseCommand {
             argv,
             working_dir: cmd_wd,
+            assignments,
+            guarded,
         });
     }
     out
@@ -1257,6 +1284,11 @@ mod tests {
         assert!(lines.contains(&":poetry run pytest -q".to_string()));
         assert!(lines.contains(&"sub:make check".to_string()));
         assert!(lines.contains(&"sub:tee log".to_string()));
+        let g = extract_loose("make lint || true\nmake check || exit 1\nRUSTFLAGS=-Dwarnings cargo build\n", "");
+        assert!(g[0].guarded);
+        assert!(!g[2].guarded, "make check || exit 1 is a gate");
+        let cb = g.iter().find(|c| c.argv[0] == "cargo").unwrap();
+        assert_eq!(cb.assignments, vec![("RUSTFLAGS".to_string(), "-Dwarnings".to_string())]);
     }
 
     #[test]
