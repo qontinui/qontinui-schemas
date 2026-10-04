@@ -1,0 +1,104 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      2 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (4):
+  COVERED         boundary-guard.yml › no-coord-import [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python3 scripts/check_no_coord_import.py  ←  ci/no-coord-import
+  PARTIAL         ci.yml › repo-checks [pull_request, push:main] 1/2 gate command(s) matched
+      missing: python3 -m unittest discover -s scripts -p test_*.py -v
+      matched: python3 scripts/check_frontend_imports.py  ←  ci/frontend-imports
+  COVERED         ci.yml › python-lint [pull_request, push:main] 3/3 gate command(s) matched
+      matched: ruff check backend/ scripts/  ←  ci/ruff-check
+      matched: ruff format --check backend/ scripts/  ←  ci/ruff-format
+      matched: mypy backend/qontinui_cloud_control scripts  ←  ci/mypy
+  UNCOVERED       ci.yml › composed-typecheck [pull_request, push:main] 0/3 gate command(s) matched
+      missing: <outside the repository>/qontinui-web/frontend: npm run cloud:install
+      missing: <outside the repository>/qontinui-web/frontend: npm run type-check
+      missing: <outside the repository>/qontinui-web/frontend: npm test
+
+NOT CONSIDERED — not on pull_request or a push to main (0 workflow(s)):
+  (none)
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (6) — not represented in the manifest — each must be handled by hand:
+  - ci.yml › python-lint › step "Install gate tooling": run script not imported — `python3 -m pip
+      install --upgrade ruff~=0.6 mypy~=1.11` installs into the host's global environment — a CI
+      host must be left as it was found; declare a pinned [[tools]] entry or make it a host
+      prerequisite
+  - ci.yml › composed-typecheck › step "Install qontinui-web frontend dependencies": run script not
+      imported — runs in "qontinui-web/frontend", outside this repository's checkout (the workflow
+      checked the repository out at "cloud-control"); the manifest's working directories are inside
+      the repository
+  - ci.yml › composed-typecheck › step "Install the cloud-control overlay from this PR": run script
+      not imported — runs in "qontinui-web/frontend", outside this repository's checkout (the
+      workflow checked the repository out at "cloud-control"); the manifest's working directories
+      are inside the repository
+  - ci.yml › composed-typecheck › step "TypeScript check (composed)": run script not imported — runs
+      in "qontinui-web/frontend", outside this repository's checkout (the workflow checked the
+      repository out at "cloud-control"); the manifest's working directories are inside the
+      repository
+  - ci.yml › composed-typecheck › step "Unit tests (composed)": run script not imported — runs in
+      "qontinui-web/frontend", outside this repository's checkout (the workflow checked the
+      repository out at "cloud-control"); the manifest's working directories are inside the
+      repository
+  - ci.yml › composed-typecheck: no step could be translated — the job is not imported
+
+TRANSLATED WITH A CHANGE (5) — represented, but not literally:
+  - boundary-guard.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job
+      runs for every pull request and merge candidate
+  - ci.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job runs for
+      every pull request and merge candidate
+  - ci.yml › composed-typecheck › step "Checkout qontinui-cloud-control (this PR)": checks this
+      repository out at "cloud-control" — the executor's checkout root IS the repository, so working
+      directories under it are re-rooted and any outside it are refused
+  - ci.yml › composed-typecheck › step "Checkout qontinui-web": checkout of qontinui/qontinui-web at
+      qontinui-web: qontinui/qontinui-web → [[siblings]] repo = "qontinui/qontinui-web" (pin =
+      declared-adaptation, the default). The executor materialises it at ../qontinui-web beside the
+      checkout; a command that used another path for it must be re-pointed, and the pin should be
+      reviewed
+  - ci.yml › composed-typecheck › step "Setup Node.js": setup-node node-version "22" → [[tools]]
+      node 22.11.0, the registry's pinned release of that line (setup-node would resolve the newest)
+
+NO-OPS (8) — accounted for; nothing to declare:
+  - boundary-guard.yml › no-coord-import › step "actions/checkout@v4": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - boundary-guard.yml › no-coord-import › step "actions/setup-python@v5": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › repo-checks › step "actions/checkout@v4": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › repo-checks › step "actions/setup-python@v5": setup-python 3.12 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - ci.yml › python-lint › step "actions/checkout@v4": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › python-lint › step "actions/setup-python@v5": setup-python 3.12 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - ci.yml › composed-typecheck › step "Checkout qontinui-cloud-control (this PR)": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - ci.yml › composed-typecheck › step "Setup Node.js": setup-node cache — a dependency cache, not a
+      gate
+
+summary: 2 covered, 0 covered by name, 1 partial, 1 uncovered of 4 job(s); 6 untranslated construct(s) — the Phase 9 precondition is NOT MET

@@ -1,0 +1,49 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      1 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (1):
+  COVERED         qontinui-ci.yml › test [pull_request, push:main] 1/1 gate command(s) matched
+      matched: pytest  ←  ci/test
+
+NOT CONSIDERED — not on pull_request or a push to main (0 workflow(s)):
+  (none)
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (1) — not represented in the manifest — each must be handled by hand:
+  - qontinui-ci.yml › test › step "Install dependencies": run script not imported — uses an `if`
+      conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+
+TRANSLATED WITH A CHANGE (1) — represented, but not literally:
+  - qontinui-ci.yml: trigger filters not carried (push branches ["main", "merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+
+NO-OPS (2) — accounted for; nothing to declare:
+  - qontinui-ci.yml › test › step "actions/checkout@v4": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - qontinui-ci.yml › test › step "actions/setup-python@v5": setup-python 3.x — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+
+summary: 1 covered, 0 covered by name, 0 partial, 0 uncovered of 1 job(s); 1 untranslated construct(s) — the Phase 9 precondition is MET

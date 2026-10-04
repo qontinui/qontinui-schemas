@@ -1,0 +1,109 @@
+name: forbid runner.* schema regressions
+
+# Phase 6 deliverable of the migration consolidation
+# (D:/qontinui-root/tmp_migration_consolidation_plan.md §"Phase 6").
+#
+# Fails if any source file (re-)introduces a `runner.<table>` schema
+# reference. Post-consolidation the `runner` schema is retired; tables
+# live in project / coord / agent / auth.
+#
+# Exclusions (legitimate runner.* references that must not trigger):
+# - All Markdown documentation (historical context, plan archaeology).
+# - alembic/versions/ — pre-consolidation chain history.
+# - alembic/_staged_consolidation/ — Phase 1 batches that legitimately
+#   reference runner.* in cleanup ALTER statements; Phase 2 v_32/v_33
+#   preserve runner.* literals in RAISE NOTICE strings by design; the
+#   cleanup revision (zz_final_runner_cleanup) drops the schema and
+#   relocates the survivors.
+# - Clorinde regen script — has documentation comments describing the
+#   runner-schema concept.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches:
+      - main
+      - develop
+      # merge-candidate refs are the tips coord LANDS: coord's candidate verdict
+      # reduces every check-run on the candidate tip, so a gate that does not
+      # run here takes no part in the land decision (plan
+      # 2026-09-12-red-main-fix-pr-opened-after-the-red-never-gets-a-probe-candidate D5).
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+  # `workflow_dispatch` exists so this workflow can be RE-FIRED on a head whose
+  # PR never matched the `branches:` filter above.
+  #
+  # This job owns the required context `forbid-runner-schema` on the
+  # `main-merge-gates` ruleset. A stacked PR opened against a non-`main` base
+  # matches neither `pull_request:` branch, so this never ran on it; when the
+  # parent lands and the PR is retargeted to `main`, GitHub emits `pull_request`
+  # with action `edited`, which is not in the default
+  # `[opened, synchronize, reopened]` type set — so the very event that makes
+  # the base match fires nothing. The required context has then never reported
+  # on that head and NO EVENT REMAINS that can produce it: the PR is BLOCKED
+  # until someone force-pushes. (Measured on runner#1182, 2026-08-29.)
+  #
+  # Of the ten required contexts, this workflow was the ONLY one that could not
+  # be re-fired at all — `ci.yml`, `clorinde-bindings-fresh.yml` and
+  # `schema-pg-sql-fresh.yml` already declare `workflow_dispatch:`, and
+  # `secret-scan.yml` needs nothing because its `pull_request:` carries no
+  # branch filter and therefore always fired. Declaring the trigger here is what
+  # lets `ci-rerun-on-declaration.yml` re-verify a retargeted head in full.
+  #
+  # A dispatched run is sound for this workflow specifically: the scan is a
+  # `git grep` over the checked-out tree with no PR context and no diff, so it
+  # produces the identical verdict whatever event carried it.
+  workflow_dispatch:
+
+jobs:
+  forbid-runner-schema:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Scan for forbidden runner.* references
+        run: |
+          set -e
+          # Two pattern passes (combined fail semantics):
+          #
+          # Pass 1 — case-sensitive, matches conventional SQL/Rust/Python:
+          # - SCHEMA runner   (DDL)
+          # - FROM/JOIN/INTO/UPDATE/DELETE FROM runner.<table>
+          # - ForeignKey("runner.<table>...
+          # - schema="runner"  /  schema='runner'
+          PATTERN_CS='SCHEMA runner|FROM runner\.|JOIN runner\.|INTO runner\.|UPDATE runner\.|DELETE FROM runner\.|ForeignKey\([^)]*runner\.|schema\s*=\s*["'\'']runner["'\'']'
+
+          # Pass 2 — case-insensitive, narrowly targets `SET search_path TO
+          # runner`. Caught at consumer-audit edit time in qontinui/vga;
+          # gating it here prevents regressions. Case-insensitive because
+          # SQL keywords vary in case across the codebase.
+          PATTERN_CI='SET\s+search_path\s+TO\s+runner'
+
+          # Shared exclude list (legitimate runner.* references):
+          EXCLUDES=(
+            ':!*.md'
+            ':!**/alembic/versions/'
+            ':!**/alembic/_staged_consolidation/'
+            ':!**/scripts/regenerate_schema_pg_sql.sh'
+            # Self-reference: this workflow file contains the pattern
+            # strings as part of its definition.
+            ':!.github/workflows/forbid-runner-schema.yml'
+          )
+
+          found_any=0
+          if git grep -nE "$PATTERN_CS" -- "${EXCLUDES[@]}"; then
+            found_any=1
+          fi
+          if git grep -niE "$PATTERN_CI" -- "${EXCLUDES[@]}"; then
+            found_any=1
+          fi
+
+          if [ "$found_any" = "1" ]; then
+            echo "::error::runner.* schema reference detected in source. The runner schema is retired post-consolidation; tables now live in project / coord / agent / auth."
+            echo "::error::If this is a legitimate historical reference (docs, alembic chain history), add the file pattern to the exclude list in .github/workflows/forbid-runner-schema.yml."
+            exit 1
+          fi
+          echo "No forbidden runner.* references found."

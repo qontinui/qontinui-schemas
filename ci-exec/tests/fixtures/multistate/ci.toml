@@ -1,0 +1,120 @@
+# CI manifest for the runner-as-CI-node lane
+# (plan qontinui-dev-notes/plans/2026-08-07-runner-local-ci-parity-and-web-
+#  configuration.md, Phase 5 — manifest coverage for the repos that had none.
+#  A repo without this file cannot run on the product's local-CI lane at all.)
+#
+# PARITY IS A REVIEW-TIME INVARIANT: the steps below mirror the gate commands of
+# .github/workflows/qontinui-ci.yml's `test` job — this repo's ONLY workflow and
+# therefore its only gate. When that job changes, update this file in the SAME
+# PR. Actions steps are referenced by NAME below, never by line number — line
+# numbers move and a stale citation makes the invariant unauditable.
+#
+# Commands are argv arrays (never shell strings); env is limited to the runner's
+# allowlist (qontinui-runner/src-tauri/src/ci_node/manifest.rs::ENV_ALLOWLIST);
+# `[limits]` values are ceilings the executor caps against host-derived sizing.
+#
+# ===========================================================================
+# THE ONE DIVERGENCE, STATED UP FRONT
+#
+# The gate itself — qontinui-ci.yml's "Test" step, a bare `pytest` — is mirrored
+# EXACTLY in intent and covers the whole suite (134 tests on the last main run).
+# What differs is how its dependencies get installed, and that difference is
+# forced twice over.
+#
+# The workflow's "Install dependencies" step is a five-line shell block:
+#
+#     python -m pip install --upgrade pip
+#     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+#     if [ -f pyproject.toml ]; then pip install -e . || pip install .; fi
+#     pip install pytest
+#
+# 1. IT CANNOT BE SPELLED AS ARGV. `if [ -f … ]` and `||` have no argv form; the
+#    contract has no shell, deliberately. (Both conditionals are determinate in
+#    THIS repo — there is no requirements.txt, there is a pyproject.toml, and
+#    `pip install -e .` succeeds against the poetry-core backend — so the branch
+#    actually taken is knowable at review time, which is what makes a mirror
+#    possible at all.)
+#
+# 2. THE BRANCH IT TAKES MUST NOT BE MIRRORED LITERALLY ANYWAY. `pip install -e .`
+#    goes into whatever interpreter is on PATH and records an editable finder
+#    pointing at `<root>/.ci-worktrees/<dispatch_id>/multistate/src` — a
+#    directory the executor DELETES at cleanup. On an ephemeral Actions runner
+#    that is free. On this lane the host is the user's own machine and it
+#    survives the dispatch, so a literal mirror would permanently break
+#    `import multistate` in their environment. The runner-as-CI-node lane must
+#    leave no trace outside its dispatch directory.
+#
+# So the install below goes through poetry, which this repo is already managed
+# by (pyproject.toml is a [tool.poetry] project with a committed poetry.lock).
+# That is STRICTLY MORE reproducible than the workflow's pip path — the lockfile
+# is the input rather than a fresh resolve — and it is venv-scoped, so it takes
+# nothing with it. `--only main,dev` is the poetry spelling closest to what the
+# workflow installs (runtime deps + pytest): it deliberately excludes the
+# `examples` group (jupyter, matplotlib, networkx) and the `docs` group (sphinx),
+# neither of which the Actions gate installs and neither of which any test
+# imports.
+#
+# IF THE WORKFLOW EVER GAINS A REAL INSTALL STEP, this is the paragraph to
+# revisit. The durable fix for the whole class is a committed script both lanes
+# invoke — that is a change to qontinui-ci.yml, so it is not smuggled in here.
+# ===========================================================================
+#
+# ===========================================================================
+# WHAT THIS MANIFEST CANNOT EXPRESS
+#
+# Recorded rather than silently omitted — the precedent is qontinui-coord's
+# manifest header: a manifest that parses but cannot run is worse than one that
+# announces why.
+#
+# 1. qontinui-ci.yml's `actions/setup-python@v5` with `python-version: '3.x'`.
+#    A manifest has one PATH and one interpreter, whatever the host installed.
+#    pyproject.toml's floor is `python = "^3.10"`; a host below that will fail
+#    for a reason that is about the host, not the commit.
+#
+# 2. NO [[tools]] ARE DECLARED, AND THAT IS NOT THE SAME AS "NEEDS NOTHING".
+#    The runner's tool registry (ci_node/tools.rs) provisions exactly one tool,
+#    cargo-nextest, which nothing here wants. The steps below assume `poetry` is
+#    already on PATH. Declaring a tool the registry does not know is a
+#    validation ERROR, so the honest move is to say so rather than declare a lie.
+#
+# 3. NO DEPENDENCY CACHE. qontinui-ci.yml has none either (no actions/cache), so
+#    this is parity rather than a gap — but a cold CI node also has no warm
+#    poetry cache, which is why the install step carries a generous timeout.
+# ===========================================================================
+
+version = 1
+
+# NO [[siblings]] — and that is a checked statement, not an omission. This repo
+# is a leaf: pyproject.toml declares no `path =` dependency of any kind (its only
+# `path`-shaped key is pytest's `pythonpath = ["src"]`, an intra-repo import
+# root), and qontinui-ci.yml checks out nothing but this repo. multistate is
+# consumed AS a sibling by qontinui — the arrow points inward, not outward.
+
+# NO [limits] TABLE, deliberately.
+#
+# CiLimits carries `cargo_build_jobs` and `test_threads`; both steps below are
+# Python, so neither knob binds anything here. Omitting a limit means "size me
+# from the host", which is the right answer when the manifest author has no
+# measurement to contribute. A table of no-ops would be a lie about what has
+# been measured.
+
+[[steps]]
+name = "install"
+# The argv-expressible, venv-scoped, lockfile-pinned equivalent of
+# qontinui-ci.yml's "Install dependencies" — see THE ONE DIVERGENCE above for
+# why it is not a literal mirror and what would have to change for it to be one.
+command = ["poetry", "install", "--no-interaction", "--no-ansi", "--only", "main,dev"]
+timeout_secs = 7200
+
+[[steps]]
+name = "test"
+# qontinui-ci.yml "Test" (`pytest`), run inside the venv the previous step
+# created. Bare `pytest` would resolve to the host interpreter's pytest, if any,
+# and would see none of the dependencies just installed.
+#
+# No `--cov`: the workflow does not collect coverage, and adding a flag the gate
+# does not have would make the two lanes' verdicts describe different runs.
+# testpaths (`tests`) and the `src` import root come from pyproject.toml's
+# [tool.pytest.ini_options], identically in both lanes.
+command = ["poetry", "run", "pytest"]
+timeout_secs = 7200

@@ -1,0 +1,193 @@
+name: CI
+
+# Lint, type-check and gate-self-test jobs for cloud-control.
+#
+# Kept separate from boundary-guard.yml on purpose: that workflow's
+# `no-coord-import` job is a licence-boundary invariant with its own required
+# status context, and folding new jobs into it would rename nothing but muddle
+# what "boundary-guard failed" means. This file holds the ordinary code gates.
+#
+# PARITY: every job below is mirrored in .qontinui/ci.toml for the
+# runner-as-CI-node lane, WITH ONE DISCLOSED EXCEPTION (`composed-typecheck`).
+# When a gate here changes, update that file in the SAME PR. Steps are referenced
+# from there BY NAME, never by line number.
+#
+# EVERY GATE HERE RUNS STANDALONE — WITH ONE EXCEPTION, RECORDED RATHER THAN
+# QUIETLY BROKEN.
+#
+# The rule was: no sibling checkout, no qontinui-web install, so that every gate
+# is mirrorable on the local-CI lane and the two lanes cannot drift. It held for
+# the Python gates and it still does.
+#
+# `composed-typecheck` breaks it deliberately, because the alternative was worse:
+# frontend/ had NO JS/TS GATE OF ANY KIND. (`repo-checks` does check it, but only
+# that its RELATIVE imports resolve — `@/...` specifiers are host-resolved and
+# that gate skips them by design, so a type error or a missing host module went
+# straight through.) frontend/ is compiled inside qontinui-web — it has no
+# tsconfig, no build step and no bundler here — so the ONLY way to type-check it
+# is to check it there. A tree with no type gate is a live silent-failure
+# surface; one un-mirrorable job is a disclosed lane gap, and .qontinui/ci.toml
+# has a "STILL NOT GATED, AND WHY" section built to hold exactly that.
+# Engineering priority over lane parity, per served policy `planning-and-scope`
+# `priority-forks`.
+#
+# The original justification for the rule cited a runner limitation that no
+# longer exists — the local-CI lane CAN provision siblings (qontinui-web's own
+# manifest declares two). The real blocker is narrower; it is stated where it
+# belongs, in .qontinui/ci.toml's disclosure.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  repo-checks:
+    name: Repo checks (stdlib only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: frontend relative imports resolve
+        run: python3 scripts/check_frontend_imports.py
+      - name: gate self-tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+  python-lint:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gate tooling
+        # `~=` rather than `>=` so this line is character-identical to the
+        # mirrored step in .qontinui/ci.toml, where `>` is a banned argv
+        # character that would reject the manifest outright.
+        run: python3 -m pip install --upgrade "ruff~=0.6" "mypy~=1.11"
+      - name: Run ruff (linting)
+        run: ruff check backend/ scripts/
+      - name: Run ruff format (formatting)
+        run: ruff format --check backend/ scripts/
+      - name: Run mypy (type checking)
+        # No `pip install -e .` — mypy is green with and without this package's
+        # runtime deps (verified both ways), and skipping the install keeps the
+        # job fast and the local-lane mirror exact.
+        run: mypy backend/qontinui_cloud_control scripts
+
+  composed-typecheck:
+    # THE ONLY GATE THIS REPO HAS FOR frontend/. See the header for why it is
+    # allowed to need a sibling checkout when nothing else here does.
+    #
+    # frontend/ is not a standalone tree: every module in it resolves through
+    # qontinui-web's `@/*` alias, and qontinui-web reaches back through its own
+    # `@cloud/*` alias into these sources. Neither half type-checks alone. So
+    # this job builds the composed shape the same way qontinui-web's
+    # `composed-cloud-build` does, only with the overlay pointed at THIS PR
+    # instead of at this repo's default branch — which is the whole difference,
+    # and the reason the failure lands on the PR that caused it.
+    #
+    # Before this job existed, a cloud-control PR that broke the composition
+    # merged green and reddened the next unrelated qontinui-web frontend PR,
+    # whose author did not cause it. That blame inversion is what this fixes.
+    #
+    # TWO CHECKS, NOT ONE — and the second is not redundant:
+    #
+    #   * `npm run type-check` runs tsc over the composed graph under
+    #     qontinui-web's `strict` settings, via its tsconfig.typecheck.json
+    #     (the split config that carries the `@cloud/*` mapping; a bare
+    #     `tsc --noEmit` there fails on every route shim).
+    #
+    #   * `npm test` carries cloud-route-shims.test.ts, which walks THIS repo's
+    #     frontend/src/routes/ tree and fails when a route has no host shim in
+    #     qontinui-web. That is a file-existence fact, so tsc cannot see it, and
+    #     it is precisely the failure mode a route added here produces.
+    #
+    # CONSEQUENCE, INTENDED: a PR here that adds a route is RED until its
+    # qontinui-web shim PR exists. That is a declared adaptation pair, the normal
+    # cross-repo shape in this fleet — not a bug in this job. A route that should
+    # exist but stay unmounted goes in that test's `UNMOUNTED` list, with a
+    # reason. Do not "fix" this by deleting the step the first time it fires.
+    #
+    # NO LINT STEP, DELIBERATELY. qontinui-web's .eslintrc.json ignorePatterns
+    # contains "node_modules/", and the overlay links this repo to exactly
+    # frontend/node_modules/@qontinui/cloud-control there. ESLint takes its file
+    # set from directory globs, never from the module graph, so the `@cloud/*`
+    # alias cannot pull these sources in. A lint step would be green regardless
+    # of what is in this repo — worse than no step, because it would read as
+    # coverage.
+    #
+    # qontinui-web is public (AGPL-3.0), so the checkout needs no credentials.
+    name: Composed type-check (inside qontinui-web)
+    runs-on: ubuntu-latest
+
+    steps:
+      # BOTH repos go in named subdirectories, NEITHER at the workspace root,
+      # and that is load-bearing rather than tidiness. The overlay LINKS this
+      # repo into qontinui-web's `frontend/node_modules/@qontinui/cloud-control`.
+      # If this repo were checked out at the workspace root with qontinui-web
+      # nested inside it, that link's target would contain the link — a symlink
+      # cycle, which any tool that globs the linked package would walk forever.
+      # Two siblings, neither containing the other, cannot form one.
+      - name: Checkout qontinui-cloud-control (this PR)
+        uses: actions/checkout@v4
+        with:
+          path: cloud-control
+
+      # No `ref:` — qontinui-web's default branch, the same pin its own composed
+      # job uses for this repo in the other direction. Pinning a SHA would make
+      # this gate go stale silently; drift against the host's main is something
+      # this job should report, not hide.
+      - name: Checkout qontinui-web
+        uses: actions/checkout@v4
+        with:
+          repository: qontinui/qontinui-web
+          path: qontinui-web
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: qontinui-web/frontend/package-lock.json
+
+      - name: Install qontinui-web frontend dependencies
+        working-directory: qontinui-web/frontend
+        run: npm ci
+
+      # The overlay source is THIS PR's checkout, not a clone of this repo's
+      # default branch. That single substitution is the whole job: it is what
+      # makes this a gate on the PR rather than a re-run of qontinui-web's.
+      - name: Install the cloud-control overlay from this PR
+        working-directory: qontinui-web/frontend
+        env:
+          QONTINUI_CLOUD_CONTROL_PATH: ${{ github.workspace }}/cloud-control
+        run: npm run cloud:install
+
+      - name: TypeScript check (composed)
+        working-directory: qontinui-web/frontend
+        run: npm run type-check
+
+      # DECLARE THE SHAPE, or this step can skip the guard and go green.
+      # `cloud-route-shims.test.ts` derives "am I composed?" from the mere
+      # PRESENCE of the overlay at frontend/node_modules/@qontinui/cloud-control,
+      # and every cross-repo case in that file — including `mirrors
+      # cloud-control's route modules exactly`, the one this job exists to run —
+      # is `it.skipIf(!composed)`. So an overlay install that fails to link but
+      # still exits 0 would leave this step running the OSS shape, skipping the
+      # inventory diff, and reporting green: the gate reads as coverage while
+      # covering nothing.
+      #
+      # The test already carries the assertion that closes that — `agrees with
+      # CI about which build shape this is` — but it is inert unless CI declares
+      # the shape, because a bare local `npm test` must stay skippable. Setting
+      # this turns a silent skip into a loud failure naming the overlay path.
+      # qontinui-web's own `composed-cloud-build` sets it for the same reason.
+      - name: Unit tests (composed)
+        working-directory: qontinui-web/frontend
+        env:
+          QONTINUI_COMPOSED_BUILD: "1"
+        run: npm test

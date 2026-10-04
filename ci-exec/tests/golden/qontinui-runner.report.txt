@@ -1,0 +1,1481 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      29 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (41):
+  UNCOVERED       advisory-red-detector.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: bash scripts/tests/test_schedule_red_streak_detector.sh
+  UNCOVERED       atlas-schema-check.yml › check [pull_request (paths-filtered)] 0/4 gate command(s) matched
+      missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/: python3 -
+      missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
+      missing: bash atlas/scripts/check_schema.sh
+  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/8 gate command(s) matched
+      missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[] | .filename, (.previous_filename /
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .changed_files
+      missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[].filename
+      missing: gh api repos/${REPO}/compare/${BASE_SHA}...${HEAD_SHA} --jq .merge_base_commit.sha
+      missing: python3 -
+      missing: gh api --paginate repos/${REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .body // ""
+      missing: gh pr comment ${PR_NUMBER} --repo ${REPO} --body-file ${RUNNER_TEMP}/notice.md
+  UNCOVERED       ci-rerun-on-declaration.yml › rerun [pull_request] 0/62 gate command(s) matched
+      missing: note
+      missing: note ### ci-rerun-on-declaration
+      missing: note 
+      missing: note - PR: `${REPO}#${PR_NUMBER}` @ `${HEAD_SHA}`
+      missing: note - Event: `${ACTION}` `${LABEL_NAME}`
+      missing: gh api repos/${REPO}/actions/runs/${SELF_RUN_ID} -q .created_at
+      missing: note - Label observed at: `${label_time}`
+      missing: gh api repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${HEAD_SHA}&event=pull_request&per_page=
+      missing: note No `ci.yml` run exists yet for this head. Nothing to re-run — a run
+      missing: note created after the label reads it on its first attempt.
+      missing: note - Target run: [`${run_id}`](https://github.com/${REPO}/actions/runs/${run_id}) (`${run_status}`
+      missing: note Run started after the label landed — it already resolved the sibling
+      missing: note against the current label set. No re-run.
+      missing: pr_head
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} -q .head.sha
+      missing: note PR head already moved (`${HEAD_SHA}` -> `${early_head}`) — the current head's
+      missing: note run reads labels live. Nothing to cancel or re-run.
+      missing: note Run is `${run_status}` and raced the label — cancelling before re-run.
+      missing: gh api -X POST repos/${REPO}/actions/runs/${run_id}/cancel
+      missing: gh api repos/${REPO}/actions/runs/${run_id} -q .status
+      missing: note ⚠️ Cancel requested but not settled within 10 min; not re-running it.
+      missing: note Re-run `ci.yml` by hand on this PR to act on `${LABEL_NAME}`.
+      missing: note PR head moved (`${HEAD_SHA}` -> `${current_head}`) — not re-running a
+      missing: note superseded run, which would cancel the current head's CI via ci.yml's
+      missing: note per-PR concurrency group. The current head's run reads labels live.
+      missing: note ⚠️ PR head UNKNOWN (`pulls/${PR_NUMBER}` unreadable after retries).
+      missing: note This job cancelled nothing, so it re-runs nothing. Re-run the PR's
+      missing: note CURRENT-head `ci.yml` run by hand to act on `${LABEL_NAME}`.
+      missing: note This job requested a cancel of run `${run_id}`, so it re-runs it anyway
+      missing: note rather than leave that head red. If the head DID move, this re-run may cancel
+      missing: note the new head's `ci.yml` run — check the PR's latest run after this job.
+      missing: gh api -X POST repos/${REPO}/actions/runs/${run_id}/rerun
+      missing: note ✅ Re-ran `ci.yml` run `${run_id}`. `checkout-sibling` reads labels live,
+      missing: note so the new attempt resolves the sibling against `${LABEL_NAME}`.
+      missing: note ⚠️ PR head moved to `${after_head}` while re-running — this re-run may have
+      missing: note cancelled that head's `ci.yml` run via the per-PR concurrency group.
+      missing: note Re-run the current head's `ci.yml` run by hand.
+      missing: note ⚠️ PR head could not be confirmed after the re-run. If it moved, this re-run
+      missing: note may have cancelled that head's `ci.yml` run — check the PR's latest run.
+      missing: note ⚠️ Could not re-run `ci.yml` run `${run_id}`.
+      missing: note Re-run it by hand so `${LABEL_NAME}` is acted on.
+      missing: note ### ci-rerun-on-declaration — base retarget
+      missing: note - Base retargeted: `${OLD_BASE_REF}` → `${BASE_REF}`
+      missing: note - Head branch: `${HEAD_REPO:-<unknown>}:${HEAD_REF}`
+      missing: note ⚠️ **This retarget cannot be re-verified automatically.**
+      missing: note The head lives in a fork (`${HEAD_REPO:-<deleted or inaccessible>}`), and
+      missing: note `workflow_dispatch` only accepts a `ref` in `${REPO}` — there is no
+      missing: note branch here to dispatch against.
+      missing: note **Action required:** push to `${HEAD_REF}` on the fork (an empty commit or
+      missing: note a rebase is enough). The resulting `synchronize` event is matched against
+      missing: note the NEW base `${BASE_REF}`, which fires every base-filtered required
+      missing: note workflow normally. Until then this PR will sit `BLOCKED` with required
+      missing: note contexts that have never reported on `${HEAD_SHA}`.
+      missing: gh api repos/${REPO}/actions/workflows/${wf}/runs?head_sha=${HEAD_SHA}&per_page=100 -q [.workflow_ru
+      missing: note - ⚠️ `${wf}`: could not read existing runs for this head (got `${existing:-<empty>}`); dispatch
+      missing: note - ⏭️ `${wf}`: ${existing} run(s) already exist on `${HEAD_SHA}` — not dispatching.
+      missing: gh api -X POST repos/${REPO}/actions/workflows/${wf}/dispatches -f ref=${HEAD_REF}
+      missing: note - ✅ `${wf}`: dispatched on `${HEAD_REF}`.
+      missing: note - ⚠️ `${wf}`: **dispatch FAILED.** Run it by hand from the Actions tab on
+      missing: note   branch `${HEAD_REF}`, or push to the branch to fire it via `synchronize`.
+      missing: note `Gitleaks Secret Detection` is not listed: `secret-scan.yml` has no
+      missing: note `branches:` filter, so it already reported on this head.
+  UNCOVERED       ci-timeout-marker-selftest.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: python3 scripts/tests/test_ci_timeout_marker.py
+  PARTIAL         ci.yml › test [pull_request, push:main] 8/34 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: git --no-pager diff -- Cargo.lock
+      missing: sudo swapoff -a
+      missing: sudo fallocate -l 12G /swapfile
+      missing: sudo mkswap /swapfile
+      missing: sudo swapon /swapfile
+      missing: uses: al-cheb/configure-pagefile-action
+      missing: powershell -File scripts/tests/test-effect-probe.ps1
+      missing: rand_uuid
+      missing: uuidgen
+      missing: python3 -c import uuid; print(uuid.uuid4())
+      missing: python -c import uuid; print(uuid.uuid4())
+      missing: hostname
+      missing: cygpath -u $USERPROFILE
+      missing: homes+=
+      missing: powershell -NoProfile -Command Get-CimInstance Win32_PageFileUsage | Format-List *; Get-CimInstance 
+      missing: sysctl -n hw.memsize
+      missing: vm_stat
+      missing: src-tauri: cargo test --no-run --verbose
+      missing: src-tauri: BINS+=
+      missing: src-tauri: run_all
+      missing: pnpm run tauri build --debug --no-bundle
+      missing: powershell -File scripts/tests/test-smoke-summary.ps1
+      missing: bash scripts/tests/ci-integrity/run-scenarios.sh
+      missing: python3 scripts/tests/ci-integrity/test-surface.py
+      missing: powershell -File scripts/contract-smoke.ps1 -DirectExe target/debug/qontinui-runner.exe -Profile ci 
+      matched: node --test scripts/__tests__/ci-flake-analyze.test.mjs scripts/__tests__/ci-test-results-ingest.tes  ←  ci/ci-tooling-node-tests
+      matched: pnpm run lint  ←  ci/frontend-lint
+      matched: pnpm run effect:fixture:check  ←  ci/effect-fixture-check
+      matched: pnpm run typecheck  ←  ci/frontend-typecheck
+      matched: pnpm test  ←  ci/frontend-test
+      matched: pnpm run build  ←  ci/frontend-build
+      matched: src-tauri: cargo fmt -- --check  ←  ci/rust-fmt
+      matched: src-tauri: cargo clippy  ←  ci/rust-clippy
+      note:    matrix job — considered once
+  PARTIAL         ci.yml › clippy-windows [pull_request, push:main] 2/4 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: uses: al-cheb/configure-pagefile-action
+      matched: pnpm run build  ←  ci/frontend-build
+      matched: src-tauri: cargo clippy  ←  ci/rust-clippy
+  PARTIAL         ci.yml › holder-crates [pull_request, push:main] 2/3 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      matched: cargo test -p qontinui-pty-holder -p qontinui-runner-win32  ←  ci/holder-crates-test
+      matched: cargo clippy -p qontinui-pty-holder --all-targets  ←  ci/holder-crates-clippy
+      note:    matrix job — considered once
+  COVERED         ci.yml › frontend-tests [pull_request, push:main] 1/1 gate command(s) matched
+      matched: pnpm test  ←  ci/frontend-test
+  UNCOVERED       ci.yml › seam-gate [pull_request, push:main] 0/0 gate command(s) matched
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       ci.yml › security [pull_request, push:main] 0/3 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: cargo audit --file Cargo.lock --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC
+      missing: pnpm audit --audit-level=moderate
+  PARTIAL         clippy-tiers.yml › clippy-nightly-unscoped [pull_request] 1/7 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: sudo swapoff -a
+      missing: sudo fallocate -l 12G /swapfile
+      missing: sudo mkswap /swapfile
+      missing: sudo swapon /swapfile
+      missing: src-tauri: cargo clippy --all-targets
+      matched: pnpm run build  ←  ci/frontend-build
+      note:    job condition `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'` — considered as running
+  PARTIAL         clippy-tiers.yml › clippy-diff [pull_request] 1/9 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: uses: reviewdog/action-setup
+      missing: sudo swapoff -a
+      missing: sudo fallocate -l 12G /swapfile
+      missing: sudo mkswap /swapfile
+      missing: sudo swapon /swapfile
+      missing: src-tauri: cargo clippy --message-format=json
+      missing: src-tauri: reviewdog -f=clippy -name=clippy-diff -filter-mode=diff_context -reporter=github-pr-check -fail-on-e
+      matched: pnpm run build  ←  ci/frontend-build
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       clorinde-bindings-fresh.yml › detect [pull_request] 0/1 gate command(s) matched
+      missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/clorinde.toml src-tauri/c
+  UNCOVERED       clorinde-bindings-fresh.yml › clorinde-verify [pull_request] 0/9 gate command(s) matched
+      missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/: python3 -
+      missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
+      missing: bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti
+      missing: <outside the repository>/: clorinde live --help
+      missing: src-tauri: clorinde live --search-path project,public
+      missing: git diff --quiet -- src-tauri/clorinde/
+      missing: git diff --stat -- src-tauri/clorinde/
+      missing: git push origin HEAD:$BRANCH
+      note:    job condition `if: needs.detect.outputs.bindings_relevant == 'true'` — considered as running
+  UNCOVERED       clorinde-bindings-fresh.yml › clorinde-fresh [pull_request] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       flake-escalation.yml › unit-tests [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: node --version
+      missing: node --test scripts/__tests__/ci-flake-escalate.test.mjs
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       flake-escalation.yml › escalate [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: args+=
+      missing: node scripts/ci-flake-escalate.mjs ${args[@]}
+      note:    job condition `if: github.event_name != 'pull_request'` — considered as running
+  UNCOVERED       forbid-runner-schema.yml › forbid-runner-schema [pull_request, push:main] 0/7 gate command(s) matched
+      missing: :!*.md
+      missing: :!**/alembic/versions/
+      missing: :!**/alembic/_staged_consolidation/
+      missing: :!**/scripts/regenerate_schema_pg_sql.sh
+      missing: :!.github/workflows/forbid-runner-schema.yml
+      missing: git grep -nE $PATTERN_CS -- ${EXCLUDES[@]}
+      missing: git grep -niE $PATTERN_CI -- ${EXCLUDES[@]}
+  UNCOVERED       forbid-sibling-clone.yml › forbid-sibling-clone [pull_request (paths-filtered), push:main (paths-filtered)] 0/3 gate command(s) matched
+      missing: :!.github/actions/checkout-sibling/
+      missing: :!.github/workflows/forbid-sibling-clone.yml
+      missing: git grep -nE $PATTERN -- .github/ ${EXCLUDES[@]}
+  UNCOVERED       forbid-untimed-subprocess.yml › forbid-untimed-subprocess [pull_request, push:main] 0/5 gate command(s) matched
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .base.ref
+      missing: git -c user.name=ci -c user.email=ci@qontinui.local merge --no-edit ${LIVE_BASE_SHA}
+      missing: git diff --name-only --diff-filter=U
+      missing: python3 scripts/check_untimed_subprocess.py --list-roots
+      missing: python3 scripts/check_untimed_subprocess.py --ci
+  UNCOVERED       frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: node scripts/export-test-coverage.mjs
+  UNCOVERED       onboarding-doc-fresh.yml › detect [pull_request] 0/1 gate command(s) matched
+      missing: git diff --name-only $merge_base $head_sha -- src-tauri/src/coord_doctor.rs src-tauri/src/bin/coord_
+  UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-verify [pull_request] 0/3 gate command(s) matched
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: src-tauri: cargo run --quiet --bin coord_doctor -- --onboarding-doc
+      missing: git diff --exit-code docs/runner-onboarding.md
+      note:    job condition `if: needs.detect.outputs.doc_relevant == 'true'` — considered as running
+  UNCOVERED       onboarding-doc-fresh.yml › onboarding-doc-fresh [pull_request] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       page-spec-paths.yml › publish [push:main] 0/1 gate command(s) matched
+      missing: node --version
+  UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
+      missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
+  UNCOVERED       qontinui-types-drift.yml › check-drift [pull_request (paths-filtered), push:main (paths-filtered)] 0/4 gate command(s) matched
+      missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --preflight
+      missing: <outside the repository>/: bash qontinui-runner/src-tauri/scripts/generate_types.sh
+      missing: <outside the repository>/qontinui-schemas: bash scripts/check-generated-drift.sh --verify
+  UNCOVERED       schema-pg-sql-fresh.yml › detect [pull_request] 0/1 gate command(s) matched
+      missing: git diff --name-only $merge_base $head_sha -- src-tauri/queries/ src-tauri/schema.pg.sql.generated s
+  UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh-verify [pull_request] 0/7 gate command(s) matched
+      missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/: python3 -
+      missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
+      missing: bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti
+      missing: bash src-tauri/scripts/regenerate_schema_pg_sql.sh
+      missing: src-tauri: diff -q /tmp/schema.checked-in.normalized.sql /tmp/schema.generated.normalized.sql
+      missing: src-tauri: diff -u /tmp/schema.checked-in.sql schema.pg.sql.generated
+      note:    job condition `if: needs.detect.outputs.schema_changed == 'true'` — considered as running
+  UNCOVERED       schema-pg-sql-fresh.yml › schema-fresh [pull_request] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       schema-pg-sql-freshness-nightly.yml › selftest [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: bash scripts/tests/test_schema_pr_step_guards.sh
+      missing: bash scripts/tests/test_ready_bot_draft_pr.sh
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       schema-pg-sql-freshness-nightly.yml › nightly [pull_request (paths-filtered)] 0/39 gate command(s) matched
+      missing: uses: ./qontinui-runner/.github/actions/checkout-sibling
+      missing: <outside the repository>/: python3 -
+      missing: <outside the repository>/qontinui-web/backend: poetry run alembic upgrade head
+      missing: bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qonti
+      missing: bash src-tauri/scripts/regenerate_schema_pg_sql.sh
+      missing: strip
+      missing: strip $RUNNER_TEMP/schema.checked-in.sql $RUNNER_TEMP/a.sql
+      missing: strip $RUNNER_TEMP/schema.fresh.sql $RUNNER_TEMP/b.sql
+      missing: diff -q $RUNNER_TEMP/a.sql $RUNNER_TEMP/b.sql
+      missing: diff -u $RUNNER_TEMP/schema.checked-in.sql $RUNNER_TEMP/schema.fresh.sql
+      missing: pr_op_failed
+      missing: gh pr list --repo $REPO --head $BRANCH --base main --state open --json number,isCrossRepository --jq
+      missing: gh pr view $existing_num --repo $REPO --json isDraft --jq .isDraft
+      missing: pr_op_failed view #$existing_num (isDraft)
+      missing: gh pr view $existing_num --repo $REPO --json mergeable,mergeStateStatus --jq .mergeable + " " + .mer
+      missing: pr_op_failed view #$existing_num (mergeable)
+      missing: gh pr view $existing_num --repo $REPO --json id --jq .id
+      missing: pr_op_failed view #$existing_num (id)
+      missing: gh api graphql -f query=mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullR
+      missing: pr_op_failed convert #$existing_num to draft
+      missing: gh api repos/$REPO/pulls/$existing_num --jq .body // ""
+      missing: pr_op_failed read body of #$existing_num
+      missing: gh api --paginate repos/$REPO/issues/$existing_num/comments --jq .[].body
+      missing: pr_op_failed read comments of #$existing_num
+      missing: gh pr comment $existing_num --repo $REPO --body-file $comment
+      missing: pr_op_failed comment on #$existing_num
+      missing: git diff --cached --quiet
+      missing: git push --force origin HEAD:refs/heads/$BRANCH
+      missing: gh pr edit $existing_num --repo $REPO --title $TITLE --body-file $body
+      missing: pr_op_failed edit #$existing_num
+      missing: gh pr view $existing_num --repo $REPO --json url --jq .url
+      missing: pr_op_failed view #$existing_num
+      missing: gh pr create --repo $REPO --base main --head $BRANCH --draft --title $TITLE --body-file $body
+      missing: pr_op_failed create
+      missing: pr_op_failed create (URL read-back)
+      missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --wait-for-checks-seconds 180 --
+      missing: pr_op_failed ready-for-review (scripts/ci/ready-bot-draft-pr.sh)
+      missing: extra_args+=
+      missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --max-age-hours 48 ${extra_args[
+      note:    job condition `if: github.event_name != 'pull_request'` — considered as running
+  UNCOVERED       schemas-pair-follow-tests.yml › selftest [pull_request (paths-filtered), push:main (paths-filtered)] 0/2 gate command(s) matched
+      missing: bash scripts/tests/schemas-pair-follow/run.sh
+      missing: python3 -
+  UNCOVERED       schemas-pair-follow.yml › detect [pull_request] 0/1 gate command(s) matched
+      missing: gh workflow run schemas-pair-follow.yml -R $REPO --ref main -f pr=$PR_NUMBER -f partner=$partner
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       schemas-pair-follow.yml › plan [pull_request] 0/2 gate command(s) matched
+      missing: bash scripts/schemas-pair-follow.sh scan
+      missing: bash scripts/schemas-pair-follow.sh decide $m $n
+      note:    job condition `if: github.event_name != 'pull_request'` — considered as running
+  UNCOVERED       schemas-pair-follow.yml › compute [pull_request] 0/3 gate command(s) matched
+      missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh merge-and-pin runner $RUNNER_TEMP/decide.json
+      missing: uses: ./main/.github/actions/checkout-sibling
+      missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh lock-and-commit runner $RUNNER_TEMP/decide.json $RUNNER_TEM
+      note:    job condition `if: needs.plan.result == 'success' && needs.plan.outputs.followups != '[]'` — considered as running
+      note:    matrix job — considered once
+  UNCOVERED       schemas-pair-follow.yml › push [pull_request] 0/1 gate command(s) matched
+      missing: <outside the repository>/: bash main/scripts/schemas-pair-follow.sh push $RUNNER_TEMP/plan-item.json $RUNNER_TEMP/out $RUNNER_T
+      note:    job condition `if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.followups != '[]' }}` — considered as running
+      note:    matrix job — considered once
+  UNCOVERED       schemas-pair-follow.yml › verdict [pull_request] 0/0 gate command(s) matched
+      note:    job condition `if: always() && github.event_name != 'pull_request'` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/2 gate command(s) matched
+      missing: ./gitleaks version
+      missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+  UNCOVERED       sibling-pin-bump.yml › bump [pull_request (paths-filtered)] 0/39 gate command(s) matched
+      missing: bash scripts/tests/test_pin_bump_pr_step.sh
+      missing: gh api repos/$repo/commits/$pin --jq .sha
+      missing: gh api repos/$repo --jq .default_branch
+      missing: gh api repos/$repo/commits/$branch --jq .sha
+      missing: gh api repos/$repo/compare/$pin...$head
+      missing: gh api repos/$REPO/contents/$MANIFEST?ref=$BASE_REF -H Accept: application/vnd.github.raw
+      missing: gh api --paginate repos/$REPO/pulls/$PR_NUMBER/files --jq .[] | .filename, (.previous_filename // em
+      missing: read_pin
+      missing: read_pin $MANIFEST
+      missing: read_pin $RUNNER_TEMP/sibling-pins.fresh.conf
+      missing: gh pr list --repo $REPO --head $BRANCH --base main --state open --json number,isDraft,isCrossReposit
+      missing: uses: ./.github/actions/checkout-sibling
+      missing: git status --porcelain
+      missing: pr_write_failed
+      missing: gh pr list --repo $REPO --head $BRANCH --base main --state open --json number,isCrossRepository --jq
+      missing: gh pr view $existing_num --repo $REPO --json isDraft --jq .isDraft
+      missing: gh pr view $existing_num --repo $REPO --json mergeable,mergeStateStatus --jq .mergeable + " " + .mer
+      missing: gh pr view $existing_num --repo $REPO --json id --jq .id
+      missing: gh api graphql -f query=mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullR
+      missing: gh api --paginate repos/$REPO/issues/$existing_num/comments --jq .[].body
+      missing: gh pr comment $existing_num --repo $REPO --body-file $RUNNER_TEMP/pr-comment.md
+      missing: pr_write_failed gh pr comment on #$existing_num
+      missing: git status --porcelain -- Cargo.lock
+      missing: git diff --cached --quiet
+      missing: git push --force origin HEAD:refs/heads/$BRANCH
+      missing: gh pr list --repo $REPO --head $BRANCH --base main --state closed --json number,mergedAt,isCrossRepo
+      missing: bash scripts/ci/ready-bot-draft-pr.sh --print-close-marker
+      missing: pr_write_failed reading the comments of closed bump PR #$existing_num
+      missing: gh pr reopen $existing_num --repo $REPO
+      missing: pr_write_failed gh pr reopen #$existing_num
+      missing: gh pr edit $existing_num --repo $REPO --title $TITLE --body-file $body
+      missing: pr_write_failed gh pr edit #$existing_num
+      missing: gh pr view $existing_num --repo $REPO --json url --jq .url
+      missing: gh pr create --repo $REPO --base main --head $BRANCH --draft --title $TITLE --body-file $body
+      missing: pr_write_failed gh pr create
+      missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --wait-for-checks-seconds 180 --
+      missing: pr_write_failed Marking the bump PR ready for review (scripts/ci/ready-bot-draft-pr.sh; its ::error:
+      missing: extra_args+=
+      missing: bash scripts/ci/ready-bot-draft-pr.sh --repo $REPO --branch $BRANCH --max-age-hours 48 ${extra_args[
+
+NOT CONSIDERED — not on pull_request or a push to main (6 workflow(s)):
+  build-python-executor.yml (jobs: build, combine) — triggers ["workflow_dispatch", "workflow_call"]
+  published-parity.yml (jobs: published-parity) — triggers ["schedule", "workflow_dispatch", "release"]
+  release.yml (jobs: build-python-executor, create-release, build, publish-update-json) — triggers ["push", "workflow_dispatch"]
+  reproducibility-gate.yml (jobs: repro-build) — triggers ["schedule", "workflow_dispatch"]
+  stacked-pr-fastlane.yml (jobs: scope, rust-fast, frontend-fast) — triggers ["pull_request"]
+  toolcache-probe.yml (jobs: probe) — triggers ["workflow_dispatch"]
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (253) — not represented in the manifest — each must be handled by hand:
+  - build-python-executor.yml: trigger `workflow_call` is not carried — a manifest job runs for pull
+      requests, merge candidates and pushes, or on its schedule
+  - flake-escalation.yml: trigger `workflow_run` is not carried — a manifest job runs for pull
+      requests, merge candidates and pushes, or on its schedule
+  - published-parity.yml: trigger `release` is not carried — a manifest job runs for pull requests,
+      merge candidates and pushes, or on its schedule
+  - atlas-schema-check.yml › check: env LIVE_URL is outside the manifest's env allowlist; not
+      imported
+  - atlas-schema-check.yml › check › step "Resolve qontinui-web ref": run script not imported — sets
+      "branch=$BRANCH", an env assignment that is not a literal (bash would expand it)
+  - atlas-schema-check.yml › check › step "Check out sibling qontinui-schemas": local action
+      ./qontinui-runner/.github/actions/checkout-sibling — its steps are not expanded; translate
+      what it does by hand
+  - atlas-schema-check.yml › check › step "Install Poetry": run script not imported — uses a pipe
+      (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - atlas-schema-check.yml › check › step "Install backend dependencies (poetry, default groups only)": run
+      script not imported — runs in "qontinui-web/backend", outside this repository's checkout (the
+      workflow checked the repository out at "qontinui-runner"); the manifest's working directories
+      are inside the repository
+  - atlas-schema-check.yml › check › step "Apply alembic chain": run script not imported — runs in
+      "qontinui-web/backend", outside this repository's checkout (the workflow checked the
+      repository out at "qontinui-runner"); the manifest's working directories are inside the
+      repository
+  - atlas-schema-check.yml › check › step "Check Atlas owns atlas_managed + orchestration cleanly": env
+      ATLAS_LIVE_URL = "${{ env.LIVE_URL }}" is an expression — a manifest env value is a literal;
+      not imported
+  - build-python-executor.yml › build: not imported: the workflow is triggered only by
+      ["workflow_dispatch", "workflow_call"] — not a pull-request/push gate or a schedule, so it is
+      not CI to import
+  - build-python-executor.yml › combine: not imported: the workflow is triggered only by
+      ["workflow_dispatch", "workflow_call"] — not a pull-request/push gate or a schedule, so it is
+      not CI to import
+  - ci-integrity.yml › guard-gating-workflows › step "Verify and record gating-workflow changes": run
+      script not imported — combines `||` with another shell operator
+  - ci-integrity.yml › guard-gating-workflows: no step could be translated — the job is not imported
+  - ci-rerun-on-declaration.yml › rerun › step "Re-run ci.yml so checkout-sibling re-resolves the declared sibling": runs
+      only `if: startsWith(github.event.label.name, 'coord:downstream-of=') ||
+      startsWith(github.event.label.name, 'coord:upstream-of=')` — the manifest has no step
+      conditions; not imported
+  - ci-rerun-on-declaration.yml › rerun › step "Dispatch base-filtered required workflows after a retarget": runs
+      only `if: github.event.action == 'edited' && github.event.changes.base != null` — the manifest
+      has no step conditions; not imported
+  - ci-rerun-on-declaration.yml › rerun: no step could be translated — the job is not imported
+  - ci.yml › env: env GITHUB_TOKEN = "${{ secrets.GITHUB_TOKEN }}" is an expression — a manifest env
+      value is a literal; not imported [secrets referenced: GITHUB_TOKEN]
+  - ci.yml › test › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › test › step "Check out sibling qontinui-web": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › test › step "Check out sibling ui-bridge": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › test › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary action; the manifest
+      runs commands only, so translate its effect by hand
+  - ci.yml › test › step "Setup Node.js": node-version "20" resolves to no node release the tool
+      registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - ci.yml › test › step "Cargo.lock is in sync with the pinned qontinui-schemas": run script not
+      imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has
+      an argv form)
+  - ci.yml › test › step "Install dependencies (Ubuntu)": runs only `if: matrix.platform ==
+      'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Free disk space (Ubuntu)": runs only `if: matrix.platform ==
+      'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Add swapfile (Ubuntu — guard against link-time OOM)": runs only `if:
+      matrix.platform == 'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Configure pagefile (Windows — guard against link-time OOM)": runs only
+      `if: matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Contract-smoke effect-probe verdict (PS 5.1)": runs only `if:
+      matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Clippy check": runs only `if: matrix.platform == 'ubuntu-22.04'` — the
+      manifest has no step conditions; not imported
+  - ci.yml › test › step "Poison ambient state": run script not imported — uses a subshell
+  - ci.yml › test › step "Build Rust tests": run script not imported — uses an `if` conditional
+      (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - ci.yml › test › step "Run Rust tests": run script not imported — sets
+      "BUILD_LOG=$GITHUB_WORKSPACE/cargo-test-build.log", an env assignment that is not a literal
+      (bash would expand it)
+  - ci.yml › test › step "Explain which Rust test phase the bound expired in": runs only `if:
+      failure()` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Windows memory peak after the Rust test steps": runs only `if: always() &&
+      matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Report test results to coord (best-effort)": runs only `if: always()` —
+      the manifest has no step conditions; not imported
+  - ci.yml › test › step "Unpoison ambient state": run script not imported — uses a subshell
+  - ci.yml › test › step "Live AI extractor smoke": runs only `if: matrix.platform ==
+      'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "Contract-smoke summary invariants (PS 5.1)": runs only `if:
+      matrix.platform == 'windows-latest'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "CI-integrity guard policy": runs only `if: matrix.platform ==
+      'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - ci.yml › test › step "SDK↔runner contract smoke (direct-exe)": runs only `if: matrix.platform ==
+      'windows-latest'` — the manifest has no step conditions; not imported
+  - ci.yml › clippy-windows › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › clippy-windows › step "Check out sibling qontinui-web": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › clippy-windows › step "Check out sibling ui-bridge": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › clippy-windows › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary action;
+      the manifest runs commands only, so translate its effect by hand
+  - ci.yml › clippy-windows › step "Setup Node.js": node-version "20" resolves to no node release
+      the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - ci.yml › clippy-windows › step "Configure pagefile (Windows — guard against link-time OOM)": uses
+      al-cheb/configure-pagefile-action@v1.4 — an arbitrary action; the manifest runs commands only,
+      so translate its effect by hand
+  - ci.yml › holder-crates › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › frontend-tests › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary action;
+      the manifest runs commands only, so translate its effect by hand
+  - ci.yml › frontend-tests › step "Setup Node.js": node-version "20" resolves to no node release
+      the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - ci.yml › seam-gate › step "Assert test-fixtures seam stays cfg-gated out of release builds": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - ci.yml › seam-gate: no step could be translated — the job is not imported
+  - ci.yml › security › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - ci.yml › security › step "Run security audit on Rust dependencies": run script not imported —
+      `cargo install cargo-audit --locked` installs into the host's global environment — a CI host
+      must be left as it was found; declare a pinned [[tools]] entry or make it a host prerequisite
+  - ci.yml › security › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - ci.yml › security › step "Run pnpm audit": run script not imported — deliberately ignores a
+      failure (`|| true`) — a manifest step has no non-gating form
+  - ci.yml › security: no step could be translated — the job is not imported
+  - clippy-tiers.yml › clippy-nightly-unscoped: job condition `if: github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'` is not carried — the imported job runs
+      unconditionally
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Check out sibling qontinui-schemas": local
+      action ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does
+      by hand
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Checkout sibling repos": run script not
+      imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Setup Node.js": node-version "20" resolves to
+      no node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node
+      by hand
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Install dependencies (Ubuntu)": run script
+      not imported — `sudo apt-get update` runs as root — a manifest step runs as the host's own
+      user
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Free disk space (Ubuntu)": uses
+      jlumbroso/free-disk-space@main — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Add swapfile (Ubuntu — guard against link-time OOM)": run
+      script not imported — deliberately ignores a failure (`|| true`) — a manifest step has no
+      non-gating form
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Clippy (unscoped, all-targets)": env
+      CARGO_BUILD_JOBS is set by the executor — express it as [limits].cargo_build_jobs; not
+      imported
+  - clippy-tiers.yml › clippy-diff: job condition `if: github.event_name == 'pull_request'` is not
+      carried — the imported job runs unconditionally
+  - clippy-tiers.yml › clippy-diff › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - clippy-tiers.yml › clippy-diff › step "Checkout sibling repos": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - clippy-tiers.yml › clippy-diff › step "Setup pnpm": uses pnpm/action-setup@v4 — an arbitrary
+      action; the manifest runs commands only, so translate its effect by hand
+  - clippy-tiers.yml › clippy-diff › step "Setup Node.js": node-version "20" resolves to no node
+      release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - clippy-tiers.yml › clippy-diff › step "Setup reviewdog": uses reviewdog/action-setup@v1 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - clippy-tiers.yml › clippy-diff › step "Install dependencies (Ubuntu)": run script not imported —
+      `sudo apt-get update` runs as root — a manifest step runs as the host's own user
+  - clippy-tiers.yml › clippy-diff › step "Free disk space (Ubuntu)": uses
+      jlumbroso/free-disk-space@main — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand
+  - clippy-tiers.yml › clippy-diff › step "Add swapfile (Ubuntu — guard against link-time OOM)": run
+      script not imported — deliberately ignores a failure (`|| true`) — a manifest step has no
+      non-gating form
+  - clippy-tiers.yml › clippy-diff › step "Clippy diff-scoped via reviewdog": run script not
+      imported — combines `||` with another shell operator
+  - clorinde-bindings-fresh.yml › detect: job key `outputs` is not carried
+  - clorinde-bindings-fresh.yml › env: env GITHUB_TOKEN = "${{ secrets.GITHUB_TOKEN }}" is an
+      expression — a manifest env value is a literal; not imported [secrets referenced:
+      GITHUB_TOKEN]
+  - clorinde-bindings-fresh.yml › detect › step "Detect Clorinde-relevant changes": run script not
+      imported — uses the expression ${{ github.event_name }} — a manifest command is a literal,
+      evaluated by no one
+  - clorinde-bindings-fresh.yml › detect: no step could be translated — the job is not imported
+  - clorinde-bindings-fresh.yml › clorinde-verify: job condition `if:
+      needs.detect.outputs.bindings_relevant == 'true'` is not carried — the imported job runs
+      unconditionally
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Resolve qontinui-web ref": run script not
+      imported — sets "branch=$BRANCH", an env assignment that is not a literal (bash would expand
+      it)
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Check out sibling qontinui-schemas": local
+      action ./qontinui-runner/.github/actions/checkout-sibling — its steps are not expanded;
+      translate what it does by hand
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Install Poetry": run script not imported —
+      uses a pipe (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version
+      instead)
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Install backend dependencies (poetry, default groups only)": run
+      script not imported — runs in "qontinui-web/backend", outside this repository's checkout (the
+      workflow checked the repository out at "qontinui-runner"); the manifest's working directories
+      are inside the repository
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Apply alembic chain": run script not
+      imported — runs in "qontinui-web/backend", outside this repository's checkout (the workflow
+      checked the repository out at "qontinui-runner"); the manifest's working directories are
+      inside the repository
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Install clorinde CLI": runs only `if:
+      steps.cache-clorinde.outputs.cache-hit != 'true'` — the manifest has no step conditions; not
+      imported
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Show clorinde live --help": run script not
+      imported — deliberately ignores a failure (`|| true`) — a manifest step has no non-gating form
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Stabilize clorinde module ordering": run
+      script not imported — uses the shell construct `{`
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Detect drift": run script not imported —
+      uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv
+      form)
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Auto-commit regenerated bindings": runs
+      only `if: steps.drift.outputs.drift == 'true' && github.event.pull_request.head.repo.full_name
+      == github.repository ` — the manifest has no step conditions; not imported
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Upload regenerated bindings on push failure": runs
+      only `if: steps.drift.outputs.drift == 'true' && (steps.autocommit.outputs.pushed != 'true') `
+      — the manifest has no step conditions; not imported
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Surface auto-commit as a check failure": runs
+      only `if: steps.autocommit.outputs.pushed == 'true'` — the manifest has no step conditions;
+      not imported
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Confirm no drift": runs only `if:
+      steps.drift.outputs.drift == 'false'` — the manifest has no step conditions; not imported
+  - clorinde-bindings-fresh.yml › clorinde-fresh: job condition `if: always()` is not carried — the
+      imported job runs unconditionally
+  - clorinde-bindings-fresh.yml › clorinde-fresh › step "Aggregate verification result": run script
+      not imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard
+      has an argv form)
+  - clorinde-bindings-fresh.yml › clorinde-fresh: no step could be translated — the job is not
+      imported
+  - flake-escalation.yml › unit-tests: job condition `if: github.event_name == 'pull_request'` is
+      not carried — the imported job runs unconditionally
+  - flake-escalation.yml › escalate: job condition `if: github.event_name != 'pull_request'` is not
+      carried — the imported job runs unconditionally
+  - flake-escalation.yml › escalate › step "Read coord's flake history and upsert escalation issues": runs
+      only `if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'push'` —
+      the manifest has no step conditions; not imported
+  - flake-escalation.yml › escalate: no step could be translated — the job is not imported
+  - forbid-runner-schema.yml › forbid-runner-schema › step "Scan for forbidden runner.* references": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - forbid-runner-schema.yml › forbid-runner-schema: no step could be translated — the job is not
+      imported
+  - forbid-sibling-clone.yml › forbid-sibling-clone › step "Scan .github for sibling checkouts that bypass the action": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - forbid-sibling-clone.yml › forbid-sibling-clone: no step could be translated — the job is not
+      imported
+  - forbid-untimed-subprocess.yml › forbid-untimed-subprocess › step "Re-derive this PR's merge state against the current base": runs
+      only `if: github.event_name == 'pull_request'` — the manifest has no step conditions; not
+      imported
+  - forbid-untimed-subprocess.yml › forbid-untimed-subprocess › step "Scan the runner's Rust crates for unbounded blocking subprocess waits": run
+      script not imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi`
+      failure guard has an argv form)
+  - forbid-untimed-subprocess.yml › forbid-untimed-subprocess: no step could be translated — the job
+      is not imported
+  - frontend-coverage-producer.yml › produce › step "Record job start time": run script not imported
+      — its `echo`/`printf` line runs a command substitution, which is more than output
+  - frontend-coverage-producer.yml › produce › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - frontend-coverage-producer.yml › produce › step "Setup Node.js": node-version "20" resolves to
+      no node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node
+      by hand
+  - frontend-coverage-producer.yml › produce › step "Produce per-file coverage and POST to coord (best-effort)": env
+      GITHUB_SHA = "${{ github.sha }}" is an expression — a manifest env value is a literal; not
+      imported
+  - frontend-coverage-producer.yml › produce › step "Warn if the job is approaching its budget": runs
+      only `if: success()` — the manifest has no step conditions; not imported
+  - frontend-coverage-producer.yml › produce › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - onboarding-doc-fresh.yml › detect: job key `outputs` is not carried
+  - onboarding-doc-fresh.yml › detect › step "Detect onboarding-doc-relevant changes": run script
+      not imported — uses the expression ${{ github.event_name }} — a manifest command is a literal,
+      evaluated by no one
+  - onboarding-doc-fresh.yml › detect: no step could be translated — the job is not imported
+  - onboarding-doc-fresh.yml › onboarding-doc-verify: job condition `if:
+      needs.detect.outputs.doc_relevant == 'true'` is not carried — the imported job runs
+      unconditionally
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Check out sibling qontinui-schemas": local
+      action ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does
+      by hand
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Install Tauri system dependencies (Ubuntu)": run
+      script not imported — `sudo apt-get update` runs as root — a manifest step runs as the host's
+      own user
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Regenerate onboarding doc": run script
+      not imported — uses an output redirect
+  - onboarding-doc-fresh.yml › onboarding-doc-fresh: job condition `if: always()` is not carried —
+      the imported job runs unconditionally
+  - onboarding-doc-fresh.yml › onboarding-doc-fresh › step "Aggregate verification result": run
+      script not imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi`
+      failure guard has an argv form)
+  - onboarding-doc-fresh.yml › onboarding-doc-fresh: no step could be translated — the job is not
+      imported
+  - page-spec-paths.yml › publish › step "Publish page-spec path map to coord": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - powershell-parse.yml › powershell-parse › step "Parse every .ps1 and .psm1 with the real PowerShell parser": runs
+      under shell "pwsh" — only bash/sh scripts are read
+  - powershell-parse.yml › powershell-parse: no step could be translated — the job is not imported
+  - published-parity.yml › published-parity › step "Assert ci.yml still has a job named "test" (the rust-cache shared-key)": run
+      script not imported — argument "^ test:" contains a character the manifest bans in a command
+      (one of & | < > ^ " % or a newline)
+  - published-parity.yml › published-parity › step "PS 5.1 scripts are ASCII and parse (the interpreter that runs them)": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - published-parity.yml › published-parity › step "Check out sibling qontinui-schemas": local
+      action ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does
+      by hand
+  - published-parity.yml › published-parity › step "Check out sibling ui-bridge": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - published-parity.yml › published-parity › step "Configure pagefile (Windows — guard against link-time OOM)": uses
+      al-cheb/configure-pagefile-action@v1.4 — an arbitrary action; the manifest runs commands only,
+      so translate its effect by hand
+  - published-parity.yml › published-parity › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - published-parity.yml › published-parity › step "Setup Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - published-parity.yml › published-parity › step "Resolve the release to compare against": run
+      script not imported — uses the expression ${{ github.repository }} — a manifest command is a
+      literal, evaluated by no one
+  - published-parity.yml › published-parity › step "Download the published installer and its checksums": run
+      script not imported — uses the expression ${{ github.repository }} — a manifest command is a
+      literal, evaluated by no one
+  - published-parity.yml › published-parity › step "Verify the installer against the release checksums": run
+      script not imported — uses the expression ${{ steps.release.outputs.tag }} — a manifest
+      command is a literal, evaluated by no one
+  - published-parity.yml › published-parity › step "Install the published build silently": runs
+      under shell "pwsh" — only bash/sh scripts are read
+  - published-parity.yml › published-parity › step "Stop any auto-launched published runner": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - published-parity.yml › published-parity › step "Capability-manifest parity (development vs published)": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - published-parity.yml › published-parity › step "Contract smoke — development build": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - published-parity.yml › published-parity › step "Contract smoke — published build": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - published-parity.yml › published-parity › step "Behavioural axis — diff the two pass/fail sets": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - published-parity.yml › published-parity › step "Upload the row-level parity diff": runs only
+      `if: always()` — the manifest has no step conditions; not imported
+  - published-parity.yml › published-parity › step "Report the count": runs only `if: always()` —
+      the manifest has no step conditions; not imported
+  - qontinui-types-drift.yml › env: env GITHUB_TOKEN = "${{ secrets.GITHUB_TOKEN }}" is an
+      expression — a manifest env value is a literal; not imported [secrets referenced:
+      GITHUB_TOKEN]
+  - qontinui-types-drift.yml › check-drift › step "Check out sibling qontinui-schemas": local action
+      ./qontinui-runner/.github/actions/checkout-sibling — its steps are not expanded; translate
+      what it does by hand
+  - qontinui-types-drift.yml › check-drift › step "Install Tauri Linux system deps": run script not
+      imported — `sudo apt-get update` runs as root — a manifest step runs as the host's own user
+  - qontinui-types-drift.yml › check-drift › step "Set up Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - qontinui-types-drift.yml › check-drift › step "Install qontinui-schemas npm deps": run script
+      not imported — runs in "qontinui-schemas", outside this repository's checkout (the workflow
+      checked the repository out at "qontinui-runner"); the manifest's working directories are
+      inside the repository
+  - qontinui-types-drift.yml › check-drift › step "Install datamodel-code-generator": run script not
+      imported — `pip install datamodel-code-generator==0.57.0` installs into the host's global
+      environment — a CI host must be left as it was found; declare a pinned [[tools]] entry or make
+      it a host prerequisite
+  - qontinui-types-drift.yml › check-drift › step "Stub qontinui-runner frontend dist": run script
+      not imported — writes to qontinui-runner/dist/index.html (an `echo`/`printf` into a file —
+      e.g. $GITHUB_ENV / $GITHUB_OUTPUT / $GITHUB_PATH — changes what later steps see, and a
+      manifest has no such channel)
+  - qontinui-types-drift.yml › check-drift › step "Preflight — codegen toolchain present": run
+      script not imported — runs in "qontinui-schemas", outside this repository's checkout (the
+      workflow checked the repository out at "qontinui-runner"); the manifest's working directories
+      are inside the repository
+  - qontinui-types-drift.yml › check-drift › step "Regenerate types": run script not imported — runs
+      in "", outside this repository's checkout (the workflow checked the repository out at
+      "qontinui-runner"); the manifest's working directories are inside the repository
+  - qontinui-types-drift.yml › check-drift › step "Upload regenerated bindings": runs only `if: ${{
+      !cancelled() }}` — the manifest has no step conditions; not imported
+  - qontinui-types-drift.yml › check-drift › step "Check for drift": run script not imported — runs
+      in "qontinui-schemas", outside this repository's checkout (the workflow checked the repository
+      out at "qontinui-runner"); the manifest's working directories are inside the repository
+  - qontinui-types-drift.yml › check-drift: no step could be translated — the job is not imported
+  - release.yml › build-python-executor: not imported: the workflow is triggered only by ["push",
+      "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - release.yml › create-release: not imported: the workflow is triggered only by ["push",
+      "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - release.yml › build: not imported: the workflow is triggered only by ["push",
+      "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - release.yml › publish-update-json: not imported: the workflow is triggered only by ["push",
+      "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - reproducibility-gate.yml › env: env GITHUB_TOKEN = "${{ secrets.GITHUB_TOKEN }}" is an
+      expression — a manifest env value is a literal; not imported [secrets referenced:
+      GITHUB_TOKEN]
+  - reproducibility-gate.yml › repro-build › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - reproducibility-gate.yml › repro-build › step "Install Linux build deps": runs only `if:
+      matrix.platform == 'ubuntu-22.04'` — the manifest has no step conditions; not imported
+  - reproducibility-gate.yml › repro-build › step "Configure pagefile (Windows — guard against link-time OOM)": runs
+      only `if: matrix.platform == 'windows-latest'` — the manifest has no step conditions; not
+      imported
+  - reproducibility-gate.yml › repro-build › step "Add swapfile (Ubuntu — guard against link-time OOM)": runs
+      only `if: matrix.platform == 'ubuntu-22.04'` — the manifest has no step conditions; not
+      imported
+  - reproducibility-gate.yml › repro-build › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - reproducibility-gate.yml › repro-build › step "Setup Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - reproducibility-gate.yml › repro-build › step "Build": env CARGO_BUILD_JOBS is set by the
+      executor — express it as [limits].cargo_build_jobs; not imported
+  - reproducibility-gate.yml › repro-build › step "Hash build": run script not imported — uses an
+      `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - reproducibility-gate.yml › repro-build › step "Hash build": run script not imported — uses the
+      expression ${{ steps.hash1.outputs.hash1 }} — a manifest command is a literal, evaluated by no
+      one
+  - schema-pg-sql-fresh.yml › detect: job key `outputs` is not carried
+  - schema-pg-sql-fresh.yml › detect › step "Detect schema-relevant changes": run script not
+      imported — uses the expression ${{ github.event_name }} — a manifest command is a literal,
+      evaluated by no one
+  - schema-pg-sql-fresh.yml › detect: no step could be translated — the job is not imported
+  - schema-pg-sql-fresh.yml › schema-fresh-verify: job condition `if:
+      needs.detect.outputs.schema_changed == 'true'` is not carried — the imported job runs
+      unconditionally
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Resolve qontinui-web ref": run script not
+      imported — sets "branch=$BRANCH", an env assignment that is not a literal (bash would expand
+      it)
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Check out sibling qontinui-schemas": local
+      action ./qontinui-runner/.github/actions/checkout-sibling — its steps are not expanded;
+      translate what it does by hand
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Install Poetry": run script not imported —
+      uses a pipe (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version
+      instead)
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Install backend dependencies (poetry, default groups only)": run
+      script not imported — runs in "qontinui-web/backend", outside this repository's checkout (the
+      workflow checked the repository out at "qontinui-runner"); the manifest's working directories
+      are inside the repository
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Apply alembic chain": run script not
+      imported — runs in "qontinui-web/backend", outside this repository's checkout (the workflow
+      checked the repository out at "qontinui-runner"); the manifest's working directories are
+      inside the repository
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Install Postgres client (for pg_dump)": run
+      script not imported — `sudo apt-get update` runs as root — a manifest step runs as the host's
+      own user
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Regenerate (native pg_dump, no docker)": env
+      CLORINDE_PG_CONTAINER is outside the manifest's env allowlist; not imported
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Regenerate (native pg_dump, no docker)": env
+      CLORINDE_PG_HOST is outside the manifest's env allowlist; not imported
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Regenerate (native pg_dump, no docker)": env
+      CLORINDE_PG_PORT is outside the manifest's env allowlist; not imported
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Regenerate (native pg_dump, no docker)": env
+      REGEN_SKIP_ATLAS is outside the manifest's env allowlist; not imported
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Diff against checked-in": run script not
+      imported — uses an output redirect
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Upload regenerated schema (on diff failure)": runs
+      only `if: failure() && steps.diff_check.conclusion == 'failure'` — the manifest has no step
+      conditions; not imported
+  - schema-pg-sql-fresh.yml › schema-fresh: job condition `if: always()` is not carried — the
+      imported job runs unconditionally
+  - schema-pg-sql-fresh.yml › schema-fresh › step "Aggregate verification result": run script not
+      imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has
+      an argv form)
+  - schema-pg-sql-fresh.yml › schema-fresh: no step could be translated — the job is not imported
+  - schema-pg-sql-freshness-nightly.yml › selftest: job condition `if: github.event_name ==
+      'pull_request'` is not carried — the imported job runs unconditionally
+  - schema-pg-sql-freshness-nightly.yml › nightly: job condition `if: github.event_name !=
+      'pull_request'` is not carried — the imported job runs unconditionally
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Check out sibling qontinui-schemas": local
+      action ./qontinui-runner/.github/actions/checkout-sibling — its steps are not expanded;
+      translate what it does by hand
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Install Poetry": run script not imported —
+      uses a pipe (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version
+      instead)
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Install backend dependencies (poetry, default groups only)": run
+      script not imported — runs in "qontinui-web/backend", outside this repository's checkout (the
+      workflow checked the repository out at "qontinui-runner"); the manifest's working directories
+      are inside the repository
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Apply alembic chain": run script not
+      imported — runs in "qontinui-web/backend", outside this repository's checkout (the workflow
+      checked the repository out at "qontinui-runner"); the manifest's working directories are
+      inside the repository
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Install Postgres client (for pg_dump)": run
+      script not imported — `sudo apt-get update` runs as root — a manifest step runs as the host's
+      own user
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Check schema.pg.sql.generated is fresh": run
+      script not imported — writes to $GITHUB_OUTPUT (an `echo`/`printf` into a file — e.g.
+      $GITHUB_ENV / $GITHUB_OUTPUT / $GITHUB_PATH — changes what later steps see, and a manifest has
+      no such channel)
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Open or update the schema refresh PR": runs
+      only `if: steps.fresh_check.outputs.drift == 'true' && steps.fresh_check.outputs.self_heal ==
+      'true'` — the manifest has no step conditions; not imported
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Sweep the refresh PR (ready it once it carries checks; page if parked)": runs
+      only `if: ${{ !cancelled() && steps.fresh_check.outputs.self_heal == 'true' }}` — the manifest
+      has no step conditions; not imported
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Upload regenerated schema (on drift)": runs
+      only `if: ${{ !cancelled() && steps.fresh_check.outputs.drift == 'true' }}` — the manifest has
+      no step conditions; not imported
+  - schemas-pair-follow-tests.yml › selftest › step "The PAT appears only under the push job": run
+      script not imported — uses an input redirect or here-document
+  - schemas-pair-follow.yml › detect: job condition `if: github.event_name == 'pull_request'` is not
+      carried — the imported job runs unconditionally
+  - schemas-pair-follow.yml › detect › step "Dispatch the follow run from main": runs only `if:
+      startsWith(github.event.label.name, 'coord:downstream-of=') && github.event.sender.login ==
+      'qontinui-merge-orchestrator[bot]' && github.event.pull_request.head.repo.full_name ==
+      github.repository && vars.SCHEMAS_PAIR_FOLLOW != 'off'` — the manifest has no step conditions;
+      not imported
+  - schemas-pair-follow.yml › detect: no step could be translated — the job is not imported
+  - schemas-pair-follow.yml › plan: job condition `if: github.event_name != 'pull_request'` is not
+      carried — the imported job runs unconditionally
+  - schemas-pair-follow.yml › plan: job key `outputs` is not carried
+  - schemas-pair-follow.yml › plan › step "Scan and decide": run script not imported — uses an `if`
+      conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - schemas-pair-follow.yml › plan: no step could be translated — the job is not imported
+  - schemas-pair-follow.yml › compute: job condition `if: needs.plan.result == 'success' &&
+      needs.plan.outputs.followups != '[]'` is not carried — the imported job runs unconditionally
+  - schemas-pair-follow.yml › compute: matrix item = ["${{ fromJSON(needs.plan.outputs.followups)
+      }}"] not expanded — the job is imported once; steps that read matrix.* are untranslated
+  - schemas-pair-follow.yml › compute › step "Merge main and move the pin": run script not imported
+      — writes to $RUNNER_TEMP/decide.json (an `echo`/`printf` into a file — e.g. $GITHUB_ENV /
+      $GITHUB_OUTPUT / $GITHUB_PATH — changes what later steps see, and a manifest has no such
+      channel)
+  - schemas-pair-follow.yml › compute › step "Check out the new qontinui-schemas pin": runs only
+      `if: steps.pin.outputs.MODE == 'FOLLOW'` — the manifest has no step conditions; not imported
+  - schemas-pair-follow.yml › compute › step "Install main's Rust toolchain": runs only `if:
+      steps.pin.outputs.MODE == 'FOLLOW'` — the manifest has no step conditions; not imported
+  - schemas-pair-follow.yml › compute › step "Refresh Cargo.lock and commit": runs only `if:
+      steps.pin.outputs.MODE == 'FOLLOW' || steps.pin.outputs.MODE == 'MERGE_ONLY'` — the manifest
+      has no step conditions; not imported
+  - schemas-pair-follow.yml › compute › step "Upload the pair-follow bundle": runs only `if:
+      steps.pin.outputs.MODE == 'FOLLOW' || steps.pin.outputs.MODE == 'MERGE_ONLY'` — the manifest
+      has no step conditions; not imported
+  - schemas-pair-follow.yml › compute: no step could be translated — the job is not imported
+  - schemas-pair-follow.yml › push: job condition `if: ${{ !cancelled() && needs.plan.result ==
+      'success' && needs.plan.outputs.followups != '[]' }}` is not carried — the imported job runs
+      unconditionally
+  - schemas-pair-follow.yml › push: matrix item = ["${{ fromJSON(needs.plan.outputs.followups) }}"]
+      not expanded — the job is imported once; steps that read matrix.* are untranslated
+  - schemas-pair-follow.yml › push › step "Download the pair-follow bundle": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - schemas-pair-follow.yml › push › step "Verify, re-read the head, push": runs only `if:
+      steps.dl.outcome == 'success'` — the manifest has no step conditions; not imported
+  - schemas-pair-follow.yml › push › step "No bundle for this PR": runs only `if: steps.dl.outcome
+      != 'success'` — the manifest has no step conditions; not imported
+  - schemas-pair-follow.yml › push: no step could be translated — the job is not imported
+  - schemas-pair-follow.yml › verdict: job condition `if: always() && github.event_name !=
+      'pull_request'` is not carried — the imported job runs unconditionally
+  - schemas-pair-follow.yml › verdict › step "Red on UNKNOWN or a failed leg": run script not
+      imported — relies on shell glob or brace expansion of "["
+  - schemas-pair-follow.yml › verdict: no step could be translated — the job is not imported
+  - secret-scan.yml › gitleaks › step "Run gitleaks (binary — the marketplace action requires a paid org license)": run
+      script not imported — uses the expression ${{ github.event.pull_request.base.sha }} — a
+      manifest command is a literal, evaluated by no one
+  - secret-scan.yml › gitleaks: no step could be translated — the job is not imported
+  - sibling-pin-bump.yml › bump › step "Test the bump-PR step (stubbed gh, no network)": runs only
+      `if: github.event_name == 'pull_request'` — the manifest has no step conditions; not imported
+  - sibling-pin-bump.yml › bump › step "Resolve each pinned sibling's current default-branch head": run
+      script not imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi`
+      failure guard has an argv form)
+  - sibling-pin-bump.yml › bump › step "Detect a moving qontinui-schemas pin": runs only `if:
+      steps.scan.outputs.self_heal == 'true'` — the manifest has no step conditions; not imported
+  - sibling-pin-bump.yml › bump › step "Check out the new qontinui-schemas pin": runs only `if:
+      steps.schemas.outputs.moved == 'true'` — the manifest has no step conditions; not imported
+  - sibling-pin-bump.yml › bump › step "Refresh Cargo.lock against the new qontinui-schemas pin": runs
+      only `if: steps.schemas.outputs.moved == 'true'` — the manifest has no step conditions; not
+      imported
+  - sibling-pin-bump.yml › bump › step "Open or update the pin bump PR": runs only `if:
+      steps.scan.outputs.self_heal == 'true'` — the manifest has no step conditions; not imported
+  - sibling-pin-bump.yml › bump › step "Sweep the bump PR (ready it once it carries checks; page if parked)": runs
+      only `if: ${{ !cancelled() && steps.scan.outputs.sweep == 'true' }}` — the manifest has no
+      step conditions; not imported
+  - sibling-pin-bump.yml › bump: no step could be translated — the job is not imported
+  - stacked-pr-fastlane.yml › scope: job key `outputs` is not carried
+  - stacked-pr-fastlane.yml › scope › step "Classify changed paths": run script not imported — sets
+      a shell variable (`KEY=value` with no command)
+  - stacked-pr-fastlane.yml › scope: no step could be translated — the job is not imported
+  - stacked-pr-fastlane.yml › rust-fast: job condition `if: needs.scope.outputs.rust == 'true'` is
+      not carried — the imported job runs unconditionally
+  - stacked-pr-fastlane.yml › rust-fast › step "Check out sibling qontinui-schemas": local action
+      ./.github/actions/checkout-sibling — its steps are not expanded; translate what it does by
+      hand
+  - stacked-pr-fastlane.yml › rust-fast › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - stacked-pr-fastlane.yml › rust-fast › step "Setup Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - stacked-pr-fastlane.yml › rust-fast › step "Install dependencies (Ubuntu)": run script not
+      imported — `sudo apt-get update` runs as root — a manifest step runs as the host's own user
+  - stacked-pr-fastlane.yml › frontend-fast: job condition `if: needs.scope.outputs.frontend ==
+      'true'` is not carried — the imported job runs unconditionally
+  - stacked-pr-fastlane.yml › frontend-fast › step "Setup pnpm": uses pnpm/action-setup@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - stacked-pr-fastlane.yml › frontend-fast › step "Setup Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - toolcache-probe.yml › probe: not imported: the workflow is triggered only by
+      ["workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - clorinde-bindings-fresh.yml › clorinde-verify: needs detect, which was not imported — dependency
+      edge dropped
+  - onboarding-doc-fresh.yml › onboarding-doc-verify: needs detect, which was not imported —
+      dependency edge dropped
+  - schema-pg-sql-fresh.yml › schema-fresh-verify: needs detect, which was not imported — dependency
+      edge dropped
+  - stacked-pr-fastlane.yml › rust-fast: needs scope, which was not imported — dependency edge
+      dropped
+  - stacked-pr-fastlane.yml › frontend-fast: needs scope, which was not imported — dependency edge
+      dropped
+
+TRANSLATED WITH A CHANGE (83) — represented, but not literally:
+  - advisory-red-detector.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - advisory-red-detector.yml: trigger filters not carried (pull_request branches ["main"]; push
+      branches ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - atlas-schema-check.yml: also runs on schedule ["17 6 * * *"]; imported as gate jobs only (a
+      manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly run
+      matters)
+  - atlas-schema-check.yml: pull_request filtered by paths — a manifest job runs for every change
+  - atlas-schema-check.yml: trigger filters not carried (pull_request branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - ci-integrity.yml: pull_request_target filtered by paths — a manifest job runs for every change
+  - ci-integrity.yml: pull_request_target (runs with the base branch's privileges) imported as an
+      ordinary gate — a manifest job always runs the dispatched commit's own manifest
+  - ci-rerun-on-declaration.yml: trigger filters not carried (pull_request branches ["main",
+      "develop", "session-restore-**"] types ["labeled", "unlabeled", "edited"]) — a manifest gate
+      job runs for every pull request and merge candidate
+  - ci-timeout-marker-selftest.yml: pull_request, push filtered by paths — a manifest job runs for
+      every change
+  - ci-timeout-marker-selftest.yml: trigger filters not carried (pull_request branches ["main"];
+      push branches ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - ci.yml: trigger filters not carried (pull_request branches ["main", "develop",
+      "session-restore-**"]; push branches ["main", "develop", "merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - clippy-tiers.yml: also runs on schedule ["23 7 * * *"]; imported as gate jobs only (a manifest
+      job is either a gate or scheduled — add a scheduled copy by hand if the nightly run matters)
+  - clippy-tiers.yml: trigger filters not carried (pull_request branches ["main", "develop",
+      "session-restore-**"]) — a manifest gate job runs for every pull request and merge candidate
+  - clorinde-bindings-fresh.yml: trigger filters not carried (pull_request branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - flake-escalation.yml: also runs on schedule ["17 6 * * *"]; imported as gate jobs only (a
+      manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly run
+      matters)
+  - flake-escalation.yml: pull_request filtered by paths — a manifest job runs for every change
+  - flake-escalation.yml: trigger filters not carried (pull_request branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - forbid-runner-schema.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - forbid-sibling-clone.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - forbid-sibling-clone.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - forbid-untimed-subprocess.yml: trigger filters not carried (push branches ["main", "develop",
+      "merge-candidate/**", "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - frontend-coverage-producer.yml: push filtered by paths — a manifest job runs for every change
+  - frontend-coverage-producer.yml: trigger filters not carried (push branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - onboarding-doc-fresh.yml: trigger filters not carried (pull_request branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - page-spec-paths.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job
+      runs for every pull request and merge candidate
+  - powershell-parse.yml: trigger filters not carried (pull_request branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - qontinui-types-drift.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - qontinui-types-drift.yml: trigger filters not carried (pull_request branches ["main"]; push
+      branches ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - schema-pg-sql-fresh.yml: trigger filters not carried (pull_request branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - schema-pg-sql-freshness-nightly.yml: also runs on schedule ["47 4 * * *"]; imported as gate jobs
+      only (a manifest job is either a gate or scheduled — add a scheduled copy by hand if the
+      nightly run matters)
+  - schema-pg-sql-freshness-nightly.yml: pull_request filtered by paths — a manifest job runs for
+      every change
+  - schema-pg-sql-freshness-nightly.yml: trigger filters not carried (pull_request branches
+      ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - schemas-pair-follow-tests.yml: pull_request, push filtered by paths — a manifest job runs for
+      every change
+  - schemas-pair-follow-tests.yml: trigger filters not carried (pull_request branches ["main"]; push
+      branches ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - schemas-pair-follow.yml: also runs on schedule ["11,41 * * * *"]; imported as gate jobs only (a
+      manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly run
+      matters)
+  - schemas-pair-follow.yml: trigger filters not carried (pull_request branches ["main"] types
+      ["unlabeled"]) — a manifest gate job runs for every pull request and merge candidate
+  - sibling-pin-bump.yml: also runs on schedule ["41 5 * * *"]; imported as gate jobs only (a
+      manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly run
+      matters)
+  - sibling-pin-bump.yml: pull_request filtered by paths — a manifest job runs for every change
+  - sibling-pin-bump.yml: trigger filters not carried (pull_request branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - stacked-pr-fastlane.yml: trigger filters not carried (pull_request branches-ignore ["main",
+      "develop"]) — a manifest gate job runs for every pull request and merge candidate
+  - advisory-red-detector.yml › selftest: job timeout-minutes applied to each imported step without
+      its own — the manifest has per-step timeouts only
+  - atlas-schema-check.yml › check › step "Checkout qontinui-runner": checks this repository out at
+      "qontinui-runner" — the executor's checkout root IS the repository, so working directories
+      under it are re-rooted and any outside it are refused
+  - atlas-schema-check.yml › check › step "Checkout qontinui-web (sibling)": checkout of
+      qontinui/qontinui-web at qontinui-web: qontinui/qontinui-web → [[siblings]] repo =
+      "qontinui/qontinui-web" (pin = declared-adaptation, the default). The executor materialises it
+      at ../qontinui-web beside the checkout; a command that used another path for it must be
+      re-pointed, and the pin should be reviewed
+  - atlas-schema-check.yml › check › step "Checkout sibling repo (qontinui)": the script clones
+      qontinui/qontinui → [[siblings]] repo = "qontinui/qontinui" (pin = declared-adaptation, the
+      default). The executor materialises it at ../qontinui beside the checkout; a command that used
+      another path for it must be re-pointed, and the pin should be reviewed
+  - ci-timeout-marker-selftest.yml › selftest: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - ci.yml › test: job timeout-minutes 150 exceeds the manifest's per-step cap; clamped to 7200s
+  - ci.yml › test: job timeout-minutes applied to each imported step without its own — the manifest
+      has per-step timeouts only
+  - ci.yml › clippy-windows: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - ci.yml › holder-crates: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - ci.yml › frontend-tests: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Checkout sibling repos": the script clones
+      qontinui/qontinui-web — already declared as [[siblings]] repo = "qontinui/qontinui-web",
+      materialised at ../qontinui-web; a command that used another path for it must be re-pointed
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Checkout sibling repos": the script clones
+      qontinui/ui-bridge → [[siblings]] repo = "qontinui/ui-bridge" (pin = declared-adaptation, the
+      default). The executor materialises it at ../ui-bridge beside the checkout; a command that
+      used another path for it must be re-pointed, and the pin should be reviewed
+  - clippy-tiers.yml › clippy-nightly-unscoped: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - clippy-tiers.yml › clippy-diff › step "Checkout sibling repos": the script clones
+      qontinui/qontinui-web — already declared as [[siblings]] repo = "qontinui/qontinui-web",
+      materialised at ../qontinui-web; a command that used another path for it must be re-pointed
+  - clippy-tiers.yml › clippy-diff › step "Checkout sibling repos": the script clones
+      qontinui/ui-bridge — already declared as [[siblings]] repo = "qontinui/ui-bridge",
+      materialised at ../ui-bridge; a command that used another path for it must be re-pointed
+  - clippy-tiers.yml › clippy-diff: job timeout-minutes applied to each imported step without its
+      own — the manifest has per-step timeouts only
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Checkout qontinui-runner": checks this
+      repository out at "qontinui-runner" — the executor's checkout root IS the repository, so
+      working directories under it are re-rooted and any outside it are refused
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Checkout qontinui-web (sibling)": checkout
+      of qontinui/qontinui-web at qontinui-web: qontinui/qontinui-web — already declared as
+      [[siblings]] repo = "qontinui/qontinui-web", materialised at ../qontinui-web; a command that
+      used another path for it must be re-pointed
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Checkout sibling repo (qontinui)": the
+      script clones qontinui/qontinui — already declared as [[siblings]] repo = "qontinui/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Apply Atlas-owned schema (atlas/schema.hcl)": carried
+      literally, but `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qo` hardcodes a
+      service connection
+      (postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qontinui_db) — the executor
+      assigns the host port and credentials per dispatch and exports them as DATABASE_URL / PG* /
+      REDIS_*; review the command
+  - flake-escalation.yml › unit-tests › step "Run unit tests": its timeout applies to each of the 2
+      commands it became, not to their sum
+  - flake-escalation.yml › unit-tests: job timeout-minutes applied to each imported step without its
+      own — the manifest has per-step timeouts only
+  - frontend-coverage-producer.yml › produce: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Verify docs/runner-onboarding.md is fresh": 1
+      `echo`/`printf` line(s) dropped (terminal output only)
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Verify docs/runner-onboarding.md is fresh": 1
+      failure-message line(s) of an `if ! …` / `|| …` guard dropped; the guarded command still fails
+      the step
+  - published-parity.yml › published-parity: job timeout-minutes 150 exceeds the manifest's per-step
+      cap; clamped to 7200s
+  - published-parity.yml › published-parity › step "Parity comparator unit tests (PS 5.1)": its
+      timeout applies to each of the 3 commands it became, not to their sum
+  - published-parity.yml › published-parity: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - qontinui-types-drift.yml › check-drift › step "Checkout qontinui-runner": checks this repository
+      out at "qontinui-runner" — the executor's checkout root IS the repository, so working
+      directories under it are re-rooted and any outside it are refused
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Checkout qontinui-runner": checks this
+      repository out at "qontinui-runner" — the executor's checkout root IS the repository, so
+      working directories under it are re-rooted and any outside it are refused
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Checkout qontinui-web (sibling)": checkout
+      of qontinui/qontinui-web at qontinui-web: qontinui/qontinui-web — already declared as
+      [[siblings]] repo = "qontinui/qontinui-web", materialised at ../qontinui-web; a command that
+      used another path for it must be re-pointed
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Checkout sibling repo (qontinui)": the
+      script clones qontinui/qontinui — already declared as [[siblings]] repo = "qontinui/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Apply Atlas-owned schema (atlas/schema.hcl)": carried
+      literally, but `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qo` hardcodes a
+      service connection
+      (postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qontinui_db) — the executor
+      assigns the host port and credentials per dispatch and exports them as DATABASE_URL / PG* /
+      REDIS_*; review the command
+  - schema-pg-sql-freshness-nightly.yml › selftest: job timeout-minutes applied to each imported
+      step without its own — the manifest has per-step timeouts only
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Checkout qontinui-runner": checks this
+      repository out at "qontinui-runner" — the executor's checkout root IS the repository, so
+      working directories under it are re-rooted and any outside it are refused
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Checkout qontinui-web (sibling, main)": checkout
+      of qontinui/qontinui-web at qontinui-web: qontinui/qontinui-web — already declared as
+      [[siblings]] repo = "qontinui/qontinui-web", materialised at ../qontinui-web; a command that
+      used another path for it must be re-pointed
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Checkout sibling repo (qontinui)": the
+      script clones qontinui/qontinui — already declared as [[siblings]] repo = "qontinui/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Apply Atlas-owned schema (atlas/schema.hcl)": carried
+      literally, but `bash atlas/scripts/apply_to.sh postgresql://qontinui_user:qo` hardcodes a
+      service connection
+      (postgresql://qontinui_user:qontinui_dev_password@localhost:5433/qontinui_db) — the executor
+      assigns the host port and credentials per dispatch and exports them as DATABASE_URL / PG* /
+      REDIS_*; review the command
+  - schemas-pair-follow-tests.yml › selftest: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - schemas-pair-follow.yml › compute › step "Check out main's pair-follow tooling": checks this
+      repository out at "main" — the executor's checkout root IS the repository, so working
+      directories under it are re-rooted and any outside it are refused
+  - schemas-pair-follow.yml › push › step "Check out main's pair-follow tooling": checks this
+      repository out at "main" — the executor's checkout root IS the repository, so working
+      directories under it are re-rooted and any outside it are refused
+  - stacked-pr-fastlane.yml › rust-fast: job timeout-minutes applied to each imported step without
+      its own — the manifest has per-step timeouts only
+  - stacked-pr-fastlane.yml › frontend-fast: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+
+NO-OPS (151) — accounted for; nothing to declare:
+  - advisory-red-detector.yml: permissions — GitHub-side setting with no manifest counterpart
+  - advisory-red-detector.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - atlas-schema-check.yml: permissions — GitHub-side setting with no manifest counterpart
+  - atlas-schema-check.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - atlas-schema-check.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - build-python-executor.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - ci-integrity.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci-rerun-on-declaration.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci-timeout-marker-selftest.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci-timeout-marker-selftest.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is
+      the manual run
+  - ci.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - ci.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - clippy-tiers.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - clorinde-bindings-fresh.yml: permissions — GitHub-side setting with no manifest counterpart
+  - clorinde-bindings-fresh.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - flake-escalation.yml: permissions — GitHub-side setting with no manifest counterpart
+  - flake-escalation.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - forbid-runner-schema.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - forbid-sibling-clone.yml: permissions — GitHub-side setting with no manifest counterpart
+  - forbid-sibling-clone.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - forbid-untimed-subprocess.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - forbid-untimed-subprocess.yml: permissions — GitHub-side setting with no manifest counterpart
+  - forbid-untimed-subprocess.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - frontend-coverage-producer.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - frontend-coverage-producer.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is
+      the manual run
+  - onboarding-doc-fresh.yml: permissions — GitHub-side setting with no manifest counterpart
+  - onboarding-doc-fresh.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - page-spec-paths.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - page-spec-paths.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - powershell-parse.yml: permissions — GitHub-side setting with no manifest counterpart
+  - powershell-parse.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - published-parity.yml: permissions — GitHub-side setting with no manifest counterpart
+  - published-parity.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - published-parity.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - qontinui-types-drift.yml: permissions — GitHub-side setting with no manifest counterpart
+  - qontinui-types-drift.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - release.yml: permissions — GitHub-side setting with no manifest counterpart
+  - release.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - reproducibility-gate.yml: permissions — GitHub-side setting with no manifest counterpart
+  - reproducibility-gate.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - schema-pg-sql-fresh.yml: permissions — GitHub-side setting with no manifest counterpart
+  - schema-pg-sql-fresh.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - schema-pg-sql-freshness-nightly.yml: permissions — GitHub-side setting with no manifest
+      counterpart
+  - schema-pg-sql-freshness-nightly.yml: concurrency — GitHub-side setting with no manifest
+      counterpart
+  - schema-pg-sql-freshness-nightly.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>`
+      is the manual run
+  - schemas-pair-follow-tests.yml: permissions — GitHub-side setting with no manifest counterpart
+  - schemas-pair-follow-tests.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - schemas-pair-follow.yml: permissions — GitHub-side setting with no manifest counterpart
+  - schemas-pair-follow.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - secret-scan.yml: permissions — GitHub-side setting with no manifest counterpart
+  - sibling-pin-bump.yml: permissions — GitHub-side setting with no manifest counterpart
+  - sibling-pin-bump.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - stacked-pr-fastlane.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - stacked-pr-fastlane.yml: permissions — GitHub-side setting with no manifest counterpart
+  - toolcache-probe.yml: permissions — GitHub-side setting with no manifest counterpart
+  - toolcache-probe.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - advisory-red-detector.yml › selftest › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - atlas-schema-check.yml › check › service postgres: env, ports, options — the executor owns
+      credentials (generated per dispatch), the host port and the readiness probe
+  - atlas-schema-check.yml › check › step "Checkout qontinui-runner": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - atlas-schema-check.yml › check › step "Set up Python": setup-python 3.12 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - ci-timeout-marker-selftest.yml › selftest › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - ci.yml › test › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › test › step "Setup Node.js": setup-node cache — a dependency cache, not a gate
+  - ci.yml › test › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the host's rust toolchain
+      runs the steps (declare [canonical] toolchains = ["rustc"] to require the host's canonical
+      one); components rustfmt, clippy must be installed on the host
+  - ci.yml › test › step "Cache Rust dependencies": Swatinem/rust-cache — a cache; the executor
+      keeps its own warm target dir and tool cache
+  - ci.yml › clippy-windows › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › clippy-windows › step "Setup Node.js": setup-node cache — a dependency cache, not a
+      gate
+  - ci.yml › clippy-windows › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the host's rust
+      toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require the host's
+      canonical one); components rustfmt, clippy must be installed on the host
+  - ci.yml › clippy-windows › step "Cache Rust dependencies": Swatinem/rust-cache — a cache; the
+      executor keeps its own warm target dir and tool cache
+  - ci.yml › holder-crates › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › holder-crates › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the host's rust
+      toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require the host's
+      canonical one); components clippy must be installed on the host
+  - ci.yml › holder-crates › step "Cache Rust dependencies": Swatinem/rust-cache — a cache; the
+      executor keeps its own warm target dir and tool cache
+  - ci.yml › frontend-tests › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › frontend-tests › step "Setup Node.js": setup-node cache — a dependency cache, not a
+      gate
+  - ci.yml › seam-gate › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › security › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Setup Node.js": setup-node cache — a
+      dependency cache, not a gate
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 —
+      the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to
+      require the host's canonical one); components rustfmt, clippy must be installed on the host
+  - clippy-tiers.yml › clippy-nightly-unscoped › step "Cache Rust dependencies": Swatinem/rust-cache
+      — a cache; the executor keeps its own warm target dir and tool cache
+  - clippy-tiers.yml › clippy-diff: permissions — GitHub-side setting with no manifest counterpart
+  - clippy-tiers.yml › clippy-diff › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - clippy-tiers.yml › clippy-diff › step "Setup Node.js": setup-node cache — a dependency cache,
+      not a gate
+  - clippy-tiers.yml › clippy-diff › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the host's
+      rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require the
+      host's canonical one); components rustfmt, clippy must be installed on the host
+  - clippy-tiers.yml › clippy-diff › step "Cache Rust dependencies": Swatinem/rust-cache — a cache;
+      the executor keeps its own warm target dir and tool cache
+  - clorinde-bindings-fresh.yml › detect › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - clorinde-bindings-fresh.yml › clorinde-verify › service postgres: env, ports, options — the
+      executor owns credentials (generated per dispatch), the host port and the readiness probe
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Checkout qontinui-runner": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Set up Python": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Set up Rust toolchain": dtolnay/rust-toolchain
+      stable — the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"]
+      to require the host's canonical one)
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Cache clorinde CLI": actions/cache — a
+      cache; the executor keeps its own warm target dir and tool cache
+  - clorinde-bindings-fresh.yml › clorinde-verify › step "Run Clorinde codegen": env DATABASE_URL:
+      exported by the executor from the job's postgres service (credentials are generated per
+      dispatch)
+  - flake-escalation.yml › unit-tests › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - flake-escalation.yml › escalate: concurrency — GitHub-side setting with no manifest counterpart
+  - flake-escalation.yml › escalate: permissions — GitHub-side setting with no manifest counterpart
+  - flake-escalation.yml › escalate › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - forbid-runner-schema.yml › forbid-runner-schema › step "actions/checkout@v5": actions/checkout —
+      the executor checks out the dispatched commit itself
+  - forbid-sibling-clone.yml › forbid-sibling-clone › step "actions/checkout@v5": actions/checkout —
+      the executor checks out the dispatched commit itself
+  - forbid-untimed-subprocess.yml › forbid-untimed-subprocess › step "actions/checkout@v5": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - forbid-untimed-subprocess.yml › forbid-untimed-subprocess › step "actions/setup-python@v5": setup-python
+      3.12 — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - frontend-coverage-producer.yml › produce › step "Checkout qontinui-runner": actions/checkout —
+      the executor checks out the dispatched commit itself
+  - frontend-coverage-producer.yml › produce › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - onboarding-doc-fresh.yml › detect › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Checkout qontinui-runner": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Set up Rust toolchain": dtolnay/rust-toolchain
+      stable — the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"]
+      to require the host's canonical one)
+  - onboarding-doc-fresh.yml › onboarding-doc-verify › step "Cache cargo build": actions/cache — a
+      cache; the executor keeps its own warm target dir and tool cache
+  - page-spec-paths.yml › publish › step "Checkout": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - powershell-parse.yml › powershell-parse › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - published-parity.yml › published-parity › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - published-parity.yml › published-parity › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - published-parity.yml › published-parity › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the
+      host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require
+      the host's canonical one)
+  - published-parity.yml › published-parity › step "Swatinem/rust-cache@v2": Swatinem/rust-cache — a
+      cache; the executor keeps its own warm target dir and tool cache
+  - qontinui-types-drift.yml › check-drift › step "Checkout qontinui-runner": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - qontinui-types-drift.yml › check-drift › step "Set up Rust toolchain": dtolnay/rust-toolchain
+      stable — the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"]
+      to require the host's canonical one)
+  - qontinui-types-drift.yml › check-drift › step "Set up Python": setup-python 3.11 — the tool
+      registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - reproducibility-gate.yml › repro-build › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - reproducibility-gate.yml › repro-build › step "Setup Rust": dtolnay/rust-toolchain stable — the
+      host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require
+      the host's canonical one)
+  - reproducibility-gate.yml › repro-build › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - reproducibility-gate.yml › repro-build › step "Cache Rust dependencies": Swatinem/rust-cache — a
+      cache; the executor keeps its own warm target dir and tool cache
+  - schema-pg-sql-fresh.yml › detect › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › service postgres: env, ports, options — the
+      executor owns credentials (generated per dispatch), the host port and the readiness probe
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Checkout qontinui-runner": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Set up Python": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - schema-pg-sql-fresh.yml › schema-fresh-verify › step "Regenerate (native pg_dump, no docker)": env
+      PGPASSWORD: exported by the executor from the job's postgres service (credentials are
+      generated per dispatch)
+  - schema-pg-sql-freshness-nightly.yml › selftest › step "actions/checkout@v5": actions/checkout —
+      the executor checks out the dispatched commit itself
+  - schema-pg-sql-freshness-nightly.yml › nightly: permissions — GitHub-side setting with no
+      manifest counterpart
+  - schema-pg-sql-freshness-nightly.yml › nightly › service postgres: env, ports, options — the
+      executor owns credentials (generated per dispatch), the host port and the readiness probe
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Checkout qontinui-runner": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - schema-pg-sql-freshness-nightly.yml › nightly › step "Set up Python": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - schemas-pair-follow-tests.yml › selftest › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - schemas-pair-follow.yml › detect: permissions — GitHub-side setting with no manifest counterpart
+  - schemas-pair-follow.yml › plan › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - schemas-pair-follow.yml › compute: permissions — GitHub-side setting with no manifest
+      counterpart
+  - schemas-pair-follow.yml › compute: concurrency — GitHub-side setting with no manifest
+      counterpart
+  - schemas-pair-follow.yml › compute › step "Check out main's pair-follow tooling": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - schemas-pair-follow.yml › compute › step "Check out the runner PR head": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - schemas-pair-follow.yml › push: permissions — GitHub-side setting with no manifest counterpart
+  - schemas-pair-follow.yml › push: concurrency — GitHub-side setting with no manifest counterpart
+  - schemas-pair-follow.yml › push › step "Check out main's pair-follow tooling": actions/checkout —
+      the executor checks out the dispatched commit itself
+  - secret-scan.yml › gitleaks › step "actions/checkout@v4": actions/checkout — the executor checks
+      out the dispatched commit itself
+  - sibling-pin-bump.yml › bump: concurrency — GitHub-side setting with no manifest counterpart
+  - sibling-pin-bump.yml › bump: permissions — GitHub-side setting with no manifest counterpart
+  - sibling-pin-bump.yml › bump › step "actions/checkout@v5": actions/checkout — the executor checks
+      out the dispatched commit itself
+  - stacked-pr-fastlane.yml › scope › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - stacked-pr-fastlane.yml › rust-fast › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - stacked-pr-fastlane.yml › rust-fast › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - stacked-pr-fastlane.yml › rust-fast › step "Setup Rust": dtolnay/rust-toolchain 1.95.0 — the
+      host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require
+      the host's canonical one); components rustfmt, clippy must be installed on the host
+  - stacked-pr-fastlane.yml › rust-fast › step "Cache Rust dependencies (restore only)": Swatinem/rust-cache
+      — a cache; the executor keeps its own warm target dir and tool cache
+  - stacked-pr-fastlane.yml › frontend-fast › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - stacked-pr-fastlane.yml › frontend-fast › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+
+summary: 1 covered, 0 covered by name, 5 partial, 35 uncovered of 41 job(s); 253 untranslated construct(s) — the Phase 9 precondition is NOT MET

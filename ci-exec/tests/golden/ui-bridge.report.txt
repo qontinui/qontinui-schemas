@@ -1,0 +1,242 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      11 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (12):
+  UNCOVERED       ci-integrity-selftest.yml › guard-tests [pull_request, push:main] 0/2 gate command(s) matched
+      missing: bash scripts/tests/ci-integrity/run-scenarios.sh
+      missing: python3 scripts/tests/ci-integrity/test-surface.py
+  UNCOVERED       ci-integrity.yml › guard-gating-workflows [pull_request_target (paths-filtered)] 0/8 gate command(s) matched
+      missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[] | .filename, (.previous_filename /
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .changed_files
+      missing: gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/files --jq .[].filename
+      missing: gh api repos/${REPO}/compare/${BASE_SHA}...${HEAD_SHA} --jq .merge_base_commit.sha
+      missing: python3 -
+      missing: gh api --paginate repos/${REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: gh api repos/${REPO}/pulls/${PR_NUMBER} --jq .body // ""
+      missing: gh pr comment ${PR_NUMBER} --repo ${REPO} --body-file ${RUNNER_TEMP}/notice.md
+  COVERED         ci.yml › lint-and-test [pull_request, push:main] 10/10 gate command(s) matched
+      matched: npm run diagnostics:check  ←  ci/diagnostics-check
+      matched: npm run redaction:check-surface  ←  ci/redaction-surface-ratchet
+      matched: npm run deps:check-ranges  ←  ci/dep-range-ratchet
+      matched: npm run docs:check-symbols:test  ←  ci/docs-symbol-ratchet-self-test
+      matched: npm run docs:check-symbols  ←  ci/docs-symbol-ratchet
+      matched: npm run ci:check-manifest  ←  ci/ci-manifest-ratchet
+      matched: npm run lint  ←  ci/lint
+      matched: npm run build  ←  ci/build
+      matched: npm run typecheck  ←  ci/typecheck
+      matched: npm run test  ←  ci/test
+      note:    matrix job — considered once
+  UNCOVERED       ci.yml › python-tests [pull_request, push:main] 0/3 gate command(s) matched
+      missing: packages/ui-bridge-python: ruff check .
+      missing: packages/ui-bridge-python: mypy ui_bridge
+      missing: packages/ui-bridge-python: pytest
+      note:    matrix job — considered once
+  COVERED         ci.yml › docs [pull_request, push:main] 1/1 gate command(s) matched
+      matched: docs-site: npm run build  ←  ci/docs-build
+  UNCOVERED       dependency-twin-resolver.yml › resolve [push:main (paths-filtered)] 0/3 gate command(s) matched
+      missing: node --version
+      missing: node scripts/dependency-twin-resolver.mjs
+      missing: node -e 
+  const fs = require("fs");
+  const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8")
+  PARTIAL         docs.yml › build [push:main (paths-filtered)] 1/3 gate command(s) matched
+      missing: uses: actions/configure-pages
+      missing: uses: actions/upload-pages-artifact
+      matched: docs-site: npm run build  ←  ci/docs-build
+  UNCOVERED       docs.yml › deploy [push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: uses: actions/deploy-pages
+  UNCOVERED       qontinui-ci.yml › build [pull_request, push:main] 0/5 gate command(s) matched
+      missing: npx --yes tsc --noEmit
+      missing: npm run redaction:check-surface --if-present
+      missing: npm run lint --if-present
+      missing: npm run build --if-present
+      missing: npm test --if-present
+  UNCOVERED       runner-contract.yml › contract [pull_request, push:main] 0/3 gate command(s) matched
+      missing: node scripts/check-runner-contract.test.mjs
+      missing: uses: qontinui/qontinui-runner/.github/actions/checkout-sibling
+      missing: node scripts/check-runner-contract.mjs --runner ./qontinui-runner --expect-sibling $EXPR{{ steps.mod
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/2 gate command(s) matched
+      missing: ./gitleaks version
+      missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+  UNCOVERED       smoke-test.yml › lint-smoke-script [pull_request, push:main] 0/3 gate command(s) matched
+      missing: bash -n scripts/smoke-test-runner.sh
+      missing: shellcheck scripts/smoke-test-runner.sh
+      missing: node -e const p=require('./package.json'); if (!p.scripts || !p.scripts['smoke-test:runner']) { cons
+
+NOT CONSIDERED — not on pull_request or a push to main (2 workflow(s)):
+  publish-pypi.yml (jobs: publish) — triggers ["push"]
+  publish.yml (jobs: publish) — triggers ["push"]
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (29) — not represented in the manifest — each must be handled by hand:
+  - ci-integrity.yml › guard-gating-workflows › step "Verify and record gating-workflow changes": run
+      script not imported — combines `||` with another shell operator
+  - ci-integrity.yml › guard-gating-workflows: no step could be translated — the job is not imported
+  - ci.yml › lint-and-test: matrix node-version = ["22.x"] not expanded — the job is imported once;
+      steps that read matrix.* are untranslated
+  - ci.yml › lint-and-test › step "Use Node.js ${{ matrix.node-version }}": setup-node node-version
+      ${{ matrix.node-version }} is an expression — declare a pinned [[tools]] node by hand
+  - ci.yml › python-tests: matrix python-version = ["3.10", "3.11", "3.12"] not expanded — the job
+      is imported once; steps that read matrix.* are untranslated
+  - ci.yml › python-tests › step "Install dependencies": run script not imported — `python -m pip
+      install --upgrade pip` installs into the host's global environment — a CI host must be left as
+      it was found; declare a pinned [[tools]] entry or make it a host prerequisite
+  - ci.yml › docs › step "Use Node.js": node-version "20.x" resolves to no node release the tool
+      registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - dependency-twin-resolver.yml › env: env COORD_HTTP_URL = "${{ secrets.COORD_HTTP_URL ||
+      'https://coord.qontinui.io' }}" is an expression — a manifest env value is a literal; not
+      imported [secrets referenced: COORD_HTTP_URL]
+  - dependency-twin-resolver.yml › resolve › step "Use Node.js": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+  - dependency-twin-resolver.yml › resolve › step "Ingest into coord (tolerant)": run script not
+      imported — turns fail-fast off (`set +e`) — what follows may deliberately ignore failures,
+      which a manifest step cannot
+  - dependency-twin-resolver.yml › resolve › step "Upload observations artifact": runs only `if:
+      always()` — the manifest has no step conditions; not imported
+  - docs.yml › build › step "Use Node.js": node-version "20.x" resolves to no node release the tool
+      registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - docs.yml › build › step "Setup Pages": uses actions/configure-pages@v4 — an arbitrary action;
+      the manifest runs commands only, so translate its effect by hand
+  - docs.yml › build › step "Upload artifact": uses actions/upload-pages-artifact@v3 — an arbitrary
+      action; the manifest runs commands only, so translate its effect by hand
+  - docs.yml › deploy: deployment environment "github-pages" (protection rules, environment secrets)
+      is not carried
+  - docs.yml › deploy › step "Deploy to GitHub Pages": uses actions/deploy-pages@v4 — an arbitrary
+      action; the manifest runs commands only, so translate its effect by hand
+  - docs.yml › deploy: no step could be translated — the job is not imported
+  - publish-pypi.yml › publish: not imported: the workflow is triggered only by ["push"] — not a
+      pull-request/push gate or a schedule, so it is not CI to import
+  - publish.yml › publish: not imported: the workflow is triggered only by ["push"] — not a
+      pull-request/push gate or a schedule, so it is not CI to import
+  - qontinui-ci.yml › build › step "actions/setup-node@v4": node-version "20" resolves to no node
+      release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - qontinui-ci.yml › build › step "Install dependencies": run script not imported — uses an `||`
+      fallback
+  - qontinui-ci.yml › build › step "Type check": run script not imported — uses an `if` conditional
+      (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - runner-contract.yml › contract › step "Resolve mode": run script not imported — uses the
+      expression ${{ github.event_name }} — a manifest command is a literal, evaluated by no one
+  - runner-contract.yml › contract › step "Check out sibling qontinui-runner": uses
+      qontinui/qontinui-runner/.github/actions/checkout-sibling@9ed902f489437bd28887331e5a94e8e338f4e846
+      — an arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - runner-contract.yml › contract › step "Contract check": run script not imported — uses the
+      expression ${{ steps.mode.outputs.expect_sibling }} — a manifest command is a literal,
+      evaluated by no one
+  - secret-scan.yml › gitleaks › step "Run gitleaks (binary — the marketplace action requires a paid org license)": run
+      script not imported — uses the expression ${{ github.event.pull_request.base.sha }} — a
+      manifest command is a literal, evaluated by no one
+  - secret-scan.yml › gitleaks: no step could be translated — the job is not imported
+  - smoke-test.yml › lint-smoke-script › step "ShellCheck (non-blocking)": run script not imported —
+      uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv
+      form)
+  - smoke-test.yml › lint-smoke-script › step "Verify npm script is wired up": run script not
+      imported — argument "const p=require('./package.json'); if (!p.scripts ||
+      !p.scripts['smoke-test:runner']) { console.error('Missing scripts.smoke-test:runner in
+      package.json'); process.exit(1); } console.log('Found:', p.scripts['smoke-test:runner']);"
+      contains a character the manifest bans in a command (one of & | < > ^ " % or a newline)
+
+TRANSLATED WITH A CHANGE (15) — represented, but not literally:
+  - ci-integrity-selftest.yml: trigger filters not carried (push branches ["main",
+      "merge-candidate/**", "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - ci-integrity.yml: pull_request_target filtered by paths — a manifest job runs for every change
+  - ci-integrity.yml: trigger filters not carried (pull_request_target branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - ci-integrity.yml: pull_request_target (runs with the base branch's privileges) imported as an
+      ordinary gate — a manifest job always runs the dispatched commit's own manifest
+  - ci.yml: trigger filters not carried (push branches ["main", "merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - dependency-twin-resolver.yml: also runs on schedule ["17 6 * * *"]; imported as gate jobs only
+      (a manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly
+      run matters)
+  - dependency-twin-resolver.yml: push filtered by paths — a manifest job runs for every change
+  - docs.yml: push filtered by paths — a manifest job runs for every change
+  - docs.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job runs for
+      every pull request and merge candidate
+  - qontinui-ci.yml: trigger filters not carried (push branches ["main", "merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - runner-contract.yml: also runs on schedule ["23 5 * * *"]; imported as gate jobs only (a
+      manifest job is either a gate or scheduled — add a scheduled copy by hand if the nightly run
+      matters)
+  - runner-contract.yml: trigger filters not carried (pull_request branches ["main"]; push branches
+      ["main"]) — a manifest gate job runs for every pull request and merge candidate
+  - smoke-test.yml: trigger filters not carried (push branches ["main", "merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - ci-integrity-selftest.yml › guard-tests: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - runner-contract.yml › contract › step "Use Node.js": setup-node node-version "22.x" → [[tools]]
+      node 22.11.0, the registry's pinned release of that line (setup-node would resolve the newest)
+
+NO-OPS (28) — accounted for; nothing to declare:
+  - ci-integrity-selftest.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci-integrity.yml: permissions — GitHub-side setting with no manifest counterpart
+  - dependency-twin-resolver.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - dependency-twin-resolver.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - docs.yml: permissions — GitHub-side setting with no manifest counterpart
+  - docs.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - docs.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - runner-contract.yml: permissions — GitHub-side setting with no manifest counterpart
+  - runner-contract.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - runner-contract.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - secret-scan.yml: permissions — GitHub-side setting with no manifest counterpart
+  - smoke-test.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - ci-integrity-selftest.yml › guard-tests › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - ci.yml › lint-and-test › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › lint-and-test › step "Use Node.js ${{ matrix.node-version }}": setup-node cache — a
+      dependency cache, not a gate
+  - ci.yml › python-tests › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - ci.yml › python-tests › step "Set up Python ${{ matrix.python-version }}": setup-python ${{
+      matrix.python-version }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › docs › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › docs › step "Use Node.js": setup-node cache — a dependency cache, not a gate
+  - dependency-twin-resolver.yml › resolve: permissions — GitHub-side setting with no manifest
+      counterpart
+  - dependency-twin-resolver.yml › resolve › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - dependency-twin-resolver.yml › resolve › step "Use Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - docs.yml › build › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - docs.yml › build › step "Use Node.js": setup-node cache — a dependency cache, not a gate
+  - qontinui-ci.yml › build › step "actions/checkout@v4": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - runner-contract.yml › contract › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - secret-scan.yml › gitleaks › step "actions/checkout@v4": actions/checkout — the executor checks
+      out the dispatched commit itself
+  - smoke-test.yml › lint-smoke-script › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+
+summary: 2 covered, 0 covered by name, 1 partial, 9 uncovered of 12 job(s); 29 untranslated construct(s) — the Phase 9 precondition is NOT MET

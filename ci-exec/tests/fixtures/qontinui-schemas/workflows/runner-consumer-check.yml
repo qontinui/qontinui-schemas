@@ -1,0 +1,1048 @@
+name: runner-consumer-check
+
+# Cross-repo consumer-compile gate: prove that the repos which consume this
+# one via a Rust `path` dependency STILL COMPILE once this PR lands.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS GATE PROVES (and what the previous version proved instead)
+# ---------------------------------------------------------------------------
+#
+# The property that protects the fleet is:
+#
+#     "consumer main still compiles AFTER this lands."
+#
+# The previous version of this workflow proved something weaker and
+# different: "SOME adaptation of this change compiles." It picked the
+# consumer ref by string-matching this PR's own head branch name against
+# refs/heads/* on the consumer repo, and compiled that branch when it
+# existed. A branch name is not an identity — `git ls-remote --heads`
+# matches any branch with that name. It does not check that the branch has
+# a pull request, that anyone reviewed it, that it is current, or that it
+# is the branch the author actually intends to land.
+#
+# That is not a theoretical hole. On schemas#104 this gate compiled
+# `feat/vision-core-signed-bbox-origin` @ 1c90d988 on qontinui-runner — a
+# branch with NO pull request at all — for 16m36s, and went green. The real
+# adaptation was qontinui-runner#840, on a DIFFERENTLY-NAMED branch
+# (`fix/vision-region-signed-origin`). Any developer who pushes a scratch
+# branch whose name happens to collide with a schemas branch name silently
+# satisfied this gate.
+#
+# So: leg 1 now compiles consumer `main` UNCONDITIONALLY, and the escape
+# hatch for a legitimately-breaking change is a DECLARED, LINKED, OPEN,
+# SHA-PINNED adaptation PR — not a naming coincidence.
+#
+# ---------------------------------------------------------------------------
+# WHY AN ESCAPE HATCH IS STILL REQUIRED
+# ---------------------------------------------------------------------------
+#
+# A legitimately-breaking schemas change CANNOT compile against consumer
+# main by definition. Compiling only main and hard-blocking on red would
+# make every intentional breaking change permanently unlandable, which in
+# practice gets "solved" by deleting the gate. The fleet needs a PAIR of
+# facts, not one bit: *is this change breaking?* and *is the break already
+# sequenced?* Leg 1 measures the first unconditionally; leg 2 measures the
+# second. Red therefore means "breaking AND unsequenced" — a coordination
+# requirement, not a block.
+#
+# ---------------------------------------------------------------------------
+# HOW TO SATISFY A RED (for the PR author)
+# ---------------------------------------------------------------------------
+#
+# 1. Open the consumer-side catch-up PR (e.g. on qontinui-runner).
+# 2. Label THIS PR `coord:upstream-of=qontinui-runner#<n>` — use the
+#    `coord-pr-label` skill, which validates against the namespace.
+#    Direction matters: `coord:upstream-of=Y` makes Y wait for this PR;
+#    the carrier never waits. That is exactly the landing order needed
+#    (schemas first, adaptation immediately after), and coord's
+#    dep_graph.rs `parse_label_to_edge` already orders by it — this gate
+#    adds no new mechanism, it only makes the declaration REQUIRED.
+# 3. This workflow re-runs on the `labeled` event and goes green once the
+#    declared PR compiles against this PR's schemas.
+#
+# NOTE the label alone does not make the consumer PR's OWN CI green: the
+# runner resolves its schemas sibling by BRANCH NAME
+# (qontinui-runner/.github/actions/resolve-schemas-ref). Naming both
+# branches identically as well costs nothing and collapses the red-main
+# window to zero; otherwise the adaptation goes green one CI cycle after
+# this PR lands. Neither is a reason to keep branch-matching HERE.
+#
+# WHAT IT CHECKS: the full consumer workspace (`--workspace --all-targets`,
+# including test targets — test-code breaks red consumer CI just the same)
+# compiled against this PR's checkout of this repo via the existing path dep.
+#
+# WHY THIS EXISTS (fleet-fresh incidents):
+#   2026-07-05 — schemas v0.8.0's apps.rs change landed with no runner
+#     catch-up; runner main went red and the merge train froze ~60 hours
+#     with 8 green PRs stuck behind coord's unconditional MainRed gate.
+#   2026-07-28 — schemas#104 landed through TWO different holes in the
+#     machinery built after the first incident (this gate's branch match,
+#     and check-consumers' `^rust/src/` self-skip). runner main went red
+#     with 11 x E0308 and stayed red 4h38m behind 16 open PRs.
+#
+# Setup steps (Tauri deps, dist stub, sibling layout) mirror
+# schema-drift.yml — the runner's build.rs needs them even for `cargo check`.
+
+on:
+  pull_request:
+    # NO `paths:` FILTER — deliberately, and it must stay that way.
+    #
+    # `consumer-gate` is intended to be a REQUIRED status check. GitHub's
+    # required-check rules look for a check-run created by the
+    # pull_request event; a path-filtered trigger that does not fire
+    # creates no check-run at all, so the required context sits at
+    # "Expected — waiting for status to be reported" forever and the PR
+    # becomes unmergeable with no way to satisfy it short of an admin
+    # bypass this fleet does not grant. A README-only PR would wedge.
+    #
+    # This is the same convention `check-drift` and `rust-ci` already
+    # follow for exactly this reason (schema-drift.yml, rust-ci.yml — both
+    # document it at length). The path test still happens, but INSIDE the
+    # job, as the `gate` step below: irrelevant PRs post a green
+    # consumer-gate in seconds without checking out or compiling anything.
+    #
+    # `labeled`/`unlabeled` are LOAD-BEARING, not decoration. The escape
+    # hatch is a label, so the gate must re-evaluate when one is applied.
+    # The default activity types are [opened, synchronize, reopened], under
+    # which applying the required coord:upstream-of label fires NO workflow
+    # at all — the author would apply the declaration and watch nothing
+    # happen. `unlabeled` is equally deliberate: removing the declaration
+    # must re-red the PR, or the gate can be satisfied and then quietly
+    # un-satisfied.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+# Only a NEW HEAD SHA (`synchronize`) cancels a run in flight. A label event
+# on the SAME head queues behind the running run instead of cancelling it.
+#
+# Why: `labeled`/`unlabeled` are load-bearing triggers (see above) and coord
+# applies and strips dep labels programmatically. Under a blanket
+# `cancel-in-progress: true` every label event cancelled the in-flight run.
+# `consumer-gate` is `if: always()`, so it ran inside the cancelled run, saw
+# `consumer-check` = cancelled, and posted a RED on the head SHA that named no
+# breakage at all. qontinui-schemas#170 collected three of those in 13 minutes
+# (runs 34782176581, 34782199138, 34782711789), each with every consumer-check
+# entry `cancelled`.
+#
+# A queued run costs at most one extra run per label burst, because GitHub keeps
+# a single pending run per group and replaces an older pending one before it
+# starts any job. The verdict that finally posts is computed with the labels as
+# they stood after the burst. The in-flight run DOES now finish, though. If it
+# read labels before a declaration landed, it posts a genuine verdict for those
+# labels, which can be red, and the queued run then posts the newer verdict on
+# the same head. That red is honest, not manufactured, and it is short-lived.
+# `synchronize` still cancels: the superseded run's
+# contexts land on a SHA that is no longer the head. `workflow_dispatch` has no
+# `action`, so it never cancels either.
+# Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 1.
+concurrency:
+  group: runner-consumer-check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
+
+# Read-only. This workflow reads PR metadata and labels across repos and
+# checks out public repos; it writes nothing and needs no elevated scope.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ------------------------------------------------------------------
+  # consumer-check: one self-contained job per consumer (matrix).
+  #
+  # BOTH LEGS LIVE IN ONE JOB ON PURPOSE. The obvious decomposition — a
+  # `consumer-main` matrix job that classifies, then a `consumer-adaptation`
+  # job gated on `needs.consumer-main.outputs.broke` — CANNOT BE BUILT.
+  # GitHub Actions gives a matrix job a SINGLE `outputs` map, last-writer-
+  # wins across entries, with no per-entry addressing; a two-consumer
+  # matrix would silently hand the adaptation job whichever entry finished
+  # last. A matrix job's `result` DOES aggregate correctly, which is why
+  # the verdict lives in the separate `consumer-gate` job below and the
+  # per-consumer classification does not.
+  # ------------------------------------------------------------------
+  consumer-check:
+    runs-on: ubuntu-latest
+    strategy:
+      # Never cancel a sibling consumer because this one broke — each
+      # consumer's verdict is independent and the aggregate needs them all.
+      fail-fast: false
+      matrix:
+        include:
+          - consumer: qontinui-runner
+            repo: qontinui/qontinui-runner
+            workdir: qontinui-runner
+            # tauri_build::build() panics without ../dist even for a
+            # `cargo check`, so this consumer needs a frontend stub.
+            needs_dist_stub: "true"
+            # `heavy` = this workspace needs the Tauri system libs AND the
+            # OOM mitigations. Only the runner does: its peak compile
+            # memory exceeds the hosted runner's 16 GB. Supervisor is a
+            # plain Rust binary whose own CI
+            # (qontinui-supervisor/.github/workflows/ci.yml:24-27) installs
+            # no system deps at all, so making it pay ~4 min of
+            # free-disk-space + apt + swapfile per run would be pure waste.
+            heavy: "true"
+          - consumer: qontinui-supervisor
+            repo: qontinui/qontinui-supervisor
+            workdir: qontinui-supervisor
+            needs_dist_stub: "false"
+            heavy: "false"
+    steps:
+      - name: Checkout qontinui-schemas (PR head)
+        uses: actions/checkout@v5
+        with:
+          path: qontinui-schemas
+          # Full history so the gate step below can diff base..head by sha.
+          fetch-depth: 0
+
+      # ----------------------------------------------------------------
+      # THE IN-JOB PATH PREDICATE (replaces the trigger's `paths:` filter).
+      #
+      # This is what makes `consumer-gate` safe to REQUIRE: the workflow
+      # fires on every PR so the context always has a producer, and this
+      # step decides whether the expensive cross-repo compile is warranted.
+      # Irrelevant PRs fall straight through to a green verdict in seconds.
+      #
+      # The surface is the same one check-consumers uses and the same one
+      # the trigger used to filter on — all three must agree. It is the set
+      # of paths a consumer can path-depend on: the four workspace crates
+      # plus both manifests (a manifest-only bump can break resolution for
+      # any consumer that still pins a version range on a schemas path dep).
+      #
+      # Note this is a two-dot `base..head` diff, so when `main` moves under
+      # an open PR the range includes commits the PR did not author. That
+      # OVER-triggers, never under-triggers. That is the safe direction and
+      # is deliberate: the incident this gate exists to prevent was a gate
+      # that ran too LITTLE. Do not "optimise" it to a merge-base diff.
+      - name: Decide whether the consumer gate must run
+        id: gate
+        working-directory: qontinui-schemas
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run_gate=false
+          changed=""
+          case "$EVENT_NAME" in
+            pull_request)
+              changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+              if printf '%s\n' "$changed" | grep -qE '^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$|\.github/workflows/runner-consumer-check\.yml$)'; then
+                run_gate=true
+              fi
+              ;;
+            *)
+              # workflow_dispatch is an explicit ask — always run fully.
+              run_gate=true
+              ;;
+          esac
+          echo "run_gate=$run_gate" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT_NAME run_gate=$run_gate"
+          if [ -n "$changed" ]; then
+            printf '%s\n' "$changed" | sed 's/^/  changed: /'
+          fi
+
+      # ----------------------------------------------------------------
+      # LEG 1 — ALWAYS (when the gate runs at all). Compile the consumer
+      # at `main`.
+      #
+      # No `ref:`, deliberately — actions/checkout defaults to the
+      # repository's default branch, which is the property this gate
+      # exists to measure. This is the one leg that can never be skipped
+      # or redirected by anything the PR author controls.
+      # ----------------------------------------------------------------
+      - name: Checkout ${{ matrix.consumer }} (main)
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ matrix.repo }}
+          path: ${{ matrix.workdir }}
+
+      # Record the SHA that was ACTUALLY checked out, from git rather than
+      # from an echo of what we asked for. Post-land verification asserts
+      # this SHA is an ancestor of (or equal to) consumer main — ancestry,
+      # not equality, because consumer main moves independently and a later
+      # equality check would prove nothing.
+      - name: Record resolved ${{ matrix.consumer }} main SHA
+        id: mainsha
+        if: steps.gate.outputs.run_gate == 'true'
+        working-directory: ${{ matrix.workdir }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Leg 1: compiling ${{ matrix.consumer }} main @ $sha against this PR's schemas"
+
+      - name: Install Tauri Linux system deps
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
+
+      # The runner workspace's peak compile memory exceeds the hosted
+      # runner's 16 GB — without paging headroom the OOM-killer takes the
+      # runner agent down ("shutdown signal … exit code 143"), which is
+      # exactly how this gate's first self-test died (run 28772691807,
+      # 2026-07-06). Both steps copied verbatim from qontinui-runner's own
+      # ci.yml, which needs them to build this same workspace.
+      - name: Free disk space (Ubuntu)
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: false
+
+      - name: Add swapfile (guard against link-time OOM)
+        if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Set up Rust toolchain
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      # Keyed per (consumer, leg). A main cache must not be poisoned by an
+      # adaptation build or vice versa — they compile different trees
+      # against the same schemas.
+      - name: Rust cache (${{ matrix.consumer }}, main leg)
+        if: steps.gate.outputs.run_gate == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.workdir }}
+          key: consumer-${{ matrix.consumer }}-main
+
+      - name: Stub ${{ matrix.consumer }} frontend dist
+        if: steps.gate.outputs.run_gate == 'true' && matrix.needs_dist_stub == 'true'
+        run: |
+          mkdir -p ${{ matrix.workdir }}/dist
+          printf '<!DOCTYPE html><html><head></head><body>consumer-check CI stub</body></html>\n' > ${{ matrix.workdir }}/dist/index.html
+
+      # continue-on-error at the STEP level: leg 1 failing is the whole
+      # point of leg 2, so the job must survive it and keep going. The
+      # job's verdict is computed explicitly at the end.
+      - name: "Leg 1: cargo check ${{ matrix.consumer }} main against PR schemas"
+        id: leg1
+        if: steps.gate.outputs.run_gate == 'true'
+        continue-on-error: true
+        working-directory: ${{ matrix.workdir }}
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: cargo check --workspace --all-targets
+
+      # ----------------------------------------------------------------
+      # LEG 2 — ONLY IF LEG 1 FAILED. Resolve the DECLARED adaptation.
+      #
+      # Labels are read LIVE from the API, never from
+      # github.event.pull_request.labels, which is frozen at trigger time:
+      # a label added after the run started is absent from the payload,
+      # and re-running the same run REPLAYS the same stale payload. A gate
+      # whose escape hatch is a label cannot read a snapshot of labels.
+      #
+      # Every cross-repo read distinguishes "absent" from "probe failed"
+      # and hard-fails the latter. An unanswered probe is UNKNOWN, not NO —
+      # treating them alike would let an API blip read as "no declaration"
+      # and render as a semantic red, which is the same class of defect as
+      # the vacuous green this gate was rebuilt to close.
+      # ----------------------------------------------------------------
+      - name: "Leg 2: resolve the declared adaptation PR"
+        id: declare
+        if: steps.leg1.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONSUMER_REPO: ${{ matrix.repo }}
+          THIS_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "No PR number (workflow_dispatch run) — leg 2 cannot resolve a declaration."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "reason=not-a-pull-request" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          consumer_short="${CONSUMER_REPO##*/}"
+
+          # --- Primary: coord:upstream-of on THIS PR, naming this consumer.
+          # Grammar: coord:upstream-of=[<owner>/]<repo>#<n>.
+          set +e
+          labels="$(gh api "repos/${THIS_REPO}/issues/${PR_NUMBER}/labels" --jq '.[].name')"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Could not read labels on ${THIS_REPO}#${PR_NUMBER} (gh api rc=${rc})."
+            echo "An unanswered probe is UNKNOWN, not 'no declaration' — refusing to guess."
+            exit 1
+          fi
+
+          echo "Live labels on ${THIS_REPO}#${PR_NUMBER}:"
+          printf '%s\n' "$labels" | sed 's/^/  /'
+
+          target=""
+          source_of_declaration=""
+          while IFS= read -r l; do
+            case "$l" in
+              coord:upstream-of=*)
+                spec="${l#coord:upstream-of=}"      # [<owner>/]<repo>#<n>
+                repo_part="${spec%%#*}"
+                num_part="${spec##*#}"
+                repo_short="${repo_part##*/}"
+                if [ "$repo_short" = "$consumer_short" ]; then
+                  target="$num_part"
+                  source_of_declaration="coord:upstream-of on this PR"
+                fi
+                ;;
+            esac
+          done <<LABELS
+          $labels
+          LABELS
+
+          # --- Fallback: the mirror declaration on the consumer side, in
+          # case a different session labelled the consumer PR instead.
+          #
+          # OWNER-STRIPPED COMPARISON, DELIBERATELY. coord's dep-label value
+          # grammar makes the owner OPTIONAL — qontinui-coord
+          # crates/coord/src/pr_merge/dep_graph.rs:138-139, "one value grammar
+          # `[<owner>/]<repo>#<n>`; a bare `<repo>` with no `/` inherits the
+          # labeled PR's own owner", pinned by
+          # parse_label_upstream_of_bare_repo_inherits_self_owner (:2413).
+          # `${THIS_REPO}` is `github.repository`, i.e. ALWAYS owner-qualified,
+          # so the exact string equality this replaced silently missed every
+          # legal bare-form label and reddened pairs that WERE properly
+          # declared. The runner twin
+          # (qontinui-runner/.github/actions/checkout-sibling/action.yml) has
+          # compared owner-stripped from the start and names this exact defect
+          # by file:line; this is that fix, applied.
+          #
+          # `sub("^[^/#]+/";"")` strips an owner segment only when a `/`
+          # precedes the `#`, so `qontinui/qontinui-schemas#145` becomes
+          # `qontinui-schemas#145` while an already-bare value is untouched.
+          #
+          # --paginate, because a fixed per_page=100 silently truncated the
+          # lookup at 100 open PRs — a declaration on the 101st read as "no
+          # declaration", which this gate treats as a hard red. gh emits the
+          # --jq program's output once PER PAGE, so take the first non-empty
+          # line. The rc!=0 hard-fail is unchanged: an unanswered probe is
+          # UNKNOWN, never NO.
+          if [ -z "$target" ]; then
+            this_short="${THIS_REPO##*/}"
+            echo "No coord:upstream-of naming ${consumer_short}; checking ${CONSUMER_REPO} for coord:downstream-of=[<owner>/]${this_short}#${PR_NUMBER}."
+            # NOT a pipeline: `rc` must be gh's OWN status. Piping straight
+            # into grep would make rc grep's (or, under this step's `set -o
+            # pipefail`, an ambiguous mix), so a failed cross-repo probe could
+            # read as "no declaration" — the precise UNKNOWN-vs-NO conflation
+            # the hard-fail below exists to prevent. Capture first, filter after.
+            set +e
+            mirror_raw="$(gh api --paginate "repos/${CONSUMER_REPO}/pulls?state=open&per_page=100" \
+              --jq "[.[] | select(any(.labels[].name;
+                       startswith(\"coord:downstream-of=\")
+                       and ((sub(\"^coord:downstream-of=\";\"\") | sub(\"^[^/#]+/\";\"\"))
+                            == \"${this_short}#${PR_NUMBER}\"))) | .number] | first // empty")"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::Could not read ${CONSUMER_REPO} pull requests (gh api rc=${rc})."
+              echo "An unanswered probe is UNKNOWN, not 'no declaration' — refusing to guess."
+              exit 1
+            fi
+            mirror="$(printf '%s\n' "$mirror_raw" | grep -m1 -v '^[[:space:]]*$' || true)"
+            if [ -n "$mirror" ]; then
+              target="$mirror"
+              source_of_declaration="coord:downstream-of on ${CONSUMER_REPO}#${mirror}"
+            fi
+          fi
+
+          if [ -z "$target" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no-declaration" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Declared adaptation: ${CONSUMER_REPO}#${target} (via ${source_of_declaration})"
+
+          # --- Validate the declaration. A declaration that is merely
+          # PRESENT is not enough; it must be VERIFIABLE.
+          set +e
+          meta="$(gh api "repos/${CONSUMER_REPO}/pulls/${target}" \
+            --jq '.head.sha + " " + .head.ref + " " + .state + " " + .base.ref')"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Could not read ${CONSUMER_REPO}#${target} (gh api rc=${rc})."
+            echo "An unanswered probe is UNKNOWN, not 'declaration invalid' — refusing to guess."
+            exit 1
+          fi
+
+          sha="$(printf '%s' "$meta" | cut -d' ' -f1)"
+          ref="$(printf '%s' "$meta" | cut -d' ' -f2)"
+          state="$(printf '%s' "$meta" | cut -d' ' -f3)"
+          base="$(printf '%s' "$meta" | cut -d' ' -f4)"
+
+          echo "  head.sha = $sha"
+          echo "  head.ref = $ref"
+          echo "  state    = $state"
+          echo "  base.ref = $base"
+
+          if [ "$state" != "open" ]; then
+            echo "Declared adaptation ${CONSUMER_REPO}#${target} is '${state}', not 'open'."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "reason=declared-pr-not-open" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # base.ref MUST be main. A PR based on another feature branch
+          # AUTO-CLOSES UNLANDED when its parent lands, so accepting one
+          # would let this gate go green on a declaration that can
+          # silently evaporate — a false all-clear on the one path that
+          # protects consumer main.
+          if [ "$base" != "main" ]; then
+            echo "Declared adaptation ${CONSUMER_REPO}#${target} is based on '${base}', not 'main'."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "reason=declared-pr-not-based-on-main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ----------------------------------------------------------------
+          # IS THE DECLARED ADAPTATION ACTUALLY LANDABLE?
+          #
+          # Compiling is not landing. Everything above this point — and the
+          # `cargo check` in leg 2 below — proves only that the adaptation
+          # COMPILES against this PR. The verdict step then asserts something
+          # strictly stronger: "coord lands the adaptation immediately after
+          # this PR". coord cannot land a PR whose required checks are red, so
+          # without this probe the gate certifies a sequence whose second step
+          # may already be impossible.
+          #
+          # THE INCIDENT (2026-08-25). This gate certified
+          # qontinui-runner#1150 @ 0a76247d as the sequenced adaptation for
+          # qontinui-schemas#145 — leg 2 compiled it green at 17:57:38Z and
+          # consumer-gate passed at 17:58:11Z. That SAME SHA had been red on
+          # FOUR of the runner's required contexts since 17:20:57Z, 37 minutes
+          # EARLIER, on a stale `pnpm-lock.yaml` (`@qontinui/ui-bridge`
+          # lockfile ^0.22.0 vs manifest ^0.24.0) — which `cargo check
+          # --workspace --all-targets` cannot see, because it never runs pnpm,
+          # vitest or clippy. #145 merged at 18:00:58Z; runner main became
+          # un-compilable (E0063, missing field `snapshot_id` in
+          # `BaselineEntry`) and 12 consecutive merge candidates across 12
+          # distinct PRs then failed, each burning ~30 min of candidate CI to
+          # rediscover the identical error. The information that the sequence
+          # could not complete was public on GitHub 37 minutes before the gate
+          # asserted that it would.
+          #
+          # Without this probe the guarantee silently degrades from "the
+          # red-main window is bounded by the merge train" to "the red-main
+          # window is unbounded".
+          #
+          # WHY THE CONSUMER'S OWN RULESET, AND NOT A NAME LIST HERE. The
+          # required contexts come from the consumer repo's active branch
+          # ruleset, so an ADVISORY check is excluded BY CONSTRUCTION and no
+          # name-sniffing heuristic is needed. On 0a76247d, "Clippy diff-scoped
+          # (advisory)" was also red and is correctly ignored, while "Clippy
+          # (windows)", "Frontend unit tests (vitest)", "test (ubuntu-22.04)"
+          # and "test (windows-latest)" are required and are not. The rules
+          # route is readable for these public repos even UNAUTHENTICATED
+          # (verified), so the default job token is more than sufficient — no
+          # PAT, no cross-repo secret.
+          #
+          # The resolved context list is echoed on EVERY run so this
+          # assumption stays continuously observable rather than a one-time
+          # verification that can silently rot.
+          # ----------------------------------------------------------------
+          set +e
+          rules_json="$(gh api "repos/${CONSUMER_REPO}/rules/branches/main")"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Could not read branch rules for ${CONSUMER_REPO} main (gh api rc=${rc})."
+            echo "An unanswered probe is UNKNOWN, not 'no required checks' — refusing to guess."
+            exit 1
+          fi
+
+          # `tr -d '\r'` on every table built here, deliberately. A single
+          # trailing CR on a folded line makes the exact-match lookup below
+          # miss and the state compare fall to the `*)` arm, so a RED required
+          # context would silently report as merely pending — a strictly
+          # weaker verdict, arrived at silently. Caught in the pre-merge replay
+          # of this classifier against the incident SHA, where a CRLF-emitting
+          # jq turned four red contexts into one.
+          required="$(printf '%s' "$rules_json" \
+            | jq -r '[.[] | select(.type == "required_status_checks")
+                          | .parameters.required_status_checks[].context]
+                     | unique | .[]' | tr -d '\r')"
+
+          if [ -z "$required" ]; then
+            # A successful read that returns no required contexts is a POSITIVE
+            # answer, not silence: nothing gates that repo's landing on CI, so
+            # there is no landability claim to make. Warn — never pass
+            # silently — and fall through to the compile-only proof.
+            #
+            # This is LIVE, not hypothetical: qontinui-supervisor's main has no
+            # ruleset and no branch protection at all (verified 2026-08-25), so
+            # the landability guarantee is qontinui-runner-only until an
+            # operator protects it. Do NOT "close" this with a heuristic
+            # (a rollup-state read, mergeable_state, advisory-name sniffing) —
+            # a guessed landability verdict is the same false-green class this
+            # whole gate exists to prevent.
+            echo "::warning::${CONSUMER_REPO} declares 0 required status checks on main — landability NOT verified for ${consumer_short}; falling through to the compile-only proof."
+          else
+            echo "::notice::${CONSUMER_REPO} required contexts on main: $(printf '%s' "$required" | tr '\n' ',' | sed 's/,$//')"
+
+            set +e
+            checks_json="$(gh api --paginate "repos/${CONSUMER_REPO}/commits/${sha}/check-runs?per_page=100")"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::Could not read check-runs for ${CONSUMER_REPO}@${sha} (gh api rc=${rc})."
+              echo "An unanswered probe is UNKNOWN, not 'checks are green' — refusing to guess."
+              exit 1
+            fi
+
+            set +e
+            statuses_json="$(gh api "repos/${CONSUMER_REPO}/commits/${sha}/status?per_page=100")"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::Could not read commit statuses for ${CONSUMER_REPO}@${sha} (gh api rc=${rc})."
+              echo "An unanswered probe is UNKNOWN, not 'checks are green' — refusing to guess."
+              exit 1
+            fi
+
+            # Fold both surfaces into one `<name><TAB><state>` table.
+            # check-runs: keep the HIGHEST id per name — ids are monotonic, so
+            # that is the newest attempt, and a re-run must not be shadowed by
+            # the failed original it replaced. A run that is not `completed`
+            # contributes the literal `pending`.
+            # `jq -rs` (SLURP) is load-bearing: `gh api --paginate` on an
+            # object-shaped response emits ONE JSON OBJECT PER PAGE, so a
+            # per-object `group_by(.name)` would dedupe within a page and leave
+            # the same name surviving twice across pages — after which the
+            # first-match lookup below could read a stale attempt as the
+            # current one. Slurping merges the pages before the fold.
+            # commit statuses: the legacy surface, already latest-per-context.
+            # GitHub treats `neutral` and `skipped` as SATISFYING a required
+            # context, so they map to success here — mapping them to red would
+            # block on conditionally-skipped required jobs, which this repo's
+            # own `*-verify` jobs are.
+            check_table="$(printf '%s' "$checks_json" \
+              | jq -rs '[.[].check_runs[]] | group_by(.name) | map(max_by(.id))
+                       | .[]
+                       | [ .name,
+                           (if .status != "completed" then "pending"
+                            elif (.conclusion // "") | IN("success","neutral","skipped") then "success"
+                            else "red" end) ]
+                       | @tsv')"
+            status_table="$(printf '%s' "$statuses_json" \
+              | jq -r '[.statuses[]?] | .[]
+                       | [ .context,
+                           (if .state == "success" then "success"
+                            elif .state == "pending" then "pending"
+                            else "red" end) ]
+                       | @tsv')"
+            all_checks="$(printf '%s\n%s\n' "$check_table" "$status_table" | tr -d '\r')"
+
+            red_list=""
+            pending_list=""
+            while IFS= read -r ctx; do
+              [ -n "$ctx" ] || continue
+              # A required context with no run AT ALL is pending, not green.
+              st="$(printf '%s\n' "$all_checks" \
+                    | awk -F'\t' -v c="$ctx" '$1 == c { print $2; exit }')"
+              case "${st:-pending}" in
+                success) ;;
+                red)     red_list="${red_list}${red_list:+, }${ctx}" ;;
+                *)       pending_list="${pending_list}${pending_list:+, }${ctx}" ;;
+              esac
+            done <<REQUIRED
+          $required
+          REQUIRED
+
+            if [ -n "$red_list" ]; then
+              echo "Declared adaptation ${CONSUMER_REPO}#${target} @ ${sha} is RED on required context(s): ${red_list}"
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              echo "number=$target" >> "$GITHUB_OUTPUT"
+              echo "red_contexts=$red_list" >> "$GITHUB_OUTPUT"
+              echo "reason=declared-pr-checks-red" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [ -n "$pending_list" ]; then
+              echo "Declared adaptation ${CONSUMER_REPO}#${target} @ ${sha} has required context(s) not yet green: ${pending_list}"
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              echo "number=$target" >> "$GITHUB_OUTPUT"
+              echo "pending_contexts=$pending_list" >> "$GITHUB_OUTPUT"
+              echo "reason=declared-pr-checks-pending" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "Declared adaptation ${CONSUMER_REPO}#${target} @ ${sha} is green on every required context — it can land."
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "number=$target" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "reason=ok" >> "$GITHUB_OUTPUT"
+
+      # Check out the adaptation BY SHA, not by ref. Pinning the SHA read
+      # at job start means a force-push after this gate goes green cannot
+      # silently change what was validated.
+      - name: "Leg 2: check out the declared adaptation (SHA-pinned)"
+        if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ steps.declare.outputs.sha }}
+          path: ${{ matrix.workdir }}
+
+      - name: "Leg 2: re-stub ${{ matrix.consumer }} frontend dist"
+        if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true' && matrix.needs_dist_stub == 'true'
+        run: |
+          mkdir -p ${{ matrix.workdir }}/dist
+          printf '<!DOCTYPE html><html><head></head><body>consumer-check CI stub</body></html>\n' > ${{ matrix.workdir }}/dist/index.html
+
+      - name: Rust cache (${{ matrix.consumer }}, adaptation leg)
+        if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.workdir }}
+          key: consumer-${{ matrix.consumer }}-adaptation
+
+      - name: "Leg 2: cargo check the declared adaptation against PR schemas"
+        id: leg2
+        if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'
+        continue-on-error: true
+        working-directory: ${{ matrix.workdir }}
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: cargo check --workspace --all-targets
+
+      # ----------------------------------------------------------------
+      # VERDICT. The job fails iff leg 1 failed AND leg 2 did not produce
+      # a green compile of a declared, open, main-based adaptation.
+      # ----------------------------------------------------------------
+      - name: Verdict for ${{ matrix.consumer }}
+        if: always()
+        env:
+          CONSUMER: ${{ matrix.consumer }}
+          CONSUMER_REPO: ${{ matrix.repo }}
+          RUN_GATE: ${{ steps.gate.outputs.run_gate }}
+          MAIN_SHA: ${{ steps.mainsha.outputs.sha }}
+          LEG1: ${{ steps.leg1.outcome }}
+          DECLARED: ${{ steps.declare.outputs.found }}
+          DECLARED_NUM: ${{ steps.declare.outputs.number }}
+          DECLARED_SHA: ${{ steps.declare.outputs.sha }}
+          DECLARE_REASON: ${{ steps.declare.outputs.reason }}
+          DECLARED_RED: ${{ steps.declare.outputs.red_contexts }}
+          DECLARED_PENDING: ${{ steps.declare.outputs.pending_contexts }}
+          LEG2: ${{ steps.leg2.outcome }}
+        run: |
+          set -euo pipefail
+
+          # Cheap exit: this PR touches nothing a consumer can path-depend
+          # on. The context still posts (that is what makes it safe to
+          # require); it simply has nothing to check.
+          if [ "${RUN_GATE:-false}" != "true" ]; then
+            echo "PASS: this PR changes no path-dep surface, so ${CONSUMER} cannot be affected."
+            echo "No checkout, no compile. This is the designed cheap-exit path."
+            exit 0
+          fi
+
+          # ANTI-VACUITY. run_gate=true means the compile was REQUIRED to
+          # run. If leg 1 did not execute, this job must NOT report success:
+          # a green here would assert "consumer main still compiles" while
+          # having compiled nothing — the exact 6-second vacuous green that
+          # let schemas#104 through on the sibling gate.
+          if [ "$LEG1" != "success" ] && [ "$LEG1" != "failure" ]; then
+            echo "::error::VACUOUS GATE: run_gate=true but leg 1 did not execute (outcome=${LEG1:-<none>})."
+            echo "Refusing to report a green that proves nothing."
+            exit 1
+          fi
+
+          if [ "$LEG1" = "success" ]; then
+            echo "PASS: ${CONSUMER} main (${MAIN_SHA}) compiles against this PR. Non-breaking change."
+            echo "Leg 2 did not run (and must not have) — there is nothing to sequence."
+            exit 0
+          fi
+
+          echo "${CONSUMER} main (${MAIN_SHA}) does NOT compile against this PR — this is a BREAKING change."
+          echo ""
+
+          if [ "$DECLARED" = "true" ] && [ "$LEG2" = "success" ]; then
+            echo "PASS: the declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM} @ ${DECLARED_SHA} compiles against this PR,"
+            echo "and is green on every required status check on ${CONSUMER_REPO} main — so it can actually land."
+            echo "The break is declared, sequenced AND landable; coord lands ${CONSUMER_REPO}#${DECLARED_NUM} after this PR."
+            exit 0
+          fi
+
+          echo "::error::${CONSUMER}: breaking change with no verified adaptation."
+          echo ""
+
+          # A red/pending adaptation is its OWN failure mode with its OWN
+          # remedy — never let it fall into the generic catch-all below, which
+          # would describe an adaptation that exists and compiles as an
+          # undeclared one and send the author to re-apply a label they
+          # already applied.
+          checks_case=""
+          case "${DECLARE_REASON:-}" in
+            declared-pr-checks-red|declared-pr-checks-pending) checks_case="yes" ;;
+          esac
+
+          if [ -n "$checks_case" ]; then
+            if [ "$DECLARE_REASON" = "declared-pr-checks-red" ]; then
+              echo "The declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM} is RED on required status check(s):"
+              echo "  ${DECLARED_RED:-<unknown>}"
+              echo ""
+              echo "Whether it COMPILES is not the question here. coord cannot land a PR whose required"
+              echo "checks are red, so 'the break is sequenced' would be false: this PR would land,"
+              echo "${CONSUMER} main would go red, and it would STAY red until a human noticed."
+            else
+              echo "The declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM} has required status check(s) not yet green:"
+              echo "  ${DECLARED_PENDING:-<unknown>}"
+              echo ""
+              echo "Its CI has not finished (or has not run) on the SHA this gate pinned, so whether the"
+              echo "sequence can complete is UNKNOWN — and UNKNOWN is not YES."
+            fi
+            echo ""
+            echo "(2026-08-25: this gate certified qontinui-runner#1150 @ 0a76247d as sequenced while"
+            echo " that SHA had been red on four required contexts for 37 minutes. schemas#145 landed;"
+            echo " 12 runner merge candidates across 12 PRs then failed on the same E0063.)"
+            echo ""
+            echo "TO FIX — make the adaptation landable, then re-evaluate THIS gate:"
+            echo "  1. Fix ${CONSUMER_REPO}#${DECLARED_NUM} until its own required checks are green."
+            echo "  2. Re-evaluate here. Pushing to the CONSUMER PR does NOT re-fire this workflow —"
+            echo "     its triggers are events on THIS PR. Either:"
+            echo "       * gh run rerun ${{ github.run_id }} --failed   (re-running replays this PR's"
+            echo "         frozen payload, but every cross-repo read in leg 2 is LIVE, so it correctly"
+            echo "         sees the now-green adaptation), or"
+            echo "       * remove and re-apply the coord:upstream-of label (fires 'unlabeled'/'labeled')."
+            echo "     Either way leg 1 recompiles: budget ~38 min."
+            echo "  NOT workflow_dispatch — it carries no PR number, so leg 2 exits 'not-a-pull-request'"
+            echo "  and no declaration can resolve."
+            echo ""
+            echo "If the adaptation genuinely cannot be made green yet, convert this PR to DRAFT — that"
+            echo "is the sanctioned hold. No label holds a PR."
+            exit 1
+          fi
+
+          if [ "$DECLARED" != "true" ]; then
+            case "${DECLARE_REASON:-}" in
+              no-declaration)
+                echo "No adaptation was declared for ${CONSUMER}." ;;
+              declared-pr-not-open)
+                echo "The declared adaptation PR is not open." ;;
+              declared-pr-not-based-on-main)
+                echo "The declared adaptation PR is not based on main, so it can auto-close UNLANDED when its parent lands." ;;
+              not-a-pull-request)
+                echo "This run is not a pull_request event, so no declaration can be resolved." ;;
+              *)
+                echo "No usable declaration (reason=${DECLARE_REASON:-unknown})." ;;
+            esac
+          else
+            echo "The declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM} @ ${DECLARED_SHA} does NOT compile against this PR."
+          fi
+          echo ""
+          echo "If this landed as-is, ${CONSUMER} main would go red and wedge its merge train."
+          echo "(2026-07-05: 60h, 8 PRs blocked. 2026-07-28: 4h38m, 16 PRs blocked."
+          echo " 2026-08-25: 12 consecutive merge candidates across 12 PRs, all on the same E0063.)"
+          echo ""
+          echo "TO FIX — declare the adaptation. Do NOT rename a branch to match:"
+          echo "  1. Open the ${CONSUMER} catch-up PR against its main."
+          echo "  2. Label THIS PR:  coord:upstream-of=${CONSUMER}#<pr-number>"
+          echo "     Use the coord-pr-label skill — it validates the namespace before sending."
+          echo "     Direction matters: upstream-of makes the NAMED PR wait; this PR never waits."
+          echo "  3. This gate re-runs on the 'labeled' event automatically — no manual re-run needed."
+          echo "  4. The declared PR must ALSO be green on its own required checks — a declaration"
+          echo "     that cannot land does not sequence anything."
+          echo ""
+          echo "coord's dep_graph.rs already orders landings by that label, so satisfying this gate"
+          echo "mechanically produces the correct cross-repo landing order. There is no second mechanism."
+          echo ""
+          echo "If the adaptation genuinely cannot exist yet, convert this PR to DRAFT — that is the"
+          echo "sanctioned hold. No label holds a PR."
+          exit 1
+
+  # ------------------------------------------------------------------
+  # wire-gate-guard: the SDK wire gate cannot be edited away.
+  #
+  # Compiling the consumers (consumer-check) cannot see a WIRE break: a
+  # schemas type change can compile everywhere and still make every live UI
+  # Bridge snapshot fail the consumers' strict serde parse
+  # (qontinui-schemas#164). rust/tests/ui_bridge_sdk_wire.rs closes that by
+  # parsing recorded, genuine SDK snapshots — and it is only worth anything if
+  # a PR cannot pass it by rewriting the recording or the test.
+  #
+  # So, without the `wire-gate:override` label:
+  #   - an existing fixture or .provenance.json sidecar under
+  #     rust/tests/fixtures/ui_bridge_sdk/ may not be Modified, Deleted or
+  #     Renamed (a new capture from a new SDK release is an Addition and
+  #     always passes; the capture/ harness is not guarded);
+  #   - rust/tests/ui_bridge_sdk_wire.rs may not be Modified or Deleted — an
+  #     edit could #[ignore] the gate, lower MIN_FIXTURES or repoint the
+  #     fixture directory, and its 4 tests are far below rust-ci's floor.
+  # The label is the deliberate decision (retiring an SDK's wire, or
+  # changing the gate itself), visible on the PR.
+  #
+  # Its own job, not a step of consumer-gate, so it answers in seconds rather
+  # than after the ~16-minute runner compile; consumer-gate needs it, so the
+  # required context still carries its verdict.
+  #
+  # Three-dot (merge-base) diff, deliberately — unlike the consumer path
+  # predicate, this must see ONLY the PR's own changes, or a fixture added to
+  # main after the branch point would read as a deletion here.
+  # ------------------------------------------------------------------
+  wire-gate-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qontinui-schemas (PR head, full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: SDK wire gate is append-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THIS_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          fixtures='rust/tests/fixtures/ui_bridge_sdk/'
+          test_file='rust/tests/ui_bridge_sdk_wire.rs'
+          # --diff-filter=a: every change EXCEPT an Addition. --no-renames
+          # splits a rename into D + A, so its D side is caught here. -z keeps
+          # any file name intact. Written to a file first so a failing
+          # `git diff` fails the step under set -e.
+          changed_list="$RUNNER_TEMP/wire-gate-changed"
+          git diff --no-renames --name-only --diff-filter=a -z \
+            "$BASE_SHA...$HEAD_SHA" -- "$fixtures" "$test_file" > "$changed_list"
+          violations=()
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              "$test_file") violations+=("$path") ;;
+              "${fixtures}capture/"*) ;;
+              "$fixtures"*.json) violations+=("$path") ;;
+            esac
+          done < "$changed_list"
+          if [ "${#violations[@]}" -eq 0 ]; then
+            echo "SDK wire gate: append-only invariant holds."
+            exit 0
+          fi
+
+          # Labels read LIVE (and paginated), never from the frozen event
+          # payload; an unanswered probe is UNKNOWN, not "no label".
+          set +e
+          labels="$(gh api --paginate "repos/${THIS_REPO}/issues/${PR_NUMBER}/labels" --jq '.[].name')"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Could not read labels on ${THIS_REPO}#${PR_NUMBER} (gh api rc=${rc}); refusing to guess."
+            exit 1
+          fi
+          # Here-string, not a pipe: `grep -q` exits on the first match, and
+          # under pipefail the writer's SIGPIPE would turn a found label into
+          # "not found".
+          if grep -qxF 'wire-gate:override' <<< "$labels"; then
+            echo "::warning::The SDK wire gate was changed under the wire-gate:override label:"
+            printf '  %s\n' "${violations[@]}"
+            exit 0
+          fi
+          echo "::error::This PR modifies or removes the recorded UI Bridge SDK wire gate:"
+          printf '  %s\n' "${violations[@]}"
+          echo "Fixtures are append-only. If the SDK's wire changed, capture a NEW fixture from"
+          echo "that SDK release (with its .provenance.json) and keep the old ones — deployed apps"
+          echo "still emit the old wire. To deliberately retire an SDK's wire or change the gate"
+          echo "itself, label this PR wire-gate:override."
+          exit 1
+
+  # ------------------------------------------------------------------
+  # consumer-gate: THE REQUIRED CONTEXT.
+  #
+  # A matrix job's `result` aggregates correctly across entries (failure
+  # if any entry failed), which is why the verdict lives here. `always()`
+  # guarantees this context always posts even when consumer-check fails or
+  # is cancelled.
+  #
+  # `always()` is necessary but NOT sufficient for required-check safety:
+  # a job can only post if its WORKFLOW fires at all. That is why the
+  # `pull_request` trigger above carries no `paths:` filter — see the long
+  # note there. Both halves are required, and removing either one turns
+  # this context into a permanently-unsatisfiable "Expected" on any PR the
+  # filter would have excluded.
+  #
+  # `cancelled` is NOT a verdict and is reported as NO VERDICT, never as
+  # "broken" — the same rule as coord's `is_supersession_conclusion`
+  # (qontinui-coord `crates/coord/src/ci_baseline.rs`). It still exits 1: a
+  # required context on a head SHA must never read green without a verdict.
+  # The job is therefore kept on `always()` rather than `!cancelled()`,
+  # because a job skipped by `if:` posts `skipped`, and both GitHub and coord
+  # count `skipped` as passing. Label events no longer cancel a same-SHA run
+  # (see `concurrency` above), so this arm is left for a manual cancel or a
+  # run superseded by a new head.
+  # ------------------------------------------------------------------
+  consumer-gate:
+    needs: [consumer-check, wire-gate-guard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: SDK wire gate verdict
+        env:
+          RESULT: ${{ needs.wire-gate-guard.result }}
+        run: |
+          set -euo pipefail
+          echo "wire-gate-guard result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            cancelled)
+              echo "::error::NO VERDICT: wire-gate-guard was cancelled. This is not evidence the SDK wire gate was modified. A superseding run posts the verdict; otherwise re-run this workflow."
+              exit 1
+              ;;
+            *)
+              echo "::error::The SDK wire gate guard failed — see the wire-gate-guard job."
+              exit 1
+              ;;
+          esac
+
+      - name: Aggregate consumer verdicts
+        env:
+          RESULT: ${{ needs.consumer-check.result }}
+        run: |
+          set -euo pipefail
+          echo "consumer-check aggregate result: $RESULT"
+          case "$RESULT" in
+            success|skipped)
+              echo "All consumers either compile against this PR at main, or have a verified declared adaptation."
+              exit 0
+              ;;
+            cancelled)
+              echo "::error::NO VERDICT: consumer-check was cancelled before any consumer reached a verdict. This is not evidence a consumer is broken. A superseding run posts the verdict; otherwise re-run this workflow."
+              exit 1
+              ;;
+            *)
+              echo "::error::At least one consumer is broken by this PR with no verified adaptation."
+              echo "Open the per-consumer consumer-check job above for the exact label to apply."
+              exit 1
+              ;;
+          esac

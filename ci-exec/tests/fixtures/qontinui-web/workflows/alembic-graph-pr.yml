@@ -1,0 +1,145 @@
+# Pre-merge sibling-head gate for the alembic chain.
+#
+# Companion to `alembic-graph-check.yml`, which fires on push-to-main
+# (post-merge) and only COMMENTS on the merging PR — by design the
+# notification arrives after main has already gained an extra head.
+#
+# This workflow is the pre-merge counterpart: it FAILS THE CHECK if the
+# resulting chain would have more than one head. Combined with branch
+# protection requiring this check, it converts "silent fork lying around
+# in the chain" into "PR cannot merge until the author either rebases
+# or adds an `alembic merge` revision."
+#
+# THE GATE LOGIC LIVES IN `scripts/ci/count_alembic_heads.py`, not here.
+# Phase 5 of plan 2026-08-08-ci-tool-registry-and-canonical-configuration-parity
+# extracted it: the counter used to be a `python -c` heredoc piped through
+# `tee`/`grep`/`sed` into $GITHUB_OUTPUT across two steps, which the
+# runner-as-CI-node lane (.qontinui/ci.toml, argv-only, deliberately
+# shell-free) could not mirror — so the manifest header recorded it as
+# inexpressible. Two lanes now invoke the one script:
+#
+#   * this workflow, step "Count alembic heads"
+#   * .qontinui/ci.toml, step `alembic-single-head`
+#   * .pre-commit-config.yaml, hook `alembic-single-head` (shift-left only —
+#     it would have caught 0 of the 3 forks on record, all post-authoring
+#     races; what it buys is the correct `down_revision` token, locally)
+#
+# The extraction collapsed the old "Count alembic heads" + "Fail if chain has
+# more than one head" pair into a single step: the two existed only so the
+# count could round-trip through $GITHUB_OUTPUT and gate the second step's
+# `if:`. Nothing else consumed that output, and the script fails directly. The
+# job's pass/fail condition is unchanged — fail iff the head count exceeds 1 —
+# and the required-check name is keyed off the JOB name (`alembic-heads-pr`),
+# which is untouched.
+#
+# Background: the 2026-05-07 multi-head divergence (cr01a2b3c4d5 +
+# 7c5e4d3b2a1f) silently broke the canonical migrator container for
+# four hours. The post-merge informational workflow noticed it but
+# didn't block; this gate would have failed the second PR's check
+# before merge.
+#
+# Why a separate workflow vs. extending alembic-graph-check.yml:
+# the existing workflow's docstring explicitly states it is
+# informational-only ("by the time it runs, the merge has already
+# happened"). Mixing pre-merge blocking semantics into the same job
+# would muddy that intent. Two short workflow files with one trigger
+# each read more clearly than one workflow with conditional behavior.
+
+name: alembic graph PR gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+    # NOTE: deliberately NO `paths:` filter. This check is wired into branch
+    # protection as a REQUIRED status (strict mode). A required check that is
+    # skipped by a paths filter leaves every non-alembic PR stuck on
+    # "Expected — waiting for status" and unable to merge. So the job runs on
+    # EVERY PR; the head count is a cheap offline scan that passes trivially
+    # when main is single-headed (the normal state) and only fails on a real
+    # fork. Combined with `strict` branch protection, this forces a stale-base
+    # alembic PR to update against main, which re-runs this check and fails on
+    # the resulting 2-head chain — converting the sequential-merge fork race
+    # from "lands + breaks migrate.yml" into "PR cannot merge until re-pointed".
+  push:
+    # merge-candidate/** refs are pushed by coord's autonomous merge scheduler
+    # (plan 2026-06-06-coord-ci-runner-autonomous-green-merge, Phase 4). This is
+    # a required merge gate, so it must run on candidate refs (which arrive as
+    # pushes, not PRs) or the candidate proposal hangs in awaiting-ci. Same
+    # no-paths-filter rationale as the pull_request trigger: it must always post
+    # the check. Validation-only (offline head-count scan); no deploy.
+    branches:
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+
+permissions:
+  contents: read
+
+# Supersede a PR run when a newer commit is pushed to the same PR, so the
+# previous head's runs stop consuming (and queueing for) runners. This
+# workflow's lanes: `pull_request`, and `push` to `merge-candidate/**` only.
+#
+# The slug is a LITERAL, not `${{ github.workflow }}`. coord models a
+# workflow's group template itself and interpolates only `github.event_name`
+# and `github.ref`, collapsing every other expression to the empty string
+# (`qontinui-coord` `ci_observer.rs::resolve_group_template`), so a
+# `github.workflow` key would make every workflow here model to one identical
+# group string. The four blocks already in this directory use a literal slug
+# for the same reason.
+#
+# The key includes the EVENT because `schedule`, `workflow_dispatch` and a
+# `push` to the default branch all resolve `github.ref` to `refs/heads/main`.
+# Without it those lanes would share one group and supersede each other, and an
+# in-flight run would occupy the very group a prospective land resolves into --
+# which `run_is_reaper_at_risk` reads as a reap hazard and hard-blocks the
+# merge train on.
+#
+# `cancel-in-progress` is an EXPRESSION, not `true`: only a `pull_request` run
+# is ever superseded. A run on a `push` or `schedule` lane is never cancelled
+# by this block, though note that a still-PENDING run in a group IS reaped when
+# a newer run enters it -- GitHub keeps at most one pending run per group.
+#
+# NOTE this workflow has no `push` lane on the DEFAULT branch, and that is what
+# makes a group safe here. A top-level group on a workflow that runs on
+# `push: main` makes its post-land runs reaper-at-risk, which flips coord's
+# blocking set from soft (relaxable by the optimism gate) to a hard block --
+# see `merge_safety_from_observation`, whose soft-blocking arm requires those
+# runs to share NO concurrency group.
+concurrency:
+  group: alembic-graph-pr-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  alembic-heads-pr:
+    # Job cap (plan 2026-09-07-nothing-escalates-a-pr-wedged-on-one-block-reason Phase 2): 40 green runs measured 2026-09-23,
+    # p50 0.13 / p90 0.15 / max 0.22 min; cap = max(5, 2x max). Replaces the 360-min default.
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Fetch the baseline for the remediation message
+        # `actions/checkout` clones at depth 1, so `origin/main` does not exist
+        # and the gate cannot tell WHICH of the two heads already landed — and
+        # naming that head is the whole remedy (it was the entire fix in 3 of 3
+        # recorded forks). One shallow fetch with an explicit refspec buys it;
+        # the default remote refspec on a PR checkout does not cover main.
+        #
+        # `continue-on-error`, not `|| true`: if the fetch fails, that must be
+        # VISIBLE in the job rather than swallowed. It cannot change the
+        # verdict either way — the gate's pass/fail is a pure function of the
+        # revision files, and with no baseline it reports the remediation as
+        # UNKNOWN instead of guessing.
+        continue-on-error: true
+        run: git fetch --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Count alembic heads
+        # Exits 1 when the chain has more than one head — printing the exact
+        # `down_revision` token to re-point at, resolved against the baseline
+        # fetched above — and 2 when the scan proved nothing: no revision
+        # files, no parseable revisions, or a zero-head chain (a cycle). None
+        # of those are a pass.
+        run: python scripts/ci/count_alembic_heads.py --baseline-ref origin/main

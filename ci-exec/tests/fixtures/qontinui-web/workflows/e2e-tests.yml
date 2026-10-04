@@ -1,0 +1,450 @@
+name: E2E Integration Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    # merge-candidate/** refs are pushed by coord's autonomous merge scheduler
+    # (plan 2026-06-06-coord-ci-runner-autonomous-green-merge, Phase 4). The
+    # workflow must still trigger on them so the required `Test Summary` +
+    # `Backend E2E Tests` contexts report and a candidate proposal gets a real
+    # CI verdict instead of hanging in awaiting-ci — but the Playwright
+    # frontend-tests shards are skipped there (see that job's `if:`); Spec CI
+    # is the merge gate for candidates. Validation-only; no deploy.
+    branches:
+      - main
+      - develop
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+  # Run the full sharded E2E suite nightly. Spec CI (spec-ci.yml) is the
+  # merge gate; this scheduled run — plus the `push: main` trigger above —
+  # catches regressions Spec CI doesn't cover, without ever blocking a PR
+  # or a merge-candidate proposal.
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+# CANCEL ONLY THE PR LANE. The original guard here was a bare
+# `cancel-in-progress: true`, added because every push or PR update spawned a
+# fresh ~1h+ E2E run while the prior one kept grinding - six concurrent 5h runs
+# were observed in flight at once. That problem is real and the PR lane below
+# still solves it; what the bare flag also did was cancel the two lanes this
+# workflow exists to report on.
+#
+# It contradicted this file's own `push:` comment. That comment states the
+# workflow must trigger on `merge-candidate*` refs so "the required `Test
+# Summary` + `Backend E2E Tests` contexts report and a candidate proposal gets a
+# real CI verdict instead of hanging in awaiting-ci". A cancelled run does not
+# report those contexts. `ci_baseline.rs` `ingest_workflow_run` returns before
+# the write when `is_supersession_conclusion` matches (`cancelled` | `stale`),
+# so the verdict is dropped SILENTLY and the proposal sits in `awaiting-ci` -
+# precisely the failure the trigger was added to prevent. `E2E Integration
+# Tests` is not on `ci_observer.rs` `BENIGN_SUPERSESSION_WORKFLOWS`
+# (`test-coverage-producer`, `deploy-coord`), so nothing downgrades it.
+#
+# `main` has the same shape: the group a prospective land's
+# `(push, refs/heads/main)` event enters is `reaper_at_risk` by `ci_observer.rs`
+# `run_is_reaper_at_risk`, and `true` upgrades GitHub's pending-reap into an
+# actual cancellation on a main SHA's baseline.
+#
+# THE GROUP IS ALSO EVENT-KEYED NOW, and that is not cosmetic here. This
+# workflow has FOUR triggers, and `schedule`, `workflow_dispatch` and
+# `push: main` all resolve `github.ref` to `refs/heads/main` - so before this
+# change the 04:00 UTC cron and a main land shared one group and could cancel
+# each other outright. Keying by `github.event_name` separates them, the shape
+# `qontinui-coord/.github/workflows/ci.yml` already uses
+# (`ci-${{ github.event_name }}-${{ github.ref }}`).
+#
+# The PR lane is where the saving was and it keeps cancelling: coord excludes
+# PR-lane runs from the no-reap blocking set (`ci_observer.rs`
+# `is_excluded_from_blocking` - "a main push neither cancels nor invalidates a
+# PR run") and reads PR checks through `coord.pr_check_runs_latest`, partitioned
+# by `(repo, head_sha, name)`, so a superseded attempt sits in a different
+# partition and is never consulted for the new head. Superseding a ~1h sharded
+# Playwright run is exactly the waste the original guard was aimed at.
+#
+# `false` on the other lanes does not pile runs up: GitHub keeps at most one
+# PENDING run per group, so the ceiling is one running plus one queued.
+concurrency:
+  group: e2e-tests-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least privilege for GITHUB_TOKEN (zizmor excessive-permissions): read the
+# repo; `actions: read` is for the job-timeout explainer's
+# `gh api .../actions/runs/$GITHUB_RUN_ID` read inside the called
+# e2e-playwright-stack.yml (a called workflow gets at most the caller's
+# token scope). A job that needs more declares its own `permissions:`.
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  backend-tests:
+    name: Backend E2E Tests
+    runs-on: ubuntu-latest
+    # Job cap. This workflow carried NO `timeout-minutes` at any level, so a
+    # hung step fell through to GitHub's DEFAULT 360-minute ceiling — that is
+    # how run 32207280679 burned 2h28m and 32216356137 burned 5h59m in
+    # `Install Playwright browsers`. Sized from 7 green runs on `main`
+    # (2026-08-18/19): this job ran 1m54s-2m26s, max 2m26s. 20 min is ~8x the
+    # observed max — deliberately loose, because its purpose is to catch a
+    # hang, not to police normal variance.
+    timeout-minutes: 20
+
+    strategy:
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # backend/pyproject.toml has path deps on ../../qontinui-schemas
+      # and ../../qontinui; without these clones, `pip install -e .`
+      # fails with ENOENT. qontinui-cloud-control is needed for the test
+      # harness's side-effect import (see backend/tests/conftest.py); it is
+      # now AGPL/public under qontinui/, cloned the same way as the others.
+      - name: Clone backend Python sibling deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for spec in \
+            "qontinui/qontinui-schemas" \
+            "qontinui/qontinui" \
+            "qontinui/qontinui-cloud-control" \
+          ; do
+            repo_name="${spec#*/}"
+            git clone --depth 1 \
+              "https://x-access-token:${GH_TOKEN}@github.com/${spec}.git" \
+              "../${repo_name}"
+          done
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio
+          # All non-path runtime deps are already pinned in requirements.txt;
+          # path-deps (qontinui-schemas, qontinui-cloud-control) are installed
+          # editable below. Together this satisfies every dep backend's
+          # pyproject declares.
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Force fresh editable install of qontinui-schemas before backend itself.
+          # Without this, `pip install -e .` resolves the schemas path-dep against
+          # pip's wheel cache (actions/cache@v3 above) and DOWNGRADES schemas to
+          # whichever version was cached (e.g., 0.2.1) even though the cloned
+          # ../../qontinui-schemas is at HEAD (0.4.0). Surfaces as
+          # `ModuleNotFoundError: No module named 'qontinui_schemas.commands'`
+          # whenever schemas ships a new sub-package.
+          pip install --no-cache-dir -e ../../qontinui-schemas
+          # `--no-deps` is critical: it prevents `pip install -e .` from
+          # re-resolving (and downgrading) the editable schemas we just
+          # installed. All backend deps are already satisfied above.
+          if [ -f pyproject.toml ]; then pip install -e . --no-deps; fi
+          pip install -e ../../qontinui-cloud-control
+
+      - name: Run backend E2E tests
+        working-directory: ./backend
+        env:
+          TESTING: 1
+          ENVIRONMENT: test
+        run: |
+          pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=term-missing
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+      - name: Upload backend coverage HTML
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: backend-coverage-report
+          path: ./backend/htmlcov/
+          retention-days: 30
+
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: backend-test-results
+          path: ./backend/test-results/
+          retention-days: 30
+
+      # This job has NO apt-dependent step, so it carries no full
+      # infrastructure marker. It does now carry a `timeout-minutes: 20` cap
+      # that did not exist before, and a job cap concludes the job `cancelled`
+      # — which `gh pr checks` renders as **fail** with ZERO failing steps.
+      # That rendering is the precise defect plan
+      # 2026-08-19-ci-apt-hang-unbounded-steps-misreported-as-test-failure
+      # removes, so adding the cap without this notice would have reintroduced
+      # it in a job that previously could not produce it.
+      - name: Explain a cancelled job (no apt step here)
+        if: cancelled()
+        run: |
+          echo "::notice title=Job cancelled - NOT a verdict on this diff::This job was cancelled. Either its 20-minute cap expired (it normally runs 1m54s-2m26s, so that would mean something wedged, not that your tests failed) or the run was cancelled externally - this workflow's 'concurrency: cancel-in-progress' is an expression (pull_request events only), so on a PR run a newer push to the same ref supersedes it and on a push or schedule run only a manual cancel does. Either way a cancelled job reports no test results at all: 'gh pr checks' will render it as 'fail' with zero failing steps, and that rendering says nothing about the code under test. Re-run if you need a verdict. See plan 2026-08-19-ci-apt-hang-unbounded-steps-misreported-as-test-failure."
+
+  # Full 4-shard suite. Runs on pushes to main/develop, on the nightly schedule,
+  # and on workflow_dispatch — never on PRs and never on coord's merge-candidate*
+  # candidate refs (Spec CI gates both; see the comment on the `if:` below for
+  # the candidate-ref rationale). The merge gate is Spec CI
+  # (.github/workflows/spec-ci.yml); the Playwright E2E smoke job that used to
+  # gate PRs here was retired 2026-05-25 once Spec CI gained a default-on
+  # console-error invariant (see spec-ci/console-policy.ts) that subsumed its
+  # last unique guarantee. This sharded suite remains the deeper
+  # nightly/on-main-push backstop.
+  #
+  # THE STACK LIVES IN ONE PLACE: .github/workflows/e2e-playwright-stack.yml,
+  # a `workflow_call` workflow holding what used to be this job's ~900 lines
+  # of steps (postgres, sibling clones, installs, the split apt/CDN browser
+  # install and its cache, migrations, hermetic auth, the run, the uploads,
+  # the infrastructure-timeout marker). This job calls it once per shard; the
+  # `frontend-e2e-changed-specs` job below calls the SAME file for the PR
+  # lane, so the two cannot drift. The effect here is byte-for-byte what the
+  # inlined job did: same `--project=chromium --shard=N/4`, same
+  # PWTEST_SHARD_WEIGHTS, same artifact names, same 60-minute budget. The
+  # only visible change is the check's spelling -- a called job renders as
+  # `Frontend E2E Tests (shard N/4) / Playwright (chromium)` -- and nothing
+  # keys on the old one (see the header of the called file).
+  frontend-tests:
+    name: Frontend E2E Tests (shard ${{ matrix.shard }}/4)
+    # Candidate refs (merge-candidate/**, -spec/**, -batch/**) are coord's
+    # proposal-validation pushes. Spec CI is the merge gate; this suite is the
+    # deeper nightly net. Running it per-candidate cost ~16m wall / ~87m compute
+    # per proposal (coord pushes TWO candidate refs per proposal, which run
+    # concurrently), for a suite that is by design not the gate. `push: main`
+    # is retained, so every LAND still runs it — detection lag is one merge,
+    # not one day. Test Summary (the required check) treats `skipped` as
+    # non-failing (see its result loop), so candidate proposals still get a
+    # green required context instead of hanging in awaiting-ci.
+    if: >-
+      github.event_name != 'pull_request' &&
+      !startsWith(github.ref, 'refs/heads/merge-candidate')
+    strategy:
+      # Don't cancel sibling shards if one fails — we want the full failure
+      # picture from every shard, not just the first one to die.
+      fail-fast: false
+      matrix:
+        # Run the suite in 4 parallel shards. Each matrix entry gets its
+        # own runner with its own ephemeral postgres + backend + frontend,
+        # so there is no shared state between shards. Wall clock ≈
+        # max(shard times), not sum. Shard spans are duration-balanced via
+        # PWTEST_SHARD_WEIGHTS, the called workflow's `shard_weights`
+        # default. (Historical: while ~309 tests were failing at 60s each
+        # under retries=0, a single shard took 5h+. The suite is green now;
+        # per-shard parallelism is set in playwright.config.ts `workers` —
+        # see plan 2026-07-22-web-playwright-single-worker-stale-rationale.)
+        # Strings, not ints: the called workflow's inputs are typed `string`.
+        shard: ['1', '2', '3', '4']
+    uses: ./.github/workflows/e2e-playwright-stack.yml
+    with:
+      shard: ${{ matrix.shard }}
+      shard_count: '4'
+      artifact_suffix: shard-${{ matrix.shard }}
+
+  # ---------------------------------------------------------------------------
+  # PR LANE: the spec files this pull request changed, and only those.
+  #
+  # Phase 2.5 of plan 2026-09-05-web-e2e-fixed-sleeps-red-main-one-test-at-a-
+  # time. The shard suite above never runs on a pull request, so until now a
+  # converted spec's FIRST real execution was the post-land `push: main` run --
+  # and a red there is a red baseline held against every open web PR. Sweeping
+  # 222 fixed sleeps across 31 files on that footing would land every
+  # conversion blind. These two jobs are the pre-land gate: `changed-specs`
+  # lists the `frontend/tests/e2e/**/*.spec.ts` files the PR changed against
+  # its base; when the list is non-empty, `frontend-e2e-changed-specs` brings
+  # up the identical stack (same called workflow as the shards) and runs
+  # exactly those files with the same config (`--project=chromium`, one
+  # worker, retries 0). When it is empty the detect job says so and the run
+  # job is skipped -- no stack is paid for.
+  #
+  # NOT WIRED INTO TEST SUMMARY, DELIBERATELY. `Test Summary` is the required
+  # context, so adding this job to its `needs:` would make the lane required
+  # by the back door. Whether it SHOULD be required for PRs that touch
+  # tests/e2e (the plan says yes) is a ruleset decision for the operator, made
+  # by adding `Frontend E2E Tests (changed specs) / Playwright (chromium)` to
+  # the required set -- not a side effect of this file. Until then a red here
+  # is advisory and visible, which is what Phase 3 needs to see.
+  #
+  # The `concurrency:` at the top of this file cancels a superseded PR run,
+  # so a newer push to the PR stops a stale ~10-15 min stack rather than
+  # letting it grind.
+  # ---------------------------------------------------------------------------
+  changed-specs:
+    name: Changed E2E spec files
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Detection only: a checkout, one extra fetch and a stdlib script.
+    timeout-minutes: 5
+    outputs:
+      files: ${{ steps.detect.outputs.files }}
+      any: ${{ steps.detect.outputs.any }}
+      groups: ${{ steps.detect.outputs.groups }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # The default pull_request checkout is the MERGE commit of the PR head
+      # into its base (refs/pull/N/merge), at depth 1. Its tree is base + the
+      # PR's changes, so a two-dot `git diff <base.sha> HEAD` is exactly the
+      # PR's diff -- the same set `base...HEAD` would give with full history,
+      # without paying for the history. All that is missing is the base
+      # commit itself, fetched here at depth 1 by sha. If base moved between
+      # the event and the merge commit (rare), or the sha fetch fails and the
+      # branch-tip fallback is taken, the diff can only OVER-report -- more
+      # specs run, never fewer.
+      - name: Fetch the PR base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          if git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+            echo "Fetched PR base $BASE_SHA (branch $BASE_REF)."
+          else
+            echo "::warning::Could not fetch the PR base commit $BASE_SHA by sha; diffing against the tip of origin/$BASE_REF instead (can over-report, never under-report)."
+            git fetch --no-tags --depth=1 origin "refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+            BASE_SHA="$(git rev-parse "refs/remotes/origin/$BASE_REF")"
+          fi
+          echo "E2E_BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      # Prints every changed file it classified (spec / skipped-with-reason /
+      # support), the frontend-relative list that will run, and writes
+      # `files` + `any` to $GITHUB_OUTPUT. A support-file change (fixtures,
+      # helpers, playwright.config.ts) is NOTED, not run: this lane runs only
+      # changed specs, so that effect is still first exercised post-land.
+      - name: List the E2E spec files this PR changed
+        id: detect
+        run: |
+          python scripts/ci/list_changed_e2e_specs.py \
+            --base "$E2E_BASE_SHA" --head HEAD \
+            --github-output "$GITHUB_OUTPUT"
+
+  frontend-e2e-changed-specs:
+    name: Frontend E2E Tests (changed specs, group ${{ matrix.group.index }})
+    needs: changed-specs
+    # Runs ONLY when the PR changed at least one spec file, and fans out over
+    # groups of at most MAX_FILES_PER_GROUP files, each on its own Playwright
+    # stack.
+    #
+    # THE ORIGINAL REASON FOR THAT CAP IS RETIRED. It was introduced because a
+    # single job running every changed spec (23 files on web#1265, 2026-09-05)
+    # degraded the `next dev` server late in the run. This lane runs a
+    # PRODUCTION build now (web#1279), so nothing compiles at request time and
+    # that failure mode cannot occur here — do not cite it as a live
+    # constraint. Nor is a group "the same per-server load a shard carries":
+    # measured, a shard carries roughly twice this cap.
+    #
+    # The cap was re-evaluated in Phase 3 of this plan (slug on its own line so
+    # it stays greppable):
+    # 2026-09-05-web-e2e-runs-against-next-dev-so-a-first-hit-compile-is-a-test-failure
+    # and deliberately left where it is. The measurements, and the reason the
+    # number stays, live with the constant in
+    # scripts/ci/list_changed_e2e_specs.py — one place, so the two cannot
+    # drift. Do not restate the value here.
+    if: needs.changed-specs.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJson(needs.changed-specs.outputs.groups) }}
+    uses: ./.github/workflows/e2e-playwright-stack.yml
+    with:
+      spec_files: ${{ matrix.group.files }}
+      artifact_suffix: changed-specs-${{ matrix.group.index }}
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    # Job cap — see `backend-tests` above. This job only downloads artifacts
+    # and tallies results: 3-9s across the same 7 green runs. 10 min is ~65x
+    # the observed max and exists purely so a wedged download cannot inherit
+    # the 360-minute default.
+    timeout-minutes: 10
+    needs: [backend-tests, frontend-tests]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+
+      - name: Generate test summary
+        run: |
+          echo "# E2E Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend Tests: ${{ needs.backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend Tests: ${{ needs.frontend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Test reports and artifacts are available in the Actions artifacts section." >> $GITHUB_STEP_SUMMARY
+
+      # Propagate shard/backend failures into this job's conclusion. Without
+      # this, `if: always()` means Test Summary stays GREEN even when a
+      # frontend shard or the backend job goes red, so push/nightly reds are
+      # invisible on the required `Test Summary` check. We treat `skipped` as
+      # OK so the cases where `frontend-tests` is skipped by its `if:` guard
+      # (PRs, and coord's merge-candidate* proposal-validation refs) do not
+      # fail the summary — only a job that actually RAN and ended
+      # `failure`/`cancelled` turns this red. `needs.<job>.result` for a
+      # matrix job aggregates across shards: it is `failure` if ANY shard failed.
+      - name: Fail if any needed job failed
+        env:
+          BACKEND_RESULT: ${{ needs.backend-tests.result }}
+          FRONTEND_RESULT: ${{ needs.frontend-tests.result }}
+        run: |
+          echo "backend-tests:  ${BACKEND_RESULT}"
+          echo "frontend-tests: ${FRONTEND_RESULT}"
+          status=0
+          for result in "${BACKEND_RESULT}" "${FRONTEND_RESULT}"; do
+            case "${result}" in
+              failure|cancelled)
+                echo "::error::A needed job concluded '${result}' — failing Test Summary."
+                status=1
+                ;;
+              success|skipped|"")
+                # success = passed; skipped = job's `if` guard excluded it
+                # (e.g. frontend-tests on PRs); "" = no such dependency. All OK.
+                ;;
+              *)
+                echo "::error::A needed job concluded unexpected status '${result}' — failing Test Summary."
+                status=1
+                ;;
+            esac
+          done
+          exit "${status}"
+
+      # Same reasoning as `backend-tests`'s notice above: this job's
+      # `timeout-minutes: 10` cap is new, and a cap expiry concludes the job
+      # `cancelled` -> rendered as **fail** with zero failing steps. `if:
+      # cancelled()` (not `always()`) so it stays silent on the normal red,
+      # where the step above has already said exactly which needed job failed.
+      - name: Explain a cancelled job (no apt step here)
+        if: cancelled()
+        run: |
+          echo "::notice title=Job cancelled - NOT a verdict on this diff::Test Summary was cancelled. It only downloads artifacts and tallies results (3-9s observed), so its 10-minute cap expiring would mean a wedged download, not a test failure; the other possibility is an external cancel, since this workflow's 'concurrency: cancel-in-progress' supersedes a running job on pull_request events. Either way this job produced no tally at all, and 'gh pr checks' renders a cancelled job as 'fail' with zero failing steps - that rendering says nothing about the code under test. Re-run if you need a verdict. See plan 2026-08-19-ci-apt-hang-unbounded-steps-misreported-as-test-failure."

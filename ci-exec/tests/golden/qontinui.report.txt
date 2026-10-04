@@ -1,0 +1,243 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      3 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (8):
+  PARTIAL         ci.yml › lint [pull_request, push:main] 1/2 gate command(s) matched
+      missing: python3 -
+      matched: poetry run ruff check .  ←  ci/lint
+      note:    matrix job — considered once
+  PARTIAL         ci.yml › typecheck [pull_request, push:main] 1/2 gate command(s) matched
+      missing: python3 -
+      matched: poetry run mypy src/qontinui --ignore-missing-imports  ←  ci/typecheck
+      note:    matrix job — considered once
+  UNCOVERED       ci.yml › tests [pull_request, push:main] 0/3 gate command(s) matched
+      missing: python3 -
+      missing: poetry run playwright install --with-deps chromium
+      missing: xvfb-run -a poetry run pytest --cov=src/qontinui --cov-report=xml --cov-report=term
+      note:    matrix job — considered once
+  UNCOVERED       ci.yml › tests-ml [pull_request, push:main] 0/3 gate command(s) matched
+      missing: python3 -
+      missing: poetry run playwright install --with-deps chromium
+      missing: xvfb-run -a poetry run pytest
+      note:    matrix job — considered once
+  PARTIAL         ci.yml › build [pull_request, push:main] 1/3 gate command(s) matched
+      missing: python3 -
+      missing: twine check dist/*
+      matched: poetry build  ←  ci/build-package
+  UNCOVERED       ci.yml › security [pull_request, push:main] 0/1 gate command(s) matched
+      missing: uses: aquasecurity/trivy-action
+  UNCOVERED       eval-desktop.yml › eval [pull_request (paths-filtered), push:main (paths-filtered)] 0/6 gate command(s) matched
+      missing: uses: docker/setup-buildx-action
+      missing: uses: docker/build-push-action
+      missing: docker run -d --name eval-desktop --shm-size=1g -p ${HAL_MCP_PORT}:${HAL_MCP_PORT} -e QONTINUI_HAL_M
+      missing: docker logs eval-desktop
+      missing: docker inspect eval-desktop
+      missing: docker rm -f eval-desktop
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/1 gate command(s) matched
+      missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+
+NOT CONSIDERED — not on pull_request or a push to main (0 workflow(s)):
+  (none)
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (42) — not represented in the manifest — each must be handled by hand:
+  - ci.yml › lint: matrix python-version = ["3.12"] not expanded — the job is imported once; steps
+      that read matrix.* are untranslated
+  - ci.yml › lint › step "Checkout sibling repo (qontinui-schemas)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › lint › step "Checkout sibling repo (multistate)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › lint › step "Install Poetry": run script not imported — uses a pipe (`|`) (it installs
+      poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - ci.yml › typecheck: matrix python-version = ["3.12"] not expanded — the job is imported once;
+      steps that read matrix.* are untranslated
+  - ci.yml › typecheck › step "Checkout sibling repo (qontinui-schemas)": run script not imported —
+      `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › typecheck › step "Checkout sibling repo (multistate)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › typecheck › step "Install Poetry": run script not imported — uses a pipe (`|`) (it
+      installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - ci.yml › tests: matrix python-version = ["3.12"] not expanded — the job is imported once; steps
+      that read matrix.* are untranslated
+  - ci.yml › tests › step "Checkout sibling repo (qontinui-schemas)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › tests › step "Checkout sibling repo (multistate)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › tests › step "Install system dependencies": run script not imported — `sudo apt-get
+      update` runs as root — a manifest step runs as the host's own user
+  - ci.yml › tests › step "Install Poetry": run script not imported — uses a pipe (`|`) (it installs
+      poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - ci.yml › tests › step "Upload coverage to Codecov": uses codecov/codecov-action@v4 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - ci.yml › tests-ml: matrix python-version = ["3.12"] not expanded — the job is imported once;
+      steps that read matrix.* are untranslated
+  - ci.yml › tests-ml › step "Checkout sibling repo (qontinui-schemas)": run script not imported —
+      `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › tests-ml › step "Checkout sibling repo (multistate)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › tests-ml › step "Install system dependencies": run script not imported — `sudo apt-get
+      update` runs as root — a manifest step runs as the host's own user
+  - ci.yml › tests-ml › step "Install Poetry": run script not imported — uses a pipe (`|`) (it
+      installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - ci.yml › build › step "Checkout sibling repo (qontinui-schemas)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › build › step "Checkout sibling repo (multistate)": run script not imported — `cd
+      $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - ci.yml › build › step "Install Poetry": run script not imported — uses a pipe (`|`) (it installs
+      poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - ci.yml › build › step "Check package": run script not imported — relies on shell glob or brace
+      expansion of "dist/*"
+  - ci.yml › build › step "Store build artifacts": uses actions/upload-artifact@v4 — an arbitrary
+      action; the manifest runs commands only, so translate its effect by hand
+  - ci.yml › security › step "Run Trivy vulnerability scanner": uses
+      aquasecurity/trivy-action@master — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand
+  - ci.yml › security › step "Upload Trivy results to GitHub Security": runs only `if: always()` —
+      the manifest has no step conditions; not imported
+  - ci.yml › security: no step could be translated — the job is not imported
+  - eval-desktop.yml › env: env IMAGE_TAG is outside the manifest's env allowlist; not imported
+  - eval-desktop.yml › env: env HAL_MCP_PORT is outside the manifest's env allowlist; not imported
+  - eval-desktop.yml › env: env QONTINUI_HAL_MCP_TOKEN = "${{ secrets.QONTINUI_HAL_MCP_TOKEN }}" is
+      an expression — a manifest env value is a literal; not imported [secrets referenced:
+      QONTINUI_HAL_MCP_TOKEN]
+  - eval-desktop.yml › eval › step "Set up Docker Buildx": uses docker/setup-buildx-action@v3 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - eval-desktop.yml › eval › step "Build eval-desktop image": uses docker/build-push-action@v5 — an
+      arbitrary action; the manifest runs commands only, so translate its effect by hand
+  - eval-desktop.yml › eval › step "Start eval-desktop container": run script not imported — sets
+      "CID=$(docker run -d \\\n --name eval-desktop \\\n --shm-size=1g \\\n -p
+      ${HAL_MCP_PORT}:${HAL_MCP_PORT} \\\n -e QONTINUI_HAL_MCP_TOKEN=\"${QONTINUI_HAL_MCP_TOKEN}\"
+      \\\n \"${IMAGE_TAG}\")", an env assignment that is not a literal (bash would expand it)
+  - eval-desktop.yml › eval › step "Wait for hal-mcp health": continue-on-error step (advisory) — a
+      manifest step always gates; not imported
+  - eval-desktop.yml › eval › step "Install qontinui-train": run script not imported — `python -m
+      pip install --upgrade pip` installs into the host's global environment — a CI host must be
+      left as it was found; declare a pinned [[tools]] entry or make it a host prerequisite
+  - eval-desktop.yml › eval › step "Run grounding eval against internal benchmark": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - eval-desktop.yml › eval › step "Capture container logs": runs only `if: always()` — the manifest
+      has no step conditions; not imported
+  - eval-desktop.yml › eval › step "Upload eval artifacts": runs only `if: always()` — the manifest
+      has no step conditions; not imported
+  - eval-desktop.yml › eval › step "Tear down container": runs only `if: always()` — the manifest
+      has no step conditions; not imported
+  - eval-desktop.yml › eval: no step could be translated — the job is not imported
+  - secret-scan.yml › gitleaks › step "Run gitleaks (binary — the marketplace action requires a paid org license)": run
+      script not imported — uses the expression ${{ github.event.pull_request.base.sha }} — a
+      manifest command is a literal, evaluated by no one
+  - secret-scan.yml › gitleaks: no step could be translated — the job is not imported
+
+TRANSLATED WITH A CHANGE (13) — represented, but not literally:
+  - ci.yml: trigger filters not carried (pull_request branches ["main"]; push branches ["main",
+      "develop"]) — a manifest gate job runs for every pull request and merge candidate
+  - eval-desktop.yml: pull_request, push filtered by paths — a manifest job runs for every change
+  - eval-desktop.yml: trigger filters not carried (pull_request branches ["main"]; push branches
+      ["main", "develop"]) — a manifest gate job runs for every pull request and merge candidate
+  - ci.yml › lint › step "Checkout sibling repo (qontinui-schemas)": the script clones
+      qontinui/qontinui-schemas → [[siblings]] repo = "qontinui/qontinui-schemas" (pin =
+      declared-adaptation, the default). The executor materialises it at ../qontinui-schemas beside
+      the checkout; a command that used another path for it must be re-pointed, and the pin should
+      be reviewed
+  - ci.yml › lint › step "Checkout sibling repo (multistate)": the script clones qontinui/multistate
+      → [[siblings]] repo = "qontinui/multistate" (pin = declared-adaptation, the default). The
+      executor materialises it at ../multistate beside the checkout; a command that used another
+      path for it must be re-pointed, and the pin should be reviewed
+  - ci.yml › typecheck › step "Checkout sibling repo (qontinui-schemas)": the script clones
+      qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - ci.yml › typecheck › step "Checkout sibling repo (multistate)": the script clones
+      qontinui/multistate — already declared as [[siblings]] repo = "qontinui/multistate",
+      materialised at ../multistate; a command that used another path for it must be re-pointed
+  - ci.yml › tests › step "Checkout sibling repo (qontinui-schemas)": the script clones
+      qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - ci.yml › tests › step "Checkout sibling repo (multistate)": the script clones
+      qontinui/multistate — already declared as [[siblings]] repo = "qontinui/multistate",
+      materialised at ../multistate; a command that used another path for it must be re-pointed
+  - ci.yml › tests-ml › step "Checkout sibling repo (qontinui-schemas)": the script clones
+      qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - ci.yml › tests-ml › step "Checkout sibling repo (multistate)": the script clones
+      qontinui/multistate — already declared as [[siblings]] repo = "qontinui/multistate",
+      materialised at ../multistate; a command that used another path for it must be re-pointed
+  - ci.yml › build › step "Checkout sibling repo (qontinui-schemas)": the script clones
+      qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - ci.yml › build › step "Checkout sibling repo (multistate)": the script clones
+      qontinui/multistate — already declared as [[siblings]] repo = "qontinui/multistate",
+      materialised at ../multistate; a command that used another path for it must be re-pointed
+
+NO-OPS (22) — accounted for; nothing to declare:
+  - eval-desktop.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - eval-desktop.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - secret-scan.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ci.yml › lint › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › lint › step "Set up Python ${{ matrix.python-version }}": setup-python ${{
+      matrix.python-version }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › lint › step "Cache Poetry dependencies": actions/cache — a cache; the executor keeps
+      its own warm target dir and tool cache
+  - ci.yml › typecheck › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › typecheck › step "Set up Python ${{ matrix.python-version }}": setup-python ${{
+      matrix.python-version }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › typecheck › step "Cache Poetry dependencies": actions/cache — a cache; the executor
+      keeps its own warm target dir and tool cache
+  - ci.yml › tests › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › tests › step "Set up Python ${{ matrix.python-version }}": setup-python ${{
+      matrix.python-version }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › tests › step "Cache Poetry dependencies": actions/cache — a cache; the executor keeps
+      its own warm target dir and tool cache
+  - ci.yml › tests-ml › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › tests-ml › step "Set up Python ${{ matrix.python-version }}": setup-python ${{
+      matrix.python-version }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ci.yml › tests-ml › step "Cache Poetry dependencies": actions/cache — a cache; the executor
+      keeps its own warm target dir and tool cache
+  - ci.yml › build › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - ci.yml › build › step "Set up Python": setup-python 3.12 — the tool registry provisions no
+      python; the host's python runs the steps (declare [canonical] toolchains = ["python"] to
+      require the host's canonical one)
+  - ci.yml › security: permissions — GitHub-side setting with no manifest counterpart
+  - ci.yml › security › step "actions/checkout@v5": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - eval-desktop.yml › eval › step "Checkout": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - eval-desktop.yml › eval › step "Set up Python": setup-python 3.12 — the tool registry provisions
+      no python; the host's python runs the steps (declare [canonical] toolchains = ["python"] to
+      require the host's canonical one)
+  - secret-scan.yml › gitleaks › step "actions/checkout@v4": actions/checkout — the executor checks
+      out the dispatched commit itself
+
+summary: 0 covered, 0 covered by name, 3 partial, 5 uncovered of 8 job(s); 42 untranslated construct(s) — the Phase 9 precondition is NOT MET

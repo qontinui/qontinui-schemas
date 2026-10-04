@@ -1,0 +1,292 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      11 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (10):
+  UNCOVERED       commitlint.yml › commitlint [pull_request] 0/1 gate command(s) matched
+      missing: uses: wagoid/commitlint-github-action
+  UNCOVERED       release-please.yml › release-please [push:main] 0/2 gate command(s) matched
+      missing: uses: actions/create-github-app-token
+      missing: uses: googleapis/release-please-action
+  UNCOVERED       release-pr-sanity.yml › release-pr-sanity [pull_request] 0/1 gate command(s) matched
+      missing: bash .github/scripts/release-pr-sanity.sh
+      note:    job condition `if: startsWith(github.head_ref, 'release-please--')` — considered as running
+  UNCOVERED       runner-consumer-check.yml › consumer-check [pull_request] 0/11 gate command(s) matched
+      missing: git diff --name-only $BASE_SHA $HEAD_SHA
+      missing: <outside the repository>/: sudo swapoff -a
+      missing: <outside the repository>/: sudo fallocate -l 12G /swapfile
+      missing: <outside the repository>/: sudo mkswap /swapfile
+      missing: <outside the repository>/: sudo swapon /swapfile
+      missing: <outside the repository>/: gh api repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      missing: <outside the repository>/: gh api --paginate repos/${CONSUMER_REPO}/pulls?state=open&per_page=100 --jq [.[] | select(any(.label
+      missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/pulls/${target} --jq .head.sha + " " + .head.ref + " " + .state + " " 
+      missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/rules/branches/main
+      missing: <outside the repository>/: gh api --paginate repos/${CONSUMER_REPO}/commits/${sha}/check-runs?per_page=100
+      missing: <outside the repository>/: gh api repos/${CONSUMER_REPO}/commits/${sha}/status?per_page=100
+      note:    matrix job — considered once
+  UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/2 gate command(s) matched
+      missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file
+      missing: gh api --paginate repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       runner-consumer-check.yml › consumer-gate [pull_request] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  PARTIAL         rust-ci.yml › rust-ci [pull_request, push:main (paths-filtered)] 4/6 gate command(s) matched
+      missing: cargo test -p qontinui-types --test fleet_nouns_vocabulary hit_matrix_for_the_cross_engine_check
+      missing: python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json
+      matched: cargo fmt --all -- --check  ←  ci/rust-fmt
+      matched: cargo clippy --workspace --all-targets -- -D warnings  ←  ci/rust-clippy
+      matched: cargo build --workspace --all-targets  ←  ci/rust-build
+      matched: cargo test --workspace  ←  ci/rust-test
+  UNCOVERED       schema-drift.yml › check-drift [pull_request, push:main (paths-filtered)] 0/3 gate command(s) matched
+      missing: uses: qontinui/qontinui-runner/.github/actions/checkout-sibling
+      missing: bash scripts/check-generated-drift.sh --preflight
+      missing: bash scripts/check-generated-drift.sh --verify
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/1 gate command(s) matched
+      missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+  UNCOVERED       ts-typecheck.yml › typecheck [pull_request, push:main] 0/2 gate command(s) matched
+      missing: ts: npm run typecheck
+      missing: ts: npm test
+
+NOT CONSIDERED — not on pull_request or a push to main (3 workflow(s)):
+  candidate-ci.yml (jobs: rust-ci) — triggers ["push"]
+  publish-rust.yml (jobs: verify-ci, publish-qontinui-types, publish-qontinui-runner-client) — triggers ["push", "workflow_dispatch"]
+  publish.yml (jobs: publish) — triggers ["push"]
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (54) — not represented in the manifest — each must be handled by hand:
+  - rust-ci.yml: trigger `workflow_call` is not carried — a manifest job runs for pull requests,
+      merge candidates and pushes, or on its schedule
+  - candidate-ci.yml › rust-ci: calls the reusable workflow ./.github/workflows/rust-ci.yml — import
+      that workflow's own file instead; not imported
+  - commitlint.yml › commitlint › step "wagoid/commitlint-github-action@v6": uses
+      wagoid/commitlint-github-action@v6 — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand
+  - commitlint.yml › commitlint: no step could be translated — the job is not imported
+  - publish-rust.yml › verify-ci: not imported: the workflow is triggered only by ["push",
+      "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - publish-rust.yml › publish-qontinui-types: not imported: the workflow is triggered only by
+      ["push", "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI to
+      import
+  - publish-rust.yml › publish-qontinui-runner-client: not imported: the workflow is triggered only
+      by ["push", "workflow_dispatch"] — not a pull-request/push gate or a schedule, so it is not CI
+      to import
+  - publish.yml › publish: not imported: the workflow is triggered only by ["push"] — not a
+      pull-request/push gate or a schedule, so it is not CI to import
+  - release-please.yml › release-please › step "Generate GitHub App token": uses
+      actions/create-github-app-token@v1 — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand [secrets referenced: RELEASE_PLEASE_APP_ID,
+      RELEASE_PLEASE_PRIVATE_KEY]
+  - release-please.yml › release-please › step "googleapis/release-please-action@v4": uses
+      googleapis/release-please-action@v4 — an arbitrary action; the manifest runs commands only, so
+      translate its effect by hand
+  - release-please.yml › release-please: no step could be translated — the job is not imported
+  - release-pr-sanity.yml › release-pr-sanity: job condition `if: startsWith(github.head_ref,
+      'release-please--')` is not carried — the imported job runs unconditionally
+  - release-pr-sanity.yml › release-pr-sanity › step "Every base manifest version has a release": env
+      GH_TOKEN = "${{ github.token }}" is an expression — a manifest env value is a literal; not
+      imported
+  - release-pr-sanity.yml › release-pr-sanity › step "Every base manifest version has a release": env
+      BASE_SHA = "${{ github.event.pull_request.base.sha }}" is an expression — a manifest env value
+      is a literal; not imported
+  - runner-consumer-check.yml › consumer-check: matrix include = ["consumer: qontinui-runner repo:
+      qontinui/qontinui-runner workdir: qontinui-runner needs_dist_stub: 'true' heavy: 'true'",
+      "consumer: qontinui-supervisor repo: qontinui/qontinui-supervisor workdir: qontinui-supervisor
+      needs_dist_stub: 'false' heavy: 'false'"] not expanded — the job is imported once; steps that
+      read matrix.* are untranslated
+  - runner-consumer-check.yml › consumer-check › step "Decide whether the consumer gate must run": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - runner-consumer-check.yml › consumer-check › step "Checkout ${{ matrix.consumer }} (main)": runs
+      only `if: steps.gate.outputs.run_gate == 'true'` — the manifest has no step conditions; not
+      imported
+  - runner-consumer-check.yml › consumer-check › step "Record resolved ${{ matrix.consumer }} main SHA": runs
+      only `if: steps.gate.outputs.run_gate == 'true'` — the manifest has no step conditions; not
+      imported
+  - runner-consumer-check.yml › consumer-check › step "Install Tauri Linux system deps": runs only
+      `if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'` — the manifest has no
+      step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Free disk space (Ubuntu)": runs only `if:
+      steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'` — the manifest has no step
+      conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Add swapfile (guard against link-time OOM)": runs
+      only `if: steps.gate.outputs.run_gate == 'true' && matrix.heavy == 'true'` — the manifest has
+      no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Set up Rust toolchain": runs only `if:
+      steps.gate.outputs.run_gate == 'true'` — the manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Rust cache (${{ matrix.consumer }}, main leg)": runs
+      only `if: steps.gate.outputs.run_gate == 'true'` — the manifest has no step conditions; not
+      imported
+  - runner-consumer-check.yml › consumer-check › step "Stub ${{ matrix.consumer }} frontend dist": runs
+      only `if: steps.gate.outputs.run_gate == 'true' && matrix.needs_dist_stub == 'true'` — the
+      manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Leg 1: cargo check ${{ matrix.consumer }} main against PR schemas": runs
+      only `if: steps.gate.outputs.run_gate == 'true'` — the manifest has no step conditions; not
+      imported
+  - runner-consumer-check.yml › consumer-check › step "Leg 2: resolve the declared adaptation PR": runs
+      only `if: steps.leg1.outcome == 'failure'` — the manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Leg 2: check out the declared adaptation (SHA-pinned)": runs
+      only `if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'` — the
+      manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Leg 2: re-stub ${{ matrix.consumer }} frontend dist": runs
+      only `if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true' &&
+      matrix.needs_dist_stub == 'true'` — the manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Rust cache (${{ matrix.consumer }}, adaptation leg)": runs
+      only `if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'` — the
+      manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Leg 2: cargo check the declared adaptation against PR schemas": runs
+      only `if: steps.leg1.outcome == 'failure' && steps.declare.outputs.found == 'true'` — the
+      manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check › step "Verdict for ${{ matrix.consumer }}": runs
+      only `if: always()` — the manifest has no step conditions; not imported
+  - runner-consumer-check.yml › consumer-check: no step could be translated — the job is not
+      imported
+  - runner-consumer-check.yml › wire-gate-guard: job condition `if: github.event_name ==
+      'pull_request'` is not carried — the imported job runs unconditionally
+  - runner-consumer-check.yml › wire-gate-guard › step "SDK wire gate is append-only": run script
+      not imported — sets a shell variable (`KEY=value` with no command)
+  - runner-consumer-check.yml › wire-gate-guard: no step could be translated — the job is not
+      imported
+  - runner-consumer-check.yml › consumer-gate: job condition `if: always()` is not carried — the
+      imported job runs unconditionally
+  - runner-consumer-check.yml › consumer-gate › step "SDK wire gate verdict": run script not
+      imported — uses the shell construct `case`
+  - runner-consumer-check.yml › consumer-gate › step "Aggregate consumer verdicts": run script not
+      imported — uses the shell construct `case`
+  - runner-consumer-check.yml › consumer-gate: no step could be translated — the job is not imported
+  - rust-ci.yml › rust-ci › step "The vacuity parser copy matches its declared digest": run script
+      not imported — sets a shell variable (`KEY=value` with no command)
+  - rust-ci.yml › rust-ci › step "cargo test": run script not imported — turns fail-fast off (`set
+      +e`) — what follows may deliberately ignore failures, which a manifest step cannot
+  - rust-ci.yml › rust-ci › step "fleet-nouns.toml patterns agree across Rust, Python and JS": env
+      FLEET_NOUNS_MATRIX_OUT is outside the manifest's env allowlist; not imported
+  - schema-drift.yml › check-drift: env GENERATE_TYPES_SH = "${{ github.workspace
+      }}/qontinui-runner/src-tauri/scripts/generate_types.sh" is an expression — a manifest env
+      value is a literal; not imported
+  - schema-drift.yml › check-drift › step "Check out sibling qontinui-runner (declared PR, else default branch)": uses
+      qontinui/qontinui-runner/.github/actions/checkout-sibling@main — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - schema-drift.yml › check-drift › step "Report which qontinui-runner tree this regenerated against": run
+      script not imported — sets "SIB_REF=${SIB_REF//|/\\\\|}", an env assignment that is not a
+      literal (bash would expand it)
+  - schema-drift.yml › check-drift › step "Install Tauri Linux system deps": run script not imported
+      — `sudo apt-get update` runs as root — a manifest step runs as the host's own user
+  - schema-drift.yml › check-drift › step "Set up Node.js": node-version "20" resolves to no node
+      release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by hand
+  - schema-drift.yml › check-drift › step "Install datamodel-code-generator": run script not
+      imported — `pip install datamodel-code-generator==0.57.0` installs into the host's global
+      environment — a CI host must be left as it was found; declare a pinned [[tools]] entry or make
+      it a host prerequisite
+  - schema-drift.yml › check-drift › step "Stub qontinui-runner frontend dist": run script not
+      imported — writes to qontinui-runner/dist/index.html (an `echo`/`printf` into a file — e.g.
+      $GITHUB_ENV / $GITHUB_OUTPUT / $GITHUB_PATH — changes what later steps see, and a manifest has
+      no such channel)
+  - schema-drift.yml › check-drift › step "Regenerate types": run script not imported — expands
+      $GENERATE_TYPES_SH at run time — a manifest argument is a literal
+  - schema-drift.yml › check-drift › step "Upload regenerated bindings": runs only `if: ${{
+      !cancelled() }}` — the manifest has no step conditions; not imported
+  - secret-scan.yml › gitleaks › step "Run gitleaks (binary — the marketplace action requires a paid org license)": run
+      script not imported — uses the expression ${{ github.event.pull_request.base.sha }} — a
+      manifest command is a literal, evaluated by no one
+  - secret-scan.yml › gitleaks: no step could be translated — the job is not imported
+  - ts-typecheck.yml › typecheck › step "actions/setup-node@v5": node-version "20" resolves to no
+      node release the tool registry pins (pinned: ["22.11.0"]) — declare a pinned [[tools]] node by
+      hand
+
+TRANSLATED WITH A CHANGE (12) — represented, but not literally:
+  - candidate-ci.yml: trigger filters not carried (push branches ["merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - commitlint.yml: trigger filters not carried (pull_request types ["opened", "reopened",
+      "synchronize", "edited"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - release-please.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job
+      runs for every pull request and merge candidate
+  - release-pr-sanity.yml: trigger filters not carried (pull_request branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - runner-consumer-check.yml: trigger filters not carried (pull_request types ["opened",
+      "synchronize", "reopened", "labeled", "unlabeled"]) — a manifest gate job runs for every pull
+      request and merge candidate
+  - rust-ci.yml: push filtered by paths — a manifest job runs for every change
+  - rust-ci.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job runs for
+      every pull request and merge candidate
+  - schema-drift.yml: push filtered by paths — a manifest job runs for every change
+  - schema-drift.yml: trigger filters not carried (pull_request branches ["main"] types ["opened",
+      "synchronize", "reopened", "labeled", "unlabeled"]; push branches ["main"]) — a manifest gate
+      job runs for every pull request and merge candidate
+  - ts-typecheck.yml: trigger filters not carried (push branches ["main"]) — a manifest gate job
+      runs for every pull request and merge candidate
+  - runner-consumer-check.yml › consumer-check › step "Checkout qontinui-schemas (PR head)": checks
+      this repository out at "qontinui-schemas" — the executor's checkout root IS the repository, so
+      working directories under it are re-rooted and any outside it are refused
+  - schema-drift.yml › check-drift › step "Checkout": checks this repository out at
+      "qontinui-schemas" — the executor's checkout root IS the repository, so working directories
+      under it are re-rooted and any outside it are refused
+
+NO-OPS (28) — accounted for; nothing to declare:
+  - candidate-ci.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - publish-rust.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - release-please.yml: permissions — GitHub-side setting with no manifest counterpart
+  - release-please.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - release-pr-sanity.yml: permissions — GitHub-side setting with no manifest counterpart
+  - runner-consumer-check.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - runner-consumer-check.yml: permissions — GitHub-side setting with no manifest counterpart
+  - runner-consumer-check.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - rust-ci.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - schema-drift.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - schema-drift.yml: permissions — GitHub-side setting with no manifest counterpart
+  - schema-drift.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - secret-scan.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ts-typecheck.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - ts-typecheck.yml: permissions — GitHub-side setting with no manifest counterpart
+  - commitlint.yml › commitlint › step "actions/checkout@v5": actions/checkout — the executor checks
+      out the dispatched commit itself
+  - release-pr-sanity.yml › release-pr-sanity › step "actions/checkout@v5": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - runner-consumer-check.yml › consumer-check › step "Checkout qontinui-schemas (PR head)": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - runner-consumer-check.yml › wire-gate-guard › step "Checkout qontinui-schemas (PR head, full history)": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - rust-ci.yml › rust-ci › step "actions/checkout@v5": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - rust-ci.yml › rust-ci › step "dtolnay/rust-toolchain@stable": dtolnay/rust-toolchain stable —
+      the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to
+      require the host's canonical one); components clippy, rustfmt must be installed on the host
+  - rust-ci.yml › rust-ci › step "Swatinem/rust-cache@v2": Swatinem/rust-cache — a cache; the
+      executor keeps its own warm target dir and tool cache
+  - schema-drift.yml › check-drift › step "Checkout": actions/checkout — the executor checks out the
+      dispatched commit itself
+  - schema-drift.yml › check-drift › step "Set up Rust toolchain": dtolnay/rust-toolchain stable —
+      the host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to
+      require the host's canonical one)
+  - schema-drift.yml › check-drift › step "Set up Python": setup-python 3.11 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - secret-scan.yml › gitleaks › step "actions/checkout@v4": actions/checkout — the executor checks
+      out the dispatched commit itself
+  - ts-typecheck.yml › typecheck › step "actions/checkout@v5": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - ts-typecheck.yml › typecheck › step "actions/setup-node@v5": setup-node cache — a dependency
+      cache, not a gate
+
+summary: 0 covered, 0 covered by name, 1 partial, 9 uncovered of 10 job(s); 54 untranslated construct(s) — the Phase 9 precondition is NOT MET

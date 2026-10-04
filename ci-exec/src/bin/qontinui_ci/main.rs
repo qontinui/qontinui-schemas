@@ -4,6 +4,10 @@
 //! qontinui-ci run      [--job <name>] [--repo-dir <dir>] [--manifest <path>] [--root <dir>]
 //! qontinui-ci list     [--manifest <file>]
 //! qontinui-ci validate [--manifest <file>]
+//! qontinui-ci import       [--out <file> [--force]] <workflow.yml>...
+//! qontinui-ci import       --report <ci.toml> [--default-branch <name>] <workflow.yml>...
+//! qontinui-ci gen-workflow [--manifest <file>] [--out <file>|-] [--executor-rev <sha>] [--force]
+//! qontinui-ci gen-workflow --check [--manifest <file>] [--out <file>] [--executor-rev <sha>]
 //! ```
 //!
 //! `run` executes one job of `.qontinui/ci.toml` exactly as a CI node would:
@@ -14,9 +18,19 @@
 //! `2026-10-04-coord-managed-ci-for-every-tenant-with-an-actions-free-mode`, D5:
 //! CI keeps running when coord is down).
 //!
+//! `import` and `gen-workflow` are the onboarding and hybrid-mode halves (plan
+//! Phase 8): `import` turns GitHub workflow files into a v2 manifest and lists
+//! everything it could not carry over; `import --report` says whether a
+//! manifest covers every workflow job that gates pull requests and
+//! default-branch pushes; `gen-workflow` writes the generated GitHub leg and
+//! `--check` fails a hand-edit of it.
+//!
 //! Exit status: 0 success, 1 failure, 3 cancelled (a non-verdict: the job did
 //! not run on its merits — wrong OS, a checkout that never produced a tree),
-//! 2 usage or setup error.
+//! 2 usage or setup error. For `import`: 1 when no job could be translated.
+//! For `import --report`: 1 when any considered job is not covered. For
+//! `gen-workflow --check`: 1 when the file is missing, hand-written,
+//! hand-edited or stale.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -26,7 +40,8 @@ use qontinui_ci_exec::dispatch::DispatchPayload;
 use qontinui_ci_exec::host::BoxFuture;
 use qontinui_ci_exec::manifest::{self, CiManifest};
 use qontinui_ci_exec::report::{Conclusion, LogSink, Reporter, Verdict};
-use qontinui_ci_exec::{executor, host_sizing, standalone};
+use qontinui_ci_exec::import::{self, ItemKind, WorkflowSource};
+use qontinui_ci_exec::{executor, gen_workflow, host_sizing, standalone};
 
 /// `println!` that cannot panic. A run's output goes to a terminal that may
 /// close mid-run (SIGHUP, a closed pipe); `println!` panics on a failed write,
@@ -54,6 +69,10 @@ usage:
   qontinui-ci run      [--job <name>] [--repo-dir <dir>] [--manifest <path>] [--root <dir>]
   qontinui-ci list     [--manifest <file>]
   qontinui-ci validate [--manifest <file>]
+  qontinui-ci import       [--out <file> [--force]] <workflow.yml>...
+  qontinui-ci import       --report <ci.toml> [--default-branch <name>] <workflow.yml>...
+  qontinui-ci gen-workflow [--manifest <file>] [--out <file>|-] [--executor-rev <sha>] [--force]
+  qontinui-ci gen-workflow --check [--manifest <file>] [--out <file>] [--executor-rev <sha>]
 
 run       run one job against a fresh checkout of the repo's committed HEAD
             --job       the [[jobs]] name (default: ci — the one job of a v1 manifest;
@@ -70,7 +89,33 @@ run       run one job against a fresh checkout of the repo's committed HEAD
                         commit there); the entry is removed and pruned when
                         the run ends
 list      print the manifest's jobs and the check-run contexts they produce
-validate  parse and validate the manifest; exit 0 when it is valid";
+validate  parse and validate the manifest; exit 0 when it is valid
+import    convert GitHub workflow files into a version-2 ci.toml (stdout, or --out;
+            --out refuses to overwrite an existing file without --force). Every
+            construct it cannot translate (an arbitrary `uses:` action, an `if:`,
+            an expression or secret, a matrix it cannot expand, a script that is
+            not plain commands, …) is listed in the generated file's header and
+            on stderr — nothing is dropped silently. Exit 1 when no job could be
+            translated
+            --report <ci.toml>  instead of converting, list every workflow job that
+                        runs on pull_request or a push to the default branch and
+                        whether <ci.toml> covers it (the rule is printed with the
+                        report); exit 0 only when every such job is covered
+            --default-branch    the branch `push` filters are matched against (main)
+gen-workflow  write .github/workflows/qontinui-ci.yml, the hybrid-mode GitHub leg:
+            one `qontinui-ci run --job <name>` job per gate job, workflow_dispatch
+            only, a GENERATED header with a content hash
+            --manifest      the manifest (default: .qontinui/ci.toml)
+            --out           the file to write (default: the repo's
+                            .github/workflows/qontinui-ci.yml; - for stdout)
+            --executor-rev  install the executor at this qontinui-schemas commit
+                            (default: main)
+            --force         overwrite a file that is not a generated one
+            --check         write nothing; exit 1 when the committed file is missing,
+                            hand-written, hand-edited or stale (it regenerates with
+                            the --rev the committed file records, unless
+                            --executor-rev is given). Wire it into the repo's CI so
+                            a hand-edit fails";
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
@@ -129,12 +174,230 @@ fn dispatch(args: &[String]) -> Result<ExitCode, String> {
         )?),
         "list" => list(&flags(rest, &["--manifest"])?),
         "validate" => validate(&flags(rest, &["--manifest"])?),
+        "import" => import_cmd(rest),
+        "gen-workflow" => gen_workflow_cmd(rest),
         "-h" | "--help" | "help" => {
             out!("{USAGE}");
             Ok(ExitCode::SUCCESS)
         }
         other => Err(format!("unknown subcommand {other:?}\n\n{USAGE}")),
     }
+}
+
+/// Parsed arguments of a subcommand that also takes switches and positionals.
+struct Args {
+    valued: Vec<(String, String)>,
+    switches: Vec<String>,
+    positionals: Vec<String>,
+}
+
+/// `--flag value` for `valued`, bare `--switch` for `switches`, everything
+/// else positional (after `--`, everything is positional).
+fn parse_args(args: &[String], valued: &[&str], switches: &[&str]) -> Result<Args, String> {
+    let mut out = Args {
+        valued: Vec::new(),
+        switches: Vec::new(),
+        positionals: Vec::new(),
+    };
+    let mut it = args.iter();
+    let mut rest_positional = false;
+    while let Some(a) = it.next() {
+        if rest_positional {
+            out.positionals.push(a.clone());
+        } else if a == "--" {
+            rest_positional = true;
+        } else if valued.contains(&a.as_str()) {
+            let v = it
+                .next()
+                .ok_or_else(|| format!("{a} needs a value\n\n{USAGE}"))?;
+            out.valued.push((a.clone(), v.clone()));
+        } else if switches.contains(&a.as_str()) {
+            out.switches.push(a.clone());
+        } else if a.starts_with("--") {
+            return Err(format!("unknown argument {a:?}\n\n{USAGE}"));
+        } else {
+            out.positionals.push(a.clone());
+        }
+    }
+    Ok(out)
+}
+
+fn read_workflows(paths: &[String]) -> Result<Vec<WorkflowSource>, String> {
+    if paths.is_empty() {
+        return Err(format!("name at least one workflow file\n\n{USAGE}"));
+    }
+    paths
+        .iter()
+        .map(|p| {
+            std::fs::read_to_string(p)
+                .map(|text| WorkflowSource {
+                    label: p.replace('\\', "/"),
+                    text,
+                })
+                .map_err(|e| format!("read {p}: {e}"))
+        })
+        .collect()
+}
+
+fn import_cmd(rest: &[String]) -> Result<ExitCode, String> {
+    let args = parse_args(rest, &["--out", "--report", "--default-branch"], &["--force"])?;
+    let sources = read_workflows(&args.positionals)?;
+    if let Some(manifest_path) = flag(&args.valued, "--report") {
+        if flag(&args.valued, "--out").is_some() || args.switches.iter().any(|s| s == "--force") {
+            return Err("--report writes nothing; --out and --force do not apply".to_string());
+        }
+        let manifest = read_manifest(Path::new(manifest_path))?;
+        let branch = flag(&args.valued, "--default-branch").unwrap_or("main");
+        let report = import::coverage_report(manifest_path, &manifest, &sources, branch)?;
+        out!("{}", import::render_report(&report).trim_end());
+        return Ok(if report.all_covered() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::from(1)
+        });
+    }
+    if flag(&args.valued, "--default-branch").is_some() {
+        return Err("--default-branch applies to --report only".to_string());
+    }
+    let outcome = import::import_workflows(&sources)?;
+    match flag(&args.valued, "--out") {
+        Some(path) if path != "-" => {
+            let p = Path::new(path);
+            if p.exists() && !args.switches.iter().any(|s| s == "--force") {
+                return Err(format!(
+                    "{path} exists — refusing to overwrite it without --force"
+                ));
+            }
+            if let Some(dir) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
+                std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+            }
+            std::fs::write(p, &outcome.manifest_toml).map_err(|e| format!("write {path}: {e}"))?;
+            err!("qontinui-ci import: wrote {path}");
+        }
+        _ => out!("{}", outcome.manifest_toml.trim_end()),
+    }
+    err!(
+        "qontinui-ci import: {} job(s) from {} workflow file(s); {} untranslated, {} translated \
+         with a change, {} no-op construct(s) — each listed in the generated header",
+        outcome.jobs.len(),
+        sources.len(),
+        outcome.count(ItemKind::Untranslated),
+        outcome.count(ItemKind::Changed),
+        outcome.count(ItemKind::NoOp)
+    );
+    for item in outcome.items.iter().filter(|i| i.kind == ItemKind::Untranslated) {
+        err!("  UNTRANSLATED {}: {}", item.location, item.detail);
+    }
+    if outcome.manifest.is_none() {
+        err!("qontinui-ci import: no job could be translated — the output is not a valid manifest");
+        return Ok(ExitCode::from(1));
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The repo root containing `manifest` and the manifest's path relative to
+/// it (forward slashes). Outside a git repo: no root, the path as given.
+fn repo_layout(manifest: &Path) -> (Option<PathBuf>, String) {
+    let given = manifest.to_string_lossy().replace('\\', "/");
+    let Ok(canon) = manifest.canonicalize() else {
+        return (None, given);
+    };
+    let dir = canon.parent().map(Path::to_path_buf).unwrap_or_default();
+    let Ok(top) = git(&dir, &["rev-parse", "--show-toplevel"]) else {
+        return (None, given);
+    };
+    let Ok(top) = PathBuf::from(top).canonicalize() else {
+        return (None, given);
+    };
+    match canon.strip_prefix(&top) {
+        Ok(rel) => (Some(top.clone()), rel.to_string_lossy().replace('\\', "/")),
+        Err(_) => (None, given),
+    }
+}
+
+fn gen_workflow_cmd(rest: &[String]) -> Result<ExitCode, String> {
+    let args = parse_args(rest, &["--manifest", "--out", "--executor-rev"], &["--force", "--check"])?;
+    if let Some(p) = args.positionals.first() {
+        return Err(format!("unexpected argument {p:?}\n\n{USAGE}"));
+    }
+    let manifest_path = PathBuf::from(flag(&args.valued, "--manifest").unwrap_or(DEFAULT_MANIFEST));
+    let manifest = read_manifest(&manifest_path)?;
+    let (root, rel_manifest) = repo_layout(&manifest_path);
+    if !gen_workflow::plain_token(&rel_manifest) {
+        return Err(format!(
+            "the manifest path {rel_manifest:?} must be a plain repo-relative path \
+             ([A-Za-z0-9._/-]) — it is written into the generated workflow's shell line"
+        ));
+    }
+    let out_path = match flag(&args.valued, "--out") {
+        Some(p) => p.to_string(),
+        None => match &root {
+            Some(r) => r.join(gen_workflow::WORKFLOW_PATH).to_string_lossy().to_string(),
+            None => gen_workflow::WORKFLOW_PATH.to_string(),
+        },
+    };
+    let check = args.switches.iter().any(|s| s == "--check");
+    let force = args.switches.iter().any(|s| s == "--force");
+    // The committed file as bytes: a non-UTF-8 file is still a file that must
+    // not be overwritten silently.
+    let existing_bytes = std::fs::read(&out_path).ok();
+    let existing = existing_bytes
+        .as_ref()
+        .map(|b| String::from_utf8_lossy(b).to_string());
+    let executor_rev = match flag(&args.valued, "--executor-rev") {
+        Some(r) => Some(r.to_string()),
+        // --check regenerates with the pin the committed file was written with.
+        None if check => existing.as_deref().and_then(gen_workflow::recorded_executor_rev),
+        None => None,
+    };
+    if let Some(r) = &executor_rev {
+        if !gen_workflow::plain_token(r) {
+            return Err(format!("--executor-rev {r:?} must be a plain commit-ish"));
+        }
+    }
+    let text = gen_workflow::generate(
+        &manifest,
+        &gen_workflow::GenOptions {
+            manifest_path: rel_manifest,
+            executor_rev,
+        },
+    );
+    if check {
+        if force || out_path == "-" {
+            return Err("--check writes nothing; --force and --out - do not apply".to_string());
+        }
+        let verdict = gen_workflow::check(existing.as_deref(), &text);
+        return Ok(if verdict == gen_workflow::CheckVerdict::UpToDate {
+            out!("ok: {out_path} is {}", verdict.explain());
+            ExitCode::SUCCESS
+        } else {
+            err!("{out_path}: {}", verdict.explain());
+            ExitCode::from(1)
+        });
+    }
+    if out_path == "-" {
+        out!("{}", text.trim_end());
+        return Ok(ExitCode::SUCCESS);
+    }
+    let p = Path::new(&out_path);
+    if let Some(existing) = &existing {
+        if !gen_workflow::is_generated(existing) && !force {
+            return Err(format!(
+                "{out_path} exists and is not a generated file (no GENERATED header) — it is a \
+                 hand-written workflow; refusing to overwrite it without --force"
+            ));
+        }
+    }
+    if let Some(dir) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
+        std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    }
+    std::fs::write(p, &text).map_err(|e| format!("write {out_path}: {e}"))?;
+    out!(
+        "wrote {out_path}: {} gate job(s) from {}",
+        manifest.gate_jobs().count(),
+        manifest_path.display()
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 fn read_manifest(path: &Path) -> Result<CiManifest, String> {

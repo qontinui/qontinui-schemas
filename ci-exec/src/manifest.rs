@@ -982,7 +982,7 @@ fn topological_order(mut pending: Vec<CiJob>) -> Result<Vec<CiJob>, String> {
 
 /// `^[a-z0-9][a-z0-9-]{0,47}$`. Tight on purpose: the name becomes a GitHub
 /// check-run context and a CLI argument.
-fn validate_job_name(name: &str) -> Result<(), String> {
+pub(crate) fn validate_job_name(name: &str) -> Result<(), String> {
     let ok = !name.is_empty()
         && name.len() <= 48
         && name
@@ -1007,7 +1007,7 @@ fn validate_job_name(name: &str) -> Result<(), String> {
 /// with every number inside the field's range. Names (`MON`, `JAN`) and the
 /// `@daily` shorthands are refused: one spelling, checked here, is what coord
 /// evaluates.
-fn validate_cron(expr: &str) -> Result<(), String> {
+pub(crate) fn validate_cron(expr: &str) -> Result<(), String> {
     const FIELDS: [(&str, u32, u32); 5] = [
         ("minute", 0, 59),
         ("hour", 0, 23),
@@ -1061,6 +1061,43 @@ fn validate_cron(expr: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// How the step-env rules treat one key. The single classification both
+/// [`parse_and_validate`] and the workflow importer (`crate::import`) read, so
+/// the importer can never emit an env key the validator would refuse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EnvKeyClass {
+    /// In [`ENV_ALLOWLIST`]: a manifest may set it.
+    Allowed,
+    /// Exported by the executor itself; the payload names the manifest key
+    /// that controls it.
+    ExecutorOwned(&'static str),
+    /// A connection variable the executor exports from a `[[services]]` entry
+    /// of this kind (`postgres`, `redis`).
+    ServiceExported(&'static str),
+    /// Anything else: refused.
+    NotAllowed,
+}
+
+/// Classify a step env key — see [`EnvKeyClass`].
+pub(crate) fn classify_step_env_key(key: &str) -> EnvKeyClass {
+    if let Some((_, owner)) = EXECUTOR_OWNED_ENV.iter().find(|(owned, _)| *owned == key) {
+        return EnvKeyClass::ExecutorOwned(owner);
+    }
+    if let Some(kind) = crate::services::kind_exporting(key) {
+        return EnvKeyClass::ServiceExported(kind.label());
+    }
+    if ENV_ALLOWLIST.contains(&key) {
+        EnvKeyClass::Allowed
+    } else {
+        EnvKeyClass::NotAllowed
+    }
+}
+
+/// Whether an argv token is free of the banned shell metacharacters.
+pub(crate) fn argv_token_ok(token: &str) -> bool {
+    !token.contains(ARGV_BANNED_CHARS)
+}
+
 /// The per-step rules, applied to every step of every job. `scope` prefixes
 /// each label (`"job 'test' "` in v2, empty in v1), so an error names the job.
 fn validate_steps(steps: &[CiStep], scope: &str) -> Result<(), String> {
@@ -1085,40 +1122,40 @@ fn validate_steps(steps: &[CiStep], scope: &str) -> Result<(), String> {
             return Err(format!("{label}: command must be a non-empty argv array"));
         }
         for token in &step.command {
-            if token.contains(ARGV_BANNED_CHARS) {
+            if !argv_token_ok(token) {
                 return Err(format!(
                     "{label}: command token {token:?} contains a banned shell metacharacter"
                 ));
             }
         }
         for key in step.env.keys() {
-            if let Some((_, owner)) = EXECUTOR_OWNED_ENV
-                .iter()
-                .find(|(owned, _)| *owned == key.as_str())
-            {
-                return Err(format!(
-                    "{label}: env var {key:?} is exported by the executor and would be \
-                     overridden — set {owner} instead"
-                ));
-            }
-            if let Some(kind) = crate::services::kind_exporting(key.as_str()) {
-                // A connection variable a manifest could only ever get wrong:
-                // the host port is assigned at dispatch time and the password
-                // is generated per dispatch. Hardcoding one would point the
-                // dispatch at whatever database happens to be running on the
-                // contributor's machine — the exact "a step that assumed a
-                // local Postgres" failure this lane exists to avoid.
-                return Err(format!(
-                    "{label}: env var {key:?} is exported by the executor from the [[services]] \
-                     entry that provides it (service kind '{}') — declare that service instead \
-                     of hardcoding a connection",
-                    kind.label()
-                ));
-            }
-            if !ENV_ALLOWLIST.contains(&key.as_str()) {
-                return Err(format!(
-                    "{label}: env var {key:?} is not allowlisted (allowed: {ENV_ALLOWLIST:?})"
-                ));
+            match classify_step_env_key(key) {
+                EnvKeyClass::Allowed => {}
+                EnvKeyClass::ExecutorOwned(owner) => {
+                    return Err(format!(
+                        "{label}: env var {key:?} is exported by the executor and would be \
+                         overridden — set {owner} instead"
+                    ));
+                }
+                EnvKeyClass::ServiceExported(kind) => {
+                    // A connection variable a manifest could only ever get
+                    // wrong: the host port is assigned at dispatch time and the
+                    // password is generated per dispatch. Hardcoding one would
+                    // point the dispatch at whatever database happens to be
+                    // running on the contributor's machine — the exact "a step
+                    // that assumed a local Postgres" failure this lane exists
+                    // to avoid.
+                    return Err(format!(
+                        "{label}: env var {key:?} is exported by the executor from the \
+                         [[services]] entry that provides it (service kind '{kind}') — declare \
+                         that service instead of hardcoding a connection"
+                    ));
+                }
+                EnvKeyClass::NotAllowed => {
+                    return Err(format!(
+                        "{label}: env var {key:?} is not allowlisted (allowed: {ENV_ALLOWLIST:?})"
+                    ));
+                }
             }
         }
         if let Some(t) = step.timeout_secs {
@@ -1274,7 +1311,7 @@ fn validate_services(services: &[CiService]) -> Result<(), String> {
 /// what a registry actually accepts AND required to name a version. The
 /// version rule is the same one `[[tools]]` enforces, for the same reason:
 /// a floating pointer makes two dispatches of one commit incomparable.
-fn validate_image_tag(tag: &str) -> Result<(), String> {
+pub(crate) fn validate_image_tag(tag: &str) -> Result<(), String> {
     if tag.is_empty() || tag.len() > 128 {
         return Err(format!("version {tag:?} must be 1..=128 chars"));
     }
@@ -1314,7 +1351,7 @@ fn validate_image_tag(tag: &str) -> Result<(), String> {
 /// `sha256:` plus exactly 64 lowercase hex digits — the only shape a registry
 /// digest takes, and the one thing in a service declaration that cannot be
 /// re-pointed under the dispatch.
-fn validate_image_digest(digest: &str) -> Result<(), String> {
+pub(crate) fn validate_image_digest(digest: &str) -> Result<(), String> {
     let Some(hex) = digest.strip_prefix("sha256:") else {
         return Err(format!(
             "digest {digest:?} must be of the form \"sha256:<64 hex digits>\""
@@ -1336,7 +1373,7 @@ fn validate_image_digest(digest: &str) -> Result<(), String> {
 /// actually allows in an owner/repo. Stricter than the argv metacharacter
 /// rule because this value is interpolated into a clone URL and into a
 /// filesystem path.
-fn validate_sibling_repo(repo: &str) -> Result<(), String> {
+pub(crate) fn validate_sibling_repo(repo: &str) -> Result<(), String> {
     if repo.len() > 200 {
         return Err("repo slug too long".to_string());
     }
@@ -1388,7 +1425,7 @@ fn validate_branch(branch: &str) -> Result<(), String> {
 /// A tool version becomes both a URL path segment and a cache directory
 /// name, so it is restricted to what a semver-ish release tag can contain and
 /// must start with a digit (which also rejects `latest`).
-fn validate_tool_version(version: &str) -> Result<(), String> {
+pub(crate) fn validate_tool_version(version: &str) -> Result<(), String> {
     if version.is_empty() || version.len() > 64 {
         return Err(format!("version {version:?} must be 1..=64 chars"));
     }
@@ -1416,7 +1453,7 @@ fn validate_tool_version(version: &str) -> Result<(), String> {
 /// Structural check that a working_dir stays inside the worktree: relative,
 /// no parent/root/prefix components. Execution additionally canonicalizes
 /// and prefix-checks against the real worktree path.
-fn validate_working_dir(wd: &str) -> Result<(), String> {
+pub(crate) fn validate_working_dir(wd: &str) -> Result<(), String> {
     let path = std::path::Path::new(wd);
     // The `:` check rejects Windows drive-qualified paths (`C:\x`, `C:x`)
     // even when this code runs on a non-Windows host (cross-platform tests).

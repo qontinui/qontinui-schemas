@@ -1,0 +1,246 @@
+name: Rust CI
+
+# Workspace-wide build / test / lint / fmt for the Rust crates in this repo.
+#
+# Triggers:
+#   pull_request: every PR (no path filter). GitHub branch-protection
+#     'required check' rules look for check-runs created by the
+#     pull_request event; a path-filtered trigger that doesn't fire
+#     (e.g. workflow-only edits or the release-please bot's PR) leaves
+#     the required check 'missing' and the PR fails the rule with no
+#     way to satisfy it short of admin bypass. Running the full
+#     compile/test on every PR is the only mechanism that posts the
+#     required status reliably; the Swatinem rust-cache makes
+#     no-Rust-change PRs fast.
+#   push: only when Rust sources actually change — main pushes that
+#     don't touch Rust don't need to re-run.
+#   workflow_dispatch: manual escape hatch — for re-running a job whose
+#     failure was environmental. It is NOT a way to clear a red main, and
+#     reaching for it there is the trap schema-drift.yml documents at
+#     length. coord scores main from `coord.ci_baselines`, and
+#     `establishes_main_baseline()` accepts `event == Some("push")` and
+#     nothing else (qontinui-coord crates/coord/src/ci_baseline.rs); a
+#     `workflow_dispatch` run neither writes NOR prunes that row. So a green
+#     dispatch of THIS workflow leaves a green checkmark on GitHub while
+#     coord still reports main-red and still holds every PR in this repo.
+#     The remedy is `gh run rerun --failed <the failed push run>`: a re-run
+#     reuses the run id, bumps `run_attempt` and KEEPS `event: push`, so
+#     coord ingests a real baseline. This is not specific to `check-drift` —
+#     the baseline table is keyed per repo and workflow name, so it applies
+#     to every push-triggered gate here, this one included.
+#   workflow_call: lets publish-rust.yml (F2 hard gate, per
+#     qontinui-dev-notes/rust-release-engineering) reuse this job and
+#     require it green for the tagged commit before publishing.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    # This list is the WORKSPACE, not a subset of it. Cargo.toml declares
+    # members = ["rust", "rust-runner-client", "rust-vision-core",
+    # "code-graph"]; omitting two of the four meant a landed change to
+    # rust-vision-core/** or code-graph/** compiled NOTHING on main —
+    # which is what happened when f8ee21db (schemas#104) was pushed on
+    # 2026-07-28T00:08:39Z: it triggered release-please and nothing else,
+    # so main's own CI never observed the break that reddened
+    # qontinui-runner sixteen minutes later. Keep this in step with
+    # runner-consumer-check.yml's `paths:` and check-consumers' in-job
+    # predicate — all three describe the same path-dep surface.
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust/**"
+      - "rust-runner-client/**"
+      - "rust-vision-core/**"
+      - "code-graph/**"
+      # Not a workspace member, but rust/tests/fleet_nouns_vocabulary.rs is
+      # its only validator: a data-only edit must still run it on main.
+      - "fleet-nouns.toml"
+      - ".github/scripts/fleet-nouns-portability.*"
+      # Not a workspace member either: rust/tests/glossary_source.rs is the
+      # glossary source's only validator (invariants, fleet nouns, the version
+      # guard, and drift of BOTH generated tables — rust/src/glossary/generated.rs
+      # and ts/src/glossary/generated.ts), so an edit to either generated file
+      # alone must still run it on main.
+      - "glossary/**"
+      - "ts/src/glossary/**"
+      - ".github/workflows/rust-ci.yml"
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  rust-ci:
+    # MIRRORED BY .qontinui/ci.toml — CHANGE BOTH IN THE SAME PR.
+    #
+    # This job's five gate commands (lock check / cargo fmt / clippy / build /
+    # test) are
+    # reproduced as argv arrays in .qontinui/ci.toml, the manifest the
+    # runner-as-CI-node lane executes. That lane is how a dispatch validates a
+    # SHA without GitHub Actions, and candidate-ci.yml calls THIS workflow and
+    # nothing else — so the two lanes are supposed to agree on what a green head
+    # means. Editing a command below without editing the manifest silently
+    # breaks that agreement, and nothing in CI will tell you: the manifest is
+    # read by the runner at dispatch time, never by this workflow.
+    #
+    # The manifest's header explains what it deliberately cannot mirror (the
+    # check-drift / consumer-gate / commitlint / gitleaks jobs) and why, so a
+    # reviewer can tell an intended gap from an oversight.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      # FIRST cargo command, deliberately. `cargo fmt`, `clippy` and `build`
+      # each silently rewrite a stale Cargo.lock, after which `--locked` would
+      # pass vacuously. Reproduced on a copy of main with rust/ at 2.0.0:
+      # `--locked` exits 101, a plain `cargo metadata` rewrites 1.9.0 -> 2.0.0,
+      # and `--locked` then exits 0. rust-cache's restore runs
+      # `cargo metadata --no-deps`, which resolves nothing, so it rewrites
+      # nothing.
+      #
+      # `cargo fetch --locked` rather than `cargo metadata --locked`: same
+      # verdict (101 on a stale lock, 0 on a fresh one), but zero bytes of
+      # stdout. The .qontinui/ci.toml mirror runs an argv array that cannot
+      # redirect, and metadata's ~1.3 MB single-line JSON would land in the
+      # runner's log stream. Do NOT add `--no-deps`: with `--locked` it exits 0
+      # on a stale lock.
+      #
+      # This is what catches a release PR that forgot the root lock. That had
+      # happened at every rust-v* tag until release-please's cargo-workspace
+      # plugin (release-please-config.json) began regenerating the lock.
+      # Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 4.
+      - name: Cargo.lock is up to date
+        run: cargo fetch --locked
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo build
+        run: cargo build --workspace --all-targets
+
+      # The vacuity parser below is a COPY. Its source of record is
+      # qontinui-claude-config/scripts/lib/cargo-vacuity.sh, which this runner
+      # cannot reach, so the copy carries the source block's digest in its own
+      # header and this step asserts the file still matches it. That catches
+      # in-repo tampering; drift FROM the source is caught by
+      # qontinui-claude-config's lint-cargo-verification-form.py wherever both
+      # repos are checked out together. Neither half alone is a cross-repo gate,
+      # and saying so is the point — plan
+      # 2026-09-06-cross-repo-transcription-drift-has-no-ci-gate owns the general
+      # mechanism. Plan 2026-09-06-rust-verification-green-but-vacuous, Phase 4.
+      - name: The vacuity parser copy matches its declared digest
+        run: |
+          F=.github/scripts/cargo-vacuity-count.awk
+          WANT=$(sed -n 's/^# source-sha256:[[:space:]]*//p' "$F" | head -1)
+          [ -n "$WANT" ] || { echo "::error::$F carries no source-sha256 header"; exit 1; }
+          GOT=$(awk '/^# >>> CARGO_VACUITY_AWK /{f=1;next} /^# <<< CARGO_VACUITY_AWK /{f=0} f' "$F" | sha256sum | cut -d" " -f1)
+          echo "vacuity parser: declared ${WANT}, computed ${GOT}"
+          [ "$WANT" = "$GOT" ] || { echo "::error::$F has been edited in place. Re-copy the block from qontinui-claude-config/scripts/lib/cargo-vacuity.sh and restamp the digest."; exit 1; }
+
+      - name: cargo test
+        run: |
+          # Correct target selection (--workspace), no floor until now: a lost
+          # --workspace, or a member dropping out of the workspace, collapses
+          # this to a fraction and still exits 0. Measured 2026-09-06: 887 tests
+          # across 15 crate targets (re-measured below for the target floor).
+          set +e
+          cargo test --workspace 2>&1 | tee /tmp/cargo-test.out
+          SUBRC=${PIPESTATUS[0]}
+          set -e
+
+          # ── TEST-COUNT FLOOR ────────────────────────────────────────────
+          # Plan 2026-09-06-rust-verification-green-but-vacuous, Phase 4.
+          # A target-selection change can collapse this suite to a handful of
+          # tests while the step still exits 0 and prints a plausible summary.
+          # The floor is the only thing that sees that, and it is committed so
+          # that LOWERING it shows up in a diff.
+          #
+          # The parser is `awk -f`, from a file this repo commits, because the
+          # source of record lives in qontinui-claude-config and this runner
+          # never checks it out. `awk` always exits 0 and always prints a
+          # number; a `grep` here would exit non-zero on no match and, under
+          # this shell's `pipefail`, abort the step in exactly the zero-tests
+          # case the guard exists for.
+          VACUITY=$(awk -f .github/scripts/cargo-vacuity-count.awk /tmp/cargo-test.out)
+          RAN=${VACUITY%% *}
+          SUMMARIES=${VACUITY##* }
+          MIN_TESTS=500
+
+          # ── CRATE-TARGET FLOOR ──────────────────────────────────────────
+          # SUMMARIES is the number of crate targets that printed a summary,
+          # and the test floor above cannot see it shrink: a fail-fast abort
+          # after the biggest targets, or a selection that keeps them and drops
+          # the rest, still clears 500 tests. Measured on run 36449139416
+          # (main 02fdbb97, 2026-09-29): 940 tests across 18 targets (15 on
+          # 2026-09-06); the floor is half, the same ratio as the test floor.
+          # Plan
+          # 2026-09-20-rust-verification-residuals-cached-green-straddles-the-edit-target-count-unfloored-and-source-pins-scan-themselves,
+          # Phase 3.
+          MIN_TARGETS=9
+
+          # ── A RED RUN IS STILL A READING ────────────────────────────────
+          # Both floors are evaluated whatever cargo exited, and both facts are
+          # printed, so a red run's log says how much of the suite it reached
+          # rather than stopping at cargo's first error. A failing floor exits
+          # with cargo's own status when that was already non-zero, so the
+          # step's exit code is never laundered into a different one; and no
+          # line here calls a red run's reading a pass.
+          FAIL_RC=${SUBRC}
+          [ "${FAIL_RC}" -ne 0 ] || FAIL_RC=1
+          echo "schemas cargo test --workspace: cargo exited ${SUBRC}; ${RAN} tests ran across ${SUMMARIES} summary line(s)" \
+               "(floors: ${MIN_TESTS} tests, ${MIN_TARGETS} crate targets)"
+          if [ "${SUMMARIES}" -eq 0 ]; then
+            echo "::error::No test summary of either format was found in this run's output." \
+                 "The command exited ${SUBRC} but produced no evidence that any test executed." \
+                 "That is UNKNOWN, not a pass."
+            exit "${FAIL_RC}"
+          fi
+          if [ "${SUBRC}" -eq 0 ]; then
+            WHY="cargo exited 0, so this is a collapse, not a crash"
+          else
+            WHY="cargo exited ${SUBRC}, so the run is RED and stopped early; cargo's own error above is the cause, and this line records how much of the suite that run reached"
+          fi
+          FLOOR_MISSED=0
+          if [ "${RAN}" -lt "${MIN_TESTS}" ]; then
+            echo "::error::Only ${RAN} tests ran (floor ${MIN_TESTS}). ${WHY}." \
+                 "On a green exit it is almost certainly a target-selection change rather than" \
+                 "deleted tests. Do NOT lower the floor to make this pass."
+            FLOOR_MISSED=1
+          fi
+          if [ "${SUMMARIES}" -lt "${MIN_TARGETS}" ]; then
+            echo "::error::Only ${SUMMARIES} of the suite's crate targets reported a summary" \
+                 "(floor ${MIN_TARGETS}). ${WHY}. Fewer targets than the floor is a fail-fast" \
+                 "abort or a target-selection collapse. Do NOT lower the floor."
+            FLOOR_MISSED=1
+          fi
+          if [ "${FLOOR_MISSED}" -ne 0 ]; then
+            exit "${FAIL_RC}"
+          fi
+          if [ "${SUBRC}" -ne 0 ]; then
+            echo "::error::cargo test exited ${SUBRC}: this run is RED. It reached ${RAN} tests" \
+                 "across ${SUMMARIES} crate targets, at or above both floors — which says how much" \
+                 "of the suite ran, never that it passed. cargo's own error above is the cause."
+          fi
+          exit "${SUBRC}"
+
+      - name: fleet-nouns.toml patterns agree across Rust, Python and JS
+        # fleet-nouns.toml promises one meaning per pattern under Rust `regex`,
+        # Python `re` and JS `new RegExp(p)`, because its consumer lints are
+        # written in all three. The Rust test can only run Rust's engine, so it
+        # writes its hit matrix and this step re-evaluates every text in the file
+        # (examples, literals, look-alikes, product constants, non-ASCII probes)
+        # under python3 and node — both preinstalled on ubuntu-latest — and fails
+        # on any disagreement.
+        run: |
+          FLEET_NOUNS_MATRIX_OUT=/tmp/fleet-nouns-rust.json \
+            cargo test -p qontinui-types --test fleet_nouns_vocabulary \
+            hit_matrix_for_the_cross_engine_check
+          python3 .github/scripts/fleet-nouns-portability.py /tmp/fleet-nouns-rust.json

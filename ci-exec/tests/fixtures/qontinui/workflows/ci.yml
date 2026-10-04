@@ -1,0 +1,316 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # qontinui's pyproject.toml has a path-dep on ../qontinui-schemas
+      # (see pyproject.toml: `qontinui-schemas = { path = "../qontinui-schemas", develop = true }`).
+      # actions/checkout@v5 refuses `path:` outside the workspace, so clone
+      # it via git directly. Pattern mirrors qontinui-web/backend-ci.yml.
+      - name: Checkout sibling repo (qontinui-schemas)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+
+      - name: Checkout sibling repo (multistate)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/multistate.git
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-ansi
+
+      - name: Run linting
+        run: |
+          poetry run ruff check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # qontinui's pyproject.toml has a path-dep on ../qontinui-schemas
+      # (see pyproject.toml: `qontinui-schemas = { path = "../qontinui-schemas", develop = true }`).
+      # actions/checkout@v5 refuses `path:` outside the workspace, so clone
+      # it via git directly. Pattern mirrors qontinui-web/backend-ci.yml.
+      - name: Checkout sibling repo (qontinui-schemas)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+
+      - name: Checkout sibling repo (multistate)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/multistate.git
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-ansi
+
+      - name: Run type checking
+        run: |
+          poetry run mypy src/qontinui --ignore-missing-imports
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # qontinui's pyproject.toml has a path-dep on ../qontinui-schemas
+      # (see pyproject.toml: `qontinui-schemas = { path = "../qontinui-schemas", develop = true }`).
+      # actions/checkout@v5 refuses `path:` outside the workspace, so clone
+      # it via git directly. Pattern mirrors qontinui-web/backend-ci.yml.
+      - name: Checkout sibling repo (qontinui-schemas)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+
+      - name: Checkout sibling repo (multistate)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/multistate.git
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev
+          sudo apt-get install -y xvfb x11-utils
+          sudo apt-get install -y libgl1
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        run: |
+          # No extras: the [ml] deps (torch et al.) are optional, so this is
+          # the torch-free core lane. Torch-dependent tests self-skip via
+          # pytest.importorskip / skip fixtures.
+          poetry install --no-interaction --no-ansi
+
+      - name: Install Playwright browsers
+        run: |
+          poetry run playwright install --with-deps chromium
+
+      - name: Run tests with coverage
+        run: |
+          # Use xvfb-run to provide DISPLAY *and* a per-run ~/.Xauthority.
+          # pynput's X backend requires Xauthority to exist; a bare
+          # `Xvfb :99 &` + `export DISPLAY=:99` was insufficient and
+          # caused every test to ERROR at collection with
+          #   ImportError: this platform is not supported:
+          #     ~/.Xauthority: [Errno 2] No such file or directory
+          # (the cascade through qontinui.__init__ → healing → hal →
+          # keyboard_operations → from pynput import keyboard).
+          xvfb-run -a poetry run pytest --cov=src/qontinui --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  tests-ml:
+    # Full suite with the [ml] extra installed — the pre-split CI shape.
+    # The core `tests` job proves the torch-free default install; this job
+    # proves `-E ml` resolves and runs the torch-dependent tests.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same sibling-repo path-dep as the tests job (see tests job comment).
+      - name: Checkout sibling repo (qontinui-schemas)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+
+      - name: Checkout sibling repo (multistate)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/multistate.git
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev
+          sudo apt-get install -y xvfb x11-utils
+          sudo apt-get install -y libgl1
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-ml-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-ml-
+
+      - name: Install dependencies (with ml extra)
+        run: |
+          # Pulls torch/torchvision from the cu128 index (multi-GB CUDA wheels
+          # on a CPU-only runner) because poetry locks a single source per dep;
+          # a CPU-wheel CI lane would need a second lock. Cost is unchanged
+          # from the pre-split CI, and the poetry cache absorbs repeat runs.
+          poetry install --no-interaction --no-ansi --extras ml
+
+      - name: Install Playwright browsers
+        run: |
+          poetry run playwright install --with-deps chromium
+
+      - name: Run tests
+        run: |
+          # xvfb-run rationale: see the tests job.
+          xvfb-run -a poetry run pytest
+
+  build:
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same sibling-repo path-dep as the test job (see test job comment).
+      - name: Checkout sibling repo (qontinui-schemas)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/qontinui-schemas.git
+
+      - name: Checkout sibling repo (multistate)
+        run: |
+          cd "$GITHUB_WORKSPACE/.."
+          git clone --depth 1 https://github.com/qontinui/multistate.git
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build package
+        run: |
+          poetry build
+
+      - name: Check package
+        run: |
+          pip install twine
+          twine check dist/*
+
+      - name: Store build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

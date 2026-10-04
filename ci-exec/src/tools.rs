@@ -502,6 +502,25 @@ pub(crate) fn known_tool_names() -> Vec<&'static str> {
     KNOWN_TOOLS.iter().map(|t| t.name).collect()
 }
 
+/// The node versions the registry can provision — those with reviewed
+/// digests — ascending, each once. The workflow importer resolves an
+/// `actions/setup-node` `node-version` against this list rather than guessing
+/// a version no host could install.
+pub(crate) fn node_pinned_versions() -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for (version, _, _) in NODE_DIGESTS {
+        if !out.contains(version) {
+            out.push(version);
+        }
+    }
+    out.sort_by_key(|v| {
+        v.split('.')
+            .map(|n| n.parse::<u64>().unwrap_or(0))
+            .collect::<Vec<_>>()
+    });
+    out
+}
+
 /// The target triple this runner is executing on, in the spelling release
 /// assets use. Derived from the compile-time target rather than probed,
 /// because it describes the binary that will actually run.

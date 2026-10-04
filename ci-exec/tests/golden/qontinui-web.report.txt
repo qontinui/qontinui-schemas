@@ -1,0 +1,1112 @@
+qontinui-ci import --report
+  manifest:       .qontinui/ci.toml (schema v1, 1 job(s): ci)
+  workflows:      27 file(s)
+  default branch: main
+  rule: A workflow job is considered when its workflow runs on `pull_request` /
+        `pull_request_target` into the default branch, or on a `push` to the default branch. Its
+        GATE COMMANDS are every command its steps run — read from `run:` scripts tolerantly, through
+        any shell control flow and inside `$(…)` — except package/tool installs and setup (npm ci,
+        pip/poetry install, git clone, curl, apt-get, …), shell glue (echo, cd, test, grep, sed, …),
+        steps whose condition is only `failure()` and/or `cancelled()`, steps with a literal
+        `continue-on-error: true`, and known setup/cache/artifact actions. Any other `uses:` action,
+        and any non-bash script, is one opaque gate command no manifest step can match. A gate
+        command is MATCHED when a step of a manifest GATE job (scheduled jobs never run for a pull
+        request) whose `os` includes every OS the workflow job runs on runs the same command in the
+        same working directory. SAME COMMAND means the whole argv is equal after normalization:
+        wrappers are stripped (poetry/uv/pipenv/pdm/hatch run, npx, pnpm/npm/yarn exec, python -m,
+        env, sudo, timeout N, bash/sh <script>), package-script runners are unified (npm run X = npm
+        X = pnpm X = yarn X), python3 = python, pip3 = pip, and a leading ./ or trailing / is
+        dropped from each word. Every other word — every flag and argument — must be equal, so
+        `cargo fmt --all` does not cover `cargo fmt --all -- --check`. Verdict: COVERED (every gate
+        command matched), PARTIAL (some), UNCOVERED (none), or COVERED-BY-NAME (the job has no gate
+        command at all and a manifest gate job carries its imported name). A job name alone never
+        covers a job that runs commands.
+
+JOBS ON pull_request / push:main (39):
+  UNCOVERED       alembic-graph-check.yml › alembic-heads [push:main (paths-filtered)] 0/3 gate command(s) matched
+      missing: backend: python ../scripts/ci/count_alembic_heads.py --report-only --baseline-ref HEAD
+      missing: uses: actions/github-script
+      missing: python scripts/ci/notify_forked_open_prs.py
+  UNCOVERED       alembic-graph-pr.yml › alembic-heads-pr [pull_request] 0/1 gate command(s) matched
+      missing: python scripts/ci/count_alembic_heads.py --baseline-ref origin/main
+  PARTIAL         backend-ci.yml › lint [pull_request (paths-filtered)] 3/4 gate command(s) matched
+      missing: backend: python3 -
+      matched: backend: poetry run ruff check .  ←  ci/backend-ruff-check
+      matched: backend: poetry run ruff format --check .  ←  ci/backend-ruff-format
+      matched: backend: poetry run mypy app/ --ignore-missing-imports  ←  ci/backend-mypy
+  PARTIAL         backend-ci.yml › test [pull_request (paths-filtered)] 3/11 gate command(s) matched
+      missing: uses: ./.github/actions/fleet-nouns-vocab
+      missing: backend: python3 -
+      missing: backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
+      missing: backend: poetry run pytest tests/ --collect-only -q -o addopts= --no-cov
+      missing: backend: find tests -name test_*.py -type f
+      missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --count-only --min-files
+      missing: backend: python ../scripts/ci/split_pytest_shards.py --nodeids collected-nodeids.txt --shards 6 --shard $EXPR
+      missing: backend: poetry run pytest ${SHARD_FILES[@]} -v --cov=app --cov-context=test --cov-report=xml --cov-report=ht
+      matched: backend: poetry run python scripts/export_openapi.py  ←  ci/openapi-export-extended
+      matched: backend: poetry run python scripts/export_openapi.py --base  ←  ci/openapi-export-base
+      matched: git diff --exit-code frontend/src/lib/api-client/openapi-schema.json frontend/src/lib/api-client/ope  ←  ci/openapi-snapshot-drift
+      note:    matrix job — considered once
+  UNCOVERED       backend-ci.yml › security-scan [pull_request (paths-filtered)] 0/3 gate command(s) matched
+      missing: uses: aquasecurity/trivy-action
+      missing: backend: python3 -
+      missing: backend: poetry run safety check --json
+  UNCOVERED       backend-ci.yml › shard-durations-proposal [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: find junit -name *.xml -type f
+      missing: python scripts/ci/refresh_shard_durations.py junit --root backend --out shard-durations-proposed.jso
+      note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
+  UNCOVERED       backend-ci.yml › test-gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  UNCOVERED       backend-ci.yml › build-test [pull_request (paths-filtered)] 0/2 gate command(s) matched
+      missing: backend: docker build --build-arg CLOUD_CONTROL_SHA=${CLOUD_CONTROL_SHA} -t qontinui-backend:test .
+      missing: backend: docker run --rm qontinui-backend:test python -c import app; print('Import successful')
+  UNCOVERED       backend-ci.yml › shard-headroom [pull_request (paths-filtered)] 0/1 gate command(s) matched
+      missing: python3 scripts/ci/shard_headroom.py --expected-shards $EXPECTED_SHARDS
+      note:    job condition `if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')` — considered as running
+  UNCOVERED       backend-coverage-producer.yml › produce [push:main (paths-filtered)] 0/6 gate command(s) matched
+      missing: uses: ./.github/actions/fleet-nouns-vocab
+      missing: backend: python3 -
+      missing: backend: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
+      missing: backend: poetry run pytest tests/ -v --cov=app --cov-context=test --cov-report=xml --cov-report=html --cov-re
+      missing: backend: python scripts/export_test_coverage.py --self-test
+      missing: backend: python scripts/export_test_coverage.py --coverage-db .coverage --junit-xml junit-results.xml
+  UNCOVERED       coord-column-drop-guard.yml › coord-column-drop-guard [pull_request, push:main] 0/1 gate command(s) matched
+      missing: python scripts/ci/check_coord_column_drops.py --base-ref ${BASE_REF}
+  UNCOVERED       dev-credentials-drift.yml › drift-check [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: python scripts/check_dev_credentials_drift.py
+  UNCOVERED       e2e-tests.yml › backend-tests [pull_request, push:main] 0/1 gate command(s) matched
+      missing: backend: pytest tests/test_integration_e2e.py -v --cov=app --cov-report=xml --cov-report=html --cov-report=te
+      note:    matrix job — considered once
+  UNCOVERED       e2e-tests.yml › frontend-tests [pull_request, push:main] 0/1 gate command(s) matched
+      missing: uses: ./.github/workflows/e2e-playwright-stack.yml
+      note:    job condition `if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/heads/merge-candidate')` — considered as running
+      note:    matrix job — considered once
+  UNCOVERED       e2e-tests.yml › changed-specs [pull_request, push:main] 0/1 gate command(s) matched
+      missing: python scripts/ci/list_changed_e2e_specs.py --base $E2E_BASE_SHA --head HEAD --github-output $GITHUB
+      note:    job condition `if: github.event_name == 'pull_request'` — considered as running
+  UNCOVERED       e2e-tests.yml › frontend-e2e-changed-specs [pull_request, push:main] 0/1 gate command(s) matched
+      missing: uses: ./.github/workflows/e2e-playwright-stack.yml
+      note:    job condition `if: needs.changed-specs.outputs.any == 'true'` — considered as running
+      note:    matrix job — considered once
+  UNCOVERED       e2e-tests.yml › test-summary [pull_request, push:main] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  COVERED         forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_fixed_sleeps_in_e2e.py  ←  ci/forbid-fixed-sleeps-in-e2e
+  COVERED         forbid-public-schema.yml › forbid-public-schema [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_forbidden_public_schema.py  ←  ci/forbid-public-schema
+  PARTIAL         frontend-ci.yml › lint-and-typecheck [pull_request (paths-filtered), push:main (paths-filtered)] 3/4 gate command(s) matched
+      missing: uses: ./.github/actions/fleet-nouns-vocab
+      matched: frontend: npm run lint  ←  ci/frontend-lint
+      matched: frontend: npm run type-check  ←  ci/frontend-typecheck
+      matched: frontend: npm test  ←  ci/frontend-test
+  PARTIAL         frontend-ci.yml › vercel-install-script [pull_request (paths-filtered), push:main (paths-filtered)] 1/3 gate command(s) matched
+      missing: bash frontend/scripts/vercel-install.sh --config-source ci
+      missing: node -e 
+  const fs = require("node:fs");
+  const pin = process.argv[1];
+  const m = JSON.parse(fs.r
+      matched: frontend: npm run type-check  ←  ci/frontend-typecheck
+  PARTIAL         frontend-ci.yml › composed-cloud-build [pull_request (paths-filtered), push:main (paths-filtered)] 5/6 gate command(s) matched
+      missing: uses: ./.github/actions/fleet-nouns-vocab
+      matched: frontend: npm run cloud:install  ←  ci/composed-cloud-install
+      matched: frontend: npm run lint  ←  ci/frontend-lint
+      matched: frontend: npm run type-check  ←  ci/frontend-typecheck
+      matched: frontend: npm test  ←  ci/frontend-test
+      matched: frontend: npm run build  ←  ci/composed-build
+  UNCOVERED       frontend-coverage-producer.yml › produce [push:main (paths-filtered)] 0/2 gate command(s) matched
+      missing: uses: ./.github/actions/fleet-nouns-vocab
+      missing: frontend: node scripts/export-test-coverage.mjs
+  COVERED         gitignore-tracked-files.yml › gitignore-tracked-files [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_tracked_ignored.py  ←  ci/gitignore-tracked-files
+  COVERED         global-state-assertions.yml › global-state-assertions [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_global_state_assertions.py  ←  ci/global-state-assertions
+  UNCOVERED       memory-recall-eval.yml › recall-eval [pull_request (paths-filtered)] 0/4 gate command(s) matched
+      missing: backend: python3 -
+      missing: backend: poetry run pytest tests/test_memory_recall_scorer.py -q --no-cov
+      missing: backend: poetry run pytest tests/test_memory_recall_eval_db.py -q --no-cov
+      missing: uses: actions/github-script
+  UNCOVERED       migration-reversal.yml › detect [pull_request (paths-filtered)] 0/1 gate command(s) matched
+      missing: git diff --name-only $base...HEAD
+  UNCOVERED       migration-reversal.yml › reverse [pull_request (paths-filtered)] 0/6 gate command(s) matched
+      missing: psql -h localhost -U qontinui_user -d qontinui_test -c CREATE SCHEMA IF NOT EXISTS project; -c CREAT
+      missing: backend: poetry run alembic --version
+      missing: backend: poetry run alembic heads
+      missing: backend: poetry run python -c from alembic.config import Config; from alembic.script import ScriptDirectory; 
+      missing: backend: poetry run alembic upgrade head
+      missing: backend: poetry run alembic downgrade -1
+      note:    job condition `if: needs.detect.outputs.relevant == 'true'` — considered as running
+  UNCOVERED       migration-reversal.yml › gate [pull_request (paths-filtered)] 0/0 gate command(s) matched
+      note:    job condition `if: always()` — considered as running
+      note:    no gate command found (only setup, glue or diagnostics)
+  COVERED         path-case-collisions.yml › path-case-collisions [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_path_case_collisions.py  ←  ci/path-case-collisions
+  UNCOVERED       powershell-parse.yml › powershell-parse [pull_request] 0/1 gate command(s) matched
+      missing: run (pwsh script): Parse every .ps1 and .psm1 with the real PowerShell parser
+  UNCOVERED       pre-commit-hook-tests.yml › pre-commit-hook-tests [pull_request (paths-filtered), push:main (paths-filtered)] 0/1 gate command(s) matched
+      missing: python -m pytest .pre-commit-hooks -rA
+  COVERED         ruff-version-parity.yml › ruff-version-parity [pull_request, push:main] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_ruff_version_parity.py  ←  ci/ruff-version-parity
+  UNCOVERED       secret-scan.yml › gitleaks [pull_request] 0/2 gate command(s) matched
+      missing: ./gitleaks version
+      missing: ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --log-opts=$EXPR{{ github.
+  PARTIAL         spec-ci.yml › spec-ci [pull_request, push:main] 1/15 gate command(s) matched
+      missing: psql -h localhost -U test_user -d test_db -c CREATE SCHEMA IF NOT EXISTS runner;
+      missing: backend: alembic upgrade heads
+      missing: backend: python scripts/spec_ci_local_idp.py --issuer $COGNITO_ISSUER --audience spec-ci-local --email spec-c
+      missing: backend: python -m http.server 8770 --bind 127.0.0.1
+      missing: backend: python -m uvicorn app.main:app --host 127.0.0.1 --port
+      missing: psql -h localhost -U test_user -d test_db -c UPDATE auth.users SET is_superuser = true WHERE email =
+      missing: frontend: node -p require('./package-lock.json').packages['node_modules/@playwright/test'].version
+      missing: find $cache_dir -maxdepth 1 -name *.deb
+      missing: frontend: npx playwright install-deps chromium
+      missing: find $cache_dir -maxdepth 1 -name *.deb -printf %f\n
+      missing: find $cache_dir -maxdepth 1 -name *.deb -printf %T@ %f\n
+      missing: frontend: npx playwright install chromium
+      missing: frontend: npx next start -p 3001 -H 0.0.0.0
+      missing: frontend: npx tsx tests/spec-ci/run-spec-ci.ts --base-url http://localhost:3001 --api-base http://localhost:80
+      matched: frontend: npm run build  ←  ci/composed-build
+  UNCOVERED       sql-through-alembic.yml › sql-through-alembic [pull_request (paths-filtered)] 0/1 gate command(s) matched
+      missing: python .github/scripts/sql_through_alembic_lint.py --base-ref origin/main --head-ref HEAD
+  UNCOVERED       style-gate.yml › style-gate [pull_request (paths-filtered)] 0/10 gate command(s) matched
+      missing: qontinui-schemas: cargo build --release --manifest-path rust-vision-core/Cargo.toml --bin vision-audit
+      missing: frontend: node -p require('./package-lock.json').packages['node_modules/@playwright/test'].version
+      missing: find $cache_dir -maxdepth 1 -name *.deb
+      missing: frontend: npx playwright install-deps chromium
+      missing: find $cache_dir -maxdepth 1 -name *.deb -printf %f\n
+      missing: find $cache_dir -maxdepth 1 -name *.deb -printf %T@ %f\n
+      missing: frontend: npx playwright install chromium
+      missing: fold_result
+      missing: fold_result analyze $an_rc $an_err
+      missing: fold_result assert $as_rc $as_err
+  COVERED         web-boundary-lint.yml › web-boundary-lint [pull_request (paths-filtered), push:main (paths-filtered)] 1/1 gate command(s) matched
+      matched: python scripts/ci/check_web_boundary.py  ←  ci/web-boundary-lint
+  UNCOVERED       workflow-lint.yml › workflow-lint [pull_request] 0/0 gate command(s) matched
+      note:    no gate command found (only setup, glue or diagnostics)
+
+NOT CONSIDERED — not on pull_request or a push to main (2 workflow(s)):
+  cross-browser-survey.yml (jobs: cross-browser-survey) — triggers ["schedule", "workflow_dispatch"]
+  e2e-playwright-stack.yml (jobs: playwright) — triggers ["workflow_call"]
+
+WHAT `qontinui-ci import` WOULD NOT CARRY OVER FROM THESE WORKFLOWS:
+UNTRANSLATED (185) — not represented in the manifest — each must be handled by hand:
+  - e2e-playwright-stack.yml: trigger `workflow_call` is not carried — a manifest job runs for pull
+      requests, merge candidates and pushes, or on its schedule
+  - alembic-graph-check.yml › alembic-heads › step "Count heads": run script not imported — uses a
+      pipe (`|`)
+  - alembic-graph-check.yml › alembic-heads › step "Comment on merging PR if forked": runs only `if:
+      steps.heads.outputs.count > 1 && github.event.head_commit.message != ''` — the manifest has no
+      step conditions; not imported
+  - alembic-graph-check.yml › alembic-heads › step "Notify open PRs this land forked": env
+      GITHUB_TOKEN = "${{ secrets.GITHUB_TOKEN }}" is an expression — a manifest env value is a
+      literal; not imported [secrets referenced: GITHUB_TOKEN]
+  - alembic-graph-pr.yml › alembic-heads-pr › step "Fetch the baseline for the remediation message": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - backend-ci.yml › env: env PYTHON_VERSION is outside the manifest's env allowlist; not imported
+  - backend-ci.yml › lint › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": run
+      script not imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - backend-ci.yml › lint › step "Install Poetry": run script not imported — uses a pipe (`|`) (it
+      installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - backend-ci.yml › test: matrix shard = ["1", "2", "3", "4", "5", "6"] not expanded — the job is
+      imported once; steps that read matrix.* are untranslated
+  - backend-ci.yml › test › step "Record job start time": run script not imported — its
+      `echo`/`printf` line runs a command substitution, which is more than output
+  - backend-ci.yml › test › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-ci.yml › test › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": run
+      script not imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - backend-ci.yml › test › step "Fleet-noun vocabulary (pinned)": local action
+      ./.github/actions/fleet-nouns-vocab — its steps are not expanded; translate what it does by
+      hand
+  - backend-ci.yml › test › step "Install Poetry": run script not imported — uses a pipe (`|`) (it
+      installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - backend-ci.yml › test › step "Upload CI-generated OpenAPI snapshot on drift": runs only `if:
+      failure()` — the manifest has no step conditions; not imported
+  - backend-ci.yml › test › step "Install postgresql-client": run script not imported — combines
+      `||` with another shell operator
+  - backend-ci.yml › test › step "Collect the test suite": run script not imported — its `if ! …`
+      condition is more than one command (`if ! a && b` means `(! a) && b` to bash)
+  - backend-ci.yml › test › step "Select this shard's test files": run script not imported — uses
+      the expression ${{ matrix.shard }} — a manifest command is a literal, evaluated by no one
+  - backend-ci.yml › test › step "Run tests with coverage": run script not imported — uses the
+      expression ${{ matrix.shard }} — a manifest command is a literal, evaluated by no one
+  - backend-ci.yml › test › step "Warn if the job is approaching its budget": runs only `if:
+      success()` — the manifest has no step conditions; not imported
+  - backend-ci.yml › test › step "Upload coverage to Codecov": uses
+      codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-ci.yml › test › step "Upload coverage artifacts": runs only `if: always()` — the
+      manifest has no step conditions; not imported
+  - backend-ci.yml › test › step "Upload junit results": runs only `if: always()` — the manifest has
+      no step conditions; not imported
+  - backend-ci.yml › test › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - backend-ci.yml › security-scan › step "Run Trivy vulnerability scanner": uses
+      aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-ci.yml › security-scan › step "Upload Trivy results to GitHub Security": runs only `if:
+      always()` — the manifest has no step conditions; not imported
+  - backend-ci.yml › security-scan › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-ci.yml › security-scan › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": run
+      script not imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - backend-ci.yml › security-scan › step "Install Poetry": run script not imported — uses a pipe
+      (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version instead)
+  - backend-ci.yml › security-scan › step "Run safety check (dependency vulnerabilities)": run
+      script not imported — deliberately ignores a failure (`|| true`) — a manifest step has no
+      non-gating form
+  - backend-ci.yml › shard-durations-proposal: job condition `if: always() && (github.event_name ==
+      'schedule' || github.event_name == 'workflow_dispatch')` is not carried — the imported job
+      runs unconditionally
+  - backend-ci.yml › shard-durations-proposal: env EXPECTED_SHARDS is outside the manifest's env
+      allowlist; not imported
+  - backend-ci.yml › shard-durations-proposal › step "Download the shards' junit results": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - backend-ci.yml › shard-durations-proposal › step "Build shard-durations-proposed.json": run
+      script not imported — sets a shell variable (`KEY=value` with no command)
+  - backend-ci.yml › shard-durations-proposal › step "Upload shard-durations-proposed.json": runs
+      only `if: steps.build.outputs.proposed == 'true'` — the manifest has no step conditions; not
+      imported
+  - backend-ci.yml › shard-durations-proposal: no step could be translated — the job is not imported
+  - backend-ci.yml › test-gate: job condition `if: always()` is not carried — the imported job runs
+      unconditionally
+  - backend-ci.yml › test-gate › step "Assert every shard succeeded": run script not imported — uses
+      the shell construct `case`
+  - backend-ci.yml › test-gate: no step could be translated — the job is not imported
+  - backend-ci.yml › build-test › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-ci.yml › build-test › step "Resolve qontinui-cloud-control pin": run script not imported
+      — sets a shell variable (`KEY=value` with no command)
+  - backend-ci.yml › build-test › step "Build Docker image": run script not imported — expands
+      $CLOUD_CONTROL_SHA at run time — a manifest argument is a literal
+  - backend-ci.yml › shard-headroom: job condition `if: always() && (github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch')` is not carried — the imported job runs
+      unconditionally
+  - backend-ci.yml › shard-headroom: env JOB_TIMEOUT_MINUTES is outside the manifest's env
+      allowlist; not imported
+  - backend-ci.yml › shard-headroom: env EXPECTED_SHARDS is outside the manifest's env allowlist;
+      not imported
+  - backend-ci.yml › shard-headroom › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      inputs not carried: sparse-checkout: scripts/ci, sparse-checkout-cone-mode: true
+  - backend-ci.yml › shard-headroom › step "Measure Run Tests shard headroom": run script not
+      imported — uses an output redirect
+  - backend-ci.yml › shard-headroom: no step could be translated — the job is not imported
+  - backend-coverage-producer.yml › env: env PYTHON_VERSION is outside the manifest's env allowlist;
+      not imported
+  - backend-coverage-producer.yml › produce › step "Record job start time": run script not imported
+      — its `echo`/`printf` line runs a command substitution, which is more than output
+  - backend-coverage-producer.yml › produce › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - backend-coverage-producer.yml › produce › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": run
+      script not imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - backend-coverage-producer.yml › produce › step "Fleet-noun vocabulary (pinned)": local action
+      ./.github/actions/fleet-nouns-vocab — its steps are not expanded; translate what it does by
+      hand
+  - backend-coverage-producer.yml › produce › step "Install Poetry": run script not imported — uses
+      a pipe (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version
+      instead)
+  - backend-coverage-producer.yml › produce › step "Install postgresql-client": run script not
+      imported — combines `||` with another shell operator
+  - backend-coverage-producer.yml › produce › step "Warn if the job is approaching its budget": runs
+      only `if: success()` — the manifest has no step conditions; not imported
+  - backend-coverage-producer.yml › produce › step "Export per-test coverage to coord (best-effort)": runs
+      only `if: ${{ !cancelled() }}` — the manifest has no step conditions; not imported
+  - backend-coverage-producer.yml › produce › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - coord-column-drop-guard.yml › coord-column-drop-guard › step "Choose the base to diff against": run
+      script not imported — uses the shell construct `case`
+  - coord-column-drop-guard.yml › coord-column-drop-guard › step "Check coord.* drops against coord's read contract": run
+      script not imported — expands $BASE_REF at run time — a manifest argument is a literal
+  - coord-column-drop-guard.yml › coord-column-drop-guard: no step could be translated — the job is
+      not imported
+  - cross-browser-survey.yml › cross-browser-survey: continue-on-error job (advisory) — a manifest
+      job always gates; not imported
+  - e2e-playwright-stack.yml › playwright: not imported: the workflow is triggered only by
+      ["workflow_call"] — not a pull-request/push gate or a schedule, so it is not CI to import
+  - e2e-tests.yml › backend-tests: matrix python-version = ["3.12"] not expanded — the job is
+      imported once; steps that read matrix.* are untranslated
+  - e2e-tests.yml › backend-tests › step "Clone backend Python sibling deps": run script not
+      imported — uses the shell construct `for`
+  - e2e-tests.yml › backend-tests › step "Install dependencies": run script not imported — uses an
+      `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - e2e-tests.yml › backend-tests › step "Upload backend coverage to Codecov": uses
+      codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - e2e-tests.yml › backend-tests › step "Upload backend coverage HTML": uses
+      actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - e2e-tests.yml › backend-tests › step "Upload backend test results": runs only `if: always()` —
+      the manifest has no step conditions; not imported
+  - e2e-tests.yml › backend-tests › step "Explain a cancelled job (no apt step here)": runs only
+      `if: cancelled()` — the manifest has no step conditions; not imported
+  - e2e-tests.yml › frontend-tests: calls the reusable workflow
+      ./.github/workflows/e2e-playwright-stack.yml — import that workflow's own file instead; not
+      imported
+  - e2e-tests.yml › changed-specs: job condition `if: github.event_name == 'pull_request'` is not
+      carried — the imported job runs unconditionally
+  - e2e-tests.yml › changed-specs: job key `outputs` is not carried
+  - e2e-tests.yml › changed-specs › step "Fetch the PR base commit": run script not imported — uses
+      an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - e2e-tests.yml › changed-specs › step "List the E2E spec files this PR changed": run script not
+      imported — expands $E2E_BASE_SHA at run time — a manifest argument is a literal
+  - e2e-tests.yml › changed-specs: no step could be translated — the job is not imported
+  - e2e-tests.yml › frontend-e2e-changed-specs: calls the reusable workflow
+      ./.github/workflows/e2e-playwright-stack.yml — import that workflow's own file instead; not
+      imported
+  - e2e-tests.yml › test-summary: job condition `if: always()` is not carried — the imported job
+      runs unconditionally
+  - e2e-tests.yml › test-summary › step "Download all artifacts": uses
+      actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - e2e-tests.yml › test-summary › step "Generate test summary": run script not imported — uses the
+      expression ${{ needs.backend-tests.result }} — a manifest command is a literal, evaluated by
+      no one
+  - e2e-tests.yml › test-summary › step "Fail if any needed job failed": run script not imported —
+      sets a shell variable (`KEY=value` with no command)
+  - e2e-tests.yml › test-summary › step "Explain a cancelled job (no apt step here)": runs only `if:
+      cancelled()` — the manifest has no step conditions; not imported
+  - e2e-tests.yml › test-summary: no step could be translated — the job is not imported
+  - frontend-ci.yml › lint-and-typecheck › step "Fleet-noun vocabulary (pinned)": local action
+      ./.github/actions/fleet-nouns-vocab — its steps are not expanded; translate what it does by
+      hand
+  - frontend-ci.yml › lint-and-typecheck › step "Fleet-noun vocabulary drift from schemas main (advisory)": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - frontend-ci.yml › vercel-install-script › step "Assert the overlay resolved and the marker is honest": run
+      script not imported — sets "PIN=$(grep -vE '^[[:space:]]*(#|$)' frontend/cloud-control.pin |
+      head -n 1 | tr -d '[:space:]')", an env assignment that is not a literal (bash would expand
+      it)
+  - frontend-ci.yml › vercel-install-script › step "Assert it refuses to fall back to the OSS shape": run
+      script not imported — writes to frontend/cloud-control.pin (an `echo`/`printf` into a file —
+      e.g. $GITHUB_ENV / $GITHUB_OUTPUT / $GITHUB_PATH — changes what later steps see, and a
+      manifest has no such channel)
+  - frontend-ci.yml › composed-cloud-build › step "Fleet-noun vocabulary (pinned)": local action
+      ./.github/actions/fleet-nouns-vocab — its steps are not expanded; translate what it does by
+      hand
+  - frontend-ci.yml › composed-cloud-build › step "Install the cloud-control overlay": env
+      QONTINUI_CLOUD_CONTROL_PATH = "${{ github.workspace }}/.sibling/qontinui-cloud-control" is an
+      expression — a manifest env value is a literal; not imported
+  - frontend-ci.yml › composed-cloud-build › step "Unit tests (composed)": env
+      QONTINUI_COMPOSED_BUILD is outside the manifest's env allowlist; not imported
+  - frontend-coverage-producer.yml › produce › step "Fleet-noun vocabulary (pinned)": local action
+      ./.github/actions/fleet-nouns-vocab — its steps are not expanded; translate what it does by
+      hand
+  - frontend-coverage-producer.yml › produce › step "Produce per-file coverage and POST to coord (best-effort)": env
+      GITHUB_SHA = "${{ github.sha }}" is an expression — a manifest env value is a literal; not
+      imported
+  - memory-recall-eval.yml › env: env PYTHON_VERSION is outside the manifest's env allowlist; not
+      imported
+  - memory-recall-eval.yml › recall-eval › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - memory-recall-eval.yml › recall-eval › step "Checkout sibling repos": run script not imported —
+      `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - memory-recall-eval.yml › recall-eval › step "Install Poetry": run script not imported — uses a
+      pipe (`|`) (it installs poetry: declare [[tools]] name = "poetry" with a pinned version
+      instead)
+  - memory-recall-eval.yml › recall-eval › step "Run the recall harness": run script not imported —
+      uses an `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv
+      form)
+  - memory-recall-eval.yml › recall-eval › step "Assert the harness actually ran": run script not
+      imported — sets "report=$GITHUB_WORKSPACE/recall-eval.json", an env assignment that is not a
+      literal (bash would expand it)
+  - memory-recall-eval.yml › recall-eval › step "Upload the sealed holdout scores": runs only `if:
+      always()` — the manifest has no step conditions; not imported
+  - memory-recall-eval.yml › recall-eval › step "Comment the scores on the PR": runs only `if:
+      always()` — the manifest has no step conditions; not imported
+  - migration-reversal.yml › detect: job key `outputs` is not carried
+  - migration-reversal.yml › detect › step "Detect alembic migration changes": run script not
+      imported — uses the expression ${{ github.event.pull_request.base.sha }} — a manifest command
+      is a literal, evaluated by no one
+  - migration-reversal.yml › detect: no step could be translated — the job is not imported
+  - migration-reversal.yml › reverse: job condition `if: needs.detect.outputs.relevant == 'true'` is
+      not carried — the imported job runs unconditionally
+  - migration-reversal.yml › reverse › step "Record job start time": run script not imported — its
+      `echo`/`printf` line runs a command substitution, which is more than output
+  - migration-reversal.yml › reverse › step "Free disk space": uses
+      jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 — an arbitrary action; the
+      manifest runs commands only, so translate its effect by hand
+  - migration-reversal.yml › reverse › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": run
+      script not imported — `cd $GITHUB_WORKSPACE/..` leaves the repository or depends on a variable
+  - migration-reversal.yml › reverse › step "Install dependencies": run script not imported — `pip
+      install poetry` installs into the host's global environment — a CI host must be left as it was
+      found; declare a pinned [[tools]] entry or make it a host prerequisite
+  - migration-reversal.yml › reverse › step "Install postgresql-client": run script not imported —
+      combines `||` with another shell operator
+  - migration-reversal.yml › reverse › step "Reversibility test (upgrade → downgrade -1 → upgrade)": run
+      script not imported — uses an output redirect
+  - migration-reversal.yml › reverse › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - migration-reversal.yml › gate: job condition `if: always()` is not carried — the imported job
+      runs unconditionally
+  - migration-reversal.yml › gate › step "Aggregate": run script not imported — uses the expression
+      ${{ needs.reverse.result }} — a manifest command is a literal, evaluated by no one
+  - migration-reversal.yml › gate: no step could be translated — the job is not imported
+  - powershell-parse.yml › powershell-parse › step "Parse every .ps1 and .psm1 with the real PowerShell parser": runs
+      under shell "pwsh" — only bash/sh scripts are read
+  - powershell-parse.yml › powershell-parse: no step could be translated — the job is not imported
+  - pre-commit-hook-tests.yml › pre-commit-hook-tests › step "Install pytest": run script not
+      imported — argument "pytest>=9,<10" contains a character the manifest bans in a command (one
+      of & | < > ^ " % or a newline)
+  - secret-scan.yml › gitleaks › step "Run gitleaks (binary — the marketplace action requires a paid org license)": run
+      script not imported — uses the expression ${{ github.token }} — a manifest command is a
+      literal, evaluated by no one
+  - secret-scan.yml › gitleaks: no step could be translated — the job is not imported
+  - spec-ci.yml › spec-ci: env NEXT_PUBLIC_API_URL is outside the manifest's env allowlist; not
+      imported
+  - spec-ci.yml › spec-ci: env BACKEND_URL is outside the manifest's env allowlist; not imported
+  - spec-ci.yml › spec-ci: env QONTINUI_API_BASE_URL is outside the manifest's env allowlist; not
+      imported
+  - spec-ci.yml › spec-ci: env STORAGE_BACKEND is outside the manifest's env allowlist; not imported
+  - spec-ci.yml › spec-ci: env COGNITO_USER_POOL_ID is outside the manifest's env allowlist; not
+      imported
+  - spec-ci.yml › spec-ci: env COGNITO_ISSUER is outside the manifest's env allowlist; not imported
+  - spec-ci.yml › spec-ci: env COGNITO_ALLOWED_AUDIENCES is outside the manifest's env allowlist;
+      not imported
+  - spec-ci.yml › spec-ci: env NEXT_PUBLIC_ENABLE_SPEC_CI is outside the manifest's env allowlist;
+      not imported
+  - spec-ci.yml › spec-ci: env NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS is outside the manifest's env
+      allowlist; not imported
+  - spec-ci.yml › spec-ci › step "Record job start time": run script not imported — its
+      `echo`/`printf` line runs a command substitution, which is more than output
+  - spec-ci.yml › spec-ci › step "Clone backend Python sibling deps": run script not imported — uses
+      the shell construct `for`
+  - spec-ci.yml › spec-ci › step "Install backend dependencies": run script not imported — uses an
+      `if` conditional (only the `if ! cmd; then …; exit N; fi` failure guard has an argv form)
+  - spec-ci.yml › spec-ci › step "Install postgresql-client": run script not imported — combines
+      `||` with another shell operator
+  - spec-ci.yml › spec-ci › step "Mint local id token + serve JWKS": run script not imported — sets
+      "TOKEN=$(python scripts/spec_ci_local_idp.py \\\n --issuer \"$COGNITO_ISSUER\" \\\n --audience
+      spec-ci-local \\\n --email spec-ci-bot@no-reply.qontinui.io \\\n --out-dir /tmp/spec-ci-idp)",
+      an env assignment that is not a literal (bash would expand it)
+  - spec-ci.yml › spec-ci › step "Start backend (uvicorn)": run script not imported — uses an output
+      redirect
+  - spec-ci.yml › spec-ci › step "Provision + elevate ci-bot (superuser parity with prod)": run
+      script not imported — uses an output redirect
+  - spec-ci.yml › spec-ci › step "Resolve Playwright apt cache key": run script not imported — sets
+      "pw=$(node -p
+      \"require('./package-lock.json').packages['node_modules/@playwright/test'].version\"
+      2>/dev/null || true)", an env assignment that is not a literal (bash would expand it)
+  - spec-ci.yml › spec-ci › step "Restore Playwright apt font cache": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - spec-ci.yml › spec-ci › step "Seed apt archives from cache": run script not imported — sets
+      "cache_dir=$HOME/.cache/qontinui-apt-playwright", an env assignment that is not a literal
+      (bash would expand it)
+  - spec-ci.yml › spec-ci › step "Stage apt archives for cache": runs only `if: always()` — the
+      manifest has no step conditions; not imported
+  - spec-ci.yml › spec-ci › step "Save Playwright apt font cache": runs only `if: always() &&
+      env.APT_CACHE_DIRTY == 'true'` — the manifest has no step conditions; not imported
+  - spec-ci.yml › spec-ci › step "Start frontend (next start)": run script not imported — uses an
+      output redirect
+  - spec-ci.yml › spec-ci › step "Run Spec CI": env GH_TOKEN = "${{ github.token }}" is an
+      expression — a manifest env value is a literal; not imported
+  - spec-ci.yml › spec-ci › step "Tear down frontend + backend": runs only `if: always()` — the
+      manifest has no step conditions; not imported
+  - spec-ci.yml › spec-ci › step "Upload Spec CI report": runs only `if: always()` — the manifest
+      has no step conditions; not imported
+  - spec-ci.yml › spec-ci › step "Upload frontend + backend logs on failure": runs only `if:
+      failure()` — the manifest has no step conditions; not imported
+  - spec-ci.yml › spec-ci › step "Summarize": runs only `if: always()` — the manifest has no step
+      conditions; not imported
+  - spec-ci.yml › spec-ci › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - style-gate.yml › style-gate: env NEXT_PUBLIC_API_URL is outside the manifest's env allowlist;
+      not imported
+  - style-gate.yml › style-gate: env BACKEND_URL is outside the manifest's env allowlist; not
+      imported
+  - style-gate.yml › style-gate: env QONTINUI_API_BASE_URL is outside the manifest's env allowlist;
+      not imported
+  - style-gate.yml › style-gate: env COGNITO_USER_POOL_ID is outside the manifest's env allowlist;
+      not imported
+  - style-gate.yml › style-gate: env COGNITO_ISSUER is outside the manifest's env allowlist; not
+      imported
+  - style-gate.yml › style-gate: env COGNITO_ALLOWED_AUDIENCES is outside the manifest's env
+      allowlist; not imported
+  - style-gate.yml › style-gate: env NEXT_PUBLIC_UI_BRIDGE_REMOTE_COMMANDS is outside the manifest's
+      env allowlist; not imported
+  - style-gate.yml › style-gate › step "Record job start time": run script not imported — its
+      `echo`/`printf` line runs a command substitution, which is more than output
+  - style-gate.yml › style-gate › step "Read pinned qontinui-schemas SHA from style-gate.lock": run
+      script not imported — uses an `if` conditional (only the `if ! cmd; then …; exit N; fi`
+      failure guard has an argv form)
+  - style-gate.yml › style-gate › step "Resolve enforce mode": run script not imported — sets a
+      shell variable (`KEY=value` with no command)
+  - style-gate.yml › style-gate › step "Build vision-audit": run script not imported — sets a shell
+      variable (`KEY=value` with no command)
+  - style-gate.yml › style-gate › step "Resolve Playwright apt cache key": run script not imported —
+      sets "pw=$(node -p
+      \"require('./package-lock.json').packages['node_modules/@playwright/test'].version\"
+      2>/dev/null || true)", an env assignment that is not a literal (bash would expand it)
+  - style-gate.yml › style-gate › step "Restore Playwright apt font cache": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Seed apt archives from cache": run script not imported —
+      sets "cache_dir=$HOME/.cache/qontinui-apt-playwright", an env assignment that is not a literal
+      (bash would expand it)
+  - style-gate.yml › style-gate › step "Stage apt archives for cache": runs only `if: always()` —
+      the manifest has no step conditions; not imported
+  - style-gate.yml › style-gate › step "Save Playwright apt font cache": runs only `if: always() &&
+      env.APT_CACHE_DIRTY == 'true'` — the manifest has no step conditions; not imported
+  - style-gate.yml › style-gate › step "Clone backend Python sibling deps": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Install backend dependencies": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Install postgresql-client": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Create runner schema": continue-on-error step (advisory) — a
+      manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Run database migrations": continue-on-error step (advisory)
+      — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Mint local id token + serve JWKS (hermetic auth)": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Capture style snapshots + frames": continue-on-error step
+      (advisory) — a manifest step always gates; not imported
+  - style-gate.yml › style-gate › step "Run vision-audit (analyze + assert) per route + summarize": runs
+      only `if: always()` — the manifest has no step conditions; not imported
+  - style-gate.yml › style-gate › step "Upload style-gate artifacts": runs only `if: always()` — the
+      manifest has no step conditions; not imported
+  - style-gate.yml › style-gate › step "Explain infrastructure timeout vs external cancellation": runs
+      only `if: cancelled() || failure()` — the manifest has no step conditions; not imported
+  - workflow-lint.yml › workflow-lint: env ZIZMOR_VERSION is outside the manifest's env allowlist;
+      not imported
+  - workflow-lint.yml › workflow-lint: env ZIZMOR_SHA256 is outside the manifest's env allowlist;
+      not imported
+  - workflow-lint.yml › workflow-lint: env ACTIONLINT_VERSION is outside the manifest's env
+      allowlist; not imported
+  - workflow-lint.yml › workflow-lint: env ACTIONLINT_SHA256 is outside the manifest's env
+      allowlist; not imported
+  - workflow-lint.yml › workflow-lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": continue-on-error
+      step (advisory) — a manifest step always gates; not imported
+  - workflow-lint.yml › workflow-lint › step "Check host architecture (release tarballs below are x86_64)": runs
+      only `if: steps.checkout.outcome == 'success'` — the manifest has no step conditions; not
+      imported
+  - workflow-lint.yml › workflow-lint › step "Install zizmor and actionlint (pinned, sha256-verified)": runs
+      only `if: steps.arch.outcome == 'success'` — the manifest has no step conditions; not imported
+  - workflow-lint.yml › workflow-lint › step "zizmor": runs only `if: steps.install.outcome ==
+      'success'` — the manifest has no step conditions; not imported
+  - workflow-lint.yml › workflow-lint › step "actionlint": runs only `if: steps.install.outcome ==
+      'success'` — the manifest has no step conditions; not imported
+  - workflow-lint.yml › workflow-lint › step "Record verdicts": runs only `if: always()` — the
+      manifest has no step conditions; not imported
+  - workflow-lint.yml › workflow-lint: no step could be translated — the job is not imported
+  - migration-reversal.yml › reverse: needs detect, which was not imported — dependency edge dropped
+
+TRANSLATED WITH A CHANGE (95) — represented, but not literally:
+  - alembic-graph-check.yml: push filtered by paths — a manifest job runs for every change
+  - alembic-graph-check.yml: trigger filters not carried (push branches ["main"]) — a manifest gate
+      job runs for every pull request and merge candidate
+  - alembic-graph-pr.yml: trigger filters not carried (pull_request branches ["main", "develop"];
+      push branches ["merge-candidate/**", "merge-candidate-spec/**", "merge-candidate-batch/**"]) —
+      a manifest gate job runs for every pull request and merge candidate
+  - backend-ci.yml: also runs on schedule ["17 7 * * *"]; imported as gate jobs only (a manifest job
+      is either a gate or scheduled — add a scheduled copy by hand if the nightly run matters)
+  - backend-ci.yml: pull_request, push filtered by paths — a manifest job runs for every change
+  - backend-ci.yml: trigger filters not carried (pull_request branches ["main", "develop"]; push
+      branches ["develop"]) — a manifest gate job runs for every pull request and merge candidate
+  - backend-coverage-producer.yml: push filtered by paths — a manifest job runs for every change
+  - backend-coverage-producer.yml: trigger filters not carried (push branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - coord-column-drop-guard.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - dev-credentials-drift.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - dev-credentials-drift.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop"]) — a manifest gate job runs for every pull
+      request and merge candidate
+  - e2e-tests.yml: also runs on schedule ["0 4 * * *"]; imported as gate jobs only (a manifest job
+      is either a gate or scheduled — add a scheduled copy by hand if the nightly run matters)
+  - e2e-tests.yml: trigger filters not carried (pull_request branches ["main", "develop"]; push
+      branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - forbid-fixed-sleeps-in-e2e.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - forbid-public-schema.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - frontend-ci.yml: pull_request, push filtered by paths — a manifest job runs for every change
+  - frontend-ci.yml: trigger filters not carried (pull_request branches ["main", "develop"]; push
+      branches ["main", "develop"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - frontend-coverage-producer.yml: push filtered by paths — a manifest job runs for every change
+  - frontend-coverage-producer.yml: trigger filters not carried (push branches ["main"]) — a
+      manifest gate job runs for every pull request and merge candidate
+  - gitignore-tracked-files.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - global-state-assertions.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - memory-recall-eval.yml: pull_request filtered by paths — a manifest job runs for every change
+  - memory-recall-eval.yml: trigger filters not carried (pull_request branches ["main", "develop"])
+      — a manifest gate job runs for every pull request and merge candidate
+  - migration-reversal.yml: pull_request filtered by paths — a manifest job runs for every change
+  - path-case-collisions.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - powershell-parse.yml: trigger filters not carried (pull_request branches ["main"]) — a manifest
+      gate job runs for every pull request and merge candidate
+  - pre-commit-hook-tests.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - pre-commit-hook-tests.yml: trigger filters not carried (pull_request branches ["main",
+      "develop"]; push branches ["main"]) — a manifest gate job runs for every pull request and
+      merge candidate
+  - ruff-version-parity.yml: trigger filters not carried (pull_request branches ["main", "develop"];
+      push branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - spec-ci.yml: trigger filters not carried (pull_request branches ["main", "develop"]; push
+      branches ["main", "develop", "merge-candidate/**", "merge-candidate-spec/**",
+      "merge-candidate-batch/**"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - sql-through-alembic.yml: pull_request filtered by paths — a manifest job runs for every change
+  - style-gate.yml: pull_request filtered by paths — a manifest job runs for every change
+  - web-boundary-lint.yml: pull_request, push filtered by paths — a manifest job runs for every
+      change
+  - web-boundary-lint.yml: trigger filters not carried (pull_request branches ["main", "develop"];
+      push branches ["main", "develop"]) — a manifest gate job runs for every pull request and merge
+      candidate
+  - workflow-lint.yml: trigger filters not carried (push branches ["merge-candidate/**",
+      "merge-candidate-spec/**", "merge-candidate-batch/**"]) — a manifest gate job runs for every
+      pull request and merge candidate
+  - alembic-graph-check.yml › alembic-heads: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - alembic-graph-pr.yml › alembic-heads-pr: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - backend-ci.yml › lint › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-schemas → [[siblings]] repo = "qontinui/qontinui-schemas" (pin
+      = declared-adaptation, the default). The executor materialises it at ../qontinui-schemas
+      beside the checkout; a command that used another path for it must be re-pointed, and the pin
+      should be reviewed
+  - backend-ci.yml › lint › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones jspinak/qontinui → [[siblings]] repo = "jspinak/qontinui" (pin =
+      declared-adaptation, the default). The executor materialises it at ../qontinui beside the
+      checkout; a command that used another path for it must be re-pointed, and the pin should be
+      reviewed
+  - backend-ci.yml › lint › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-cloud-control → [[siblings]] repo =
+      "qontinui/qontinui-cloud-control" (pin = declared-adaptation, the default). The executor
+      materialises it at ../qontinui-cloud-control beside the checkout; a command that used another
+      path for it must be re-pointed, and the pin should be reviewed
+  - backend-ci.yml › lint: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - backend-ci.yml › test › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - backend-ci.yml › test › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones jspinak/qontinui — already declared as [[siblings]] repo = "jspinak/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - backend-ci.yml › test › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - backend-ci.yml › test › step "Check OpenAPI snapshot is up to date": 2 failure-message line(s)
+      of an `if ! …` / `|| …` guard dropped; the guarded command still fails the step
+  - backend-ci.yml › test › step "Check OpenAPI snapshot is up to date": its timeout applies to each
+      of the 3 commands it became, not to their sum
+  - backend-ci.yml › test › step "Create test schemas and extensions": carried literally, but `psql
+      -h localhost -U qontinui_user -d qontinui_test -c CREAT` hardcodes a service connection
+      (localhost) — the executor assigns the host port and credentials per dispatch and exports them
+      as DATABASE_URL / PG* / REDIS_*; review the command
+  - backend-ci.yml › test: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - backend-ci.yml › security-scan › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - backend-ci.yml › security-scan › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones jspinak/qontinui — already declared as [[siblings]] repo = "jspinak/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - backend-ci.yml › security-scan › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - backend-ci.yml › security-scan: job timeout-minutes applied to each imported step without its
+      own — the manifest has per-step timeouts only
+  - backend-ci.yml › build-test: job timeout-minutes applied to each imported step without its own —
+      the manifest has per-step timeouts only
+  - backend-coverage-producer.yml › produce › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - backend-coverage-producer.yml › produce › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones jspinak/qontinui — already declared as [[siblings]] repo = "jspinak/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - backend-coverage-producer.yml › produce › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - backend-coverage-producer.yml › produce › step "Create test schemas and extensions": carried
+      literally, but `psql -h localhost -U qontinui_user -d qontinui_test -c CREAT` hardcodes a
+      service connection (localhost) — the executor assigns the host port and credentials per
+      dispatch and exports them as DATABASE_URL / PG* / REDIS_*; review the command
+  - backend-coverage-producer.yml › produce: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - dev-credentials-drift.yml › drift-check: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - e2e-tests.yml › backend-tests: job timeout-minutes applied to each imported step without its own
+      — the manifest has per-step timeouts only
+  - forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e: job timeout-minutes applied to each
+      imported step without its own — the manifest has per-step timeouts only
+  - forbid-public-schema.yml › forbid-public-schema: job timeout-minutes applied to each imported
+      step without its own — the manifest has per-step timeouts only
+  - frontend-ci.yml › lint-and-typecheck › step "Setup Node.js": setup-node node-version "22" →
+      [[tools]] node 22.11.0, the registry's pinned release of that line (setup-node would resolve
+      the newest)
+  - frontend-ci.yml › lint-and-typecheck: job timeout-minutes applied to each imported step without
+      its own — the manifest has per-step timeouts only
+  - frontend-ci.yml › vercel-install-script › step "Setup Node.js": setup-node node-version "22" →
+      [[tools]] node 22.11.0, the registry's pinned release of that line (setup-node would resolve
+      the newest)
+  - frontend-ci.yml › vercel-install-script: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - frontend-ci.yml › composed-cloud-build › step "Checkout qontinui-cloud-control": checkout of
+      qontinui/qontinui-cloud-control at .sibling/qontinui-cloud-control:
+      qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - frontend-ci.yml › composed-cloud-build › step "Setup Node.js": setup-node node-version "22" →
+      [[tools]] node 22.11.0, the registry's pinned release of that line (setup-node would resolve
+      the newest)
+  - frontend-ci.yml › composed-cloud-build: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - frontend-coverage-producer.yml › produce › step "Setup Node.js": setup-node node-version "22" →
+      [[tools]] node 22.11.0, the registry's pinned release of that line (setup-node would resolve
+      the newest)
+  - frontend-coverage-producer.yml › produce: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - gitignore-tracked-files.yml › gitignore-tracked-files: job timeout-minutes applied to each
+      imported step without its own — the manifest has per-step timeouts only
+  - global-state-assertions.yml › global-state-assertions: job timeout-minutes applied to each
+      imported step without its own — the manifest has per-step timeouts only
+  - memory-recall-eval.yml › recall-eval › step "Checkout sibling repos": the script clones
+      qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - memory-recall-eval.yml › recall-eval › step "Checkout sibling repos": the script clones
+      jspinak/qontinui — already declared as [[siblings]] repo = "jspinak/qontinui", materialised at
+      ../qontinui; a command that used another path for it must be re-pointed
+  - memory-recall-eval.yml › recall-eval › step "Checkout sibling repos": the script clones
+      qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - memory-recall-eval.yml › recall-eval: job timeout-minutes applied to each imported step without
+      its own — the manifest has per-step timeouts only
+  - migration-reversal.yml › reverse › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-schemas — already declared as [[siblings]] repo =
+      "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a command that used another
+      path for it must be re-pointed
+  - migration-reversal.yml › reverse › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones jspinak/qontinui — already declared as [[siblings]] repo = "jspinak/qontinui",
+      materialised at ../qontinui; a command that used another path for it must be re-pointed
+  - migration-reversal.yml › reverse › step "Checkout sibling repos (qontinui-schemas, qontinui, qontinui-cloud-control)": the
+      script clones qontinui/qontinui-cloud-control — already declared as [[siblings]] repo =
+      "qontinui/qontinui-cloud-control", materialised at ../qontinui-cloud-control; a command that
+      used another path for it must be re-pointed
+  - migration-reversal.yml › reverse › step "Create named schemas + extension": carried literally,
+      but `psql -h localhost -U qontinui_user -d qontinui_test -c CREAT` hardcodes a service
+      connection (localhost) — the executor assigns the host port and credentials per dispatch and
+      exports them as DATABASE_URL / PG* / REDIS_*; review the command
+  - migration-reversal.yml › reverse: job timeout-minutes applied to each imported step without its
+      own — the manifest has per-step timeouts only
+  - path-case-collisions.yml › path-case-collisions: job timeout-minutes applied to each imported
+      step without its own — the manifest has per-step timeouts only
+  - pre-commit-hook-tests.yml › pre-commit-hook-tests: job timeout-minutes applied to each imported
+      step without its own — the manifest has per-step timeouts only
+  - ruff-version-parity.yml › ruff-version-parity: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - spec-ci.yml › spec-ci › step "Create runner schema": carried literally, but `psql -h localhost
+      -U test_user -d test_db -c CREATE SCHEMA I` hardcodes a service connection (localhost) — the
+      executor assigns the host port and credentials per dispatch and exports them as DATABASE_URL /
+      PG* / REDIS_*; review the command
+  - spec-ci.yml › spec-ci › step "Setup Node": setup-node node-version "22" → [[tools]] node
+      22.11.0, the registry's pinned release of that line (setup-node would resolve the newest)
+  - spec-ci.yml › spec-ci › step "Run Spec CI": carried literally, but `npx tsx
+      tests/spec-ci/run-spec-ci.ts --base-url http://local` hardcodes a service connection
+      (http://localhost:3001) — the executor assigns the host port and credentials per dispatch and
+      exports them as DATABASE_URL / PG* / REDIS_*; review the command
+  - spec-ci.yml › spec-ci: job timeout-minutes applied to each imported step without its own — the
+      manifest has per-step timeouts only
+  - sql-through-alembic.yml › sql-through-alembic: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - style-gate.yml › style-gate › step "Checkout pinned qontinui-schemas (analyzer source)": checkout
+      of qontinui/qontinui-schemas at qontinui-schemas: qontinui/qontinui-schemas — already declared
+      as [[siblings]] repo = "qontinui/qontinui-schemas", materialised at ../qontinui-schemas; a
+      command that used another path for it must be re-pointed
+  - style-gate.yml › style-gate › step "Setup Node": setup-node node-version "22" → [[tools]] node
+      22.11.0, the registry's pinned release of that line (setup-node would resolve the newest)
+  - style-gate.yml › style-gate: job timeout-minutes applied to each imported step without its own —
+      the manifest has per-step timeouts only
+  - web-boundary-lint.yml › web-boundary-lint: job timeout-minutes applied to each imported step
+      without its own — the manifest has per-step timeouts only
+  - workflow-lint.yml › workflow-lint: runs-on ["self-hosted", "public-pool"] names no OS; imported
+      as os = any
+
+NO-OPS (139) — accounted for; nothing to declare:
+  - alembic-graph-check.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - alembic-graph-check.yml: permissions — GitHub-side setting with no manifest counterpart
+  - alembic-graph-check.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - alembic-graph-pr.yml: permissions — GitHub-side setting with no manifest counterpart
+  - alembic-graph-pr.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - backend-ci.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - backend-ci.yml: permissions — GitHub-side setting with no manifest counterpart
+  - backend-ci.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - backend-coverage-producer.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - backend-coverage-producer.yml: permissions — GitHub-side setting with no manifest counterpart
+  - backend-coverage-producer.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - coord-column-drop-guard.yml: permissions — GitHub-side setting with no manifest counterpart
+  - cross-browser-survey.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - cross-browser-survey.yml: permissions — GitHub-side setting with no manifest counterpart
+  - cross-browser-survey.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - dev-credentials-drift.yml: permissions — GitHub-side setting with no manifest counterpart
+  - dev-credentials-drift.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - e2e-tests.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - e2e-tests.yml: permissions — GitHub-side setting with no manifest counterpart
+  - e2e-tests.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - forbid-fixed-sleeps-in-e2e.yml: permissions — GitHub-side setting with no manifest counterpart
+  - forbid-fixed-sleeps-in-e2e.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is
+      the manual run
+  - forbid-public-schema.yml: permissions — GitHub-side setting with no manifest counterpart
+  - frontend-ci.yml: permissions — GitHub-side setting with no manifest counterpart
+  - frontend-ci.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - frontend-coverage-producer.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - frontend-coverage-producer.yml: permissions — GitHub-side setting with no manifest counterpart
+  - frontend-coverage-producer.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is
+      the manual run
+  - gitignore-tracked-files.yml: permissions — GitHub-side setting with no manifest counterpart
+  - global-state-assertions.yml: permissions — GitHub-side setting with no manifest counterpart
+  - global-state-assertions.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the
+      manual run
+  - memory-recall-eval.yml: permissions — GitHub-side setting with no manifest counterpart
+  - memory-recall-eval.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - memory-recall-eval.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - migration-reversal.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - migration-reversal.yml: permissions — GitHub-side setting with no manifest counterpart
+  - path-case-collisions.yml: permissions — GitHub-side setting with no manifest counterpart
+  - powershell-parse.yml: permissions — GitHub-side setting with no manifest counterpart
+  - powershell-parse.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - pre-commit-hook-tests.yml: permissions — GitHub-side setting with no manifest counterpart
+  - ruff-version-parity.yml: permissions — GitHub-side setting with no manifest counterpart
+  - secret-scan.yml: permissions — GitHub-side setting with no manifest counterpart
+  - secret-scan.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - spec-ci.yml: permissions — GitHub-side setting with no manifest counterpart
+  - spec-ci.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - sql-through-alembic.yml: permissions — GitHub-side setting with no manifest counterpart
+  - sql-through-alembic.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - style-gate.yml: concurrency — GitHub-side setting with no manifest counterpart
+  - style-gate.yml: permissions — GitHub-side setting with no manifest counterpart
+  - style-gate.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - web-boundary-lint.yml: permissions — GitHub-side setting with no manifest counterpart
+  - web-boundary-lint.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual
+      run
+  - workflow-lint.yml: permissions — GitHub-side setting with no manifest counterpart
+  - workflow-lint.yml: trigger workflow_dispatch — `qontinui-ci run --job <name>` is the manual run
+  - alembic-graph-check.yml › alembic-heads › step "Checkout": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - alembic-graph-check.yml › alembic-heads › step "Set up Python": setup-python 3.12 — the tool
+      registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - alembic-graph-pr.yml › alembic-heads-pr › step "Checkout": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - backend-ci.yml › lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-ci.yml › lint › step "Set up Python": setup-python ${{ env.PYTHON_VERSION }} — the tool
+      registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - backend-ci.yml › test › service postgres: env, options, ports — the executor owns credentials
+      (generated per dispatch), the host port and the readiness probe
+  - backend-ci.yml › test › service redis: options, ports — the executor owns credentials (generated
+      per dispatch), the host port and the readiness probe
+  - backend-ci.yml › test › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-ci.yml › test › step "Set up Python": setup-python ${{ env.PYTHON_VERSION }} — the tool
+      registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - backend-ci.yml › test › step "Check OpenAPI snapshot is up to date": env DATABASE_URL: exported
+      by the executor from the job's postgres service (credentials are generated per dispatch)
+  - backend-ci.yml › test › step "Create test schemas and extensions": env PGPASSWORD: exported by
+      the executor from the job's postgres service (credentials are generated per dispatch)
+  - backend-ci.yml › security-scan: permissions — GitHub-side setting with no manifest counterpart
+  - backend-ci.yml › security-scan › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-ci.yml › security-scan › step "Set up Python": setup-python ${{ env.PYTHON_VERSION }} —
+      the tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - backend-ci.yml › shard-durations-proposal: permissions — GitHub-side setting with no manifest
+      counterpart
+  - backend-ci.yml › shard-durations-proposal › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-ci.yml › shard-durations-proposal › step "Set up Python": setup-python ${{
+      env.PYTHON_VERSION }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - backend-ci.yml › build-test › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-ci.yml › shard-headroom: permissions — GitHub-side setting with no manifest counterpart
+  - backend-ci.yml › shard-headroom › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-coverage-producer.yml › produce › service postgres: env, options, ports — the executor
+      owns credentials (generated per dispatch), the host port and the readiness probe
+  - backend-coverage-producer.yml › produce › service redis: options, ports — the executor owns
+      credentials (generated per dispatch), the host port and the readiness probe
+  - backend-coverage-producer.yml › produce › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - backend-coverage-producer.yml › produce › step "Set up Python": setup-python ${{
+      env.PYTHON_VERSION }} — the tool registry provisions no python; the host's python runs the
+      steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - backend-coverage-producer.yml › produce › step "Create test schemas and extensions": env
+      PGPASSWORD: exported by the executor from the job's postgres service (credentials are
+      generated per dispatch)
+  - backend-coverage-producer.yml › produce › step "Run tests with coverage": env DATABASE_URL:
+      exported by the executor from the job's postgres service (credentials are generated per
+      dispatch)
+  - backend-coverage-producer.yml › produce › step "Run tests with coverage": env REDIS_HOST:
+      exported by the executor from the job's redis service (credentials are generated per dispatch)
+  - backend-coverage-producer.yml › produce › step "Run tests with coverage": env REDIS_PORT:
+      exported by the executor from the job's redis service (credentials are generated per dispatch)
+  - coord-column-drop-guard.yml › coord-column-drop-guard › step "Checkout": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - dev-credentials-drift.yml › drift-check › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - dev-credentials-drift.yml › drift-check › step "Set up Python": setup-python 3.12 — the tool
+      registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - e2e-tests.yml › backend-tests › step "Checkout code": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - e2e-tests.yml › backend-tests › step "Set up Python ${{ matrix.python-version }}": setup-python
+      ${{ matrix.python-version }} — the tool registry provisions no python; the host's python runs
+      the steps (declare [canonical] toolchains = ["python"] to require the host's canonical one)
+  - e2e-tests.yml › backend-tests › step "Cache pip dependencies": actions/cache — a cache; the
+      executor keeps its own warm target dir and tool cache
+  - e2e-tests.yml › changed-specs › step "Checkout code": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - e2e-tests.yml › changed-specs › step "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065": setup-python
+      3.12 — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - forbid-fixed-sleeps-in-e2e.yml › forbid-fixed-sleeps-in-e2e › step "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065": setup-python
+      3.12 — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - forbid-public-schema.yml › forbid-public-schema › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - frontend-ci.yml › lint-and-typecheck › step "Checkout qontinui-web": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - frontend-ci.yml › lint-and-typecheck › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - frontend-ci.yml › vercel-install-script › step "Checkout qontinui-web": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - frontend-ci.yml › vercel-install-script › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - frontend-ci.yml › composed-cloud-build › step "Checkout qontinui-web": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - frontend-ci.yml › composed-cloud-build › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - frontend-coverage-producer.yml › produce › step "Checkout qontinui-web": actions/checkout — the
+      executor checks out the dispatched commit itself
+  - frontend-coverage-producer.yml › produce › step "Setup Node.js": setup-node cache — a dependency
+      cache, not a gate
+  - gitignore-tracked-files.yml › gitignore-tracked-files › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - global-state-assertions.yml › global-state-assertions › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - global-state-assertions.yml › global-state-assertions › step "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065": setup-python
+      3.12 — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - memory-recall-eval.yml › recall-eval › service postgres: env, options, ports — the executor owns
+      credentials (generated per dispatch), the host port and the readiness probe
+  - memory-recall-eval.yml › recall-eval › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - memory-recall-eval.yml › recall-eval › step "Set up Python": setup-python ${{ env.PYTHON_VERSION
+      }} — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - migration-reversal.yml › detect › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - migration-reversal.yml › reverse › service postgres: env, options, ports — the executor owns
+      credentials (generated per dispatch), the host port and the readiness probe
+  - migration-reversal.yml › reverse › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - migration-reversal.yml › reverse › step "Set up Python": setup-python 3.12 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - migration-reversal.yml › reverse › step "Create named schemas + extension": env PGPASSWORD:
+      exported by the executor from the job's postgres service (credentials are generated per
+      dispatch)
+  - path-case-collisions.yml › path-case-collisions › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - powershell-parse.yml › powershell-parse › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - pre-commit-hook-tests.yml › pre-commit-hook-tests › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - pre-commit-hook-tests.yml › pre-commit-hook-tests › step "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065": setup-python
+      3.12 — the tool registry provisions no python; the host's python runs the steps (declare
+      [canonical] toolchains = ["python"] to require the host's canonical one)
+  - ruff-version-parity.yml › ruff-version-parity › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - ruff-version-parity.yml › ruff-version-parity › step "Set up Python": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - secret-scan.yml › gitleaks › step "actions/checkout@11d5960a326750d5838078e36cf38b85af677262": actions/checkout
+      — the executor checks out the dispatched commit itself
+  - spec-ci.yml › spec-ci › service postgres: env, options, ports — the executor owns credentials
+      (generated per dispatch), the host port and the readiness probe
+  - spec-ci.yml › spec-ci › service redis: options, ports — the executor owns credentials (generated
+      per dispatch), the host port and the readiness probe
+  - spec-ci.yml › spec-ci: env DATABASE_URL: exported by the executor from the job's postgres
+      service (credentials are generated per dispatch)
+  - spec-ci.yml › spec-ci: env REDIS_HOST: exported by the executor from the job's redis service
+      (credentials are generated per dispatch)
+  - spec-ci.yml › spec-ci: env REDIS_PORT: exported by the executor from the job's redis service
+      (credentials are generated per dispatch)
+  - spec-ci.yml › spec-ci › step "Checkout qontinui-web": actions/checkout — the executor checks out
+      the dispatched commit itself
+  - spec-ci.yml › spec-ci › step "Set up Python": setup-python 3.12 — the tool registry provisions
+      no python; the host's python runs the steps (declare [canonical] toolchains = ["python"] to
+      require the host's canonical one)
+  - spec-ci.yml › spec-ci › step "Create runner schema": env PGPASSWORD: exported by the executor
+      from the job's postgres service (credentials are generated per dispatch)
+  - spec-ci.yml › spec-ci › step "Setup Node": setup-node cache — a dependency cache, not a gate
+  - sql-through-alembic.yml › sql-through-alembic › step "Checkout": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - sql-through-alembic.yml › sql-through-alembic › step "Set up Python": setup-python 3.12 — the
+      tool registry provisions no python; the host's python runs the steps (declare [canonical]
+      toolchains = ["python"] to require the host's canonical one)
+  - style-gate.yml › style-gate › service postgres: env, options, ports — the executor owns
+      credentials (generated per dispatch), the host port and the readiness probe
+  - style-gate.yml › style-gate: env DATABASE_URL: exported by the executor from the job's postgres
+      service (credentials are generated per dispatch)
+  - style-gate.yml › style-gate › step "Checkout qontinui-web": actions/checkout — the executor
+      checks out the dispatched commit itself
+  - style-gate.yml › style-gate › step "Set up Rust toolchain": dtolnay/rust-toolchain stable — the
+      host's rust toolchain runs the steps (declare [canonical] toolchains = ["rustc"] to require
+      the host's canonical one)
+  - style-gate.yml › style-gate › step "Cache cargo build": actions/cache — a cache; the executor
+      keeps its own warm target dir and tool cache
+  - style-gate.yml › style-gate › step "Setup Node": setup-node cache — a dependency cache, not a
+      gate
+  - style-gate.yml › style-gate › step "Set up Python": setup-python 3.12 — the tool registry
+      provisions no python; the host's python runs the steps (declare [canonical] toolchains =
+      ["python"] to require the host's canonical one)
+  - style-gate.yml › style-gate › step "Cache pip dependencies": actions/cache — a cache; the
+      executor keeps its own warm target dir and tool cache
+  - web-boundary-lint.yml › web-boundary-lint › step "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09": actions/checkout
+      — the executor checks out the dispatched commit itself
+
+summary: 7 covered, 0 covered by name, 6 partial, 26 uncovered of 39 job(s); 185 untranslated construct(s) — the Phase 9 precondition is NOT MET

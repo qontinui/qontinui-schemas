@@ -25,17 +25,25 @@
 //! | [`report`] | the [`report::Reporter`] seam and the capture-before-cleanup receipt |
 //! | [`host`] | the traits a host implements |
 //! | [`standalone`] | the host implementations for a plain shell (`qontinui-ci`) |
+//! | [`import`] | `qontinui-ci import`: GitHub workflows → a v2 manifest, and the `--report` coverage check |
+//! | [`gen_workflow`] | `qontinui-ci gen-workflow`: the generated hybrid-mode GitHub workflow and its `--check` |
+//! | [`gha`] | the read-only GitHub workflow model the importer reads |
+//! | [`shell`] | the argv subset of shell a `run:` script must stay inside to be imported |
 
 pub mod canonical;
 pub mod checkout;
 pub mod dispatch;
 pub mod executor;
+pub mod gen_workflow;
+pub mod gha;
 pub mod host;
 pub mod host_sizing;
+pub mod import;
 pub mod junit;
 pub mod manifest;
 pub mod report;
 pub mod services;
+pub mod shell;
 pub mod sibling;
 pub mod standalone;
 pub mod tools;
