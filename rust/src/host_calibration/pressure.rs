@@ -46,7 +46,6 @@ pub struct WorkloadGroupPressure {
     /// `unavailable` when the runner's cgroup was unknown, `not_supported`
     /// for the runner record itself and for platforms without cgroups.
     /// A mixed group's figures OVERLAP the `runner` record: never sum them.
-    #[serde(default)]
     pub mixed: Measured<bool>,
     /// The REDACTED shapes of the cgroups aggregated into this record
     /// ([`crate::host_calibration::cgroup_path::redact_cgroup_path`]): no uid,

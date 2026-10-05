@@ -140,10 +140,12 @@ pub struct ProcessObservation {
     /// Whether the process's cgroup is a managed systemd service
     /// ([`crate::host_calibration::cgroup_path::is_managed_service_cgroup`] on
     /// `/proc/<pid>/cgroup`): stopping the unit reaps it, so it is not an
-    /// orphan. `not_supported` (no cgroups on this platform) leaves the
-    /// predicate deciding on the other inputs; `unavailable` (the process's
-    /// cgroup could not be read) makes the verdict UNKNOWN unless another
-    /// input is a definite negative.
+    /// orphan. Every daemon has ppid 1 and no tty, so this is the input that
+    /// keeps busy services from reading as orphans: anything other than a
+    /// measured value — `unavailable` (cgroup unreadable) and `not_supported`
+    /// alike (e.g. a cgroup-v1-only host, where `parse_proc_pid_cgroup`
+    /// yields `None`) — makes the verdict UNKNOWN unless another input is a
+    /// definite negative.
     pub managed_unit: Measured<bool>,
 }
 
@@ -243,7 +245,7 @@ pub fn orphan_cpu_burner(
     let Some(age_secs) = obs.age_secs else {
         return LeakVerdict::Unknown(UnknownInput::Age);
     };
-    if obs.managed_unit == Measured::Unavailable {
+    if !matches!(obs.managed_unit, Measured::Measured(_)) {
         return LeakVerdict::Unknown(UnknownInput::ManagedUnit);
     }
     LeakVerdict::Leak(LeakRecord {
@@ -393,12 +395,18 @@ mod tests {
             orphan_cpu_burner(&o, &c, &t),
             LeakVerdict::NotLeak(NotLeakReason::ManagedUnit)
         );
-        // No cgroups on this platform: decided on the other inputs.
-        o.managed_unit = Measured::NotSupported;
+        // Measured not-managed: decided on the other inputs.
+        o.managed_unit = Measured::Measured(false);
         assert!(matches!(
             orphan_cpu_burner(&o, &c, &t),
             LeakVerdict::Leak(_)
         ));
+        // No cgroup v2 answer (e.g. a v1-only host): UNKNOWN, never a leak.
+        o.managed_unit = Measured::NotSupported;
+        assert_eq!(
+            orphan_cpu_burner(&o, &c, &t),
+            LeakVerdict::Unknown(UnknownInput::ManagedUnit)
+        );
         // Cgroup unreadable: UNKNOWN, never a leak.
         o.managed_unit = Measured::Unavailable;
         assert_eq!(
