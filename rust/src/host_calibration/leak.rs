@@ -179,8 +179,8 @@ pub enum UnknownInput {
     OwnerUid,
     /// Age not computable.
     Age,
-    /// The process's cgroup could not be read, so whether it is a managed
-    /// unit is unknown.
+    /// No measured answer to whether the process is in a managed unit: its
+    /// cgroup was unreadable, or carried no cgroup v2 path.
     ManagedUnit,
 }
 
@@ -198,7 +198,7 @@ pub enum LeakVerdict {
 /// Decide whether `obs` is an orphan CPU burner. PURE.
 ///
 /// A leak needs ALL of: parent is init or a subreaper; not in a managed
-/// service unit (when that is known); no controlling tty;
+/// service unit (an unmeasured answer is UNKNOWN); no controlling tty;
 /// `comm` not a known workload; sustained CPU share above
 /// `min_cpu_share` for at least `min_sustained_secs`. A definite negative on
 /// any measured input wins over an unknown on another; otherwise any unknown
