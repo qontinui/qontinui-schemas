@@ -27,6 +27,8 @@ pub enum CompileCacheClass {
 }
 
 /// What a compile-cache probe found.
+// Unboxed so the wire shape stays flat; one reading per class per probe.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompileCacheReading {

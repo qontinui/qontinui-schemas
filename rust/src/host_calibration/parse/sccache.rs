@@ -53,6 +53,11 @@ pub struct SccacheStats {
     /// `max_cache_size`, bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_cache_size_bytes: Option<u64>,
+    /// Entries of the count maps read (hits, misses, errors, `not_cached`)
+    /// whose value was not a non-negative integer and so was LEFT OUT of the
+    /// sums above. Non-zero means the hit/miss totals are lower bounds.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub non_integer_entries_skipped: u64,
     /// sccache's own version, when it reports one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
@@ -85,23 +90,29 @@ pub fn parse_sccache_stats_json(text: &str) -> Result<SccacheStats, SccacheParse
     let stats = doc
         .get("stats")
         .ok_or(SccacheParseError::MissingField("stats"))?;
-    let hits_by_language = language_counts(stats.get("cache_hits"))
+    let mut skipped = 0u64;
+    let hits_by_language = language_counts(stats.get("cache_hits"), &mut skipped)
         .ok_or(SccacheParseError::MissingField("cache_hits"))?;
-    let misses = language_counts(stats.get("cache_misses"))
+    let misses = language_counts(stats.get("cache_misses"), &mut skipped)
         .ok_or(SccacheParseError::MissingField("cache_misses"))?;
+    let cache_errors =
+        language_counts(stats.get("cache_errors"), &mut skipped).map(|m| m.values().sum());
+    let non_cacheable_reasons =
+        count_map(stats.get("not_cached"), &mut skipped).unwrap_or_default();
     let u = |v: &Value, k: &str| v.get(k).and_then(Value::as_u64);
     Ok(SccacheStats {
         hits: hits_by_language.values().sum(),
         misses: misses.values().sum(),
         hits_by_language,
-        cache_errors: language_counts(stats.get("cache_errors")).map(|m| m.values().sum()),
+        cache_errors,
         compile_requests: u(stats, "compile_requests"),
         requests_executed: u(stats, "requests_executed"),
         requests_not_cacheable: u(stats, "requests_not_cacheable"),
         non_cacheable_compilations: u(stats, "non_cacheable_compilations"),
-        non_cacheable_reasons: count_map(stats.get("not_cached")).unwrap_or_default(),
+        non_cacheable_reasons,
         cache_size_bytes: u(&doc, "cache_size"),
         max_cache_size_bytes: u(&doc, "max_cache_size"),
+        non_integer_entries_skipped: skipped,
         version: doc
             .get("version")
             .and_then(Value::as_str)
@@ -110,18 +121,28 @@ pub fn parse_sccache_stats_json(text: &str) -> Result<SccacheStats, SccacheParse
 }
 
 /// A `PerLanguageCount` (`{"counts":{…}}`) → its `counts` map.
-fn language_counts(v: Option<&Value>) -> Option<BTreeMap<String, u64>> {
-    count_map(v?.get("counts"))
+fn language_counts(v: Option<&Value>, skipped: &mut u64) -> Option<BTreeMap<String, u64>> {
+    count_map(v?.get("counts"), skipped)
 }
 
-/// A `{"key": n}` object → map; non-integer values are skipped.
-fn count_map(v: Option<&Value>) -> Option<BTreeMap<String, u64>> {
+/// A `{"key": n}` object → map. Entries whose value is not a non-negative
+/// integer are left out AND counted into `skipped`, never dropped silently.
+fn count_map(v: Option<&Value>, skipped: &mut u64) -> Option<BTreeMap<String, u64>> {
     let obj = v?.as_object()?;
-    Some(
-        obj.iter()
-            .filter_map(|(k, n)| Some((k.clone(), n.as_u64()?)))
-            .collect(),
-    )
+    let mut out = BTreeMap::new();
+    for (k, n) in obj {
+        match n.as_u64() {
+            Some(n) => {
+                out.insert(k.clone(), n);
+            }
+            None => *skipped += 1,
+        }
+    }
+    Some(out)
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 #[cfg(test)]
@@ -169,6 +190,22 @@ mod tests {
         assert_eq!(s.hit_rate(), None);
         assert_eq!(s.cache_size_bytes, None);
         assert_eq!(s.version, None);
+    }
+
+    #[test]
+    fn non_integer_count_entries_are_counted_not_silently_dropped() {
+        let s = parse_sccache_stats_json(
+            r#"{"stats":{"cache_hits":{"counts":{"Rust":3,"C":-1}},"cache_misses":{"counts":{"Rust":"x"}},"not_cached":{"a":1.5}}}"#,
+        )
+        .unwrap();
+        assert_eq!((s.hits, s.misses), (3, 0));
+        assert_eq!(s.non_integer_entries_skipped, 3);
+        assert_eq!(
+            parse_sccache_stats_json(STATS)
+                .unwrap()
+                .non_integer_entries_skipped,
+            0
+        );
     }
 
     #[test]

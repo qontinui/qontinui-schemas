@@ -64,7 +64,9 @@ pub type MeasuredManifest = BTreeMap<String, MeasuredState>;
 /// Serialized adjacently tagged — `{"state":"measured","value":…}`,
 /// `{"state":"not_supported"}`, `{"state":"unavailable"}` — so a reader can
 /// never take a missing value for a zero. It defaults to `unavailable`: a
-/// field nobody filled in is UNKNOWN, not measured-empty.
+/// field nobody filled in is UNKNOWN, not measured-empty. (`#[derive(Default)]`
+/// on an enum whose `#[default]` is a unit variant adds NO `T: Default`
+/// bound; `default_needs_no_t_default` pins that.)
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "state", content = "value", rename_all = "snake_case")]
@@ -178,6 +180,13 @@ mod tests {
             MeasuredState::from_read::<u8>(&None),
             MeasuredState::Unavailable
         );
+    }
+
+    #[test]
+    fn default_needs_no_t_default() {
+        struct NoDefault;
+        let d: Measured<NoDefault> = Measured::default();
+        assert!(matches!(d, Measured::Unavailable));
     }
 
     #[test]

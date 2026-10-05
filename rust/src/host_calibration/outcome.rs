@@ -79,13 +79,44 @@ impl BuildOutcome {
 pub struct BuildLedger {
     /// Lines that parsed, in file order.
     pub outcomes: Vec<BuildOutcome>,
-    /// Non-blank lines that did not (a torn last line after a crash, …).
+    /// Non-blank lines that did not (a torn last line after a crash, or a line
+    /// from a newer writer — those are also counted in
+    /// `unsupported_version_lines`).
     pub malformed_lines: usize,
+    /// Of `malformed_lines`, how many were refused for a newer
+    /// `schema_version`.
+    pub unsupported_version_lines: usize,
 }
 
-/// Parse one ledger line.
-pub fn parse_build_outcome_line(line: &str) -> Result<BuildOutcome, serde_json::Error> {
-    serde_json::from_str(line.trim())
+/// Why a ledger line was rejected.
+#[derive(Debug, thiserror::Error)]
+pub enum BuildOutcomeParseError {
+    /// Not a JSON object of the expected shape.
+    #[error("build outcome line is not valid: {0}")]
+    Json(#[from] serde_json::Error),
+    /// Written by a NEWER writer than this reader understands. Its fields may
+    /// have changed meaning, so it is refused rather than half-read.
+    #[error("build outcome schema_version {found} is newer than supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The line's version.
+        found: u32,
+        /// [`BUILD_OUTCOME_SCHEMA_VERSION`].
+        supported: u32,
+    },
+}
+
+/// Parse one ledger line. A line whose `schema_version` is greater than
+/// [`BUILD_OUTCOME_SCHEMA_VERSION`] is refused with
+/// [`BuildOutcomeParseError::UnsupportedSchemaVersion`].
+pub fn parse_build_outcome_line(line: &str) -> Result<BuildOutcome, BuildOutcomeParseError> {
+    let o: BuildOutcome = serde_json::from_str(line.trim())?;
+    if o.schema_version > BUILD_OUTCOME_SCHEMA_VERSION {
+        return Err(BuildOutcomeParseError::UnsupportedSchemaVersion {
+            found: o.schema_version,
+            supported: BUILD_OUTCOME_SCHEMA_VERSION,
+        });
+    }
+    Ok(o)
 }
 
 /// Parse a whole `builds.jsonl`. Malformed lines are counted, not fatal: a
@@ -95,7 +126,12 @@ pub fn parse_build_ledger(text: &str) -> BuildLedger {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         match parse_build_outcome_line(line) {
             Ok(o) => ledger.outcomes.push(o),
-            Err(_) => ledger.malformed_lines += 1,
+            Err(e) => {
+                ledger.malformed_lines += 1;
+                if matches!(e, BuildOutcomeParseError::UnsupportedSchemaVersion { .. }) {
+                    ledger.unsupported_version_lines += 1;
+                }
+            }
         }
     }
     ledger
@@ -136,5 +172,22 @@ mod tests {
         let l = parse_build_ledger(&text);
         assert_eq!(l.outcomes.len(), 2);
         assert_eq!(l.malformed_lines, 1);
+        assert_eq!(l.unsupported_version_lines, 0);
+    }
+
+    #[test]
+    fn a_newer_schema_version_is_refused_and_counted_malformed() {
+        let newer = LINE.replace("\"schema_version\":1", "\"schema_version\":2");
+        assert!(matches!(
+            parse_build_outcome_line(&newer),
+            Err(BuildOutcomeParseError::UnsupportedSchemaVersion {
+                found: 2,
+                supported: 1
+            })
+        ));
+        let l = parse_build_ledger(&format!("{LINE}\n{newer}\n"));
+        assert_eq!(l.outcomes.len(), 1);
+        assert_eq!(l.malformed_lines, 1);
+        assert_eq!(l.unsupported_version_lines, 1);
     }
 }

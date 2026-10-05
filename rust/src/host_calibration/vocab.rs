@@ -61,58 +61,79 @@ pub const RUNNER_SERVICE_UNIT: &str = "qontinui-runner.service";
 pub struct CgroupClass {
     /// The group the cgroup's use is charged to.
     pub group: WorkloadGroup,
-    /// True when the cgroup is known to hold more than one workload — today
-    /// only the runner's service cgroup (runner + its in-process sessions).
+    /// True when the cgroup holds more than one workload: it IS the runner
+    /// process's cgroup or an ANCESTOR of it, so its counters include the
+    /// runner (which spawns sessions in-process and shares their cgroup).
+    ///
+    /// A mixed group's figures OVERLAP the `runner` record, which is measured
+    /// from the runner process itself: never sum a mixed group and `runner`.
     pub mixed: bool,
 }
 
-/// Classify a cgroup v2 path to its [`CgroupClass`]. Pure.
+/// Classify a cgroup v2 path to its [`CgroupClass`], with `mixed` computed
+/// from the runner process's ACTUAL cgroup. Pure.
 ///
-/// Accepts the path as `/proc/<pid>/cgroup` writes it (`0::/user.slice/…`),
-/// cgroupfs-relative with or without the leading `/`. Rules, first match wins:
+/// Paths are accepted as `/proc/<pid>/cgroup` writes them (`0::/user.slice/…`),
+/// or cgroupfs-relative with or without the leading `/`. Group rules, first
+/// match wins:
 ///
 /// 1. `ci.slice` and its children → `ci`;
 /// 2. `system.slice` and `init.scope` → `system`;
-/// 3. `user.slice/…/user@<uid>.service/app.slice/<runner unit>` (and below)
-///    → `agents`, mixed;
-/// 4. the rest of `user.slice` (the `user@<uid>.service/*.scope` session
-///    scopes included) → `agents`;
-/// 5. anything else → `other`.
+/// 3. `user.slice` and everything under it (the `user@<uid>.service/*.scope`
+///    session scopes and the runner's own service cgroup included) → `agents`;
+/// 4. anything else → `other`.
 ///
-/// The runner group is never produced here — see [`WorkloadGroup::Runner`].
-pub fn classify_cgroup(path: &str) -> CgroupClass {
-    let trimmed = path.trim();
-    let trimmed = trimmed.strip_prefix("0::").unwrap_or(trimmed);
-    let mut parts = trimmed.split('/').filter(|p| !p.is_empty());
-    let first = parts.next();
-    let plain = |group| CgroupClass {
-        group,
-        mixed: false,
+/// `mixed`: with `runner_cgroup = Some(rc)` (from
+/// [`super::parse::cgroup::parse_proc_pid_cgroup`] on the runner pid), the
+/// path is mixed iff it equals `rc` or is an ancestor of it — so `/user.slice`
+/// is mixed on a host whose runner lives under it. With `None` (runner pid
+/// unknown), the fallback is the unit-name rule: mixed iff the path is at or
+/// below `user@<uid>.service/app.slice/<runner unit>`.
+///
+/// The `runner` group is never produced here — see [`WorkloadGroup::Runner`].
+pub fn classify_cgroup_with(path: &str, runner_cgroup: Option<&str>) -> CgroupClass {
+    let parts = cgroup_components(path);
+    let group = match parts.first().copied() {
+        Some("ci.slice") => WorkloadGroup::Ci,
+        Some("system.slice") | Some("init.scope") => WorkloadGroup::System,
+        Some("user.slice") => WorkloadGroup::Agents,
+        _ => WorkloadGroup::Other,
     };
-    match first {
-        Some("ci.slice") => plain(WorkloadGroup::Ci),
-        Some("system.slice") | Some("init.scope") => plain(WorkloadGroup::System),
-        Some("user.slice") => {
-            let rest: Vec<&str> = parts.collect();
-            let mixed = rest.windows(3).any(|w| {
-                is_user_manager_unit(w[0]) && w[1] == "app.slice" && w[2] == RUNNER_SERVICE_UNIT
-            });
-            CgroupClass {
-                group: WorkloadGroup::Agents,
-                mixed,
-            }
+    let mixed = match runner_cgroup {
+        Some(rc) => {
+            let rc = cgroup_components(rc);
+            parts.len() <= rc.len() && parts.iter().zip(&rc).all(|(a, b)| a == b)
         }
-        _ => plain(WorkloadGroup::Other),
-    }
+        None => {
+            group == WorkloadGroup::Agents
+                && parts.windows(3).any(|w| {
+                    is_user_manager_unit(w[0]) && w[1] == "app.slice" && w[2] == RUNNER_SERVICE_UNIT
+                })
+        }
+    };
+    CgroupClass { group, mixed }
 }
 
-/// [`classify_cgroup`] without the mixed flag.
+/// [`classify_cgroup_with`] with the runner's cgroup unknown (unit-name
+/// fallback for `mixed`).
+pub fn classify_cgroup(path: &str) -> CgroupClass {
+    classify_cgroup_with(path, None)
+}
+
+/// The group alone, for callers that do not need `mixed`.
 pub fn classify_cgroup_path(path: &str) -> WorkloadGroup {
     classify_cgroup(path).group
 }
 
+/// A cgroup path's components, `0::` prefix and empty segments removed.
+pub(crate) fn cgroup_components(path: &str) -> Vec<&str> {
+    let t = path.trim();
+    let t = t.strip_prefix("0::").unwrap_or(t);
+    t.split('/').filter(|p| !p.is_empty()).collect()
+}
+
 /// `user@<digits>.service` — the per-user systemd manager's unit.
-fn is_user_manager_unit(component: &str) -> bool {
+pub(crate) fn is_user_manager_unit(component: &str) -> bool {
     component
         .strip_prefix("user@")
         .and_then(|r| r.strip_suffix(".service"))
@@ -307,6 +328,37 @@ mod tests {
         );
         // A prefix match on the NAME is not a match on the component.
         assert_eq!(classify_cgroup_path("/ci.slicex"), WorkloadGroup::Other);
+    }
+
+    #[test]
+    fn mixed_follows_the_runner_pids_actual_cgroup() {
+        let rc = "0::/user.slice/user-7.slice/user@7.service/app.slice/qontinui-runner.service";
+        // The runner's cgroup and every ancestor are mixed.
+        for p in [
+            "/user.slice",
+            "/user.slice/user-7.slice",
+            "/user.slice/user-7.slice/user@7.service",
+            "/user.slice/user-7.slice/user@7.service/app.slice/qontinui-runner.service",
+            "/",
+        ] {
+            assert!(classify_cgroup_with(p, Some(rc)).mixed, "{p}");
+        }
+        // Siblings and descendants are not.
+        for p in [
+            "/ci.slice",
+            "/system.slice",
+            "/user.slice/user-7.slice/user@7.service/tmux-spawn-a.scope",
+            "/user.slice/user-7.slice/user@7.service/app.slice/qontinui-runner.service/x",
+            "/user.slice/user-7.slice/user@7.servicex",
+        ] {
+            assert!(!classify_cgroup_with(p, Some(rc)).mixed, "{p}");
+        }
+        // A runner run as a system service makes system.slice mixed instead.
+        let sys = Some("/system.slice/qontinui-runner.service");
+        assert!(classify_cgroup_with("/system.slice", sys).mixed);
+        assert!(!classify_cgroup_with("/user.slice", sys).mixed);
+        // Without the runner cgroup, /user.slice falls back to the unit rule.
+        assert!(!classify_cgroup("/user.slice").mixed);
     }
 
     #[test]

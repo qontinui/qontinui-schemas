@@ -6,13 +6,14 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::cgroup_path::redact_cgroup_path;
 use super::measured::{Measured, MeasuredManifest};
 use super::parse::cgroup::{
     parse_cpu_stat, parse_cpu_weight, parse_memory_bytes, parse_memory_events, MemoryEvents,
 };
 use super::parse::proc::ProcStat;
 use super::parse::psi::{parse_psi, Psi};
-use super::vocab::WorkloadGroup;
+use super::vocab::{CgroupClass, WorkloadGroup};
 
 /// The platform a fact set was measured on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -40,14 +41,22 @@ impl Platform {
 pub struct WorkloadGroupPressure {
     /// The group.
     pub group: WorkloadGroup,
-    /// True when the measured cgroup set is known to hold more than this
-    /// group (the runner's service cgroup inside `agents`).
+    /// True when the measured cgroup IS the runner process's cgroup or an
+    /// ancestor of it ([`crate::host_calibration::vocab::classify_cgroup_with`]).
+    /// A mixed group's figures OVERLAP the `runner` record: never sum them.
     #[serde(default)]
     pub mixed: bool,
-    /// The cgroupfs-relative paths aggregated into this record (empty for the
-    /// runner process and for platforms without cgroups).
+    /// The REDACTED shapes of the cgroups aggregated into this record
+    /// ([`crate::host_calibration::cgroup_path::redact_cgroup_path`]): no uid,
+    /// host name or session name ever reaches the wire. Empty for the runner
+    /// process and for platforms without cgroups.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub cgroup_paths: Vec<String>,
+    pub cgroup_shapes: Vec<String>,
+    /// How many session/container scopes sit beneath the measured cgroup(s) —
+    /// the count that replaces their names. `unavailable` unless the collector
+    /// supplies it ([`WorkloadGroupPressure::with_scope_count`]);
+    /// `not_supported` without cgroups.
+    pub scope_count: Measured<u32>,
     /// Share of the host's total CPU capacity used over the sample interval,
     /// 0.0..=1.0 (1.0 = every core busy).
     pub cpu_usage_share: Measured<f64>,
@@ -75,6 +84,7 @@ impl WorkloadGroupPressure {
         let mut put = |field: &str, s| {
             out.insert(format!("{prefix}{g}.{field}"), s);
         };
+        put("scope_count", self.scope_count.state());
         put("cpu_usage_share", self.cpu_usage_share.state());
         put("cpu_usage_usec", self.cpu_usage_usec.state());
         put("cpu_pressure", self.cpu_pressure.state());
@@ -84,61 +94,110 @@ impl WorkloadGroupPressure {
         put("memory_events", self.memory_events.state());
         put("io_pressure", self.io_pressure.state());
     }
+
+    /// Set the scope count the collector measured (`None` → `unavailable`).
+    pub fn with_scope_count(mut self, scopes: Option<u32>) -> Self {
+        self.scope_count = Measured::from_read(scopes);
+        self
+    }
 }
 
-/// The contents of one cgroup's interface files; `None` = unreadable.
+/// What reading one cgroup interface file produced. Absent and failed are
+/// different facts: a file that does not EXIST means this cgroup or kernel
+/// has no such instrument (`cpu.weight` / `cpu.stat`'s throttling lines where
+/// the `cpu` controller is not enabled — `app.slice` enables only
+/// `memory pids`; `memory.*` where `memory` is off; `memory.peak` before
+/// kernel 5.19; `*.pressure` with `cgroup.pressure` disabled) and maps to
+/// `not_supported`; a read that FAILED is UNKNOWN and maps to `unavailable`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CgroupFile<'a> {
+    /// The file's contents.
+    Contents(&'a str),
+    /// The file does not exist (ENOENT).
+    Absent,
+    /// The read failed for another reason, or was not attempted.
+    #[default]
+    ReadError,
+}
+
+impl<'a> CgroupFile<'a> {
+    /// Map a read result: `NotFound` → [`CgroupFile::Absent`], any other
+    /// error → [`CgroupFile::ReadError`]. Pure over the result value.
+    pub fn from_read_result(result: &'a std::io::Result<String>) -> Self {
+        match result {
+            Ok(text) => CgroupFile::Contents(text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => CgroupFile::Absent,
+            Err(_) => CgroupFile::ReadError,
+        }
+    }
+
+    /// Parse the contents: absent → `not_supported`, failed read or
+    /// unparseable contents → `unavailable`.
+    fn measure<T>(self, parse: impl FnOnce(&str) -> Option<T>) -> Measured<T> {
+        match self {
+            CgroupFile::Contents(t) => Measured::from_read(parse(t)),
+            CgroupFile::Absent => Measured::NotSupported,
+            CgroupFile::ReadError => Measured::Unavailable,
+        }
+    }
+}
+
+/// One cgroup's interface files. Fields default to
+/// [`CgroupFile::ReadError`] — a file nobody read is UNKNOWN.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CgroupFiles<'a> {
     /// `cpu.pressure`.
-    pub cpu_pressure: Option<&'a str>,
+    pub cpu_pressure: CgroupFile<'a>,
     /// `cpu.stat`.
-    pub cpu_stat: Option<&'a str>,
+    pub cpu_stat: CgroupFile<'a>,
     /// `cpu.weight` (absent where the `cpu` controller is not enabled).
-    pub cpu_weight: Option<&'a str>,
-    /// `memory.current`.
-    pub memory_current: Option<&'a str>,
-    /// `memory.peak` (kernel ≥ 5.19).
-    pub memory_peak: Option<&'a str>,
-    /// `memory.events`.
-    pub memory_events: Option<&'a str>,
+    pub cpu_weight: CgroupFile<'a>,
+    /// `memory.current` (absent where `memory` is not enabled).
+    pub memory_current: CgroupFile<'a>,
+    /// `memory.peak` (absent before kernel 5.19, or without `memory`).
+    pub memory_peak: CgroupFile<'a>,
+    /// `memory.events` (absent without `memory`).
+    pub memory_events: CgroupFile<'a>,
     /// `io.pressure`.
-    pub io_pressure: Option<&'a str>,
+    pub io_pressure: CgroupFile<'a>,
 }
 
 /// Build a cgroup-backed group record from file contents. PURE.
 ///
+/// `class` comes from
+/// [`crate::host_calibration::vocab::classify_cgroup_with`] on the same path.
+/// The path itself is published only as its redacted shape.
 /// `cpu_usage_share` comes from two samples, so the caller computes it with
 /// [`cpu_share_of_host`] (`None` on the first tick → `unavailable`).
 pub fn group_pressure_from_files(
-    group: WorkloadGroup,
+    class: CgroupClass,
     cgroup_path: &str,
-    mixed: bool,
     files: &CgroupFiles<'_>,
     cpu_usage_share: Option<f64>,
 ) -> WorkloadGroupPressure {
     WorkloadGroupPressure {
-        group,
-        mixed,
-        cgroup_paths: vec![cgroup_path.to_string()],
+        group: class.group,
+        mixed: class.mixed,
+        cgroup_shapes: vec![redact_cgroup_path(cgroup_path)],
+        scope_count: Measured::Unavailable,
         cpu_usage_share: Measured::from_read(cpu_usage_share),
-        cpu_usage_usec: Measured::from_read(
-            files
-                .cpu_stat
-                .and_then(parse_cpu_stat)
-                .map(|s| s.usage_usec),
-        ),
-        cpu_pressure: Measured::from_read(files.cpu_pressure.and_then(parse_psi)),
-        cpu_weight: Measured::from_read(files.cpu_weight.and_then(parse_cpu_weight)),
-        memory_current_bytes: Measured::from_read(
-            files.memory_current.and_then(parse_memory_bytes),
-        ),
-        memory_peak_bytes: Measured::from_read(files.memory_peak.and_then(parse_memory_bytes)),
-        memory_events: Measured::from_read(files.memory_events.and_then(parse_memory_events)),
-        io_pressure: Measured::from_read(files.io_pressure.and_then(parse_psi)),
+        cpu_usage_usec: files
+            .cpu_stat
+            .measure(|t| parse_cpu_stat(t).map(|s| s.usage_usec)),
+        cpu_pressure: files.cpu_pressure.measure(parse_psi),
+        cpu_weight: files.cpu_weight.measure(parse_cpu_weight),
+        memory_current_bytes: files.memory_current.measure(parse_memory_bytes),
+        memory_peak_bytes: files.memory_peak.measure(parse_memory_bytes),
+        memory_events: files.memory_events.measure(parse_memory_events),
+        io_pressure: files.io_pressure.measure(parse_psi),
     }
 }
 
 /// Build the `runner` group record from the runner PROCESS. PURE.
+///
+/// This record OVERLAPS every mixed group (the runner's cgroup and its
+/// ancestors also count the runner): it is the runner's own share, never an
+/// addend to them.
 ///
 /// Per-process PSI, `cpu.weight` and `memory.events` do not exist, so those
 /// axes are `not_supported` (never `unavailable`, never 0). `stat = None`
@@ -160,7 +219,8 @@ pub fn runner_pressure_from_stat(
     WorkloadGroupPressure {
         group: WorkloadGroup::Runner,
         mixed: false,
-        cgroup_paths: Vec::new(),
+        cgroup_shapes: Vec::new(),
+        scope_count: Measured::NotSupported,
         cpu_usage_share: Measured::from_read(cpu_usage_share),
         cpu_usage_usec: Measured::from_read(usec),
         cpu_pressure: Measured::NotSupported,
@@ -183,7 +243,8 @@ pub fn group_pressure_without_cgroups(
     WorkloadGroupPressure {
         group,
         mixed: false,
-        cgroup_paths: Vec::new(),
+        cgroup_shapes: Vec::new(),
+        scope_count: Measured::NotSupported,
         cpu_usage_share: Measured::from_read(cpu_usage_share),
         cpu_usage_usec: Measured::NotSupported,
         cpu_pressure: Measured::NotSupported,
@@ -283,16 +344,18 @@ mod tests {
     use super::*;
     use crate::host_calibration::measured::MeasuredState;
     use crate::host_calibration::parse::proc::parse_proc_pid_stat;
+    use crate::host_calibration::vocab::{classify_cgroup, classify_cgroup_with};
 
     #[test]
     fn group_from_files_marks_unreadable_as_unavailable() {
         let files = CgroupFiles {
-            cpu_pressure: Some("some avg10=1 avg60=2 avg300=3 total=4\n"),
-            cpu_weight: Some("100\n"),
-            memory_current: Some("garbage"),
+            cpu_pressure: CgroupFile::Contents("some avg10=1 avg60=2 avg300=3 total=4\n"),
+            cpu_weight: CgroupFile::Contents("100\n"),
+            memory_current: CgroupFile::Contents("garbage"),
             ..CgroupFiles::default()
         };
-        let g = group_pressure_from_files(WorkloadGroup::Ci, "/ci.slice", false, &files, None);
+        let g = group_pressure_from_files(classify_cgroup("/ci.slice"), "/ci.slice", &files, None);
+        assert_eq!(g.group, WorkloadGroup::Ci);
         assert_eq!(g.cpu_weight, Measured::Measured(100));
         assert_eq!(
             g.cpu_pressure.value().unwrap().some.unwrap().avg300,
@@ -301,6 +364,58 @@ mod tests {
         assert_eq!(g.memory_current_bytes, Measured::Unavailable);
         assert_eq!(g.cpu_usage_share, Measured::Unavailable);
         assert_eq!(g.io_pressure, Measured::Unavailable);
+        assert_eq!(g.cgroup_shapes, ["/ci.slice"]);
+        assert_eq!(g.scope_count, Measured::Unavailable);
+        assert_eq!(
+            g.with_scope_count(Some(3)).scope_count,
+            Measured::Measured(3)
+        );
+    }
+
+    #[test]
+    fn absent_files_are_not_supported_failed_reads_unavailable() {
+        // The runner's app.slice cgroup: the cpu controller is not enabled
+        // there (app.slice enables only memory+pids), so cpu.weight does not
+        // exist; this kernel predates memory.peak; io.pressure read failed.
+        let path = "/user.slice/user-9.slice/user@9.service/app.slice/qontinui-runner.service";
+        let files = CgroupFiles {
+            cpu_pressure: CgroupFile::Contents("some avg10=1 avg60=1 avg300=1 total=1\n"),
+            cpu_stat: CgroupFile::Contents("usage_usec 5\nuser_usec 3\nsystem_usec 2\n"),
+            cpu_weight: CgroupFile::Absent,
+            memory_current: CgroupFile::Contents("4096\n"),
+            memory_peak: CgroupFile::Absent,
+            memory_events: CgroupFile::Contents("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n"),
+            io_pressure: CgroupFile::ReadError,
+        };
+        let g =
+            group_pressure_from_files(classify_cgroup_with(path, Some(path)), path, &files, None);
+        assert_eq!(g.group, WorkloadGroup::Agents);
+        assert!(g.mixed);
+        assert_eq!(g.cpu_weight, Measured::NotSupported);
+        assert_eq!(g.memory_peak_bytes, Measured::NotSupported);
+        assert_eq!(g.io_pressure, Measured::Unavailable);
+        assert_eq!(g.cpu_usage_usec, Measured::Measured(5));
+        assert_eq!(g.memory_current_bytes, Measured::Measured(4096));
+        // No uid on the wire.
+        assert_eq!(
+            g.cgroup_shapes,
+            ["/user.slice/user-N.slice/user@N.service/app.slice/qontinui-runner.service"]
+        );
+        assert!(!serde_json::to_string(&g).unwrap().contains("user-9"));
+    }
+
+    #[test]
+    fn from_read_result_splits_enoent_from_other_errors() {
+        use std::io::{Error, ErrorKind};
+        let ok: std::io::Result<String> = Ok("100".into());
+        let missing: std::io::Result<String> = Err(Error::from(ErrorKind::NotFound));
+        let denied: std::io::Result<String> = Err(Error::from(ErrorKind::PermissionDenied));
+        assert_eq!(
+            CgroupFile::from_read_result(&ok),
+            CgroupFile::Contents("100")
+        );
+        assert_eq!(CgroupFile::from_read_result(&missing), CgroupFile::Absent);
+        assert_eq!(CgroupFile::from_read_result(&denied), CgroupFile::ReadError);
     }
 
     #[test]
@@ -326,7 +441,7 @@ mod tests {
         assert_eq!(f.groups.len(), 5);
         let mut m = MeasuredManifest::new();
         f.manifest_into(&mut m);
-        assert_eq!(m.len(), 40);
+        assert_eq!(m.len(), 45);
         assert_eq!(
             m["cgroup_pressure.ci.cpu_pressure"],
             MeasuredState::NotSupported

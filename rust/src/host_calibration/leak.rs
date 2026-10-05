@@ -82,7 +82,41 @@ pub struct LeakContext {
     /// `comm` values of every known workload class (agent sessions, CI
     /// runners, compilers, the runner itself, …) — the capacity plan's
     /// census classes. A known workload is never a leak here.
+    ///
+    /// Entries must be the KERNEL's comm, which is truncated to
+    /// [`KERNEL_COMM_MAX_BYTES`] bytes (`qontinui-runner` is `qontinui-runne`
+    /// in `/proc/<pid>/stat`). Build the set with
+    /// [`LeakContext::add_known_workload`] / [`LeakContext::with_known_workloads`],
+    /// which truncate for you; an untruncated long name would never match.
     pub known_workload_comms: BTreeSet<String>,
+}
+
+/// The kernel's `comm` limit: `TASK_COMM_LEN` (16) minus the NUL.
+pub const KERNEL_COMM_MAX_BYTES: usize = 15;
+
+/// A process name as the kernel stores it in `comm`: truncated to
+/// [`KERNEL_COMM_MAX_BYTES`] bytes (backed off to a char boundary).
+pub fn kernel_comm(name: &str) -> String {
+    let mut end = name.len().min(KERNEL_COMM_MAX_BYTES);
+    while !name.is_char_boundary(end) {
+        end -= 1;
+    }
+    name[..end].to_string()
+}
+
+impl LeakContext {
+    /// Add one known workload name, truncated to the kernel's comm.
+    pub fn add_known_workload(&mut self, name: &str) {
+        self.known_workload_comms.insert(kernel_comm(name));
+    }
+
+    /// Add every name, truncated to the kernel's comm.
+    pub fn with_known_workloads<'a>(mut self, names: impl IntoIterator<Item = &'a str>) -> Self {
+        for n in names {
+            self.add_known_workload(n);
+        }
+        self
+    }
 }
 
 /// What the collector observed about one process.
@@ -100,6 +134,12 @@ pub struct ProcessObservation {
     pub sustained_cpu_share: Option<f64>,
     /// How long the process has been observed, seconds.
     pub observed_secs: Option<u64>,
+    /// Whether the process's cgroup is a managed systemd service
+    /// ([`crate::host_calibration::cgroup_path::is_managed_service_cgroup`] on
+    /// `/proc/<pid>/cgroup`): stopping the unit reaps it, so it is not an
+    /// orphan. `None` (cgroup unknown, or no cgroups on this platform) leaves
+    /// the predicate deciding on the other inputs.
+    pub managed_unit: Option<bool>,
 }
 
 /// Why a process is not a leak.
@@ -110,6 +150,8 @@ pub enum NotLeakReason {
     HasTty,
     /// Its parent is neither init nor a subreaper.
     NotOrphaned,
+    /// It is a member of a managed systemd `*.service` unit.
+    ManagedUnit,
     /// Its `comm` is a known workload class.
     KnownWorkload,
     /// Its sustained CPU share is at or below the threshold.
@@ -145,7 +187,8 @@ pub enum LeakVerdict {
 
 /// Decide whether `obs` is an orphan CPU burner. PURE.
 ///
-/// A leak needs ALL of: parent is init or a subreaper; no controlling tty;
+/// A leak needs ALL of: parent is init or a subreaper; not in a managed
+/// service unit (when that is known); no controlling tty;
 /// `comm` not a known workload; sustained CPU share above
 /// `min_cpu_share` for at least `min_sustained_secs`. A definite negative on
 /// any measured input wins over an unknown on another; otherwise any unknown
@@ -161,6 +204,9 @@ pub fn orphan_cpu_burner(
     }
     if st.ppid != INIT_PID && !ctx.subreaper_pids.contains(&st.ppid) {
         return LeakVerdict::NotLeak(NotLeakReason::NotOrphaned);
+    }
+    if obs.managed_unit == Some(true) {
+        return LeakVerdict::NotLeak(NotLeakReason::ManagedUnit);
     }
     if ctx.known_workload_comms.contains(&st.comm) {
         return LeakVerdict::NotLeak(NotLeakReason::KnownWorkload);
@@ -217,6 +263,7 @@ mod tests {
             age_secs: Some(90_000),
             sustained_cpu_share: Some(0.98),
             observed_secs: Some(7200),
+            managed_unit: Some(false),
         }
     }
 
@@ -322,6 +369,41 @@ mod tests {
         assert_eq!(
             orphan_cpu_burner(&o, &c, &t),
             LeakVerdict::Unknown(UnknownInput::CpuShare)
+        );
+    }
+
+    #[test]
+    fn a_managed_service_member_is_not_an_orphan_and_unknown_is_safe() {
+        let t = LeakThresholds::default();
+        let c = LeakContext::default();
+        let mut o = obs(stat(1, 0, "cat"));
+        o.managed_unit = Some(true);
+        assert_eq!(
+            orphan_cpu_burner(&o, &c, &t),
+            LeakVerdict::NotLeak(NotLeakReason::ManagedUnit)
+        );
+        o.managed_unit = None;
+        assert!(matches!(
+            orphan_cpu_burner(&o, &c, &t),
+            LeakVerdict::Leak(_)
+        ));
+    }
+
+    #[test]
+    fn known_workloads_are_truncated_to_the_kernel_comm() {
+        assert_eq!(kernel_comm("qontinui-runner"), "qontinui-runner");
+        assert_eq!(kernel_comm("qontinui-runner-x"), "qontinui-runner");
+        assert_eq!(kernel_comm("Runner.Listener"), "Runner.Listener");
+        assert_eq!(kernel_comm("ééééééééé"), "ééééééé"); // 18 bytes → 14, char boundary
+        let c = LeakContext::default().with_known_workloads(["a-very-long-process-name"]);
+        assert!(c.known_workload_comms.contains("a-very-long-pro"));
+        assert_eq!(
+            orphan_cpu_burner(
+                &obs(stat(1, 0, "a-very-long-pro")),
+                &c,
+                &LeakThresholds::default()
+            ),
+            LeakVerdict::NotLeak(NotLeakReason::KnownWorkload)
         );
     }
 

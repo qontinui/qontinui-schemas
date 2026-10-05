@@ -10,7 +10,8 @@
 //! Those values are exact; the avg10/avg60/total fields beside them are filled
 //! in, in the kernel's line shape, because the plan did not record them. The
 //! orphan's `stat` line is the real one (same process), and `proc_uptime` is
-//! set so its age is the ~4.1 days it had at 10:20Z.
+//! set so its age is the ~4.1 days it had at 10:20Z. `runner_proc_pid_cgroup`
+//! is the runner process's `/proc/<pid>/cgroup` line on that host.
 //!
 //! `fixtures/host_calibration/live_2026-10-05/` holds unedited copies of the
 //! same files read from the same host later that day (the mountinfo and
@@ -26,9 +27,10 @@ use qontinui_types::host_calibration::parse::proc::{
 };
 use qontinui_types::host_calibration::parse::psi::parse_psi;
 use qontinui_types::host_calibration::{
-    classify_cgroup, group_pressure_from_files, orphan_cpu_burner, CalibrationFacts, CgroupFiles,
-    CgroupPressureFacts, LeakContext, LeakThresholds, LeakVerdict, Measured, MeasuredState,
-    Platform, ProcessObservation, WorkloadGroup,
+    classify_cgroup, classify_cgroup_with, group_pressure_from_files, is_managed_service_cgroup,
+    orphan_cpu_burner, CalibrationFacts, CgroupFile, CgroupFiles, CgroupPressureFacts, LeakContext,
+    LeakThresholds, LeakVerdict, Measured, MeasuredState, Platform, ProcessObservation,
+    WorkloadGroup,
 };
 
 macro_rules! m1020 {
@@ -88,10 +90,15 @@ fn motivating_reading_weights_and_memory() {
         parse_memory_bytes(m1020!("user.slice_memory.peak")),
         Some(388_000_000_000)
     );
+    assert_eq!(
+        parse_memory_bytes(m1020!("user.slice_memory.current")),
+        Some(235_000_000_000)
+    );
 }
 
 #[test]
 fn motivating_reading_group_pressure_assembles() {
+    let runner_cgroup = parse_proc_pid_cgroup(m1020!("runner_proc_pid_cgroup")).unwrap();
     let groups = [
         (
             "/user.slice",
@@ -114,14 +121,12 @@ fn motivating_reading_group_pressure_assembles() {
         groups: groups
             .iter()
             .map(|(path, psi, w)| {
-                let class = classify_cgroup(path);
                 group_pressure_from_files(
-                    class.group,
+                    classify_cgroup_with(path, Some(&runner_cgroup)),
                     path,
-                    class.mixed,
                     &CgroupFiles {
-                        cpu_pressure: Some(psi),
-                        cpu_weight: Some(w),
+                        cpu_pressure: CgroupFile::Contents(psi),
+                        cpu_weight: CgroupFile::Contents(w),
                         ..CgroupFiles::default()
                     },
                     None,
@@ -139,6 +144,11 @@ fn motivating_reading_group_pressure_assembles() {
         Measured::Measured(100)
     );
     assert!(facts.group(WorkloadGroup::System).is_some());
+    // The runner lives under /user.slice, so agents is mixed (it overlaps the
+    // runner record); ci and system are not.
+    assert!(agents.mixed);
+    assert!(!facts.group(WorkloadGroup::Ci).unwrap().mixed);
+    assert!(!facts.group(WorkloadGroup::System).unwrap().mixed);
     // Files not read are UNKNOWN, never 0.
     assert_eq!(agents.memory_current_bytes, Measured::Unavailable);
 }
@@ -157,14 +167,19 @@ fn motivating_reading_orphan_is_a_leak() {
         age_secs: Some(age),
         sustained_cpu_share: Some(0.98),
         observed_secs: Some(3600),
+        managed_unit: parse_proc_pid_cgroup(live!("proc_118544_cgroup"))
+            .map(|cg| is_managed_service_cgroup(&cg, None)),
     };
-    let ctx = LeakContext {
-        known_workload_comms: ["rustc", "cargo", "claude", "node", "Runner.Worker"]
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        ..LeakContext::default()
-    };
+    // It sits in a session scope, not a managed service.
+    assert_eq!(obs.managed_unit, Some(false));
+    let ctx = LeakContext::default().with_known_workloads([
+        "rustc",
+        "cargo",
+        "claude",
+        "node",
+        "Runner.Worker",
+        "qontinui-runner",
+    ]);
     let LeakVerdict::Leak(r) = orphan_cpu_burner(&obs, &ctx, &LeakThresholds::default()) else {
         panic!("the cat /dev/zero orphan must be detected");
     };
@@ -192,15 +207,16 @@ fn live_files_parse() {
         assert!(p.full.is_some());
     }
     let files = CgroupFiles {
-        cpu_pressure: Some(live!("ci.slice_cpu.pressure")),
-        cpu_stat: Some(live!("ci.slice_cpu.stat")),
-        cpu_weight: Some(live!("ci.slice_cpu.weight")),
-        memory_current: Some(live!("ci.slice_memory.current")),
-        memory_peak: Some(live!("ci.slice_memory.peak")),
-        memory_events: Some(live!("ci.slice_memory.events")),
-        io_pressure: Some(live!("ci.slice_io.pressure")),
+        cpu_pressure: CgroupFile::Contents(live!("ci.slice_cpu.pressure")),
+        cpu_stat: CgroupFile::Contents(live!("ci.slice_cpu.stat")),
+        cpu_weight: CgroupFile::Contents(live!("ci.slice_cpu.weight")),
+        memory_current: CgroupFile::Contents(live!("ci.slice_memory.current")),
+        memory_peak: CgroupFile::Contents(live!("ci.slice_memory.peak")),
+        memory_events: CgroupFile::Contents(live!("ci.slice_memory.events")),
+        io_pressure: CgroupFile::Contents(live!("ci.slice_io.pressure")),
     };
-    let ci = group_pressure_from_files(WorkloadGroup::Ci, "/ci.slice", false, &files, Some(0.2));
+    let ci =
+        group_pressure_from_files(classify_cgroup("/ci.slice"), "/ci.slice", &files, Some(0.2));
     for (axis, state) in [
         ("cpu_usage_usec", ci.cpu_usage_usec.state()),
         ("cpu_pressure", ci.cpu_pressure.state()),
@@ -229,11 +245,15 @@ fn live_files_parse() {
     assert!(mi.swap_used_bytes().unwrap() > 0);
     assert!(parse_loadavg(live!("proc_loadavg")).is_some());
 
-    // The runner's own cgroup is mixed agents (vet correction 4).
+    // The runner's own cgroup is mixed agents (vet correction 4), both by the
+    // runner pid's cgroup and by the unit-name fallback.
     let cg = parse_proc_pid_cgroup(live!("proc_self_cgroup")).unwrap();
-    let class = classify_cgroup(&cg);
+    let class = classify_cgroup_with(&cg, Some(&cg));
     assert_eq!(class.group, WorkloadGroup::Agents);
     assert!(class.mixed);
+    assert!(classify_cgroup(&cg).mixed);
+    // The runner's cgroup is never "managed" for the leak predicate.
+    assert!(!is_managed_service_cgroup(&cg, Some(&cg)));
 
     let mounts = parse_mountinfo(live!("proc_self_mountinfo_excerpt"));
     assert_eq!(
