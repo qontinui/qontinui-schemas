@@ -15,6 +15,7 @@ use std::collections::BTreeSet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::measured::Measured;
 use super::parse::proc::ProcStat;
 
 /// The init process's pid: the kernel reparents orphans to it (or to the
@@ -84,8 +85,8 @@ pub struct LeakContext {
     /// census classes. A known workload is never a leak here.
     ///
     /// Entries must be the KERNEL's comm, which is truncated to
-    /// [`KERNEL_COMM_MAX_BYTES`] bytes (`qontinui-runner` is `qontinui-runne`
-    /// in `/proc/<pid>/stat`). Build the set with
+    /// [`KERNEL_COMM_MAX_BYTES`] bytes (`containerd-shim-runc-v2` is
+    /// `containerd-shim` in `/proc/<pid>/stat`). Build the set with
     /// [`LeakContext::add_known_workload`] / [`LeakContext::with_known_workloads`],
     /// which truncate for you; an untruncated long name would never match.
     pub known_workload_comms: BTreeSet<String>,
@@ -94,14 +95,16 @@ pub struct LeakContext {
 /// The kernel's `comm` limit: `TASK_COMM_LEN` (16) minus the NUL.
 pub const KERNEL_COMM_MAX_BYTES: usize = 15;
 
-/// A process name as the kernel stores it in `comm`: truncated to
-/// [`KERNEL_COMM_MAX_BYTES`] bytes (backed off to a char boundary).
+/// A process name as the kernel stores it in `comm`: the first
+/// [`KERNEL_COMM_MAX_BYTES`] BYTES, exactly as the kernel cuts it — which can
+/// split a multi-byte UTF-8 character. The cut is decoded lossily (a split
+/// character becomes U+FFFD), which matches what a collector gets when it
+/// reads `/proc/<pid>/stat` as bytes and decodes it with
+/// `String::from_utf8_lossy` — the decoding collectors must use, since a
+/// strict UTF-8 read fails on such a comm.
 pub fn kernel_comm(name: &str) -> String {
-    let mut end = name.len().min(KERNEL_COMM_MAX_BYTES);
-    while !name.is_char_boundary(end) {
-        end -= 1;
-    }
-    name[..end].to_string()
+    let bytes = name.as_bytes();
+    String::from_utf8_lossy(&bytes[..bytes.len().min(KERNEL_COMM_MAX_BYTES)]).into_owned()
 }
 
 impl LeakContext {
@@ -137,9 +140,11 @@ pub struct ProcessObservation {
     /// Whether the process's cgroup is a managed systemd service
     /// ([`crate::host_calibration::cgroup_path::is_managed_service_cgroup`] on
     /// `/proc/<pid>/cgroup`): stopping the unit reaps it, so it is not an
-    /// orphan. `None` (cgroup unknown, or no cgroups on this platform) leaves
-    /// the predicate deciding on the other inputs.
-    pub managed_unit: Option<bool>,
+    /// orphan. `not_supported` (no cgroups on this platform) leaves the
+    /// predicate deciding on the other inputs; `unavailable` (the process's
+    /// cgroup could not be read) makes the verdict UNKNOWN unless another
+    /// input is a definite negative.
+    pub managed_unit: Measured<bool>,
 }
 
 /// Why a process is not a leak.
@@ -172,6 +177,9 @@ pub enum UnknownInput {
     OwnerUid,
     /// Age not computable.
     Age,
+    /// The process's cgroup could not be read, so whether it is a managed
+    /// unit is unknown.
+    ManagedUnit,
 }
 
 /// The predicate's answer.
@@ -205,7 +213,7 @@ pub fn orphan_cpu_burner(
     if st.ppid != INIT_PID && !ctx.subreaper_pids.contains(&st.ppid) {
         return LeakVerdict::NotLeak(NotLeakReason::NotOrphaned);
     }
-    if obs.managed_unit == Some(true) {
+    if obs.managed_unit == Measured::Measured(true) {
         return LeakVerdict::NotLeak(NotLeakReason::ManagedUnit);
     }
     if ctx.known_workload_comms.contains(&st.comm) {
@@ -235,6 +243,9 @@ pub fn orphan_cpu_burner(
     let Some(age_secs) = obs.age_secs else {
         return LeakVerdict::Unknown(UnknownInput::Age);
     };
+    if obs.managed_unit == Measured::Unavailable {
+        return LeakVerdict::Unknown(UnknownInput::ManagedUnit);
+    }
     LeakVerdict::Leak(LeakRecord {
         kind: LeakKind::OrphanCpu,
         comm: st.comm.clone(),
@@ -263,7 +274,7 @@ mod tests {
             age_secs: Some(90_000),
             sustained_cpu_share: Some(0.98),
             observed_secs: Some(7200),
-            managed_unit: Some(false),
+            managed_unit: Measured::Measured(false),
         }
     }
 
@@ -377,24 +388,39 @@ mod tests {
         let t = LeakThresholds::default();
         let c = LeakContext::default();
         let mut o = obs(stat(1, 0, "cat"));
-        o.managed_unit = Some(true);
+        o.managed_unit = Measured::Measured(true);
         assert_eq!(
             orphan_cpu_burner(&o, &c, &t),
             LeakVerdict::NotLeak(NotLeakReason::ManagedUnit)
         );
-        o.managed_unit = None;
+        // No cgroups on this platform: decided on the other inputs.
+        o.managed_unit = Measured::NotSupported;
         assert!(matches!(
             orphan_cpu_burner(&o, &c, &t),
             LeakVerdict::Leak(_)
         ));
+        // Cgroup unreadable: UNKNOWN, never a leak.
+        o.managed_unit = Measured::Unavailable;
+        assert_eq!(
+            orphan_cpu_burner(&o, &c, &t),
+            LeakVerdict::Unknown(UnknownInput::ManagedUnit)
+        );
+        // …but a definite negative elsewhere still wins.
+        o.sustained_cpu_share = Some(0.1);
+        assert_eq!(
+            orphan_cpu_burner(&o, &c, &t),
+            LeakVerdict::NotLeak(NotLeakReason::BelowCpuThreshold)
+        );
     }
 
     #[test]
     fn known_workloads_are_truncated_to_the_kernel_comm() {
+        // Exactly 15 bytes: unchanged.
         assert_eq!(kernel_comm("qontinui-runner"), "qontinui-runner");
-        assert_eq!(kernel_comm("qontinui-runner-x"), "qontinui-runner");
-        assert_eq!(kernel_comm("Runner.Listener"), "Runner.Listener");
-        assert_eq!(kernel_comm("ééééééééé"), "ééééééé"); // 18 bytes → 14, char boundary
+        assert_eq!(kernel_comm("containerd-shim-runc-v2"), "containerd-shim");
+        // 18 bytes cut at byte 15 splits the 8th char → U+FFFD, as a lossy
+        // read of /proc/<pid>/stat would show it.
+        assert_eq!(kernel_comm("ééééééééé"), "ééééééé\u{FFFD}");
         let c = LeakContext::default().with_known_workloads(["a-very-long-process-name"]);
         assert!(c.known_workload_comms.contains("a-very-long-pro"));
         assert_eq!(

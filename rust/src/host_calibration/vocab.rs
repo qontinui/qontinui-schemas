@@ -6,6 +6,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::measured::Measured;
+
 /// Which workload a cgroup's (or process's) resource use is charged to.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -61,13 +63,19 @@ pub const RUNNER_SERVICE_UNIT: &str = "qontinui-runner.service";
 pub struct CgroupClass {
     /// The group the cgroup's use is charged to.
     pub group: WorkloadGroup,
-    /// True when the cgroup holds more than one workload: it IS the runner
+    /// Whether the cgroup holds more than one workload: it IS the runner
     /// process's cgroup or an ANCESTOR of it, so its counters include the
     /// runner (which spawns sessions in-process and shares their cgroup).
     ///
+    /// Tri-state: `measured(true|false)` when the runner pid's cgroup was
+    /// known; without it only the runner unit's own cgroup is
+    /// `measured(true)` (by its name) and every other path is `unavailable` —
+    /// an ancestor like `/user.slice` may hold the runner, so it never reads
+    /// as a measured `false`.
+    ///
     /// A mixed group's figures OVERLAP the `runner` record, which is measured
     /// from the runner process itself: never sum a mixed group and `runner`.
-    pub mixed: bool,
+    pub mixed: Measured<bool>,
 }
 
 /// Classify a cgroup v2 path to its [`CgroupClass`], with `mixed` computed
@@ -87,8 +95,8 @@ pub struct CgroupClass {
 /// [`super::parse::cgroup::parse_proc_pid_cgroup`] on the runner pid), the
 /// path is mixed iff it equals `rc` or is an ancestor of it — so `/user.slice`
 /// is mixed on a host whose runner lives under it. With `None` (runner pid
-/// unknown), the fallback is the unit-name rule: mixed iff the path is at or
-/// below `user@<uid>.service/app.slice/<runner unit>`.
+/// unknown) the path ending in `user@<uid>.service/app.slice/<runner unit>`
+/// is `measured(true)` by its name, and every other path is `unavailable`.
 ///
 /// The `runner` group is never produced here — see [`WorkloadGroup::Runner`].
 pub fn classify_cgroup_with(path: &str, runner_cgroup: Option<&str>) -> CgroupClass {
@@ -102,20 +110,30 @@ pub fn classify_cgroup_with(path: &str, runner_cgroup: Option<&str>) -> CgroupCl
     let mixed = match runner_cgroup {
         Some(rc) => {
             let rc = cgroup_components(rc);
-            parts.len() <= rc.len() && parts.iter().zip(&rc).all(|(a, b)| a == b)
+            Measured::Measured(
+                parts.len() <= rc.len() && parts.iter().zip(&rc).all(|(a, b)| a == b),
+            )
         }
         None => {
-            group == WorkloadGroup::Agents
-                && parts.windows(3).any(|w| {
-                    is_user_manager_unit(w[0]) && w[1] == "app.slice" && w[2] == RUNNER_SERVICE_UNIT
-                })
+            let is_runner_unit = group == WorkloadGroup::Agents
+                && parts.len() >= 3
+                && matches!(
+                    &parts[parts.len() - 3..],
+                    [manager, "app.slice", unit]
+                        if is_user_manager_unit(manager) && *unit == RUNNER_SERVICE_UNIT
+                );
+            if is_runner_unit {
+                Measured::Measured(true)
+            } else {
+                Measured::Unavailable
+            }
         }
     };
     CgroupClass { group, mixed }
 }
 
-/// [`classify_cgroup_with`] with the runner's cgroup unknown (unit-name
-/// fallback for `mixed`).
+/// [`classify_cgroup_with`] with the runner's cgroup unknown (`mixed` is
+/// `measured(true)` only for the runner unit's own cgroup, else `unavailable`).
 pub fn classify_cgroup(path: &str) -> CgroupClass {
     classify_cgroup_with(path, None)
 }
@@ -273,7 +291,7 @@ mod tests {
             c,
             CgroupClass {
                 group: WorkloadGroup::Agents,
-                mixed: false
+                mixed: Measured::Unavailable
             }
         );
         assert_eq!(classify_cgroup_path("/user.slice"), WorkloadGroup::Agents);
@@ -292,25 +310,21 @@ mod tests {
             c,
             CgroupClass {
                 group: WorkloadGroup::Agents,
-                mixed: true
+                mixed: Measured::Measured(true)
             }
         );
-        // Below it too.
-        assert!(
-            classify_cgroup(
-                "/user.slice/user-42.slice/user@42.service/app.slice/qontinui-runner.service/x"
-            )
-            .mixed
-        );
-        // Another app.slice unit is plain agents.
-        assert!(
-            !classify_cgroup("/user.slice/user-42.slice/user@42.service/app.slice/other.service")
-                .mixed
-        );
-        // `user@.service` without a uid is not a user manager.
-        assert!(
-            !classify_cgroup("/user.slice/user@.service/app.slice/qontinui-runner.service").mixed
-        );
+        // Without the runner pid's cgroup, nothing else can be decided —
+        // below it, a sibling unit, and a malformed manager are all UNKNOWN,
+        // never a measured false.
+        for p in [
+            "/user.slice/user-42.slice/user@42.service/app.slice/qontinui-runner.service/x",
+            "/user.slice/user-42.slice/user@42.service/app.slice/other.service",
+            "/user.slice/user@.service/app.slice/qontinui-runner.service",
+            "/user.slice",
+            "/ci.slice",
+        ] {
+            assert_eq!(classify_cgroup(p).mixed, Measured::Unavailable, "{p}");
+        }
     }
 
     #[test]
@@ -341,7 +355,11 @@ mod tests {
             "/user.slice/user-7.slice/user@7.service/app.slice/qontinui-runner.service",
             "/",
         ] {
-            assert!(classify_cgroup_with(p, Some(rc)).mixed, "{p}");
+            assert_eq!(
+                classify_cgroup_with(p, Some(rc)).mixed,
+                Measured::Measured(true),
+                "{p}"
+            );
         }
         // Siblings and descendants are not.
         for p in [
@@ -351,14 +369,24 @@ mod tests {
             "/user.slice/user-7.slice/user@7.service/app.slice/qontinui-runner.service/x",
             "/user.slice/user-7.slice/user@7.servicex",
         ] {
-            assert!(!classify_cgroup_with(p, Some(rc)).mixed, "{p}");
+            assert_eq!(
+                classify_cgroup_with(p, Some(rc)).mixed,
+                Measured::Measured(false),
+                "{p}"
+            );
         }
         // A runner run as a system service makes system.slice mixed instead.
         let sys = Some("/system.slice/qontinui-runner.service");
-        assert!(classify_cgroup_with("/system.slice", sys).mixed);
-        assert!(!classify_cgroup_with("/user.slice", sys).mixed);
-        // Without the runner cgroup, /user.slice falls back to the unit rule.
-        assert!(!classify_cgroup("/user.slice").mixed);
+        assert_eq!(
+            classify_cgroup_with("/system.slice", sys).mixed,
+            Measured::Measured(true)
+        );
+        assert_eq!(
+            classify_cgroup_with("/user.slice", sys).mixed,
+            Measured::Measured(false)
+        );
+        // Without the runner cgroup, /user.slice is UNKNOWN, not false.
+        assert_eq!(classify_cgroup("/user.slice").mixed, Measured::Unavailable);
     }
 
     #[test]

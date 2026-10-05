@@ -68,7 +68,7 @@ pub type MeasuredManifest = BTreeMap<String, MeasuredState>;
 /// on an enum whose `#[default]` is a unit variant adds NO `T: Default`
 /// bound; `default_needs_no_t_default` pins that.)
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "state", content = "value", rename_all = "snake_case")]
 pub enum Measured<T> {
     /// The probe produced this value.

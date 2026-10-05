@@ -33,7 +33,7 @@ pub mod parse;
 pub mod pressure;
 pub mod vocab;
 
-pub use cgroup_path::{is_managed_service_cgroup, redact_cgroup_path};
+pub use cgroup_path::{is_managed_service_cgroup, redact_cgroup_path, STRUCTURAL_SLICES};
 pub use facts::{
     BuildVolumeKind, BuildVolumeState, CalibrationFacts, CompileCacheClass, CompileCacheClassFacts,
     CompileCacheFacts, CompileCacheReading, DiskConsumer, DiskUseEntry, DiskUseFacts,

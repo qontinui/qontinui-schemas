@@ -13,7 +13,7 @@ use super::parse::cgroup::{
 };
 use super::parse::proc::ProcStat;
 use super::parse::psi::{parse_psi, Psi};
-use super::vocab::{CgroupClass, WorkloadGroup};
+use super::vocab::{classify_cgroup_with, WorkloadGroup};
 
 /// The platform a fact set was measured on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -41,11 +41,13 @@ impl Platform {
 pub struct WorkloadGroupPressure {
     /// The group.
     pub group: WorkloadGroup,
-    /// True when the measured cgroup IS the runner process's cgroup or an
-    /// ancestor of it ([`crate::host_calibration::vocab::classify_cgroup_with`]).
+    /// Whether the measured cgroup IS the runner process's cgroup or an
+    /// ancestor of it ([`crate::host_calibration::vocab::CgroupClass::mixed`]):
+    /// `unavailable` when the runner's cgroup was unknown, `not_supported`
+    /// for the runner record itself and for platforms without cgroups.
     /// A mixed group's figures OVERLAP the `runner` record: never sum them.
     #[serde(default)]
-    pub mixed: bool,
+    pub mixed: Measured<bool>,
     /// The REDACTED shapes of the cgroups aggregated into this record
     /// ([`crate::host_calibration::cgroup_path::redact_cgroup_path`]): no uid,
     /// host name or session name ever reaches the wire. Empty for the runner
@@ -84,6 +86,7 @@ impl WorkloadGroupPressure {
         let mut put = |field: &str, s| {
             out.insert(format!("{prefix}{g}.{field}"), s);
         };
+        put("mixed", self.mixed.state());
         put("scope_count", self.scope_count.state());
         put("cpu_usage_share", self.cpu_usage_share.state());
         put("cpu_usage_usec", self.cpu_usage_usec.state());
@@ -123,10 +126,23 @@ pub enum CgroupFile<'a> {
 impl<'a> CgroupFile<'a> {
     /// Map a read result: `NotFound` → [`CgroupFile::Absent`], any other
     /// error → [`CgroupFile::ReadError`]. Pure over the result value.
+    ///
+    /// Only correct when the cgroup DIRECTORY is known to exist: a cgroup that
+    /// vanished between listing and reading (a scope that exited) also reads
+    /// ENOENT, and that is a failed read, not a missing instrument. Collectors
+    /// should use [`CgroupFile::from_read_result_in`].
     pub fn from_read_result(result: &'a std::io::Result<String>) -> Self {
+        Self::from_read_result_in(true, result)
+    }
+
+    /// [`CgroupFile::from_read_result`] with the cgroup directory's existence
+    /// checked AFTER the read: `NotFound` with `dir_exists == false` (the
+    /// cgroup itself is gone) → [`CgroupFile::ReadError`]; `NotFound` with the
+    /// directory present → [`CgroupFile::Absent`].
+    pub fn from_read_result_in(dir_exists: bool, result: &'a std::io::Result<String>) -> Self {
         match result {
             Ok(text) => CgroupFile::Contents(text),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => CgroupFile::Absent,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && dir_exists => CgroupFile::Absent,
             Err(_) => CgroupFile::ReadError,
         }
     }
@@ -164,17 +180,19 @@ pub struct CgroupFiles<'a> {
 
 /// Build a cgroup-backed group record from file contents. PURE.
 ///
-/// `class` comes from
-/// [`crate::host_calibration::vocab::classify_cgroup_with`] on the same path.
-/// The path itself is published only as its redacted shape.
+/// The path is classified here, with
+/// [`crate::host_calibration::vocab::classify_cgroup_with`] and the runner
+/// pid's cgroup (`None` when unknown), so the class cannot drift from the
+/// path. The path itself is published only as its redacted shape.
 /// `cpu_usage_share` comes from two samples, so the caller computes it with
 /// [`cpu_share_of_host`] (`None` on the first tick → `unavailable`).
 pub fn group_pressure_from_files(
-    class: CgroupClass,
+    runner_cgroup: Option<&str>,
     cgroup_path: &str,
     files: &CgroupFiles<'_>,
     cpu_usage_share: Option<f64>,
 ) -> WorkloadGroupPressure {
+    let class = classify_cgroup_with(cgroup_path, runner_cgroup);
     WorkloadGroupPressure {
         group: class.group,
         mixed: class.mixed,
@@ -218,7 +236,7 @@ pub fn runner_pressure_from_stat(
     });
     WorkloadGroupPressure {
         group: WorkloadGroup::Runner,
-        mixed: false,
+        mixed: Measured::NotSupported,
         cgroup_shapes: Vec::new(),
         scope_count: Measured::NotSupported,
         cpu_usage_share: Measured::from_read(cpu_usage_share),
@@ -242,7 +260,7 @@ pub fn group_pressure_without_cgroups(
 ) -> WorkloadGroupPressure {
     WorkloadGroupPressure {
         group,
-        mixed: false,
+        mixed: Measured::NotSupported,
         cgroup_shapes: Vec::new(),
         scope_count: Measured::NotSupported,
         cpu_usage_share: Measured::from_read(cpu_usage_share),
@@ -344,7 +362,6 @@ mod tests {
     use super::*;
     use crate::host_calibration::measured::MeasuredState;
     use crate::host_calibration::parse::proc::parse_proc_pid_stat;
-    use crate::host_calibration::vocab::{classify_cgroup, classify_cgroup_with};
 
     #[test]
     fn group_from_files_marks_unreadable_as_unavailable() {
@@ -354,7 +371,7 @@ mod tests {
             memory_current: CgroupFile::Contents("garbage"),
             ..CgroupFiles::default()
         };
-        let g = group_pressure_from_files(classify_cgroup("/ci.slice"), "/ci.slice", &files, None);
+        let g = group_pressure_from_files(None, "/ci.slice", &files, None);
         assert_eq!(g.group, WorkloadGroup::Ci);
         assert_eq!(g.cpu_weight, Measured::Measured(100));
         assert_eq!(
@@ -387,10 +404,9 @@ mod tests {
             memory_events: CgroupFile::Contents("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n"),
             io_pressure: CgroupFile::ReadError,
         };
-        let g =
-            group_pressure_from_files(classify_cgroup_with(path, Some(path)), path, &files, None);
+        let g = group_pressure_from_files(Some(path), path, &files, None);
         assert_eq!(g.group, WorkloadGroup::Agents);
-        assert!(g.mixed);
+        assert_eq!(g.mixed, Measured::Measured(true));
         assert_eq!(g.cpu_weight, Measured::NotSupported);
         assert_eq!(g.memory_peak_bytes, Measured::NotSupported);
         assert_eq!(g.io_pressure, Measured::Unavailable);
@@ -416,6 +432,19 @@ mod tests {
         );
         assert_eq!(CgroupFile::from_read_result(&missing), CgroupFile::Absent);
         assert_eq!(CgroupFile::from_read_result(&denied), CgroupFile::ReadError);
+        // The cgroup itself vanished: ENOENT is a failed read, not absence.
+        assert_eq!(
+            CgroupFile::from_read_result_in(false, &missing),
+            CgroupFile::ReadError
+        );
+        assert_eq!(
+            CgroupFile::from_read_result_in(true, &missing),
+            CgroupFile::Absent
+        );
+        assert_eq!(
+            CgroupFile::from_read_result_in(false, &ok),
+            CgroupFile::Contents("100")
+        );
     }
 
     #[test]
@@ -441,7 +470,7 @@ mod tests {
         assert_eq!(f.groups.len(), 5);
         let mut m = MeasuredManifest::new();
         f.manifest_into(&mut m);
-        assert_eq!(m.len(), 45);
+        assert_eq!(m.len(), 50);
         assert_eq!(
             m["cgroup_pressure.ci.cpu_pressure"],
             MeasuredState::NotSupported

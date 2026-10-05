@@ -4,13 +4,30 @@
 
 use super::vocab::{cgroup_components, is_user_manager_unit, RUNNER_SERVICE_UNIT};
 
+/// The slice names [`redact_cgroup_path`] publishes verbatim: systemd's own
+/// structural slices, the fleet's CI slices, and the calibration builds slice.
+/// (`user-<uid>.slice` is published too, after its uid is rewritten to `N`.)
+/// Any slice not listed is published as `*.slice`.
+pub const STRUCTURAL_SLICES: [&str; 9] = [
+    "user.slice",
+    "system.slice",
+    "machine.slice",
+    "ci.slice",
+    "ci-runners.slice",
+    "app.slice",
+    "session.slice",
+    "background.slice",
+    "qontinui-builds.slice",
+];
+
 /// Reduce a cgroup path to a shape that carries no uid, hostname or session
 /// name, for publishing. Rules per component:
 ///
 /// - `user-<digits>.slice` → `user-N.slice`; `user@<digits>.service` →
 ///   `user@N.service`;
-/// - any other `*.slice` is kept (slices are structural: `ci.slice`,
-///   `app.slice`, `ci-runners.slice`);
+/// - a slice on the [`STRUCTURAL_SLICES`] ALLOWLIST is kept verbatim; every
+///   other `*.slice` → `*.slice` (a slice name is operator-chosen and may
+///   carry a host or project name);
 /// - the runner's own unit is kept (a product name);
 /// - any other `*.service` → `*.service` (CI runner units embed the host
 ///   name and repo);
@@ -27,8 +44,10 @@ pub fn redact_cgroup_path(path: &str) -> String {
             out.push("user@N.service");
         } else if is_user_slice(c) {
             out.push("user-N.slice");
-        } else if c.ends_with(".slice") || c == RUNNER_SERVICE_UNIT {
+        } else if STRUCTURAL_SLICES.contains(&c) || c == RUNNER_SERVICE_UNIT {
             out.push(c);
+        } else if c.ends_with(".slice") {
+            out.push("*.slice");
         } else if c.ends_with(".service") {
             out.push("*.service");
         } else if c.ends_with(".scope") {
@@ -48,12 +67,15 @@ pub fn redact_cgroup_path(path: &str) -> String {
 /// the runner unit name when unknown), because the runner hosts the sessions
 /// it spawns and a leak there is exactly what the detector looks for.
 ///
-/// A `*.scope` below the service (a session scope) is not managed.
+/// A `*.scope` below the service (a session scope) is not managed. A
+/// `runner_cgroup` of the root `/` is treated as unknown (the runner unit
+/// name still applies): every path is under root, so honouring it would
+/// switch the check off entirely.
 pub fn is_managed_service_cgroup(path: &str, runner_cgroup: Option<&str>) -> bool {
     let parts = cgroup_components(path);
     if let Some(rc) = runner_cgroup {
         let rc = cgroup_components(rc);
-        if parts.len() >= rc.len() && parts.iter().zip(&rc).all(|(a, b)| a == b) {
+        if !rc.is_empty() && parts.len() >= rc.len() && parts.iter().zip(&rc).all(|(a, b)| a == b) {
             return false;
         }
     }
@@ -105,10 +127,18 @@ mod tests {
             "/system.slice/*.scope"
         );
         assert_eq!(redact_cgroup_path("/"), "/");
+        // Not on the allowlist → *.slice.
         assert_eq!(
             redact_cgroup_path("/user.slice/user-.slice"),
-            "/user.slice/user-.slice"
+            "/user.slice/*.slice"
         );
+        assert_eq!(
+            redact_cgroup_path("/somehost-projects.slice/a.service"),
+            "/*.slice/*.service"
+        );
+        for s in STRUCTURAL_SLICES {
+            assert_eq!(redact_cgroup_path(&format!("/{s}")), format!("/{s}"));
+        }
     }
 
     #[test]
@@ -149,6 +179,15 @@ mod tests {
         assert!(!is_managed_service_cgroup(
             "/system.slice/renamed.service",
             Some("/system.slice/renamed.service")
+        ));
+        // A root runner cgroup does not switch the check off.
+        assert!(is_managed_service_cgroup(
+            "/system.slice/cron.service",
+            Some("/")
+        ));
+        assert!(is_managed_service_cgroup(
+            "/system.slice/cron.service",
+            Some("0::/")
         ));
     }
 }

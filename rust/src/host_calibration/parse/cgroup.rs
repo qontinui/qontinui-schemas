@@ -132,11 +132,15 @@ pub fn parse_memory_events_oom_kill(text: &str) -> Option<u64> {
 }
 
 /// The cgroup v2 path from a `/proc/<pid>/cgroup` file: the `0::<path>`
-/// line. `None` on a v1-only (no unified line) file.
+/// line. `None` on a v1-only (no unified line) file. A trailing ` (deleted)`
+/// (the kernel's mark for a removed cgroup) is stripped.
 pub fn parse_proc_pid_cgroup(text: &str) -> Option<String> {
     text.lines()
         .find_map(|l| l.strip_prefix("0::"))
-        .map(|p| p.trim().to_string())
+        .map(|p| {
+            let p = p.trim();
+            p.strip_suffix(" (deleted)").unwrap_or(p).to_string()
+        })
         .filter(|p| !p.is_empty())
 }
 
@@ -211,5 +215,9 @@ mod tests {
             Some("/ci.slice")
         );
         assert_eq!(parse_proc_pid_cgroup("12:cpu:/x\n"), None);
+        assert_eq!(
+            parse_proc_pid_cgroup("0::/user.slice/a.scope (deleted)\n").as_deref(),
+            Some("/user.slice/a.scope")
+        );
     }
 }
