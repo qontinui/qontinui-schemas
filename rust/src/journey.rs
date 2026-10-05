@@ -107,7 +107,8 @@ pub enum JourneyContractError {
         to_key: String,
     },
     /// A `navigation` trigger names an activated affordance — a
-    /// `targetFingerprint`, or a `navigationTrigger` of `affordance`. An
+    /// `targetFingerprint`, `targetRole` or `declaredEffect`, or a
+    /// `navigationTrigger` of `affordance`. An
     /// agent-driven navigation activates none, and the arrivals
     /// `requires_prior_knowledge` reads are told apart by exactly that.
     #[error("chokePoint is navigation but {reason}; a navigation activates no affordance")]
@@ -348,11 +349,14 @@ pub enum ChokePoint {
     SdkElementAction,
     /// Any execute-with-diff route (runner routes and the SDK twin).
     ExecuteWithDiff,
-    /// An agent-driven navigation (the SDK and control `page/navigate` /
-    /// `page/navigate-to` routes): no affordance was activated, so
-    /// `targetFingerprint` is absent and the edge's `navigationTrigger` is
-    /// never `affordance` (typically `push`/`replace`). These are the arrivals
-    /// `requires_prior_knowledge` reads.
+    /// An agent-driven navigation, SDK and control alike: `page/navigate` /
+    /// `page/navigate-to`, back/forward, refresh and hard refresh, tab
+    /// switches and `navigate_tab`, and gated-flow `view:` navigation. No
+    /// affordance was activated, so the trigger carries no `targetFingerprint`,
+    /// `targetRole` or `declaredEffect`, and its `navigationTrigger` is never
+    /// `affordance` (`push`/`replace` for a navigate, `pop` for back/forward,
+    /// `initial` for a reload). [`JourneyTrigger::validate`] enforces this.
+    /// These are the arrivals `requires_prior_knowledge` reads.
     Navigation,
 }
 
@@ -397,7 +401,8 @@ pub struct JourneyTrigger {
 
 impl JourneyTrigger {
     /// Check the invariant the type cannot express: a
-    /// [`ChokePoint::Navigation`] trigger carries no `targetFingerprint` and a
+    /// [`ChokePoint::Navigation`] trigger names no affordance — no
+    /// `targetFingerprint`, `targetRole` or `declaredEffect`, and a
     /// `navigationTrigger` other than `affordance`.
     /// [`JourneyEdgeObservation::validate`] calls this.
     pub fn validate(&self) -> Result<(), JourneyContractError> {
@@ -407,6 +412,16 @@ impl JourneyTrigger {
         if self.target_fingerprint.is_some() {
             return Err(JourneyContractError::NavigationNamesAffordance {
                 reason: "targetFingerprint is present",
+            });
+        }
+        if self.target_role.is_some() {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "targetRole is present",
+            });
+        }
+        if self.declared_effect.is_some() {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "declaredEffect is present",
             });
         }
         if self.navigation_trigger == NavigationTriggerKind::Affordance {
@@ -1015,7 +1030,7 @@ mod tests {
     #[test]
     fn navigation_trigger_accepts_every_non_affordance_kind() {
         use NavigationTriggerKind::*;
-        for kind in [Initial, Push, Replace, Pop] {
+        for kind in [Push, Replace, Pop, Initial, Hash] {
             let t = JourneyTrigger {
                 navigation_trigger: kind,
                 ..navigation_trigger()
@@ -1043,6 +1058,30 @@ mod tests {
     }
 
     #[test]
+    fn navigation_trigger_rejects_a_target_role_or_declared_effect() {
+        let t = JourneyTrigger {
+            target_role: Some("link".into()),
+            ..navigation_trigger()
+        };
+        assert_eq!(
+            t.validate(),
+            Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "targetRole is present",
+            })
+        );
+        let t = JourneyTrigger {
+            declared_effect: Some(IrEffect::Read),
+            ..navigation_trigger()
+        };
+        assert_eq!(
+            t.validate(),
+            Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "declaredEffect is present",
+            })
+        );
+    }
+
+    #[test]
     fn navigation_trigger_rejects_affordance_kind() {
         let t = JourneyTrigger {
             navigation_trigger: NavigationTriggerKind::Affordance,
@@ -1058,8 +1097,9 @@ mod tests {
 
     #[test]
     fn non_navigation_triggers_are_unconstrained_here() {
-        // The fixture trigger is an element action with a fingerprint and an
-        // affordance kind — both of which a navigation may not carry.
+        // The fixture trigger is an element action with a fingerprint, role,
+        // effect and an affordance kind — all of which a navigation may not
+        // carry.
         assert_eq!(trigger().validate(), Ok(()));
     }
 
