@@ -100,6 +100,10 @@ fn golden(name: &str, actual: &str) {
             path.display()
         )
     });
+    // `.gitattributes` pins the goldens to LF; normalising here as well keeps
+    // a checkout that predates that attribute (or ignores it) from failing on
+    // line endings alone, which `lines()` below cannot even display.
+    let expected = expected.replace("\r\n", "\n");
     if expected != actual {
         let first = expected
             .lines()

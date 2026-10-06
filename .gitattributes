@@ -41,3 +41,12 @@ rust/tests/fixtures/ui_bridge_sdk/*.json -text
 glossary/terms.toml text eol=lf
 glossary/versions.lock text eol=lf
 rust/src/glossary/generated.rs text eol=lf
+
+# qontinui-ci import / gen-workflow golden tests (ci-exec/tests/import_golden.rs).
+# The goldens are compared byte-for-byte against the importer's LF output, and
+# the fixtures are copies of other repos' origin/main blobs (LF). Under
+# core.autocrlf=true a Windows checkout rewrote the goldens to CRLF, so
+# ci-exec-windows failed with every line equal ("expected None, got None").
+# The committed blobs are already LF; this changes no committed bytes.
+ci-exec/tests/golden/** text eol=lf
+ci-exec/tests/fixtures/** text eol=lf
