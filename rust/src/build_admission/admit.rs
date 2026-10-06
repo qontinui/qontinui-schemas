@@ -14,9 +14,10 @@
 //! running or paused and the controls are clear, so the ticket is admitted
 //! with jobs from live memory. That bounds the box at one build instead of
 //! stalling it, and it is the only arm an `unknown` input reaches. The same
-//! floor admits an idle host's ticket whose estimate exceeds the whole budget
-//! (no amount of waiting would ever make it fit); a live or pressure refusal is
-//! never floored, because those clear on their own.
+//! floor admits an idle host's ticket whose estimate exceeds MemTotal minus
+//! the reserve floor (no amount of waiting could ever make it fit); a
+//! reservation refusal that can clear, and every live or pressure refusal,
+//! waits.
 
 use serde::{Deserialize, Serialize};
 
@@ -148,7 +149,7 @@ pub fn admit(ticket: &Ticket, leases: &[Lease], facts: &HostFacts, policy: &Poli
             None
         }
     };
-    let psi = match facts.psi_mem_full_avg10.resolve() {
+    let psi = match facts.psi_mem_full_avg10.resolve_finite() {
         Resolved::Value(v) => Some(v),
         Resolved::Dropped => None,
         Resolved::Unknown => {
@@ -185,15 +186,21 @@ pub fn admit(ticket: &Ticket, leases: &[Lease], facts: &HostFacts, policy: &Poli
     }
 
     // The progress floor: on an idle host (no lease running or paused) with the
-    // controls clear, a ticket held back only by an unknown input or by a
-    // reservation larger than the whole budget is admitted alone, sized from
-    // live memory. Neither of those can clear by waiting on an idle host, so
-    // refusing would stall the queue forever; one build is the bound. Live and
-    // pressure refusals still wait: those are conditions that do clear.
+    // controls clear, a ticket held back only by an unknown input — or by an
+    // estimate larger than MemTotal minus the reserve floor, which no amount
+    // of waiting can ever make fit — is admitted alone, sized from live
+    // memory. One build is the bound. A reservation refusal that CAN clear
+    // (the CI reservation, non-build use and unleased trees all move) waits,
+    // so an idle host never builds into CI's reservation (D6); live and
+    // pressure refusals wait too.
+    let never_fits = est.is_some_and(|e| e > facts.mem_total_bytes.saturating_sub(reserve));
     let floor_eligible = leases.is_empty()
-        && blocking
-            .iter()
-            .all(|b| matches!(b, Blocking::Reservation { .. }));
+        && blocking.iter().all(|b| match b {
+            // A never-fitting estimate also fails the live check (MemAvailable
+            // is at most MemTotal), so both refusals are its own size.
+            Blocking::Reservation { .. } | Blocking::Live { .. } => never_fits,
+            _ => false,
+        });
     if floor_eligible && (!unknown.is_empty() || !blocking.is_empty()) {
         let share = avail.map(|a| a.saturating_sub(reserve));
         return Admission::Admit {

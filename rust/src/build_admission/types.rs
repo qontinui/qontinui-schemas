@@ -54,6 +54,19 @@ impl<T: Copy> Fact<T> {
     }
 }
 
+impl Fact<f64> {
+    /// [`Fact::resolve`] for a reading that must be a finite number: a NaN or
+    /// infinite "measurement" is a broken probe, so it resolves to `Unknown`
+    /// rather than comparing false against every threshold (which would read
+    /// as calm).
+    pub fn resolve_finite(&self) -> Resolved<f64> {
+        match self.resolve() {
+            Resolved::Value(v) if !v.is_finite() => Resolved::Unknown,
+            r => r,
+        }
+    }
+}
+
 /// Priority class, highest first in [`Class::rank`] (D5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,9 +92,9 @@ impl Class {
         }
     }
 
-    /// The class a ticket is promoted to after waiting `promote_after_s`.
-    /// Promotion is capped at `Merge`: `Operator` is reachable only through a
-    /// coord command, never through age.
+    /// The class one promotion step above this one. Promotion is capped at
+    /// `Merge`: `Operator` is reachable only through a coord command, never
+    /// through age.
     pub fn promoted(self) -> Class {
         match self {
             Class::Background => Class::Agent,
@@ -249,7 +262,8 @@ pub struct Policy {
     /// `reserve_floor = max(reserve_floor_min_bytes, reserve_floor_fraction × MemTotal)`.
     pub reserve_floor_fraction: f64,
     pub reserve_floor_min_bytes: u64,
-    /// A ticket waiting this long is promoted one class, and backfill stops.
+    /// A ticket is promoted one class per this many seconds waited (capped at
+    /// `merge`), and once the head has waited this long backfill stops.
     pub promote_after_s: u64,
     /// A lease paused this long raises `build_paused_long`.
     pub paused_alert_after_s: u64,
@@ -291,8 +305,14 @@ pub enum PolicyError {
     PercentOutOfRange,
     /// `reserve_floor_fraction` outside `0..1`.
     FractionOutOfRange,
-    /// A window or count of zero.
+    /// A window, count or promotion period of zero.
     ZeroCount,
+    /// `psi_admit_max` above `psi_pause`: admissions would continue into a
+    /// pressure the ladder is already pausing for.
+    AdmitAbovePause,
+    /// `min_measurements` larger than `history_window`: no key could ever
+    /// leave its seed.
+    MinMeasurementsAboveWindow,
 }
 
 impl Policy {
@@ -308,8 +328,14 @@ impl Policy {
         if !(0.0..1.0).contains(&self.reserve_floor_fraction) {
             return Err(PolicyError::FractionOutOfRange);
         }
-        if self.history_window == 0 || self.min_measurements == 0 {
+        if self.psi_admit_max > self.psi_pause {
+            return Err(PolicyError::AdmitAbovePause);
+        }
+        if self.history_window == 0 || self.min_measurements == 0 || self.promote_after_s == 0 {
             return Err(PolicyError::ZeroCount);
+        }
+        if self.min_measurements > self.history_window {
+            return Err(PolicyError::MinMeasurementsAboveWindow);
         }
         Ok(())
     }

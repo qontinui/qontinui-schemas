@@ -2,9 +2,9 @@
 //! EASY backfill and the paused-holder skip.
 //!
 //! - **Order.** Effective class (highest first), then queue time (oldest
-//!   first), then id. A ticket waiting at least `promote_after_s` is promoted
-//!   one class (capped at `merge`), so an `agent` ticket cannot wait forever
-//!   behind a stream of `merge` tickets.
+//!   first), then id. A ticket is promoted one class per `promote_after_s`
+//!   waited (capped at `merge`), so neither an `agent` nor a `background`
+//!   ticket can wait forever behind a stream of `merge` tickets.
 //! - **Head eligibility.** A ticket whose output directory is held by a lease
 //!   (running or paused) cannot start until that lease ends, so it is neither
 //!   the head nor a backfill candidate — it waits behind exactly that one build
@@ -28,11 +28,12 @@ use super::types::{Class, HostFacts, Lease, LeaseState, Policy, Ticket};
 
 /// A ticket's class after promotion.
 pub fn effective_class(t: &Ticket, now_s: u64, policy: &Policy) -> Class {
-    if now_s.saturating_sub(t.queued_at_s) >= policy.promote_after_s {
-        t.class.promoted()
-    } else {
-        t.class
+    let steps = now_s.saturating_sub(t.queued_at_s) / policy.promote_after_s.max(1);
+    let mut c = t.class;
+    for _ in 0..steps.min(3) {
+        c = c.promoted();
     }
+    c
 }
 
 /// The queue in admission order (indices into `queue`).

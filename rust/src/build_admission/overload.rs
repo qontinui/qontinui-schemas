@@ -22,7 +22,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{Class, Fact, HostFacts, Lease, LeaseState, Policy, Resolved};
+use super::types::{Class, HostFacts, Lease, LeaseState, Policy, Resolved};
 
 /// An attributed build tree with no lease (seen, counted, paused last).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,7 +81,7 @@ pub fn overload_step(
 ) -> (GovernorState, GovernorAction) {
     let psi = facts.psi_mem_full_avg10;
     let mut next = state;
-    next.pressure_since_s = match psi.resolve() {
+    next.pressure_since_s = match psi.resolve_finite() {
         Resolved::Value(p) if p >= policy.psi_pause => {
             Some(state.pressure_since_s.unwrap_or(now_s))
         }
@@ -158,10 +158,13 @@ pub fn overload_step(
     let Some((_, _, oldest)) = cands.into_iter().next() else {
         return (next, hold(HoldReason::Calm));
     };
-    let psi_ok = match psi {
-        Fact::NotSupported => Some(true),
-        _ => psi.value().map(|p| p < policy.psi_resume),
+    let psi_ok = match psi.resolve_finite() {
+        Resolved::Dropped => Some(true),
+        Resolved::Value(p) => Some(p < policy.psi_resume),
+        Resolved::Unknown => None,
     };
+    let nothing_running = !leases.iter().any(|l| l.state == LeaseState::Running)
+        && !unleased.iter().any(|t| t.paused_at_s.is_none());
     let Some(avail) = facts.mem_available_bytes.value() else {
         return (next, hold(HoldReason::UnknownInput));
     };
@@ -170,6 +173,12 @@ pub fn overload_step(
             (Some(est), Some(cur)) => Some(est.saturating_sub(cur)),
             // Not sampled yet: the whole estimate is still to come.
             (Some(est), None) => Some(est),
+            // Admitted on the progress floor with no estimate. While anything
+            // else runs its need is unknowable, so it waits; alone on the host
+            // it is the progress floor again (it holds the whole queue), so it
+            // needs only the reserve floor — otherwise it would never resume
+            // and nothing on the host would ever build again.
+            (None, _) if nothing_running => Some(0),
             (None, _) => None,
         },
         Cand::Tree(_) => Some(0),
