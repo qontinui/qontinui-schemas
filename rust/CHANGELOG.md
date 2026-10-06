@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.2.0...rust-v4.3.0) (2026-10-06)
+
+
+### Features
+
+* **journey:** a Navigation trigger names no affordance at all ([862b5d5](https://github.com/qontinui/qontinui-schemas/commit/862b5d58eac25984add58b50d8c4d22297bfab54))
+* **journey:** validate the Navigation trigger invariant ([db340c6](https://github.com/qontinui/qontinui-schemas/commit/db340c67a38d7ca4f2289bd7d931b79105059679))
+
+## [4.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.1.0...rust-v4.2.0) (2026-10-06)
+
+
+### Features
+
+* **journey:** ChokePoint::Navigation for agent-driven navigation ([0b9dba5](https://github.com/qontinui/qontinui-schemas/commit/0b9dba5bf9141ca5175f395f124abc9ba1e55291))
+* **refusal:** generic HTTP-class refusal codes every producer can share ([3db4fba](https://github.com/qontinui/qontinui-schemas/commit/3db4fba446afa07774cd04991ce93cd29e5e0ae5))
+* **rust:** commit the refusal render fixture generator ([d9e7fd4](https://github.com/qontinui/qontinui-schemas/commit/d9e7fd4c1ddbc30c7adb634520c9d02dc519faf8))
+* **types:** shared Page&lt;T&gt;, Bound and keyset cursor codec for bounded reads ([d6cc075](https://github.com/qontinui/qontinui-schemas/commit/d6cc075278ccf8e53404288a302f502ce91abf0a))
+
+
+### Bug Fixes
+
+* **refusal:** a retry_later target says what to re-check before retrying ([ccf7b86](https://github.com/qontinui/qontinui-schemas/commit/ccf7b86f4e9b22c0f61f07e79ad68994e92848aa))
+* **refusal:** carry the retry_later target doc into the generated bindings ([c1be97a](https://github.com/qontinui/qontinui-schemas/commit/c1be97a259900ff8bb56bad8840bb98e7c1d00c2))
+
 ## [4.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.0.0...rust-v4.1.0) (2026-10-02)
 
 
