@@ -144,7 +144,7 @@ pub fn schedule(
                 };
                 let ends_before_shadow = cand
                     .est
-                    .duration_s
+                    .duration_p90_s
                     .is_some_and(|d| now_s.saturating_add(d) <= window.at_s);
                 let fits_in_extra = cand.est.bytes.is_some_and(|b| b <= window.extra_bytes);
                 if ends_before_shadow || fits_in_extra {

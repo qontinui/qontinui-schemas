@@ -44,7 +44,8 @@ fn calm_facts() -> HostFacts {
 fn est(gib_v: u64) -> Estimate {
     Estimate {
         bytes: Some(gib_v * G),
-        duration_s: None,
+        duration_p50_s: None,
+        duration_p90_s: None,
         source: EstimateSource::Seed,
     }
 }
@@ -257,7 +258,11 @@ fn an_idle_host_floors_only_an_estimate_that_can_never_fit() {
         Admission::Admit { basis, .. } => assert_eq!(basis, AdmitBasis::ProgressFloor),
         other => panic!("{other:?}"),
     }
-    // ...but never under pressure.
+    // ...nor into a host already below the reserve floor...
+    let mut low = calm_facts();
+    low.mem_available_bytes = Fact::Measured(5 * G);
+    assert!(!admit(&t, &[], &low, &Policy::default()).is_admit());
+    // ...and never under pressure.
     let mut f = calm_facts();
     f.psi_mem_full_avg10 = Fact::Measured(50.0);
     assert!(!admit(&t, &[], &f, &Policy::default()).is_admit());
@@ -333,7 +338,7 @@ fn backfill_fixture() -> (Vec<Lease>, Ticket) {
 
 fn cand(id: &str, gib_v: u64, duration_s: Option<u64>) -> Ticket {
     let mut t = ticket(id, id, Class::Agent, 10, est(gib_v));
-    t.est.duration_s = duration_s;
+    t.est.duration_p90_s = duration_s;
     t
 }
 
@@ -375,6 +380,11 @@ fn backfill_never_delays_the_head() {
         started(&run(cand("early", 25, Some(900)), now, &leases)),
         Some("early")
     );
+    // A candidate is judged by its SLOW tail: a median of 900 s does not
+    // qualify when its p90 runs past the shadow.
+    let mut median_short = cand("median-short", 25, Some(5000));
+    median_short.est.duration_p50_s = Some(900);
+    assert_eq!(started(&run(median_short, now, &leases)), None);
     // Fits in the 18.46 GiB extra: it may start however long it runs.
     assert_eq!(
         started(&run(cand("small", 18, None), now, &leases)),
@@ -736,7 +746,12 @@ fn no_host_literals_in_rules() {
     // Every `pub mod` in mod.rs is scanned: a new module file cannot slip past.
     let declared: Vec<String> = include_str!("mod.rs")
         .lines()
-        .filter_map(|l| l.trim().strip_prefix("pub mod "))
+        .filter_map(|l| {
+            let l = l.trim();
+            l.strip_prefix("pub mod ")
+                .or_else(|| l.strip_prefix("mod "))
+        })
+        .filter(|m| m.ends_with(';') && *m != "golden_tests;")
         .map(|m| format!("{}.rs", m.trim_end_matches(';')))
         .collect();
     for m in &declared {
@@ -746,7 +761,7 @@ fn no_host_literals_in_rules() {
         );
     }
     for (name, src) in SOURCES {
-        for lit in string_literals(non_test_code(src)) {
+        for lit in string_literals(&non_test_code(src)) {
             assert!(
                 ALLOWED.contains(&lit.as_str()),
                 "{name}: string literal {lit:?} in rule code — hostnames and paths \
@@ -766,17 +781,18 @@ fn no_host_literals_in_rules() {
     );
     // ...and the test-module cut is the LAST one, so a mention earlier hides nothing.
     assert_eq!(
-        string_literals(non_test_code(
-            "//! #[cfg(test)]\nlet h = \"x\";\n#[cfg(test)]\nmod tests { \"y\" }"
+        string_literals(&non_test_code(
+            "//! #[cfg(test)]\r\nlet h = \"x\";\r\n#[cfg(test)]\r\nmod tests { \"y\" }"
         )),
         vec!["x".to_owned()]
     );
 }
 
 /// `src` up to its trailing `#[cfg(test)] mod tests` block, if any.
-fn non_test_code(src: &str) -> &str {
+fn non_test_code(src: &str) -> String {
+    let src = src.replace("\r\n", "\n");
     match src.rfind("#[cfg(test)]\nmod tests") {
-        Some(i) => &src[..i],
+        Some(i) => src[..i].to_owned(),
         None => src,
     }
 }

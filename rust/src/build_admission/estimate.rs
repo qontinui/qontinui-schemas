@@ -44,10 +44,9 @@ pub fn nearest_rank(vals: &[u64], q: f64) -> Option<u64> {
 /// - Otherwise the seed for the key, source `seed`.
 /// - Otherwise `unknown`.
 ///
-/// `duration_s` is the p90 run time of the same window when measured — backfill
-/// promises not to delay the head, so it plans on the slow tail, not the
-/// median — and is `None` for a seed or unknown estimate (backfill then never
-/// relies on it).
+/// `duration_p50_s` / `duration_p90_s` are the median and slow-tail run times
+/// of the same window when measured, and `None` for a seed or unknown estimate
+/// (backfill then never relies on them).
 pub fn estimate(
     key: &EstimateKey,
     history: &[Measurement],
@@ -68,7 +67,8 @@ pub fn estimate(
         };
         return Estimate {
             bytes: Some(bytes),
-            duration_s: nearest_rank(&runs, 0.9),
+            duration_p50_s: nearest_rank(&runs, 0.5),
+            duration_p90_s: nearest_rank(&runs, 0.9),
             source: EstimateSource::Measured {
                 n: recent.len() as u32,
             },
@@ -77,7 +77,8 @@ pub fn estimate(
     match seeds.iter().find(|s| &s.key == key) {
         Some(s) => Estimate {
             bytes: Some(s.bytes),
-            duration_s: None,
+            duration_p50_s: None,
+            duration_p90_s: None,
             source: EstimateSource::Seed,
         },
         None => Estimate::UNKNOWN,
@@ -145,7 +146,7 @@ mod tests {
         let e = estimate(&key("a"), &hist, &seeds, None, &Policy::default());
         assert_eq!(e.source, EstimateSource::Seed);
         assert_eq!(e.bytes, Some(15 * GIB));
-        assert_eq!(e.duration_s, None);
+        assert_eq!((e.duration_p50_s, e.duration_p90_s), (None, None));
     }
 
     #[test]
@@ -155,7 +156,8 @@ mod tests {
         let e = estimate(&key("a"), &hist, &[], None, &Policy::default());
         assert_eq!(e.source, EstimateSource::Measured { n: 20 });
         assert_eq!(e.bytes, Some(23 * GIB));
-        assert_eq!(e.duration_s, Some(23 * 60));
+        assert_eq!(e.duration_p50_s, Some(15 * 60));
+        assert_eq!(e.duration_p90_s, Some(23 * 60));
     }
 
     #[test]
