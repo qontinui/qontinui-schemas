@@ -58,6 +58,12 @@ pub enum Blocking {
         need_bytes: u64,
         reserve_floor_bytes: u64,
     },
+    /// An idle host is already below the reserve floor, so not even the
+    /// progress floor starts a build.
+    BelowReserve {
+        mem_available_bytes: u64,
+        reserve_floor_bytes: u64,
+    },
     /// Memory PSI full avg10 is at or above `psi_admit_max`.
     Pressure { psi_full_avg10: f64, max: f64 },
     /// A memory input is unknown while a lease runs (gating consumer: withhold).
@@ -196,7 +202,10 @@ pub fn admit(ticket: &Ticket, leases: &[Lease], facts: &HostFacts, policy: &Poli
     let never_fits = est.is_some_and(|e| e > facts.mem_total_bytes.saturating_sub(reserve));
     // Even the floor never starts a build into a host already below the reserve
     // floor (the governor's own pause condition).
-    let floor_mem_ok = avail.is_none_or(|a| a >= reserve);
+    let floor_mem_ok = match avail {
+        Some(a) => a >= reserve,
+        None => true,
+    };
     let floor_eligible = leases.is_empty()
         && floor_mem_ok
         && blocking.iter().all(|b| match b {
@@ -218,6 +227,13 @@ pub fn admit(ticket: &Ticket, leases: &[Lease], facts: &HostFacts, policy: &Poli
             },
             basis: AdmitBasis::ProgressFloor,
         };
+    }
+    if leases.is_empty() && !floor_mem_ok {
+        // Name the reason an idle host holds the floor back.
+        blocking.push(Blocking::BelowReserve {
+            mem_available_bytes: avail.unwrap_or(0),
+            reserve_floor_bytes: reserve,
+        });
     }
     if !unknown.is_empty() {
         blocking.push(Blocking::Unknown { inputs: unknown });

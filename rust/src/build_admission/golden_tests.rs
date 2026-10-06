@@ -261,7 +261,13 @@ fn an_idle_host_floors_only_an_estimate_that_can_never_fit() {
     // ...nor into a host already below the reserve floor...
     let mut low = calm_facts();
     low.mem_available_bytes = Fact::Measured(5 * G);
-    assert!(!admit(&t, &[], &low, &Policy::default()).is_admit());
+    let a = admit(&t, &[], &low, &Policy::default());
+    assert!(
+        waits(&a)
+            .iter()
+            .any(|b| matches!(b, Blocking::BelowReserve { .. })),
+        "{a:?}"
+    );
     // ...and never under pressure.
     let mut f = calm_facts();
     f.psi_mem_full_avg10 = Fact::Measured(50.0);
