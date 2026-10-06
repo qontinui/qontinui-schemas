@@ -156,19 +156,25 @@ pub enum EstimateSource {
     Unknown,
 }
 
-/// A ticket's memory reservation and, when history has it, its expected run
-/// time (used only by EASY backfill).
+/// A ticket's memory reservation and, when history has it, its run time (used
+/// only by EASY backfill, which needs BOTH tails: see [`Lease::expected_duration_s`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Estimate {
     pub bytes: Option<u64>,
-    pub duration_s: Option<u64>,
+    /// Median run time — what a RUNNING lease is expected to take, so the
+    /// head's shadow time is not pushed late. Fills [`Lease::expected_duration_s`].
+    pub duration_p50_s: Option<u64>,
+    /// Slow-tail run time — what a backfill CANDIDATE is assumed to take, so it
+    /// is only started when even a slow run ends before the shadow.
+    pub duration_p90_s: Option<u64>,
     pub source: EstimateSource,
 }
 
 impl Estimate {
     pub const UNKNOWN: Estimate = Estimate {
         bytes: None,
-        duration_s: None,
+        duration_p50_s: None,
+        duration_p90_s: None,
         source: EstimateSource::Unknown,
     };
 }
@@ -216,7 +222,8 @@ pub struct Lease {
     /// The reservation it was admitted with; `None` when admitted on the
     /// progress floor with an unknown estimate.
     pub est_bytes: Option<u64>,
-    /// Expected run time from history, for backfill's shadow time.
+    /// Expected run time for backfill's shadow time: the admitted ticket's
+    /// [`Estimate::duration_p50_s`] (the median, so the shadow is not late).
     pub expected_duration_s: Option<u64>,
     pub started_at_s: u64,
     /// When the governor or a command paused it.

@@ -194,7 +194,11 @@ pub fn admit(ticket: &Ticket, leases: &[Lease], facts: &HostFacts, policy: &Poli
     // so an idle host never builds into CI's reservation (D6); live and
     // pressure refusals wait too.
     let never_fits = est.is_some_and(|e| e > facts.mem_total_bytes.saturating_sub(reserve));
+    // Even the floor never starts a build into a host already below the reserve
+    // floor (the governor's own pause condition).
+    let floor_mem_ok = avail.is_none_or(|a| a >= reserve);
     let floor_eligible = leases.is_empty()
+        && floor_mem_ok
         && blocking.iter().all(|b| match b {
             // A never-fitting estimate also fails the live check (MemAvailable
             // is at most MemTotal), so both refusals are its own size.
