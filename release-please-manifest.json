@@ -1,5 +1,5 @@
 {
-  "rust": "4.2.0",
-  "rust-runner-client": "0.2.6",
+  "rust": "4.3.0",
+  "rust-runner-client": "0.2.7",
   "ts": "2.2.0"
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.2.0...rust-v4.3.0) (2026-10-06)
+
+
+### Features
+
+* **journey:** a Navigation trigger names no affordance at all ([862b5d5](https://github.com/qontinui/qontinui-schemas/commit/862b5d58eac25984add58b50d8c4d22297bfab54))
+* **journey:** validate the Navigation trigger invariant ([db340c6](https://github.com/qontinui/qontinui-schemas/commit/db340c67a38d7ca4f2289bd7d931b79105059679))
+
 ## [4.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.1.0...rust-v4.2.0) (2026-10-06)
 
 
