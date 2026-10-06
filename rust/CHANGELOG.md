@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.3.0...rust-v4.4.0) (2026-10-06)
+
+
+### Features
+
+* build_admission — the pure per-invocation build admission core ([cdb815a](https://github.com/qontinui/qontinui-schemas/commit/cdb815a655149bb453ea312af89d31426fb63c22))
+
+
+### Bug Fixes
+
+* build_admission backfill uses p50 shadow and p90 candidates; floor respects the reserve ([cb72d39](https://github.com/qontinui/qontinui-schemas/commit/cb72d397b6aea6bc89ae20764a38946797388a05))
+* build_admission names BelowReserve when an idle host holds the floor back ([3ca5b0a](https://github.com/qontinui/qontinui-schemas/commit/3ca5b0aeb372872d717c814c783a99332823cb21))
+* build_admission review findings — jobs identity, lone paused lease, floor scope ([bc4d7df](https://github.com/qontinui/qontinui-schemas/commit/bc4d7dfd960249f11fe7c0cd50ee060fa01ae4a3))
+
 ## [4.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.2.0...rust-v4.3.0) (2026-10-06)
 
 
