@@ -4,7 +4,7 @@
 
 use super::admit::{admit, Admission, AdmitBasis, Blocking, JobsSource, UnknownInput};
 use super::degraded::{degraded_slots, DegradedInputs};
-use super::order::{order, schedule, HoldReason as SchedHold, Schedule};
+use super::order::{effective_class, order, schedule, HoldReason as SchedHold, Schedule};
 use super::overload::{overload_step, GovernorAction, GovernorState, HoldReason, UnleasedTree};
 use super::types::*;
 
@@ -243,14 +243,38 @@ fn the_progress_floor_never_overrides_the_controls() {
 }
 
 #[test]
-fn an_idle_host_admits_a_ticket_larger_than_the_whole_budget() {
-    // 200 GiB exceeds the 148.46 GiB budget but not MemAvailable (300 GiB):
-    // only the reservation check refuses, and it can never clear on an idle host.
-    let t = ticket("huge", "y", Class::Agent, 0, est(200));
+fn an_idle_host_floors_only_an_estimate_that_can_never_fit() {
+    // 200 GiB exceeds the 148.46 GiB budget, but the budget can grow (CI,
+    // non-build use and unleased trees all move): it waits, so an idle host
+    // never builds into CI's reservation.
+    let t = ticket("big", "y", Class::Agent, 0, est(200));
+    let a = admit(&t, &[], &calm_facts(), &Policy::default());
+    assert!(matches!(waits(&a), [Blocking::Reservation { .. }]), "{a:?}");
+    // 400 GiB exceeds MemTotal − reserve (356.96 GiB): it could never fit, so
+    // refusing it would stall the queue forever. It runs alone.
+    let t = ticket("huge", "y", Class::Agent, 0, est(400));
     match admit(&t, &[], &calm_facts(), &Policy::default()) {
         Admission::Admit { basis, .. } => assert_eq!(basis, AdmitBasis::ProgressFloor),
         other => panic!("{other:?}"),
     }
+    // ...but never under pressure.
+    let mut f = calm_facts();
+    f.psi_mem_full_avg10 = Fact::Measured(50.0);
+    assert!(!admit(&t, &[], &f, &Policy::default()).is_admit());
+}
+
+#[test]
+fn a_non_finite_psi_reading_is_unknown_not_calm() {
+    let mut f = calm_facts();
+    f.psi_mem_full_avg10 = Fact::Measured(f64::NAN);
+    let t = ticket("t", "y", Class::Agent, 0, est(15));
+    let a = admit(&t, &[lease("a", "x", 15, 0)], &f, &Policy::default());
+    assert_eq!(
+        waits(&a),
+        &[Blocking::Unknown {
+            inputs: vec![UnknownInput::PsiMemFull]
+        }]
+    );
 }
 
 #[test]
@@ -278,6 +302,17 @@ fn promotion_fires_at_promote_after() {
     let first = |now| queue[order(&queue, now, &p)[0]].id.clone();
     assert_eq!(first(p.promote_after_s - 1), "merge-new");
     assert_eq!(first(p.promote_after_s), "agent-old");
+    // One step per period: background reaches merge after two periods.
+    let bg = ticket("bg", "c", Class::Background, 0, est(1));
+    assert_eq!(effective_class(&bg, p.promote_after_s, &p), Class::Agent);
+    assert_eq!(
+        effective_class(&bg, 2 * p.promote_after_s, &p),
+        Class::Merge
+    );
+    assert_eq!(
+        effective_class(&bg, 50 * p.promote_after_s, &p),
+        Class::Merge
+    );
     // Promotion never reaches operator.
     assert_eq!(Class::Merge.promoted(), Class::Merge);
     assert_eq!(Class::Background.promoted(), Class::Agent);
@@ -517,6 +552,33 @@ fn resume_uses_est_minus_current_anon_oldest_paused_first() {
 }
 
 #[test]
+fn a_lone_paused_lease_with_no_estimate_still_resumes() {
+    let p = Policy::default();
+    let mut floor = lease("floor", "a", 0, 0);
+    floor.est_bytes = None; // admitted on the progress floor
+    floor.state = LeaseState::PausedByGovernor;
+    floor.paused_at_s = Some(1);
+    let mut f = calm_facts();
+    f.mem_available_bytes = Fact::Measured(gib(11.1)); // just above the 11.04 floor
+    let (_, a) = overload_step(GovernorState::default(), &[floor.clone()], &[], &f, 100, &p);
+    assert_eq!(
+        a,
+        GovernorAction::ResumeLease {
+            lease_id: "floor".into()
+        }
+    );
+    // With another build running its need is unknowable: it waits.
+    let others = [floor, lease("r", "b", 5, 0)];
+    let (_, a) = overload_step(GovernorState::default(), &others, &[], &f, 100, &p);
+    assert_eq!(
+        a,
+        GovernorAction::Hold {
+            reason: HoldReason::UnknownInput
+        }
+    );
+}
+
+#[test]
 fn hysteresis_and_unknown_inputs_never_move_anything() {
     let p = Policy::default();
     let mut paused = lease("p", "a", 5, 0);
@@ -618,6 +680,16 @@ fn default_policy_is_valid_and_resume_must_be_below_pause() {
         ..Policy::default()
     };
     assert_eq!(bad.validate(), Err(PolicyError::ResumeNotBelowPause));
+    let bad = Policy {
+        psi_admit_max: 25.0,
+        ..Policy::default()
+    };
+    assert_eq!(bad.validate(), Err(PolicyError::AdmitAbovePause));
+    let bad = Policy {
+        min_measurements: 21,
+        ..Policy::default()
+    };
+    assert_eq!(bad.validate(), Err(PolicyError::MinMeasurementsAboveWindow));
 }
 
 #[test]
@@ -633,8 +705,10 @@ fn facts_round_trip_with_provenance() {
     assert_eq!(back, f);
 }
 
-/// No hostname, uid or path literal in a rule or a default: every string
-/// literal in the module's non-test code must be a serde attribute value.
+/// No hostname or path literal in a rule or a default: every string literal in
+/// the module's non-test code must be a serde attribute value. (Numbers are not
+/// scanned: every numeric default is a named `Policy` field, and a host-specific
+/// number such as a uid has no field to live in.)
 #[test]
 fn no_host_literals_in_rules() {
     const SOURCES: &[(&str, &str)] = &[
@@ -659,52 +733,91 @@ fn no_host_literals_in_rules() {
         "action",
         "reason",
     ];
+    // Every `pub mod` in mod.rs is scanned: a new module file cannot slip past.
+    let declared: Vec<String> = include_str!("mod.rs")
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("pub mod "))
+        .map(|m| format!("{}.rs", m.trim_end_matches(';')))
+        .collect();
+    for m in &declared {
+        assert!(
+            SOURCES.iter().any(|(n, _)| n == m),
+            "{m} is a module of build_admission but is not scanned"
+        );
+    }
     for (name, src) in SOURCES {
-        let code = src.split("#[cfg(test)]").next().unwrap_or(src);
-        for lit in string_literals(code) {
+        for lit in string_literals(non_test_code(src)) {
             assert!(
                 ALLOWED.contains(&lit.as_str()),
-                "{name}: string literal {lit:?} in rule code — hostnames, uids and paths \
+                "{name}: string literal {lit:?} in rule code — hostnames and paths \
                  belong in measurements or Policy, never in a rule"
             );
         }
     }
-    // The scanner itself sees literals (a vacuous scan would pass everything).
+    // The scanner is not vacuous: it sees a literal, including one that spans
+    // lines, and ignores comments.
     assert_eq!(
         string_literals("let h = \"merytshost\"; // \"in a comment\"\n/// \"doc\"\nlet x = 1;"),
         vec!["merytshost".to_owned()]
     );
+    assert_eq!(
+        string_literals("let h = \"a\nmerytshost\";"),
+        vec!["a\nmerytshost".to_owned()]
+    );
+    // ...and the test-module cut is the LAST one, so a mention earlier hides nothing.
+    assert_eq!(
+        string_literals(non_test_code(
+            "//! #[cfg(test)]\nlet h = \"x\";\n#[cfg(test)]\nmod tests { \"y\" }"
+        )),
+        vec!["x".to_owned()]
+    );
+}
+
+/// `src` up to its trailing `#[cfg(test)] mod tests` block, if any.
+fn non_test_code(src: &str) -> &str {
+    match src.rfind("#[cfg(test)]\nmod tests") {
+        Some(i) => &src[..i],
+        None => src,
+    }
 }
 
 /// String literals in `code`, skipping `//` comments (incl. doc comments).
+/// String state carries across lines, so a multi-line literal is seen whole.
 fn string_literals(code: &str) -> Vec<String> {
     let mut out = Vec::new();
-    for line in code.lines() {
-        let mut chars = line.chars().peekable();
-        let mut in_str = false;
-        let mut cur = String::new();
-        let mut prev = '\0';
-        while let Some(c) = chars.next() {
-            if !in_str {
-                if c == '/' && chars.peek() == Some(&'/') {
-                    break;
+    let mut in_str = false;
+    let mut cur = String::new();
+    let mut chars = code.chars().peekable();
+    let mut prev = '\0';
+    while let Some(c) = chars.next() {
+        if !in_str {
+            if c == '/' && chars.peek() == Some(&'/') {
+                for n in chars.by_ref() {
+                    if n == '\n' {
+                        break;
+                    }
                 }
-                if c == '"' && prev != '\'' {
-                    in_str = true;
-                    cur.clear();
-                }
-            } else if c == '\\' {
-                if let Some(n) = chars.next() {
-                    cur.push(n);
-                }
-            } else if c == '"' {
-                in_str = false;
-                out.push(cur.clone());
-            } else {
-                cur.push(c);
+                prev = '\n';
+                continue;
             }
-            prev = c;
+            if c == '"' && prev != '\'' {
+                in_str = true;
+                cur.clear();
+            }
+        } else if c == '\\' {
+            if let Some(n) = chars.next() {
+                cur.push(match n {
+                    'n' => '\n',
+                    o => o,
+                });
+            }
+        } else if c == '"' {
+            in_str = false;
+            out.push(cur.clone());
+        } else {
+            cur.push(c);
         }
+        prev = c;
     }
     out
 }

@@ -16,7 +16,7 @@
 //! | [`order::schedule`] | which queued ticket starts next: class, age, promotion, EASY backfill, the paused-holder skip |
 //! | [`overload::overload_step`] | the governor ladder as a state machine: pause / resume / hold |
 //! | [`degraded::degraded_slots`] | the slot count of the wrapper's broker-less arm (D4) |
-//! | [`jobs::jobs`] | `CARGO_BUILD_JOBS` for a memory share, the runner's CI sizing arithmetic |
+//! | [`jobs::jobs`] | `CARGO_BUILD_JOBS` for a per-lease memory share (the runner's CI `derive`, applied to a lease's share) |
 //!
 //! ## UNKNOWN is never free capacity
 //!
@@ -29,10 +29,10 @@
 //!
 //! ## No host literals
 //!
-//! No hostname, uid or path appears in a rule or a default; the
+//! No hostname or path appears in a rule or a default; the
 //! `no_host_literals_in_rules` test reads this module's own sources and fails
-//! on one. Every number is a measurement handed in by the caller or a named
-//! [`Policy`] parameter.
+//! on a string literal that is not a serde attribute value. Every number is a
+//! measurement handed in by the caller or a named [`Policy`] parameter.
 
 pub mod admit;
 pub mod budget;
