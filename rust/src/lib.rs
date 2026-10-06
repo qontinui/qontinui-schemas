@@ -65,6 +65,11 @@ pub mod agent_text_units;
 pub mod ai_workflows;
 pub mod app_events;
 pub mod apps;
+/// Build admission — the PURE decision core the runner's host broker uses to
+/// admit cargo builds against measured host memory (and coord uses to explain
+/// a host's verdicts). No I/O. See
+/// `2026-10-06-builds-are-admitted-per-invocation-against-measured-host-memory.md`.
+pub mod build_admission;
 pub mod canonical_hash;
 /// Completeness **evaluation** — the deterministic rubric walk that turns a
 /// [`functional_spec::FunctionalSpec`] + coverage evidence into a
