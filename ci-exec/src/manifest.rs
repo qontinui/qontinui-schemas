@@ -798,7 +798,7 @@ fn validate_argv(label: &str, field: &str, argv: &[String]) -> Result<(), String
         return Err(format!("{label}: {field} must be a non-empty argv array"));
     }
     for token in argv {
-        if token.contains(ARGV_BANNED_CHARS) {
+        if !argv_token_ok(token) {
             return Err(format!(
                 "{label}: {field} token {token:?} contains a banned shell metacharacter"
             ));
@@ -1170,16 +1170,7 @@ fn validate_steps(steps: &[CiStep], scope: &str) -> Result<(), String> {
             ));
         }
         seen_names.push(&step.name);
-        if step.command.is_empty() || step.command[0].trim().is_empty() {
-            return Err(format!("{label}: command must be a non-empty argv array"));
-        }
-        for token in &step.command {
-            if !argv_token_ok(token) {
-                return Err(format!(
-                    "{label}: command token {token:?} contains a banned shell metacharacter"
-                ));
-            }
-        }
+        validate_argv(&label, "command", &step.command)?;
         for key in step.env.keys() {
             match classify_step_env_key(key) {
                 EnvKeyClass::Allowed => {}
