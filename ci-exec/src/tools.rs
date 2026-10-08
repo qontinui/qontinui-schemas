@@ -1626,6 +1626,7 @@ fn materialize_links(dest: &Path, links: &[LinkEntry], url: &str) -> Result<(), 
 /// The target is interpolated raw, which is only sound because
 /// [`symlink_target_is_contained`] has already restricted it to
 /// `[A-Za-z0-9._/-]` — no character in that set means anything to `sh`.
+#[cfg_attr(not(unix), allow(dead_code))] // only the unix write path calls it outside tests
 fn launcher_body(target: &str) -> String {
     format!("#!/bin/sh\nexec \"$(dirname \"$0\")/{target}\" \"$@\"\n")
 }
