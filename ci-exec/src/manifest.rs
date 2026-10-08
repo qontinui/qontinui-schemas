@@ -844,6 +844,12 @@ fn validate_repairs(repairs: &[CiRepair]) -> Result<(), String> {
 /// enough to mean something. These globs bound what coord ACCEPTS from a
 /// repair, so a glob that names the whole repo, or that a glob engine could
 /// expand outside it, defeats the declaration.
+///
+/// This is an author-facing lint, best-effort by nature: a glob language can
+/// always spell "nearly everything" (`**/?a*`) or match `.git` through a
+/// bare `*` component. The enforcing check is coord's, on the actual patch
+/// paths. What this refuses is every SPELLING an author could reasonably
+/// believe was narrow.
 fn validate_allowed_path(glob: &str) -> Result<(), String> {
     let g = glob.trim();
     if g.is_empty() {
@@ -851,21 +857,64 @@ fn validate_allowed_path(glob: &str) -> Result<(), String> {
     }
     // Brace alternation (`{src,../x}`) expands past a component check, and a
     // backslash is a separator only on Windows — on a Linux runner `..\x`
-    // would pass as one component. Neither is needed to name a path set.
-    if g.contains(['{', '}', '\\']) {
+    // would pass as one component. A character class (`.gi[t]`) defeats the
+    // literal `.git` check below. None is needed to name a path set.
+    if g.contains(['{', '}', '[', ']', '\\']) {
         return Err(format!(
-            "allowed_paths {glob:?} must not use braces or backslashes"
+            "allowed_paths {glob:?} must not use braces, character classes or backslashes"
         ));
     }
-    if matches!(g, "." | "*" | "**" | "**/*" | "./**") {
+    validate_repo_relative("allowed_paths", g)?;
+    // Judge the components, not the whole string: `./.git/x` and `sub/.git/x`
+    // (a submodule's git dir) reach into `.git` as surely as `.git/x`, and
+    // `./**`, `**/**` or `?*` are as unbounded as `**`.
+    let components: Vec<&str> = g
+        .split('/')
+        .filter(|c| !c.is_empty() && *c != ".")
+        .collect();
+    if components
+        .iter()
+        .all(|c| c.chars().all(|ch| matches!(ch, '*' | '?')))
+    {
         return Err(format!(
-            "allowed_paths {glob:?} names the whole repository — name the files the repair may change"
+            "allowed_paths {glob:?} is only wildcards, so it names the whole repository or \
+             nearly — name the files the repair may change"
         ));
     }
-    if g == ".git" || g.starts_with(".git/") {
-        return Err(format!("allowed_paths {glob:?} must not reach into .git"));
+    for c in &components {
+        // A bare `*` / `**` is the admitted limitation in the doc above; any
+        // other component is refused when it could resolve to `.git`.
+        if matches!(*c, "*" | "**") {
+            continue;
+        }
+        // Case-insensitive filesystems resolve `.GIT`, and Win32 strips a
+        // trailing dot or space, so `.git.` and `.git ` resolve there too —
+        // and a wildcard (`.g*`, `?git`, `*it`) can expand to `.git`.
+        let resolved = c.trim_end_matches(['.', ' ']);
+        if resolved.eq_ignore_ascii_case(".git") || wildcard_matches(c, ".git") {
+            return Err(format!(
+                "allowed_paths {glob:?} must not reach into .git (component {c:?})"
+            ));
+        }
     }
-    validate_working_dir(g).map_err(|e| format!("allowed_paths: {e}"))
+    Ok(())
+}
+
+/// Whether `pattern` (only `*` and `?` special, ASCII case-insensitive, and
+/// a leading `.` NOT special — the most permissive reading a glob engine may
+/// take) matches the single path component `name`.
+fn wildcard_matches(pattern: &str, name: &str) -> bool {
+    fn go(p: &[u8], n: &[u8]) -> bool {
+        match p.split_first() {
+            None => n.is_empty(),
+            Some((b'*', rest)) => (0..=n.len()).any(|i| go(rest, &n[i..])),
+            Some((b'?', rest)) => !n.is_empty() && go(rest, &n[1..]),
+            Some((c, rest)) => n
+                .first()
+                .is_some_and(|m| m.eq_ignore_ascii_case(c) && go(rest, &n[1..])),
+        }
+    }
+    go(pattern.as_bytes(), name.as_bytes())
 }
 
 /// Validate v2 jobs and return them topologically ordered.
@@ -1457,18 +1506,23 @@ pub(crate) fn validate_tool_version(version: &str) -> Result<(), String> {
 /// no parent/root/prefix components. Execution additionally canonicalizes
 /// and prefix-checks against the real worktree path.
 pub(crate) fn validate_working_dir(wd: &str) -> Result<(), String> {
+    validate_repo_relative("working_dir", wd)
+}
+
+/// `field`'s value is a repo-relative path with no parent or root component.
+fn validate_repo_relative(field: &str, wd: &str) -> Result<(), String> {
     let path = std::path::Path::new(wd);
     // The `:` check rejects Windows drive-qualified paths (`C:\x`, `C:x`)
     // even when this code runs on a non-Windows host (cross-platform tests).
     if path.is_absolute() || wd.starts_with('/') || wd.starts_with('\\') || wd.contains(':') {
-        return Err(format!("working_dir {wd:?} must be repo-relative"));
+        return Err(format!("{field} {wd:?} must be repo-relative"));
     }
     for component in path.components() {
         match component {
             std::path::Component::Normal(_) | std::path::Component::CurDir => {}
             _ => {
                 return Err(format!(
-                    "working_dir {wd:?} must not contain parent/root components"
+                    "{field} {wd:?} must not contain parent/root components"
                 ))
             }
         }
@@ -1558,6 +1612,23 @@ check = ["cargo", "fmt", "--all", "--", "--check"]
         );
     }
 
+    /// The component checks must not over-refuse: a name that merely starts
+    /// with `.git`, or a wildcard narrowed by a literal, is a real path set.
+    #[test]
+    fn repair_accepts_narrow_globs_beside_the_refused_shapes() {
+        for g in [
+            ".github/workflows/*.yml",
+            ".gitignore",
+            "./src/**/*.rs",
+            "*/Cargo.toml",
+            ".env*",
+            ".cargo*/config.toml",
+        ] {
+            let text = WITH_REPAIR.replace("[\"**/*.rs\"]", &format!("[{g:?}]"));
+            parse_and_validate(&text).unwrap_or_else(|e| panic!("{g:?} refused: {e}"));
+        }
+    }
+
     #[test]
     fn repair_rejects_bad_declarations() {
         let cases = [
@@ -1580,11 +1651,11 @@ check = ["cargo", "fmt", "--all", "--", "--check"]
             ),
             (
                 WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"{src,../../etc}/**\"]"),
-                "braces or backslashes",
+                "braces, character classes or backslashes",
             ),
             (
                 WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"..\\\\x\\\\*.rs\"]"),
-                "braces or backslashes",
+                "braces, character classes or backslashes",
             ),
             (
                 WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"**\"]"),
@@ -1593,6 +1664,78 @@ check = ["cargo", "fmt", "--all", "--", "--check"]
             (
                 WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".git/hooks/*\"]"),
                 ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"./**\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"**/**\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"*/*\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"./.git/hooks/*\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"vendor/sub/.git/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"?*\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"**/?*\"]"),
+                "whole repository",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".gi?/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".*/hooks/*\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".git*/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".GIT/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".git./config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"?git/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"*git/hooks/*\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"?gi?/HEAD\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\"*it/config\"]"),
+                ".git",
+            ),
+            (
+                WITH_REPAIR.replace("[\"**/*.rs\"]", "[\".gi[t]/config\"]"),
+                "character classes",
             ),
             (
                 WITH_REPAIR.replace(
