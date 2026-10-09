@@ -50,3 +50,10 @@ rust/src/glossary/generated.rs text eol=lf
 # The committed blobs are already LF; this changes no committed bytes.
 ci-exec/tests/golden/** text eol=lf
 ci-exec/tests/fixtures/** text eol=lf
+
+# The BoundedReadMeta cross-language fixtures (rust/tests/round_trip.rs,
+# tests/test_round_trip.py). Both suites compare against the fixture's exact
+# RFC 8785 JCS bytes, so a CRLF checkout under core.autocrlf=true fails the
+# Rust half on every Windows box for a reason unrelated to the contract.
+# `-text` checks them out byte-for-byte; the committed blobs are LF already.
+tests/fixtures/bounded_read_meta_*.json -text
