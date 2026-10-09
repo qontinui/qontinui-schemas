@@ -331,7 +331,7 @@ fn the_gate_bit_cannot_be_forged_on_the_wire() {
     // deserialization recomputes rather than trusts it.
     let forged = r#"{
         "conclusive": true,
-        "verdict": { "state": "blocked", "reason": "no element carries a bbox (0/3)" },
+        "verdict": { "state": "blocked", "code": "input_missing", "reason": "no element carries a bbox (0/3)" },
         "findings": []
     }"#;
     let result: analyzers::AnalyzerResult = serde_json::from_str(forged).unwrap();
