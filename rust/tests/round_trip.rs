@@ -6504,6 +6504,85 @@ fn between_iterations_roundtrips_with_payload() {
 }
 
 #[test]
+fn restart_capability_enums_roundtrip_snake_case() {
+    let paths = [
+        (RestartPathKind::InstanceManager, "\"instance_manager\""),
+        (RestartPathKind::DevSupervisor, "\"dev_supervisor\""),
+        (RestartPathKind::NotNeeded, "\"not_needed\""),
+    ];
+    for (p, expected) in paths {
+        let json = serde_json::to_string(&p).unwrap();
+        assert_eq!(json, expected, "RestartPathKind mismatch");
+        let back: RestartPathKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, p);
+    }
+    let codes = [
+        (
+            RestartUnsupportedCode::TargetIsOrchestrator,
+            "\"target_is_orchestrator\"",
+        ),
+        (
+            RestartUnsupportedCode::TargetNotRunnerManaged,
+            "\"target_not_runner_managed\"",
+        ),
+        (
+            RestartUnsupportedCode::RebuildNeedsDevSupervisor,
+            "\"rebuild_needs_dev_supervisor\"",
+        ),
+    ];
+    for (c, expected) in codes {
+        let json = serde_json::to_string(&c).unwrap();
+        assert_eq!(json, expected, "RestartUnsupportedCode mismatch");
+        let back: RestartUnsupportedCode = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, c);
+    }
+}
+
+#[test]
+fn restart_capability_roundtrips_supported_and_unsupported() {
+    let supported = RestartCapability {
+        supported: true,
+        path: Some(RestartPathKind::InstanceManager),
+        code: None,
+        reason: None,
+        target_port: 9877,
+        instance_id: Some("temp-1".to_string()),
+    };
+    let json = serde_json::to_string(&supported).unwrap();
+    assert_eq!(
+        json,
+        r#"{"supported":true,"path":"instance_manager","targetPort":9877,"instanceId":"temp-1"}"#
+    );
+    let back: RestartCapability = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, supported);
+
+    let unsupported = RestartCapability {
+        supported: false,
+        path: None,
+        code: Some(RestartUnsupportedCode::TargetIsOrchestrator),
+        reason: Some("The loop runs inside this runner.".to_string()),
+        target_port: 9876,
+        instance_id: None,
+    };
+    let json = serde_json::to_string(&unsupported).unwrap();
+    assert_eq!(
+        json,
+        r#"{"supported":false,"code":"target_is_orchestrator","reason":"The loop runs inside this runner.","targetPort":9876}"#
+    );
+    let back: RestartCapability = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, unsupported);
+
+    // snake_case aliases are accepted on input, like the file's other DTOs.
+    let aliased: RestartCapability = serde_json::from_str(
+        r#"{"supported":true,"path":"dev_supervisor","target_port":9877,"instance_id":null}"#,
+    )
+    .unwrap();
+    assert_eq!(aliased.path, Some(RestartPathKind::DevSupervisor));
+    assert_eq!(aliased.target_port, 9877);
+    assert_eq!(aliased.instance_id, None);
+}
+
+#[test]
 fn loop_phase_roundtrips_snake_case() {
     let json = serde_json::to_string(&LoopPhase::ImplementingFixes).unwrap();
     assert_eq!(json, "\"implementing_fixes\"");

@@ -291,8 +291,9 @@ pub struct OrchestrationLoopConfig {
     )]
     pub target_runner_port: Option<u16>,
 
-    /// Target runner ID (for supervisor restart calls). If `None`, uses
-    /// `"primary"`.
+    /// Target runner ID, used ONLY by the dev-supervisor rebuild path. If
+    /// `None`, it is resolved from the supervisor `/runners` list by
+    /// `target_runner_port`; a plain restart never uses this id.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -564,6 +565,60 @@ pub enum BetweenIterations {
     /// No action between iterations.
     #[default]
     None,
+}
+
+/// Which mechanism will restart the target runner between iterations.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RestartPathKind {
+    /// This runner's own instance manager restarts a runner it started.
+    InstanceManager,
+    /// The dev supervisor restarts (and optionally rebuilds) the target.
+    DevSupervisor,
+    /// The configured between-iterations mode never restarts the target.
+    NotNeeded,
+}
+
+/// Why a restart-mode loop cannot run against this target, decided BEFORE start.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RestartUnsupportedCode {
+    /// The loop runs inside this runner; restarting it would end the loop.
+    TargetIsOrchestrator,
+    /// The runner on that port was not started by this runner, so it cannot restart it.
+    TargetNotRunnerManaged,
+    /// Rebuild compiles from a source checkout, which needs the dev supervisor.
+    RebuildNeedsDevSupervisor,
+}
+
+/// Pre-start verdict on whether the configured between-iterations mode can
+/// restart the target.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct RestartCapability {
+    /// Whether the configured mode can restart the target.
+    pub supported: bool,
+    /// The mechanism that will restart the target. `Some` when `supported`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<RestartPathKind>,
+    /// Why the mode cannot run against this target. `Some` when `!supported`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<RestartUnsupportedCode>,
+    /// Human-readable sentence explaining `code`. `Some` when `!supported`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Port of the target runner the verdict was computed for.
+    #[serde(alias = "target_port")]
+    pub target_port: u16,
+    /// Instance-manager slot id of the target, when `path` is
+    /// `InstanceManager`.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "instance_id"
+    )]
+    pub instance_id: Option<String>,
 }
 
 // ============================================================================

@@ -363,7 +363,10 @@ from .per_type.repository_watch import RepositoryWatch
 from .per_type.resolved_initial_states import ResolvedInitialStates
 from .per_type.resolved_initial_states_result import ResolvedInitialStatesResult
 from .per_type.resource_limits import ResourceLimits
+from .per_type.restart_capability import RestartCapability
+from .per_type.restart_path_kind import RestartPathKind
 from .per_type.restart_process_step import RestartProcessStep
+from .per_type.restart_unsupported_code import RestartUnsupportedCode
 from .per_type.retry_policy import RetryPolicy
 from .per_type.retry_spec import RetrySpec
 from .per_type.role_criterion import RoleCriterion
@@ -937,7 +940,10 @@ __all__ = [
     "ResolvedInitialStates",
     "ResolvedInitialStatesResult",
     "ResourceLimits",
+    "RestartCapability",
+    "RestartPathKind",
     "RestartProcessStep",
+    "RestartUnsupportedCode",
     "RetryPolicy",
     "RetrySpec",
     "RoleCriterion",
