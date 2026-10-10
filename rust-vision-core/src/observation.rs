@@ -41,12 +41,27 @@
 //! is no `measured` without a value, no `unknown` without an
 //! [`UnknownInfo`] (and therefore without a [`UnknownCode`]), and no value
 //! riding beside an `absent`. The one invariant that spans the state AND
-//! the provenance — **`absent` only over full coverage** — cannot be carried
-//! by the enum alone, so [`Observation`]'s fields are private and every
-//! construction path checks it: [`Observation::absent`] returns `Err`, and
-//! deserialization routes through the same check. "Absent" can therefore
-//! never be asserted over a region the producer did not measure, whether the
-//! value was built in this process or read off someone else's wire.
+//! the provenance — **`absent` only over full coverage of at least one
+//! considered item** — cannot be carried by the enum alone, so
+//! [`Observation`]'s fields are private and every construction path checks
+//! it: [`Observation::absent`] returns `Err`, and deserialization routes
+//! through the same check. "Absent" can therefore never be asserted over a
+//! region the producer did not measure, nor by a producer that looked at
+//! nothing (`considered: 0` — that is `unknown` with `producer_not_run` or
+//! `input_missing`, never absence), whether the value was built in this
+//! process or read off someone else's wire.
+//!
+//! # The generated bindings are types, not validators
+//!
+//! The TypeScript and Python bindings generated from this module's JSON
+//! Schema describe the SHAPE of the wire and nothing more. They accept
+//! envelopes the canon refuses — an `absent` carrying `value`, a present
+//! `"unknown": null`, an `absent` over non-empty `unmeasured` or over
+//! `considered: 0` — because those rules span keys a JSON Schema union arm
+//! cannot relate. They also accept unrecognised sibling keys, on purpose:
+//! the canon ignores them too, so the envelope can grow. A consumer parsing an envelope it did not build
+//! must apply the canon's rules: deserialize through [`Observation`] in
+//! Rust, or a parser that enforces the same checks.
 //!
 //! Serialization is hand-written rather than derived because the wire is
 //! FLAT (`status`, `value`, `unknown` and `provenance` are siblings) while
@@ -229,7 +244,10 @@ impl UnmeasuredDimension {
 /// A non-empty [`Self::unmeasured`] is what makes a `measured` observation
 /// DEGRADED (legal: the value stands, some dimension was not ruled out), and
 /// what makes an `absent` observation ILLEGAL (nothing can be claimed absent
-/// from a region that was not measured).
+/// from a region that was not measured). A `considered` of zero makes
+/// `absent` illegal too: a producer that looked at nothing found nothing
+/// only vacuously, so it reports `unknown` (`producer_not_run` or
+/// `input_missing`) instead.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObservationCoverage {
@@ -252,8 +270,10 @@ impl ObservationCoverage {
         }
     }
 
-    /// True when no dimension went unmeasured — the precondition for
-    /// `absent`.
+    /// True when no dimension went unmeasured — one of the two
+    /// preconditions for `absent`; the other is `considered > 0` (see
+    /// [`Observation::absent`]). Says nothing about how MANY items were
+    /// considered: `full(0)` is full coverage of nothing.
     pub fn is_full(&self) -> bool {
         self.unmeasured.is_empty()
     }
@@ -497,6 +517,35 @@ pub enum ObservationError {
         .dimensions.join(", ")
     )]
     AbsentOverUnmeasuredCoverage { dimensions: Vec<String> },
+    /// `absent` was claimed with `coverage.considered == 0`: the producer
+    /// looked at nothing, so it has found nothing only vacuously.
+    #[error(
+        "`absent` requires the producer to have considered at least one item, \
+         but `coverage.considered` is 0; a producer that looked at nothing reports \
+         `unknown` (`producer_not_run` or `input_missing`), not `absent`"
+    )]
+    AbsentOverNothingConsidered,
+}
+
+impl ObservationError {
+    /// The one check every `absent` passes, shared by [`Observation::absent`]
+    /// and deserialization so the two paths cannot drift. Unmeasured
+    /// dimensions are reported first: they name what to fix.
+    fn check_absent(coverage: &ObservationCoverage) -> Result<(), Self> {
+        if !coverage.is_full() {
+            return Err(Self::AbsentOverUnmeasuredCoverage {
+                dimensions: coverage
+                    .unmeasured
+                    .iter()
+                    .map(|d| d.dimension.clone())
+                    .collect(),
+            });
+        }
+        if coverage.considered == 0 {
+            return Err(Self::AbsentOverNothingConsidered);
+        }
+        Ok(())
+    }
 }
 
 /// One observation: a [`ObservationState`] plus its [`Provenance`]. See the
@@ -518,24 +567,20 @@ impl<T> Observation<T> {
         }
     }
 
-    /// The producer looked with FULL coverage and found nothing.
+    /// The producer LOOKED — considered at least one item — with FULL
+    /// coverage and found nothing.
     ///
     /// # Errors
     ///
-    /// [`ObservationError::AbsentOverUnmeasuredCoverage`] when
-    /// `provenance.coverage.unmeasured` is non-empty: nothing can be claimed
-    /// absent from a region that was not measured.
+    /// - [`ObservationError::AbsentOverUnmeasuredCoverage`] when
+    ///   `provenance.coverage.unmeasured` is non-empty: nothing can be
+    ///   claimed absent from a region that was not measured.
+    /// - [`ObservationError::AbsentOverNothingConsidered`] when
+    ///   `provenance.coverage.considered` is 0: looking at nothing is not
+    ///   absence. This also catches a producer that forgot to state coverage,
+    ///   since [`ObservationCoverage::default`] is `{0, 0, []}`.
     pub fn absent(provenance: Provenance) -> Result<Self, ObservationError> {
-        if !provenance.coverage.is_full() {
-            return Err(ObservationError::AbsentOverUnmeasuredCoverage {
-                dimensions: provenance
-                    .coverage
-                    .unmeasured
-                    .iter()
-                    .map(|d| d.dimension.clone())
-                    .collect(),
-            });
-        }
+        ObservationError::check_absent(&provenance.coverage)?;
         Ok(Self {
             state: ObservationState::Absent,
             provenance,
@@ -671,12 +716,8 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Observation<T> {
                 )))
             }
         };
-        if matches!(state, ObservationState::Absent) && !w.provenance.coverage.is_full() {
-            return Err(de::Error::custom(
-                Observation::<T>::absent(w.provenance)
-                    .err()
-                    .expect("coverage is not full, so absent refuses"),
-            ));
+        if matches!(state, ObservationState::Absent) {
+            ObservationError::check_absent(&w.provenance.coverage).map_err(de::Error::custom)?;
         }
         Ok(Self {
             state,
@@ -691,9 +732,18 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Observation<T> {
 // than an all-optional bag. Its doc comment below is the published schema
 // description of `Observation`.
 /// One UI Bridge observation: `measured` (with `value`), `absent` (the
-/// producer looked with full coverage and found nothing), or `unknown` (the
-/// producer could not answer; `unknown.code` says why). `provenance` is
-/// always present and every one of its keys is always present.
+/// producer considered at least one item, measured all of it, and found
+/// nothing), or `unknown` (the producer could not answer; `unknown.code` says
+/// why). `provenance` is always present and every one of its keys is always
+/// present.
+///
+/// This type describes the wire SHAPE only; it is not a validator. It
+/// accepts envelopes the canonical parser refuses: `absent` carrying `value`
+/// or `unknown`, a present `"unknown": null`, and `absent` over non-empty
+/// `provenance.coverage.unmeasured` or over `provenance.coverage.considered`
+/// of 0. Parse an envelope you did not build with
+/// `qontinui_vision_core::Observation` (Rust) or a parser enforcing the same
+/// rules.
 #[derive(JsonSchema)]
 #[serde(tag = "status", rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -875,6 +925,51 @@ mod tests {
             }
         );
         assert!(Observation::<Value>::absent(prov(ObservationCoverage::full(7))).is_ok());
+    }
+
+    #[test]
+    fn absent_over_nothing_considered_is_refused() {
+        // Looking at nothing is not absence — and this is also what a
+        // producer that forgot to state coverage would send, since the
+        // default coverage is {0, 0, []}.
+        for cov in [ObservationCoverage::full(0), ObservationCoverage::default()] {
+            let err = Observation::<Value>::absent(prov(cov)).unwrap_err();
+            assert_eq!(err, ObservationError::AbsentOverNothingConsidered);
+            assert!(err.to_string().contains("considered"), "{err}");
+        }
+        // One item looked at, fully measured, nothing found: absent.
+        let o = Observation::<Value>::absent(prov(ObservationCoverage::full(1))).unwrap();
+        assert_eq!(o.status(), ObservationStatus::Absent);
+    }
+
+    #[test]
+    fn absent_over_nothing_considered_fails_to_deserialize() {
+        let mut zero = wire_provenance();
+        zero["coverage"] = json!({"considered": 0, "measured": 0, "unmeasured": []});
+        let absent = json!({"status": "absent", "provenance": zero});
+        let err = serde_json::from_value::<Observation<Value>>(absent).unwrap_err();
+        assert!(
+            err.to_string().contains("considered at least one item"),
+            "{err}"
+        );
+
+        // The same zero coverage stays legal on the other two states.
+        let measured = json!({"status": "measured", "value": [], "provenance": zero});
+        assert!(serde_json::from_value::<Observation<Value>>(measured).is_ok());
+        let unknown = json!({
+            "status": "unknown",
+            "unknown": {"code": "producer_not_run", "detail": ""},
+            "provenance": zero,
+        });
+        assert!(serde_json::from_value::<Observation<Value>>(unknown).is_ok());
+
+        let mut one = wire_provenance();
+        one["coverage"] = json!({"considered": 1, "measured": 1, "unmeasured": []});
+        let o = serde_json::from_value::<Observation<Value>>(
+            json!({"status": "absent", "provenance": one}),
+        )
+        .expect("one item considered with full coverage is a legal absent");
+        assert_eq!(o.status(), ObservationStatus::Absent);
     }
 
     #[test]
