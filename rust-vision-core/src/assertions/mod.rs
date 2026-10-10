@@ -278,8 +278,10 @@ impl AssertionOutcome {
 /// `passed` and `outcome` are two views of one verdict and are always
 /// consistent: `passed == outcome.passed()`. `passed` is retained as the
 /// wire-stable gate bit existing consumers read (`vision-audit`'s exit code);
-/// `outcome` is the finer answer, and the runner's assert route rolls up
-/// `outcome` (failed > unknown > passed), never `passed`.
+/// `outcome` is the finer answer. The runner's assert route rolls up
+/// `outcome` (failed > unknown > passed) from the runner companion change of
+/// plan `2026-09-20-ui-bridge-observations-…` Phase 2 onward; a runner that
+/// predates it still rolls up `passed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "AssertionResultWire")]
@@ -659,6 +661,34 @@ fn missing_operand(id: &str, consequence: &str) -> String {
     format!(
         "element '{id}' is not in the snapshot, so {consequence}. Either the id is wrong, or \
          the surface is not registered with the producer."
+    )
+}
+
+/// `typography_consistent` over a dimension one of the two elements does not
+/// carry: the comparison was never made, so the verdict is UNKNOWN, never a
+/// pass (two absent values are not "equal") and never a fail.
+fn typography_unmeasured(
+    assertion: &Assertion,
+    a: &crate::element_snapshot::Element,
+    b: &crate::element_snapshot::Element,
+    dimension: &str,
+) -> AssertionResult {
+    let missing: Vec<&str> = [a, b]
+        .iter()
+        .filter(|e| match dimension {
+            "font-family" => e.font_family.is_none(),
+            "font-size" => e.font_size_px.is_none(),
+            _ => e.line_height_px.is_none(),
+        })
+        .map(|e| e.id.as_str())
+        .collect();
+    AssertionResult::unknown(
+        assertion.clone(),
+        UnknownCode::InputMissing,
+        format!(
+            "{dimension} was never compared: {} carries no {dimension}",
+            missing.join(" and ")
+        ),
     )
 }
 
@@ -1235,8 +1265,9 @@ fn eval_aligned(
         let bbox = match el.bbox {
             Some(bb) => bb,
             None => {
-                return AssertionResult::fail(
+                return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     format!("element '{id}' has no geometry (bbox) — cannot check alignment"),
                 )
             }
@@ -1404,6 +1435,9 @@ fn eval_typography(
             for dim in &dims {
                 match dim {
                     TypographyDimension::FontFamily => {
+                        if prev.font_family.is_none() || el.font_family.is_none() {
+                            return typography_unmeasured(&assertion, prev, el, "font-family");
+                        }
                         if prev.font_family != el.font_family {
                             return AssertionResult::fail(
                                 assertion,
@@ -1415,9 +1449,10 @@ fn eval_typography(
                         }
                     }
                     TypographyDimension::FontSize => {
-                        if (prev.font_size_px.unwrap_or(0.0) - el.font_size_px.unwrap_or(0.0)).abs()
-                            > 0.5
-                        {
+                        let (Some(a), Some(b)) = (prev.font_size_px, el.font_size_px) else {
+                            return typography_unmeasured(&assertion, prev, el, "font-size");
+                        };
+                        if (a - b).abs() > 0.5 {
                             return AssertionResult::fail(
                                 assertion,
                                 format!(
@@ -1428,10 +1463,10 @@ fn eval_typography(
                         }
                     }
                     TypographyDimension::LineHeight => {
-                        if (prev.line_height_px.unwrap_or(0.0) - el.line_height_px.unwrap_or(0.0))
-                            .abs()
-                            > 0.5
-                        {
+                        let (Some(a), Some(b)) = (prev.line_height_px, el.line_height_px) else {
+                            return typography_unmeasured(&assertion, prev, el, "line-height");
+                        };
+                        if (a - b).abs() > 0.5 {
                             return AssertionResult::fail(
                                 assertion,
                                 format!(

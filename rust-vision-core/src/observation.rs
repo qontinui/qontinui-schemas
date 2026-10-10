@@ -252,10 +252,12 @@ impl ObservationCoverage {
         }
     }
 
-    /// True when no dimension went unmeasured — the precondition for
-    /// `absent`.
+    /// True when every considered item was measured and no dimension went
+    /// unmeasured — the precondition for `absent`. Both halves are needed: an
+    /// empty `unmeasured` beside `measured < considered` still leaves items
+    /// nobody looked at, and nothing can be claimed absent from those.
     pub fn is_full(&self) -> bool {
-        self.unmeasured.is_empty()
+        self.unmeasured.is_empty() && self.measured == self.considered
     }
 }
 
@@ -491,7 +493,7 @@ impl<T> ObservationState<T> {
 pub enum ObservationError {
     /// `absent` was claimed over coverage that left dimensions unmeasured.
     #[error(
-        "`absent` requires full coverage, but {} dimension(s) went unmeasured ({}); \
+        "`absent` requires full coverage (every considered item measured, none unmeasured), but {} dimension(s) went unmeasured ({}); \
          report `measured` with the unmeasured dimensions, or `unknown`",
         .dimensions.len(),
         .dimensions.join(", ")
@@ -671,6 +673,12 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Observation<T> {
                 )))
             }
         };
+        if w.provenance.coverage.measured > w.provenance.coverage.considered {
+            return Err(de::Error::custom(format!(
+                "coverage.measured ({}) exceeds coverage.considered ({})",
+                w.provenance.coverage.measured, w.provenance.coverage.considered
+            )));
+        }
         if matches!(state, ObservationState::Absent) && !w.provenance.coverage.is_full() {
             return Err(de::Error::custom(
                 Observation::<T>::absent(w.provenance)
@@ -875,6 +883,40 @@ mod tests {
             }
         );
         assert!(Observation::<Value>::absent(prov(ObservationCoverage::full(7))).is_ok());
+    }
+
+    #[test]
+    fn absent_over_partially_measured_coverage_is_refused_even_with_no_named_dimension() {
+        // An empty `unmeasured` list beside `measured < considered` still leaves
+        // two items nobody looked at; `absent` must not be claimed over them.
+        let cov = ObservationCoverage {
+            considered: 7,
+            measured: 5,
+            unmeasured: vec![],
+        };
+        assert!(!cov.is_full());
+        assert!(Observation::<Value>::absent(prov(cov.clone())).is_err());
+        let mut wire = serde_json::to_value(Observation::<Value>::unknown(
+            UnknownCode::InputMissing,
+            "x",
+            prov(cov),
+        ))
+        .unwrap();
+        let o = wire.as_object_mut().unwrap();
+        o.insert("status".into(), json!("absent"));
+        o.remove("unknown");
+        assert!(serde_json::from_value::<Observation<Value>>(wire).is_err());
+    }
+
+    #[test]
+    fn coverage_that_measured_more_than_it_considered_is_refused_on_the_wire() {
+        let cov = ObservationCoverage {
+            considered: 2,
+            measured: 3,
+            unmeasured: vec![],
+        };
+        let wire = serde_json::to_value(Observation::measured(json!([]), prov(cov))).unwrap();
+        assert!(serde_json::from_value::<Observation<Value>>(wire).is_err());
     }
 
     #[test]
