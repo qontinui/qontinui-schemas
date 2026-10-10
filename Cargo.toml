@@ -4,7 +4,7 @@ members = ["rust", "rust-runner-client", "rust-vision-core", "code-graph", "ci-e
 
 [workspace.package]
 edition = "2021"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/qontinui/qontinui-schemas"
 
 # Workspace-level profile override. Cargo honours [profile.*] only in the
