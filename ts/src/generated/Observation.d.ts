@@ -15,9 +15,18 @@ import type { UnmeasuredDimension } from "./UnmeasuredDimension";
 
 /**
  * One UI Bridge observation: `measured` (with `value`), `absent` (the
- * producer looked with full coverage and found nothing), or `unknown` (the
- * producer could not answer; `unknown.code` says why). `provenance` is
- * always present and every one of its keys is always present.
+ * producer considered at least one item, measured all of it, and found
+ * nothing), or `unknown` (the producer could not answer; `unknown.code` says
+ * why). `provenance` is always present and every one of its keys is always
+ * present.
+ *
+ * This type describes the wire SHAPE only; it is not a validator. It
+ * accepts envelopes the canonical parser refuses: `absent` carrying `value`
+ * or `unknown`, a present `"unknown": null`, and `absent` over non-empty
+ * `provenance.coverage.unmeasured` or over `provenance.coverage.considered`
+ * of 0. Parse an envelope you did not build with
+ * `qontinui_vision_core::Observation` (Rust) or a parser enforcing the same
+ * rules.
  */
 export type Observation =
   | {
