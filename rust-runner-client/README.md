@@ -72,4 +72,4 @@ not `native-tls`, to match the rest of the qontinui ecosystem.
 
 ## License
 
-Apache-2.0. See the workspace [`LICENSE`](https://github.com/qontinui/qontinui-schemas/blob/main/LICENSE).
+AGPL-3.0-or-later. See the workspace [`LICENSE`](https://github.com/qontinui/qontinui-schemas/blob/main/LICENSE).
