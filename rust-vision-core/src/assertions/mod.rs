@@ -56,6 +56,7 @@ use crate::element_snapshot::{
     display_snapshot_id, intersection, region_contains, regions_overlap, ElementSnapshot, Rgb,
 };
 use crate::frame::{Frame, Region};
+use crate::observation::UnknownCode;
 
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -276,15 +277,25 @@ impl AssertionOutcome {
 ///
 /// `passed` and `outcome` are two views of one verdict and are always
 /// consistent: `passed == outcome.passed()`. `passed` is retained as the
-/// wire-stable gate bit every existing consumer already reads (the runner's
-/// `all_passed`, `vision-audit`'s exit code); `outcome` is the finer answer.
+/// wire-stable gate bit existing consumers read (`vision-audit`'s exit code);
+/// `outcome` is the finer answer. The runner's assert route rolls up
+/// `outcome` (failed > unknown > passed) from the runner companion change of
+/// plan `2026-09-20-ui-bridge-observations-…` Phase 2 onward; a runner that
+/// predates it still rolls up `passed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[serde(from = "AssertionResultWire")]
+#[serde(try_from = "AssertionResultWire")]
 pub struct AssertionResult {
     pub passed: bool,
     /// The three-way verdict. See [`AssertionOutcome`].
     pub outcome: AssertionOutcome,
+    /// WHY the assertion could not be evaluated, typed. Present iff
+    /// `outcome` is [`AssertionOutcome::Unknown`] — every unknown carries
+    /// one, and no other outcome does, so the key's presence on the wire is
+    /// itself the statement "not evaluated" and its value says why. The
+    /// deserializer refuses a payload that breaks either half.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<UnknownCode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     /// Echo of the input assertion for downstream display. Owned (cloned)
@@ -383,6 +394,8 @@ struct AssertionResultWire {
     passed: bool,
     outcome: Option<AssertionOutcome>,
     #[serde(default)]
+    code: Option<UnknownCode>,
+    #[serde(default)]
     detail: Option<String>,
     assertion: Assertion,
     /// Absent in every payload written before the field existed, and that
@@ -391,23 +404,41 @@ struct AssertionResultWire {
     confidence: Option<f64>,
 }
 
-impl From<AssertionResultWire> for AssertionResult {
-    fn from(w: AssertionResultWire) -> Self {
+impl TryFrom<AssertionResultWire> for AssertionResult {
+    type Error = String;
+
+    fn try_from(w: AssertionResultWire) -> Result<Self, Self::Error> {
         let outcome = w.outcome.unwrap_or(if w.passed {
             AssertionOutcome::Passed
         } else {
             AssertionOutcome::Failed
         });
-        Self {
+        // `code` is present iff the outcome is `unknown`. Unlike `outcome`
+        // itself there is no legacy form to repair toward: an `unknown`
+        // written without a code does not say why, and that is the shape
+        // this field exists to make unrepresentable.
+        match (outcome, w.code) {
+            (AssertionOutcome::Unknown, None) => {
+                return Err("an `unknown` assertion result must carry a `code`".to_string())
+            }
+            (AssertionOutcome::Passed | AssertionOutcome::Failed, Some(code)) => {
+                return Err(format!(
+                    "`code` ({code}) is legal only on an `unknown` assertion result"
+                ))
+            }
+            _ => {}
+        }
+        Ok(Self {
             // The outcome is authoritative: a payload whose two fields
             // disagree is repaired toward the richer one rather than
             // carried forward inconsistent.
             passed: outcome.passed(),
             outcome,
+            code: w.code,
             detail: w.detail,
             assertion: w.assertion,
             confidence: w.confidence,
-        }
+        })
     }
 }
 
@@ -416,6 +447,7 @@ impl AssertionResult {
         Self {
             passed: outcome.passed(),
             outcome,
+            code: None,
             detail,
             assertion,
             confidence: None,
@@ -448,8 +480,14 @@ impl AssertionResult {
     /// The assertion could not be evaluated. `detail` must say WHICH input
     /// was missing — an `unknown` whose detail does not name the gap is
     /// indistinguishable from a failure to the reader it exists to inform.
-    fn unknown(assertion: Assertion, detail: impl Into<String>) -> Self {
-        Self::of(assertion, AssertionOutcome::Unknown, Some(detail.into()))
+    ///
+    /// `code` is required, and is the machine-readable half of the same
+    /// statement: an agent branches on it without parsing `detail`.
+    fn unknown(assertion: Assertion, code: UnknownCode, detail: impl Into<String>) -> Self {
+        Self {
+            code: Some(code),
+            ..Self::of(assertion, AssertionOutcome::Unknown, Some(detail.into()))
+        }
     }
 }
 
@@ -598,6 +636,7 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
             // checked instead of reporting that it held.
             AssertionResult::unknown(
                 assertion.clone(),
+                UnknownCode::NeedsMultiFrameInput,
                 "animation_settled needs successive captures that this evaluator is never given, \
                  so nothing was measured. No runner-side multi-frame path is wired up yet; until \
                  one is, this assertion cannot answer.",
@@ -625,6 +664,34 @@ fn missing_operand(id: &str, consequence: &str) -> String {
     )
 }
 
+/// `typography_consistent` over a dimension one of the two elements does not
+/// carry: the comparison was never made, so the verdict is UNKNOWN, never a
+/// pass (two absent values are not "equal") and never a fail.
+fn typography_unmeasured(
+    assertion: &Assertion,
+    a: &crate::element_snapshot::Element,
+    b: &crate::element_snapshot::Element,
+    dimension: &str,
+) -> AssertionResult {
+    let missing: Vec<&str> = [a, b]
+        .iter()
+        .filter(|e| match dimension {
+            "font-family" => e.font_family.is_none(),
+            "font-size" => e.font_size_px.is_none(),
+            _ => e.line_height_px.is_none(),
+        })
+        .map(|e| e.id.as_str())
+        .collect();
+    AssertionResult::unknown(
+        assertion.clone(),
+        UnknownCode::InputMissing,
+        format!(
+            "{dimension} was never compared: {} carries no {dimension}",
+            missing.join(" and ")
+        ),
+    )
+}
+
 fn require_snapshot<'a>(
     ctx: &'a EvalContext<'_>,
     assertion: &Assertion,
@@ -632,6 +699,7 @@ fn require_snapshot<'a>(
     ctx.snapshot.ok_or_else(|| {
         AssertionResult::unknown(
             assertion.clone(),
+            UnknownCode::InputMissing,
             "no ElementSnapshot supplied, so this assertion was never evaluated",
         )
     })
@@ -655,6 +723,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&elements[0], "the pair was never compared"),
             )
         }
@@ -664,6 +733,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&elements[1], "the pair was never compared"),
             )
         }
@@ -673,6 +743,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{}' carries no geometry (bbox), so overlap was never measured",
                     elements[0]
@@ -685,6 +756,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{}' carries no geometry (bbox), so overlap was never measured",
                     elements[1]
@@ -780,6 +852,7 @@ fn eval_element_above(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(above_id, "no ordering verdict was reached"),
             )
         }
@@ -789,6 +862,7 @@ fn eval_element_above(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(below_id, "no ordering verdict was reached"),
             )
         }
@@ -806,6 +880,7 @@ fn eval_element_above(
                 };
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     format!(
                         "element_above[{above_id}, {below_id}]: no geometry (bbox) on {which}, \
                          so the required overlap could not be checked. Set \
@@ -856,6 +931,7 @@ fn eval_element_above(
         };
         return AssertionResult::unknown(
             assertion,
+            UnknownCode::InputMissing,
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
                  reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
@@ -915,6 +991,7 @@ fn eval_contains_text(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(&t.element, "its text was never read"),
                 )
             }
@@ -1031,6 +1108,7 @@ fn eval_contains_text(
 
     AssertionResult::unknown(
         assertion,
+        UnknownCode::InputMissing,
         "no snapshot text and no ocr_blocks supplied, so the text was never read",
     )
 }
@@ -1066,6 +1144,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "text fit was never checked"),
             )
         }
@@ -1084,6 +1163,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{element}' carries no geometry (bbox), so text fit was never checked"
                 ),
@@ -1177,6 +1257,7 @@ fn eval_aligned(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(id, "alignment was never measured"),
                 )
             }
@@ -1184,8 +1265,9 @@ fn eval_aligned(
         let bbox = match el.bbox {
             Some(bb) => bb,
             None => {
-                return AssertionResult::fail(
+                return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     format!("element '{id}' has no geometry (bbox) — cannot check alignment"),
                 )
             }
@@ -1235,6 +1317,7 @@ fn eval_color_within(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "its color was never read"),
             )
         }
@@ -1244,6 +1327,7 @@ fn eval_color_within(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 "the snapshot carries no `fg_color` for this element, so no color was compared",
             )
         }
@@ -1342,6 +1426,7 @@ fn eval_typography(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(id, "typography was never compared"),
                 )
             }
@@ -1350,6 +1435,9 @@ fn eval_typography(
             for dim in &dims {
                 match dim {
                     TypographyDimension::FontFamily => {
+                        if prev.font_family.is_none() || el.font_family.is_none() {
+                            return typography_unmeasured(&assertion, prev, el, "font-family");
+                        }
                         if prev.font_family != el.font_family {
                             return AssertionResult::fail(
                                 assertion,
@@ -1361,9 +1449,10 @@ fn eval_typography(
                         }
                     }
                     TypographyDimension::FontSize => {
-                        if (prev.font_size_px.unwrap_or(0.0) - el.font_size_px.unwrap_or(0.0)).abs()
-                            > 0.5
-                        {
+                        let (Some(a), Some(b)) = (prev.font_size_px, el.font_size_px) else {
+                            return typography_unmeasured(&assertion, prev, el, "font-size");
+                        };
+                        if (a - b).abs() > 0.5 {
                             return AssertionResult::fail(
                                 assertion,
                                 format!(
@@ -1374,10 +1463,10 @@ fn eval_typography(
                         }
                     }
                     TypographyDimension::LineHeight => {
-                        if (prev.line_height_px.unwrap_or(0.0) - el.line_height_px.unwrap_or(0.0))
-                            .abs()
-                            > 0.5
-                        {
+                        let (Some(a), Some(b)) = (prev.line_height_px, el.line_height_px) else {
+                            return typography_unmeasured(&assertion, prev, el, "line-height");
+                        };
+                        if (a - b).abs() > 0.5 {
                             return AssertionResult::fail(
                                 assertion,
                                 format!(
@@ -1414,6 +1503,7 @@ fn eval_layout_shift(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 "no baselines were supplied to the evaluator, so no shift was measured",
             )
         }
@@ -1423,6 +1513,7 @@ fn eval_layout_shift(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "baseline '{baseline}' is not registered, so no shift was measured — \
                      register it with `vision/baseline` first"
@@ -1523,6 +1614,7 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "contrast was never computed"),
             )
         }
@@ -1537,6 +1629,7 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
             };
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "the snapshot carries no {which} for this element, so contrast was never \
                      computed"
@@ -2035,10 +2128,14 @@ mod tests {
                 "bit and outcome disagree for {a:?}: {res:?}"
             );
             match res.outcome {
-                AssertionOutcome::Passed => seen_pass = true,
+                AssertionOutcome::Passed => {
+                    seen_pass = true;
+                    assert_eq!(res.code, None, "a pass carries no unknown code: {a:?}");
+                }
                 AssertionOutcome::Failed => {
                     seen_fail = true;
                     assert!(res.detail.is_some(), "a failure must say why: {a:?}");
+                    assert_eq!(res.code, None, "a failure carries no unknown code: {a:?}");
                 }
                 AssertionOutcome::Unknown => {
                     seen_unknown = true;
@@ -2046,6 +2143,10 @@ mod tests {
                         res.detail.is_some(),
                         "an unknown whose detail does not name the missing input is \
                          indistinguishable from a failure: {a:?}"
+                    );
+                    assert!(
+                        res.code.is_some(),
+                        "an unknown must carry a typed code: {a:?}"
                     );
                 }
             }
@@ -2129,6 +2230,14 @@ mod tests {
             .as_deref()
             .unwrap()
             .contains("nothing was measured"));
+        assert_eq!(
+            res.code,
+            Some(UnknownCode::NeedsMultiFrameInput),
+            "animation_settled is unknown because it needs frames, not because an input \
+             was dropped"
+        );
+        let v = serde_json::to_value(&res).unwrap();
+        assert_eq!(v["code"], serde_json::json!("needs_multi_frame_input"));
     }
 
     /// An operand the producer never registered is a gap in the snapshot,
@@ -2176,6 +2285,7 @@ mod tests {
                 "the detail must name the gap: {:?}",
                 res.detail
             );
+            assert_eq!(res.code, Some(UnknownCode::InputMissing), "{a:?}");
         }
     }
 
@@ -2189,6 +2299,59 @@ mod tests {
         );
         assert_eq!(res.outcome, AssertionOutcome::Unknown);
         assert!(!res.passed);
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    }
+
+    /// `code` is present iff the outcome is `unknown`, on the wire as well
+    /// as in memory: a pass or failure never serializes the key.
+    #[test]
+    fn the_code_key_is_on_the_wire_iff_unknown() {
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        let unknown = serde_json::to_value(eval_on(&snap, &above(["a", "b"], true))).unwrap();
+        assert_eq!(unknown["code"], serde_json::json!("input_missing"));
+        let failed = serde_json::to_value(eval_on(
+            &snap,
+            &Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            },
+        ))
+        .unwrap();
+        assert_eq!(failed["outcome"], serde_json::json!("failed"));
+        assert!(
+            !failed.as_object().unwrap().contains_key("code"),
+            "{failed}"
+        );
+    }
+
+    /// An `unknown` that does not say why is refused at the deserialization
+    /// boundary, and so is a code on an outcome that reached a verdict.
+    #[test]
+    fn an_unknown_without_a_code_or_a_verdict_with_one_fails_to_deserialize() {
+        let no_code = serde_json::json!({
+            "passed": false,
+            "outcome": "unknown",
+            "detail": "no snapshot",
+            "assertion": { "type": "no_clipping" }
+        });
+        assert!(serde_json::from_value::<AssertionResult>(no_code).is_err());
+
+        let code_on_failed = serde_json::json!({
+            "passed": false,
+            "outcome": "failed",
+            "code": "input_missing",
+            "assertion": { "type": "no_clipping" }
+        });
+        assert!(serde_json::from_value::<AssertionResult>(code_on_failed).is_err());
+
+        let ok = serde_json::json!({
+            "passed": false,
+            "outcome": "unknown",
+            "code": "stale_input",
+            "assertion": { "type": "no_clipping" }
+        });
+        let res: AssertionResult = serde_json::from_value(ok).unwrap();
+        assert_eq!(res.code, Some(UnknownCode::StaleInput));
     }
 
     /// Wire shape. `passed` stays where every existing consumer reads it,
@@ -2233,6 +2396,7 @@ mod tests {
         let contradictory = serde_json::json!({
             "passed": true,
             "outcome": "unknown",
+            "code": "input_missing",
             "assertion": { "type": "no_clipping" }
         });
         let res: AssertionResult = serde_json::from_value(contradictory).unwrap();

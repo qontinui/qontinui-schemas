@@ -63,6 +63,7 @@ from .per_type.bounding_box import BoundingBox
 from .per_type.bridge_fingerprint import BridgeFingerprint
 from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
+from .per_type.cache_provenance import CacheProvenance
 from .per_type.candidate_miss import CandidateMiss
 from .per_type.canonical_step import CanonicalStep
 from .per_type.canvas_panel import CanvasPanel
@@ -306,6 +307,9 @@ from .per_type.next_task_info import NextTaskInfo
 from .per_type.node_metadata import NodeMetadata
 from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
+from .per_type.observation import Observation
+from .per_type.observation_coverage import ObservationCoverage
+from .per_type.observation_status import ObservationStatus
 from .per_type.ocr_engine import OcrEngine
 from .per_type.ol_config import OlConfig
 from .per_type.operation import Operation
@@ -338,11 +342,13 @@ from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
 from .per_type.process_status_lite import ProcessStatusLite
+from .per_type.producer import Producer
 from .per_type.profile import Profile
 from .per_type.project_snapshot import ProjectSnapshot
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.proposal_status import ProposalStatus
+from .per_type.provenance import Provenance
 from .per_type.provenance_mix import ProvenanceMix
 from .per_type.rag_dashboard_stats import RAGDashboardStats
 from .per_type.rag_completion_event import RagCompletionEvent
@@ -530,6 +536,9 @@ from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
 from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionStep
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
+from .per_type.unknown_code import UnknownCode
+from .per_type.unknown_info import UnknownInfo
+from .per_type.unmeasured_dimension import UnmeasuredDimension
 from .per_type.update_app_request import UpdateAppRequest
 from .per_type.update_mcp_server_input import UpdateMcpServerInput
 from .per_type.update_ol_config_request import UpdateOlConfigRequest
@@ -637,6 +646,7 @@ __all__ = [
     "BridgeFingerprint",
     "BuildPhaseConfig",
     "BuiltinOverrideProposal",
+    "CacheProvenance",
     "CandidateMiss",
     "CanonicalStep",
     "CanvasPanel",
@@ -880,6 +890,9 @@ __all__ = [
     "NodeMetadata",
     "NodeStatus",
     "NodeType",
+    "Observation",
+    "ObservationCoverage",
+    "ObservationStatus",
     "OcrEngine",
     "OlConfig",
     "Operation",
@@ -912,11 +925,13 @@ __all__ = [
     "ProcessState",
     "ProcessStatus",
     "ProcessStatusLite",
+    "Producer",
     "Profile",
     "ProjectSnapshot",
     "PromptStep",
     "PromptStepPhase",
     "ProposalStatus",
+    "Provenance",
     "ProvenanceMix",
     "RAGDashboardStats",
     "RagCompletionEvent",
@@ -1104,6 +1119,9 @@ __all__ = [
     "UiBridgeVisualAssertionStep",
     "UnifiedStep",
     "UnifiedWorkflow",
+    "UnknownCode",
+    "UnknownInfo",
+    "UnmeasuredDimension",
     "UpdateAppRequest",
     "UpdateMcpServerInput",
     "UpdateOlConfigRequest",

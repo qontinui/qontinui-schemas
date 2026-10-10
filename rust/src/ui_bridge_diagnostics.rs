@@ -39,6 +39,8 @@ pub enum UiBridgeErrorCode {
     UbAssertTimeout,
     /// `UB-ASSERT-VISIBILITY`
     UbAssertVisibility,
+    /// `UB-CAPABILITY-UNAVAILABLE`
+    UbCapabilityUnavailable,
     /// `UB-ELEM-BLOCKED`
     UbElemBlocked,
     /// `UB-ELEM-DISABLED`
@@ -83,6 +85,24 @@ pub enum UiBridgeErrorCode {
     UbNavigationError,
     /// `UB-NET-ERROR`
     UbNetError,
+    /// `UB-OBS-APP-UNREACHABLE`
+    UbObsAppUnreachable,
+    /// `UB-OBS-BELOW-CONFIDENCE-FLOOR`
+    UbObsBelowConfidenceFloor,
+    /// `UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD`
+    UbObsCapabilityUnavailableInBuild,
+    /// `UB-OBS-INPUT-MISSING`
+    UbObsInputMissing,
+    /// `UB-OBS-MODEL-REPLY-UNPARSEABLE`
+    UbObsModelReplyUnparseable,
+    /// `UB-OBS-NEEDS-MULTI-FRAME-INPUT`
+    UbObsNeedsMultiFrameInput,
+    /// `UB-OBS-PRODUCER-FAILED`
+    UbObsProducerFailed,
+    /// `UB-OBS-PRODUCER-NOT-RUN`
+    UbObsProducerNotRun,
+    /// `UB-OBS-STALE-INPUT`
+    UbObsStaleInput,
     /// `UB-PAGE-LOAD-ERROR`
     UbPageLoadError,
     /// `UB-PARSE-ERROR`
@@ -118,6 +138,7 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbAssertTextMismatch => "UB-ASSERT-TEXT-MISMATCH",
             UiBridgeErrorCode::UbAssertTimeout => "UB-ASSERT-TIMEOUT",
             UiBridgeErrorCode::UbAssertVisibility => "UB-ASSERT-VISIBILITY",
+            UiBridgeErrorCode::UbCapabilityUnavailable => "UB-CAPABILITY-UNAVAILABLE",
             UiBridgeErrorCode::UbElemBlocked => "UB-ELEM-BLOCKED",
             UiBridgeErrorCode::UbElemDisabled => "UB-ELEM-DISABLED",
             UiBridgeErrorCode::UbElemNotEnabled => "UB-ELEM-NOT-ENABLED",
@@ -140,6 +161,15 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbMultipleElements => "UB-MULTIPLE-ELEMENTS",
             UiBridgeErrorCode::UbNavigationError => "UB-NAVIGATION-ERROR",
             UiBridgeErrorCode::UbNetError => "UB-NET-ERROR",
+            UiBridgeErrorCode::UbObsAppUnreachable => "UB-OBS-APP-UNREACHABLE",
+            UiBridgeErrorCode::UbObsBelowConfidenceFloor => "UB-OBS-BELOW-CONFIDENCE-FLOOR",
+            UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild => "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD",
+            UiBridgeErrorCode::UbObsInputMissing => "UB-OBS-INPUT-MISSING",
+            UiBridgeErrorCode::UbObsModelReplyUnparseable => "UB-OBS-MODEL-REPLY-UNPARSEABLE",
+            UiBridgeErrorCode::UbObsNeedsMultiFrameInput => "UB-OBS-NEEDS-MULTI-FRAME-INPUT",
+            UiBridgeErrorCode::UbObsProducerFailed => "UB-OBS-PRODUCER-FAILED",
+            UiBridgeErrorCode::UbObsProducerNotRun => "UB-OBS-PRODUCER-NOT-RUN",
+            UiBridgeErrorCode::UbObsStaleInput => "UB-OBS-STALE-INPUT",
             UiBridgeErrorCode::UbPageLoadError => "UB-PAGE-LOAD-ERROR",
             UiBridgeErrorCode::UbParseError => "UB-PARSE-ERROR",
             UiBridgeErrorCode::UbStaleElement => "UB-STALE-ELEMENT",
@@ -165,6 +195,7 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbAssertTextMismatch,
             UiBridgeErrorCode::UbAssertTimeout,
             UiBridgeErrorCode::UbAssertVisibility,
+            UiBridgeErrorCode::UbCapabilityUnavailable,
             UiBridgeErrorCode::UbElemBlocked,
             UiBridgeErrorCode::UbElemDisabled,
             UiBridgeErrorCode::UbElemNotEnabled,
@@ -187,6 +218,15 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbMultipleElements,
             UiBridgeErrorCode::UbNavigationError,
             UiBridgeErrorCode::UbNetError,
+            UiBridgeErrorCode::UbObsAppUnreachable,
+            UiBridgeErrorCode::UbObsBelowConfidenceFloor,
+            UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild,
+            UiBridgeErrorCode::UbObsInputMissing,
+            UiBridgeErrorCode::UbObsModelReplyUnparseable,
+            UiBridgeErrorCode::UbObsNeedsMultiFrameInput,
+            UiBridgeErrorCode::UbObsProducerFailed,
+            UiBridgeErrorCode::UbObsProducerNotRun,
+            UiBridgeErrorCode::UbObsStaleInput,
             UiBridgeErrorCode::UbPageLoadError,
             UiBridgeErrorCode::UbParseError,
             UiBridgeErrorCode::UbStaleElement,
@@ -233,6 +273,7 @@ impl FromStr for UiBridgeErrorCode {
             "UB-ASSERT-TEXT-MISMATCH" => Ok(UiBridgeErrorCode::UbAssertTextMismatch),
             "UB-ASSERT-TIMEOUT" => Ok(UiBridgeErrorCode::UbAssertTimeout),
             "UB-ASSERT-VISIBILITY" => Ok(UiBridgeErrorCode::UbAssertVisibility),
+            "UB-CAPABILITY-UNAVAILABLE" => Ok(UiBridgeErrorCode::UbCapabilityUnavailable),
             "UB-ELEM-BLOCKED" => Ok(UiBridgeErrorCode::UbElemBlocked),
             "UB-ELEM-DISABLED" => Ok(UiBridgeErrorCode::UbElemDisabled),
             "UB-ELEM-NOT-ENABLED" => Ok(UiBridgeErrorCode::UbElemNotEnabled),
@@ -255,6 +296,15 @@ impl FromStr for UiBridgeErrorCode {
             "UB-MULTIPLE-ELEMENTS" => Ok(UiBridgeErrorCode::UbMultipleElements),
             "UB-NAVIGATION-ERROR" => Ok(UiBridgeErrorCode::UbNavigationError),
             "UB-NET-ERROR" => Ok(UiBridgeErrorCode::UbNetError),
+            "UB-OBS-APP-UNREACHABLE" => Ok(UiBridgeErrorCode::UbObsAppUnreachable),
+            "UB-OBS-BELOW-CONFIDENCE-FLOOR" => Ok(UiBridgeErrorCode::UbObsBelowConfidenceFloor),
+            "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD" => Ok(UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild),
+            "UB-OBS-INPUT-MISSING" => Ok(UiBridgeErrorCode::UbObsInputMissing),
+            "UB-OBS-MODEL-REPLY-UNPARSEABLE" => Ok(UiBridgeErrorCode::UbObsModelReplyUnparseable),
+            "UB-OBS-NEEDS-MULTI-FRAME-INPUT" => Ok(UiBridgeErrorCode::UbObsNeedsMultiFrameInput),
+            "UB-OBS-PRODUCER-FAILED" => Ok(UiBridgeErrorCode::UbObsProducerFailed),
+            "UB-OBS-PRODUCER-NOT-RUN" => Ok(UiBridgeErrorCode::UbObsProducerNotRun),
+            "UB-OBS-STALE-INPUT" => Ok(UiBridgeErrorCode::UbObsStaleInput),
             "UB-PAGE-LOAD-ERROR" => Ok(UiBridgeErrorCode::UbPageLoadError),
             "UB-PARSE-ERROR" => Ok(UiBridgeErrorCode::UbParseError),
             "UB-STALE-ELEMENT" => Ok(UiBridgeErrorCode::UbStaleElement),

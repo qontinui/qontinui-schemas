@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::ElementSnapshot;
 use crate::frame::{Frame, Region};
+use crate::observation::UnknownCode;
 
 pub mod color;
 pub mod dynamic;
@@ -223,6 +224,9 @@ pub enum AnalyzerVerdict {
     ///
     /// Informational, and green by design — see the type doc.
     Degraded {
+        /// WHY the dimension went unmeasured, typed so a consumer can branch
+        /// on it without parsing [`Self::Degraded::reason`].
+        code: UnknownCode,
         /// What could not be measured, and what that costs. Written for a
         /// human reading a report, e.g. "2 intersecting pair(s) carry no
         /// usable stacking order, so occlusion is UNKNOWN".
@@ -237,6 +241,9 @@ pub enum AnalyzerVerdict {
     /// analyzer exists to catch; reading it as a failure sends a reader
     /// looking for a bug that no evidence points at.
     Blocked {
+        /// WHY the precondition failed, typed so a consumer can branch on it
+        /// without parsing [`Self::Blocked::reason`].
+        code: UnknownCode,
         /// Which precondition failed, in terms of the coverage that was
         /// measured, e.g. "no element carries a bbox (0/7)".
         reason: String,
@@ -270,7 +277,17 @@ impl AnalyzerVerdict {
     pub fn reason(&self) -> Option<&str> {
         match self {
             Self::Checked => None,
-            Self::Degraded { reason } | Self::Blocked { reason } => Some(reason),
+            Self::Degraded { reason, .. } | Self::Blocked { reason, .. } => Some(reason),
+        }
+    }
+
+    /// The typed reason carried by a non-`Checked` verdict, `None` for
+    /// [`Self::Checked`]. Every `Degraded` and `Blocked` carries one — the
+    /// constructors on [`AnalyzerResult`] take it as a required argument.
+    pub fn code(&self) -> Option<UnknownCode> {
+        match self {
+            Self::Checked => None,
+            Self::Degraded { code, .. } | Self::Blocked { code, .. } => Some(*code),
         }
     }
 }
@@ -342,13 +359,18 @@ impl AnalyzerResult {
     }
 
     /// Ran, findings stand, one named dimension unmeasured. Green.
+    ///
+    /// `code` is required so no analyzer can emit a degradation an agent
+    /// cannot branch on.
     pub fn degraded(
+        code: UnknownCode,
         reason: impl Into<String>,
         coverage: Option<SnapshotCoverage>,
         findings: Vec<Finding>,
     ) -> Self {
         Self::new(
             AnalyzerVerdict::Degraded {
+                code,
                 reason: reason.into(),
             },
             coverage,
@@ -358,13 +380,18 @@ impl AnalyzerResult {
 
     /// Preconditions not met. `findings` are diagnostic only — see the type
     /// doc on why they are carried rather than dropped.
+    ///
+    /// `code` is required so no analyzer can emit a refusal an agent cannot
+    /// branch on.
     pub fn blocked(
+        code: UnknownCode,
         reason: impl Into<String>,
         coverage: Option<SnapshotCoverage>,
         findings: Vec<Finding>,
     ) -> Self {
         Self::new(
             AnalyzerVerdict::Blocked {
+                code,
                 reason: reason.into(),
             },
             coverage,
@@ -437,6 +464,7 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
     /// spell it identically.
     fn missing_input(detail: &str, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult {
         AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             detail.to_string(),
             snapshot.map(SnapshotCoverage::of),
             vec![Finding::new("skipped", Severity::Warning, detail)],
