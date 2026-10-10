@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.4.0...rust-v4.5.0) (2026-10-10)
+
+
+### Features
+
+* **types:** CliProfile, SessionFailure and a shared CapabilityState ([0662611](https://github.com/qontinui/qontinui-schemas/commit/066261185d58160f06a1c3c69c1a157730974233))
+
 ## [4.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.3.0...rust-v4.4.0) (2026-10-06)
 
 

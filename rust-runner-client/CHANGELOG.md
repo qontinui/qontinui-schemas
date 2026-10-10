@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.9](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.8...rust-runner-client-v0.2.9) (2026-10-10)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * qontinui-types bumped from 4.4.0 to 4.5.0
+
 ## [0.2.8](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.7...rust-runner-client-v0.2.8) (2026-10-06)
 
 
