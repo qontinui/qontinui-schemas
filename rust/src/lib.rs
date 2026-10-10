@@ -124,6 +124,11 @@ pub mod glossary;
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
+/// Fleet calibration — the shared host fact types (workload-group pressure,
+/// compile cache, build outcomes, build volume, leaks, disk use) and the pure
+/// `/proc` + cgroup v2 + sccache parsers both the runner and the CI host agent
+/// report through. See `2026-10-05-fleet-calibration-reversible-machine-tuning.md`.
+pub mod host_calibration;
 pub mod ir;
 /// Journey twin — observed edges between IR-named page configurations and
 /// the frontier of seen-but-never-activated affordances. See
