@@ -170,6 +170,35 @@ class ScheduledTaskType6(BaseModel):
     ] = None
 
 
+class ScheduledTaskType7(BaseModel):
+    """
+    Run a shell command in-binary (no Claude session). The recorded
+    outcome is the command's exit status: success iff exit code 0; a
+    timeout is a failure.
+    """
+
+    command: Annotated[
+        str,
+        Field(
+            description="Shell command line, run via the platform shell (`sh -c`; on\nWindows `bash -c`, then `cmd /C` as the fallback)."
+        ),
+    ]
+    task_type: Literal['Script']
+    timeout_seconds: Annotated[
+        int | None,
+        Field(
+            description='Wall-clock timeout in seconds. `None` = runner default\n(600s = 10 min).',
+            ge=0,
+        ),
+    ] = None
+    working_directory: Annotated[
+        str | None,
+        Field(
+            description="Working directory for the command. `None` = the runner's project\nroot."
+        ),
+    ] = None
+
+
 class ScheduledTaskType(
     RootModel[
         ScheduledTaskType1
@@ -178,6 +207,7 @@ class ScheduledTaskType(
         | ScheduledTaskType4
         | ScheduledTaskType5
         | ScheduledTaskType6
+        | ScheduledTaskType7
     ]
 ):
     root: Annotated[
@@ -186,7 +216,8 @@ class ScheduledTaskType(
         | ScheduledTaskType3
         | ScheduledTaskType4
         | ScheduledTaskType5
-        | ScheduledTaskType6,
+        | ScheduledTaskType6
+        | ScheduledTaskType7,
         Field(
             description='Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.',
             discriminator='task_type',
