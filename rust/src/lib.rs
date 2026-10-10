@@ -71,6 +71,12 @@ pub mod apps;
 /// `2026-10-06-builds-are-admitted-per-invocation-against-measured-host-memory.md`.
 pub mod build_admission;
 pub mod canonical_hash;
+/// Per-CLI AI-session handling — the [`cli_session::CliProfile`] manifest (one
+/// record of session-behaviour facts per AI CLI), the
+/// [`cli_session::SessionFailure`] taxonomy, and the shared
+/// [`cli_session::CapabilityState`] tri-state. See
+/// `2026-09-20-ai-session-handling-is-claude-shaped-provider-manifest-and-failure-taxonomy.md`.
+pub mod cli_session;
 /// Completeness **evaluation** — the deterministic rubric walk that turns a
 /// [`functional_spec::FunctionalSpec`] + coverage evidence into a
 /// [`completeness_verdict::CompletenessVerdict`] (node enumeration + gap diff +
