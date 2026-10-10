@@ -525,6 +525,14 @@ pub enum ObservationError {
          `unknown` (`producer_not_run` or `input_missing`), not `absent`"
     )]
     AbsentOverNothingConsidered,
+    /// `absent` over items that were considered but not measured in full —
+    /// coverage must say every considered item was measured.
+    #[error(
+        "an `absent` observation must have measured every considered item \
+         (measured {measured} of {considered}); a partial look is `measured` with \
+         its gaps in `coverage.unmeasured`, never `absent`"
+    )]
+    AbsentOverPartiallyMeasured { considered: u64, measured: u64 },
 }
 
 impl ObservationError {
@@ -543,6 +551,12 @@ impl ObservationError {
         }
         if coverage.considered == 0 {
             return Err(Self::AbsentOverNothingConsidered);
+        }
+        if coverage.measured != coverage.considered {
+            return Err(Self::AbsentOverPartiallyMeasured {
+                considered: coverage.considered,
+                measured: coverage.measured,
+            });
         }
         Ok(())
     }
@@ -943,6 +957,35 @@ mod tests {
     }
 
     #[test]
+    fn absent_over_a_partial_measurement_is_refused_on_both_paths() {
+        // 3 considered, 0 measured, nothing named unmeasured: not "looked and
+        // found nothing", so not absent.
+        let partial = ObservationCoverage {
+            considered: 3,
+            measured: 0,
+            unmeasured: Vec::new(),
+        };
+        let err = Observation::<Value>::absent(prov(partial.clone())).unwrap_err();
+        assert_eq!(
+            err,
+            ObservationError::AbsentOverPartiallyMeasured {
+                considered: 3,
+                measured: 0
+            }
+        );
+        let mut p = wire_provenance();
+        p["coverage"] = json!({"considered": 3, "measured": 0, "unmeasured": []});
+        let err = serde_json::from_value::<Observation<Value>>(
+            json!({"status": "absent", "provenance": p}),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("measured every considered item"),
+            "{err}"
+        );
+    }
+
+    #[test]
     fn absent_over_nothing_considered_fails_to_deserialize() {
         let mut zero = wire_provenance();
         zero["coverage"] = json!({"considered": 0, "measured": 0, "unmeasured": []});
@@ -1051,7 +1094,9 @@ mod tests {
     }
 
     fn wire_provenance() -> Value {
-        serde_json::to_value(prov(ObservationCoverage::full(0))).unwrap()
+        // considered >= 1 on purpose: with 0, `check_absent` would reject every
+        // `absent` row below for coverage, masking whether the key-shape match did.
+        serde_json::to_value(prov(ObservationCoverage::full(1))).unwrap()
     }
 
     #[test]
