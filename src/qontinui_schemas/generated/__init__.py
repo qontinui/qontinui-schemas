@@ -66,10 +66,12 @@ from .per_type.builtin_override_proposal import BuiltinOverrideProposal
 from .per_type.candidate_miss import CandidateMiss
 from .per_type.canonical_step import CanonicalStep
 from .per_type.canvas_panel import CanvasPanel
+from .per_type.capability_state import CapabilityState
 from .per_type.catch_up_policy import CatchUpPolicy
 from .per_type.category import Category
 from .per_type.check_issue_detail import CheckIssueDetail
 from .per_type.check_type import CheckType
+from .per_type.cli_profile import CliProfile
 from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
 from .per_type.command_step import CommandStep
@@ -405,6 +407,7 @@ from .per_type.search_strategy import SearchStrategy
 from .per_type.section_verdict import SectionVerdict
 from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
+from .per_type.session_failure import SessionFailure
 from .per_type.session_lite import SessionLite
 from .per_type.session_source import SessionSource
 from .per_type.spec_api_event import SpecApiEvent
@@ -637,10 +640,12 @@ __all__ = [
     "CandidateMiss",
     "CanonicalStep",
     "CanvasPanel",
+    "CapabilityState",
     "CatchUpPolicy",
     "Category",
     "CheckIssueDetail",
     "CheckType",
+    "CliProfile",
     "CodeExecutionStep",
     "CommandMode",
     "CommandStep",
@@ -976,6 +981,7 @@ __all__ = [
     "SectionVerdict",
     "SemanticSearchRequest",
     "SemanticSearchResponse",
+    "SessionFailure",
     "SessionLite",
     "SessionSource",
     "SpecApiEvent",
