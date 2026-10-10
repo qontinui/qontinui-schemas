@@ -14,7 +14,10 @@ import type { UnmeasuredDimension } from "./UnmeasuredDimension";
  * A non-empty [`Self::unmeasured`] is what makes a `measured` observation
  * DEGRADED (legal: the value stands, some dimension was not ruled out), and
  * what makes an `absent` observation ILLEGAL (nothing can be claimed absent
- * from a region that was not measured).
+ * from a region that was not measured). A `considered` of zero makes
+ * `absent` illegal too: a producer that looked at nothing found nothing
+ * only vacuously, so it reports `unknown` (`producer_not_run` or
+ * `input_missing`) instead.
  */
 export interface ObservationCoverage {
   /**
