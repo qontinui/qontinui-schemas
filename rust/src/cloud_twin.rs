@@ -15,7 +15,9 @@
 //! - [`SubstitutionBlock`] — the τ/β block every world-derived verdict carries.
 //!   Its fields are private and its **only constructor is the pure
 //!   [`SubstitutionBlock::compute`]** (plan D4: "τ is computed, never
-//!   stamped"); deserialization refuses a block `compute` could not produce.
+//!   stamped"). Deserialization refuses an internally inconsistent block,
+//!   but consistency is not provenance: coord's ingest must recompute a
+//!   posted block with `compute` rather than trust it.
 //! - [`RehearsalRecord`], [`ConformanceRow`] (requested amendment A4, keyed by
 //!   [`ClaimKind`]) and [`VendorDriftEvent`] (requested amendment A5).
 //!
@@ -112,6 +114,7 @@ pub enum ClaimVerdict {
 /// One cloud API operation, by service and operation name (e.g.
 /// `ecs` / `DescribeServices`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OperationRef {
     pub service: String,
     pub operation: String,
@@ -146,6 +149,7 @@ pub enum DataClass {
 /// A world: production, a clone, or a fork. Worlds are an instance dimension
 /// of the twin, not a sub-space.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct World {
     pub kind: WorldKind,
     pub id: String,
@@ -183,9 +187,9 @@ pub enum WorldSeedSource {
 }
 
 /// The lifecycle transition a [`WorldLifecycleEvent`] records. Internally
-/// tagged by `change`.
+/// tagged by `kind`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "change", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WorldLifecycleChange {
     Created {
         world: World,
@@ -212,12 +216,14 @@ pub enum WorldLifecycleChange {
 }
 
 /// One world lifecycle event, as the clone platform exports it (requested
-/// amendment A2).
+/// amendment A2). The transition is a nested `change` object rather than
+/// flattened, because serde's `deny_unknown_fields` does not compose with
+/// `flatten` and a producer's misspelled field must be refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct WorldLifecycleEvent {
     pub world_id: String,
     pub occurred_at: String,
-    #[serde(flatten)]
     pub change: WorldLifecycleChange,
     /// When the world expires, if it carries a TTL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1012,7 +1018,7 @@ impl TryFrom<SubstitutionBlockWire> for SubstitutionBlock {
                 ))
             }
             (false, Some(a)) => {
-                let named = w.exercised_ops.iter().any(|o| {
+                let mut named = w.exercised_ops.iter().filter(|o| {
                     o.service == a.service
                         && o.op_family == a.op_family
                         && match a.claim_kind {
@@ -1020,13 +1026,35 @@ impl TryFrom<SubstitutionBlockWire> for SubstitutionBlock {
                             None => o.claim_kinds.is_empty(),
                         }
                 });
-                if !named {
+                // Unsupported, kindless, or any non-contradicted verdict can
+                // yield an unknown cell; only a contradicted op with kinds
+                // cannot (it yields a contradicted cell, row or no row).
+                let can_be_unknown = |o: &&ExercisedOp| {
+                    o.claim_kinds.is_empty() || o.verdict != ClaimVerdict::Contradicted
+                };
+                if state == TauState::UnknownOp {
+                    if !named.any(|o| can_be_unknown(&o)) {
+                        return Err(ContractViolation::new(
+                            "under unknown_op, tau.argmin must name an exercised op that can yield an unknown cell (unsupported, kindless, or not contradicted)",
+                        ));
+                    }
+                } else if named.next().is_none() {
                     return Err(ContractViolation::new(
                         "tau.argmin must name an exercised (service, op_family) and one of its claim kinds (absent only for an op with none)",
                     ));
                 }
             }
-            (true, None) => {}
+            (true, None) => {
+                let overriding_state = matches!(
+                    state,
+                    TauState::FirewallViolated | TauState::UnreleasedClone
+                );
+                if !overriding_state && state != TauState::Uncalibrated {
+                    return Err(ContractViolation::new(
+                        "with nothing exercised, tau.state must be uncalibrated (or firewall_violated / unreleased_clone)",
+                    ));
+                }
+            }
         }
         let overriding = matches!(
             state,
@@ -1285,6 +1313,7 @@ pub enum RehearsalProvenance {
 /// classifies; coord builds the `DriftVerdict` envelope and attaches the
 /// [`SubstitutionBlock`] at record time — neither is carried here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RehearsalRecord {
     pub subject_repo: String,
     pub subject_ref: String,
@@ -1334,6 +1363,7 @@ pub enum CompatLevel {
 
 /// A count of ledger claims at one authority and verdict.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ClaimTally {
     pub authority: ClaimAuthority,
     pub verdict: ClaimVerdict,
@@ -1345,6 +1375,7 @@ pub struct ClaimTally {
 /// Breadth is never reported without depth beside it: the authority tallies,
 /// oracle share and open contradictions travel with every row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConformanceRow {
     pub clone_release: String,
     pub scorecard_sha: String,
@@ -1368,6 +1399,7 @@ pub struct ConformanceRow {
 /// One vendor change seen by the clone's drift watcher (requested amendment
 /// A5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct VendorDriftEvent {
     /// The vendor artifact that changed (a Smithy model, an SDK, a doc page…).
     pub artifact: String,
@@ -1520,8 +1552,8 @@ mod tests {
             ttl_at: None,
         })
         .unwrap();
-        assert_eq!(v["change"], "snapshotted");
-        assert_eq!(v["consistency"], "control_plane_only");
+        assert_eq!(v["change"]["kind"], "snapshotted");
+        assert_eq!(v["change"]["consistency"], "control_plane_only");
     }
 
     #[test]
@@ -2453,5 +2485,165 @@ mod tests {
         v.as_object_mut().unwrap().remove("oracle_cases");
         let e = serde_json::from_value::<ConformanceRow>(v).unwrap_err();
         assert!(e.to_string().contains("oracle_cases"), "{e}");
+    }
+
+    // ------------------------------------------------- round 4
+
+    /// With nothing exercised, only `uncalibrated` (or the two overriding
+    /// states) is consistent — as `compute` produces.
+    #[test]
+    fn block_refuses_contradicted_or_unknown_op_with_nothing_exercised() {
+        for (state, value) in [("contradicted", json!(0.0)), ("unknown_op", Value::Null)] {
+            let e = refused(|v| {
+                v["exercised_ops"] = json!([]);
+                v.as_object_mut().unwrap().remove("band");
+                v["tau"] = json!({"value": value, "state": state, "n": 0, "oracle_share": 0.0});
+            });
+            assert!(e.contains("nothing exercised"), "{state}: {e}");
+        }
+        // The consistent empty block is accepted.
+        let mut v = block_json();
+        v["exercised_ops"] = json!([]);
+        v.as_object_mut().unwrap().remove("band");
+        v["tau"] = json!({"value": null, "state": "uncalibrated", "n": 0, "oracle_share": 0.0});
+        assert!(serde_json::from_value::<SubstitutionBlock>(v).is_ok());
+    }
+
+    /// The reviewer's probe: under `unknown_op` the argmin cannot sit on a
+    /// contradicted op with kinds; compute puts it on the unsupported op.
+    #[test]
+    fn block_refuses_an_unknown_op_argmin_on_a_contradicted_op() {
+        let j = json!({"world_id": "w", "clone_release": "r1", "exercised_ops": [
+                {"service": "a", "operation": "X", "op_family": "f", "claim_kinds": ["shape"], "verdict": "contradicted"},
+                {"service": "b", "operation": "Y", "op_family": "g", "claim_kinds": ["shape"], "verdict": "unsupported"}],
+            "tau": {"value": null, "state": "unknown_op", "n": 0, "oracle_share": 0.0,
+                "argmin": {"service": "a", "op_family": "f", "claim_kind": "shape"}},
+            "beta": {"value": null, "basis": "snapshot"}, "scorecard_sha": "s", "firewall": "ok"});
+        let e = serde_json::from_value::<SubstitutionBlock>(j.clone())
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("under unknown_op"), "{e}");
+
+        let ops = [
+            ExercisedOpInput {
+                service: "a",
+                operation: "X",
+                op_family: "f",
+                authority: None,
+                verdict: ClaimVerdict::Contradicted,
+                claim_kinds: ECS_KINDS,
+            },
+            ExercisedOpInput {
+                service: "b",
+                operation: "Y",
+                op_family: "g",
+                authority: None,
+                verdict: ClaimVerdict::Unsupported,
+                claim_kinds: ECS_KINDS,
+            },
+        ];
+        let b = SubstitutionBlock::compute(SubstitutionInput {
+            world_id: "w",
+            clone_release: Some("r1"),
+            exercised_ops: &ops,
+            conformance: &[],
+            scorecard_sha: "s",
+            min_cases: 1,
+            beta: BetaInput::Snapshot,
+            firewall: FirewallStatus::Ok,
+        });
+        let b = round_trip(&b);
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        assert_eq!(b.tau().argmin().unwrap().service, "b");
+        // And the same block with the argmin moved to `b` is accepted.
+        let mut ok = j;
+        ok["tau"]["argmin"] = json!({"service": "b", "op_family": "g", "claim_kind": "shape"});
+        assert!(serde_json::from_value::<SubstitutionBlock>(ok).is_ok());
+    }
+
+    fn rehearsal_json() -> Value {
+        serde_json::to_value(RehearsalRecord {
+            subject_repo: "qontinui/qontinui-stack".into(),
+            subject_ref: "refs/heads/main".into(),
+            subject_sha: "abc".into(),
+            subject_session_id: Some("s".into()),
+            subject_work_unit: None,
+            base: "snap-0".into(),
+            world_id: "w-1".into(),
+            clone_release: Some(REL.into()),
+            drift_class: "none".into(),
+            coverage: 1.0,
+            exercised_ops: vec![],
+            non_rehearsable: vec![],
+            predicted_delta: json!({}),
+            observed_delta: json!({}),
+            active_negation: false,
+            replan_clean: true,
+            provenance: RehearsalProvenance::TrustedCi,
+            ran_at: "2026-10-11T00:00:00Z".into(),
+        })
+        .unwrap()
+    }
+
+    /// A misspelled optional field the firewall reads is refused, not
+    /// silently dropped as an absent session.
+    #[test]
+    fn rehearsal_record_refuses_a_misspelled_session_id() {
+        let mut v = rehearsal_json();
+        let sid = v
+            .as_object_mut()
+            .unwrap()
+            .remove("subject_session_id")
+            .unwrap();
+        v["subject_sesion_id"] = sid;
+        let e = serde_json::from_value::<RehearsalRecord>(v).unwrap_err();
+        assert!(
+            e.to_string().contains("unknown field `subject_sesion_id`"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn producer_posted_types_refuse_misspelled_optional_fields() {
+        // ConformanceRow: `measured_conformance` misspelled.
+        let mut v =
+            serde_json::to_value(row("rds", "f", ClaimKind::Shape, Some(0.9), 40, 1.0, 0)).unwrap();
+        let m = v
+            .as_object_mut()
+            .unwrap()
+            .remove("measured_conformance")
+            .unwrap();
+        v["measured_conformence"] = m;
+        assert!(serde_json::from_value::<ConformanceRow>(v).is_err());
+        // World: `clone_release` misspelled.
+        let mut v = serde_json::to_value(world()).unwrap();
+        v["clone_relase"] = json!("x");
+        assert!(serde_json::from_value::<World>(v).is_err());
+        // WorldLifecycleEvent: `ttl_at` misspelled, at the top and inside `change`.
+        let ev = WorldLifecycleEvent {
+            world_id: "w".into(),
+            occurred_at: "t".into(),
+            change: WorldLifecycleChange::Destroyed { reason: None },
+            ttl_at: None,
+        };
+        let mut v = serde_json::to_value(&ev).unwrap();
+        v["ttl"] = json!("t");
+        assert!(serde_json::from_value::<WorldLifecycleEvent>(v).is_err());
+        let mut v = serde_json::to_value(&ev).unwrap();
+        v["change"]["reasn"] = json!("x");
+        assert!(serde_json::from_value::<WorldLifecycleEvent>(v).is_err());
+        // OperationRef, ClaimTally, VendorDriftEvent.
+        assert!(serde_json::from_value::<OperationRef>(
+            json!({"service": "s", "operation": "o", "opration": "x"})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<ClaimTally>(
+            json!({"authority": "documentation", "verdict": "confirmed", "count": 1, "cnt": 2})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<VendorDriftEvent>(
+            json!({"artifact": "a", "detected_at": "t", "verison": "1"})
+        )
+        .is_err());
     }
 }
