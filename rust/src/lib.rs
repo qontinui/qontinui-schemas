@@ -80,7 +80,7 @@ pub mod cli_session;
 /// Cloud twin contracts — worlds (prod / clone / fork), the allowlisted
 /// CloudTrail-shaped audit projection (no field for a parameter value, only a
 /// digest), the [`cloud_twin::SubstitutionBlock`] whose τ is computed never
-/// stamped (private fields, no public constructor), and the rehearsal,
+/// stamped (private fields; the pure `compute` is its only constructor), and the rehearsal,
 /// conformance and vendor-drift records. No TS/Python export yet — no
 /// consumer. See `2026-10-11-local-cloud-as-twin-substrate.md` Phase 2.
 pub mod cloud_twin;
