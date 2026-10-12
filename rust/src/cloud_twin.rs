@@ -324,18 +324,29 @@ pub enum AuditOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DigestAlgorithm {
-    /// SHA-256 over the RFC 8785 (JCS) canonical JSON of the request
-    /// parameters.
+    /// Unkeyed SHA-256 over the RFC 8785 (JCS) canonical JSON of the request
+    /// parameters. **Not for stored audit rows:** an unsalted digest of a
+    /// low-entropy value (a flag, an enum, a short name, a guessable
+    /// password) is recoverable by hashing a dictionary of candidates. Use it
+    /// only for transient comparisons that are not persisted.
     Sha256Jcs,
+    /// HMAC-SHA256 over the RFC 8785 (JCS) canonical JSON of the request
+    /// parameters, keyed with a per-tenant secret held by the ingester and
+    /// never stored beside the rows it keys. **Stored audit rows use
+    /// this variant**, so a stored digest cannot be reversed by dictionary
+    /// without the key.
+    HmacSha256,
 }
 
-/// A digest of an event's request parameters. Equality of digests says two
-/// calls carried the same parameters; the parameters themselves are never
-/// stored (plan D3).
+/// A digest of an event's request parameters. Equality of digests (under the
+/// same algorithm and key) says two calls carried the same parameters. The
+/// parameter *values* are never stored (plan D3) — only this digest, which
+/// for a stored row must be [`DigestAlgorithm::HmacSha256`] so it does not
+/// leak low-entropy values through a dictionary attack.
 ///
 /// Fields are private and validated both by [`ParameterDigest::new`] and on
-/// deserialization: for [`DigestAlgorithm::Sha256Jcs`], `hex` must be exactly
-/// 64 lowercase hex characters, so the field cannot smuggle a value.
+/// deserialization: for either algorithm, `hex` must be exactly 64 lowercase
+/// hex characters, so the field cannot smuggle a value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "ParameterDigestWire")]
 pub struct ParameterDigest {
@@ -367,15 +378,16 @@ impl ParameterDigest {
     ) -> Result<Self, ContractViolation> {
         let hex = hex.into();
         match algorithm {
-            DigestAlgorithm::Sha256Jcs => {
+            // Both are 256-bit outputs rendered as lowercase hex.
+            DigestAlgorithm::Sha256Jcs | DigestAlgorithm::HmacSha256 => {
                 let ok = hex.len() == 64
                     && hex
                         .bytes()
                         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
                 if !ok {
-                    return Err(ContractViolation::new(
-                        "parameter digest: sha256_jcs hex must be exactly 64 lowercase hex characters",
-                    ));
+                    return Err(ContractViolation::new(format!(
+                        "parameter digest: {algorithm:?} hex must be exactly 64 lowercase hex characters"
+                    )));
                 }
             }
         }
@@ -504,10 +516,21 @@ pub struct CloudAuditRollup {
 /// One operation a world-derived verdict relied on, with the ledger
 /// authority and verdict the clone's scorecard holds for it. `authority` is
 /// absent for an operation the ledger has no claim for (e.g. `unsupported`).
+///
+/// `op_family` and `claim_kinds` extend the plan's `{service, operation,
+/// authority, verdict}` so a deserialized block's argmin can be checked
+/// against the operations it names.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ExercisedOp {
     pub service: String,
     pub operation: String,
+    /// The ledger operation family conformance rows are keyed by.
+    pub op_family: String,
+    /// The claim kinds relevant to this use of the operation. Empty means
+    /// none was named, which makes τ `unknown_op`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub claim_kinds: Vec<ClaimKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authority: Option<ClaimAuthority>,
     pub verdict: ClaimVerdict,
@@ -530,8 +553,9 @@ pub enum TauState {
     /// - **partial oracle coverage** — some oracle evidence, but not measured
     ///   or below `min_cases` at the argmin, so `oracle_share` is non-zero.
     Uncalibrated,
-    /// An exercised operation is unsupported, has no claim kinds, or has no
-    /// conformance row for a relevant (family, kind). `value` is null.
+    /// An exercised operation is unsupported, has no claim kinds, or — with a
+    /// verdict that is not `contradicted` — has no conformance row for a
+    /// relevant (family, kind). `value` is null.
     UnknownOp,
     /// An exercised operation is contradicted; τ is 0.
     Contradicted,
@@ -554,12 +578,16 @@ impl TauState {
 }
 
 /// The (service, operation family, claim kind) at which τ attains its
-/// minimum — the theory's argmin, reported beside τ.
+/// minimum — the theory's argmin, reported beside τ. `claim_kind` is absent
+/// exactly when the argmin is an exercised operation that named no claim
+/// kinds (which is what makes τ `unknown_op`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TauArgmin {
     pub service: String,
     pub op_family: String,
-    pub claim_kind: ClaimKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_kind: Option<ClaimKind>,
 }
 
 fn check_unit(name: &str, v: f64) -> Result<(), ContractViolation> {
@@ -590,7 +618,7 @@ pub struct Tau {
     state: TauState,
     /// The number of oracle cases behind the argmin.
     n: u64,
-    /// Absent only when no (family, kind) was evaluated.
+    /// Absent exactly when nothing was exercised.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     argmin: Option<TauArgmin>,
     /// The argmin's oracle share in `[0, 1]`; 0 for a prior-only τ.
@@ -598,6 +626,7 @@ pub struct Tau {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct TauWire {
     value: Option<f64>,
     state: TauState,
@@ -707,6 +736,7 @@ pub struct Beta {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct BetaWire {
     value: Option<f64>,
     basis: BetaBasis,
@@ -721,6 +751,11 @@ impl TryFrom<BetaWire> for Beta {
         if w.basis == BetaBasis::Hcl && w.value != Some(1.0) {
             return Err(ContractViolation::new(
                 "beta with basis hcl must have value 1",
+            ));
+        }
+        if w.basis == BetaBasis::Snapshot && w.value.is_some() {
+            return Err(ContractViolation::new(
+                "beta with basis snapshot is not measured and must have a null value",
             ));
         }
         Ok(Self {
@@ -785,10 +820,12 @@ pub struct SubstitutionInput<'a> {
     pub clone_release: Option<&'a str>,
     pub exercised_ops: &'a [ExercisedOpInput<'a>],
     /// The conformance snapshot. Only rows whose `scorecard_sha` equals
-    /// `scorecard_sha` (when given) and whose `clone_release` equals the
-    /// world's (when released) are read.
+    /// `scorecard_sha` and whose `clone_release` equals the world's (when
+    /// released) are read.
     pub conformance: &'a [ConformanceRow],
-    pub scorecard_sha: Option<&'a str>,
+    /// The scorecard the snapshot was taken from. Required: a block always
+    /// records which scorecard it was computed against.
+    pub scorecard_sha: &'a str,
     /// The fewest oracle cases a (family, kind) needs to count as measured.
     pub min_cases: u64,
     pub beta: BetaInput,
@@ -809,7 +846,8 @@ enum CellTier {
 struct Cell<'a> {
     service: &'a str,
     op_family: &'a str,
-    kind: ClaimKind,
+    /// `None` for an operation that named no claim kinds.
+    kind: Option<ClaimKind>,
     tier: CellTier,
     /// Valid measured conformance (only meaningful for `Calibrated`).
     measured: f64,
@@ -822,7 +860,9 @@ impl Cell<'_> {
     /// Total order, worst first: tier; then measured conformance (calibrated
     /// cells); then oracle share; then weaker authority (no authority is
     /// weakest); then service, family (lexical) and claim kind (declaration
-    /// order) so the argmin is deterministic.
+    /// order, no kind first); then fewer oracle cases and lower measured
+    /// conformance — so the argmin, and the `n` read off it, do not depend on
+    /// row order.
     fn worse_first(&self, other: &Self) -> std::cmp::Ordering {
         let weakness =
             |a: Option<ClaimAuthority>| std::cmp::Reverse(a.map_or(u8::MAX, |a| a as u8));
@@ -840,6 +880,8 @@ impl Cell<'_> {
             .then_with(|| self.service.cmp(other.service))
             .then_with(|| self.op_family.cmp(other.op_family))
             .then_with(|| self.kind.cmp(&other.kind))
+            .then_with(|| self.cases.cmp(&other.cases))
+            .then_with(|| self.measured.total_cmp(&other.measured))
     }
 }
 
@@ -880,10 +922,21 @@ fn weakest_authority(
 /// It still derives `Serialize`/`Deserialize`, because coord ingests a block
 /// and re-serializes it (the rehearsal table's `substitution` column, the
 /// `DriftVerdict` it rides in). Deserialization is a transport path, not a
-/// computation path, and it **refuses** a block that `compute` could not have
-/// produced: τ's and β's invariants (see [`Tau`], [`Beta`]), the band against
-/// the exercised operations, and the firewall / unreleased-clone states
-/// against the fields they are derived from.
+/// computation path.
+///
+/// **What deserialization proves, and what it does not.** It enforces
+/// *consistency*: τ's and β's own invariants (see [`Tau`], [`Beta`]); the
+/// band against the exercised operations; the argmin against the operations
+/// it names; the state against the operations' verdicts (an `unsupported` or
+/// kindless op forces `unknown_op` unless the firewall or an unreleased clone
+/// takes precedence; a `contradicted` op rules out `calibrated` and
+/// `uncalibrated`); and the firewall / unreleased-clone states against the
+/// fields they derive from. It does **not** prove *provenance*: a block that
+/// is internally consistent can still carry a τ no conformance snapshot
+/// supports. Only [`SubstitutionBlock::compute`] against the snapshot proves
+/// the value, so plan Phase 6's coord ingest must **recompute** the block
+/// from the exercised operations and its own snapshot rather than trust a
+/// posted one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "SubstitutionBlockWire")]
 pub struct SubstitutionBlock {
@@ -899,12 +952,12 @@ pub struct SubstitutionBlock {
     band: Option<ClaimAuthority>,
     tau: Tau,
     beta: Beta,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    scorecard_sha: Option<String>,
+    scorecard_sha: String,
     firewall: FirewallStatus,
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SubstitutionBlockWire {
     world_id: String,
     #[serde(default)]
@@ -914,8 +967,7 @@ struct SubstitutionBlockWire {
     band: Option<ClaimAuthority>,
     tau: Tau,
     beta: Beta,
-    #[serde(default)]
-    scorecard_sha: Option<String>,
+    scorecard_sha: String,
     firewall: FirewallStatus,
 }
 
@@ -948,6 +1000,56 @@ impl TryFrom<SubstitutionBlockWire> for SubstitutionBlock {
                 "band must be the weakest authority among the exercised operations",
             ));
         }
+        match (w.exercised_ops.is_empty(), w.tau.argmin()) {
+            (true, Some(_)) => {
+                return Err(ContractViolation::new(
+                    "tau names an argmin but nothing was exercised",
+                ))
+            }
+            (false, None) => {
+                return Err(ContractViolation::new(
+                    "tau must name an argmin when operations were exercised",
+                ))
+            }
+            (false, Some(a)) => {
+                let named = w.exercised_ops.iter().any(|o| {
+                    o.service == a.service
+                        && o.op_family == a.op_family
+                        && match a.claim_kind {
+                            Some(k) => o.claim_kinds.contains(&k),
+                            None => o.claim_kinds.is_empty(),
+                        }
+                });
+                if !named {
+                    return Err(ContractViolation::new(
+                        "tau.argmin must name an exercised (service, op_family) and one of its claim kinds (absent only for an op with none)",
+                    ));
+                }
+            }
+            (true, None) => {}
+        }
+        let overriding = matches!(
+            state,
+            TauState::FirewallViolated | TauState::UnreleasedClone
+        );
+        let unknown_op = w
+            .exercised_ops
+            .iter()
+            .any(|o| o.verdict == ClaimVerdict::Unsupported || o.claim_kinds.is_empty());
+        if unknown_op && !overriding && state != TauState::UnknownOp {
+            return Err(ContractViolation::new(
+                "an unsupported or kindless exercised op requires tau.state unknown_op (or firewall_violated / unreleased_clone)",
+            ));
+        }
+        let contradicted = w
+            .exercised_ops
+            .iter()
+            .any(|o| o.verdict == ClaimVerdict::Contradicted);
+        if contradicted && matches!(state, TauState::Calibrated | TauState::Uncalibrated) {
+            return Err(ContractViolation::new(
+                "a contradicted exercised op rules out tau.state calibrated and uncalibrated",
+            ));
+        }
         Ok(Self {
             world_id: w.world_id,
             clone_release: w.clone_release,
@@ -968,10 +1070,11 @@ impl SubstitutionBlock {
     /// Each exercised operation is expanded into one *cell* per relevant
     /// claim kind, keyed `(service, op_family, claim_kind)` and matched to the
     /// snapshot's [`ConformanceRow`]s. A cell is:
-    /// - **unknown** — the operation's verdict is `unsupported`, or no row
-    ///   matches;
-    /// - **contradicted** — the verdict is `contradicted`, or the row has
-    ///   `contradictions_open > 0`;
+    /// - **unknown** — the operation's verdict is `unsupported`; or it named
+    ///   no claim kinds (one cell with no kind); or no row matches and its
+    ///   verdict is not `contradicted`;
+    /// - **contradicted** — the verdict is `contradicted` (whether or not a
+    ///   row matches), or the matching row has `contradictions_open > 0`;
     /// - **calibrated** — the row's `measured_conformance` is a finite number
     ///   in `[0, 1]` and `oracle_cases ≥ min_cases`;
     /// - **uncalibrated** — otherwise.
@@ -982,8 +1085,7 @@ impl SubstitutionBlock {
     /// applies wins):
     /// 1. firewall `violated` → `firewall_violated`, value 0;
     /// 2. no `clone_release` → `unreleased_clone`, null;
-    /// 3. any unknown cell, or any exercised operation with no claim kinds →
-    ///    `unknown_op`, null;
+    /// 3. any unknown cell → `unknown_op`, null;
     /// 4. any contradicted cell → `contradicted`, value 0;
     /// 5. every cell calibrated → `calibrated`, value = the minimum measured
     ///    conformance (never an average over breadth);
@@ -992,9 +1094,12 @@ impl SubstitutionBlock {
     /// Whatever the state, `argmin` is the worst cell under a total order —
     /// tier (in the precedence order above), then measured conformance, then
     /// oracle share, then weaker authority, then service and family
-    /// (lexical) and claim kind (declaration order) — and `oracle_share` and
+    /// (lexical), claim kind (declaration order, no kind first), then fewer
+    /// oracle cases and lower measured conformance — and `oracle_share` and
     /// `n` are that cell's row's `oracle_verified_share` and `oracle_cases`
-    /// (0 with no row). `band` is the weakest exercised authority.
+    /// (0 with no row). Every non-empty exercised set fills `argmin`, so an
+    /// `unknown_op` τ names the operation that caused it. `band` is the
+    /// weakest exercised authority.
     ///
     /// Numeric inputs that are not finite numbers in `[0, 1]` (a measured
     /// conformance, an oracle share, a measured β) are treated as *not
@@ -1005,27 +1110,33 @@ impl SubstitutionBlock {
         let rows: Vec<&ConformanceRow> = input
             .conformance
             .iter()
-            .filter(|r| input.scorecard_sha.is_none_or(|sha| r.scorecard_sha == sha))
+            .filter(|r| r.scorecard_sha == input.scorecard_sha)
             .filter(|r| input.clone_release.is_none_or(|rel| r.clone_release == rel))
             .collect();
 
         let mut cells: Vec<Cell<'_>> = Vec::new();
-        let mut kindless_op = false;
         for op in input.exercised_ops {
+            // The cell an op gets when no row matches.
+            let unmatched = |kind: Option<ClaimKind>| Cell {
+                service: op.service,
+                op_family: op.op_family,
+                kind,
+                tier: if op.verdict == ClaimVerdict::Contradicted && kind.is_some() {
+                    CellTier::Contradicted
+                } else {
+                    CellTier::Unknown
+                },
+                measured: 0.0,
+                share: 0.0,
+                cases: 0,
+                authority: op.authority,
+            };
             if op.claim_kinds.is_empty() {
-                kindless_op = true;
+                cells.push(unmatched(None));
+                continue;
             }
             for &kind in op.claim_kinds {
-                let base = Cell {
-                    service: op.service,
-                    op_family: op.op_family,
-                    kind,
-                    tier: CellTier::Unknown,
-                    measured: 0.0,
-                    share: 0.0,
-                    cases: 0,
-                    authority: op.authority,
-                };
+                let base = unmatched(Some(kind));
                 let candidates = rows
                     .iter()
                     .filter(|r| {
@@ -1063,7 +1174,7 @@ impl SubstitutionBlock {
             (TauState::FirewallViolated, Some(0.0))
         } else if input.clone_release.is_none() {
             (TauState::UnreleasedClone, None)
-        } else if kindless_op || worst.is_some_and(|c| c.tier == CellTier::Unknown) {
+        } else if worst.is_some_and(|c| c.tier == CellTier::Unknown) {
             (TauState::UnknownOp, None)
         } else {
             match worst {
@@ -1112,6 +1223,8 @@ impl SubstitutionBlock {
                 .map(|o| ExercisedOp {
                     service: o.service.to_owned(),
                     operation: o.operation.to_owned(),
+                    op_family: o.op_family.to_owned(),
+                    claim_kinds: o.claim_kinds.to_vec(),
                     authority: o.authority,
                     verdict: o.verdict,
                 })
@@ -1119,7 +1232,7 @@ impl SubstitutionBlock {
             band: weakest_authority(input.exercised_ops.iter().map(|o| o.authority)),
             tau,
             beta,
-            scorecard_sha: input.scorecard_sha.map(str::to_owned),
+            scorecard_sha: input.scorecard_sha.to_owned(),
             firewall: input.firewall,
         }
     }
@@ -1142,8 +1255,8 @@ impl SubstitutionBlock {
     pub fn beta(&self) -> &Beta {
         &self.beta
     }
-    pub fn scorecard_sha(&self) -> Option<&str> {
-        self.scorecard_sha.as_deref()
+    pub fn scorecard_sha(&self) -> &str {
+        &self.scorecard_sha
     }
     pub fn firewall(&self) -> FirewallStatus {
         self.firewall
@@ -1247,7 +1360,6 @@ pub struct ConformanceRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub measured_conformance: Option<f64>,
     /// Oracle cases behind `measured_conformance` (compared to `min_cases`).
-    #[serde(default)]
     pub oracle_cases: u64,
     pub contradictions_open: u64,
     pub observed_at: String,
@@ -1355,6 +1467,7 @@ mod tests {
             "clone_release": "qcloud-0.3.0",
             "exercised_ops": [
                 {"service": "rds", "operation": "ModifyDBInstance",
+                 "op_family": "db-instance", "claim_kinds": ["semantic"],
                  "authority": "documentation", "verdict": "unknown"}
             ],
             "band": "documentation",
@@ -1509,11 +1622,14 @@ mod tests {
         assert_eq!(b.tau().value(), None);
         assert_eq!(b.tau().state(), TauState::Uncalibrated);
         assert_eq!(b.tau().n(), 0);
-        assert_eq!(b.tau().argmin().unwrap().claim_kind, ClaimKind::Semantic);
+        assert_eq!(
+            b.tau().argmin().unwrap().claim_kind,
+            Some(ClaimKind::Semantic)
+        );
         assert_eq!(b.tau().oracle_share(), 0.0);
         assert_eq!(b.beta().value(), Some(1.0));
         assert_eq!(b.beta().basis(), BetaBasis::Hcl);
-        assert_eq!(b.scorecard_sha(), Some("deadbeef"));
+        assert_eq!(b.scorecard_sha(), "deadbeef");
         assert_eq!(b.firewall(), FirewallStatus::Ok);
     }
 
@@ -1732,7 +1848,7 @@ mod tests {
             clone_release,
             exercised_ops: ops,
             conformance: rows,
-            scorecard_sha: Some(SHA),
+            scorecard_sha: SHA,
             min_cases: 30,
             beta: BetaInput::Hcl,
             firewall,
@@ -1755,7 +1871,7 @@ mod tests {
             .expect("argmin is filled when something was exercised");
         assert_eq!(
             (a.service.as_str(), a.op_family.as_str(), a.claim_kind),
-            argmin
+            (argmin.0, argmin.1, Some(argmin.2))
         );
         assert_eq!(t.oracle_share(), share);
     }
@@ -1777,7 +1893,7 @@ mod tests {
         );
         assert_eq!(b.tau().n(), 35);
         assert_eq!(b.band(), Some(ClaimAuthority::VendorSdkAcceptance));
-        assert_eq!(b.scorecard_sha(), Some(SHA));
+        assert_eq!(b.scorecard_sha(), SHA);
         assert_eq!(b.beta().value(), Some(1.0));
     }
 
@@ -1959,7 +2075,7 @@ mod tests {
                 clone_release: Some(REL),
                 exercised_ops: &[],
                 conformance: &[],
-                scorecard_sha: None,
+                scorecard_sha: SHA,
                 min_cases: 30,
                 beta: input,
                 firewall: FirewallStatus::Ok,
@@ -2115,5 +2231,227 @@ mod tests {
     fn block_refuses_a_band_that_is_not_the_weakest_authority() {
         let e = refused(|v| v["band"] = json!("recorded_real_service"));
         assert!(e.contains("band"), "{e}");
+    }
+
+    // ------------------------------------------------- round 3 (probe cases)
+
+    fn kindless_op() -> ExercisedOpInput<'static> {
+        ExercisedOpInput {
+            service: "rds",
+            operation: "B",
+            op_family: "g",
+            authority: Some(ClaimAuthority::Documentation),
+            verdict: ClaimVerdict::Confirmed,
+            claim_kinds: &[],
+        }
+    }
+
+    /// Probe (c): a kindless op beside a calibrated one is `unknown_op`, and
+    /// the argmin names the kindless op with no claim kind.
+    #[test]
+    fn compute_kindless_op_beside_a_calibrated_one_is_unknown_op_and_names_it() {
+        let ops = [rds_op(ClaimVerdict::Confirmed), kindless_op()];
+        let b = compute(&ops, &measured_rows(), Some(REL), FirewallStatus::Ok);
+        let t = b.tau();
+        assert_eq!(t.state(), TauState::UnknownOp);
+        assert_eq!(t.value(), None);
+        let a = t.argmin().unwrap();
+        assert_eq!(
+            (a.service.as_str(), a.op_family.as_str(), a.claim_kind),
+            ("rds", "g", None)
+        );
+        assert_eq!(t.oracle_share(), 0.0);
+        assert_eq!(t.n(), 0);
+    }
+
+    /// Probe (d): a kindless op alone still fills the argmin.
+    #[test]
+    fn compute_kindless_op_alone_fills_the_argmin() {
+        let b = compute(
+            &[kindless_op()],
+            &measured_rows(),
+            Some(REL),
+            FirewallStatus::Ok,
+        );
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        let a = b
+            .tau()
+            .argmin()
+            .expect("a non-empty exercised set fills argmin");
+        assert_eq!(
+            (a.service.as_str(), a.op_family.as_str(), a.claim_kind),
+            ("rds", "g", None)
+        );
+    }
+
+    /// Probe (e): a contradicted op with no conformance row is Contradicted,
+    /// value 0 — not `unknown_op`.
+    #[test]
+    fn compute_contradicted_op_with_no_row_is_contradicted() {
+        let contra_no_row = ExercisedOpInput {
+            service: "rds",
+            operation: "C",
+            op_family: "zzz",
+            authority: Some(ClaimAuthority::Documentation),
+            verdict: ClaimVerdict::Contradicted,
+            claim_kinds: ECS_KINDS,
+        };
+        let ops = [rds_op(ClaimVerdict::Confirmed), contra_no_row];
+        let b = compute(&ops, &measured_rows(), Some(REL), FirewallStatus::Ok);
+        assert_tau(
+            &b,
+            Some(0.0),
+            TauState::Contradicted,
+            ("rds", "zzz", ClaimKind::Shape),
+            0.0,
+        );
+        // ...whereas a non-contradicted op with no row is unknown_op.
+        let unknown_no_row = ExercisedOpInput {
+            verdict: ClaimVerdict::Confirmed,
+            ..contra_no_row
+        };
+        let b = compute(
+            &[rds_op(ClaimVerdict::Confirmed), unknown_no_row],
+            &measured_rows(),
+            Some(REL),
+            FirewallStatus::Ok,
+        );
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        assert_eq!(b.tau().value(), None);
+    }
+
+    /// Probe (f): `n` does not depend on row order when two rows tie.
+    #[test]
+    fn compute_n_is_independent_of_row_order() {
+        let r1 = vec![
+            row("ecs", "service", ClaimKind::Shape, None, 3, 0.5, 0),
+            row("ecs", "service", ClaimKind::Shape, None, 7, 0.5, 0),
+        ];
+        let r2: Vec<_> = r1.iter().cloned().rev().collect();
+        let ops = [ecs_op(
+            Some(ClaimAuthority::Documentation),
+            ClaimVerdict::Unknown,
+        )];
+        let n1 = compute(&ops, &r1, Some(REL), FirewallStatus::Ok).tau().n();
+        let n2 = compute(&ops, &r2, Some(REL), FirewallStatus::Ok).tau().n();
+        assert_eq!(n1, 3);
+        assert_eq!(n2, 3);
+    }
+
+    /// Probe (a), split one rule per test: a stamped calibrated τ with no
+    /// exercised ops is refused.
+    #[test]
+    fn block_refuses_an_argmin_with_nothing_exercised() {
+        let e = refused(|v| {
+            v["exercised_ops"] = json!([]);
+            v.as_object_mut().unwrap().remove("band");
+            v["tau"] = json!({"value": 0.97, "state": "calibrated", "n": 1000,
+                "argmin": {"service": "anything", "op_family": "x", "claim_kind": "shape"},
+                "oracle_share": 1.0});
+        });
+        assert!(e.contains("nothing was exercised"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_ops_without_an_argmin() {
+        let e = refused(|v| {
+            v["tau"].as_object_mut().unwrap().remove("argmin");
+        });
+        assert!(e.contains("must name an argmin"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_an_argmin_naming_an_unexercised_op() {
+        let e = refused(|v| v["tau"]["argmin"]["op_family"] = json!("other"));
+        assert!(e.contains("tau.argmin must name"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_an_argmin_kind_the_op_did_not_name() {
+        let e = refused(|v| v["tau"]["argmin"]["claim_kind"] = json!("timing"));
+        assert!(e.contains("tau.argmin must name"), "{e}");
+    }
+
+    #[test]
+    fn beta_refuses_a_snapshot_value() {
+        let e = refused(|v| v["beta"] = json!({"value": 0.4, "basis": "snapshot"}));
+        assert!(e.contains("snapshot"), "{e}");
+    }
+
+    #[test]
+    fn wire_types_refuse_unknown_fields() {
+        for mutate in [
+            (|v: &mut Value| v["extra_junk"] = json!(1)) as fn(&mut Value),
+            |v| v["tau"]["extra"] = json!(1),
+            |v| v["tau"]["argmin"]["extra"] = json!(1),
+            |v| v["beta"]["extra"] = json!(1),
+            |v| v["exercised_ops"][0]["extra"] = json!(1),
+        ] {
+            let e = refused(mutate);
+            assert!(e.contains("unknown field"), "{e}");
+        }
+    }
+
+    /// Probe (b), one rule per test: a calibrated τ beside an unsupported op,
+    /// and an uncalibrated τ beside a contradicted op.
+    #[test]
+    fn block_refuses_a_calibrated_tau_beside_an_unsupported_op() {
+        let e = refused(|v| {
+            v["exercised_ops"][0]["verdict"] = json!("unsupported");
+            v["tau"]["state"] = json!("calibrated");
+            v["tau"]["value"] = json!(0.9);
+        });
+        assert!(e.contains("unsupported or kindless"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_a_kindless_op_without_unknown_op() {
+        let e = refused(|v| {
+            v["exercised_ops"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("claim_kinds");
+            v["tau"]["argmin"]
+                .as_object_mut()
+                .unwrap()
+                .remove("claim_kind");
+        });
+        assert!(e.contains("unsupported or kindless"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_an_uncalibrated_tau_beside_a_contradicted_op() {
+        let e = refused(|v| v["exercised_ops"][0]["verdict"] = json!("contradicted"));
+        assert!(e.contains("contradicted exercised op"), "{e}");
+    }
+
+    #[test]
+    fn block_refuses_a_missing_scorecard_sha() {
+        let e = refused(|v| {
+            v.as_object_mut().unwrap().remove("scorecard_sha");
+        });
+        assert!(e.contains("scorecard_sha"), "{e}");
+    }
+
+    #[test]
+    fn hmac_digest_follows_the_same_hex_rule() {
+        let ok = "0123456789abcdef".repeat(4);
+        let d = ParameterDigest::new(DigestAlgorithm::HmacSha256, ok.clone()).unwrap();
+        assert_eq!(d.algorithm(), DigestAlgorithm::HmacSha256);
+        assert_eq!(
+            serde_json::to_value(&d).unwrap()["algorithm"],
+            "hmac_sha256"
+        );
+        assert!(ParameterDigest::new(DigestAlgorithm::HmacSha256, ok.to_uppercase()).is_err());
+        assert!(ParameterDigest::new(DigestAlgorithm::HmacSha256, "secret").is_err());
+    }
+
+    #[test]
+    fn conformance_row_requires_oracle_cases() {
+        let mut v =
+            serde_json::to_value(row("rds", "f", ClaimKind::Shape, None, 0, 0.0, 0)).unwrap();
+        v.as_object_mut().unwrap().remove("oracle_cases");
+        let e = serde_json::from_value::<ConformanceRow>(v).unwrap_err();
+        assert!(e.to_string().contains("oracle_cases"), "{e}");
     }
 }
