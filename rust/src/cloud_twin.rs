@@ -1060,10 +1060,11 @@ impl TryFrom<SubstitutionBlockWire> for SubstitutionBlock {
             state,
             TauState::FirewallViolated | TauState::UnreleasedClone
         );
-        let unknown_op = w
-            .exercised_ops
-            .iter()
-            .any(|o| o.verdict == ClaimVerdict::Unsupported || o.claim_kinds.is_empty());
+        let kindless = w.exercised_ops.iter().any(|o| o.claim_kinds.is_empty());
+        let unknown_op = kindless
+            || w.exercised_ops
+                .iter()
+                .any(|o| o.verdict == ClaimVerdict::Unsupported);
         if unknown_op && !overriding && state != TauState::UnknownOp {
             return Err(ContractViolation::new(
                 "an unsupported or kindless exercised op requires tau.state unknown_op (or firewall_violated / unreleased_clone)",
@@ -1076,6 +1077,30 @@ impl TryFrom<SubstitutionBlockWire> for SubstitutionBlock {
         if contradicted && matches!(state, TauState::Calibrated | TauState::Uncalibrated) {
             return Err(ContractViolation::new(
                 "a contradicted exercised op rules out tau.state calibrated and uncalibrated",
+            ));
+        }
+        // An unknown cell carries a row's n and share only when it comes from
+        // an UNSUPPORTED op that matched a row; any other unknown cell (no
+        // row, or a kindless op) has n = 0 and share = 0.
+        if let (TauState::UnknownOp, Some(a)) = (state, w.tau.argmin()) {
+            let names_unsupported = w.exercised_ops.iter().any(|o| {
+                o.verdict == ClaimVerdict::Unsupported
+                    && o.service == a.service
+                    && o.op_family == a.op_family
+                    && a.claim_kind.is_some_and(|k| o.claim_kinds.contains(&k))
+            });
+            if !names_unsupported && (w.tau.n() != 0 || w.tau.oracle_share() != 0.0) {
+                return Err(ContractViolation::new(
+                    "under unknown_op, an argmin that names no unsupported op has n = 0 and oracle_share = 0",
+                ));
+            }
+        }
+        // A kindless op is an unknown cell with share 0, and the order ranks
+        // unknown cells by share first, so whenever one is exercised the
+        // argmin's share is 0 — in every state a kindless op permits.
+        if kindless && w.tau.oracle_share() != 0.0 {
+            return Err(ContractViolation::new(
+                "with a kindless exercised op, tau.oracle_share must be 0",
             ));
         }
         Ok(Self {
@@ -2645,5 +2670,146 @@ mod tests {
             json!({"artifact": "a", "detected_at": "t", "verison": "1"})
         )
         .is_err());
+    }
+
+    // ------------------------------------------------- round 5
+
+    fn unknown_op_block(ops: Value, argmin: Value, n: u64, share: f64) -> Value {
+        json!({"world_id": "w", "clone_release": "r1", "exercised_ops": ops,
+            "tau": {"value": null, "state": "unknown_op", "n": n, "oracle_share": share, "argmin": argmin},
+            "beta": {"value": null, "basis": "snapshot"}, "scorecard_sha": "s", "firewall": "ok"})
+    }
+
+    fn refuse(v: Value) -> String {
+        serde_json::from_value::<SubstitutionBlock>(v)
+            .expect_err("must be refused")
+            .to_string()
+    }
+
+    fn r5_compute(
+        ops: &[ExercisedOpInput<'_>],
+        rows: &[ConformanceRow],
+        clone_release: Option<&str>,
+        firewall: FirewallStatus,
+    ) -> SubstitutionBlock {
+        round_trip(&SubstitutionBlock::compute(SubstitutionInput {
+            world_id: "w",
+            clone_release,
+            exercised_ops: ops,
+            conformance: rows,
+            scorecard_sha: SHA,
+            min_cases: 1,
+            beta: BetaInput::Snapshot,
+            firewall,
+        }))
+    }
+
+    fn op_a(verdict: ClaimVerdict, kinds: &'static [ClaimKind]) -> ExercisedOpInput<'static> {
+        ExercisedOpInput {
+            service: "a",
+            operation: "X",
+            op_family: "f",
+            authority: None,
+            verdict,
+            claim_kinds: kinds,
+        }
+    }
+
+    fn op_b_unsupported() -> ExercisedOpInput<'static> {
+        ExercisedOpInput {
+            service: "b",
+            operation: "Y",
+            op_family: "g",
+            authority: None,
+            verdict: ClaimVerdict::Unsupported,
+            claim_kinds: ECS_KINDS,
+        }
+    }
+
+    /// P1: a confirmed op with kinds is unknown only when no row matches, so
+    /// its unknown cell has n = 0 and share = 0.
+    #[test]
+    fn p1_refuses_unknown_op_with_cases_on_a_rowless_confirmed_op() {
+        let v = unknown_op_block(
+            json!([{"service": "a", "operation": "X", "op_family": "f", "claim_kinds": ["shape"], "verdict": "confirmed"}]),
+            json!({"service": "a", "op_family": "f", "claim_kind": "shape"}),
+            40,
+            0.9,
+        );
+        let e = refuse(v);
+        assert!(e.contains("names no unsupported op"), "{e}");
+        // compute's shape: no row -> unknown_op, n 0, share 0.
+        let b = r5_compute(
+            &[op_a(ClaimVerdict::Confirmed, ECS_KINDS)],
+            &[],
+            Some(REL),
+            FirewallStatus::Ok,
+        );
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        assert_eq!((b.tau().n(), b.tau().oracle_share()), (0, 0.0));
+    }
+
+    /// P2: a kindless op's cell is always unmatched — n = 0, share = 0.
+    #[test]
+    fn p2_refuses_cases_on_a_kindless_op() {
+        let v = unknown_op_block(
+            json!([{"service": "a", "operation": "X", "op_family": "f", "verdict": "confirmed"}]),
+            json!({"service": "a", "op_family": "f"}),
+            5,
+            0.5,
+        );
+        let e = refuse(v);
+        assert!(e.contains("oracle_share"), "{e}");
+        let b = r5_compute(
+            &[op_a(ClaimVerdict::Confirmed, &[])],
+            &[],
+            Some(REL),
+            FirewallStatus::Ok,
+        );
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        assert_eq!(b.tau().argmin().unwrap().claim_kind, None);
+        assert_eq!((b.tau().n(), b.tau().oracle_share()), (0, 0.0));
+    }
+
+    /// P3: beside an unsupported op that matched a share-0.5 row, the
+    /// kindless op's share-0 cell is the worse one, so the share must be 0.
+    #[test]
+    fn p3_refuses_a_non_zero_share_beside_a_kindless_op() {
+        let v = unknown_op_block(
+            json!([{"service": "a", "operation": "X", "op_family": "f", "verdict": "confirmed"},
+                   {"service": "b", "operation": "Y", "op_family": "g", "claim_kinds": ["shape"], "verdict": "unsupported"}]),
+            json!({"service": "b", "op_family": "g", "claim_kind": "shape"}),
+            3,
+            0.5,
+        );
+        let e = refuse(v);
+        assert!(e.contains("kindless exercised op"), "{e}");
+        let rows = [row("b", "g", ClaimKind::Shape, Some(0.9), 3, 0.5, 0)];
+        let ops = [op_a(ClaimVerdict::Confirmed, &[]), op_b_unsupported()];
+        // In every state a kindless op permits, compute's share is 0.
+        for (rel, fw, state) in [
+            (Some(REL), FirewallStatus::Ok, TauState::UnknownOp),
+            (
+                Some(REL),
+                FirewallStatus::Violated,
+                TauState::FirewallViolated,
+            ),
+            (None, FirewallStatus::Ok, TauState::UnreleasedClone),
+        ] {
+            let b = r5_compute(&ops, &rows, rel, fw);
+            assert_eq!(b.tau().state(), state);
+            assert_eq!(b.tau().argmin().unwrap().service, "a");
+            assert_eq!(b.tau().oracle_share(), 0.0);
+        }
+    }
+
+    /// The case the checks must still admit: an unsupported op that matched
+    /// a row carries that row's n and share under unknown_op.
+    #[test]
+    fn unknown_op_on_an_unsupported_op_with_a_row_keeps_its_cases() {
+        let rows = [row("b", "g", ClaimKind::Shape, Some(0.9), 3, 0.5, 0)];
+        let b = r5_compute(&[op_b_unsupported()], &rows, Some(REL), FirewallStatus::Ok);
+        assert_eq!(b.tau().state(), TauState::UnknownOp);
+        assert_eq!((b.tau().n(), b.tau().oracle_share()), (3, 0.5));
     }
 }
