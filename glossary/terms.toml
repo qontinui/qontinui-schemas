@@ -70,7 +70,7 @@ short = "A recorded declaration by an agent or a person: that an approval gate's
 long = """
 An **attestation** clears a gate whose predicate is an approval rather than something the product can observe by itself.
 
-Who may attest is decided per gate class by its clearance authority: *operator only*, *an agent other than the author* (separation of duties), or *any agent* in the tenant. Gates addressed to agents can by default be attested by any agent; gates addressed to the operator need a human approval.
+Who may attest is decided per gate class by its clearance authority: *operator only*, *an agent other than the author* (separation of duties: another machine counts; on the same machine, only a different agent session counts, and when that cannot be shown the attester is treated as the author), or *any agent* in the tenant. Gates addressed to agents can by default be attested by any agent; gates addressed to the operator need a human approval.
 
 An attestation can also say the condition can **never** be met; that ends the gate **failed**, with the reason recorded. Force-clearing a gate that can no longer clear on its own is a separate action, checked against the same authority.
 
@@ -88,7 +88,7 @@ A **work unit** is how the product tracks a piece of work over its whole life, i
 
 Every status change is kept in its history, and gates can wait on a work unit reaching a status. Statuses come in three kinds:
 
-- **derived**: *ready* (vetted, with at least one gate and all of them cleared) and *shipped* (a cited pull request landed) are computed by the service; writing one directly is refused.
+- **derived**: *ready* (vetted, with at least one gate and all of its remaining gates cleared) and *shipped* (at least one cited pull request landed and no citation is still open; taken back if that stops holding) are set only by the service when it derives them; they cannot be written directly.
 - **attested**: *vetted*, *superseded* and *obsolete* need an **attestation**, normally from someone other than the unit's owner.
 - **free**: `draft`, `in_progress`, `blocked` or any other word, stored exactly as written. Read an unrecognized word as its writer's label, not a state the product tracks.
 
@@ -128,18 +128,17 @@ since = 1
 [[term]]
 id = "tier"
 term = "Tier"
-short = "A level in one of several separate ladders: coordination, the autonomy dial, clause permission, gate identity, agent write access, or runner account."
+short = "A level in one of several separate ladders: coordination, the autonomy dial, clause permission, agent write access, or runner account."
 long = """
 **Tier** names a level in several separate ladders; read which one from context.
 
 1. **Coordination tiers** stack: *claims* (who is touching what, always on), then *work units* (the durable record of work), then *plan files* (optional; enabled by configuring a plans folder). A tenant with no plan files loses very little.
 2. **The autonomy dial** says how far agents may go on security-sensitive work: *proceed*, *draft required* (open a draft behind an approval gate) or *ask first*.
 3. **Clause tiers** mark what one policy clause permits: *proceed*, *proceed and log*, *proceed and notify*, *ask first* or *never*.
-4. **Identity tiers** decide whether whoever clears a gate is someone other than its author: a different device counts; on the same device only a different proven session does, and anything unproven counts as the author.
-5. **Agent write tiers** say whether agents may edit a prompt document: *deny*, *allow* or *allow with notification*.
-6. **Runner account tiers**: *Tier 0* uses local AI only, *Tier 1* your own provider keys, *Tier 2* is signed in to a Qontinui account, which multi-machine coordination needs.
+4. **Agent write tiers** say whether agents may edit a prompt document: *deny*, *allow* or *allow with notification*.
+5. **Runner account tiers**: *Tier 0* uses local AI only, *Tier 1* your own provider keys, *Tier 2* is signed in to a Qontinui account, which multi-machine coordination needs.
 """
-see_also = ["claim", "work_unit", "plan", "policy", "clause", "attestation", "runner"]
+see_also = ["claim", "work_unit", "plan", "policy", "clause", "runner"]
 since = 1
 
 [[term]]
@@ -260,15 +259,13 @@ id = "drain"
 term = "Drain"
 short = "Either stopping new work being sent to a device (reversible), or preparing one runner for a planned restart (final)."
 long = """
-**Drain** names two different operations, plus a narrower third use.
+**Drain** names two different operations.
 
 **Device drain** (in the coordination service): the operator stops new work being sent to a device or machine until a set time: CI, builds, merges, agent-session starts and gate continuations. It is reversible and expires. Nothing already running is interrupted; sessions that declared themselves finished and sat idle are closed.
 
 **Runner drain**: a graceful stop before a restart. It refuses new AI turns, saves in-flight turns and parks uncommitted worktree changes on a saved ref. It covers only the runner's own AI and task sessions, not agents in its terminals, and it is final: a drained runner is not un-drained.
-
-Draining the merge train means something narrower: before the service itself is updated, the update waits, for a bounded time, until the train has nothing in flight. Landings are not paused.
 """
-see_also = ["restart_readiness", "device", "runner", "session_status", "merge_train"]
+see_also = ["restart_readiness", "device", "runner", "session_status"]
 since = 1
 
 [[term]]
@@ -334,7 +331,7 @@ since = 1
 [[term]]
 id = "tenant"
 term = "Tenant"
-short = "The isolation boundary that owns repositories, devices, gates, work units, policies and memory. Shown as a Project in the app."
+short = "The isolation boundary that owns gates, work units, policies and memory; devices and repositories can belong to several. Shown as a Project in the app."
 long = """
 A **tenant** is the unit of ownership and isolation. Gates, work units, findings, policies and intent documents each belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.
 
@@ -390,7 +387,7 @@ short = "Asking the service where an agent should work: usually its own isolated
 long = """
 A **worktree allocation** gives an agent its own git worktree for each repository it needs, on a branch reserved for that agent, and records what the agent intends to do there so overlapping work is visible.
 
-The answer is one of three: a separate **worktree** (the usual case); a **shared branch**, meaning work on the reserved branch inside the main checkout after taking a lease on it, given only to a caller that declared it can honor that; or *wait* when the machine's isolation budget is used up. A refused allocation records nothing. Repositories a checkout builds against are allocated beside it automatically.
+The answer is one of three: a separate **worktree** (the usual case); a **shared branch**, meaning work on the reserved branch inside the main checkout, used only when the agent's tools support working safely in the shared checkout; or *wait* when the machine's isolation budget is used up. A refused allocation records nothing. Repositories a checkout builds against are allocated beside it automatically.
 
 Every successful allocation creates a record, so never make one just to test whether the service is reachable.
 """
