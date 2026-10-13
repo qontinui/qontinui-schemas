@@ -229,7 +229,7 @@ JOBS ON pull_request / push:main (10):
       review:  pins dtolnay/rust-toolchain stable (the current stable rustc, which moves; the manifest host's rustc is not pinned to it) — the manifest's [[tools]] does not pin the same version
       review:  matrix legs include = ["consumer: qontinui-runner repo: qontinui/qontinui-runner workdir: qontinui-runner needs_dist_stub: 'true' heavy: 'true'", "consumer: qontinui-supervisor repo: qontinui/qontinui-supervisor workdir: qontinui-supervisor needs_dist_stub: 'false' heavy: 'false'"] — the manifest runs one leg
   UNCOVERED       runner-consumer-check.yml › wire-gate-guard [pull_request] 0/5 gate command(s) matched
-      missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file
+      missing: git diff --no-renames --name-only --diff-filter=a -z $BASE_SHA...$HEAD_SHA -- $fixtures $test_file $
       missing: [ ${#violations[@]} -eq 0 ]
       missing: gh api --paginate repos/${THIS_REPO}/issues/${PR_NUMBER}/labels --jq .[].name
       missing: [ $rc -ne 0 ]
