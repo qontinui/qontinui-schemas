@@ -107,8 +107,33 @@ struct Api {
     seen: Arc<Mutex<Vec<Seen>>>,
 }
 
+/// How the API double misbehaves, beyond `hang_pulls`.
+#[derive(Clone, Copy, Default)]
+struct Quirks {
+    hang_pulls: bool,
+    /// The FIRST revocation `DELETE` never answers (later ones do) — a
+    /// cancellation landing mid-revoke.
+    hang_first_delete: bool,
+    /// The dispatched PR's label read answers this status with no body.
+    labels_status: Option<u16>,
+}
+
 impl Api {
     async fn start(hang_pulls: bool) -> Self {
+        Self::start_with(Quirks {
+            hang_pulls,
+            ..Quirks::default()
+        })
+        .await
+    }
+
+    async fn start_with(quirks: Quirks) -> Self {
+        let Quirks {
+            hang_pulls,
+            hang_first_delete,
+            labels_status,
+        } = quirks;
+        let deletes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
             .await
@@ -122,6 +147,7 @@ impl Api {
                     return;
                 };
                 let record = record.clone();
+                let deletes = deletes.clone();
                 tokio::spawn(async move {
                     let mut buf = Vec::new();
                     let mut chunk = [0u8; 4096];
@@ -149,7 +175,18 @@ impl Api {
                     if hang_pulls && path.contains("/pulls") {
                         std::future::pending::<()>().await;
                     }
-                    let resp = if method == "DELETE" {
+                    if method == "DELETE"
+                        && hang_first_delete
+                        && deletes.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0
+                    {
+                        std::future::pending::<()>().await;
+                    }
+                    let resp = if let (Some(code), true) = (labels_status, path.contains("/labels"))
+                    {
+                        format!(
+                            "HTTP/1.1 {code} Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        )
+                    } else if method == "DELETE" {
                         "HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n".to_string()
                     } else {
                         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
@@ -664,4 +701,71 @@ fn a_granted_answer_debug_carries_no_token() {
     let rendered = format!("{:?}", granted(SIB));
     assert!(!rendered.contains(MINTED), "{rendered}");
     assert!(rendered.contains(EXPIRES));
+}
+
+// ── fix round: cancellation mid-revoke, and what the fix text may wrap ──────
+
+/// A cancellation that lands WHILE the revocation `DELETE` is in flight still
+/// revokes: the token stays in the guard until the request completes, so the
+/// guard's `Drop` sends a second `DELETE` with it.
+#[tokio::test]
+async fn a_cancellation_mid_revoke_still_revokes_through_drop() {
+    let api = Api::start_with(Quirks {
+        hang_first_delete: true,
+        ..Quirks::default()
+    })
+    .await;
+    let guard = RevokeGuard {
+        token: Some(ReadToken::new(MINTED)),
+        client: reqwest::Client::new(),
+        url: format!("{}/installation/token", api.base),
+        repo: SIB.to_string(),
+        expires_at: EXPIRES.to_string(),
+    };
+    let cut = tokio::time::timeout(std::time::Duration::from_millis(300), guard.revoke()).await;
+    assert!(cut.is_err(), "the hung DELETE should have been cut off");
+    let revoked = api.await_revocations(2).await;
+    assert_eq!(
+        revoked.len(),
+        2,
+        "the cancelled revoke was not retried by Drop: {:?}",
+        api.seen()
+    );
+    for r in &revoked {
+        assert_eq!(r.auth.as_deref(), Some(format!("Bearer {MINTED}").as_str()));
+    }
+}
+
+/// A failure that is NOT a read of the sibling — here the dispatched repo's
+/// own label read — is not dressed as a sibling-privacy failure.
+#[tokio::test]
+async fn a_failure_reading_the_dispatched_repo_carries_no_reader_fix() {
+    let o = origin(SIB);
+    let api = Api::start_with(Quirks {
+        labels_status: Some(500),
+        ..Quirks::default()
+    })
+    .await;
+    let door = Door::new(|_: &str| SiblingReadAnswer::NoGrant {
+        code: "no_ci_read_grant".into(),
+    });
+    let d = dispatch();
+    let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+    let (r, _) = run(
+        &api,
+        &o.base,
+        &door,
+        &HostGithub::default(),
+        &d,
+        &[s],
+        Some(7),
+    )
+    .await;
+    let err = r.unwrap_err();
+    assert!(
+        err.contains(&format!("reading labels on {CONSUMER}#7")),
+        "{err}"
+    );
+    assert!(!err.contains("[[ci_readers]]"), "{err}");
+    assert!(!err.contains("no_ci_read_grant"), "{err}");
 }
