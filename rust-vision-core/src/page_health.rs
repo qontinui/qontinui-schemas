@@ -15,8 +15,12 @@
 //!
 //! Coverage (how many visible elements carried geometry) is NOT here: it
 //! lives in the observation's `provenance.coverage`. A report only ever
-//! exists inside a `measured` observation — "could not look" is an
-//! `unknown` with a typed code, never a CRITICAL report over nothing.
+//! exists inside a `measured` observation, and "could not look" (no
+//! `elements`, an empty registry, visible elements none of which carry
+//! geometry) is an `unknown` with a typed code. One gap remains on the SDK
+//! side at 0.30.0: elements registered but NONE visible still yields a
+//! `measured` CRITICAL report over zero considered elements — the
+//! `..._populated.json` fixture records exactly that.
 //!
 //! Field names are the SDK's wire names verbatim (`element_count`, not
 //! camelCase), so there is no `rename_all`. Unrecognised keys are ignored
