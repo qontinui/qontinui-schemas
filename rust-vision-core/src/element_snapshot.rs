@@ -6,9 +6,14 @@
 //! one of those callers projects into this shape before invoking
 //! `vision/analyze` or `vision/assert`.
 //!
-//! Pixel-space units throughout. Geometry uses [`Region`] (from `frame.rs`);
-//! visual properties (color, font size, etc) are optional because not every
-//! snapshot source can populate them — analyzers/assertions that depend on
+//! Geometry is in CSS pixels throughout — `getBoundingClientRect()` space for
+//! a web page, the platform's device-independent units for other sources —
+//! never frame pixels, and uses [`Region`] (from `frame.rs`). A frame captured
+//! at a device pixel ratio holds that many buffer pixels per CSS pixel, so a
+//! reader of pixels maps each box onto the buffer first with
+//! [`crate::Frame::css_region_to_pixels`]. Visual properties (color, font
+//! size, etc) are optional because not every snapshot source can populate
+//! them — analyzers/assertions that depend on
 //! a missing field surface a soft "skipped: missing X" finding instead of
 //! erroring.
 
