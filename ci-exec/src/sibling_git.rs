@@ -13,7 +13,15 @@
 //! `2026-10-13-local-lane-ci-reads-a-private-sibling-through-a-dispatch-scoped-door`,
 //! D5). This module closes every one of those paths:
 //!
-//! * `GIT_CONFIG_NOSYSTEM=1` — the system config is not read.
+//! * `GIT_CONFIG_NOSYSTEM=1` — the system config is not read. **Not on
+//!   Windows**: there D5's NAMED FALLBACK is taken (Phase 0 item 2 was not
+//!   measured on Windows), because Git for Windows keeps its schannel/CA and
+//!   `core.longpaths` settings in the system file and a sibling fetch without
+//!   them is a different failure. The global file's `[credential] helper =`
+//!   line still clears every system-level helper, URL-scoped ones included
+//!   (measured on Linux). **Recorded residual:** a SYSTEM-level
+//!   `url.<x>.insteadOf` on Windows is still read — nothing in this module
+//!   resets it.
 //! * `GIT_CONFIG_GLOBAL=<dispatch root>/git-global.config` — the owner's
 //!   `~/.gitconfig` and XDG config are not read. The file holds exactly
 //!   `[credential] helper =`, which empties git's helper list (an empty value
@@ -22,6 +30,24 @@
 //!   because an empty `GIT_CONFIG_VALUE_n` may reach a mingw `git.exe` as unset
 //!   and git then dies `missing config value` on every invocation (runner
 //!   `git_posture.rs`, the `ASKPASS_DISABLED_SENTINEL` doc).
+//! * `GIT_CEILING_DIRECTORIES=<parent of the dispatch root>` — git's repository
+//!   discovery stops before it leaves the dispatch root. Without it a sibling
+//!   git whose cwd is `<root>/.ci-worktrees/<id>` (ls-remote, `git init`)
+//!   walks UPWARD, finds whatever repository encloses the CI root, and reads
+//!   that repository's `.git/config` — measured: an enclosing repo's
+//!   `credential.helper=store` and `url.git@github.com:.insteadOf` both applied
+//!   under the rest of this isolation. The ceiling is the dispatch root's
+//!   PARENT, not the dispatch root: git always examines its cwd itself, and a
+//!   ceiling equal to the cwd was measured NOT to stop the walk. Every cwd a
+//!   sibling's git runs in is the dispatch root or a sibling checkout below it,
+//!   whose own `.git` is found first.
+//! * `HOME` (and `USERPROFILE` on Windows, `XDG_CONFIG_HOME` everywhere) = an
+//!   empty per-dispatch directory under the dispatch root. libcurl reads
+//!   `$HOME/.netrc` (`_netrc` on Windows) on its own, below git's config, so
+//!   an owner's netrc supplied credentials for github.com even with every git
+//!   config source isolated (measured). `GIT_CONFIG_GLOBAL` still names the
+//!   global file explicitly, so moving `HOME` changes nothing about which
+//!   global config git reads.
 //! * **Every inherited `GIT_*` variable except an explicit allowlist is
 //!   removed** — from the process environment AND from whatever the host's
 //!   [`ProcessSpawn::command`] set on the command. Removing only the
@@ -59,6 +85,24 @@ pub const GLOBAL_CONFIG_FILE: &str = "git-global.config";
 
 /// Its whole body: an empty `helper =` resets git's credential-helper list.
 const GLOBAL_CONFIG_BODY: &str = "[credential]\n\thelper =\n";
+
+/// The per-dispatch, EMPTY directory a sibling's git sees as `HOME`, under the
+/// dispatch root (so cleanup removes it with everything else).
+pub const ISOLATED_HOME_DIR: &str = "git-home";
+
+/// The `GIT_*` keys the overlay itself SETS. An inherited value of any of them
+/// is scrubbed like every other non-allowlisted git variable, then replaced
+/// by the overlay's own. (Pinned by the allowlist test.)
+#[cfg(test)]
+pub(crate) const OVERLAY_GIT_KEYS: &[&str] = &[
+    #[cfg(not(windows))]
+    "GIT_CONFIG_NOSYSTEM",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CEILING_DIRECTORIES",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_KEY_0",
+    "GIT_CONFIG_VALUE_0",
+];
 
 /// The oldest git the isolation holds on. `GIT_CONFIG_GLOBAL` arrived in 2.32
 /// and `GIT_CONFIG_COUNT` in 2.31; an older git silently ignores both and reads
@@ -200,6 +244,8 @@ impl SiblingGitEnv {
         inherited: impl IntoIterator<Item = (OsString, OsString)>,
     ) -> Result<Self, String> {
         let global = write_global_config(dispatch_root)?;
+        let ceiling = ceiling_for(dispatch_root)?;
+        let home = fresh_isolated_home(dispatch_root)?;
 
         let removals: Vec<OsString> = inherited
             .into_iter()
@@ -207,18 +253,36 @@ impl SiblingGitEnv {
             .filter(|k| is_git_key(k) && !inherited_git_key_allowed(k))
             .collect();
 
-        let mut sets = vec![
-            EnvSet {
-                key: "GIT_CONFIG_NOSYSTEM".into(),
-                value: "1".into(),
+        let mut sets = Vec::new();
+        // Windows: D5's named fallback — the system config stays readable (see
+        // the module docs for why, and for the residual it leaves).
+        #[cfg(not(windows))]
+        sets.push(EnvSet {
+            key: "GIT_CONFIG_NOSYSTEM".into(),
+            value: "1".into(),
+            secret: false,
+        });
+        sets.push(EnvSet {
+            key: "GIT_CONFIG_GLOBAL".into(),
+            value: global.into_os_string(),
+            secret: false,
+        });
+        sets.push(EnvSet {
+            key: "GIT_CEILING_DIRECTORIES".into(),
+            value: ceiling,
+            secret: false,
+        });
+        let mut home_keys = vec!["HOME", "XDG_CONFIG_HOME"];
+        if cfg!(windows) {
+            home_keys.push("USERPROFILE");
+        }
+        for key in home_keys {
+            sets.push(EnvSet {
+                key: key.into(),
+                value: home.clone().into_os_string(),
                 secret: false,
-            },
-            EnvSet {
-                key: "GIT_CONFIG_GLOBAL".into(),
-                value: global.into_os_string(),
-                secret: false,
-            },
-        ];
+            });
+        }
         if let Some((url, token)) = auth {
             sets.push(EnvSet {
                 key: "GIT_CONFIG_COUNT".into(),
@@ -248,7 +312,7 @@ impl SiblingGitEnv {
 
     /// Apply to `cmd`: remove every non-allowlisted `GIT_*` the HOST set on it
     /// and every one inherited from this process, then set the overlay.
-    pub(crate) fn apply(&self, cmd: &mut tokio::process::Command) {
+    pub(crate) fn isolate_command(&self, cmd: &mut tokio::process::Command) {
         let host_set: Vec<OsString> = cmd
             .as_std()
             .get_envs()
@@ -306,6 +370,35 @@ fn base64(input: &[u8]) -> String {
     out
 }
 
+/// `GIT_CEILING_DIRECTORIES` for a git whose cwd is `dispatch_root` or below:
+/// the dispatch root's PARENT, absolute (git ignores a relative entry).
+fn ceiling_for(dispatch_root: &Path) -> Result<OsString, String> {
+    let abs = std::path::absolute(dispatch_root)
+        .map_err(|e| format!("resolve {}: {e}", dispatch_root.display()))?;
+    let parent = abs.parent().ok_or_else(|| {
+        format!(
+            "dispatch root {} has no parent to stop git's repository discovery at",
+            abs.display()
+        )
+    })?;
+    // `join_paths` refuses a path containing the list separator, which git
+    // would otherwise split into two (wrong) ceilings.
+    std::env::join_paths([parent]).map_err(|e| format!("ceiling {}: {e}", parent.display()))
+}
+
+/// Create the per-dispatch `HOME` EMPTY — anything a previous sibling's git
+/// left there is removed first.
+fn fresh_isolated_home(dispatch_root: &Path) -> Result<PathBuf, String> {
+    let home = dispatch_root.join(ISOLATED_HOME_DIR);
+    match std::fs::remove_dir_all(&home) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(format!("clear {}: {e}", home.display())),
+    }
+    std::fs::create_dir_all(&home).map_err(|e| format!("create {}: {e}", home.display()))?;
+    Ok(home)
+}
+
 fn write_global_config(dispatch_root: &Path) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dispatch_root)
         .map_err(|e| format!("create {}: {e}", dispatch_root.display()))?;
@@ -321,7 +414,7 @@ pub(crate) fn sibling_git_command(
     env: &SiblingGitEnv,
 ) -> tokio::process::Command {
     let mut cmd = process.command("git");
-    env.apply(&mut cmd);
+    env.isolate_command(&mut cmd);
     cmd
 }
 
@@ -473,8 +566,7 @@ mod tests {
         for (k, _) in &eff {
             if is_git_key(OsStr::new(k)) {
                 assert!(
-                    allowed.contains(&k.as_str())
-                        || ["GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL"].contains(&k.as_str()),
+                    allowed.contains(&k.as_str()) || OVERLAY_GIT_KEYS.contains(&k.as_str()),
                     "{k} survived the scrub"
                 );
             }
@@ -503,8 +595,23 @@ mod tests {
 
     #[test]
     fn nosystem_and_global_are_set() {
-        let (dir, _env, eff) = built(&[("GIT_CONFIG_GLOBAL", "/home/owner/.gitconfig")], None);
-        assert!(eff.contains(&("GIT_CONFIG_NOSYSTEM".into(), "1".into())));
+        let (dir, _env, eff) = built(
+            &[
+                ("GIT_CONFIG_GLOBAL", "/home/owner/.gitconfig"),
+                ("GIT_CONFIG_NOSYSTEM", "0"),
+            ],
+            None,
+        );
+        // Windows takes D5's named fallback: the system config stays readable.
+        let nosystem = eff.iter().find(|(k, _)| k == "GIT_CONFIG_NOSYSTEM");
+        if cfg!(windows) {
+            assert_eq!(nosystem, None, "{eff:?}");
+        } else {
+            assert_eq!(
+                nosystem,
+                Some(&("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string()))
+            );
+        }
         let global = dir.path().join(GLOBAL_CONFIG_FILE);
         assert!(
             eff.contains(&(
@@ -664,7 +771,7 @@ mod tests {
             .env("GIT_CONFIG_COUNT", "1")
             .env("GIT_CONFIG_KEY_0", "credential.helper")
             .env("GIT_CONFIG_VALUE_0", "cache");
-        env.apply(&mut cmd);
+        env.isolate_command(&mut cmd);
         let out = cmd
             .current_dir(dir.path())
             .args([
@@ -679,7 +786,7 @@ mod tests {
         // The only helper value git can see is our empty reset.
         assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "");
         let mut all = tokio::process::Command::new("git");
-        env.apply(&mut all);
+        env.isolate_command(&mut all);
         let all = all
             .current_dir(dir.path())
             .args(["config", "--get-regexp", "^url\\..*insteadof$"])
@@ -690,6 +797,225 @@ mod tests {
             String::from_utf8_lossy(&all.stdout).trim(),
             "",
             "an insteadOf reached the sibling"
+        );
+    }
+
+    /// An inherited ceiling is scrubbed and replaced: the overlay's ceiling is
+    /// the dispatch root's absolute PARENT.
+    #[test]
+    fn the_ceiling_is_the_dispatch_roots_parent() {
+        let (dir, _env, eff) = built(&[("GIT_CEILING_DIRECTORIES", "/elsewhere")], None);
+        let want = std::path::absolute(dir.path())
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let got: Vec<&(String, String)> = eff
+            .iter()
+            .filter(|(k, _)| k == "GIT_CEILING_DIRECTORIES")
+            .collect();
+        assert_eq!(got, vec![&("GIT_CEILING_DIRECTORIES".to_string(), want)]);
+    }
+
+    /// Run real git under the built env, from `cwd`.
+    async fn git_under(env: &SiblingGitEnv, cwd: &Path, args: &[&str]) -> std::process::Output {
+        let mut cmd = tokio::process::Command::new("git");
+        env.isolate_command(&mut cmd);
+        cmd.current_dir(cwd).args(args).output().await.unwrap()
+    }
+
+    fn setup_git(cwd: &Path, args: &[&str]) {
+        let out = std::process::Command::new("git")
+            .current_dir(cwd)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {out:?}");
+    }
+
+    /// A repository ENCLOSING the CI root must not lend its local config to a
+    /// sibling's git: with the dispatch root at
+    /// `<enclosing>/ci-root/.ci-worktrees/<id>`, git run from the dispatch root
+    /// (where ls-remote and `git init` run) sees no `credential.helper` but the
+    /// empty reset, and no `insteadOf` rewrite.
+    #[tokio::test]
+    async fn an_enclosing_repos_local_config_does_not_reach_sibling_git() {
+        let tmp = tempfile::tempdir().unwrap();
+        let enclosing = tmp.path().join("enclosing");
+        std::fs::create_dir_all(&enclosing).unwrap();
+        setup_git(&enclosing, &["init", "-q"]);
+        setup_git(&enclosing, &["config", "credential.helper", "store"]);
+        setup_git(
+            &enclosing,
+            &[
+                "config",
+                "url.git@github.com:.insteadOf",
+                "https://github.com/",
+            ],
+        );
+        let dispatch_root = enclosing.join("ci-root").join(".ci-worktrees").join("d-1");
+        std::fs::create_dir_all(&dispatch_root).unwrap();
+        let env = SiblingGitEnv::isolated(&dispatch_root, None).unwrap();
+
+        let helpers = git_under(
+            &env,
+            &dispatch_root,
+            &["config", "--get-all", "credential.helper"],
+        )
+        .await;
+        // Exactly one value — our empty reset — and nothing after it.
+        assert_eq!(
+            String::from_utf8_lossy(&helpers.stdout),
+            "\n",
+            "an enclosing repo's helper reached the sibling: {helpers:?}"
+        );
+        let url = git_under(
+            &env,
+            &dispatch_root,
+            &["ls-remote", "--get-url", "https://github.com/o/n.git"],
+        )
+        .await;
+        assert_eq!(
+            String::from_utf8_lossy(&url.stdout).trim(),
+            "https://github.com/o/n.git",
+            "an enclosing repo's insteadOf rewrote the sibling URL"
+        );
+        // And the dispatch root is not inside any repository at all.
+        let top = git_under(&env, &dispatch_root, &["rev-parse", "--git-dir"]).await;
+        assert!(!top.status.success(), "discovery escaped: {top:?}");
+    }
+
+    /// The child's HOME is an EMPTY directory inside the dispatch root, never
+    /// the HOME the host gave it (whose `.netrc` libcurl would read), and
+    /// `GIT_CONFIG_GLOBAL` still names the global file git reads.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn the_childs_home_is_an_empty_dir_in_the_dispatch_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let owner_home = tmp.path().join("owner-home");
+        std::fs::create_dir_all(&owner_home).unwrap();
+        std::fs::write(
+            owner_home.join(".netrc"),
+            "machine github.com login owner password ghp_OWNER\n",
+        )
+        .unwrap();
+        std::fs::write(owner_home.join(".gitconfig"), "[user]\n\tname = owner\n").unwrap();
+        let dispatch_root = tmp.path().join("ci").join("d-1");
+        let env = SiblingGitEnv::isolated(&dispatch_root, None).unwrap();
+
+        let mut cmd = tokio::process::Command::new("sh");
+        // What a host's posture would hand the child.
+        cmd.env("HOME", &owner_home)
+            .env("XDG_CONFIG_HOME", &owner_home);
+        env.isolate_command(&mut cmd);
+        let out = cmd
+            .args(["-c", "printf '%s' \"$HOME\""])
+            .output()
+            .await
+            .unwrap();
+        let seen = PathBuf::from(String::from_utf8_lossy(&out.stdout).into_owned());
+        assert_ne!(seen, owner_home);
+        assert_eq!(seen, dispatch_root.join(ISOLATED_HOME_DIR));
+        assert!(seen.starts_with(&dispatch_root));
+        assert_eq!(
+            std::fs::read_dir(&seen).unwrap().count(),
+            0,
+            "HOME is not empty"
+        );
+
+        // git's global config is still exactly the per-dispatch file.
+        let mut git = tokio::process::Command::new("git");
+        git.env("HOME", &owner_home);
+        env.isolate_command(&mut git);
+        let origin = git
+            .current_dir(&dispatch_root)
+            .args(["config", "--global", "--list", "--show-origin"])
+            .output()
+            .await
+            .unwrap();
+        let listed = String::from_utf8_lossy(&origin.stdout).into_owned();
+        assert!(
+            listed.contains(&format!(
+                "file:{}",
+                dispatch_root.join(GLOBAL_CONFIG_FILE).display()
+            )),
+            "{origin:?}"
+        );
+        assert!(!listed.contains("owner"), "{listed}");
+    }
+
+    /// End to end through libcurl: a loopback git-over-HTTP endpoint that
+    /// challenges with `401 Basic`. With the owner's `~/.netrc` naming it, git
+    /// under the built env must NOT answer the challenge with the netrc
+    /// credential.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_owner_netrc_never_answers_a_sibling_fetch() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let auths = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let record = auths.clone();
+        tokio::spawn(async move {
+            while let Ok((mut conn, _)) = listener.accept().await {
+                let record = record.clone();
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut chunk = [0u8; 4096];
+                    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match conn.read(&mut chunk).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&buf).into_owned();
+                    for line in head.lines() {
+                        if line.to_ascii_lowercase().starts_with("authorization:") {
+                            record.lock().unwrap().push(line.to_string());
+                        }
+                    }
+                    let _ = conn
+                        .write_all(
+                            b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\n\
+                              Content-Length: 0\r\nConnection: close\r\n\r\n",
+                        )
+                        .await;
+                    let _ = conn.shutdown().await;
+                });
+            }
+        });
+
+        let tmp = tempfile::tempdir().unwrap();
+        let owner_home = tmp.path().join("owner-home");
+        std::fs::create_dir_all(&owner_home).unwrap();
+        std::fs::write(
+            owner_home.join(".netrc"),
+            "machine 127.0.0.1 login owner password OWNERnetrcSECRET\n",
+        )
+        .unwrap();
+        let dispatch_root = tmp.path().join("ci").join("d-1");
+        let env = SiblingGitEnv::isolated(&dispatch_root, None).unwrap();
+        let mut cmd = tokio::process::Command::new("git");
+        cmd.env("HOME", &owner_home);
+        env.isolate_command(&mut cmd);
+        let out = cmd
+            .current_dir(&dispatch_root)
+            .env_remove("http_proxy")
+            .env_remove("HTTP_PROXY")
+            .env_remove("all_proxy")
+            .env_remove("ALL_PROXY")
+            .args(["ls-remote", &format!("http://127.0.0.1:{port}/o/n.git")])
+            .output()
+            .await
+            .unwrap();
+        assert!(!out.status.success(), "{out:?}");
+        let seen = auths.lock().unwrap().clone();
+        assert!(
+            seen.is_empty(),
+            "the owner's netrc answered the challenge: {seen:?}"
         );
     }
 }

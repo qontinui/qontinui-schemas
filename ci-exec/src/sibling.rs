@@ -961,6 +961,38 @@ async fn fetch_sibling_pr_detail(
     })
 }
 
+/// Why provisioning one sibling failed, and whether the failure was a READ OF
+/// THE SIBLING ITSELF — its own API read, or a git ls-remote/fetch of it. Only
+/// those can be caused by the sibling being private, so only those are dressed
+/// with the read door's answer and the `[[ci_readers]]` fix
+/// ([`DoorNote::public_path_failure`]); anything else (the dispatched repo's
+/// own label read, a malformed pin file, a local git step) is reported as it
+/// came.
+#[derive(Debug)]
+struct SiblingFailure {
+    message: String,
+    sibling_read: bool,
+}
+
+impl SiblingFailure {
+    /// A failed read of the sibling itself.
+    fn sibling_read(message: String) -> Self {
+        Self {
+            message,
+            sibling_read: true,
+        }
+    }
+}
+
+impl From<String> for SiblingFailure {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            sibling_read: false,
+        }
+    }
+}
+
 /// One sibling's git: the host's process posture, the sibling's isolated
 /// environment, and the base its clone URL is spelled against.
 struct SiblingIo<'a> {
@@ -986,7 +1018,7 @@ async fn ls_remote_branch_sha(
     cwd: &Path,
     repo: &str,
     branch: &str,
-) -> Result<String, String> {
+) -> Result<String, SiblingFailure> {
     let url = io.clone_url(repo);
     let refspec = format!("refs/heads/{branch}");
     let out = io
@@ -996,7 +1028,7 @@ async fn ls_remote_branch_sha(
             SIBLING_FETCH_TIMEOUT,
         )
         .await
-        .map_err(|e| format!("resolving {repo}@{branch}: {e}"))?;
+        .map_err(|e| SiblingFailure::sibling_read(format!("resolving {repo}@{branch}: {e}")))?;
     let sha = out
         .split_whitespace()
         .next()
@@ -1005,7 +1037,8 @@ async fn ls_remote_branch_sha(
     if !is_full_sha(&sha) {
         return Err(format!(
             "resolving {repo}@{branch}: ls-remote returned {sha:?}, not a commit id"
-        ));
+        )
+        .into());
     }
     Ok(sha)
 }
@@ -1039,7 +1072,7 @@ async fn no_declaration(
     worktree: &Path,
     sibling: &CiSibling,
     why: &str,
-) -> Result<ResolvedSibling, String> {
+) -> Result<ResolvedSibling, SiblingFailure> {
     if sibling.pin == SiblingPin::PinFile {
         let sha = read_pin(worktree, &sibling.repo)?;
         return Ok(ResolvedSibling {
@@ -1073,7 +1106,7 @@ async fn resolve_one(
     sibling: &CiSibling,
     this_repo: &str,
     pr_number: Option<u64>,
-) -> Result<ResolvedSibling, String> {
+) -> Result<ResolvedSibling, SiblingFailure> {
     if sibling.pin == SiblingPin::DefaultBranch {
         let sha = ls_remote_branch_sha(io, cwd, &sibling.repo, &sibling.branch).await?;
         return Ok(ResolvedSibling {
@@ -1097,7 +1130,9 @@ async fn resolve_one(
     };
 
     let this_labels = fetch_pr_labels(host_api, this_repo, pr).await?;
-    let sibling_prs = fetch_sibling_open_prs(sibling_api, &sibling.repo).await?;
+    let sibling_prs = fetch_sibling_open_prs(sibling_api, &sibling.repo)
+        .await
+        .map_err(SiblingFailure::sibling_read)?;
     let inputs = DeclarationInputs {
         this_pr_labels: this_labels,
         sibling_open_prs: sibling_prs,
@@ -1127,7 +1162,9 @@ async fn resolve_one(
             .await
         }
         DeclaredTarget::Pr { number, forms } => {
-            let detail = fetch_sibling_pr_detail(sibling_api, &sibling.repo, number).await?;
+            let detail = fetch_sibling_pr_detail(sibling_api, &sibling.repo, number)
+                .await
+                .map_err(SiblingFailure::sibling_read)?;
             let sha = validate_declared_pr(&sibling.repo, number, &detail)?;
             Ok(ResolvedSibling {
                 repo: sibling.repo.clone(),
@@ -1151,12 +1188,13 @@ async fn materialise(
     io: &SiblingIo<'_>,
     dest: &Path,
     resolved: &ResolvedSibling,
-) -> Result<(), String> {
+) -> Result<(), SiblingFailure> {
     if dest.exists() {
         return Err(format!(
             "{} already exists — refusing to overwrite a checkout that is already there",
             dest.display()
-        ));
+        )
+        .into());
     }
     let parent = dest
         .parent()
@@ -1183,10 +1221,10 @@ async fn materialise(
     )
     .await
     .map_err(|e| {
-        format!(
+        SiblingFailure::sibling_read(format!(
             "fetching {}@{}: {e}. (The commit must be reachable from {url}; a fork's head is not.)",
             resolved.repo, resolved.sha
-        )
+        ))
     })?;
     io.git(dest, &["checkout", "-q", "FETCH_HEAD"], GIT_LOCAL_TIMEOUT)
         .await?;
@@ -1199,7 +1237,8 @@ async fn materialise(
             "asked for {} but checked out {} — refusing a substituted tree",
             resolved.sha,
             got.trim()
-        ));
+        )
+        .into());
     }
     Ok(())
 }
@@ -1218,7 +1257,7 @@ enum DoorNote {
 
 impl DoorNote {
     /// Split an answer into its loggable half and the token, if any.
-    fn split(answer: SiblingReadAnswer) -> (Self, Option<ReadToken>) {
+    fn from_door_answer(answer: SiblingReadAnswer) -> (Self, Option<ReadToken>) {
         match answer {
             SiblingReadAnswer::Granted(token, expires_at) => {
                 (Self::Granted { expires_at }, Some(token))
@@ -1315,11 +1354,18 @@ impl RevokeGuard {
 
     /// Revoke now; returns the one log line for it. Best-effort: a failure is
     /// logged, never fatal — the token still expires at `expires_at`.
+    ///
+    /// The token stays IN the guard until the `DELETE` has completed: a
+    /// cancellation that drops this future mid-request leaves it there, and
+    /// `Drop` then revokes it — taking it out first would skip revocation.
     async fn revoke(mut self) -> String {
-        let Some(token) = self.token.take() else {
+        let Some(token) = self.token.as_ref() else {
             return String::new();
         };
-        let line = match revoke_token(&self.client, &self.url, &token).await {
+        let result = revoke_token(&self.client, &self.url, token).await;
+        // Completed (either way): nothing is left for Drop to revoke.
+        self.token = None;
+        let line = match result {
             Ok(()) => format!("[ci-node] sibling {}: read token revoked", self.repo),
             Err(e) => format!(
                 "[ci-node] sibling {}: read token revocation FAILED ({e}); it expires at {}",
@@ -1469,7 +1515,8 @@ pub(crate) async fn provision_at(
     let mut resolved_all = Vec::with_capacity(siblings.len());
     for sibling in siblings {
         // D3: ask first, once, before any read of this sibling.
-        let (door, minted) = DoorNote::split(reads.read_token(dispatch_id, &sibling.repo).await);
+        let (door, minted) =
+            DoorNote::from_door_answer(reads.read_token(dispatch_id, &sibling.repo).await);
         let line = door.log_line(&sibling.repo);
         info!("ci_node: {line}");
         log(line);
@@ -1529,7 +1576,7 @@ pub(crate) async fn provision_at(
                 dest.display(),
                 resolved.sha
             );
-            Ok::<_, String>(resolved)
+            Ok::<_, SiblingFailure>(resolved)
         }
         .await;
 
@@ -1538,8 +1585,15 @@ pub(crate) async fn provision_at(
         if let Some(guard) = guard {
             log(guard.revoke().await);
         }
-        let resolved =
-            outcome.map_err(|e| door.public_path_failure(&e, &sibling.repo, this_repo))?;
+        // Only a read OF THE SIBLING is dressed with the door's answer and the
+        // `[[ci_readers]]` fix; every other failure is reported as it came.
+        let resolved = outcome.map_err(|f| {
+            if f.sibling_read {
+                door.public_path_failure(&f.message, &sibling.repo, this_repo)
+            } else {
+                f.message
+            }
+        })?;
         resolved_all.push(resolved);
     }
     Ok(resolved_all)
@@ -2293,6 +2347,8 @@ mod tests {
         let err = no_declaration(&io, dir.path(), dir.path(), &sibling, "no declaration")
             .await
             .unwrap_err();
+        assert!(!err.sibling_read, "a pin-file error is not a sibling read");
+        let err = err.message;
         assert!(err.contains("no commit SHA after it"), "got: {err}");
     }
 
