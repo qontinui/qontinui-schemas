@@ -17,7 +17,7 @@
 //! - the judges, whose yes/no rubric questions come from [`ImageSlotSpec::job`],
 //!   [`ImageSlotContent`], [`ImageSlotTextInImage`] and [`ImageSlotFocal`];
 //! - the deterministic image assertions, which receive slot-derived values
-//!   (the focal region, the expected copy, threshold overrides) as parameters.
+//!   (the focal region, the expected text, threshold overrides) as parameters.
 //!   vision-core never reads a slot spec itself.
 //!
 //! Specs are authored as YAML, one file per slot. Rust is the source of truth;
@@ -61,10 +61,12 @@
 //! [`ImageSlotProvenance`] records the binding the pipeline made for the spec
 //! whose [`ImageSlotSpec::content_sha256`] was
 //! [`ImageSlotProvenance::spec_sha256`]. When the spec has changed since, the
-//! binding is STALE, not invalid, so `validate` checks a binding only for its
-//! own consistency and never against the current authored fields. The
-//! pipeline's obligations toward the spec it binds are documented on each
-//! field.
+//! binding is STALE, not invalid: `validate` then checks it only for its own
+//! consistency. A CURRENT binding (its `spec_sha256` is the spec's own hash)
+//! must also meet the obligations toward the spec it binds, each a
+//! cross-field rule: an `alt: required` slot's `alt_text`, the exemplar-set and
+//! LoRA digests the staleness check needs, no AI-generated identity mark, and a
+//! captured screenshot.
 //!
 //! # Wire-format notes
 //!
@@ -81,22 +83,35 @@
 //!   has one canonical input in every language.
 //! - Every digest is lowercase hex sha256, the form the image pipeline uses
 //!   for asset store keys, recipe hashes and manifest file hashes.
+//! - Every number is one RFC 8785 (I-JSON) carries exactly: floats are finite
+//!   and bounded, integers at most [`MAX_SAFE_INTEGER`]. The schema bounds every
+//!   number, so a validator generated from it refuses infinity as `validate`
+//!   does, and [`ImageSlotSpec::content_sha256`] refuses whatever slips past.
+//! - No field is named after a pydantic `BaseModel` attribute (`copy`, `json`,
+//!   `dict`, `schema`, …). datamodel-codegen renames such a field (`copy_`,
+//!   with `alias='copy'`), and a dump without `by_alias=True` then emits a key
+//!   the contract does not have, so the content hash differs. That is why
+//!   expected text is `text`, not the plan's `copy`.
 //! - Every type name carries the `ImageSlot` prefix. The bindings generator
 //!   imports a nested `$defs` entry that shares a registered top-level name
 //!   (`Region`, `Finding`, `AssertionResult`, `Context`, …) from that type's own
 //!   file instead of declaring it, so a short name would silently become a
 //!   different type.
-//! - No type is referenced both from inside a tagged-union arm and from
-//!   anywhere else. The TypeScript generator declares such a type twice, the
-//!   second copy under an invented name, and its fork guard refuses the result.
-//!   That is one reason [`ImageSlotSafeArea`] is not [`ImageSlotRegion`].
+//! - Every definition is referenced from exactly one site. The TypeScript
+//!   generator (json-schema-to-typescript, behind
+//!   `scripts/compile_typescript.mjs`) copies a definition at a reference that
+//!   carries a sibling `description`, so a definition reached from such a
+//!   reference and from any other site is declared twice, the second copy under
+//!   an invented name (`ImageSlotRegion1`), and the script's fork guard refuses
+//!   the result. A test pins one reference per definition. It is one reason
+//!   [`ImageSlotSafeArea`] is not [`ImageSlotRegion`].
 
 use std::fmt;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::canonical_hash::{canonical_hash, CanonicalHashError};
+use crate::canonical_hash::canonical_hash;
 
 // ============================================================================
 // Value rules shared by the schema and `validate`
@@ -133,9 +148,18 @@ pub const BREAKPOINT_MAX_PX: u32 = 16_384;
 pub const DPR_MIN: f64 = 0.5;
 /// Largest device pixel ratio a context may declare.
 pub const DPR_MAX: f64 = 8.0;
-
-/// Slack for float sums such as `x + width`, so `0.7 + 0.3` reads as 1.
-const REGION_EPSILON: f64 = 1e-9;
+/// The largest integer RFC 8785 (I-JSON) carries exactly, 2^53 − 1. Larger
+/// integers are rounded by every canonicalizer that reads numbers as IEEE 754
+/// doubles, so a hash over them would differ between languages.
+pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+/// The upper bound of a threshold with no natural ceiling: the largest finite
+/// `f64`. Bounding it keeps infinity out of the schema's range as well as
+/// `validate`'s, so a validator generated from the schema refuses it too.
+pub const FINITE_MAX: f64 = f64::MAX;
+/// The slack a region's far edge gets: `x + width` (or `y + height`) may
+/// exceed 1 by at most this much and still lie inside the box, because the sum
+/// of two fractions written in decimal can round a hair above the true total.
+pub const REGION_EPSILON: f64 = 1e-9;
 
 // ============================================================================
 // The spec
@@ -220,10 +244,10 @@ pub enum ImageSlotRole {
     /// A rich composed illustration or photograph that no other role describes.
     Scene,
     /// An identity mark. Identity assets are selected or supplied, never
-    /// generated: the pipeline must not bind an `ai_generated` asset here.
+    /// generated: a current binding here is never `ai_generated`.
     Logo,
-    /// A capture of the running product. Captured from the product, never
-    /// generated.
+    /// A capture of the running product: a current binding here has the source
+    /// `captured`.
     Screenshot,
 }
 
@@ -262,9 +286,8 @@ pub struct ImageSlotAspect {
     #[schemars(pattern(ASPECT_RATIO_PATTERN))]
     pub preferred: String,
     /// Other ratios a layout may give the box, in the same form. None may equal
-    /// `preferred` or another entry in value (`8/6` equals `4/3`). Empty means
-    /// only `preferred`.
-    #[serde(default)]
+    /// `preferred` or another entry in value (`8/6` equals `4/3`). Required:
+    /// an author states `[]` when only `preferred` is allowed.
     #[schemars(inner(pattern(ASPECT_RATIO_PATTERN)))]
     pub allowed: Vec<String>,
 }
@@ -383,12 +406,12 @@ pub enum ImageSlotTextInImage {
     /// No text in the image. Copy belongs in the page, where it can be
     /// translated, read by assistive technology and spell-checked.
     Forbidden {},
-    /// The image must carry exactly this copy. OCR reads the image and reports
-    /// its edit distance from `copy`.
+    /// The image must carry exactly this text. OCR reads the image and reports
+    /// its edit distance from `text`.
     Expected {
         /// The text as it must read.
         #[schemars(pattern(NON_BLANK_PATTERN))]
-        copy: String,
+        text: String,
         /// Its language, as a BCP 47 tag (`en`, `de-CH`).
         #[schemars(pattern(LOCALE_PATTERN))]
         locale: String,
@@ -430,26 +453,27 @@ pub enum ImageSlotThresholds {
         /// Floor on effective resolution, natural ÷ (rendered × DPR): the
         /// `min_effective` of `image_resolution_sufficient`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schemars(range(min = 0.0))]
+        #[schemars(range(min = 0.0, max = FINITE_MAX))]
         min_effective_resolution: Option<f64>,
         /// Ceiling on effective resolution, against oversized images: the
         /// `max_effective` of `image_not_oversized`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schemars(range(min = 0.0))]
+        #[schemars(range(min = 0.0, max = FINITE_MAX))]
         max_effective_resolution: Option<f64>,
         /// Tolerated relative difference between the natural and rendered
         /// aspect ratios: the `max_aspect_delta` of `image_not_distorted`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schemars(range(min = 0.0))]
+        #[schemars(range(min = 0.0, max = FINITE_MAX))]
         max_aspect_delta: Option<f64>,
-        /// Encoded byte budget: the `max_bytes` of `image_weight_within`.
+        /// Encoded byte budget, at most 2^53 − 1: the `max_bytes` of
+        /// `image_weight_within`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schemars(range(min = 1))]
+        #[schemars(range(min = 1, max = MAX_SAFE_INTEGER))]
         max_bytes: Option<u64>,
         /// Largest CIEDE2000 distance from the declared palette that still
         /// counts as on-palette: the `max_delta_e` of `image_palette_within`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schemars(range(min = 0.0))]
+        #[schemars(range(min = 0.0, max = FINITE_MAX))]
         max_palette_delta_e: Option<f64>,
         /// Least fraction (0 to 1) of the image's pixels that must be
         /// on-palette: the `min_coverage` of `image_palette_within`.
@@ -478,7 +502,8 @@ pub enum ImageSlotThresholds {
 /// The asset bound to a slot, as the asset pipeline records it; never
 /// authored. It describes the binding made for the spec whose content hash was
 /// `spec_sha256`. When the spec's current content hash differs, the binding is
-/// stale (the spec changed since), not invalid.
+/// stale (the spec changed since), not invalid. A current binding also meets
+/// the obligations stated on its fields and on [`ImageSlotRole`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImageSlotProvenance {
@@ -507,17 +532,18 @@ pub struct ImageSlotProvenance {
     #[schemars(pattern(SHA256_HEX_PATTERN))]
     pub imagery_sha256: Option<String>,
     /// sha256 identifying the version of the exemplar set in force when the
-    /// asset was produced; recorded whenever the slot names a set.
+    /// asset was produced. Required in a current binding whenever the slot names
+    /// a set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(pattern(SHA256_HEX_PATTERN))]
     pub exemplars_sha256: Option<String>,
-    /// sha256 of the LoRA weights applied; recorded whenever the slot names a
-    /// LoRA and a model produced the asset.
+    /// sha256 of the LoRA weights applied. Required in a current binding of a
+    /// model-made asset whenever the slot names a LoRA.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(pattern(SHA256_HEX_PATTERN))]
     pub lora_sha256: Option<String>,
-    /// The text alternative written for this asset; recorded whenever the
-    /// slot's `alt` is `required`.
+    /// The text alternative written for this asset. Required in a current
+    /// binding whenever the slot's `alt` is `required`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(pattern(NON_BLANK_PATTERN))]
     pub alt_text: Option<String>,
@@ -565,22 +591,369 @@ impl ImageSlotSpec {
     /// The canonical input is the spec's JSON form: absent optional fields
     /// omitted, never `null`; lists always present, even empty. A pydantic
     /// model reproduces it with
-    /// `model_dump(mode="json", exclude_none=True, exclude={"provenance"})`
-    /// fed to an RFC 8785 canonicalizer.
-    pub fn content_sha256(&self) -> Result<String, CanonicalHashError> {
+    /// `model_dump(mode="json", by_alias=True, exclude_none=True, exclude={"provenance"})`
+    /// fed to an RFC 8785 canonicalizer. `by_alias=True` matters as soon as a
+    /// binding aliases any field.
+    ///
+    /// It refuses a spec holding a number RFC 8785 cannot carry exactly (NaN,
+    /// an infinity, or an integer above [`MAX_SAFE_INTEGER`]) rather than hash
+    /// what a serializer writes instead: `null`, or digits another language
+    /// rounds. It does not run [`Self::validate`], so a rule tightened later
+    /// never leaves an existing spec without a hash.
+    pub fn content_sha256(&self) -> Result<String, ImageSlotHashError> {
         let authored = Self {
             provenance: None,
             ..self.clone()
         };
-        let prefixed = canonical_hash(&authored)?;
+        let mut audit = NumberAudit::default();
+        authored
+            .serialize(&mut audit)
+            .map_err(|e| ImageSlotHashError::Canonicalize(e.to_string()))?;
+        if let Some(problem) = audit.found {
+            return Err(problem);
+        }
+        let prefixed = canonical_hash(&authored)
+            .map_err(|e| ImageSlotHashError::Canonicalize(e.to_string()))?;
         prefixed
             .strip_prefix("sha256-")
             .map(str::to_owned)
             .ok_or_else(|| {
-                CanonicalHashError::Canonicalize(format!(
+                ImageSlotHashError::Canonicalize(format!(
                     "canonical_hash returned {prefixed:?}, not a sha256- digest"
                 ))
             })
+    }
+}
+
+/// Why a spec has no content hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImageSlotHashError {
+    /// NaN or an infinity at `path`. JSON has no spelling for either, and
+    /// serializers write `null` in its place.
+    NonFiniteNumber {
+        /// Where, in the spec's own spelling (`contexts.dpr[1]`).
+        path: String,
+    },
+    /// An integer beyond ±[`MAX_SAFE_INTEGER`] at `path`, which a
+    /// canonicalizer reading numbers as doubles would round.
+    UnsafeInteger {
+        /// Where, in the spec's own spelling.
+        path: String,
+        /// The integer, in decimal.
+        value: String,
+    },
+    /// The canonicalizer itself failed.
+    Canonicalize(String),
+}
+
+impl fmt::Display for ImageSlotHashError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NonFiniteNumber { path } => {
+                write!(f, "{path}: NaN or infinity has no RFC 8785 form")
+            }
+            Self::UnsafeInteger { path, value } => write!(
+                f,
+                "{path}: {value} is beyond 2^53 - 1, which RFC 8785 does not carry exactly"
+            ),
+            Self::Canonicalize(reason) => write!(f, "canonicalization failed: {reason}"),
+        }
+    }
+}
+
+impl std::error::Error for ImageSlotHashError {}
+
+type AuditError = serde::de::value::Error;
+
+/// Walks a value through its `Serialize` impl and records the first number
+/// RFC 8785 cannot carry exactly, with its path. It reads every number serde
+/// emits, so a numeric field added later is audited without being listed here.
+#[derive(Default)]
+struct NumberAudit {
+    path: Vec<String>,
+    found: Option<ImageSlotHashError>,
+}
+
+impl NumberAudit {
+    fn here(&self) -> String {
+        let mut out = String::new();
+        for part in &self.path {
+            if !out.is_empty() && !part.starts_with('[') {
+                out.push('.');
+            }
+            out.push_str(part);
+        }
+        out
+    }
+
+    fn float(&mut self, value: f64) -> Result<(), AuditError> {
+        if !value.is_finite() && self.found.is_none() {
+            self.found = Some(ImageSlotHashError::NonFiniteNumber { path: self.here() });
+        }
+        Ok(())
+    }
+
+    fn signed(&mut self, value: i128) -> Result<(), AuditError> {
+        if value.unsigned_abs() > u128::from(MAX_SAFE_INTEGER) && self.found.is_none() {
+            self.found = Some(ImageSlotHashError::UnsafeInteger {
+                path: self.here(),
+                value: value.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn unsigned(&mut self, value: u128) -> Result<(), AuditError> {
+        if value > u128::from(MAX_SAFE_INTEGER) && self.found.is_none() {
+            self.found = Some(ImageSlotHashError::UnsafeInteger {
+                path: self.here(),
+                value: value.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn nested<T: ?Sized + Serialize>(&mut self, part: String, value: &T) -> Result<(), AuditError> {
+        self.path.push(part);
+        let result = value.serialize(&mut *self);
+        self.path.pop();
+        result
+    }
+}
+
+impl<'a> serde::Serializer for &'a mut NumberAudit {
+    type Ok = ();
+    type Error = AuditError;
+    type SerializeSeq = AuditSeq<'a>;
+    type SerializeTuple = AuditSeq<'a>;
+    type SerializeTupleStruct = AuditSeq<'a>;
+    type SerializeTupleVariant = AuditSeq<'a>;
+    type SerializeMap = AuditSeq<'a>;
+    type SerializeStruct = Self;
+    type SerializeStructVariant = Self;
+
+    fn serialize_bool(self, _: bool) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_i8(self, v: i8) -> Result<(), AuditError> {
+        self.signed(v.into())
+    }
+    fn serialize_i16(self, v: i16) -> Result<(), AuditError> {
+        self.signed(v.into())
+    }
+    fn serialize_i32(self, v: i32) -> Result<(), AuditError> {
+        self.signed(v.into())
+    }
+    fn serialize_i64(self, v: i64) -> Result<(), AuditError> {
+        self.signed(v.into())
+    }
+    fn serialize_i128(self, v: i128) -> Result<(), AuditError> {
+        self.signed(v)
+    }
+    fn serialize_u8(self, v: u8) -> Result<(), AuditError> {
+        self.unsigned(v.into())
+    }
+    fn serialize_u16(self, v: u16) -> Result<(), AuditError> {
+        self.unsigned(v.into())
+    }
+    fn serialize_u32(self, v: u32) -> Result<(), AuditError> {
+        self.unsigned(v.into())
+    }
+    fn serialize_u64(self, v: u64) -> Result<(), AuditError> {
+        self.unsigned(v.into())
+    }
+    fn serialize_u128(self, v: u128) -> Result<(), AuditError> {
+        self.unsigned(v)
+    }
+    fn serialize_f32(self, v: f32) -> Result<(), AuditError> {
+        self.float(v.into())
+    }
+    fn serialize_f64(self, v: f64) -> Result<(), AuditError> {
+        self.float(v)
+    }
+    fn serialize_char(self, _: char) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_str(self, _: &str) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_bytes(self, _: &[u8]) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_none(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<(), AuditError> {
+        value.serialize(self)
+    }
+    fn serialize_unit(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_unit_struct(self, _: &'static str) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_unit_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+    ) -> Result<(), AuditError> {
+        Ok(())
+    }
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(
+        self,
+        _: &'static str,
+        value: &T,
+    ) -> Result<(), AuditError> {
+        value.serialize(self)
+    }
+    fn serialize_newtype_variant<T: ?Sized + Serialize>(
+        self,
+        _: &'static str,
+        _: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<(), AuditError> {
+        self.nested(variant.to_owned(), value)
+    }
+    fn serialize_seq(self, _: Option<usize>) -> Result<AuditSeq<'a>, AuditError> {
+        Ok(AuditSeq {
+            audit: self,
+            index: 0,
+        })
+    }
+    fn serialize_tuple(self, _: usize) -> Result<AuditSeq<'a>, AuditError> {
+        self.serialize_seq(None)
+    }
+    fn serialize_tuple_struct(self, _: &'static str, _: usize) -> Result<AuditSeq<'a>, AuditError> {
+        self.serialize_seq(None)
+    }
+    fn serialize_tuple_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<AuditSeq<'a>, AuditError> {
+        self.serialize_seq(None)
+    }
+    fn serialize_map(self, _: Option<usize>) -> Result<AuditSeq<'a>, AuditError> {
+        self.serialize_seq(None)
+    }
+    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self, AuditError> {
+        Ok(self)
+    }
+    fn serialize_struct_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self, AuditError> {
+        Ok(self)
+    }
+}
+
+impl serde::ser::SerializeStruct for &mut NumberAudit {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), AuditError> {
+        self.nested(key.to_owned(), value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+impl serde::ser::SerializeStructVariant for &mut NumberAudit {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), AuditError> {
+        self.nested(key.to_owned(), value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+/// A sequence, tuple or map under audit: elements are addressed `[i]`, map
+/// entries `[i]` in emission order (a key is audited like a value).
+struct AuditSeq<'a> {
+    audit: &'a mut NumberAudit,
+    index: usize,
+}
+
+impl AuditSeq<'_> {
+    fn element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        let part = format!("[{}]", self.index);
+        self.index += 1;
+        self.audit.nested(part, value)
+    }
+}
+
+impl serde::ser::SerializeSeq for AuditSeq<'_> {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        self.element(value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+impl serde::ser::SerializeTuple for AuditSeq<'_> {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        self.element(value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+impl serde::ser::SerializeTupleStruct for AuditSeq<'_> {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        self.element(value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+impl serde::ser::SerializeTupleVariant for AuditSeq<'_> {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        self.element(value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+impl serde::ser::SerializeMap for AuditSeq<'_> {
+    type Ok = ();
+    type Error = AuditError;
+    fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), AuditError> {
+        self.element(key)
+    }
+    fn serialize_value<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
+        self.element(value)
+    }
+    fn end(self) -> Result<(), AuditError> {
+        Ok(())
     }
 }
 
@@ -612,31 +985,43 @@ pub enum ImageSlotProblem {
     TooLong(usize),
     /// A list that needs at least one entry is empty.
     Empty,
-    /// A number outside the field's inclusive range.
+    /// A number outside the field's inclusive range. Every range is finite, so
+    /// NaN and the infinities are always outside it.
     OutOfRange {
         /// Lower bound.
         min: f64,
-        /// Upper bound, `f64::INFINITY` when the field has none.
+        /// Upper bound; [`FINITE_MAX`] for a field with no natural ceiling.
         max: f64,
     },
     /// A list that must be strictly ascending is not.
     NotAscending,
-    /// A list holds the same value twice (aspect ratios compare by value,
-    /// content entries ignoring case and surrounding whitespace).
+    /// A list holds the same value twice. Aspect ratios compare by value in
+    /// lowest terms (`8/6` equals `4/3`); content entries compare after
+    /// trimming surrounding whitespace and lowercasing.
     Duplicate,
-    /// The same entry is both required and forbidden content.
+    /// The same entry is both required and forbidden content, compared after
+    /// trimming surrounding whitespace and lowercasing.
     Contradictory,
-    /// A region with no area, or one reaching past its reference box.
+    /// A region with no area, or one whose far edge passes its reference box by
+    /// more than [`REGION_EPSILON`].
     RegionOutsideBox,
     /// `thresholds` is `overrides` but names no threshold.
     NoOverride,
-    /// `min_effective_resolution` is above `max_effective_resolution`.
+    /// `min_effective_resolution` is above `max_effective_resolution` (equal is
+    /// allowed).
     MinAboveMax,
     /// A model-made asset is not marked `ai_generated`.
     UnmarkedModelAsset,
-    /// A model-made asset lacks the input digest that makes it re-renderable
-    /// when that input changes.
+    /// The binding lacks an input digest it must record: a model-made asset's
+    /// recipe or imagery digest, or, in a current binding, the digest of the
+    /// exemplar set or LoRA the slot names.
     MissingInputDigest,
+    /// A current binding of an `alt: required` slot records no `alt_text`.
+    MissingAltText,
+    /// A current binding of a `logo` slot is `ai_generated`.
+    AiGeneratedLogo,
+    /// A current binding of a `screenshot` slot was not `captured`.
+    UncapturedScreenshot,
 }
 
 impl ImageSlotProblem {
@@ -644,10 +1029,20 @@ impl ImageSlotProblem {
     /// generated from it enforces the rule too. False for the cross-field rules
     /// a non-Rust validator must mirror by hand.
     pub fn is_schema_rule(&self) -> bool {
-        matches!(
-            self,
-            Self::Pattern(_) | Self::TooLong(_) | Self::Empty | Self::OutOfRange { .. }
-        )
+        match self {
+            Self::Pattern(_) | Self::TooLong(_) | Self::Empty | Self::OutOfRange { .. } => true,
+            Self::NotAscending
+            | Self::Duplicate
+            | Self::Contradictory
+            | Self::RegionOutsideBox
+            | Self::NoOverride
+            | Self::MinAboveMax
+            | Self::UnmarkedModelAsset
+            | Self::MissingInputDigest
+            | Self::MissingAltText
+            | Self::AiGeneratedLogo
+            | Self::UncapturedScreenshot => false,
+        }
     }
 }
 
@@ -657,8 +1052,8 @@ impl fmt::Display for ImageSlotProblem {
             Self::Pattern(pattern) => write!(f, "does not match {pattern}"),
             Self::TooLong(max) => write!(f, "is longer than {max} characters"),
             Self::Empty => f.write_str("must have at least one entry"),
-            Self::OutOfRange { min, max } if max.is_infinite() => {
-                write!(f, "must be at least {min}")
+            Self::OutOfRange { min, max } if *max >= FINITE_MAX => {
+                write!(f, "must be a finite number of at least {min}")
             }
             Self::OutOfRange { min, max } => write!(f, "must be between {min} and {max}"),
             Self::NotAscending => f.write_str("must be strictly ascending"),
@@ -676,8 +1071,15 @@ impl fmt::Display for ImageSlotProblem {
             Self::UnmarkedModelAsset => {
                 f.write_str("a generated or edited asset must be marked ai_generated")
             }
-            Self::MissingInputDigest => {
-                f.write_str("a generated or edited asset must record this input digest")
+            Self::MissingInputDigest => f.write_str("the binding must record this input digest"),
+            Self::MissingAltText => f.write_str(
+                "a current binding of an `alt: required` slot must record the asset's alt_text",
+            ),
+            Self::AiGeneratedLogo => {
+                f.write_str("a current binding of a logo is never ai_generated")
+            }
+            Self::UncapturedScreenshot => {
+                f.write_str("a current binding of a screenshot must be `captured`")
             }
         }
     }
@@ -713,6 +1115,11 @@ impl ImageSlotSpec {
     /// Check every value rule — the schema's and the cross-field ones — and
     /// report all the spec breaks. A spec is valid iff it deserializes AND this
     /// returns `Ok`.
+    ///
+    /// A binding is checked for its own consistency, and, when it is current
+    /// (its `spec_sha256` equals [`Self::content_sha256`]), for its obligations
+    /// toward this spec. A spec without a content hash has a number its range
+    /// rules already refuse, so its binding's currency is not decided.
     pub fn validate(&self) -> Result<(), ImageSlotSpecInvalid> {
         let mut c = Checker::default();
 
@@ -738,8 +1145,8 @@ impl ImageSlotSpec {
         self.style.check(&mut c);
         self.content.check(&mut c);
         match &self.text_in_image {
-            ImageSlotTextInImage::Expected { copy, locale } => {
-                c.pattern("text_in_image.copy", copy, NON_BLANK_PATTERN, is_non_blank);
+            ImageSlotTextInImage::Expected { text, locale } => {
+                c.pattern("text_in_image.text", text, NON_BLANK_PATTERN, is_non_blank);
                 c.pattern("text_in_image.locale", locale, LOCALE_PATTERN, is_locale);
             }
             ImageSlotTextInImage::Forbidden {} | ImageSlotTextInImage::Allowed {} => {}
@@ -759,6 +1166,12 @@ impl ImageSlotSpec {
         }
         if let Some(provenance) = &self.provenance {
             provenance.check(&mut c);
+            let current = self
+                .content_sha256()
+                .is_ok_and(|hash| hash == provenance.spec_sha256);
+            if current {
+                self.check_current_binding(provenance, &mut c);
+            }
         }
 
         if c.issues.is_empty() {
@@ -768,6 +1181,38 @@ impl ImageSlotSpec {
                 slot: self.slot.clone(),
                 issues: c.issues,
             })
+        }
+    }
+}
+
+impl ImageSlotSpec {
+    /// The obligations a CURRENT binding has toward the spec it binds.
+    fn check_current_binding(&self, binding: &ImageSlotProvenance, c: &mut Checker) {
+        if matches!(self.alt, ImageSlotAlt::Required {}) && binding.alt_text.is_none() {
+            c.push("provenance.alt_text", ImageSlotProblem::MissingAltText);
+        }
+        if self.style.exemplars.is_some() && binding.exemplars_sha256.is_none() {
+            c.push(
+                "provenance.exemplars_sha256",
+                ImageSlotProblem::MissingInputDigest,
+            );
+        }
+        if self.style.lora.is_some()
+            && binding.source.is_model_made()
+            && binding.lora_sha256.is_none()
+        {
+            c.push(
+                "provenance.lora_sha256",
+                ImageSlotProblem::MissingInputDigest,
+            );
+        }
+        if self.role == ImageSlotRole::Logo && binding.ai_generated {
+            c.push("provenance.ai_generated", ImageSlotProblem::AiGeneratedLogo);
+        }
+        if self.role == ImageSlotRole::Screenshot
+            && binding.source != ImageSlotAssetSource::Captured
+        {
+            c.push("provenance.source", ImageSlotProblem::UncapturedScreenshot);
         }
     }
 }
@@ -930,21 +1375,16 @@ impl ImageSlotThresholds {
                 "min_effective_resolution",
                 *min_effective_resolution,
                 0.0,
-                f64::INFINITY,
+                FINITE_MAX,
             ),
             (
                 "max_effective_resolution",
                 *max_effective_resolution,
                 0.0,
-                f64::INFINITY,
+                FINITE_MAX,
             ),
-            ("max_aspect_delta", *max_aspect_delta, 0.0, f64::INFINITY),
-            (
-                "max_palette_delta_e",
-                *max_palette_delta_e,
-                0.0,
-                f64::INFINITY,
-            ),
+            ("max_aspect_delta", *max_aspect_delta, 0.0, FINITE_MAX),
+            ("max_palette_delta_e", *max_palette_delta_e, 0.0, FINITE_MAX),
             ("min_palette_coverage", *min_palette_coverage, 0.0, 1.0),
             (
                 "min_text_over_image_contrast",
@@ -971,12 +1411,12 @@ impl ImageSlotThresholds {
             }
         }
         if let Some(bytes) = max_bytes {
-            if *bytes == 0 {
+            if !(1..=MAX_SAFE_INTEGER).contains(bytes) {
                 c.push(
                     "thresholds.max_bytes",
                     ImageSlotProblem::OutOfRange {
                         min: 1.0,
-                        max: f64::INFINITY,
+                        max: MAX_SAFE_INTEGER as f64,
                     },
                 );
             }
@@ -1078,9 +1518,10 @@ impl Checker {
         }
     }
 
-    /// Records an out-of-range (or non-finite) value; returns whether it was in range.
+    /// Records a value outside `min..=max`; returns whether it was inside. Every
+    /// bound passed here is finite, so NaN and the infinities are outside.
     fn range(&mut self, path: &str, value: f64, min: f64, max: f64) -> bool {
-        let ok = value.is_finite() && (min..=max).contains(&value);
+        let ok = (min..=max).contains(&value);
         if !ok {
             self.push(path, ImageSlotProblem::OutOfRange { min, max });
         }
@@ -1271,6 +1712,36 @@ mod tests {
         }
     }
 
+    /// `no_overrides()` with the fields `edit` sets.
+    fn overriding(edit: fn(&mut ImageSlotThresholds)) -> ImageSlotThresholds {
+        let mut thresholds = no_overrides();
+        edit(&mut thresholds);
+        thresholds
+    }
+
+    /// Bind `binding` to `spec` as a CURRENT binding: its `spec_sha256` is the
+    /// spec's hash as it stands. Call it after every other edit to the spec.
+    fn bind_current(spec: &mut ImageSlotSpec, mut binding: ImageSlotProvenance) {
+        binding.spec_sha256 = spec.content_sha256().unwrap();
+        spec.provenance = Some(binding);
+    }
+
+    /// A non-model binding carrying the exemplar digest `empty_state()`'s
+    /// exemplar set obliges, so a test can isolate one other obligation.
+    fn supplied_binding() -> ImageSlotProvenance {
+        ImageSlotProvenance {
+            asset_sha256: DIGEST_A.into(),
+            spec_sha256: DIGEST_B.into(),
+            source: ImageSlotAssetSource::Supplied,
+            ai_generated: false,
+            recipe_sha256: None,
+            imagery_sha256: None,
+            exemplars_sha256: Some(DIGEST_B.into()),
+            lora_sha256: None,
+            alt_text: None,
+        }
+    }
+
     fn issues(spec: &ImageSlotSpec) -> Vec<(String, ImageSlotProblem)> {
         match spec.validate() {
             Ok(()) => Vec::new(),
@@ -1323,14 +1794,20 @@ mod tests {
     #[test]
     fn data_carrying_arms_put_their_fields_beside_the_kind() {
         let expected: ImageSlotTextInImage =
-            wire_round_trip(json!({"kind": "expected", "copy": "Ship it", "locale": "en"}));
+            wire_round_trip(json!({"kind": "expected", "text": "Ship it", "locale": "en"}));
         assert_eq!(
             expected,
             ImageSlotTextInImage::Expected {
-                copy: "Ship it".into(),
+                text: "Ship it".into(),
                 locale: "en".into()
             }
         );
+        // The plan's `copy` spelling is not the contract's: refused, not aliased.
+        let err = serde_json::from_value::<ImageSlotTextInImage>(
+            json!({"kind": "expected", "copy": "Ship it", "locale": "en"}),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field `copy`"), "{err}");
         let alt: ImageSlotAlt = wire_round_trip(json!({"kind": "text", "text": "A chart"}));
         assert_eq!(
             alt,
@@ -1386,10 +1863,10 @@ mod tests {
         refuses_stray_key::<ImageSlotAlt>(json!({"kind": "decorative", "text": "Logo"}), "text");
         refuses_stray_key::<ImageSlotAlt>(json!({"kind": "required", "text": "Logo"}), "text");
         refuses_stray_key::<ImageSlotTextInImage>(
-            json!({"kind": "forbidden", "copy": "x"}),
-            "copy",
+            json!({"kind": "forbidden", "text": "x"}),
+            "text",
         );
-        refuses_stray_key::<ImageSlotTextInImage>(json!({"kind": "allowed", "copy": "x"}), "copy");
+        refuses_stray_key::<ImageSlotTextInImage>(json!({"kind": "allowed", "text": "x"}), "text");
         refuses_stray_key::<ImageSlotSafeAreas>(
             json!({"kind": "derived", "regions": []}),
             "regions",
@@ -1543,33 +2020,28 @@ mod tests {
     }
 
     /// The TypeScript generator (json-schema-to-typescript, behind
-    /// `scripts/compile_typescript.mjs`) parses a definition reached from inside
-    /// a tagged-union arm separately from the same definition reached anywhere
-    /// else, and declares the second copy under an invented name
-    /// (`ImageSlotRegion1`), which that script's fork guard then refuses. So no
-    /// definition may be referenced both inside a union arm and outside one.
+    /// `scripts/compile_typescript.mjs`) copies a definition at a reference
+    /// carrying a sibling `description`, so a definition reached from such a
+    /// reference and from any other site is declared twice, the second copy
+    /// under an invented name (`ImageSlotRegion1`) that the script's fork guard
+    /// refuses. One reference site per definition rules that out whatever the
+    /// siblings are.
     #[test]
-    fn no_definition_is_shared_between_a_union_arm_and_anything_else() {
+    fn every_definition_has_exactly_one_reference_site() {
         let schema = schema();
-        let mut in_arms = Vec::new();
-        let mut elsewhere = Vec::new();
-        refs(&schema["properties"], &mut elsewhere);
-        for def in schema["$defs"].as_object().unwrap().values() {
-            match def.get("oneOf") {
-                Some(arms) => refs(arms, &mut in_arms),
-                None => refs(def, &mut elsewhere),
-            }
+        let mut sites = Vec::new();
+        refs(&schema, &mut sites);
+        let defs = schema["$defs"].as_object().unwrap();
+        assert!(defs.len() >= 15, "only {} definitions", defs.len());
+        for name in defs.keys() {
+            let n = sites.iter().filter(|site| *site == name).count();
+            assert_eq!(n, 1, "{name} has {n} reference sites");
         }
-        assert!(
-            in_arms.contains(&"ImageSlotSafeArea".to_owned()),
-            "the probe must see the one definition a union arm references: {in_arms:?}"
-        );
-        for name in &in_arms {
-            assert!(
-                !elsewhere.contains(name),
-                "{name} is referenced inside a union arm and outside one"
-            );
-        }
+        // Control: the census reads real references, and one with a sibling
+        // `description` (the shape that forks) counts like any other.
+        let focal = &defs["ImageSlotFocal"]["properties"]["region"];
+        assert_eq!(focal["$ref"], json!("#/$defs/ImageSlotRegion"));
+        assert!(focal.get("description").is_some(), "{focal}");
     }
 
     #[test]
@@ -1678,6 +2150,7 @@ mod tests {
         );
         let expected = &d["ImageSlotTextInImage"]["oneOf"][1]["properties"];
         assert_eq!(expected["locale"]["pattern"], json!(LOCALE_PATTERN));
+        assert_eq!(expected["text"]["pattern"], json!(NON_BLANK_PATTERN));
         let overrides = &d["ImageSlotThresholds"]["oneOf"][1]["properties"];
         assert_eq!(overrides["min_palette_coverage"]["maximum"], json!(1.0));
         assert_eq!(
@@ -1685,6 +2158,27 @@ mod tests {
             json!(1.0)
         );
         assert_eq!(overrides["max_bytes"]["minimum"], json!(1));
+        assert_eq!(overrides["max_bytes"]["maximum"], json!(MAX_SAFE_INTEGER));
+        for uncapped in [
+            "min_effective_resolution",
+            "max_effective_resolution",
+            "max_aspect_delta",
+            "max_palette_delta_e",
+        ] {
+            assert_eq!(
+                overrides[uncapped]["maximum"],
+                json!(FINITE_MAX),
+                "{uncapped}"
+            );
+        }
+        let mut aspect_required: Vec<&str> = d["ImageSlotAspect"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        aspect_required.sort_unstable();
+        assert_eq!(aspect_required, ["allowed", "preferred"]);
     }
 
     // ── each pattern predicate is its regex ──────────────────────────────
@@ -1949,7 +2443,7 @@ mod tests {
             case(
                 |s| {
                     s.text_in_image = ImageSlotTextInImage::Expected {
-                        copy: "Ship it".into(),
+                        text: "Ship it".into(),
                         locale: "English".into(),
                     }
                 },
@@ -2045,32 +2539,219 @@ mod tests {
                 "provenance.alt_text",
                 P::Pattern(NON_BLANK_PATTERN),
             ),
+            case(
+                |s| {
+                    s.provenance = Some(ImageSlotProvenance {
+                        imagery_sha256: None,
+                        ..generated_binding()
+                    })
+                },
+                "provenance.imagery_sha256",
+                P::MissingInputDigest,
+            ),
+            case(
+                |s| {
+                    s.provenance = Some(ImageSlotProvenance {
+                        source: ImageSlotAssetSource::Edited,
+                        ai_generated: false,
+                        ..generated_binding()
+                    })
+                },
+                "provenance.ai_generated",
+                P::UnmarkedModelAsset,
+            ),
+            case(
+                |s| {
+                    s.thresholds = overriding(|t| {
+                        if let ImageSlotThresholds::Overrides {
+                            max_aspect_delta, ..
+                        } = t
+                        {
+                            *max_aspect_delta = Some(f64::INFINITY);
+                        }
+                    })
+                },
+                "thresholds.max_aspect_delta",
+                P::OutOfRange {
+                    min: 0.0,
+                    max: FINITE_MAX,
+                },
+            ),
+            case(
+                |s| {
+                    s.thresholds = overriding(|t| {
+                        if let ImageSlotThresholds::Overrides {
+                            max_effective_resolution,
+                            ..
+                        } = t
+                        {
+                            *max_effective_resolution = Some(f64::NAN);
+                        }
+                    })
+                },
+                "thresholds.max_effective_resolution",
+                P::OutOfRange {
+                    min: 0.0,
+                    max: FINITE_MAX,
+                },
+            ),
+            case(
+                |s| {
+                    s.thresholds = overriding(|t| {
+                        if let ImageSlotThresholds::Overrides { max_bytes, .. } = t {
+                            *max_bytes = Some(MAX_SAFE_INTEGER + 1);
+                        }
+                    })
+                },
+                "thresholds.max_bytes",
+                P::OutOfRange {
+                    min: 1.0,
+                    max: MAX_SAFE_INTEGER as f64,
+                },
+            ),
+            // The obligations of a CURRENT binding, one each.
+            case(
+                |s| {
+                    s.alt = ImageSlotAlt::Required {};
+                    bind_current(s, supplied_binding());
+                },
+                "provenance.alt_text",
+                P::MissingAltText,
+            ),
+            case(
+                |s| {
+                    bind_current(
+                        s,
+                        ImageSlotProvenance {
+                            exemplars_sha256: None,
+                            ..supplied_binding()
+                        },
+                    )
+                },
+                "provenance.exemplars_sha256",
+                P::MissingInputDigest,
+            ),
+            case(
+                |s| {
+                    s.style.lora = Some("house-v1".into());
+                    bind_current(
+                        s,
+                        ImageSlotProvenance {
+                            exemplars_sha256: Some(DIGEST_B.into()),
+                            ..generated_binding()
+                        },
+                    );
+                },
+                "provenance.lora_sha256",
+                P::MissingInputDigest,
+            ),
+            case(
+                |s| {
+                    s.role = ImageSlotRole::Logo;
+                    bind_current(
+                        s,
+                        ImageSlotProvenance {
+                            exemplars_sha256: Some(DIGEST_B.into()),
+                            ..generated_binding()
+                        },
+                    );
+                },
+                "provenance.ai_generated",
+                P::AiGeneratedLogo,
+            ),
+            case(
+                |s| {
+                    s.role = ImageSlotRole::Screenshot;
+                    bind_current(s, supplied_binding());
+                },
+                "provenance.source",
+                P::UncapturedScreenshot,
+            ),
         ];
-        for (mutate, path, problem) in cases {
+        let mut missed = Vec::new();
+        for (mutate, path, problem) in &cases {
             let mut spec = empty_state();
             mutate(&mut spec);
             let found = issues(&spec);
-            assert!(
-                found.contains(&(path.to_owned(), problem.clone())),
-                "expected {path}: {problem:?}, got {found:?}"
-            );
+            if !found.contains(&(path.to_string(), problem.clone())) {
+                missed.push(format!("expected {path}: {problem:?}, got {found:?}"));
+            }
         }
+        // Every case is reported, so one regression cannot hide another.
+        assert!(
+            missed.is_empty(),
+            "{} of {} cases missed:\n{}",
+            missed.len(),
+            cases.len(),
+            missed.join("\n")
+        );
     }
 
     #[test]
-    fn a_binding_by_hand_is_valid_when_nothing_was_model_made() {
+    fn a_current_binding_by_hand_meets_every_obligation_with_no_model_digest() {
         let mut spec = empty_state();
         spec.role = ImageSlotRole::Logo;
-        spec.provenance = Some(ImageSlotProvenance {
-            asset_sha256: DIGEST_A.into(),
-            spec_sha256: DIGEST_B.into(),
-            source: ImageSlotAssetSource::Supplied,
-            ai_generated: false,
-            recipe_sha256: None,
-            imagery_sha256: None,
+        bind_current(&mut spec, supplied_binding());
+        assert_eq!(spec.validate(), Ok(()));
+
+        let mut shot = empty_state();
+        shot.role = ImageSlotRole::Screenshot;
+        bind_current(
+            &mut shot,
+            ImageSlotProvenance {
+                source: ImageSlotAssetSource::Captured,
+                ..supplied_binding()
+            },
+        );
+        assert_eq!(shot.validate(), Ok(()));
+    }
+
+    #[test]
+    fn a_stale_binding_owes_the_spec_nothing_a_current_one_does() {
+        let mut spec = empty_state();
+        spec.alt = ImageSlotAlt::Required {};
+        let bare = ImageSlotProvenance {
             exemplars_sha256: None,
-            lora_sha256: None,
-            alt_text: None,
+            ..supplied_binding()
+        };
+        spec.provenance = Some(bare.clone());
+        assert_ne!(
+            spec.content_sha256().unwrap(),
+            DIGEST_B,
+            "the binding must be stale"
+        );
+        assert_eq!(spec.validate(), Ok(()));
+
+        bind_current(&mut spec, bare);
+        let found = issues(&spec);
+        assert_eq!(
+            found,
+            [
+                (
+                    "provenance.alt_text".to_owned(),
+                    ImageSlotProblem::MissingAltText
+                ),
+                (
+                    "provenance.exemplars_sha256".to_owned(),
+                    ImageSlotProblem::MissingInputDigest
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn equal_effective_resolution_bounds_are_valid() {
+        let mut spec = empty_state();
+        spec.thresholds = overriding(|t| {
+            if let ImageSlotThresholds::Overrides {
+                min_effective_resolution,
+                max_effective_resolution,
+                ..
+            } = t
+            {
+                *min_effective_resolution = Some(1.0);
+                *max_effective_resolution = Some(1.0);
+            }
         });
         assert_eq!(spec.validate(), Ok(()));
     }
@@ -2095,6 +2776,9 @@ mod tests {
             P::MinAboveMax,
             P::UnmarkedModelAsset,
             P::MissingInputDigest,
+            P::MissingAltText,
+            P::AiGeneratedLogo,
+            P::UncapturedScreenshot,
         ] {
             assert!(!cross_field.is_schema_rule(), "{cross_field:?}");
         }
@@ -2138,17 +2822,69 @@ mod tests {
     }
 
     #[test]
-    fn content_hash_reads_absent_and_explicitly_empty_allowed_as_one_spec() {
-        // `allowed` defaults to empty, so an author who omits it and one who
-        // writes `allowed: []` declare the same spec and must hash alike.
+    fn content_hash_refuses_numbers_rfc_8785_cannot_carry() {
+        let mut spec = empty_state();
+        spec.contexts.dpr = vec![1.0, f64::NAN];
+        assert_eq!(
+            spec.content_sha256(),
+            Err(ImageSlotHashError::NonFiniteNumber {
+                path: "contexts.dpr[1]".into()
+            })
+        );
+
+        let mut spec = empty_state();
+        spec.thresholds = overriding(|t| {
+            if let ImageSlotThresholds::Overrides {
+                max_aspect_delta, ..
+            } = t
+            {
+                *max_aspect_delta = Some(f64::NEG_INFINITY);
+            }
+        });
+        assert_eq!(
+            spec.content_sha256(),
+            Err(ImageSlotHashError::NonFiniteNumber {
+                path: "thresholds.max_aspect_delta".into()
+            })
+        );
+
+        let mut spec = empty_state();
+        spec.thresholds = overriding(|t| {
+            if let ImageSlotThresholds::Overrides { max_bytes, .. } = t {
+                *max_bytes = Some(MAX_SAFE_INTEGER + 1);
+            }
+        });
+        assert_eq!(
+            spec.content_sha256(),
+            Err(ImageSlotHashError::UnsafeInteger {
+                path: "thresholds.max_bytes".into(),
+                value: "9007199254740992".into()
+            })
+        );
+
+        // The boundary itself is carried exactly.
+        spec.thresholds = overriding(|t| {
+            if let ImageSlotThresholds::Overrides { max_bytes, .. } = t {
+                *max_bytes = Some(MAX_SAFE_INTEGER);
+            }
+        });
+        assert!(spec.content_sha256().is_ok());
+    }
+
+    #[test]
+    fn content_hash_does_not_depend_on_validate() {
+        let mut spec = empty_state();
+        spec.slot = "Not A Slug".into();
+        spec.contexts.dpr = vec![2.0, 1.0];
+        assert!(spec.validate().is_err());
+        assert!(spec.content_sha256().is_ok());
+    }
+
+    #[test]
+    fn aspect_allowed_is_required() {
         let mut wire = serde_json::to_value(empty_state()).unwrap();
         wire["aspect"] = json!({"preferred": "4/3"});
-        let omitted: ImageSlotSpec = serde_json::from_value(wire.clone()).unwrap();
-        wire["aspect"] = json!({"preferred": "4/3", "allowed": []});
-        let explicit: ImageSlotSpec = serde_json::from_value(wire).unwrap();
-        assert_eq!(
-            omitted.content_sha256().unwrap(),
-            explicit.content_sha256().unwrap()
-        );
+        let err = serde_json::from_value::<ImageSlotSpec>(wire).unwrap_err();
+        assert!(err.to_string().contains("missing field `allowed`"), "{err}");
     }
 }

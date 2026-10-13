@@ -28,7 +28,7 @@ content:
     - third-party logos
 text_in_image:
   kind: expected
-  copy: Start
+  text: Start
   locale: English
 alt:
   kind: decorative

@@ -1,5 +1,5 @@
-# refused-by: serde missing field `copy`
-# An `expected` text arm without its copy.
+# refused-by: schema thresholds.max_aspect_delta
+# An infinite threshold: the schema bounds every number, so infinity is out of range.
 slot: sessions.empty-state
 role: empty_state
 job: "Reassure a first-time operator that nothing is broken; point at 'Start a session'."
@@ -27,9 +27,9 @@ content:
     - people
     - third-party logos
 text_in_image:
-  kind: expected
-  locale: en
+  kind: forbidden
 alt:
   kind: decorative
 thresholds:
-  kind: from_visual_system
+  kind: overrides
+  max_aspect_delta: .inf

@@ -2,6 +2,7 @@
 # text alternative the slot's `alt: required` asks for. `spec_sha256` is this
 # spec's own content hash, so the file is also a golden vector for any other
 # implementation of the hash.
+# content-sha256: 71d882ba7dc42635fe0328d2c933889db5de6c98410daa4a8fe95a4051eee4ab
 slot: onboarding.connect-runner
 role: onboarding
 job: Show that the desktop runner and the web dashboard are one system once connected.
@@ -12,6 +13,7 @@ contexts:
   dpr: [1, 2]
 aspect:
   preferred: 3/2
+  allowed: []
 safe_areas:
   kind: derived
 focal:
