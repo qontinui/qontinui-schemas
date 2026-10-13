@@ -30,17 +30,21 @@
 //! SDK release ADDS a capture; the old ones stay.
 
 use chrono::DateTime;
-use qontinui_vision_core::{Observation, ObservationStatus, PageHealthValue, UnknownCode};
+use qontinui_vision_core::{
+    Observation, ObservationStatus, PageHealthSeverity, PageHealthValue, UnknownCode,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-/// The pair the plan requires: a populated page and an empty registry.
-const MIN_FIXTURES: usize = 2;
+/// The pair the plan requires (a populated page, an empty registry) plus the
+/// laid-out capture that carries visible, geometry-bearing elements.
+const MIN_FIXTURES: usize = 3;
 
 const POPULATED: &str = "sdk_0_30_0_page_health_populated.json";
 const EMPTY_REGISTRY: &str = "sdk_0_30_0_page_health_empty_registry.json";
+const LAID_OUT: &str = "sdk_0_30_0_page_health_laid_out.json";
 
 const SIDECAR_SUFFIX: &str = ".provenance.json";
 
@@ -289,6 +293,33 @@ fn populated_page_is_measured_with_a_report() {
         obs.provenance().observed_at.is_some(),
         "the populated capture analyzed a timestamped snapshot"
     );
+}
+
+/// The populated capture above is over a genuine live snapshot whose elements
+/// are all `state.visible: false`, so it never carries a WARNING, a `#`
+/// heatmap cell or a non-zero coverage. This one does, so a respelled
+/// `WARNING` or a mangled coverage cannot pass on the strength of the
+/// degenerate report alone.
+#[test]
+fn laid_out_page_is_measured_with_visible_geometry_and_a_warning() {
+    let f = fixture(LAID_OUT);
+    let obs = parse(as_json(&f)).expect("laid-out fixture parses");
+    assert_eq!(obs.status(), ObservationStatus::Measured);
+    let value = obs
+        .value()
+        .expect("a measured observation carries its value");
+    assert_eq!(value.summary, PageHealthSeverity::Warning);
+    assert!(
+        value.visible_count > 0,
+        "the laid-out capture has visible elements"
+    );
+    assert!(
+        value.heatmap.iter().any(|row| row.contains('#')),
+        "the laid-out capture covers some of the grid"
+    );
+    let coverage = &obs.provenance().coverage;
+    assert!(coverage.considered > 0 && coverage.measured == coverage.considered);
+    assert_eq!(coverage.measured, value.visible_count);
 }
 
 #[test]
