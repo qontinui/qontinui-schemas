@@ -323,7 +323,7 @@ pub enum ScheduledTaskType {
         /// root.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         working_directory: Option<String>,
-        /// Wall-clock timeout in seconds. `None` = runner default
+        /// Wall-clock timeout in seconds. `None` (or 0) = runner default
         /// (600s = 10 min).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeout_seconds: Option<u64>,
