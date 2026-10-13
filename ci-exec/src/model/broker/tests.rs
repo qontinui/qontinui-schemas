@@ -753,7 +753,10 @@ async fn non_reading_client(port: u16, request: Vec<u8>) -> TcpStream {
 
 #[tokio::test]
 async fn stop_is_prompt_with_clients_that_never_read() {
-    let answer = Box::leak("y".repeat(MAX_RESPONSE_BYTES - 1024).into_boxed_str());
+    // A few KiB is enough to outgrow the clients' 4 KiB receive buffers; a
+    // larger answer only adds serialization time inside the measured window
+    // (the write timeout itself is a_response_write_is_bounded_by_the_write_timeout's).
+    let answer = Box::leak("y".repeat(16 * 1024).into_boxed_str());
     let (b, _l, inv) = start(
         FakeInvoker::answering(answer, 1),
         declaration(100, 100_000, 60),
