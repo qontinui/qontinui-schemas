@@ -1,5 +1,34 @@
 # Changelog
 
+## [4.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.1...rust-v4.6.0) (2026-10-13)
+
+
+### Features
+
+* **types:** add ImageSlotSpec, the declared contract of one image placement ([1288679](https://github.com/qontinui/qontinui-schemas/commit/12886796e2c83d8b9fce7ceec204a1c230e0a091))
+
+
+### Bug Fixes
+
+* **types:** close the ImageSlotSpec pre-PR review findings ([775abdc](https://github.com/qontinui/qontinui-schemas/commit/775abdcc7577e496c4f67ff5263fdab5b6eee2c6))
+* **types:** make the stale-binding fixture's history true and checkable ([89c3c3d](https://github.com/qontinui/qontinui-schemas/commit/89c3c3db4712ca35901294b40d9192f2dcdb10c2))
+* **types:** pin the stale-binding exemption and compare region edges exactly ([73a6085](https://github.com/qontinui/qontinui-schemas/commit/73a6085746f433686277de70b5feaa51ac1e2170))
+
+## [4.5.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.0...rust-v4.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* address pre-PR review of the glossary v2 corrections ([e797a9b](https://github.com/qontinui/qontinui-schemas/commit/e797a9b443121d3580b7d6129b4ed961378639b7))
+* correct seven glossary terms that disagree with the services (glossary v2) ([2253e55](https://github.com/qontinui/qontinui-schemas/commit/2253e55cc8d40a90508484dc3ff65d3231616b68))
+
+## [4.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.4.0...rust-v4.5.0) (2026-10-13)
+
+
+### Features
+
+* **types:** CliProfile, SessionFailure and a shared CapabilityState ([0662611](https://github.com/qontinui/qontinui-schemas/commit/066261185d58160f06a1c3c69c1a157730974233))
+
 ## [4.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.3.0...rust-v4.4.0) (2026-10-06)
 
 

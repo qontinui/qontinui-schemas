@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-types"
-version = "4.4.0"
+version = "4.6.0"
 description = "Canonical DTO types for Qontinui. Rust is the source of truth; TypeScript and Python are generated from JSON Schema emitted by schemars."
 edition.workspace = true
 license.workspace = true
@@ -33,3 +33,6 @@ base64 = "0.22"
 # tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.
 regex = "1"
 toml = "1"
+# tests/image_slot_fixtures.rs — image-slot specs are authored as YAML. The
+# maintained fork of the deprecated serde_yaml, already locked here by ci-exec.
+serde_yaml_ng = "0.10"

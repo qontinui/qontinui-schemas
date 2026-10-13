@@ -1,0 +1,58 @@
+# codegen/pending-registration.toml — declared waits for bindings ahead of runner main.
+#
+# Plan: 2026-10-13-schemas-check-drift-red-while-bindings-await-runner-registration
+# Dossier: schemas-bindings-ahead-of-runner-generator
+#
+# WHY. A schemas PR that adds a type lands BEFORE qontinui-runner registers it
+# with `add!` in src-tauri/src/schema_export.rs (the runner cannot compile the
+# registration until the type exists on its pinned sibling). The push run on
+# main then regenerates against runner MAIN, which deletes the new bindings, and
+# check-drift reads red. While main is red, coord holds every PR in this repo.
+# Each row below declares one such wait.
+#
+# WHAT A ROW MAY ABSORB — exactly, and only where the regeneration DELETED it:
+#   files (2)  ts/src/generated/<type>.d.ts
+#              src/qontinui_schemas/generated/per_type/<module>.py
+#   lines (3)  `export type { <type> } from './<type>';`  in ts/src/generated/index.ts
+#              `from .per_type.<module> import <type>`    in src/qontinui_schemas/generated/__init__.py
+#              `    "<type>",`                             in that file's __all__
+# A binding regenerated with DIFFERENT content, or any other line, is never absorbed.
+#
+# A row absorbs anything only when ALL of these hold (else it is INERT):
+#   1. `added` is a date, not in the future, and at most 14 days old;
+#   2. `runner_pr` is a qontinui/qontinui-runner PR;
+#   3. that PR is OPEN;
+#   4. that PR's head registers the type (`add!("<type>", …)`, comments ignored);
+#   5. every GitHub read succeeded (GITHUB_TOKEN only).
+#
+# WHO ADDS A ROW. The author of the LEADING schemas PR, in that same PR. When
+# check-drift resolves a TRAILING runner declaration it requires a row for every
+# binding the PR adds, naming that declared runner PR, already ACTIVE-eligible,
+# with `added` between the PR's creation date and the run date, and prints the
+# rows to paste.
+#
+# ACCEPTED COST. While a row is ACTIVE, a schemas-side change to that type's own
+# shape is invisible to check-drift until the runner PR lands; the next push
+# then compares it against runner main.
+#
+# CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
+# the daily pending-registration-audit workflow reds until the row is deleted.
+
+# The cli_session types (schemas#212, 86710c89), awaiting runner#1990.
+[[pending]]
+type = "CapabilityState"
+runner_pr = "qontinui/qontinui-runner#1990"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#212"
+
+[[pending]]
+type = "CliProfile"
+runner_pr = "qontinui/qontinui-runner#1990"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#212"
+
+[[pending]]
+type = "SessionFailure"
+runner_pr = "qontinui/qontinui-runner#1990"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#212"

@@ -71,9 +71,21 @@ These must be green on your PR before merge:
 
   So if you declared a pair and the run still reports `declaration=none`, **direction is no longer a possible explanation** — it was the right first guess before 2026-08-27 and it is now a dead end. What remains: no coord dep-edge label on either PR, a malformed value, or one naming a **closed** or nonexistent PR.
 
-  A green `check-drift` against a declared sibling is a claim about a tree that **hasn't landed**, and the cost of that is worth expecting rather than rediscovering. Between the two lands `main` here **will** read red on `schema-drift`, and while `main` is red coord holds *every* PR in this repo. Measured 2026-08-30: `main` sat red ~33h on exactly this shape after qontinui-schemas#144 landed ahead of its runner half, with #154 and #155 blocked behind it throughout.
+  A green `check-drift` against a declared sibling is a claim about a tree that **hasn't landed**. When this PR is the one that lands FIRST, the push run on `main` afterwards regenerates against runner `main`, which does not register your type yet, so it deletes your bindings. Until 2026-10-13 that read red, and while `main` is red coord holds *every* PR in this repo (measured 2026-08-30: ~33h after qontinui-schemas#144; and again four times in twelve days in October).
 
-  Clearing it needs a **re-run of the failed push run** (`gh run rerun --failed <run-id>`), and only after the paired runner PR has landed — a re-run re-executes at the same sha, so against an unchanged world it just reproduces the red. A re-run keeps `event: push`, which is what coord ingests as a baseline; `gh workflow run schema-drift.yml --ref main` refreshes the GitHub checkmark but writes no baseline at all (`establishes_main_baseline` accepts `event == Some("push")` and nothing else — qontinui-coord `crates/coord/src/ci_baseline.rs`), so it leaves coord red while looking like it worked. Pushing a fixing commit is circular: it needs a PR, and PRs are what the red is blocking.
+  **Declare the wait in the same PR: `codegen/pending-registration.toml`.** Add one row per type your PR adds bindings for:
+
+  ```toml
+  [[pending]]
+  type = "CliProfile"                             # exactly as the runner's add!("…") names it
+  runner_pr = "qontinui/qontinui-runner#1990"     # the PR that registers it
+  added = 2026-10-12                              # a date between this PR's creation and today (UTC)
+  schemas_pr = "qontinui/qontinui-schemas#212"    # this PR
+  ```
+
+  `check-drift` enforces it: when it resolved a TRAILING runner declaration it requires a row for every binding file this PR adds, naming exactly that declared runner PR, and already ACTIVE-eligible (the PR open, its head registering the type). On a miss it prints the rows to paste, with the resolved PR number filled in. On `main`, a row lets arm 2 accept the deletion of exactly that type's 2 files (`ts/src/generated/<T>.d.ts`, its `per_type/<module>.py`) and 3 barrel lines, and only while the runner PR is open, its head registers the type, and the row is at most 14 days old. Anything else — a binding regenerated *differently*, any other barrel line, any other file — still reds. Each run's summary lists every row as `ACTIVE`, `INERT (<reason>)` or `STALE`. When the runner PR lands the row reads `STALE`; delete it (the daily `pending-registration-audit` workflow reds until you do, without holding any PR). The full contract is in the file's header and in `scripts/pending_registration.py`.
+
+  If `main` is red on `check-drift` for some OTHER reason, clearing it needs a **re-run of the failed push run** (`gh run rerun --failed <run-id>`) once the cause is fixed — a re-run re-executes at the same sha, so against an unchanged world it just reproduces the red. A re-run keeps `event: push`, which is what coord ingests as a baseline; `gh workflow run schema-drift.yml --ref main` refreshes the GitHub checkmark but writes no baseline at all (`establishes_main_baseline` accepts `event == Some("push")` and nothing else — qontinui-coord `crates/coord/src/ci_baseline.rs`), so it leaves coord red while looking like it worked.
 
   **This is not a `schema-drift` quirk.** coord's baseline table is keyed per repo and workflow name, and `establishes_main_baseline()` inspects only the event — so a `workflow_dispatch` of *any* push-triggered gate in this repo, `rust-ci` very much included, refreshes that workflow's badge and leaves coord holding every PR. `rust-ci`'s dispatch is the one an operator reaches for on a red `main`, and it is the wrong lever. Whichever gate reddened `main`, the remedy is the same: `gh run rerun --failed` on *its* failed push run.
 

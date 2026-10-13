@@ -131,6 +131,11 @@ pub mod glossary;
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
+/// Image-slot specs — [`image_slot::ImageSlotSpec`], the declared contract of
+/// one image placement (job, audience, contexts, geometry, style, content,
+/// text and alt policy, check thresholds, and the asset bound to it). See
+/// `2026-10-13-image-generation-and-visual-judgment.md` Phase 14.
+pub mod image_slot;
 pub mod ir;
 /// Journey twin — observed edges between IR-named page configurations and
 /// the frontier of seen-but-never-activated affordances. See
