@@ -674,6 +674,14 @@ async fn a_reset_in_the_past_is_held_the_minimum_and_capped() {
         t0.elapsed() >= Duration::from_millis(50) * MAX_EXHAUSTION_HOLDS,
         "every hold lasted at least the minimum"
     );
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    assert!(
+        env.reset_at.unwrap() >= now,
+        "the reported reset is never in the past"
+    );
     let held = lines.all().iter().filter(|l| l.contains("held")).count();
     assert_eq!(held, MAX_EXHAUSTION_HOLDS as usize, "{:?}", lines.all());
 }
@@ -829,7 +837,7 @@ async fn a_rejection_tells_an_unauthenticated_peer_nothing_about_the_budget() {
 }
 
 #[tokio::test]
-async fn connections_past_the_cap_are_closed_unanswered() {
+async fn reading_connections_past_the_cap_get_a_busy_envelope() {
     let (b, lines, _inv) = start(
         FakeInvoker::answering("hi", 1),
         declaration(10, 1000, 60),
@@ -842,16 +850,19 @@ async fn connections_past_the_cap_are_closed_unanswered() {
     }
     tokio::time::sleep(Duration::from_millis(200)).await;
     let mut extra = TcpStream::connect(("127.0.0.1", b.port())).await.unwrap();
-    let mut buf = [0u8; 16];
-    let n = tokio::time::timeout(Duration::from_secs(5), extra.read(&mut buf))
+    let mut buf = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), extra.read_to_end(&mut buf))
         .await
-        .expect("the extra connection is closed, not left hanging")
-        .unwrap_or(0);
-    assert_eq!(n, 0, "closed unanswered");
-    assert!(lines
-        .all()
-        .iter()
-        .any(|l| l.contains("closed a connection unanswered")));
+        .expect("the extra connection is answered, not left hanging")
+        .unwrap();
+    let text = String::from_utf8_lossy(&buf).to_string();
+    assert!(text.starts_with("HTTP/1.1 503 "), "{text}");
+    let body = text.split_once("\r\n\r\n").unwrap().1;
+    let env: Envelope = serde_json::from_str(body).unwrap();
+    assert_eq!(env.subtype, "busy");
+    assert_eq!(env.retryable, Some(true));
+    assert!(env.broker.budget_left.is_none());
+    assert!(lines.all().iter().any(|l| l.contains("answered busy")));
     drop(idle);
     // Once the idle peers go, the broker serves again.
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -873,6 +884,83 @@ async fn connections_past_the_cap_are_closed_unanswered() {
         assert!(Instant::now() < deadline, "the broker never recovered");
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+}
+
+/// Authenticated requests waiting for an in-flight slot do not count against
+/// the connection cap: more of them than the cap are all answered.
+#[tokio::test]
+async fn more_authenticated_requests_than_the_connection_cap_are_all_answered() {
+    let gate = Arc::new(Semaphore::new(0));
+    let (in_flight, max_seen) = (Arc::new(AtomicU64::new(0)), Arc::new(AtomicU64::new(0)));
+    let (b, _l, inv) = start(
+        gated(gate.clone(), 1, in_flight, max_seen),
+        declaration(1000, 1_000_000, 60),
+        MAX_IN_FLIGHT,
+    )
+    .await;
+    let b = Arc::new(b);
+    let n = MAX_CONNECTIONS + 8;
+    let mut handles = Vec::new();
+    for i in 0..n {
+        let b = b.clone();
+        handles.push(tokio::spawn(async move {
+            raw_exchange(
+                b.port(),
+                &http(
+                    b.port(),
+                    COMPLETE_PATH,
+                    Some(b.token()),
+                    "",
+                    &prompt_body(&format!("{i}")),
+                ),
+            )
+            .await
+            .0
+        }));
+    }
+    wait_until("the cap in flight", || {
+        inv.calls.load(Ordering::SeqCst) == 4
+    })
+    .await;
+    // Hold the calls past the accept loop's read-slot wait: a request queued
+    // for a slot must not be counted as reading, or the extra connections
+    // would be answered `busy` meanwhile.
+    tokio::time::sleep(READ_SLOT_WAIT + Duration::from_secs(1)).await;
+    gate.add_permits(10_000);
+    for h in handles {
+        assert_eq!(h.await.unwrap(), 200);
+    }
+    assert_eq!(inv.calls.load(Ordering::SeqCst), n as u64);
+}
+
+/// A call that reached the host and failed is a call, not a refusal: it is
+/// never capped, always logged, and counted in coverage.
+#[tokio::test]
+async fn calls_that_reached_the_host_are_never_capped_as_refusals() {
+    let inv = FakeInvoker::new(Arc::new(|_req| {
+        Box::pin(async {
+            Err(InvokeError::Provider {
+                message: "overloaded".to_string(),
+                retryable: true,
+            })
+        })
+    }));
+    let (b, lines, _inv) = start(inv, declaration(1000, 1000, 60), 4).await;
+    let total = crate::model::ledger::MAX_STORED_REFUSALS + 36;
+    for _ in 0..total {
+        assert_eq!(ask(&b, "p").await.1.subtype, "provider_error");
+    }
+    let logged = lines
+        .all()
+        .iter()
+        .filter(|l| l.contains("outcome=provider_error"))
+        .count();
+    assert_eq!(logged, total, "every call that reached the host is logged");
+    let out = b.stop().await;
+    assert_eq!(out.ledger.calls.len(), total);
+    assert!(out.ledger.calls.iter().all(|r| r.attempts == 1));
+    assert_eq!(out.ledger.refused_rows_dropped, 0);
+    assert_eq!(out.ledger.token_coverage.calls, total as u64);
 }
 
 #[tokio::test]

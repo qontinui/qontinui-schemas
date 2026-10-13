@@ -86,6 +86,9 @@ pub enum ErrorSubtype {
     Cancelled,
     /// A request that is not `POST /v1/complete` with a JSON body.
     BadRequest,
+    /// Too many connections were still sending their request; this one was
+    /// answered before it was read. Nothing was spent: retry.
+    Busy,
 }
 
 impl ErrorSubtype {
@@ -101,6 +104,7 @@ impl ErrorSubtype {
             ErrorSubtype::Unauthorized => "unauthorized".to_string(),
             ErrorSubtype::Cancelled => "cancelled".to_string(),
             ErrorSubtype::BadRequest => "bad_request".to_string(),
+            ErrorSubtype::Busy => "busy".to_string(),
         }
     }
 
@@ -111,9 +115,13 @@ impl ErrorSubtype {
     /// spend of a timed-out call cannot be observed. The call was cancelled
     /// before the provider reported its usage, so none of its tokens reached
     /// the budget, and every retry would add more spend the budget cannot
-    /// see. Only `all_accounts_exhausted` is retryable — nothing was spent.
+    /// see. Only `all_accounts_exhausted` and `busy` are retryable — nothing
+    /// was spent on either.
     pub fn retryable(self) -> bool {
-        matches!(self, ErrorSubtype::AllAccountsExhausted)
+        matches!(
+            self,
+            ErrorSubtype::AllAccountsExhausted | ErrorSubtype::Busy
+        )
     }
 
     /// The HTTP status the broker answers with.
@@ -121,7 +129,7 @@ impl ErrorSubtype {
         match self {
             ErrorSubtype::BudgetExhausted(_) => (429, "Too Many Requests"),
             ErrorSubtype::ModelNotDeclared | ErrorSubtype::BadRequest => (400, "Bad Request"),
-            ErrorSubtype::AllAccountsExhausted | ErrorSubtype::Cancelled => {
+            ErrorSubtype::AllAccountsExhausted | ErrorSubtype::Cancelled | ErrorSubtype::Busy => {
                 (503, "Service Unavailable")
             }
             ErrorSubtype::ProviderError | ErrorSubtype::ResponseTooLarge => (502, "Bad Gateway"),
@@ -277,6 +285,7 @@ mod tests {
             (ErrorSubtype::Unauthorized, "unauthorized"),
             (ErrorSubtype::Cancelled, "cancelled"),
             (ErrorSubtype::BadRequest, "bad_request"),
+            (ErrorSubtype::Busy, "busy"),
         ];
         for (s, wire) in all {
             assert_eq!(s.as_str(), wire);
@@ -287,6 +296,8 @@ mod tests {
         // A timed-out call's spend cannot be observed, so it is not
         // retryable: a retrying client would multiply uncounted spend.
         assert!(!ErrorSubtype::Timeout.retryable());
+        assert!(ErrorSubtype::Busy.retryable());
+        assert_eq!(ErrorSubtype::Busy.http_status().0, 503);
     }
 
     /// The envelope keeps `claude -p`'s key spellings, so a harness parses a

@@ -47,8 +47,10 @@ use crate::model::protocol::{
 };
 use crate::report::LogSink;
 
-/// At most this many calls in flight per dispatch. A request beyond it waits
-/// for a slot (the wait counts toward the wall budget).
+/// At most this many calls in flight per dispatch. An authenticated request
+/// beyond it waits for a slot (the wait counts toward the wall budget); a
+/// waiting request does NOT count against [`MAX_CONNECTIONS`], which bounds
+/// only connections still sending their request.
 pub const MAX_IN_FLIGHT: usize = 4;
 /// The broker's own per-call deadline, inside the wall budget.
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(900);
@@ -64,10 +66,18 @@ pub const MAX_EXHAUSTION_HOLDS: u32 = 5;
 /// How long the broker may take to write one response. A client that stops
 /// reading cannot hold a connection task — or `stop` — past this.
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
-/// At most this many connections are served at once. Past it a new
-/// connection is closed unanswered: idle or stalled local peers cannot grow
-/// the broker's task set without bound.
+/// At most this many connections may be in the READ phase at once — accepted
+/// but not yet authenticated. Past it a new connection is answered with a
+/// fixed `busy` envelope (`retryable: true`) and closed, without a task:
+/// idle or stalled local peers cannot grow the broker's task set without
+/// bound. Authenticated requests waiting for an in-flight slot are not
+/// counted, so a local peer holding idle connections cannot crowd out a
+/// step's admitted calls — at worst its new connections are told to retry.
 pub const MAX_CONNECTIONS: usize = 32;
+/// How long the accept loop waits for a read-phase slot before answering a
+/// connection `busy`. A burst of well-behaved clients clears its read phase
+/// in milliseconds, so it is served; only a cap held by stalled peers sheds.
+pub const READ_SLOT_WAIT: Duration = Duration::from_secs(1);
 /// How long a client may take to send its request head and body.
 const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -127,8 +137,58 @@ struct State {
     exhausted_reset_at: Option<u64>,
     /// Requests refused before admission, by subtype (for the log limit).
     rejections: std::collections::BTreeMap<String, u64>,
-    /// Connections closed unanswered at the connection cap.
+    /// Connections answered `busy` at the read-phase cap.
     connections_shed: u64,
+}
+
+/// Answer a shed connection with the fixed `busy` response and close it,
+/// without blocking: drain whatever request bytes already arrived (closing a
+/// socket with unread input sends a reset that can destroy the answer before
+/// the client reads it), write the answer, and half-close.
+fn shed_busy(stream: &std::net::TcpStream, busy: &[u8]) {
+    use std::io::{Read as _, Write as _};
+    let _ = stream.set_nonblocking(true);
+    let mut scratch = [0u8; 16 * 1024];
+    for _ in 0..8 {
+        match (&*stream).read(&mut scratch) {
+            Ok(n) if n > 0 => continue,
+            _ => break,
+        }
+    }
+    let _ = (&*stream).write(busy);
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+}
+
+/// Holds one read-phase slot; released when dropped (on every exit path of
+/// the read phase).
+struct ReadingSlot(Arc<Shared>);
+
+impl Drop for ReadingSlot {
+    fn drop(&mut self) {
+        self.0
+            .reading
+            .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// The fixed answer to a connection shed at the read-phase cap.
+fn busy_response() -> Vec<u8> {
+    let env = Envelope::error(
+        ErrorSubtype::Busy,
+        "the broker has too many connections still sending a request; retry".to_string(),
+        None,
+        BrokerBlock::default(),
+    );
+    let body = serde_json::to_vec(&env).unwrap_or_default();
+    let (code, reason) = ErrorSubtype::Busy.http_status();
+    let mut out = format!(
+        "HTTP/1.1 {code} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
+         Connection: close\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    out.extend_from_slice(&body);
+    out
 }
 
 struct Shared {
@@ -144,6 +204,10 @@ struct Shared {
     write_timeout: Duration,
     shutdown: CancellationToken,
     state: Mutex<State>,
+    /// Connections in the read phase (accepted, not yet admitted).
+    reading: std::sync::atomic::AtomicUsize,
+    /// [`busy_response`], serialized once.
+    busy: Vec<u8>,
 }
 
 impl Shared {
@@ -229,6 +293,8 @@ impl Broker {
             min_exhaustion_hold: config.min_exhaustion_hold,
             write_timeout: config.write_timeout,
             shutdown: CancellationToken::new(),
+            reading: std::sync::atomic::AtomicUsize::new(0),
+            busy: busy_response(),
             state: Mutex::new(State {
                 next_index: 0,
                 calls_started: 0,
@@ -317,9 +383,25 @@ async fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
             _ = shared.shutdown.cancelled() => break,
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
-                    while conns.try_join_next().is_some() {}
-                    if conns.len() >= MAX_CONNECTIONS {
-                        drop(stream);
+                    use std::sync::atomic::Ordering;
+                    // Back-pressure first: give the connections already
+                    // reading a moment to finish (new ones queue in the
+                    // kernel's backlog meanwhile).
+                    let deadline = Instant::now() + READ_SLOT_WAIT;
+                    while shared.reading.load(Ordering::SeqCst) >= MAX_CONNECTIONS
+                        && Instant::now() < deadline
+                        && !shared.shutdown.is_cancelled()
+                    {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    if shared.reading.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
+                        // No task: one non-blocking write of the fixed
+                        // answer (it fits any socket buffer), then close.
+                        // Written through the std socket: tokio's `try_write`
+                        // refuses before the reactor has seen the socket.
+                        if let Ok(std_stream) = stream.into_std() {
+                            shed_busy(&std_stream, &shared.busy);
+                        }
                         let shed = {
                             let mut st = shared.state();
                             st.connections_shed += 1;
@@ -327,12 +409,14 @@ async fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
                         };
                         if log_occurrence(shed) {
                             shared.sink.push(&format!(
-                                "[ci-model] closed a connection unanswered: {MAX_CONNECTIONS} \
-                                 already open ({shed} so far)"
+                                "[ci-model] answered busy: {MAX_CONNECTIONS} connections still \
+                                 sending a request ({shed} so far)"
                             ));
                         }
                     } else {
-                        conns.spawn(serve(shared.clone(), stream));
+                        shared.reading.fetch_add(1, Ordering::SeqCst);
+                        let slot = ReadingSlot(shared.clone());
+                        conns.spawn(serve(shared.clone(), stream, slot));
                     }
                 }
                 Err(e) => {
@@ -569,19 +653,29 @@ enum CallEnd {
         /// The reply of a call that completed but cannot be returned (too
         /// large): its tokens were spent and are counted.
         spent: Option<InvokeReply>,
+        /// How many times the invoker was called for this request. 0 means it
+        /// never reached the host (a refusal); anything else is a call.
+        attempts: u32,
     },
 }
 
+/// A request that never reached the host.
 fn failed(subtype: ErrorSubtype, message: impl Into<String>) -> CallEnd {
+    failed_after(subtype, message, 0)
+}
+
+/// A call that ended after `attempts` invoker calls (0: never reached it).
+fn failed_after(subtype: ErrorSubtype, message: impl Into<String>, attempts: u32) -> CallEnd {
     CallEnd::Failed {
         subtype,
         message: message.into(),
         reset_at: None,
         spent: None,
+        attempts,
     }
 }
 
-async fn serve(shared: Arc<Shared>, stream: TcpStream) {
+async fn serve(shared: Arc<Shared>, stream: TcpStream, reading: ReadingSlot) {
     let peer_ok = shared.invoker.accept_peer(&stream);
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -633,6 +727,9 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
         }),
         _ = shared.shutdown.cancelled() => return,
     };
+    // The read phase is over: this connection no longer counts against the
+    // read-phase cap, whatever happens next.
+    drop(reading);
     let request = match admitted {
         Ok(r) => r,
         Err(rej) => {
@@ -733,6 +830,7 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
                 message,
                 reset_at,
                 spent,
+                attempts,
             } => {
                 let outcome = subtype.as_str();
                 let row = match &spent {
@@ -745,6 +843,10 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
                     None => {
                         let mut row = CallRow::refused(index, &step, &requested, outcome);
                         row.latency_ms = latency_ms;
+                        // A call that reached the invoker and failed is a
+                        // call (no model id or account is reported for a
+                        // failure); only `attempts == 0` is a refusal.
+                        row.attempts = attempts;
                         row
                     }
                 };
@@ -892,10 +994,17 @@ async fn run_call(
     };
     let mut broker_attempts: u32 = 0;
     let mut holds: u32 = 0;
+    // Every failure from here on carries how many times the invoker was
+    // called: 0 is a refusal before the host, anything else a call.
+    macro_rules! fail {
+        ($subtype:expr, $message:expr $(,)?) => {
+            failed_after($subtype, $message, broker_attempts)
+        };
+    }
     loop {
         let remaining = wall_deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return failed(
+            return fail!(
                 ErrorSubtype::BudgetExhausted(Budget::Wall),
                 "the wall budget ran out",
             );
@@ -906,18 +1015,18 @@ async fn run_call(
         let call = shared.invoker.complete(invoke.clone());
         let result = tokio::select! {
             r = tokio::time::timeout(limit, call) => r,
-            _ = disconnected(rd) => return failed(ErrorSubtype::Cancelled, "the client disconnected"),
-            _ = shared.shutdown.cancelled() => return failed(ErrorSubtype::Cancelled, "the dispatch ended"),
+            _ = disconnected(rd) => return fail!(ErrorSubtype::Cancelled, "the client disconnected"),
+            _ = shared.shutdown.cancelled() => return fail!(ErrorSubtype::Cancelled, "the dispatch ended"),
         };
         match result {
             Err(_) if wall_bound => {
-                return failed(
+                return fail!(
                     ErrorSubtype::BudgetExhausted(Budget::Wall),
                     "the wall budget ran out during the call",
                 )
             }
             Err(_) => {
-                return failed(
+                return fail!(
                     ErrorSubtype::Timeout,
                     format!("the call ran past {}s", shared.call_timeout.as_secs()),
                 )
@@ -933,15 +1042,16 @@ async fn run_call(
                             result: String::new(),
                             ..reply
                         }),
+                        attempts: broker_attempts,
                     };
                 }
                 return CallEnd::Ok(reply);
             }
             Ok(Err(InvokeError::Timeout)) => {
-                return failed(ErrorSubtype::Timeout, "the host's call deadline ran out")
+                return fail!(ErrorSubtype::Timeout, "the host's call deadline ran out")
             }
             Ok(Err(InvokeError::Provider { message, .. })) => {
-                return failed(ErrorSubtype::ProviderError, message)
+                return fail!(ErrorSubtype::ProviderError, message)
             }
             Ok(Err(InvokeError::AllAccountsExhausted { reset_at })) => {
                 let reset_unix = unix_secs(reset_at);
@@ -957,8 +1067,11 @@ async fn run_call(
                             "every model account is still exhausted after {MAX_EXHAUSTION_HOLDS} \
                              holds (last reported reset: unix {reset_unix})"
                         ),
-                        reset_at: Some(reset_unix),
+                        // Never a reset already past: the hold this call
+                        // would have waited for is the honest "not before".
+                        reset_at: Some(unix_secs(hold_until)),
                         spent: None,
+                        attempts: broker_attempts,
                     };
                 }
                 if hold_until > wall_deadline_at {
@@ -968,8 +1081,11 @@ async fn run_call(
                             "every model account is exhausted; the earliest reset (unix \
                              {reset_unix}) falls outside the dispatch's wall budget"
                         ),
-                        reset_at: Some(reset_unix),
+                        // Never a reset already past: the hold this call
+                        // would have waited for is the honest "not before".
+                        reset_at: Some(unix_secs(hold_until)),
                         spent: None,
+                        attempts: broker_attempts,
                     };
                 }
                 // Hold until the reset, logging each interval (the log line
@@ -988,8 +1104,8 @@ async fn run_call(
                     ));
                     tokio::select! {
                         _ = tokio::time::sleep(wait.min(shared.hold_log_interval)) => {}
-                        _ = disconnected(rd) => return failed(ErrorSubtype::Cancelled, "the client disconnected"),
-                        _ = shared.shutdown.cancelled() => return failed(ErrorSubtype::Cancelled, "the dispatch ended"),
+                        _ = disconnected(rd) => return fail!(ErrorSubtype::Cancelled, "the client disconnected"),
+                        _ = shared.shutdown.cancelled() => return fail!(ErrorSubtype::Cancelled, "the dispatch ended"),
                     }
                 }
             }
