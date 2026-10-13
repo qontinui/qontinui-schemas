@@ -16,6 +16,7 @@
 //! | [`VolumeState`] | whether the CI root sits on a volume that may vanish |
 //! | [`HostIdentity`] | where CI state lives on this host, and what to call the host |
 //! | [`CanonicalConvergence`] | the `[canonical]` gate's measuring and acting halves |
+//! | [`ModelInvoker`] | how one model call is made for a `model = true` step (optional: a host with none refuses model access) |
 //!
 //! Every trait is object-safe, so a host is assembled at runtime from
 //! `Arc<dyn …>` parts and the crate never grows a generic parameter per trait.
@@ -39,6 +40,16 @@ pub trait CiSettings: Send + Sync {
     /// manifest can require canonical, but only the box's owner can authorise
     /// rewriting the box to meet it.
     fn canonical_converge(&self) -> bool;
+
+    /// Whether this device's owner lets CI steps call models on this
+    /// machine's accounts (plan `2026-10-13-ci-node-runs-model-dependent-eval-steps`
+    /// D6, the device scope). Read only when the host offers a
+    /// [`ModelInvoker`]; `false` refuses model access with
+    /// `device_consent_off`. Defaults to `true`: the capability ships
+    /// enabled, with the owner's off-switch.
+    fn model_access(&self) -> bool {
+        true
+    }
 }
 
 /// GitHub reads for sibling resolution: a token, and the host's metering and
@@ -94,6 +105,14 @@ pub trait ProcessSpawn: Send + Sync {
     /// uses to bound their memory and to reap stragglers when the dispatch
     /// ends. Dropped at dispatch end.
     fn step_containment(&self) -> Box<dyn StepContainment>;
+    /// Extra variables this host removes from EVERY CI step's environment, on
+    /// top of the model-credential class the executor always removes
+    /// ([`crate::model::MODEL_CREDENTIAL_ENV`]). A host that keeps credential
+    /// values in its own environment (the runner's login passwords) lists
+    /// them here. Default: none.
+    fn scrubbed_env(&self) -> &'static [&'static str] {
+        &[]
+    }
     /// Run CPU-bound blocking work (archive extraction) off the async
     /// workers. `Err` means the task did not complete (it panicked or was
     /// cancelled). The default is plain [`tokio::task::spawn_blocking`]; a host
@@ -233,6 +252,110 @@ pub trait CanonicalConvergence: Send + Sync {
     fn converge<'a>(&'a self, keys: &'a [String]) -> BoxFuture<'a, Result<ConvergeReport, String>>;
 }
 
+/// One model call, as the dispatch's broker hands it to the host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvokeRequest {
+    /// The broker's 1-based index of this call within the dispatch.
+    pub call_index: u64,
+    /// The model name as the step requested it (a declared registry name or
+    /// pinned id).
+    pub requested: String,
+    /// What to pass as the CLI's `--model`: the family alias, or the pinned
+    /// id itself.
+    pub cli_model: String,
+    /// The prompt. The host passes it on stdin, never in argv.
+    pub prompt: String,
+}
+
+/// Tokens as the provider reported them for one call.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TokenUsage {
+    pub input: u64,
+    pub output: u64,
+    pub cache_creation: u64,
+    pub cache_read: u64,
+}
+
+impl TokenUsage {
+    /// Input + output + cache tokens: what `max_tokens` counts.
+    pub fn total(&self) -> u64 {
+        self.input
+            .saturating_add(self.output)
+            .saturating_add(self.cache_creation)
+            .saturating_add(self.cache_read)
+    }
+}
+
+/// A completed model call.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InvokeReply {
+    /// The answer text.
+    pub result: String,
+    /// The concrete model id the provider reports (`modelUsage`). `None` is
+    /// UNKNOWN, never a guess.
+    pub model_id: Option<String>,
+    /// Tokens as the provider reported them. `None` when it reported none —
+    /// the ledger then shows the call as uncovered rather than as zero.
+    pub usage: Option<TokenUsage>,
+    /// The provider-reported cost in USD, when it reports one.
+    pub cost_usd: Option<f64>,
+    /// How the call was routed (`subscription`, `gateway`).
+    pub route: String,
+    /// The account label it ran on, when the route has accounts.
+    pub account: Option<String>,
+    /// How many provider attempts the host made (a provider-limit retry on
+    /// the next account is a second attempt).
+    pub attempts: u32,
+}
+
+/// Why a model call did not complete.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvokeError {
+    /// Every model account this host could use is exhausted; the earliest
+    /// one resets at `reset_at`. The broker holds the call until then when
+    /// that falls inside the dispatch's wall budget.
+    AllAccountsExhausted { reset_at: std::time::SystemTime },
+    /// The provider or the CLI failed. `retryable` says whether the same
+    /// request may succeed later.
+    Provider { message: String, retryable: bool },
+    /// The host's own per-call deadline ran out.
+    Timeout,
+}
+
+/// How one model call is made on this host (plan
+/// `2026-10-13-ci-node-runs-model-dependent-eval-steps`, D1/D5).
+///
+/// The credential lives behind this trait and never reaches a step: a step
+/// gets only the dispatch's broker address and a capability bound to one
+/// dispatch and one budget.
+pub trait ModelInvoker: Send + Sync {
+    /// Make one call. DROPPING the returned future cancels the call — the
+    /// broker drops it when the client disconnects or the dispatch ends — so
+    /// an implementation that spawns a process must kill it on drop
+    /// (`kill_on_drop`), or the spend continues for an answer nobody reads.
+    fn complete(
+        &self,
+        request: InvokeRequest,
+    ) -> BoxFuture<'static, Result<InvokeReply, InvokeError>>;
+
+    /// Whether this host can make calls right now, checked once per dispatch.
+    /// `Err` carries the refusal reason the dispatch reports, one of the
+    /// closed runner reasons (`cli_missing`, `cli_version_unsupported`,
+    /// `no_model_account`, `gateway_unresolved`).
+    fn ready(&self) -> Result<(), String>;
+
+    /// The argv of the `qontinui-ci-model` shim this host ships, or `None`
+    /// when it has none. Its first element must be a non-empty regular file,
+    /// or the dispatch refuses model access with `shim_missing`.
+    fn shim_argv(&self) -> Option<Vec<String>>;
+
+    /// Whether to serve a broker connection from this peer. A host refuses
+    /// peers from another OS user here. Default: admit.
+    fn accept_peer(&self, _peer: &tokio::net::TcpStream) -> bool {
+        true
+    }
+}
+
 /// One implementation of each host trait.
 #[derive(Clone)]
 pub struct Host {
@@ -242,4 +365,8 @@ pub struct Host {
     pub volume: Arc<dyn VolumeState>,
     pub identity: Arc<dyn HostIdentity>,
     pub canonical: Arc<dyn CanonicalConvergence>,
+    /// How model calls are made for `model = true` steps. `None` — a host
+    /// with no invoker — refuses model access with `host_has_no_broker`; the
+    /// steps still run.
+    pub model: Option<Arc<dyn ModelInvoker>>,
 }

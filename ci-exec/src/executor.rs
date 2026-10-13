@@ -61,6 +61,8 @@ use crate::dispatch::DispatchPayload;
 use crate::host::{Host, ProcessSpawn, StepContainment};
 use crate::host_sizing;
 use crate::manifest::{CiJob, CiManifest, CiStep, Os};
+use crate::model::access::{section_before_checks, ModelAccess};
+use crate::model::ledger::ModelSection;
 use crate::report::{self, Conclusion, LogSink, Reporter, ResultReported, StepSummary, Verdict};
 use crate::services::ServiceStack;
 
@@ -310,6 +312,8 @@ pub async fn run_dispatch(
                     reason,
                     test_results: None,
                     canonical: None,
+                    model: &ModelSection::NotEvaluated,
+                    model_ledger: None,
                 },
             )
             .await;
@@ -359,6 +363,8 @@ pub async fn run_dispatch(
                     reason,
                     test_results: None,
                     canonical: None,
+                    model: &ModelSection::NotEvaluated,
+                    model_ledger: None,
                 },
             )
             .await;
@@ -390,6 +396,8 @@ pub async fn run_dispatch(
                 reason: Some("job_os_mismatch"),
                 test_results: None,
                 canonical: None,
+                model: &section_before_checks(Some(job)),
+                model_ledger: None,
             },
         )
         .await;
@@ -473,6 +481,8 @@ pub async fn run_dispatch(
                 reason: canonical_outcome.reason(),
                 test_results: None,
                 canonical: Some(&canonical_outcome),
+                model: &section_before_checks(Some(job)),
+                model_ledger: None,
             },
         )
         .await;
@@ -529,6 +539,8 @@ pub async fn run_dispatch(
                     reason: None,
                     test_results: None,
                     canonical: Some(&canonical_outcome),
+                    model: &section_before_checks(Some(job)),
+                    model_ledger: None,
                 },
             )
             .await;
@@ -550,6 +562,21 @@ pub async fn run_dispatch(
         &service_env,
     );
 
+    // ── Model access (after provisioning, before the first step) ──
+    //
+    // Decided once; from here on there is ONE exit path, and it stops the
+    // broker (`model_access.finish`) before the capture, the report and the
+    // cleanup. See `crate::model::access` for the ordered refusal checks.
+    let model_access = crate::model::access::prepare(
+        host,
+        payload.model_access.as_ref(),
+        manifest.model.as_ref(),
+        job,
+        sink.clone(),
+    )
+    .await;
+    let dispatch_root = crate::checkout::ci_dispatch_root(&root, &payload.dispatch_id);
+
     // Per-dispatch containment (held across all steps; dropping it at
     // dispatch end reaps any stray build processes).
     let containment = host.process.step_containment();
@@ -568,16 +595,27 @@ pub async fn run_dispatch(
             step.effective_timeout_secs()
         ));
         let step_started = Instant::now();
-        let outcome = run_step(
-            host.process.as_ref(),
-            step,
-            &dispatch_env,
-            &worktree,
-            containment.as_ref(),
-            &sink,
-            &cancel,
-        )
-        .await;
+        model_access.set_step(&step.name);
+        let outcome =
+            match step_model_env(&model_access, step, &payload.dispatch_id, &dispatch_root) {
+                Ok(model_env) => {
+                    run_step(
+                        host.process.as_ref(),
+                        step,
+                        &dispatch_env,
+                        &model_env,
+                        &worktree,
+                        containment.as_ref(),
+                        &sink,
+                        &cancel,
+                    )
+                    .await
+                }
+                Err(e) => {
+                    sink.push(&format!("[ci-node] step {}: {e}", step.name));
+                    StepOutcome::Failure
+                }
+            };
         let duration = step_started.elapsed().as_secs();
         sink.push(&format!(
             "[ci-node] step {} → {} in {duration}s",
@@ -595,6 +633,10 @@ pub async fn run_dispatch(
         }
     }
     drop(containment);
+    // The broker stops BEFORE capture, report and cleanup: no call can be in
+    // flight while the worktree goes, and the ledger it hands back rides the
+    // verdict.
+    let (model_section, model_ledger) = model_access.finish().await;
 
     let conclusion = overall.conclusion();
     sink.push(&format!(
@@ -630,6 +672,8 @@ pub async fn run_dispatch(
             reason: None,
             test_results: capture.artifact(),
             canonical: Some(&canonical_outcome),
+            model: &model_section,
+            model_ledger: model_ledger.as_ref(),
         },
     )
     .await;
@@ -658,6 +702,8 @@ async fn refuse_before_checkout(
             reason: Some(reason),
             test_results: None,
             canonical: None,
+            model: &ModelSection::NotEvaluated,
+            model_ledger: None,
         },
     )
     .await;
@@ -761,6 +807,27 @@ fn load_manifest(worktree: &Path, manifest_path: &str) -> Result<CiManifest, Str
     crate::manifest::parse_and_validate(&text)
 }
 
+/// The model env one step gets on top of the dispatch's exports: the dispatch
+/// id, the model variables (or the refusal) for a `model = true` step, and
+/// `CLAUDE_CONFIG_DIR` pointed at a freshly emptied per-dispatch directory —
+/// for EVERY step, so an un-brokered `claude` inside a step finds no login
+/// (D11). `Err` when no empty directory could be guaranteed: the step fails
+/// rather than run pointed at something that is not empty.
+fn step_model_env(
+    access: &ModelAccess,
+    step: &CiStep,
+    dispatch_id: &str,
+    dispatch_root: &Path,
+) -> Result<Vec<(String, String)>, String> {
+    let mut env = access.step_env(step, dispatch_id);
+    let dir = crate::model::scrub::fresh_empty_config_dir(dispatch_root)?;
+    env.push((
+        crate::model::CLAUDE_CONFIG_DIR_ENV.to_string(),
+        dir.to_string_lossy().to_string(),
+    ));
+    Ok(env)
+}
+
 /// Resolve a step's working dir inside the worktree (canonicalize +
 /// prefix-check — the runtime enforcement behind the manifest's structural
 /// validation).
@@ -808,9 +875,14 @@ fn build_step_command(program: &str, args: &[String]) -> tokio::process::Command
 /// when the program is a `.cmd`/`.bat` shim (pnpm) that `CreateProcess`
 /// cannot launch directly. Argv tokens are metacharacter-validated by the
 /// manifest, so the shim path cannot smuggle shell syntax.
+///
+/// `removals` are taken out of the inherited environment FIRST (the step env
+/// scrub, see [`crate::model::scrub`]); `envs` are applied after, so an
+/// executor-owned value such as `CLAUDE_CONFIG_DIR` is set, not removed.
 fn spawn_step_child(
     step: &CiStep,
     cwd: &Path,
+    removals: &[String],
     envs: &[(String, String)],
 ) -> Result<tokio::process::Child, String> {
     let apply = |cmd: &mut tokio::process::Command| {
@@ -818,6 +890,9 @@ fn spawn_step_child(
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        for k in removals {
+            cmd.env_remove(k);
+        }
         for (k, v) in envs {
             cmd.env(k, v);
         }
@@ -931,10 +1006,12 @@ fn tool_path(tool_dirs: &[PathBuf]) -> Option<String> {
 }
 
 /// Run one step: spawn, pump output, enforce timeout + cancellation.
+#[allow(clippy::too_many_arguments)]
 async fn run_step(
     process: &dyn ProcessSpawn,
     step: &CiStep,
     dispatch_env: &DispatchEnv,
+    model_env: &[(String, String)],
     worktree: &Path,
     containment: &dyn StepContainment,
     sink: &Arc<dyn LogSink>,
@@ -956,8 +1033,12 @@ async fn run_step(
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     envs.extend(dispatch_env.exports.iter().cloned());
+    envs.extend(model_env.iter().cloned());
 
-    let mut child = match spawn_step_child(step, &cwd, &envs) {
+    // The scrub: no step inherits a model credential, a model command or the
+    // host's credential values (D11).
+    let removals = crate::model::scrub::current_step_env_removals(process.scrubbed_env());
+    let mut child = match spawn_step_child(step, &cwd, &removals, &envs) {
         Ok(c) => c,
         Err(e) => {
             sink.push(&format!("[ci-node] step {}: {e}", step.name));
@@ -1309,9 +1390,13 @@ mod tests {
     /// `(conclusion, "name=conclusion" per step, reason)` per verdict filed.
     type Filed = Arc<std::sync::Mutex<Vec<(Conclusion, Vec<String>, Option<String>)>>>;
 
+    /// `(summary.model as JSON, the ledger as JSON)` per verdict filed.
+    type Models = Arc<std::sync::Mutex<Vec<(serde_json::Value, Option<serde_json::Value>)>>>;
+
     struct Recording {
         lines: Arc<std::sync::Mutex<Vec<String>>>,
         filed: Filed,
+        models: Models,
     }
 
     struct Lines(Arc<std::sync::Mutex<Vec<String>>>);
@@ -1338,6 +1423,12 @@ mod tests {
                         .map(|s| format!("{}={}", s.name, s.conclusion))
                         .collect(),
                     verdict.reason.map(str::to_string),
+                ));
+                self.models.lock().unwrap().push((
+                    serde_json::to_value(verdict.model).unwrap(),
+                    verdict
+                        .model_ledger
+                        .map(|l| serde_json::to_value(l).unwrap()),
                 ));
             })
         }
@@ -1388,11 +1479,25 @@ mod tests {
         repo: &str,
     ) -> (Conclusion, Recording) {
         let host = crate::standalone::host(root.to_path_buf(), "test-host".to_string());
+        run_on(&host, root, head, job, dispatch_id, repo, None).await
+    }
+
+    async fn run_on(
+        host: &Host,
+        root: &Path,
+        head: &str,
+        job: Option<&str>,
+        dispatch_id: &str,
+        repo: &str,
+        model_access: Option<crate::dispatch::ModelAccessGrant>,
+    ) -> (Conclusion, Recording) {
         let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
         let filed = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let models = Arc::new(std::sync::Mutex::new(Vec::new()));
         let reporter = Box::new(Recording {
             lines: lines.clone(),
             filed: filed.clone(),
+            models: models.clone(),
         });
         let payload = DispatchPayload {
             dispatch_id: dispatch_id.to_string(),
@@ -1405,13 +1510,14 @@ mod tests {
             job: job.map(str::to_string),
             check_name: String::new(),
             coord_http_url: String::new(),
+            model_access,
         };
         let capacity = host_sizing::HostCapacity {
             mem_bytes: Some(8 * 1024 * 1024 * 1024),
             cpus: 4,
         };
         let conclusion = run_dispatch(
-            &host,
+            host,
             reporter,
             payload,
             CancellationToken::new(),
@@ -1419,7 +1525,14 @@ mod tests {
             1,
         )
         .await;
-        (conclusion, Recording { lines, filed })
+        (
+            conclusion,
+            Recording {
+                lines,
+                filed,
+                models,
+            },
+        )
     }
 
     const TWO_JOBS: &str = r#"
@@ -1603,5 +1716,193 @@ command = ["git", "--version"]
             rec.filed.lock().unwrap()[0].2.as_deref(),
             Some("job_os_mismatch")
         );
+    }
+
+    // ── Model access through the executor (plan
+    // `2026-10-13-ci-node-runs-model-dependent-eval-steps`, Phase 2) ──
+
+    fn model_section(rec: &Recording) -> (String, bool) {
+        let models = rec.models.lock().unwrap();
+        assert_eq!(models.len(), 1, "exactly one verdict");
+        let (section, ledger) = &models[0];
+        let status = section["status"].as_str().unwrap().to_string();
+        let status = match section.get("reason").and_then(|r| r.as_str()) {
+            Some(reason) => format!("{status}:{reason}"),
+            None => status,
+        };
+        (status, ledger.is_some())
+    }
+
+    const MODEL_TABLE: &str = "[model]\nmodels = [\"claude-sonnet\"]\nmax_calls = 5\n\
+                               max_tokens = 1000\nmax_wall_secs = 60\n";
+
+    /// Every exit path files a `summary.model` section: `not_evaluated` before
+    /// the job's model steps can be known or checked, `not_requested` for a job
+    /// without one, `refused` when checked and withheld.
+    #[tokio::test]
+    async fn the_verdict_carries_the_model_section_on_every_exit_path() {
+        let other = if cfg!(windows) { "linux" } else { "windows" };
+        let manifest = format!(
+            "version = 2\n{MODEL_TABLE}\
+             [[jobs]]\nname = \"plain\"\n[[jobs.steps]]\nname = \"v\"\ncommand = [\"git\", \"--version\"]\n\
+             [[jobs]]\nname = \"llm\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"git\", \"--version\"]\nmodel = true\n\
+             [[jobs]]\nname = \"elsewhere\"\nos = \"{other}\"\n[[jobs.steps]]\nname = \"m\"\ncommand = [\"git\", \"--version\"]\nmodel = true\n\
+             [[jobs]]\nname = \"elsewhere-plain\"\nos = \"{other}\"\n[[jobs.steps]]\nname = \"v\"\ncommand = [\"git\", \"--version\"]\n"
+        );
+        let (_tmp, root, head) = repo_with(&manifest);
+        let host = crate::standalone::host(root.clone(), "test-host".to_string());
+
+        // Refused before checkout (unsafe repo slug).
+        let (_, rec) = run_on(&host, &root, &head, Some("llm"), "m-0", "owner/../x", None).await;
+        assert_eq!(model_section(&rec), ("not_evaluated".to_string(), false));
+        // (The checkout-failure exit spells `NotEvaluated` the same way; it is
+        // not driven here because a missing head waits out the mirror's
+        // retry deadline.)
+        // The manifest declares no such job.
+        let (_, rec) = run_on(&host, &root, &head, Some("nope"), "m-2", "local/demo", None).await;
+        assert_eq!(model_section(&rec), ("not_evaluated".to_string(), false));
+        // A job for another OS: known, but never reached the checks.
+        let (_, rec) = run_on(
+            &host,
+            &root,
+            &head,
+            Some("elsewhere"),
+            "m-3",
+            "local/demo",
+            None,
+        )
+        .await;
+        assert_eq!(model_section(&rec), ("not_evaluated".to_string(), false));
+        let (_, rec) = run_on(
+            &host,
+            &root,
+            &head,
+            Some("elsewhere-plain"),
+            "m-4",
+            "local/demo",
+            None,
+        )
+        .await;
+        assert_eq!(model_section(&rec), ("not_requested".to_string(), false));
+        // A job with no model step runs and starts no broker.
+        let (c, rec) = run_on(
+            &host,
+            &root,
+            &head,
+            Some("plain"),
+            "m-5",
+            "local/demo",
+            None,
+        )
+        .await;
+        assert_eq!(c, Conclusion::Success);
+        assert_eq!(model_section(&rec), ("not_requested".to_string(), false));
+        assert!(!rec
+            .lines
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|l| l.contains("model access")));
+        // The standalone host offers no broker: refused, and the verdict stands.
+        let (c, rec) = run_on(&host, &root, &head, Some("llm"), "m-6", "local/demo", None).await;
+        assert_eq!(c, Conclusion::Success, "a refusal never turns a run red");
+        assert_eq!(
+            model_section(&rec),
+            ("refused:host_has_no_broker".to_string(), false)
+        );
+    }
+
+    /// The canonical refusal exit files the section too.
+    #[tokio::test]
+    async fn a_canonical_refusal_files_the_model_section() {
+        let (_tmp, root, head) = repo_with(&format!(
+            "version = 1\n{MODEL_TABLE}[canonical]\ntoolchains = [\"rustc\"]\n\
+             [[steps]]\nname = \"m\"\ncommand = [\"git\", \"--version\"]\nmodel = true\n"
+        ));
+        let (c, rec) = run(&root, &head, None).await;
+        assert_eq!(c, Conclusion::Failure);
+        assert_eq!(model_section(&rec), ("not_evaluated".to_string(), false));
+    }
+
+    fn step_out<'a>(lines: &'a [String], step: &str) -> Vec<&'a str> {
+        let prefix = format!("[{step}:out] ");
+        lines
+            .iter()
+            .filter_map(|l| l.strip_prefix(prefix.as_str()))
+            .collect()
+    }
+
+    /// The arming sentinel: on a host with no broker a `model = true` step
+    /// still runs, with `QONTINUI_CI_MODEL_REFUSED=host_has_no_broker` and no
+    /// model variables; a plain step gets neither. Every step gets the
+    /// dispatch id.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_model_step_on_a_host_with_no_broker_runs_with_the_refusal() {
+        let (_tmp, root, head) = repo_with(&format!(
+            "version = 1\n{MODEL_TABLE}[[steps]]\nname = \"plain\"\ncommand = [\"env\"]\n\
+             [[steps]]\nname = \"llm\"\ncommand = [\"env\"]\nmodel = true\n"
+        ));
+        let (c, rec) = run(&root, &head, None).await;
+        assert_eq!(c, Conclusion::Success);
+        let lines = rec.lines.lock().unwrap().clone();
+        let plain = step_out(&lines, "plain");
+        let llm = step_out(&lines, "llm");
+        assert!(
+            llm.contains(&"QONTINUI_CI_MODEL_REFUSED=host_has_no_broker"),
+            "{llm:?}"
+        );
+        assert!(
+            !plain.iter().any(|l| l.starts_with("QONTINUI_CI_MODEL_")),
+            "{plain:?}"
+        );
+        for out in [&plain, &llm] {
+            assert!(out.contains(&"QONTINUI_CI_DISPATCH_ID=e2e-1"), "{out:?}");
+            assert!(!out
+                .iter()
+                .any(|l| l.starts_with("QONTINUI_CI_MODEL_TOKEN=")));
+            assert!(!out.iter().any(|l| l.starts_with("QONTINUI_CI_MODEL_URL=")));
+        }
+    }
+
+    /// The scrub: a credential or model command the PARENT process holds never
+    /// reaches a step, and every step sees `CLAUDE_CONFIG_DIR` pointing at an
+    /// empty directory — emptied again before each step, so one step cannot
+    /// plant a login for the next.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn the_scrub_strips_inherited_credentials_and_every_step_gets_an_empty_config_dir() {
+        let planted: Vec<String> = crate::model::MODEL_CREDENTIAL_ENV
+            .iter()
+            .map(|k| k.to_string())
+            .chain(["DOCS_EVAL_MODEL_CMD".to_string()])
+            .collect();
+        for k in &planted {
+            std::env::set_var(k, format!("inherited-leak-{k}"));
+        }
+        let (_tmp, root, head) = repo_with(
+            "version = 1\n[[steps]]\nname = \"s1\"\ncommand = [\"env\"]\n\
+             [[steps]]\nname = \"s2\"\ncommand = [\"sh\", \"-c\", \"ls -A $CLAUDE_CONFIG_DIR; touch $CLAUDE_CONFIG_DIR/planted; echo S2-DONE\"]\n\
+             [[steps]]\nname = \"s3\"\ncommand = [\"sh\", \"-c\", \"ls -A $CLAUDE_CONFIG_DIR; echo S3-DONE\"]\n",
+        );
+        let (c, rec) = run(&root, &head, None).await;
+        for k in &planted {
+            std::env::remove_var(k);
+        }
+        assert_eq!(c, Conclusion::Success, "{:#?}", rec.lines.lock().unwrap());
+        let lines = rec.lines.lock().unwrap().clone();
+        let s1 = step_out(&lines, "s1");
+        assert!(!s1.iter().any(|l| l.contains("inherited-leak")), "{s1:?}");
+        let dir = s1
+            .iter()
+            .find_map(|l| l.strip_prefix("CLAUDE_CONFIG_DIR="))
+            .expect("CLAUDE_CONFIG_DIR is set for every step");
+        assert!(dir.ends_with(".ci-claude-config"), "{dir}");
+        assert!(
+            dir.starts_with(&*crate::checkout::ci_dispatch_root(&root, "e2e-1").to_string_lossy()),
+            "{dir}"
+        );
+        assert_eq!(step_out(&lines, "s2"), ["S2-DONE"], "empty for s2");
+        assert_eq!(step_out(&lines, "s3"), ["S3-DONE"], "emptied again for s3");
     }
 }

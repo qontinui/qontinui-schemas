@@ -555,6 +555,7 @@ fn run(flags: &[(String, String)]) -> Result<ExitCode, String> {
         job,
         check_name: String::new(),
         coord_http_url: String::new(),
+        model_access: None,
     };
     let label = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
@@ -657,6 +658,7 @@ impl Reporter for Terminal {
             if let Some(canonical) = verdict.canonical {
                 out!("  {}", canonical.summary_line());
             }
+            out!("  {}", verdict.model.summary_line());
             match verdict.test_results {
                 Some(artifact) => out!(
                     "  test report captured ({} bytes, {})",
