@@ -459,7 +459,8 @@ mod tests {
     async fn exports_reach_only_model_steps() {
         let tmp = tempfile::tempdir().unwrap();
         let mut inv = FakeInvoker::answering("x", 1);
-        inv.shim = Some(shim_file(tmp.path(), b"x"));
+        let shim_argv = shim_file(tmp.path(), b"x");
+        inv.shim = Some(shim_argv.clone());
         let host = host_with(Some(inv), true);
         let m = crate::manifest::parse_and_validate(
             "version = 1\n[model]\nmodels = [\"claude-sonnet\"]\nmax_calls = 1\nmax_tokens = 1\n\
@@ -488,8 +489,12 @@ mod tests {
         let get = |k: &str| llm.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone());
         assert_eq!(get(MODEL_URL_ENV), Some(broker.url()));
         assert_eq!(get(MODEL_TOKEN_ENV).as_deref(), Some(broker.token()));
-        // The spelling is quoted and carries `.exe` on Windows; the shim name is what matters.
-        assert!(get(MODEL_CMD_ENV).unwrap().contains("qontinui-ci-model"));
+        // Compare with what the executor must spell (forward slashes, quoting,
+        // `.exe` on Windows) rather than a platform-specific suffix.
+        assert_eq!(
+            get(MODEL_CMD_ENV).as_deref(),
+            Some(shim_command_spelling(&shim_argv).as_str())
+        );
         assert_eq!(get(DISPATCH_ID_ENV).as_deref(), Some("d-1"));
         assert!(get(MODEL_REFUSED_ENV).is_none());
         let (section, ledger) = access.finish().await;
