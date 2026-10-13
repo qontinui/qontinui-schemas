@@ -70,6 +70,26 @@ pub struct DispatchPayload {
     /// back to its own configured coord base.
     #[serde(default)]
     pub coord_http_url: String,
+    /// Coord's per-dispatch model-access decision (plan
+    /// `2026-10-13-ci-node-runs-model-dependent-eval-steps`, D7). Absent — an
+    /// older coord — reads as `not_offered_by_coord`: the executor fails
+    /// closed.
+    #[serde(default)]
+    pub model_access: Option<ModelAccessGrant>,
+}
+
+/// Coord's answer to "may this dispatch's `model = true` steps call a model".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ModelAccessGrant {
+    #[serde(default)]
+    pub granted: bool,
+    /// Coord's closed refusal reason when not granted (`fork_pr`,
+    /// `preference_off_repo`, …).
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// `live`, `last_known` or `unknown` — how coord read the preference.
+    #[serde(default)]
+    pub basis: Option<String>,
 }
 
 /// `""` / whitespace-only → `None`; anything else is kept as sent.
@@ -244,6 +264,31 @@ mod tests {
         assert_eq!(lean.manifest_path, ".qontinui/ci.toml");
         assert!(lean.check_name.is_empty());
         assert!(lean.coord_http_url.is_empty());
+    }
+
+    /// Coord's model-access key parses with its closed reason, tolerates
+    /// keys it does not know (`dial`), and is `None` from an older coord —
+    /// which the executor reads as `not_offered_by_coord`.
+    #[test]
+    fn model_access_parses_and_is_absent_from_an_older_coord() {
+        let base = serde_json::json!({
+            "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+            "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x",
+        });
+        let older: DispatchPayload = serde_json::from_value(base.clone()).unwrap();
+        assert_eq!(older.model_access, None);
+        let mut refused = base.clone();
+        refused["model_access"] = serde_json::json!({
+            "granted": false, "reason": "fork_pr", "basis": "live", "dial": {"tenant": "on"},
+        });
+        let refused: DispatchPayload = serde_json::from_value(refused).unwrap();
+        let grant = refused.model_access.unwrap();
+        assert!(!grant.granted);
+        assert_eq!(grant.reason.as_deref(), Some("fork_pr"));
+        let mut granted = base;
+        granted["model_access"] = serde_json::json!({"granted": true, "basis": "live"});
+        let granted: DispatchPayload = serde_json::from_value(granted).unwrap();
+        assert!(granted.model_access.unwrap().granted);
     }
 
     #[derive(Default)]

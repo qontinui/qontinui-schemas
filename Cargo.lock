@@ -1385,6 +1385,7 @@ dependencies = [
  "serde_json",
  "serde_yaml_ng",
  "sha2 0.10.9",
+ "subtle",
  "sysinfo",
  "tar",
  "tempfile",
@@ -1413,7 +1414,7 @@ dependencies = [
 
 [[package]]
 name = "qontinui-runner-client"
-version = "0.2.8"
+version = "0.2.12"
 dependencies = [
  "qontinui-types",
  "reqwest",
@@ -1428,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "qontinui-types"
-version = "4.4.0"
+version = "4.7.0"
 dependencies = [
  "base64",
  "chrono",
@@ -1439,6 +1440,7 @@ dependencies = [
  "serde",
  "serde_jcs",
  "serde_json",
+ "serde_yaml_ng",
  "sha2 0.10.9",
  "thiserror",
  "toml",

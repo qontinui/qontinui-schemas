@@ -1,6 +1,12 @@
 //! Color analyzer — dominant-color extraction (sampling, not k-means in
 //! Phase 6 first pass) + contrast distribution. Pure pixel math on the
 //! frame buffer, no external CV deps.
+//!
+//! Snapshot bboxes are CSS pixels; the frame buffer is device pixels. Every
+//! box is mapped onto the buffer through the frame's
+//! [`crate::FrameSource::scale_factor`] ([`Frame::css_region_to_pixels`])
+//! before a pixel is read, so a HiDPI frame is sampled where the element
+//! actually rendered rather than in the top-left 1/scale² of it.
 
 use std::collections::BTreeMap;
 
@@ -74,10 +80,13 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
             (Some(f), Some(b)) => (f, b, None),
             // At least one color undeclared: fall back to sampling the frame
             // under the element's bbox. Requires geometry — bbox-less
-            // elements can't be sampled, so they're skipped (no finding).
+            // elements can't be sampled, so they're skipped (no finding). The
+            // bbox is CSS pixels; it is placed on the buffer through the
+            // frame's scale factor before a single pixel is read.
             _ => match el
                 .bbox
-                .and_then(|bbox| sample_dominant_two_scored(frame, bbox))
+                .and_then(|css| frame.css_region_to_pixels(css))
+                .and_then(|px| sample_dominant_two_scored(frame, px))
             {
                 Some((f, b, share)) => (f, b, Some(share)),
                 None => continue,
@@ -149,7 +158,14 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
         ));
     }
 
-    verdict(coverage, ratios_computed, findings)
+    let scale = frame.source.scale_factor;
+    let unusable_scale = (!scale.is_finite() || scale <= 0.0).then(|| {
+        format!(
+            " The frame's scale_factor {scale} is not a positive finite number, so no \
+             element box could be placed on its pixels."
+        )
+    });
+    verdict(coverage, ratios_computed, findings, unusable_scale)
 }
 
 /// Classify a completed color run.
@@ -173,17 +189,23 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
 /// Some but not all text elements yielded a ratio. The findings stand for
 /// the ones that did; the rest were not checked, and a reader deserves to be
 /// told the sample was partial rather than infer full coverage from silence.
+///
+/// `unusable_scale` is appended to either reason when the frame's scale factor
+/// could not place any box on the buffer, so the reader is told WHY nothing
+/// was sampled instead of being left to suspect the snapshot.
 fn verdict(
     coverage: SnapshotCoverage,
     ratios_computed: usize,
     findings: Vec<Finding>,
+    unusable_scale: Option<String>,
 ) -> AnalyzerResult {
+    let why = unusable_scale.unwrap_or_default();
     if ratios_computed == 0 {
         return AnalyzerResult::blocked(
             format!(
                 "no contrast ratio could be computed for any of the {} text element(s): \
                  none carried declared foreground/background colors and none could be \
-                 sampled from the frame.",
+                 sampled from the frame.{why}",
                 coverage.with_text
             ),
             Some(coverage),
@@ -194,7 +216,8 @@ fn verdict(
         return AnalyzerResult::degraded(
             format!(
                 "contrast measured for {}/{} text element(s); the rest carried neither \
-                 declared colors nor a sampleable bbox and were not checked.",
+                 declared colors nor a bbox that could be sampled on the frame and were \
+                 not checked.{why}",
                 ratios_computed, coverage.with_text
             ),
             Some(coverage),
@@ -214,7 +237,9 @@ pub fn wcag_contrast(a: Rgb, b: Rgb) -> f64 {
 }
 
 /// Crude two-color summary of a region: histogram-mode + its
-/// complementary "second-mode" color. Suitable for inferring foreground vs
+/// complementary "second-mode" color. `region` is in BUFFER pixels of
+/// `frame`; a snapshot bbox (CSS pixels) is placed there first with
+/// [`Frame::css_region_to_pixels`]. Suitable for inferring foreground vs
 /// background of a text element when the snapshot didn't supply computed
 /// styles. Quantizes RGB to a 5-bit-per-channel cube (32×32×32 = 32k bins)
 /// so background gradients still collapse to one mode in practice.
@@ -592,6 +617,185 @@ mod tests {
             .find(|x| x.kind == "low_contrast")
             .expect("declared low_contrast finding");
         assert_eq!(lc.severity, Severity::Warning);
+    }
+
+    /// A frame built the way a DPR-`scale` browser renders a page whose one
+    /// text element has CSS box (40, 40, 20, 20) and NO declared colours, so
+    /// its contrast must come from the pixels.
+    ///
+    /// - Where the element ACTUALLY rendered — its CSS box times `scale` — the
+    ///   buffer holds a low-contrast pair (#888 with a #777 band, ~1.4:1).
+    /// - At the UNSCALED position — the CSS box read as buffer pixels — it
+    ///   holds black text on white (21:1).
+    /// - Everything else is white.
+    ///
+    /// So a sampler that maps the box through the scale factor finds the
+    /// low-contrast element, and one that does not finds a perfect 21:1 and
+    /// says nothing. The two regions are disjoint for every `scale >= 1.5`.
+    fn hidpi_fixture(scale: f64) -> (Frame, ElementSnapshot) {
+        let css = Region {
+            x: 40,
+            y: 40,
+            w: 20,
+            h: 20,
+        };
+        let side = (100.0 * scale).ceil() as u32;
+        let mut img =
+            image::RgbaImage::from_pixel(side, side, image::Rgba([0xff, 0xff, 0xff, 0xff]));
+        // The unscaled position: black band on white.
+        for y in 40..45u32 {
+            for x in 40..60u32 {
+                img.put_pixel(x, y, image::Rgba([0, 0, 0, 0xff]));
+            }
+        }
+        // The real position: #888 with a #777 band.
+        let x0 = (40.0 * scale).floor() as u32;
+        let x1 = (60.0 * scale).ceil() as u32;
+        for y in x0..x1 {
+            for x in x0..x1 {
+                let v = if y < x0 + (x1 - x0) / 4 { 0x77 } else { 0x88 };
+                img.put_pixel(x, y, image::Rgba([v, v, v, 0xff]));
+            }
+        }
+        let frame = Frame::from_rgba(
+            img,
+            FrameSource {
+                kind: FrameSourceKind::Synthetic,
+                scale_factor: scale,
+                captured_at: chrono::Utc::now(),
+                capture_backend: None,
+            },
+        );
+        let snap = ElementSnapshot {
+            elements: vec![Element {
+                id: "hero-caption".to_string(),
+                bbox: Some(css),
+                text: Some("caption".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        (frame, snap)
+    }
+
+    /// The Phase 9 gate (plan 2026-10-13-image-generation-and-visual-judgment):
+    /// a bbox at DPR 2 samples the pixels the element rendered on. Drop the
+    /// scale from the mapping and this test goes red — the sampler then reads
+    /// the black-on-white unscaled position and finds nothing wrong.
+    #[test]
+    fn a_bbox_at_dpr_2_samples_the_pixels_the_element_rendered_on() {
+        let (frame, snap) = hidpi_fixture(2.0);
+        let result = run(&frame, &snap);
+        assert!(
+            matches!(result.verdict, super::super::AnalyzerVerdict::Checked),
+            "the one text element was sampled: {:?}",
+            result.verdict
+        );
+        let lc: Vec<_> = result
+            .findings
+            .iter()
+            .filter(|f| f.kind == "low_contrast")
+            .collect();
+        assert_eq!(
+            lc.len(),
+            1,
+            "the low-contrast pair under the SCALED box must be found: {:?}",
+            result.findings
+        );
+        assert_eq!(lc[0].severity, Severity::Info);
+        assert_eq!(lc[0].elements, vec!["hero-caption".to_string()]);
+        assert!(
+            lc[0].detail.contains("ratio≈1.4"),
+            "sampled #888/#777, not black on white: {}",
+            lc[0].detail
+        );
+        // Two bins hold every pixel of the scaled box.
+        assert_eq!(lc[0].confidence, Some(1.0));
+    }
+
+    #[test]
+    fn a_fractional_dpr_samples_the_scaled_box_too() {
+        let (frame, snap) = hidpi_fixture(1.5);
+        let findings = run(&frame, &snap).findings;
+        assert_eq!(
+            findings.iter().filter(|f| f.kind == "low_contrast").count(),
+            1,
+            "{findings:?}"
+        );
+    }
+
+    /// The same pixels read as if they were CSS pixels — what every HiDPI
+    /// frame got before the mapping existed: the wrong region, a clean 21:1,
+    /// and no finding. Pinned so the fixture itself is shown to discriminate.
+    #[test]
+    fn the_same_pixels_at_scale_1_are_the_wrong_region() {
+        let (mut frame, snap) = hidpi_fixture(2.0);
+        frame.source.scale_factor = 1.0;
+        let findings = run(&frame, &snap).findings;
+        assert!(
+            !findings.iter().any(|f| f.kind == "low_contrast"),
+            "scale 1 reads the unscaled black-on-white position: {findings:?}"
+        );
+    }
+
+    /// A text element whose box is EMPTY on one axis covers no pixel at any
+    /// DPR, so nothing can be sampled and the colour verdict must stay
+    /// BLOCKED. Rounding a fractional ratio outward used to give such a box a
+    /// one-pixel column (CSS x 3, w 0 at 1.5 became buffer x 4..5), which
+    /// sampled a single colour and turned the verdict CHECKED with a fabricated
+    /// ratio of about 1.00:1 at confidence 1.0.
+    #[test]
+    fn an_empty_box_stays_unsampled_at_a_fractional_dpr() {
+        for scale in [1.5, 2.625] {
+            for css in [
+                Region {
+                    x: 3,
+                    y: 1,
+                    w: 0,
+                    h: 20,
+                },
+                Region {
+                    x: 3,
+                    y: 1,
+                    w: 20,
+                    h: 0,
+                },
+            ] {
+                let mut frame = solid_frame(100, 100, [0xff, 0xff, 0xff, 0xff]);
+                frame.source.scale_factor = scale;
+                let snap = ElementSnapshot {
+                    elements: vec![Element {
+                        id: "empty-box".to_string(),
+                        bbox: Some(css),
+                        text: Some("label".to_string()),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                };
+                let result = run(&frame, &snap);
+                assert!(
+                    result.verdict.is_blocked(),
+                    "{css:?} at DPR {scale} covers no pixel, so no ratio exists: {:?} / {:?}",
+                    result.verdict,
+                    result.findings
+                );
+                assert!(result.findings.is_empty(), "{:?}", result.findings);
+            }
+        }
+    }
+
+    #[test]
+    fn an_unusable_scale_factor_blocks_and_says_why() {
+        let (mut frame, snap) = hidpi_fixture(2.0);
+        frame.source.scale_factor = 0.0;
+        let result = run(&frame, &snap);
+        assert!(result.verdict.is_blocked(), "{:?}", result.verdict);
+        let reason = result.verdict.reason().unwrap_or_default();
+        assert!(
+            reason.contains("scale_factor 0 is not a positive finite number"),
+            "{reason}"
+        );
+        assert!(result.findings.is_empty());
     }
 
     #[test]

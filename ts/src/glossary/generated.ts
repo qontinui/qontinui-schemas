@@ -20,9 +20,9 @@ export interface GlossaryEntry<Id extends GlossaryTerm = GlossaryTerm> {
 }
 
 /** The glossary's `version` (glossary/terms.toml). */
-export const GLOSSARY_VERSION: number = 1;
+export const GLOSSARY_VERSION: number = 2;
 /** SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock). */
-export const GLOSSARY_CONTENT_SHA256 = "6e753bcf582accfec2223bdde074407dadf79ea4b417c1e32c269033b3e4388c";
+export const GLOSSARY_CONTENT_SHA256 = "9f0bb2a99e2b2cee5c4ec306724fc225ecfc8ad93fa29bd38411a343fc519981";
 
 /** Every term id, in glossary order. */
 export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
@@ -61,7 +61,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     id: "gate",
     term: "Gate",
     short: "A watched record of work that stopped because it is waiting on something observable; it resumes by itself when the condition clears.",
-    long: "A **gate** turns \"I am blocked\" into something the product watches. It has a typed predicate (a pull request landed, CI went green, a deploy is healthy, a claim ended, an operator approved, a time elapsed, and more) that is re-checked on a schedule.\n\nVerdicts: **open**, **cleared**, **failed** (the event happened the wrong way), **misconfigured** (can never be evaluated) and **withdrawn**. When the evaluator cannot answer, the gate stays open with a reason rather than guessing.\n\nVerbs: *register* creates a gate, *attest* clears an approval gate, *withdraw* retires it with a reason. A gate can carry a **continuation** that runs when it clears.",
+    long: "A **gate** turns \"I am blocked\" into something the product watches. It has a typed predicate (a pull request landed, CI went green, a deploy is healthy, a claim ended, an operator approved, a time elapsed, and more) that is re-checked on a schedule.\n\nVerdicts: **open**, **cleared**, **failed** (the event happened the wrong way), **misconfigured** (can never be evaluated) and **withdrawn**. When the evaluator cannot answer, the gate stays open with a reason rather than guessing. If it stays unanswerable for a sustained stretch (at least five checks in a row over at least 90 minutes), the gate ends **failed** and must be registered again.\n\nVerbs: *register* creates a gate, *attest* clears an approval gate, *withdraw* retires it with a reason. A gate can carry a **continuation** that runs when it clears.",
     see_also: ["continuation", "attestation", "work_unit", "unknown"],
     since: 1,
   },
@@ -76,17 +76,17 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
   "attestation": {
     id: "attestation",
     term: "Attestation",
-    short: "A declaration by an agent or a person that a gate's condition is met, which clears an approval gate.",
-    long: "An **attestation** clears a gate whose predicate is an approval rather than something the product can observe by itself.\n\nWho may attest is decided per gate class by its clearance authority: *operator only*, *an agent other than the author* (separation of duties), or *any agent* in the tenant. Gates addressed to agents can by default be attested by any agent; gates addressed to the operator need a human approval.\n\nForce-clearing a gate that can no longer clear on its own is a separate action, checked against the same authority.",
-    see_also: ["gate", "operator", "tenant"],
+    short: "A recorded declaration by an agent or a person: that an approval gate's condition is met or can never be met, or that a work unit reached a judged status.",
+    long: "An **attestation** clears a gate whose predicate is an approval rather than something the product can observe by itself.\n\nWho may attest is decided per gate class by its clearance authority: *operator only*, *an agent other than the author* (separation of duties: another machine counts; on the same machine, only a different agent session counts, and when that cannot be shown the attester is treated as the author), or *any agent* in the tenant. Gates addressed to agents can by default be attested by any agent; gates addressed to the operator need a human approval.\n\nAn attestation can also say the condition can **never** be met; that ends the gate **failed**, with the reason recorded. Force-clearing a gate that can no longer clear on its own is a separate action, checked against the same authority.\n\nWork units are attested too: the judged statuses (*vetted*, *superseded*, *obsolete*) are normally accepted only from someone other than the unit's owner, or with a recorded declaration of how the attester is independent of the author.",
+    see_also: ["gate", "work_unit", "operator", "tenant"],
     since: 1,
   },
   "work_unit": {
     id: "work_unit",
     term: "Work unit",
     short: "The durable record of one piece of work: a slug with a status, an owner, the pull requests that implement it, and its dependencies.",
-    long: "A **work unit** is how the product tracks a piece of work over its whole life, independent of any file. It carries a status, an owner, **citations** (the pull requests that implement it), dependency edges and free-form metadata.\n\nEvery status change is kept in its history, and gates can wait on a work unit reaching a status. The status is free text chosen by whoever writes it, so read it as that writer's label rather than a fixed state machine.\n\nWhen plans are enabled, each plan's status is mirrored into a work unit.",
-    see_also: ["plan", "gate", "tier", "claim"],
+    long: "A **work unit** is how the product tracks a piece of work over its whole life, independent of any file. It carries a status, an owner, **citations** (the pull requests that implement it), dependency edges and free-form metadata.\n\nEvery status change is kept in its history, and gates can wait on a work unit reaching a status. Statuses come in three kinds:\n\n- **derived**: *ready* (vetted, with at least one gate and all of its remaining gates cleared) and *shipped* (at least one cited pull request landed and no citation is still open; taken back if that stops holding) are set only by the service when it derives them; they cannot be written directly.\n- **attested**: *vetted*, *superseded* and *obsolete* need an **attestation**, normally from someone other than the unit's owner.\n- **free**: `draft`, `in_progress`, `blocked` or any other word, stored exactly as written. Read an unrecognized word as its writer's label, not a state the product tracks.\n\nWhen plans are enabled, each plan's status is mirrored into a work unit.",
+    see_also: ["plan", "gate", "attestation", "tier", "claim"],
     since: 1,
   },
   "plan": {
@@ -108,9 +108,9 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
   "tier": {
     id: "tier",
     term: "Tier",
-    short: "A level in one of three ladders: coordination (claims, work units, plans), the autonomy dial, or a policy clause's permission level.",
-    long: "**Tier** names a level in three separate ladders; read which one from context.\n\n1. **Coordination tiers** stack: *claims* (who is touching what, always on), then *work units* (the durable record of work), then *plan files* (optional; enabled by configuring a plans folder). A tenant with no plan files loses very little.\n2. **The autonomy dial** says how far agents may go on security-sensitive work: *proceed*, *draft required* (open a draft behind an approval gate) or *ask first*.\n3. **Clause tiers** mark what one policy clause permits: *proceed*, *proceed and log*, *proceed and notify*, *ask first* or *never*.",
-    see_also: ["claim", "work_unit", "plan", "policy", "clause"],
+    short: "A level in one of several separate ladders: coordination, the autonomy dial, clause permission, agent write access, or runner account.",
+    long: "**Tier** names a level in several separate ladders; read which one from context.\n\n1. **Coordination tiers** stack: *claims* (who is touching what, always on), then *work units* (the durable record of work), then *plan files* (optional; enabled by configuring a plans folder). A tenant with no plan files loses very little.\n2. **The autonomy dial** says how far agents may go on security-sensitive work: *proceed*, *draft required* (open a draft behind an approval gate) or *ask first*.\n3. **Clause tiers** mark what one policy clause permits: *proceed*, *proceed and log*, *proceed and notify*, *ask first* or *never*.\n4. **Agent write tiers** say whether agents may edit a prompt document: *deny*, *allow* or *allow with notification*.\n5. **Runner account tiers**: *Tier 0* uses local AI only, *Tier 1* your own provider keys, *Tier 2* is signed in to a Qontinui account, which multi-machine coordination needs.",
+    see_also: ["claim", "work_unit", "plan", "policy", "clause", "runner"],
     since: 1,
   },
   "merge_train": {
@@ -220,8 +220,8 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
   "tenant": {
     id: "tenant",
     term: "Tenant",
-    short: "The isolation boundary that owns repositories, devices, gates, work units, policies and memory. Shown as a Project in the app.",
-    long: "A **tenant** is the unit of ownership and isolation. Repositories, devices, gates, work units, findings, policies and intent documents all belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.\n\nThe web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only where the tenant has automatic merging enabled, the repository has merging enabled, and the tenant has not paused merging; a tenant-wide pause overrides every repository.",
+    short: "The isolation boundary that owns gates, work units, policies and memory; devices and repositories can belong to several. Shown as a Project in the app.",
+    long: "A **tenant** is the unit of ownership and isolation. Gates, work units, findings, policies and intent documents each belong to exactly one tenant, and every read and write is scoped to the tenant resolved from the caller's identity.\n\nA device can be bound to more than one tenant, and a repository can be registered under more than one. Each credential names one tenant. Where a request leaves the choice open, the service either refuses it as ambiguous or, where that check is not switched on, falls back to the device's default tenant.\n\nThe web app calls a tenant a **Project**, and users can create their own. The merge train lands changes automatically only where the tenant has automatic merging enabled, the repository has merging enabled, and the tenant has not paused merging; a tenant-wide pause overrides every repository.",
     see_also: ["device", "operator", "policy", "intent_document"],
     since: 1,
   },
@@ -229,7 +229,7 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     id: "device",
     term: "Device",
     short: "A registered machine running the runner. Pairing links it to your account and issues the credential it uses.",
-    long: "A **device** is a machine (or runner instance) the product knows by its device id. The id is an identifier, not a secret.\n\n**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. On authenticated requests the service works out the device's tenant from that credential rather than from anything the device asserts.\n\nWork is sent only to devices that are paired, heartbeating, capable of the work and not drained.",
+    long: "A **device** is a machine (or runner instance) the product knows by its device id. The id is an identifier, not a secret.\n\n**Pairing** links a device to a person who belongs to the tenant: a short-lived pairing token is completed by that person, and the device is issued its own credential. On authenticated requests the service works out the tenant from that credential rather than from anything the device asserts. A device may be paired into several tenants; each credential carries one of them.\n\nWork is sent only to devices that are paired, heartbeating, capable of the work and not drained.",
     see_also: ["tenant", "runner", "drain"],
     since: 1,
   },
@@ -252,8 +252,8 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
   "worktree_allocation": {
     id: "worktree_allocation",
     term: "Worktree allocation",
-    short: "Asking the service for an agent's own isolated working copy on a reserved branch, so parallel agents never share one.",
-    long: "A **worktree allocation** gives an agent its own git worktree for each repository it needs, on a branch reserved for that agent, and records what the agent intends to do there so overlapping work is visible.\n\nIt can answer *wait* when the machine's isolation budget is used up; a refused allocation records nothing. Repositories a checkout builds against are allocated beside it automatically.\n\nEvery successful allocation creates a record, so never make one just to test whether the service is reachable.",
+    short: "Asking the service where an agent should work: usually its own isolated working copy on a reserved branch, so parallel agents do not collide.",
+    long: "A **worktree allocation** gives an agent its own git worktree for each repository it needs, on a branch reserved for that agent, and records what the agent intends to do there so overlapping work is visible.\n\nThe answer is one of three: a separate **worktree** (the usual case); a **shared branch**, meaning work on the reserved branch inside the main checkout, used only when the agent's tools support working safely in the shared checkout; or *wait* when the machine's isolation budget is used up. A refused allocation records nothing. Repositories a checkout builds against are allocated beside it automatically.\n\nEvery successful allocation creates a record, so never make one just to test whether the service is reachable.",
     see_also: ["claim", "agent_session", "device"],
     since: 1,
   },

@@ -23,6 +23,7 @@ use serde::Serialize;
 use crate::canonical::Outcome as CanonicalOutcome;
 use crate::host::BoxFuture;
 use crate::junit::TestArtifact;
+use crate::model::ledger::{ModelLedger, ModelSection};
 
 /// A run's final conclusion, in the wire vocabulary coord's result route and
 /// a GitHub check run both speak.
@@ -77,6 +78,15 @@ pub struct Verdict<'a> {
     /// renders as `not_evaluated` — a different statement from
     /// `not_requested`.
     pub canonical: Option<&'a CanonicalOutcome>,
+    /// The result's `summary.model` block. Always present — spelled at every
+    /// exit, like `test_results` — so "no model access" is always a stated
+    /// reason (`not_evaluated`, `not_requested`, `refused{reason}`) rather
+    /// than an absent key.
+    pub model: &'a ModelSection,
+    /// The per-call model ledger, a top-level result field of its own (never
+    /// inside `summary`: coord replaces an oversize summary wholesale). `None`
+    /// when no broker ran.
+    pub model_ledger: Option<&'a ModelLedger>,
 }
 
 /// Where one run reports. Created by the host before the run starts.
@@ -194,6 +204,8 @@ mod tests {
                 reason: Some("why"),
                 test_results: None,
                 canonical: None,
+                model: &ModelSection::NotEvaluated,
+                model_ledger: None,
             },
         )
         .await;

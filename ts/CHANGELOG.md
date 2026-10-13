@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.0...ts-v2.3.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* address pre-PR review of the glossary v2 corrections ([e797a9b](https://github.com/qontinui/qontinui-schemas/commit/e797a9b443121d3580b7d6129b4ed961378639b7))
+* correct seven glossary terms that disagree with the services (glossary v2) ([2253e55](https://github.com/qontinui/qontinui-schemas/commit/2253e55cc8d40a90508484dc3ff65d3231616b68))
+
+## [2.3.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.2.0...ts-v2.3.0) (2026-10-13)
+
+
+### Features
+
+* **types:** generated TS/Python bindings for the cli_session types ([86710c8](https://github.com/qontinui/qontinui-schemas/commit/86710c896b0834516ae072959e92013530022b0d))
+
 ## [2.2.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.1.0...ts-v2.2.0) (2026-10-06)
 
 

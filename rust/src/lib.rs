@@ -77,6 +77,13 @@ pub mod canonical_hash;
 /// [`cli_session::CapabilityState`] tri-state. See
 /// `2026-09-20-ai-session-handling-is-claude-shaped-provider-manifest-and-failure-taxonomy.md`.
 pub mod cli_session;
+/// Cloud twin contracts — worlds (prod / clone / fork), the allowlisted
+/// CloudTrail-shaped audit projection (no field for a parameter value, only a
+/// digest), the [`cloud_twin::SubstitutionBlock`] whose τ is computed never
+/// stamped (private fields; the pure `compute` is its only constructor), and the rehearsal,
+/// conformance and vendor-drift records. No TS/Python export yet — no
+/// consumer. See `2026-10-11-local-cloud-as-twin-substrate.md` Phase 2.
+pub mod cloud_twin;
 /// Completeness **evaluation** — the deterministic rubric walk that turns a
 /// [`functional_spec::FunctionalSpec`] + coverage evidence into a
 /// [`completeness_verdict::CompletenessVerdict`] (node enumeration + gap diff +
@@ -124,6 +131,11 @@ pub mod glossary;
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
+/// Image-slot specs — [`image_slot::ImageSlotSpec`], the declared contract of
+/// one image placement (job, audience, contexts, geometry, style, content,
+/// text and alt policy, check thresholds, and the asset bound to it). See
+/// `2026-10-13-image-generation-and-visual-judgment.md` Phase 14.
+pub mod image_slot;
 pub mod ir;
 /// Journey twin — observed edges between IR-named page configurations and
 /// the frontier of seen-but-never-activated affordances. See

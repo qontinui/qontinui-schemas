@@ -605,6 +605,11 @@ fn filter_env(
                 loc,
                 format!("env {k} is set by the executor — express it as {owner}; not imported"),
             ),
+            EnvKeyClass::ModelCommand => ctx.push(
+                ItemKind::Untranslated,
+                loc,
+                format!("env {k} names a model command — needs `[model]` + `model = true`; not imported"),
+            ),
             EnvKeyClass::ServiceExported(kind) if kinds.contains(&kind) => ctx.push(
                 ItemKind::NoOp,
                 loc,
@@ -3887,6 +3892,45 @@ jobs:
         assert!(un("SOME_TOKEN"));
         assert!(o.manifest_toml.contains("# UNTRANSLATED ("));
         assert!(o.manifest_toml.contains("some/action"));
+    }
+
+    /// A workflow that hands a step a model command is listed, not imported,
+    /// with the pointer to `[model]` — in the generated file's header, which
+    /// is what the CLI also prints on stderr.
+    #[test]
+    fn a_model_command_env_is_listed_with_the_model_pointer() {
+        let o = import_workflows(&[WorkflowSource {
+            label: ".github/workflows/evals.yml".into(),
+            text: r#"
+on: pull_request
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baseline
+        run: make baseline
+        env:
+          DOCS_EVAL_MODEL_CMD: claude -p
+          CARGO_TERM_COLOR: always
+"#
+            .into(),
+        }])
+        .unwrap();
+        let item = o
+            .items
+            .iter()
+            .find(|i| i.detail.contains("DOCS_EVAL_MODEL_CMD"))
+            .unwrap_or_else(|| panic!("{:#?}", o.items));
+        assert_eq!(item.kind, ItemKind::Untranslated);
+        assert!(
+            item.detail
+                .contains("needs `[model]` + `model = true`; not imported"),
+            "{}",
+            item.detail
+        );
+        assert!(o.manifest_toml.contains("DOCS_EVAL_MODEL_CMD"));
+        let m = o.manifest.as_ref().expect("valid manifest");
+        assert!(!m.jobs[0].steps[0].env.contains_key("DOCS_EVAL_MODEL_CMD"));
     }
 
     const HOSTILE: &str = r#"

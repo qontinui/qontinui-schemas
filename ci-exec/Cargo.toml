@@ -19,6 +19,13 @@ path = "src/bin/qontinui_ci/main.rs"
 # coord) build without the feature and never compile libyaml.
 required-features = ["import"]
 
+[[bin]]
+# The model shim a `model = true` step runs as `$QONTINUI_CI_MODEL_CMD`: a
+# std-only HTTP/1.1 client for the dispatch's loopback model broker. No feature
+# gate — every host that offers model access ships it.
+name = "qontinui-ci-model"
+path = "src/bin/qontinui_ci_model.rs"
+
 [[test]]
 name = "import_golden"
 path = "tests/import_golden.rs"
@@ -40,6 +47,8 @@ serde_json = "1"
 # serde_yaml itself is deprecated upstream; this is a maintained fork.
 serde_yaml_ng = { version = "0.10", optional = true }
 sha2 = "0.10"
+# Constant-time compare of the model broker's per-dispatch capability token.
+subtle = "2"
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 tar = "0.4"
 tempfile = "3"
