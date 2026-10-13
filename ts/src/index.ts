@@ -26,6 +26,12 @@ export type { PendingQuestion } from "./generated/PendingQuestion";
 export type { HealthLite } from "./generated/HealthLite";
 export type { HealthLevel } from "./generated/HealthLevel";
 
+// Image-slot specs — the declared contract of one image placement (plan
+// 2026-10-13-image-generation-and-visual-judgment, Phase 14). Generated from
+// `rust/src/image_slot.rs`. Its `ImageSlot*` sub-types are declared inside
+// `ImageSlotSpec.d.ts`; reach one by indexed access (`ImageSlotSpec["aspect"]`).
+export type { ImageSlotSpec } from "./generated/ImageSlotSpec";
+
 // State discovery types
 export * from "./discovery";
 
