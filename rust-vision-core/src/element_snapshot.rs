@@ -19,6 +19,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::element_media::ElementMedia;
 use crate::frame::Region;
 
 /// Snapshot of one rendered page worth of elements, ready to feed
@@ -176,6 +177,14 @@ pub struct Element {
     /// Visible text content (innerText / accessibilityLabel equivalent).
     /// `None` when the element has no text or the snapshot source didn't
     /// populate it.
+    ///
+    /// **For a media element (`media` is `Some`) this is painted text only,
+    /// NEVER its text alternative.** An `<img>`'s `alt`, an `aria-label`, an
+    /// SVG's `<title>`, a canvas's or video's fallback content and a native
+    /// image's `accessibilityLabel` are not drawn on screen; they belong in
+    /// [`ElementMedia::alt`]. Projected here, they make an image read as a
+    /// visible label: the elements analyzer counts it as text, and the color
+    /// analyzer gates contrast on a string nobody can see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// ARIA role / native-platform equivalent. e.g., `"button"`, `"link"`.
@@ -302,6 +311,19 @@ pub struct Element {
     /// is measurement rather than declaration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_overflow: Option<String>,
+
+    // ---- Media -------------------------------------------------------------
+    /// What this element is as an image, picture, SVG, video, canvas,
+    /// `[role=img]` element or CSS background image, and what the producer
+    /// measured about it. `Some` exactly when the element is a media element.
+    ///
+    /// `None` means the element is not media, or the producer measured no
+    /// media facts for it — which includes every snapshot persisted before
+    /// this field existed. Image checks therefore answer Unknown for an
+    /// element without it rather than passing. See [`ElementMedia`] for how a
+    /// converter unwraps the UI Bridge SDK's media observation into it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<ElementMedia>,
 }
 
 /// Linear-light RGB color (no alpha). Used for both `fg_color` and
