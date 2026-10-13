@@ -252,6 +252,7 @@ mod tests {
             working_dir: working_dir.map(|s| s.to_string()),
             env: Default::default(),
             timeout_secs: None,
+            model: false,
         }
     }
 

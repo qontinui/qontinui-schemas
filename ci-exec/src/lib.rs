@@ -23,6 +23,7 @@
 //! | [`canonical`] | the `[canonical]` toolchain gate |
 //! | [`dispatch`] | the dispatch payload and the [`dispatch::Admission`] seam |
 //! | [`report`] | the [`report::Reporter`] seam and the capture-before-cleanup receipt |
+//! | [`model`] | the `[model]` declaration, and model access for the steps that declare it |
 //! | [`host`] | the traits a host implements |
 //! | [`standalone`] | the host implementations for a plain shell (`qontinui-ci`) |
 //! | [`import`] (feature `import`) | `qontinui-ci import`: GitHub workflows → a v2 manifest, and the `--report` coverage check |
@@ -44,6 +45,7 @@ pub mod host_sizing;
 pub mod import;
 pub mod junit;
 pub mod manifest;
+pub mod model;
 pub mod report;
 pub mod services;
 #[cfg(feature = "import")]

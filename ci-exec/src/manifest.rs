@@ -165,6 +165,40 @@ const EXECUTOR_OWNED_ENV: &[(&str, &str)] = &[
         "the executor's per-repo CI target dir (not settable)",
     ),
     ("CI", "nothing: the executor always exports CI=true"),
+    // ── Model access (plan `2026-10-13-ci-node-runs-model-dependent-eval-steps`).
+    // The broker's address, its per-dispatch capability and the shim that
+    // speaks to it are minted per dispatch and handed only to `model = true`
+    // steps; a refusal reason replaces them when access was withheld. A
+    // manifest could only ever hold a wrong (or a stolen) value for any of
+    // them.
+    (
+        "QONTINUI_CI_MODEL_CMD",
+        crate::model::declaration::MODEL_POINTER,
+    ),
+    (
+        "QONTINUI_CI_MODEL_URL",
+        crate::model::declaration::MODEL_POINTER,
+    ),
+    (
+        "QONTINUI_CI_MODEL_TOKEN",
+        crate::model::declaration::MODEL_POINTER,
+    ),
+    (
+        "QONTINUI_CI_MODEL_REFUSED",
+        crate::model::declaration::MODEL_POINTER,
+    ),
+    (
+        "QONTINUI_CI_DISPATCH_ID",
+        "nothing: the executor always exports it",
+    ),
+    // The executor SETS this for every step to an empty per-dispatch
+    // directory, so an un-brokered `claude` inside a step starts with no login
+    // instead of falling back to the owner's default config dir (D11).
+    (
+        "CLAUDE_CONFIG_DIR",
+        "nothing: the executor sets it to an empty per-dispatch directory for every step; \
+         declare [model] and set `model = true` on the step to use a model",
+    ),
     // NOTE: the SERVICE connection variables (`DATABASE_URL`, the libpq `PG*`
     // family, `REDIS_URL`/`REDIS_HOST`/`REDIS_PORT`) are executor-owned too,
     // but they are not restated here — they are derived from
@@ -209,6 +243,10 @@ struct RawManifest {
     canonical: Option<CiCanonical>,
     #[serde(default)]
     repair: Vec<CiRepair>,
+    /// Top-level in both versions: one per-dispatch budget. A job-level
+    /// `[model]` stays a `deny_unknown_fields` refusal on [`RawJob`].
+    #[serde(default)]
+    model: Option<crate::model::declaration::RawModelDeclaration>,
 }
 
 /// One `[[jobs]]` entry as written.
@@ -329,6 +367,10 @@ pub struct CiManifest {
     /// It never EXECUTES one: a repair runs in the repo's own
     /// `coord-repair.yml` workflow, and coord alone writes the result.
     pub repair: Vec<CiRepair>,
+    /// The `[model]` declaration: the models `model = true` steps may call
+    /// through the dispatch's broker, and the per-dispatch budget they share.
+    /// `None` when the repo declares none — then no step may set `model`.
+    pub model: Option<crate::model::declaration::ModelDeclaration>,
 }
 
 /// One declared repair.
@@ -499,6 +541,10 @@ pub struct CiStep {
     /// worktree — validated structurally here AND canonicalize+prefix-checked
     /// at execution time.
     pub working_dir: Option<String>,
+    /// Whether this step gets model access (`QONTINUI_CI_MODEL_*`). Requires
+    /// a top-level `[model]`; default `false`.
+    #[serde(default)]
+    pub model: bool,
 }
 
 /// How a sibling's commit is chosen.
@@ -782,6 +828,7 @@ pub fn parse_and_validate(text: &str) -> Result<CiManifest, String> {
         ))
         }
     };
+    let model = crate::model::declaration::validate_model(raw.model, &jobs)?;
     Ok(CiManifest {
         schema_version: raw.version,
         jobs,
@@ -790,6 +837,7 @@ pub fn parse_and_validate(text: &str) -> Result<CiManifest, String> {
         tools: raw.tools,
         canonical: raw.canonical,
         repair: raw.repair,
+        model,
     })
 }
 
@@ -1126,9 +1174,18 @@ pub(crate) enum EnvKeyClass {
     /// A connection variable the executor exports from a `[[services]]` entry
     /// of this kind (`postgres`, `redis`).
     ServiceExported(&'static str),
+    /// A key ending in `_MODEL_CMD`: it would choose which program a step runs
+    /// as its model, and that program would need a model login. Model access
+    /// goes through `[model]` + `model = true` instead.
+    ModelCommand,
     /// Anything else: refused.
     NotAllowed,
 }
+
+/// The suffix of the [`EnvKeyClass::ModelCommand`] class. The executor also
+/// removes every INHERITED key with this suffix from a step's environment, so a
+/// host-provided model command cannot outrank the broker.
+pub const MODEL_COMMAND_SUFFIX: &str = "_MODEL_CMD";
 
 /// Classify a step env key — see [`EnvKeyClass`].
 pub(crate) fn classify_step_env_key(key: &str) -> EnvKeyClass {
@@ -1137,6 +1194,9 @@ pub(crate) fn classify_step_env_key(key: &str) -> EnvKeyClass {
     }
     if let Some(kind) = crate::services::kind_exporting(key) {
         return EnvKeyClass::ServiceExported(kind.label());
+    }
+    if key.ends_with(MODEL_COMMAND_SUFFIX) {
+        return EnvKeyClass::ModelCommand;
     }
     if ENV_ALLOWLIST.contains(&key) {
         EnvKeyClass::Allowed
@@ -1177,7 +1237,7 @@ fn validate_steps(steps: &[CiStep], scope: &str) -> Result<(), String> {
                 EnvKeyClass::ExecutorOwned(owner) => {
                     return Err(format!(
                         "{label}: env var {key:?} is exported by the executor and would be \
-                         overridden — set {owner} instead"
+                         overridden — what controls it: {owner}"
                     ));
                 }
                 EnvKeyClass::ServiceExported(kind) => {
@@ -1192,6 +1252,13 @@ fn validate_steps(steps: &[CiStep], scope: &str) -> Result<(), String> {
                         "{label}: env var {key:?} is exported by the executor from the \
                          [[services]] entry that provides it (service kind '{kind}') — declare \
                          that service instead of hardcoding a connection"
+                    ));
+                }
+                EnvKeyClass::ModelCommand => {
+                    return Err(format!(
+                        "{label}: env var {key:?} would choose the program a step runs as its \
+                         model, and that program would need a model login — {}",
+                        crate::model::declaration::MODEL_POINTER
                     ));
                 }
                 EnvKeyClass::NotAllowed => {
@@ -2499,6 +2566,86 @@ command = ["true"]
             );
             let err = parse_and_validate(&text).unwrap_err();
             assert!(err.contains("not allowlisted"), "{key}: got {err}");
+        }
+    }
+
+    /// No manifest key can choose a step's model program or hand it a model
+    /// credential (plan `2026-10-13-ci-node-runs-model-dependent-eval-steps`
+    /// D1/D11). The keys are spelled as literals on purpose: a list derived
+    /// from the classifier would pass whatever the classifier does.
+    #[test]
+    fn model_command_env_stays_outside_the_allowlist() {
+        for key in [
+            "DOCS_EVAL_MODEL_CMD",
+            "REFERENCE_EVAL_MODEL_CMD",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "CLAUDE_CONFIG_DIR",
+            "OPENAI_API_KEY",
+        ] {
+            assert!(
+                !ENV_ALLOWLIST.contains(&key),
+                "{key} must never be allowlisted"
+            );
+            assert_ne!(classify_step_env_key(key), EnvKeyClass::Allowed, "{key}");
+            let text = format!(
+                "version = 1\n[[steps]]\nname = \"x\"\ncommand = [\"true\"]\nenv = {{ {key} = \"evil\" }}\n"
+            );
+            let err = parse_and_validate(&text).unwrap_err();
+            assert!(
+                err.contains("not allowlisted") || err.contains("declare [model]"),
+                "{key}: got {err}"
+            );
+        }
+        // The model-command class carries the [model] pointer, not the bare
+        // allowlist message.
+        for key in [
+            "DOCS_EVAL_MODEL_CMD",
+            "REFERENCE_EVAL_MODEL_CMD",
+            "ANY_MODEL_CMD",
+        ] {
+            assert_eq!(
+                classify_step_env_key(key),
+                EnvKeyClass::ModelCommand,
+                "{key}"
+            );
+            let text = format!(
+                "version = 1\n[[steps]]\nname = \"x\"\ncommand = [\"true\"]\nenv = {{ {key} = \"claude -p\" }}\n"
+            );
+            let err = parse_and_validate(&text).unwrap_err();
+            assert!(
+                err.contains("declare [model] and set `model = true` on the step"),
+                "{key}: got {err}"
+            );
+        }
+    }
+
+    /// The model-access names the executor exports are refused with the
+    /// pointer to what controls them.
+    #[test]
+    fn model_access_env_is_executor_owned_with_a_pointer() {
+        for (key, expect) in [
+            ("QONTINUI_CI_MODEL_CMD", "declare [model]"),
+            ("QONTINUI_CI_MODEL_URL", "declare [model]"),
+            ("QONTINUI_CI_MODEL_TOKEN", "declare [model]"),
+            ("QONTINUI_CI_MODEL_REFUSED", "declare [model]"),
+            ("QONTINUI_CI_DISPATCH_ID", "always exports it"),
+            ("CLAUDE_CONFIG_DIR", "empty per-dispatch directory"),
+        ] {
+            assert!(
+                matches!(classify_step_env_key(key), EnvKeyClass::ExecutorOwned(_)),
+                "{key}"
+            );
+            let text = format!(
+                "version = 1\n[[steps]]\nname = \"x\"\ncommand = [\"true\"]\nenv = {{ {key} = \"v\" }}\n"
+            );
+            let err = parse_and_validate(&text).unwrap_err();
+            assert!(
+                err.contains("exported by the executor") && err.contains(expect),
+                "{key}: got {err}"
+            );
         }
     }
 
