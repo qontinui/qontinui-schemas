@@ -44,6 +44,13 @@ const READ_TIMEOUT: Duration = Duration::from_secs(MAX_MODEL_WALL_SECS + 60);
 /// a head plus an envelope the broker measured against [`MAX_ENVELOPE_BYTES`].
 pub(crate) const MAX_RESPONSE_READ: usize = MAX_ENVELOPE_BYTES + MAX_RESPONSE_HEAD_BYTES;
 
+/// How many times the shim sends a request the broker answered `busy`.
+const BUSY_RETRIES: u32 = 8;
+/// The pause before retry `n` is `n` times this.
+const BUSY_BACKOFF: Duration = Duration::from_millis(250);
+/// The broker's subtype for a connection it shed before reading.
+const BUSY_SUBTYPE: &str = "busy";
+
 const USAGE: &str = "usage: qontinui-ci-model [-p|--print] [--output-format text|json] \
                      [--model <name>] [<prompt>]  (the prompt is read from stdin when not given)";
 
@@ -227,25 +234,38 @@ pub fn run(
         prompt,
     })
     .unwrap_or_default();
-    let (status, answer) = match exchange(addr, &token, &body) {
-        Ok(r) => r,
-        Err(e) => {
-            // `e` is built from I/O errors and fixed text only: never the
-            // token, which lives in a header this process wrote.
-            let _ = writeln!(stderr, "qontinui-ci-model: {e}");
-            return 1;
+    // A `busy` answer means the broker shed the connection before reading
+    // it: nothing was spent, so retry a few times with a growing pause before
+    // handing the envelope to the caller.
+    let mut attempt: u32 = 0;
+    let (status, answer, envelope) = loop {
+        attempt += 1;
+        let (status, answer) = match exchange(addr, &token, &body) {
+            Ok(r) => r,
+            Err(e) => {
+                // `e` is built from I/O errors and fixed text only: never the
+                // token, which lives in a header this process wrote.
+                let _ = writeln!(stderr, "qontinui-ci-model: {e}");
+                return 1;
+            }
+        };
+        let envelope: Envelope = match serde_json::from_slice(&answer) {
+            Ok(env) => env,
+            Err(_) => {
+                let _ = writeln!(
+                    stderr,
+                    "qontinui-ci-model: the broker answered HTTP {status} without an envelope"
+                );
+                return 1;
+            }
+        };
+        if envelope.subtype == BUSY_SUBTYPE && attempt < BUSY_RETRIES {
+            std::thread::sleep(BUSY_BACKOFF * attempt);
+            continue;
         }
+        break (status, answer, envelope);
     };
-    let envelope: Envelope = match serde_json::from_slice(&answer) {
-        Ok(env) => env,
-        Err(_) => {
-            let _ = writeln!(
-                stderr,
-                "qontinui-ci-model: the broker answered HTTP {status} without an envelope"
-            );
-            return 1;
-        }
-    };
+    let _ = status;
     match (args.format, envelope.is_error) {
         (Format::Json, is_error) => {
             let _ = stdout.write_all(&answer);
@@ -413,6 +433,29 @@ mod tests {
             (MODEL_TOKEN_ENV.to_string(), "t".to_string()),
         ]);
         assert_eq!(shim(&[], v, "p").await.code, 2);
+    }
+
+    /// A broker whose read-phase cap is held by idle peers answers `busy`;
+    /// the shim retries and is served once the peers go.
+    #[tokio::test]
+    async fn the_shim_retries_a_busy_broker() {
+        let b = broker(FakeInvoker::answering("served", 1), 5).await;
+        let mut idle = Vec::new();
+        for _ in 0..crate::model::broker::MAX_CONNECTIONS {
+            idle.push(
+                tokio::net::TcpStream::connect(("127.0.0.1", b.port()))
+                    .await
+                    .unwrap(),
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let run = tokio::spawn(shim(&[], vars(&b), "p"));
+        // Long enough for at least one `busy` answer, then free the cap.
+        tokio::time::sleep(Duration::from_millis(1800)).await;
+        drop(idle);
+        let r = run.await.unwrap();
+        assert_eq!(r.code, 0, "{}", r.stderr);
+        assert_eq!(r.stdout, "served\n");
     }
 
     #[tokio::test]
