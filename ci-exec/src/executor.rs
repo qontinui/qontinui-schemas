@@ -1911,6 +1911,7 @@ command = ["git", "--version"]
     /// RED on the pre-scrub executor rather than failing to compile: an
     /// inherited `*_MODEL_CMD` reached every step, and no step saw a pinned
     /// `CLAUDE_CONFIG_DIR`.
+    #[cfg(unix)]
     #[tokio::test]
     async fn arming_an_inherited_model_command_never_reaches_a_ci_step() {
         const KEY: &str = "ARMING_PROBE_MODEL_CMD";

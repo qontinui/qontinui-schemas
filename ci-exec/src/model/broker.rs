@@ -42,8 +42,8 @@ use crate::model::declaration::ModelDeclaration;
 use crate::model::ledger::{usd_to_microusd, BudgetReport, CallRow, LedgerBuilder, ModelLedger};
 use crate::model::protocol::{
     BrokerBlock, Budget, BudgetLeft, CompleteRequest, Envelope, ErrorSubtype, ModelUsage, Usage,
-    COMPLETE_PATH, MAX_PROMPT_BYTES, MAX_REQUEST_BODY_BYTES, MAX_REQUEST_HEAD_BYTES,
-    MAX_RESPONSE_BYTES,
+    COMPLETE_PATH, MAX_ENVELOPE_BYTES, MAX_PROMPT_BYTES, MAX_REQUEST_BODY_BYTES,
+    MAX_REQUEST_HEAD_BYTES, MAX_RESPONSE_BYTES,
 };
 use crate::report::LogSink;
 
@@ -54,6 +54,20 @@ pub const MAX_IN_FLIGHT: usize = 4;
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(900);
 /// How often a held call logs that it is still waiting.
 pub const HOLD_LOG_INTERVAL: Duration = Duration::from_secs(60);
+/// The shortest an exhaustion hold lasts, even when the host reports a reset
+/// already in the past — so a host that keeps reporting a stale reset cannot
+/// turn the hold into a retry storm.
+pub const MIN_EXHAUSTION_HOLD: Duration = Duration::from_secs(1);
+/// How many times one call is held for exhaustion before it fails
+/// `all_accounts_exhausted` anyway.
+pub const MAX_EXHAUSTION_HOLDS: u32 = 5;
+/// How long the broker may take to write one response. A client that stops
+/// reading cannot hold a connection task — or `stop` — past this.
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+/// At most this many connections are served at once. Past it a new
+/// connection is closed unanswered: idle or stalled local peers cannot grow
+/// the broker's task set without bound.
+pub const MAX_CONNECTIONS: usize = 32;
 /// How long a client may take to send its request head and body.
 const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -64,6 +78,8 @@ pub struct BrokerConfig {
     pub max_in_flight: usize,
     pub call_timeout: Duration,
     pub hold_log_interval: Duration,
+    pub min_exhaustion_hold: Duration,
+    pub write_timeout: Duration,
 }
 
 impl BrokerConfig {
@@ -73,8 +89,17 @@ impl BrokerConfig {
             max_in_flight: MAX_IN_FLIGHT,
             call_timeout: CALL_TIMEOUT,
             hold_log_interval: HOLD_LOG_INTERVAL,
+            min_exhaustion_hold: MIN_EXHAUSTION_HOLD,
+            write_timeout: WRITE_TIMEOUT,
         }
     }
+}
+
+/// Whether the `n`th occurrence of a repeated log line is written: the first
+/// three, then every hundredth. Bounds what a looping client can put in the
+/// dispatch log.
+fn log_occurrence(n: u64) -> bool {
+    n <= 3 || n.is_multiple_of(100)
 }
 
 /// What a stopped broker hands back.
@@ -100,6 +125,10 @@ struct State {
     step: String,
     ledger: LedgerBuilder,
     exhausted_reset_at: Option<u64>,
+    /// Requests refused before admission, by subtype (for the log limit).
+    rejections: std::collections::BTreeMap<String, u64>,
+    /// Connections closed unanswered at the connection cap.
+    connections_shed: u64,
 }
 
 struct Shared {
@@ -111,6 +140,8 @@ struct Shared {
     permits: Arc<Semaphore>,
     call_timeout: Duration,
     hold_log_interval: Duration,
+    min_exhaustion_hold: Duration,
+    write_timeout: Duration,
     shutdown: CancellationToken,
     state: Mutex<State>,
 }
@@ -195,6 +226,8 @@ impl Broker {
             permits: Arc::new(Semaphore::new(config.max_in_flight.max(1))),
             call_timeout: config.call_timeout,
             hold_log_interval: config.hold_log_interval,
+            min_exhaustion_hold: config.min_exhaustion_hold,
+            write_timeout: config.write_timeout,
             shutdown: CancellationToken::new(),
             state: Mutex::new(State {
                 next_index: 0,
@@ -204,6 +237,8 @@ impl Broker {
                 step: String::new(),
                 ledger: LedgerBuilder::default(),
                 exhausted_reset_at: None,
+                rejections: std::collections::BTreeMap::new(),
+                connections_shed: 0,
             }),
         });
         let accept = tokio::spawn(accept_loop(listener, shared.clone()));
@@ -282,7 +317,23 @@ async fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
             _ = shared.shutdown.cancelled() => break,
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
-                    conns.spawn(serve(shared.clone(), stream));
+                    while conns.try_join_next().is_some() {}
+                    if conns.len() >= MAX_CONNECTIONS {
+                        drop(stream);
+                        let shed = {
+                            let mut st = shared.state();
+                            st.connections_shed += 1;
+                            st.connections_shed
+                        };
+                        if log_occurrence(shed) {
+                            shared.sink.push(&format!(
+                                "[ci-model] closed a connection unanswered: {MAX_CONNECTIONS} \
+                                 already open ({shed} so far)"
+                            ));
+                        }
+                    } else {
+                        conns.spawn(serve(shared.clone(), stream));
+                    }
                 }
                 Err(e) => {
                     shared.sink.push(&format!("[ci-model] broker accept failed: {e}"));
@@ -462,7 +513,22 @@ fn check(shared: &Shared, head: &Head) -> Result<usize, Rejection> {
     Ok(len)
 }
 
-async fn respond(wr: &mut tokio::net::tcp::OwnedWriteHalf, status: (u16, &str), env: &Envelope) {
+/// Write one response, bounded by `write_timeout`: a client that never reads
+/// cannot hold the connection task (or `stop`) past it.
+async fn respond(
+    wr: &mut tokio::net::tcp::OwnedWriteHalf,
+    write_timeout: Duration,
+    status: (u16, &str),
+    env: &Envelope,
+) {
+    let _ = tokio::time::timeout(write_timeout, write_response(wr, status, env)).await;
+}
+
+async fn write_response(
+    wr: &mut tokio::net::tcp::OwnedWriteHalf,
+    status: (u16, &str),
+    env: &Envelope,
+) {
     let body = serde_json::to_vec(env).unwrap_or_default();
     let head = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -529,7 +595,7 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
             None,
             BrokerBlock::default(),
         );
-        respond(&mut wr, FORBIDDEN, &env).await;
+        respond(&mut wr, shared.write_timeout, FORBIDDEN, &env).await;
         return;
     }
 
@@ -545,41 +611,49 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
                 "the body ended before Content-Length",
             )
         })?;
-        serde_json::from_slice::<CompleteRequest>(&body).map_err(|e| {
+        // The serde error is NOT echoed: it can quote body content, and the
+        // rejection message reaches the dispatch log.
+        serde_json::from_slice::<CompleteRequest>(&body).map_err(|_| {
             Rejection::new(
                 (400, "Bad Request"),
                 ErrorSubtype::BadRequest,
-                &format!("the body is not a {{model, prompt}} request: {e}"),
+                "the body is not a JSON {model, prompt} request",
             )
         })
-    })
-    .await
-    .unwrap_or_else(|_| {
-        Err(Rejection::new(
-            (408, "Request Timeout"),
-            ErrorSubtype::BadRequest,
-            "the request was not sent in time",
-        ))
     });
+    // Reading the request observes the dispatch ending: a stalled client
+    // cannot hold `stop` for the read timeout.
+    let admitted = tokio::select! {
+        r = admitted => r.unwrap_or_else(|_| {
+            Err(Rejection::new(
+                (408, "Request Timeout"),
+                ErrorSubtype::BadRequest,
+                "the request was not sent in time",
+            ))
+        }),
+        _ = shared.shutdown.cancelled() => return,
+    };
     let request = match admitted {
         Ok(r) => r,
         Err(rej) => {
-            shared.sink.push(&format!(
-                "[ci-model] refused a request: {} ({})",
-                rej.subtype.as_str(),
-                rej.message
-            ));
-            let left = shared.budget_left(&shared.state());
-            let env = Envelope::error(
-                rej.subtype,
-                rej.message,
-                None,
-                BrokerBlock {
-                    call_index: 0,
-                    budget_left: left,
-                },
-            );
-            respond(&mut wr, rej.status, &env).await;
+            // A fixed category per subtype, rate-limited: a looping or
+            // hostile local client cannot fill the dispatch log.
+            let n = {
+                let mut st = shared.state();
+                let n = st.rejections.entry(rej.subtype.as_str()).or_insert(0);
+                *n += 1;
+                *n
+            };
+            if log_occurrence(n) {
+                shared.sink.push(&format!(
+                    "[ci-model] refused a request: {} ({n} so far)",
+                    rej.subtype.as_str()
+                ));
+            }
+            // No `budget_left`: a request refused before admission learns
+            // nothing about the dispatch.
+            let env = Envelope::error(rej.subtype, rej.message, None, BrokerBlock::default());
+            respond(&mut wr, shared.write_timeout, rej.status, &env).await;
             return;
         }
     };
@@ -634,7 +708,25 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
                     reply.cost_usd,
                     BrokerBlock::default(),
                 );
-                (row, env, (200, "OK"))
+                // Measure the SERIALIZED envelope (JSON escaping can inflate
+                // the answer), with room for the broker block filled below,
+                // so nothing the broker sends exceeds what the shim reads.
+                let size = serde_json::to_vec(&env)
+                    .map(|v| v.len())
+                    .unwrap_or(usize::MAX);
+                if size.saturating_add(BROKER_BLOCK_ROOM) > MAX_ENVELOPE_BYTES {
+                    let mut row = row;
+                    row.outcome = ErrorSubtype::ResponseTooLarge.as_str();
+                    let env = Envelope::error(
+                        ErrorSubtype::ResponseTooLarge,
+                        format!("the answer's envelope exceeds {MAX_ENVELOPE_BYTES} bytes"),
+                        None,
+                        BrokerBlock::default(),
+                    );
+                    (row, env, ErrorSubtype::ResponseTooLarge.http_status())
+                } else {
+                    (row, env, (200, "OK"))
+                }
             }
             CallEnd::Failed {
                 subtype,
@@ -666,20 +758,34 @@ async fn serve(shared: Arc<Shared>, stream: TcpStream) {
         (row, env, status)
     };
     let mut env = env;
-    {
+    let refusals_so_far = {
         let mut st = shared.state();
-        st.ledger.push(row.clone());
+        let n = st.ledger.push(row.clone());
         env.broker = BrokerBlock {
             call_index: index,
-            budget_left: shared.budget_left(&st),
+            budget_left: Some(shared.budget_left(&st)),
         };
+        n
+    };
+    // A call that reached the host is always logged; a refusal before the
+    // host (a harness looping on a spent budget) is rate-limited.
+    if refusals_so_far == 0 || log_occurrence(refusals_so_far) {
+        let tally = if refusals_so_far > 0 {
+            format!(" ({refusals_so_far} so far)")
+        } else {
+            String::new()
+        };
+        shared.sink.push(&format!(
+            "[ci-model] call {index} step={} model={} outcome={} latency_ms={latency_ms}{tally}",
+            row.step, row.requested, row.outcome
+        ));
     }
-    shared.sink.push(&format!(
-        "[ci-model] call {index} step={} model={} outcome={} latency_ms={latency_ms}",
-        row.step, row.requested, row.outcome
-    ));
-    respond(&mut wr, status, &env).await;
+    respond(&mut wr, shared.write_timeout, status, &env).await;
 }
+
+/// Room left in [`MAX_ENVELOPE_BYTES`] for the broker block, which is filled
+/// after the size check (a few integers).
+const BROKER_BLOCK_ROOM: usize = 256;
 
 fn reply_row(
     index: u64,
@@ -785,6 +891,7 @@ async fn run_call(
         prompt: request.prompt,
     };
     let mut broker_attempts: u32 = 0;
+    let mut holds: u32 = 0;
     loop {
         let remaining = wall_deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -838,7 +945,23 @@ async fn run_call(
             }
             Ok(Err(InvokeError::AllAccountsExhausted { reset_at })) => {
                 let reset_unix = unix_secs(reset_at);
-                if reset_at > wall_deadline_at {
+                // Never hold for less than the minimum, even for a reset
+                // already past: a host repeating a stale reset must not turn
+                // the hold into a retry storm.
+                let hold_until = reset_at.max(SystemTime::now() + shared.min_exhaustion_hold);
+                holds += 1;
+                if holds > MAX_EXHAUSTION_HOLDS {
+                    return CallEnd::Failed {
+                        subtype: ErrorSubtype::AllAccountsExhausted,
+                        message: format!(
+                            "every model account is still exhausted after {MAX_EXHAUSTION_HOLDS} \
+                             holds (last reported reset: unix {reset_unix})"
+                        ),
+                        reset_at: Some(reset_unix),
+                        spent: None,
+                    };
+                }
+                if hold_until > wall_deadline_at {
                     return CallEnd::Failed {
                         subtype: ErrorSubtype::AllAccountsExhausted,
                         message: format!(
@@ -852,7 +975,7 @@ async fn run_call(
                 // Hold until the reset, logging each interval (the log line
                 // rides the progress POST that renews the dispatch lease).
                 loop {
-                    let wait = reset_at
+                    let wait = hold_until
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
                     if wait.is_zero() {

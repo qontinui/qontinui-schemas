@@ -22,6 +22,14 @@ pub const MAX_PROMPT_BYTES: usize = 1024 * 1024;
 /// The largest answer the broker returns, in bytes. A larger one fails the call
 /// `response_too_large` (its tokens are still counted: they were spent).
 pub const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+/// The largest SERIALIZED envelope the broker sends. Measured on the
+/// envelope itself, not the answer text: JSON escaping can inflate an answer
+/// up to six-fold, so an answer under [`MAX_RESPONSE_BYTES`] can still
+/// serialize past this, and is then failed `response_too_large`. The shim's
+/// read cap is this plus [`MAX_RESPONSE_HEAD_BYTES`], so the two agree.
+pub const MAX_ENVELOPE_BYTES: usize = 2 * MAX_RESPONSE_BYTES;
+/// The most a broker response head (status line + headers) takes.
+pub const MAX_RESPONSE_HEAD_BYTES: usize = 8 * 1024;
 /// The largest request body the broker reads. JSON escaping can inflate a
 /// prompt (a control character becomes six bytes), so the body cap is wider
 /// than the prompt cap; the prompt cap is applied to the decoded prompt.
@@ -96,13 +104,16 @@ impl ErrorSubtype {
         }
     }
 
-    /// Whether the same request may succeed later in this dispatch. A spent
-    /// budget, an undeclared model or an oversize prompt never will.
+    /// Whether the client may retry the same request in this dispatch. A
+    /// spent budget, an undeclared model or an oversize prompt never succeeds.
+    ///
+    /// `timeout` is NOT retryable either, though a retry might succeed: the
+    /// spend of a timed-out call cannot be observed. The call was cancelled
+    /// before the provider reported its usage, so none of its tokens reached
+    /// the budget, and every retry would add more spend the budget cannot
+    /// see. Only `all_accounts_exhausted` is retryable — nothing was spent.
     pub fn retryable(self) -> bool {
-        matches!(
-            self,
-            ErrorSubtype::AllAccountsExhausted | ErrorSubtype::Timeout
-        )
+        matches!(self, ErrorSubtype::AllAccountsExhausted)
     }
 
     /// The HTTP status the broker answers with.
@@ -156,7 +167,11 @@ pub struct BrokerBlock {
     /// The call's 1-based index in the dispatch; 0 for a request refused
     /// before it was admitted as a call (unauthorized, malformed).
     pub call_index: u64,
-    pub budget_left: BudgetLeft,
+    /// What is left of the budget. Absent on a request refused before it
+    /// was admitted: an unauthenticated peer learns nothing about the
+    /// dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_left: Option<BudgetLeft>,
 }
 
 /// The `claude -p --output-format json`-compatible answer.
@@ -269,6 +284,9 @@ mod tests {
         assert!(!ErrorSubtype::BudgetExhausted(Budget::Calls).retryable());
         assert!(ErrorSubtype::AllAccountsExhausted.retryable());
         assert!(!ErrorSubtype::PromptTooLarge.retryable());
+        // A timed-out call's spend cannot be observed, so it is not
+        // retryable: a retrying client would multiply uncounted spend.
+        assert!(!ErrorSubtype::Timeout.retryable());
     }
 
     /// The envelope keeps `claude -p`'s key spellings, so a harness parses a

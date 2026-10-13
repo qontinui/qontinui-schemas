@@ -83,11 +83,6 @@ pub const RUNNER_REFUSALS: &[&str] = &[
     "broker_start_failed",
 ];
 
-/// Whether `reason` is one of the closed refusal reasons.
-pub fn is_known_refusal(reason: &str) -> bool {
-    COORD_REFUSALS.contains(&reason) || RUNNER_REFUSALS.contains(&reason)
-}
-
 /// Constant-time equality for secrets (the broker's capability token).
 ///
 /// `ct_eq` requires equal lengths; the length is not secret (the token is a
@@ -117,14 +112,12 @@ mod tests {
         assert!(secret_eq(b"", b""));
     }
 
-    /// The reason vocabulary is closed and the two halves do not overlap.
+    /// The two halves of the closed reason vocabulary do not overlap, so a
+    /// reason names which side decided it.
     #[test]
     fn refusal_reasons_are_closed_and_disjoint() {
         for r in COORD_REFUSALS {
             assert!(!RUNNER_REFUSALS.contains(r), "{r}");
-            assert!(is_known_refusal(r));
         }
-        assert!(is_known_refusal("host_has_no_broker"));
-        assert!(!is_known_refusal("all_accounts_exhausted"));
     }
 }

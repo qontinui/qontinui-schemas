@@ -9,6 +9,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::Semaphore;
 
+use std::net::{Ipv4Addr, SocketAddr};
+
+use tokio::net::TcpListener;
+
 use super::*;
 use crate::model::test_support::{declaration, ok_reply, FakeInvoker, Lines};
 
@@ -22,6 +26,8 @@ async fn start(
     let mut cfg = BrokerConfig::new(decl);
     cfg.max_in_flight = in_flight;
     cfg.hold_log_interval = Duration::from_millis(200);
+    cfg.min_exhaustion_hold = Duration::from_millis(50);
+    cfg.write_timeout = Duration::from_millis(300);
     let broker = Broker::start(inv.clone(), cfg, Arc::new(lines.clone()))
         .await
         .expect("broker starts");
@@ -206,8 +212,8 @@ async fn a_good_request_gets_a_cli_shaped_envelope_and_the_log_carries_no_text()
     assert_eq!(env.usage.unwrap().input_tokens, 7);
     assert!(env.model_usage.contains_key("claude-sonnet-4-5-20250929"));
     assert_eq!(env.broker.call_index, 1);
-    assert_eq!(env.broker.budget_left.calls, 4);
-    assert_eq!(env.broker.budget_left.tokens, 993);
+    assert_eq!(env.broker.budget_left.unwrap().calls, 4);
+    assert_eq!(env.broker.budget_left.unwrap().tokens, 993);
     let log = lines.all();
     assert!(
         log.iter()
@@ -247,7 +253,7 @@ async fn calls_are_a_hard_limit_at_n_and_n_plus_one() {
     assert_eq!(ask(&b, "1").await.0, 200);
     let (status, env) = ask(&b, "2").await;
     assert_eq!(status, 200);
-    assert_eq!(env.broker.budget_left.calls, 0);
+    assert_eq!(env.broker.budget_left.unwrap().calls, 0);
     let (status, env) = ask(&b, "3").await;
     assert_eq!(status, 429);
     assert_eq!(env.subtype, "budget_exhausted:calls");
@@ -639,4 +645,323 @@ async fn stopping_the_broker_cancels_in_flight_calls_and_records_them() {
     assert_eq!(out.ledger.calls[0].outcome, "cancelled");
     let answer = client.await.unwrap();
     assert!(answer.contains("\"cancelled\""), "{answer}");
+}
+
+// ── Review round 1: bounded holds, bounded ledger and log, bounded stop ──
+
+#[tokio::test]
+async fn a_reset_in_the_past_is_held_the_minimum_and_capped() {
+    let inv = FakeInvoker::new(Arc::new(|_req| {
+        Box::pin(async {
+            Err(InvokeError::AllAccountsExhausted {
+                reset_at: SystemTime::now() - Duration::from_secs(10),
+            })
+        })
+    }));
+    let (b, lines, inv) = start(inv, declaration(10, 1000, 60), 4).await;
+    let t0 = Instant::now();
+    let (status, env) = tokio::time::timeout(Duration::from_secs(10), ask(&b, "p"))
+        .await
+        .expect("a stale reset must not hold the call until the wall budget");
+    assert_eq!(status, 503);
+    assert_eq!(env.subtype, "all_accounts_exhausted");
+    assert_eq!(
+        inv.calls.load(Ordering::SeqCst),
+        u64::from(MAX_EXHAUSTION_HOLDS) + 1,
+        "one attempt per hold, then it fails"
+    );
+    assert!(
+        t0.elapsed() >= Duration::from_millis(50) * MAX_EXHAUSTION_HOLDS,
+        "every hold lasted at least the minimum"
+    );
+    let held = lines.all().iter().filter(|l| l.contains("held")).count();
+    assert_eq!(held, MAX_EXHAUSTION_HOLDS as usize, "{:?}", lines.all());
+}
+
+#[tokio::test]
+async fn a_harness_looping_on_a_spent_budget_grows_neither_ledger_nor_log() {
+    let (b, lines, inv) = start(FakeInvoker::answering("hi", 1), declaration(1, 1000, 60), 4).await;
+    assert_eq!(ask(&b, "first").await.0, 200);
+    for _ in 0..300 {
+        let (status, env) = ask(&b, "again").await;
+        assert_eq!(status, 429);
+        assert_eq!(env.subtype, "budget_exhausted:calls");
+    }
+    assert_eq!(inv.calls.load(Ordering::SeqCst), 1);
+    let logged = lines
+        .all()
+        .iter()
+        .filter(|l| l.contains("budget_exhausted:calls"))
+        .count();
+    assert!(
+        logged <= 6,
+        "the repeated refusal line is rate-limited: {logged}"
+    );
+    let out = b.stop().await;
+    let stored = crate::model::ledger::MAX_STORED_REFUSALS;
+    assert_eq!(out.ledger.calls.len(), 1 + stored);
+    assert_eq!(out.ledger.refused_rows_dropped, 300 - stored as u64);
+    assert_eq!(
+        out.ledger.refusals_by_outcome["budget_exhausted:calls"],
+        300
+    );
+    assert_eq!(out.ledger.totals.calls, 301);
+}
+
+#[tokio::test]
+async fn stop_is_prompt_with_a_stalled_reader() {
+    let (b, _l, _inv) = start(
+        FakeInvoker::answering("hi", 1),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    let mut s = TcpStream::connect(("127.0.0.1", b.port())).await.unwrap();
+    // Half a request head, then silence.
+    s.write_all(b"POST /v1/complete HTTP/1.1\r\nHost: 127.0.0.1")
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let t0 = Instant::now();
+    tokio::time::timeout(Duration::from_secs(10), b.stop())
+        .await
+        .expect("stop must not wait out the request read timeout");
+    assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    drop(s);
+}
+
+/// A client with a tiny receive window that sends its request and never
+/// reads the answer.
+async fn non_reading_client(port: u16, request: Vec<u8>) -> TcpStream {
+    let sock = tokio::net::TcpSocket::new_v4().unwrap();
+    sock.set_recv_buffer_size(4096).unwrap();
+    let mut s = sock
+        .connect(SocketAddr::from((Ipv4Addr::LOCALHOST, port)))
+        .await
+        .unwrap();
+    s.write_all(&request).await.unwrap();
+    s
+}
+
+#[tokio::test]
+async fn stop_is_prompt_with_clients_that_never_read() {
+    let answer = Box::leak("y".repeat(MAX_RESPONSE_BYTES - 1024).into_boxed_str());
+    let (b, _l, inv) = start(
+        FakeInvoker::answering(answer, 1),
+        declaration(100, 100_000, 60),
+        4,
+    )
+    .await;
+    let mut clients = Vec::new();
+    for _ in 0..16 {
+        let req = http(
+            b.port(),
+            COMPLETE_PATH,
+            Some(b.token()),
+            "",
+            &prompt_body("p"),
+        );
+        clients.push(non_reading_client(b.port(), req).await);
+    }
+    wait_until("every call to run", || {
+        inv.calls.load(Ordering::SeqCst) == 16
+    })
+    .await;
+    let t0 = Instant::now();
+    tokio::time::timeout(Duration::from_secs(10), b.stop())
+        .await
+        .expect("stop must not wait on a client that never reads");
+    assert!(t0.elapsed() < Duration::from_secs(3), "{:?}", t0.elapsed());
+    drop(clients);
+}
+
+/// The write itself is bounded: a response far larger than any socket buffer,
+/// to a client that never reads, returns after the write timeout.
+#[tokio::test]
+async fn a_response_write_is_bounded_by_the_write_timeout() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let client = non_reading_client(port, Vec::new()).await;
+    let (server, _) = listener.accept().await.unwrap();
+    let (_rd, mut wr) = server.into_split();
+    let env = Envelope::error(
+        ErrorSubtype::ProviderError,
+        "z".repeat(64 * 1024 * 1024),
+        None,
+        BrokerBlock::default(),
+    );
+    let t0 = Instant::now();
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        respond(&mut wr, Duration::from_millis(300), (200, "OK"), &env),
+    )
+    .await
+    .expect("respond must give up on a client that never reads");
+    assert!(t0.elapsed() < Duration::from_secs(3), "{:?}", t0.elapsed());
+    drop(client);
+}
+
+#[tokio::test]
+async fn a_rejection_tells_an_unauthenticated_peer_nothing_about_the_budget() {
+    let (b, _l, _inv) = start(
+        FakeInvoker::answering("hi", 1),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    let (status, text) = raw_exchange(
+        b.port(),
+        &http(b.port(), COMPLETE_PATH, None, "", &prompt_body("p")),
+    )
+    .await;
+    assert_eq!(status, 401);
+    assert!(!text.contains("budget_left"), "{text}");
+    let req = format!(
+        "POST {COMPLETE_PATH} HTTP/1.1\r\nHost: evil.example\r\nAuthorization: Bearer {}\r\nContent-Length: 2\r\n\r\n{{}}",
+        b.token()
+    );
+    let (status, text) = raw_exchange(b.port(), req.as_bytes()).await;
+    assert_eq!(status, 403);
+    assert!(!text.contains("budget_left"), "{text}");
+    // An admitted call still reports it.
+    let (_, env) = ask(&b, "p").await;
+    assert!(env.broker.budget_left.is_some());
+}
+
+#[tokio::test]
+async fn connections_past_the_cap_are_closed_unanswered() {
+    let (b, lines, _inv) = start(
+        FakeInvoker::answering("hi", 1),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    let mut idle = Vec::new();
+    for _ in 0..MAX_CONNECTIONS {
+        idle.push(TcpStream::connect(("127.0.0.1", b.port())).await.unwrap());
+    }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let mut extra = TcpStream::connect(("127.0.0.1", b.port())).await.unwrap();
+    let mut buf = [0u8; 16];
+    let n = tokio::time::timeout(Duration::from_secs(5), extra.read(&mut buf))
+        .await
+        .expect("the extra connection is closed, not left hanging")
+        .unwrap_or(0);
+    assert_eq!(n, 0, "closed unanswered");
+    assert!(lines
+        .all()
+        .iter()
+        .any(|l| l.contains("closed a connection unanswered")));
+    drop(idle);
+    // Once the idle peers go, the broker serves again.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let (status, _) = raw_exchange(
+            b.port(),
+            &http(
+                b.port(),
+                COMPLETE_PATH,
+                Some(b.token()),
+                "",
+                &prompt_body("p"),
+            ),
+        )
+        .await;
+        if status == 200 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "the broker never recovered");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test]
+async fn a_malformed_body_is_never_echoed_into_the_log() {
+    let (b, lines, _inv) = start(
+        FakeInvoker::answering("hi", 1),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    for body in [
+        r#"{"prompt":"SECRET-BODY","bogus_SECRET":1}"#,
+        r#"{"prompt": SECRET-BODY}"#,
+    ] {
+        let (status, text) = raw_exchange(
+            b.port(),
+            &http(b.port(), COMPLETE_PATH, Some(b.token()), "", body),
+        )
+        .await;
+        assert_eq!(status, 400);
+        assert!(!text.contains("SECRET"), "{text}");
+    }
+    let log = lines.all();
+    assert!(log.iter().any(|l| l.contains("bad_request")), "{log:?}");
+    assert!(!log.iter().any(|l| l.contains("SECRET")), "{log:?}");
+}
+
+#[tokio::test]
+async fn an_answer_whose_envelope_exceeds_the_shared_cap_is_refused() {
+    // Half the answer cap of control characters: under MAX_RESPONSE_BYTES as
+    // text, ~3 MiB once JSON-escaped.
+    let answer = Box::leak("\u{1}".repeat(MAX_RESPONSE_BYTES / 2).into_boxed_str());
+    let (b, _l, _inv) = start(
+        FakeInvoker::answering(answer, 4),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    let (status, env) = ask(&b, "p").await;
+    assert_eq!(status, 502);
+    assert_eq!(env.subtype, "response_too_large");
+    let out = b.stop().await;
+    assert_eq!(out.ledger.calls[0].outcome, "response_too_large");
+    assert_eq!(out.ledger.budget.tokens_used, 4, "its tokens were spent");
+
+    // The largest plain answer the broker returns fits what the shim reads.
+    let plain = Box::leak("x".repeat(MAX_RESPONSE_BYTES).into_boxed_str());
+    let (b, _l, _inv) = start(
+        FakeInvoker::answering(plain, 4),
+        declaration(10, 1000, 60),
+        4,
+    )
+    .await;
+    let (status, text) = raw_exchange(
+        b.port(),
+        &http(
+            b.port(),
+            COMPLETE_PATH,
+            Some(b.token()),
+            "",
+            &prompt_body("p"),
+        ),
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert!(
+        text.len() <= crate::model::shim::MAX_RESPONSE_READ,
+        "{}",
+        text.len()
+    );
+}
+
+/// A call the broker times out is answered `timeout` with `retryable: false`:
+/// its provider spend was never reported, so a retry would multiply spend the
+/// budget cannot see.
+#[tokio::test]
+async fn a_timed_out_call_is_not_retryable() {
+    let dropped = Arc::new(AtomicBool::new(false));
+    let inv = Arc::new(hanging(dropped.clone()));
+    let lines = Lines::default();
+    let mut cfg = BrokerConfig::new(declaration(10, 1000, 60));
+    cfg.call_timeout = Duration::from_millis(200);
+    let b = Broker::start(inv, cfg, Arc::new(lines)).await.unwrap();
+    let (status, env) = ask(&b, "p").await;
+    assert_eq!(status, 504);
+    assert_eq!(env.subtype, "timeout");
+    assert_eq!(env.retryable, Some(false));
+    assert!(
+        dropped.load(Ordering::SeqCst),
+        "the timed-out call was cancelled"
+    );
 }

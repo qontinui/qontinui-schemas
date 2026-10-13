@@ -1187,6 +1187,25 @@ pub(crate) enum EnvKeyClass {
 /// host-provided model command cannot outrank the broker.
 pub const MODEL_COMMAND_SUFFIX: &str = "_MODEL_CMD";
 
+/// Whether `key` is in the [`EnvKeyClass::ModelCommand`] class. On Windows,
+/// where environment names are case-insensitive, the suffix is too: a
+/// `docs_eval_model_cmd` there IS `DOCS_EVAL_MODEL_CMD`.
+pub(crate) fn is_model_command_key(key: &str) -> bool {
+    model_command_suffix_matches(key, cfg!(windows))
+}
+
+/// The suffix test, with case-insensitivity as a parameter so both arms are
+/// testable on any OS.
+fn model_command_suffix_matches(key: &str, case_insensitive: bool) -> bool {
+    if case_insensitive {
+        key.len() >= MODEL_COMMAND_SUFFIX.len()
+            && key.as_bytes()[key.len() - MODEL_COMMAND_SUFFIX.len()..]
+                .eq_ignore_ascii_case(MODEL_COMMAND_SUFFIX.as_bytes())
+    } else {
+        key.ends_with(MODEL_COMMAND_SUFFIX)
+    }
+}
+
 /// Classify a step env key — see [`EnvKeyClass`].
 pub(crate) fn classify_step_env_key(key: &str) -> EnvKeyClass {
     if let Some((_, owner)) = EXECUTOR_OWNED_ENV.iter().find(|(owned, _)| *owned == key) {
@@ -1195,7 +1214,7 @@ pub(crate) fn classify_step_env_key(key: &str) -> EnvKeyClass {
     if let Some(kind) = crate::services::kind_exporting(key) {
         return EnvKeyClass::ServiceExported(kind.label());
     }
-    if key.ends_with(MODEL_COMMAND_SUFFIX) {
+    if is_model_command_key(key) {
         return EnvKeyClass::ModelCommand;
     }
     if ENV_ALLOWLIST.contains(&key) {
@@ -2620,6 +2639,29 @@ command = ["true"]
                 "{key}: got {err}"
             );
         }
+    }
+
+    /// The suffix match follows the platform's env-name case rule: exact on
+    /// Unix, case-insensitive on Windows.
+    #[test]
+    fn the_model_command_suffix_is_case_insensitive_where_env_names_are() {
+        for key in [
+            "DOCS_EVAL_MODEL_CMD",
+            "docs_eval_model_cmd",
+            "Docs_Eval_Model_Cmd",
+        ] {
+            assert!(model_command_suffix_matches(key, true), "{key}");
+        }
+        assert!(model_command_suffix_matches("DOCS_EVAL_MODEL_CMD", false));
+        assert!(!model_command_suffix_matches("docs_eval_model_cmd", false));
+        for key in ["MODEL_CM", "", "MODEL_CMDX", "Ä_MODEL_CM"] {
+            assert!(!model_command_suffix_matches(key, true), "{key}");
+        }
+        assert_eq!(is_model_command_key("docs_eval_model_cmd"), cfg!(windows));
+        assert_eq!(
+            classify_step_env_key("docs_eval_model_cmd") == EnvKeyClass::ModelCommand,
+            cfg!(windows)
+        );
     }
 
     /// The model-access names the executor exports are refused with the
