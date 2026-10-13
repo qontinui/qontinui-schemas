@@ -14,7 +14,9 @@
 //! - no canonical-configuration source, so a manifest that declares
 //!   `[canonical]` is REFUSED here rather than run unchecked;
 //! - no model invoker, so a `model = true` step runs refused with
-//!   `host_has_no_broker`.
+//!   `host_has_no_broker`;
+//! - no sibling read door ([`NoSiblingDoor`]), so every sibling is read on
+//!   the public path.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -22,7 +24,8 @@ use std::time::Duration;
 
 use crate::host::{
     BoxFuture, CanonicalConvergence, CanonicalReading, CiSettings, ConvergeReport, GithubAccess,
-    Host, HostIdentity, ProcessSpawn, StepContainment, TreeGuard, VolumeState,
+    Host, HostIdentity, ProcessSpawn, SiblingReadAccess, SiblingReadAnswer, StepContainment,
+    TreeGuard, VolumeState,
 };
 
 /// How long `gh auth token` may take before the run proceeds without a token.
@@ -276,6 +279,23 @@ impl CanonicalConvergence for NoCanonical {
     }
 }
 
+/// No sibling read door: a plain shell has no coord to ask.
+pub struct NoSiblingDoor;
+
+impl SiblingReadAccess for NoSiblingDoor {
+    fn read_token<'a>(
+        &'a self,
+        _dispatch_id: &'a str,
+        _repo: &'a str,
+    ) -> BoxFuture<'a, SiblingReadAnswer> {
+        Box::pin(async {
+            SiblingReadAnswer::NotOffered {
+                reason: "standalone host has no coord door".to_string(),
+            }
+        })
+    }
+}
+
 /// A complete standalone host rooted at `root`.
 pub fn host(root: PathBuf, label: String) -> Host {
     Host {
@@ -288,6 +308,7 @@ pub fn host(root: PathBuf, label: String) -> Host {
         // A plain shell holds no model invoker: a `model = true` step runs
         // with `QONTINUI_CI_MODEL_REFUSED=host_has_no_broker`.
         model: None,
+        sibling_reads: Arc::new(NoSiblingDoor),
     }
 }
 
@@ -415,6 +436,17 @@ mod tests {
         let outcome =
             crate::canonical::ensure(Some(&declared), false, h.canonical.as_ref(), &mut log).await;
         assert!(outcome.is_refusal());
+    }
+
+    #[tokio::test]
+    async fn a_standalone_host_offers_no_sibling_read_door() {
+        let h = host(std::env::temp_dir(), "test".to_string());
+        match h.sibling_reads.read_token("d-1", "qontinui/x").await {
+            SiblingReadAnswer::NotOffered { reason } => {
+                assert_eq!(reason, "standalone host has no coord door")
+            }
+            other => panic!("expected NotOffered, got {other:?}"),
+        }
     }
 
     #[test]

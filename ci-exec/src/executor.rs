@@ -785,6 +785,8 @@ async fn provision(
     crate::sibling::provision(
         host.github.as_ref(),
         host.process.as_ref(),
+        host.sibling_reads.as_ref(),
+        &payload.dispatch_id,
         &dispatch_root,
         worktree,
         &manifest.siblings,

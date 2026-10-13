@@ -110,9 +110,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
-use crate::host::{GithubAccess, ProcessSpawn};
+use crate::host::{GithubAccess, ProcessSpawn, SiblingReadAccess, SiblingReadAnswer};
 use crate::manifest::{CiSibling, SiblingPin};
-use crate::sibling_git::{require_git_floor, run_sibling_git, SiblingGitEnv};
+use crate::sibling_git::{require_git_floor, run_sibling_git, ReadToken, SiblingGitEnv};
 
 /// Budget for the sibling fetch (a `--depth 1` fetch of one commit).
 const SIBLING_FETCH_TIMEOUT: Duration = Duration::from_secs(600);
@@ -651,13 +651,42 @@ fn read_pin(worktree: &Path, repo: &str) -> Result<String, String> {
     }
 }
 
-/// Clone URL for a sibling slug. It never carries a credential: a granted
-/// sibling authenticates through a URL-scoped `http.<this url>.extraHeader`
-/// in its isolated git environment ([`crate::sibling_git`]), whose key is
-/// spelled from THIS function so the header matches exactly this URL. Nothing
-/// from the node owner's git config (helper, `insteadOf`) reaches the fetch.
-pub(crate) fn clone_url(repo: &str) -> String {
-    format!("https://github.com/{repo}.git")
+/// Clone URL for a sibling slug against `base` (GitHub in production). It
+/// never carries a credential: a granted sibling authenticates through a
+/// URL-scoped `http.<this url>.extraHeader` in its isolated git environment
+/// ([`crate::sibling_git`]), whose key is spelled from THIS function — the
+/// same call the fetch's URL comes from — so the header matches exactly this
+/// URL. Nothing from the node owner's git config (helper, `insteadOf`) reaches
+/// the fetch.
+fn clone_url_at(base: &str, repo: &str) -> String {
+    format!("{base}/{repo}.git")
+}
+
+/// The production clone URL ([`clone_url_at`] on GitHub).
+#[cfg(test)]
+fn clone_url(repo: &str) -> String {
+    clone_url_at(GITHUB_WEB, repo)
+}
+
+const GITHUB_WEB: &str = "https://github.com";
+const GITHUB_API: &str = "https://api.github.com";
+
+/// Where this module's network reads go: GitHub in production; local doubles
+/// in tests. Never configurable from a manifest.
+pub(crate) struct Endpoints {
+    /// The REST API base (labels, PRs, token revocation).
+    pub api: String,
+    /// The git base a sibling is cloned from.
+    pub clone: String,
+}
+
+impl Endpoints {
+    pub(crate) fn github() -> Self {
+        Self {
+            api: GITHUB_API.to_string(),
+            clone: GITHUB_WEB.to_string(),
+        }
+    }
 }
 
 // ──────────────────────────────── IO ──────────────────────────────────────
@@ -671,11 +700,21 @@ struct ApiAnswer {
 }
 
 /// One provision's GitHub door: the host's access (token source, ETag cache,
-/// budget meter), one HTTP client, and the token resolved once per provision.
+/// budget meter), one HTTP client, and the token to read with.
+///
+/// Two of these exist per granted sibling: the HOST one (the host's token, the
+/// host's books) for reads of the dispatched repo itself, and the SIBLING one,
+/// which carries the door's minted token and keeps OUT of the host's books
+/// (`host_books: false`). A private PR-list body must never land in an ETag
+/// cache that unauthenticated reads replay from, and the minted token spends
+/// the installation's budget, not the host token's.
+#[derive(Clone, Copy)]
 struct Api<'a> {
     github: &'a dyn GithubAccess,
     client: &'a reqwest::Client,
+    base: &'a str,
     token: Option<&'a str>,
+    host_books: bool,
 }
 
 /// The ONE door every GitHub read in this module goes through, so that metering
@@ -694,6 +733,9 @@ struct Api<'a> {
 /// never as a charged call: it cost a socket, and dropping it would make a
 /// storm of DNS failures read as "nothing happened".
 async fn api_get(api: &Api<'_>, url: &str) -> Option<ApiAnswer> {
+    if !api.host_books {
+        return api_get_unbooked(api, url).await;
+    }
     let cached_etag = api.github.cached_etag(url);
 
     let mut req = api
@@ -754,6 +796,24 @@ async fn api_get(api: &Api<'_>, url: &str) -> Option<ApiAnswer> {
     Some(ApiAnswer { status, body })
 }
 
+/// A read with a minted credential: no `If-None-Match`, no cache write, no
+/// replay, no host metering — none of the host's books see it.
+async fn api_get_unbooked(api: &Api<'_>, url: &str) -> Option<ApiAnswer> {
+    let mut req = api
+        .client
+        .get(url)
+        .header("Accept", "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .header("User-Agent", "qontinui-ci");
+    if let Some(t) = api.token {
+        req = req.header("Authorization", format!("Bearer {t}"));
+    }
+    let resp = req.send().await.ok()?;
+    let status = resp.status().as_u16();
+    let body = resp.text().await.ok()?;
+    Some(ApiAnswer { status, body })
+}
+
 /// What a conditional read does to the cache entry for its URL.
 #[derive(Debug, PartialEq, Eq)]
 enum CacheDecision<'a> {
@@ -799,7 +859,10 @@ fn expect_ok(what: &str, answer: Option<ApiAnswer>) -> Result<ApiAnswer, String>
 /// Read the label names on a pull request.
 async fn fetch_pr_labels(api: &Api<'_>, repo: &str, number: u64) -> Result<Vec<String>, String> {
     let what = format!("reading labels on {repo}#{number}");
-    let url = format!("https://api.github.com/repos/{repo}/issues/{number}/labels?per_page=100");
+    let url = format!(
+        "{}/repos/{repo}/issues/{number}/labels?per_page=100",
+        api.base
+    );
     let a = expect_ok(&what, api_get(api, &url).await)?;
     if a.status == 404 {
         return Err(format!("{what}: HTTP 404 — no such pull request."));
@@ -823,7 +886,8 @@ async fn fetch_sibling_open_prs(
     for page in 1..=MAX_PR_PAGES {
         let what = format!("reading open pull requests on {sibling_repo} (page {page})");
         let url = format!(
-            "https://api.github.com/repos/{sibling_repo}/pulls?state=open&per_page=100&page={page}"
+            "{}/repos/{sibling_repo}/pulls?state=open&per_page=100&page={page}",
+            api.base
         );
         let a = expect_ok(&what, api_get(api, &url).await)?;
         if a.status == 404 {
@@ -868,7 +932,7 @@ async fn fetch_sibling_pr_detail(
     number: u64,
 ) -> Result<SiblingPrDetail, String> {
     let what = format!("reading {sibling_repo}#{number}");
-    let url = format!("https://api.github.com/repos/{sibling_repo}/pulls/{number}");
+    let url = format!("{}/repos/{sibling_repo}/pulls/{number}", api.base);
     let a = expect_ok(&what, api_get(api, &url).await)?;
     if a.status == 404 {
         return Err(format!(
@@ -897,26 +961,42 @@ async fn fetch_sibling_pr_detail(
     })
 }
 
+/// One sibling's git: the host's process posture, the sibling's isolated
+/// environment, and the base its clone URL is spelled against.
+struct SiblingIo<'a> {
+    process: &'a dyn ProcessSpawn,
+    git_env: &'a SiblingGitEnv,
+    clone_base: &'a str,
+}
+
+impl SiblingIo<'_> {
+    fn clone_url(&self, repo: &str) -> String {
+        clone_url_at(self.clone_base, repo)
+    }
+
+    async fn git(&self, cwd: &Path, args: &[&str], timeout: Duration) -> Result<String, String> {
+        run_sibling_git(self.process, cwd, args, timeout, self.git_env).await
+    }
+}
+
 /// Resolve a branch tip to a SHA so both resolution paths converge on the
 /// same "fetch this exact commit" primitive.
 async fn ls_remote_branch_sha(
-    process: &dyn ProcessSpawn,
+    io: &SiblingIo<'_>,
     cwd: &Path,
     repo: &str,
     branch: &str,
-    git_env: &SiblingGitEnv,
 ) -> Result<String, String> {
-    let url = clone_url(repo);
+    let url = io.clone_url(repo);
     let refspec = format!("refs/heads/{branch}");
-    let out = run_sibling_git(
-        process,
-        cwd,
-        &["ls-remote", "--exit-code", &url, &refspec],
-        SIBLING_FETCH_TIMEOUT,
-        git_env,
-    )
-    .await
-    .map_err(|e| format!("resolving {repo}@{branch}: {e}"))?;
+    let out = io
+        .git(
+            cwd,
+            &["ls-remote", "--exit-code", &url, &refspec],
+            SIBLING_FETCH_TIMEOUT,
+        )
+        .await
+        .map_err(|e| format!("resolving {repo}@{branch}: {e}"))?;
     let sha = out
         .split_whitespace()
         .next()
@@ -954,12 +1034,11 @@ pub(crate) struct ResolvedSibling {
 /// dispatch whose declared adaptation would have outranked it — exactly the
 /// action's `if [ -n "${SHA}" ]; then return 0; fi`.
 async fn no_declaration(
-    process: &dyn ProcessSpawn,
+    io: &SiblingIo<'_>,
     cwd: &Path,
     worktree: &Path,
     sibling: &CiSibling,
     why: &str,
-    git_env: &SiblingGitEnv,
 ) -> Result<ResolvedSibling, String> {
     if sibling.pin == SiblingPin::PinFile {
         let sha = read_pin(worktree, &sibling.repo)?;
@@ -969,7 +1048,7 @@ async fn no_declaration(
             provenance: format!("pinned in {SIBLING_PIN_FILE} ({why}; no declaration applied)"),
         });
     }
-    let sha = ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch, git_env).await?;
+    let sha = ls_remote_branch_sha(io, cwd, &sibling.repo, &sibling.branch).await?;
     Ok(ResolvedSibling {
         repo: sibling.repo.clone(),
         sha,
@@ -980,20 +1059,23 @@ async fn no_declaration(
 /// Resolve one sibling to an exact commit. `worktree` is the dispatched
 /// repo's checkout — where [`SIBLING_PIN_FILE`] is read from, at the
 /// dispatched commit, exactly as `.qontinui/ci.toml` itself was.
+///
+/// `host_api` reads the DISPATCHED repo (its PR's labels) with the host's
+/// token; `sibling_api` reads the SIBLING (its open PRs, one PR's detail) —
+/// with the door's minted token when the sibling was granted.
 #[allow(clippy::too_many_arguments)]
 async fn resolve_one(
-    process: &dyn ProcessSpawn,
-    api: &Api<'_>,
+    io: &SiblingIo<'_>,
+    host_api: &Api<'_>,
+    sibling_api: &Api<'_>,
     cwd: &Path,
     worktree: &Path,
     sibling: &CiSibling,
     this_repo: &str,
     pr_number: Option<u64>,
-    git_env: &SiblingGitEnv,
 ) -> Result<ResolvedSibling, String> {
     if sibling.pin == SiblingPin::DefaultBranch {
-        let sha =
-            ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch, git_env).await?;
+        let sha = ls_remote_branch_sha(io, cwd, &sibling.repo, &sibling.branch).await?;
         return Ok(ResolvedSibling {
             repo: sibling.repo.clone(),
             sha,
@@ -1005,18 +1087,17 @@ async fn resolve_one(
     // at all — then the pin or the branch, as the action's emit() does.
     let Some(pr) = pr_number else {
         return no_declaration(
-            process,
+            io,
             cwd,
             worktree,
             sibling,
             "no pull request on this dispatch — no declaration probe",
-            git_env,
         )
         .await;
     };
 
-    let this_labels = fetch_pr_labels(api, this_repo, pr).await?;
-    let sibling_prs = fetch_sibling_open_prs(api, &sibling.repo).await?;
+    let this_labels = fetch_pr_labels(host_api, this_repo, pr).await?;
+    let sibling_prs = fetch_sibling_open_prs(sibling_api, &sibling.repo).await?;
     let inputs = DeclarationInputs {
         this_pr_labels: this_labels,
         sibling_open_prs: sibling_prs,
@@ -1028,12 +1109,10 @@ async fn resolve_one(
         sibling.accept_trailing_sibling,
         &inputs,
     )? {
-        DeclaredTarget::None => {
-            no_declaration(process, cwd, worktree, sibling, "no declaration", git_env).await
-        }
+        DeclaredTarget::None => no_declaration(io, cwd, worktree, sibling, "no declaration").await,
         DeclaredTarget::TrailingSiblingDeclined { number, forms } => {
             no_declaration(
-                process,
+                io,
                 cwd,
                 worktree,
                 sibling,
@@ -1044,12 +1123,11 @@ async fn resolve_one(
                     forms_label(&forms),
                     short_name(&sibling.repo),
                 ),
-                git_env,
             )
             .await
         }
         DeclaredTarget::Pr { number, forms } => {
-            let detail = fetch_sibling_pr_detail(api, &sibling.repo, number).await?;
+            let detail = fetch_sibling_pr_detail(sibling_api, &sibling.repo, number).await?;
             let sha = validate_declared_pr(&sibling.repo, number, &detail)?;
             Ok(ResolvedSibling {
                 repo: sibling.repo.clone(),
@@ -1070,10 +1148,9 @@ async fn resolve_one(
 /// got exactly that commit**. The assertion is the point: without it a fetch
 /// that resolved something else is a silent substitution.
 async fn materialise(
-    process: &dyn ProcessSpawn,
+    io: &SiblingIo<'_>,
     dest: &Path,
     resolved: &ResolvedSibling,
-    git_env: &SiblingGitEnv,
 ) -> Result<(), String> {
     if dest.exists() {
         return Err(format!(
@@ -1086,26 +1163,13 @@ async fn materialise(
         .ok_or_else(|| format!("{} has no parent", dest.display()))?;
     std::fs::create_dir_all(dest).map_err(|e| format!("create {}: {e}", dest.display()))?;
     let dest_str = dest.to_string_lossy().to_string();
-    let url = clone_url(&resolved.repo);
+    let url = io.clone_url(&resolved.repo);
 
-    run_sibling_git(
-        process,
-        parent,
-        &["init", "-q", &dest_str],
-        GIT_LOCAL_TIMEOUT,
-        git_env,
-    )
-    .await?;
-    run_sibling_git(
-        process,
-        dest,
-        &["remote", "add", "origin", &url],
-        GIT_LOCAL_TIMEOUT,
-        git_env,
-    )
-    .await?;
-    run_sibling_git(
-        process,
+    io.git(parent, &["init", "-q", &dest_str], GIT_LOCAL_TIMEOUT)
+        .await?;
+    io.git(dest, &["remote", "add", "origin", &url], GIT_LOCAL_TIMEOUT)
+        .await?;
+    io.git(
         dest,
         &[
             "fetch",
@@ -1116,7 +1180,6 @@ async fn materialise(
             &resolved.sha,
         ],
         SIBLING_FETCH_TIMEOUT,
-        git_env,
     )
     .await
     .map_err(|e| {
@@ -1125,23 +1188,12 @@ async fn materialise(
             resolved.repo, resolved.sha
         )
     })?;
-    run_sibling_git(
-        process,
-        dest,
-        &["checkout", "-q", "FETCH_HEAD"],
-        GIT_LOCAL_TIMEOUT,
-        git_env,
-    )
-    .await?;
+    io.git(dest, &["checkout", "-q", "FETCH_HEAD"], GIT_LOCAL_TIMEOUT)
+        .await?;
 
-    let got = run_sibling_git(
-        process,
-        dest,
-        &["rev-parse", "HEAD"],
-        GIT_LOCAL_TIMEOUT,
-        git_env,
-    )
-    .await?;
+    let got = io
+        .git(dest, &["rev-parse", "HEAD"], GIT_LOCAL_TIMEOUT)
+        .await?;
     if got.trim() != resolved.sha {
         return Err(format!(
             "asked for {} but checked out {} — refusing a substituted tree",
@@ -1152,6 +1204,166 @@ async fn materialise(
     Ok(())
 }
 
+// ─────────────────────────── the read door (D3, D4) ───────────────────────────
+
+/// The door's answer with the token taken out: what log lines and error
+/// messages may name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DoorNote {
+    Granted { expires_at: String },
+    NoGrant { code: String },
+    NotOffered { reason: String },
+    Unknown { reason: String },
+}
+
+impl DoorNote {
+    /// Split an answer into its loggable half and the token, if any.
+    fn split(answer: SiblingReadAnswer) -> (Self, Option<ReadToken>) {
+        match answer {
+            SiblingReadAnswer::Granted(token, expires_at) => {
+                (Self::Granted { expires_at }, Some(token))
+            }
+            SiblingReadAnswer::NoGrant { code } => (Self::NoGrant { code }, None),
+            SiblingReadAnswer::NotOffered { reason } => (Self::NotOffered { reason }, None),
+            SiblingReadAnswer::Unknown { reason } => (Self::Unknown { reason }, None),
+        }
+    }
+
+    /// The one log line per answer — sibling, answer, code, expiry; never the
+    /// token.
+    fn log_line(&self, repo: &str) -> String {
+        match self {
+            Self::Granted { expires_at } => format!(
+                "[ci-node] sibling {repo}: read door answered granted (expires {expires_at})"
+            ),
+            Self::NoGrant { code } => {
+                format!("[ci-node] sibling {repo}: read door answered no grant ({code})")
+            }
+            Self::NotOffered { reason } => {
+                format!("[ci-node] sibling {repo}: read door not offered ({reason})")
+            }
+            Self::Unknown { reason } => {
+                format!("[ci-node] sibling {repo}: read door answer UNKNOWN ({reason})")
+            }
+        }
+    }
+
+    /// A public-path failure, with D3's fix text. An UNKNOWN door is named as
+    /// UNKNOWN and is never rendered as a refusal.
+    fn public_path_failure(&self, err: &str, repo: &str, consumer: &str) -> String {
+        let fix = format!(
+            "if {repo} is private, its default branch must declare [[ci_readers]] \
+             repo = \"{consumer}\""
+        );
+        match self {
+            Self::NoGrant { code } => format!("{err}. {fix}; the door answered {code}"),
+            Self::NotOffered { reason } => format!(
+                "{err}. This host offers no sibling read door ({reason}), so a private \
+                 sibling cannot be read here; on a coord-dispatched node, {fix}"
+            ),
+            Self::Unknown { reason } => format!(
+                "{err}. The read door's answer was UNKNOWN ({reason}) — not a refusal, so \
+                 this sibling was read on the public path without a grant. {fix}, and the \
+                 door must answer"
+            ),
+            // Not a public-path failure; reported as it came.
+            Self::Granted { .. } => err.to_string(),
+        }
+    }
+}
+
+/// Revoke a minted installation token with itself (`DELETE /installation/token`).
+async fn revoke_token(
+    client: &reqwest::Client,
+    url: &str,
+    token: &ReadToken,
+) -> Result<(), String> {
+    let resp = client
+        .delete(url)
+        .header("Accept", "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .header("User-Agent", "qontinui-ci")
+        .header("Authorization", format!("Bearer {}", token.secret()))
+        .send()
+        .await
+        .map_err(|_| "no answer (network/DNS/TLS)".to_string())?;
+    match resp.status().as_u16() {
+        204 => Ok(()),
+        s => Err(format!("HTTP {s}")),
+    }
+}
+
+/// Holds a granted sibling's token until it is revoked. [`Self::revoke`] is the
+/// normal path, taken after `materialise` on success AND failure; if the
+/// provision is dropped mid-flight (a cancelled dispatch), `Drop` hands the
+/// revocation to the runtime so a cancellation does not leave the token live
+/// for its full hour.
+struct RevokeGuard {
+    token: Option<ReadToken>,
+    client: reqwest::Client,
+    url: String,
+    repo: String,
+    expires_at: String,
+}
+
+impl RevokeGuard {
+    fn token(&self) -> &ReadToken {
+        self.token
+            .as_ref()
+            .expect("a RevokeGuard holds its token until revoke or drop")
+    }
+
+    /// Revoke now; returns the one log line for it. Best-effort: a failure is
+    /// logged, never fatal — the token still expires at `expires_at`.
+    async fn revoke(mut self) -> String {
+        let Some(token) = self.token.take() else {
+            return String::new();
+        };
+        let line = match revoke_token(&self.client, &self.url, &token).await {
+            Ok(()) => format!("[ci-node] sibling {}: read token revoked", self.repo),
+            Err(e) => format!(
+                "[ci-node] sibling {}: read token revocation FAILED ({e}); it expires at {}",
+                self.repo, self.expires_at
+            ),
+        };
+        info!("ci_node: {line}");
+        line
+    }
+}
+
+impl Drop for RevokeGuard {
+    fn drop(&mut self) {
+        let Some(token) = self.token.take() else {
+            return;
+        };
+        let (client, url, repo, expires_at) = (
+            self.client.clone(),
+            std::mem::take(&mut self.url),
+            std::mem::take(&mut self.repo),
+            std::mem::take(&mut self.expires_at),
+        );
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => {
+                handle.spawn(async move {
+                    match revoke_token(&client, &url, &token).await {
+                        Ok(()) => info!(
+                            "ci_node: sibling {repo}: read token revoked (provision cancelled)"
+                        ),
+                        Err(e) => warn!(
+                            "ci_node: sibling {repo}: read token revocation FAILED after a \
+                             cancelled provision ({e}); it expires at {expires_at}"
+                        ),
+                    }
+                });
+            }
+            Err(_) => warn!(
+                "ci_node: sibling {repo}: no runtime to revoke its read token on; it expires \
+                 at {expires_at}"
+            ),
+        }
+    }
+}
+
 /// Provision every declared sibling into the dispatch-scoped parent.
 ///
 /// `worktree` is the dispatched repo's checkout: its directory name is what a
@@ -1159,10 +1371,17 @@ async fn materialise(
 /// over the worktree is the one collision the "destination already exists"
 /// refusal would report far too late to be legible), and it is where a
 /// `pin = "pin-file"` sibling's [`SIBLING_PIN_FILE`] is read from.
+///
+/// Per sibling, `reads` is asked ONCE, before any read of it (D3). A granted
+/// sibling is read — API and git — with the minted token, and the token is
+/// revoked once that sibling is provisioned, on every exit path (D4). Every
+/// other answer reads on the public path, under the same isolated git env.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn provision(
     github: &dyn GithubAccess,
     process: &dyn ProcessSpawn,
+    reads: &dyn SiblingReadAccess,
+    dispatch_id: &str,
     dispatch_root: &Path,
     worktree: &Path,
     siblings: &[CiSibling],
@@ -1170,6 +1389,37 @@ pub(crate) async fn provision(
     pr_number: Option<u64>,
     // `+ Send` because a dispatch runs on a `tokio::spawn`ed task and this
     // callback is held across awaits.
+    log: &mut (dyn FnMut(String) + Send),
+) -> Result<Vec<ResolvedSibling>, String> {
+    provision_at(
+        &Endpoints::github(),
+        github,
+        process,
+        reads,
+        dispatch_id,
+        dispatch_root,
+        worktree,
+        siblings,
+        this_repo,
+        pr_number,
+        log,
+    )
+    .await
+}
+
+/// [`provision`] against explicit [`Endpoints`].
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn provision_at(
+    endpoints: &Endpoints,
+    github: &dyn GithubAccess,
+    process: &dyn ProcessSpawn,
+    reads: &dyn SiblingReadAccess,
+    dispatch_id: &str,
+    dispatch_root: &Path,
+    worktree: &Path,
+    siblings: &[CiSibling],
+    this_repo: &str,
+    pr_number: Option<u64>,
     log: &mut (dyn FnMut(String) + Send),
 ) -> Result<Vec<ResolvedSibling>, String> {
     if siblings.is_empty() {
@@ -1203,11 +1453,14 @@ pub(crate) async fn provision(
         .timeout(API_TIMEOUT)
         .build()
         .map_err(|e| format!("build http client: {e}"))?;
-    let api = Api {
+    let host_api = Api {
         github,
         client: &client,
+        base: &endpoints.api,
         token: token.as_deref(),
+        host_books: true,
     };
+    let revoke_url = format!("{}/installation/token", endpoints.api);
 
     // Once per provision: a git too old to honour the isolation would ignore
     // it SILENTLY and read the owner's helper again, so it is refused here.
@@ -1215,33 +1468,78 @@ pub(crate) async fn provision(
 
     let mut resolved_all = Vec::with_capacity(siblings.len());
     for sibling in siblings {
-        let git_env = SiblingGitEnv::isolated(dispatch_root, None)?;
-        let resolved = resolve_one(
-            process,
-            &api,
-            dispatch_root,
-            worktree,
-            sibling,
-            this_repo,
-            pr_number,
-            &git_env,
-        )
-        .await?;
-        let dest = sibling_dest(dispatch_root, sibling);
-        log(format!(
-            "[ci-node] sibling {} -> {} @ {} [{}]",
-            sibling.repo,
-            dest.display(),
-            resolved.sha,
-            resolved.provenance
-        ));
-        materialise(process, &dest, &resolved, &git_env).await?;
-        info!(
-            "ci_node: sibling {} materialised at {} ({})",
-            sibling.repo,
-            dest.display(),
-            resolved.sha
-        );
+        // D3: ask first, once, before any read of this sibling.
+        let (door, minted) = DoorNote::split(reads.read_token(dispatch_id, &sibling.repo).await);
+        let line = door.log_line(&sibling.repo);
+        info!("ci_node: {line}");
+        log(line);
+        let guard = minted.map(|token| RevokeGuard {
+            token: Some(token),
+            client: client.clone(),
+            url: revoke_url.clone(),
+            repo: sibling.repo.clone(),
+            expires_at: match &door {
+                DoorNote::Granted { expires_at } => expires_at.clone(),
+                _ => String::new(),
+            },
+        });
+
+        let outcome = async {
+            let url = clone_url_at(&endpoints.clone, &sibling.repo);
+            let git_env = SiblingGitEnv::isolated(
+                dispatch_root,
+                guard.as_ref().map(|g| (url.as_str(), g.token())),
+            )?;
+            let sibling_api = match &guard {
+                Some(g) => Api {
+                    token: Some(g.token().secret()),
+                    host_books: false,
+                    ..host_api
+                },
+                None => host_api,
+            };
+            let io = SiblingIo {
+                process,
+                git_env: &git_env,
+                clone_base: &endpoints.clone,
+            };
+            let resolved = resolve_one(
+                &io,
+                &host_api,
+                &sibling_api,
+                dispatch_root,
+                worktree,
+                sibling,
+                this_repo,
+                pr_number,
+            )
+            .await?;
+            let dest = sibling_dest(dispatch_root, sibling);
+            log(format!(
+                "[ci-node] sibling {} -> {} @ {} [{}]",
+                sibling.repo,
+                dest.display(),
+                resolved.sha,
+                resolved.provenance
+            ));
+            materialise(&io, &dest, &resolved).await?;
+            info!(
+                "ci_node: sibling {} materialised at {} ({})",
+                sibling.repo,
+                dest.display(),
+                resolved.sha
+            );
+            Ok::<_, String>(resolved)
+        }
+        .await;
+
+        // D4: revoke on every exit path — success and failure here; a
+        // cancellation (this future dropped above) through the guard's Drop.
+        if let Some(guard) = guard {
+            log(guard.revoke().await);
+        }
+        let resolved =
+            outcome.map_err(|e| door.public_path_failure(&e, &sibling.repo, this_repo))?;
         resolved_all.push(resolved);
     }
     Ok(resolved_all)
@@ -1971,16 +2269,15 @@ mod tests {
         // The SHA assertion below is what catches a regression that consulted
         // the branch: `ls-remote` needs no repository cwd, so on a networked
         // box it would answer with ui-bridge's real tip, which is not PIN_A.
-        let resolved = no_declaration(
-            &PlainSpawn,
-            dir.path(),
-            dir.path(),
-            &sibling,
-            "no declaration",
-            &SiblingGitEnv::isolated(dir.path(), None).unwrap(),
-        )
-        .await
-        .unwrap();
+        let git_env = SiblingGitEnv::isolated(dir.path(), None).unwrap();
+        let io = SiblingIo {
+            process: &PlainSpawn,
+            git_env: &git_env,
+            clone_base: GITHUB_WEB,
+        };
+        let resolved = no_declaration(&io, dir.path(), dir.path(), &sibling, "no declaration")
+            .await
+            .unwrap();
         assert_eq!(resolved.sha, PIN_A);
         assert_eq!(resolved.repo, UI_BRIDGE);
         assert!(
@@ -1993,16 +2290,9 @@ mod tests {
         // A half-finished bump reaches the dispatch as the manifest's own
         // error, not as a float: the branch is still never consulted.
         std::fs::write(&manifest, format!("{UI_BRIDGE}\n")).unwrap();
-        let err = no_declaration(
-            &PlainSpawn,
-            dir.path(),
-            dir.path(),
-            &sibling,
-            "no declaration",
-            &SiblingGitEnv::isolated(dir.path(), None).unwrap(),
-        )
-        .await
-        .unwrap_err();
+        let err = no_declaration(&io, dir.path(), dir.path(), &sibling, "no declaration")
+            .await
+            .unwrap_err();
         assert!(err.contains("no commit SHA after it"), "got: {err}");
     }
 
@@ -2026,3 +2316,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod door_tests;
