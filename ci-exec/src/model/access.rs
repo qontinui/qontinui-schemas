@@ -26,7 +26,8 @@ use crate::model::broker::{Broker, BrokerConfig};
 use crate::model::declaration::ModelDeclaration;
 use crate::model::ledger::{ModelLedger, ModelSection};
 use crate::model::{
-    DISPATCH_ID_ENV, MODEL_CMD_ENV, MODEL_REFUSED_ENV, MODEL_TOKEN_ENV, MODEL_URL_ENV,
+    COORD_REFUSALS, DISPATCH_ID_ENV, MODEL_CMD_ENV, MODEL_REFUSED_ENV, MODEL_TOKEN_ENV,
+    MODEL_URL_ENV, RUNNER_REFUSALS,
 };
 use crate::report::LogSink;
 
@@ -55,15 +56,11 @@ pub(crate) enum ModelAccess {
     Granted { broker: Broker, shim_cmd: String },
 }
 
-/// A reason as it may reach a step's environment: a plain lowercase token,
-/// else `fallback`.
-fn plain_reason(reason: &str, fallback: &str) -> String {
-    let plain = !reason.is_empty()
-        && reason.len() <= 48
-        && reason
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
-    if plain {
+/// `reason` if it is in the closed vocabulary `allowed`, else `fallback`.
+/// D12's reasons form a closed list: a reason outside it — a typo, a newer
+/// coord, a host's free text — never reaches a step or the result.
+fn closed_reason(reason: &str, allowed: &[&str], fallback: &str) -> String {
+    if allowed.contains(&reason) {
         reason.to_string()
     } else {
         fallback.to_string()
@@ -165,8 +162,9 @@ async fn decide(
     match grant {
         None => return refused("not_offered_by_coord"),
         Some(g) if !g.granted => {
-            return refused(&plain_reason(
+            return refused(&closed_reason(
                 g.reason.as_deref().unwrap_or(""),
+                COORD_REFUSALS,
                 "not_offered_by_coord",
             ))
         }
@@ -177,7 +175,11 @@ async fn decide(
         _ => return refused("shim_missing"),
     };
     if let Err(reason) = invoker.ready() {
-        return refused(&plain_reason(&reason, "broker_start_failed"));
+        return refused(&closed_reason(
+            &reason,
+            RUNNER_REFUSALS,
+            "broker_start_failed",
+        ));
     }
     // Validation guarantees a `model = true` step implies a declaration; a
     // missing one here is a broken invariant, refused rather than unwrapped.
@@ -512,13 +514,47 @@ mod tests {
         );
     }
 
-    #[test]
-    fn reasons_reaching_a_step_are_plain_tokens() {
-        assert_eq!(plain_reason("fork_pr", "x"), "fork_pr");
-        assert_eq!(
-            plain_reason("", "not_offered_by_coord"),
-            "not_offered_by_coord"
-        );
-        assert_eq!(plain_reason("a b\nEVIL=1", "fallback"), "fallback");
+    /// D12's closed vocabulary is enforced on both sources: coord's reason
+    /// must be a coord reason, and `ready()`'s a runner reason.
+    #[tokio::test]
+    async fn refusal_reasons_outside_the_closed_vocabulary_are_replaced() {
+        let tmp = tempfile::tempdir().unwrap();
+        let shim = shim_file(tmp.path(), b"x");
+        let decl = declaration(5, 100, 60);
+        let job = job(true);
+        let sink: Arc<dyn LogSink> = Arc::new(Lines::default());
+        for (coord_reason, want) in [
+            ("fork_pr", "fork_pr"),
+            ("rate_capped", "rate_capped"),
+            ("made_up_reason", "not_offered_by_coord"),
+            ("cli_missing", "not_offered_by_coord"),
+            ("a b\nEVIL=1", "not_offered_by_coord"),
+            ("", "not_offered_by_coord"),
+        ] {
+            let mut inv = FakeInvoker::answering("x", 1);
+            inv.shim = Some(shim.clone());
+            let host = host_with(Some(inv), true);
+            let grant = ModelAccessGrant {
+                granted: false,
+                reason: Some(coord_reason.to_string()),
+                basis: None,
+            };
+            let access = prepare(&host, Some(&grant), Some(&decl), &job, sink.clone()).await;
+            assert_eq!(reason_of(access).await, want, "coord {coord_reason:?}");
+        }
+        for (ready_err, want) in [
+            ("cli_missing", "cli_missing"),
+            ("no_model_account", "no_model_account"),
+            ("gateway_unresolved", "gateway_unresolved"),
+            ("claude not found on PATH", "broker_start_failed"),
+            ("fork_pr", "broker_start_failed"),
+        ] {
+            let mut inv = FakeInvoker::answering("x", 1);
+            inv.shim = Some(shim.clone());
+            inv.ready = Err(ready_err.to_string());
+            let host = host_with(Some(inv), true);
+            let access = prepare(&host, Some(&granted()), Some(&decl), &job, sink.clone()).await;
+            assert_eq!(reason_of(access).await, want, "ready {ready_err:?}");
+        }
     }
 }

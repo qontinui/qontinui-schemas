@@ -20,7 +20,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use crate::manifest::MODEL_COMMAND_SUFFIX;
+use crate::manifest::is_model_command_key;
 
 /// The model-credential class, removed from every CI step's environment.
 ///
@@ -46,6 +46,24 @@ pub const MODEL_CREDENTIAL_ENV: &[&str] = &[
     "ANTHROPIC_VERTEX_BASE_URL",
     "ANTHROPIC_FOUNDRY_BASE_URL",
     "ANTHROPIC_FOUNDRY_RESOURCE",
+    // Credential-bearing names read off the installed CLI (`claude` 2.1.296,
+    // `strings` of the binary, 2026-10-13): the Bedrock bearer token, the
+    // Foundry key/token, the first-party AWS key, the refresh and session
+    // tokens, the gateway token and the identity token.
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "ANTHROPIC_FOUNDRY_API_KEY",
+    "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
+    "ANTHROPIC_AWS_API_KEY",
+    "ANTHROPIC_IDENTITY_TOKEN",
+    "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+    "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
+    "CLAUDE_CODE_GATEWAY_TOKEN",
+    // Provider switches the same binary reads beside the ones above: each
+    // re-routes a `claude` in a step away from the (absent) login.
+    "CLAUDE_CODE_USE_MANTLE",
+    "CLAUDE_CODE_USE_GATEWAY",
+    "CLAUDE_CODE_SKIP_MANTLE_AUTH",
+    "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
     // Other providers' keys.
     "OPENAI_API_KEY",
     "GEMINI_API_KEY",
@@ -73,7 +91,7 @@ pub fn step_env_removals(
         // way a manifest could name; compare on the lossy spelling anyway so a
         // mangled key is still removed when it carries the suffix.
         let key = key.to_string_lossy().into_owned();
-        if key.ends_with(MODEL_COMMAND_SUFFIX) {
+        if is_model_command_key(&key) {
             out.push(key);
         }
     }
@@ -152,6 +170,14 @@ mod tests {
             "OPENAI_API_KEY",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
+            "AWS_BEARER_TOKEN_BEDROCK",
+            "ANTHROPIC_FOUNDRY_API_KEY",
+            "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
+            "ANTHROPIC_AWS_API_KEY",
+            "ANTHROPIC_IDENTITY_TOKEN",
+            "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+            "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
+            "CLAUDE_CODE_GATEWAY_TOKEN",
         ] {
             assert!(MODEL_CREDENTIAL_ENV.contains(&k), "{k}");
         }

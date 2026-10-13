@@ -202,6 +202,14 @@ pub struct ModelLedger {
     /// Rows omitted to keep the ledger under its byte bound. The aggregates
     /// still count them.
     pub rows_omitted: u64,
+    /// Rows of requests refused before they reached the host (a harness
+    /// looping on `budget_exhausted`) that were counted but not stored once
+    /// [`MAX_STORED_REFUSALS`] were. The aggregates and
+    /// `refusals_by_outcome` still count them.
+    pub refused_rows_dropped: u64,
+    /// Every refusal before the host, by outcome, stored or not.
+    pub refusals_by_outcome: BTreeMap<String, u64>,
+    /// `false` when any row was omitted or dropped.
     pub rows_complete: bool,
     pub by_model: BTreeMap<String, Aggregate>,
     pub by_account: BTreeMap<String, Aggregate>,
@@ -211,15 +219,43 @@ pub struct ModelLedger {
     pub cost: CostReport,
 }
 
+/// How many rows of requests refused before they reached the host a ledger
+/// stores during a run. Calls that reached the host are bounded by
+/// `max_calls`; refusals are bounded only by how often a harness asks, so past
+/// this they are counted, not stored — memory stays bounded however long a
+/// harness loops on `budget_exhausted`.
+pub const MAX_STORED_REFUSALS: usize = 64;
+
 /// Collects rows during a dispatch.
 #[derive(Debug, Default)]
 pub struct LedgerBuilder {
     rows: Vec<CallRow>,
+    stored_refusals: usize,
+    dropped_refusals: u64,
+    refusals: BTreeMap<String, u64>,
 }
 
 impl LedgerBuilder {
-    pub fn push(&mut self, row: CallRow) {
-        self.rows.push(row);
+    /// Record one row. A row that never reached the host (`attempts == 0`)
+    /// is a refusal: it is counted by outcome, and stored only while fewer
+    /// than [`MAX_STORED_REFUSALS`] are. Returns how many refusals with this
+    /// row's outcome there have been so far (0 for a call that reached the
+    /// host), so the caller can rate-limit its log line.
+    pub fn push(&mut self, row: CallRow) -> u64 {
+        if row.attempts > 0 {
+            self.rows.push(row);
+            return 0;
+        }
+        let seen = self.refusals.entry(row.outcome.clone()).or_insert(0);
+        *seen += 1;
+        let seen = *seen;
+        if self.stored_refusals < MAX_STORED_REFUSALS {
+            self.stored_refusals += 1;
+            self.rows.push(row);
+        } else {
+            self.dropped_refusals += 1;
+        }
+        seen
     }
 
     pub fn rows(&self) -> &[CallRow] {
@@ -267,11 +303,20 @@ impl LedgerBuilder {
                 }
             }
         }
+        // Dropped refusals reached no model and no account.
+        if self.dropped_refusals > 0 {
+            let dropped = self.dropped_refusals;
+            totals.calls += dropped;
+            by_model.entry(UNKNOWN_MODEL.to_string()).or_default().calls += dropped;
+            by_account.entry(NO_ACCOUNT.to_string()).or_default().calls += dropped;
+        }
         let mut ledger = ModelLedger {
             schema: LEDGER_SCHEMA,
             isolation: ISOLATION,
             calls: Vec::new(),
             rows_omitted: 0,
+            refused_rows_dropped: self.dropped_refusals,
+            refusals_by_outcome: self.refusals,
             rows_complete: true,
             by_model,
             by_account,
@@ -306,7 +351,7 @@ impl LedgerBuilder {
         let mut rows = self.rows;
         rows.truncate(kept);
         ledger.rows_omitted = total_rows - kept as u64;
-        ledger.rows_complete = ledger.rows_omitted == 0;
+        ledger.rows_complete = ledger.rows_omitted == 0 && ledger.refused_rows_dropped == 0;
         ledger.calls = rows;
         ledger
     }
@@ -452,6 +497,33 @@ mod tests {
         assert_eq!(l.calls.last().unwrap().index, l.calls.len() as u64);
         assert_eq!(l.totals.calls, 500, "aggregates count every call");
         assert_eq!(l.totals.input_tokens, 3500);
+    }
+
+    /// Refusals past the stored cap are counted, not stored: memory stays
+    /// bounded however long a harness loops on a spent budget.
+    #[test]
+    fn refusals_past_the_cap_are_counted_not_stored() {
+        let mut b = LedgerBuilder::default();
+        b.push(ok_row(1, "claude-sonnet-4-5", "acct-a", 7, None));
+        let mut last = 0;
+        for i in 0..1000u64 {
+            last = b.push(CallRow::refused(
+                i + 2,
+                "b2",
+                "claude-sonnet",
+                "budget_exhausted:calls".to_string(),
+            ));
+        }
+        assert_eq!(last, 1000, "push reports the running count per outcome");
+        assert_eq!(b.rows().len(), 1 + MAX_STORED_REFUSALS);
+        let l = b.finish(BudgetReport::default());
+        assert_eq!(l.calls.len(), 1 + MAX_STORED_REFUSALS);
+        assert_eq!(l.refused_rows_dropped, 1000 - MAX_STORED_REFUSALS as u64);
+        assert!(!l.rows_complete);
+        assert_eq!(l.refusals_by_outcome["budget_exhausted:calls"], 1000);
+        assert_eq!(l.totals.calls, 1001, "the aggregates count every request");
+        assert_eq!(l.by_model[UNKNOWN_MODEL].calls, 1000);
+        assert_eq!(l.by_account[NO_ACCOUNT].calls, 1000);
     }
 
     #[test]

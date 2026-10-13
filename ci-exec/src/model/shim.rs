@@ -29,7 +29,8 @@ use std::time::Duration;
 
 use crate::model::declaration::MAX_MODEL_WALL_SECS;
 use crate::model::protocol::{
-    CompleteRequest, Envelope, COMPLETE_PATH, MAX_PROMPT_BYTES, MAX_RESPONSE_BYTES,
+    CompleteRequest, Envelope, COMPLETE_PATH, MAX_ENVELOPE_BYTES, MAX_PROMPT_BYTES,
+    MAX_RESPONSE_HEAD_BYTES,
 };
 use crate::model::{MODEL_REFUSED_ENV, MODEL_TOKEN_ENV, MODEL_URL_ENV};
 
@@ -39,8 +40,9 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 /// The longest a call can take: a held call waits inside the dispatch's wall
 /// budget, which is at most this.
 const READ_TIMEOUT: Duration = Duration::from_secs(MAX_MODEL_WALL_SECS + 60);
-/// The largest response the shim reads (the answer cap plus envelope room).
-const MAX_RESPONSE_READ: usize = MAX_RESPONSE_BYTES * 2 + 64 * 1024;
+/// The largest response the shim reads: exactly what the broker may send —
+/// a head plus an envelope the broker measured against [`MAX_ENVELOPE_BYTES`].
+pub(crate) const MAX_RESPONSE_READ: usize = MAX_ENVELOPE_BYTES + MAX_RESPONSE_HEAD_BYTES;
 
 const USAGE: &str = "usage: qontinui-ci-model [-p|--print] [--output-format text|json] \
                      [--model <name>] [<prompt>]  (the prompt is read from stdin when not given)";
