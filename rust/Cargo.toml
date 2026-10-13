@@ -33,3 +33,6 @@ base64 = "0.22"
 # tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.
 regex = "1"
 toml = "1"
+# tests/image_slot_fixtures.rs — image-slot specs are authored as YAML. The
+# maintained fork of the deprecated serde_yaml, already locked here by ci-exec.
+serde_yaml_ng = "0.10"
