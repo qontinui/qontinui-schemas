@@ -1288,6 +1288,32 @@ mod tests {
         }
     }
 
+    /// A checked-out tree whose `.qontinui/ci.toml` declares a `[[ci_readers]]`
+    /// grant loads through the production reader, and the grant changes
+    /// nothing about the jobs/steps it would run. Names no symbol of the
+    /// `[[ci_readers]]` change itself, so with that change absent the table is
+    /// refused (`deny_unknown_fields`) and this goes red.
+    #[test]
+    fn a_ci_readers_declaration_loads_through_load_manifest() {
+        const BASE: &str = "version = 2\n[[jobs]]\nname = \"lint\"\n[[jobs.steps]]\nname = \"s\"\ncommand = [\"true\"]\n";
+        let load = |manifest: &str| {
+            let tmp = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(tmp.path().join(".qontinui")).unwrap();
+            std::fs::write(tmp.path().join(".qontinui").join("ci.toml"), manifest).unwrap();
+            load_manifest(tmp.path(), ".qontinui/ci.toml")
+        };
+        let with_readers = load(&format!(
+            "{BASE}\n[[ci_readers]]\nrepo = \"qontinui-docs-evals\"\n"
+        ))
+        .unwrap_or_else(|e| panic!("a [[ci_readers]] grant must load: {e}"));
+        let plain = load(BASE).unwrap();
+        assert_eq!(
+            format!("{:?}", with_readers.jobs),
+            format!("{:?}", plain.jobs),
+            "a [[ci_readers]] grant must not change the jobs/steps"
+        );
+    }
+
     /// A dispatch naming a job the manifest does not declare is refused with
     /// the jobs that DO exist.
     #[test]
