@@ -1682,6 +1682,18 @@ mod tests {
             summary.contains("frame: 200x200 px at scale factor 2"),
             "{summary}"
         );
+
+        // ...and so does the assert summary, from the same echo.
+        let assert_text = assert_summary(&assert_all(
+            &snap,
+            Some(&frame),
+            &[Assertion::NoClipping { region: None }],
+            &HashMap::new(),
+        ));
+        assert!(
+            assert_text.contains("frame: 200x200 px at scale factor 2"),
+            "{assert_text}"
+        );
     }
 
     #[test]
