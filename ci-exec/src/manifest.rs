@@ -207,6 +207,10 @@ struct RawManifest {
     tools: Vec<CiTool>,
     #[serde(default)]
     canonical: Option<CiCanonical>,
+    /// Top-level in both versions. A `[[ci_readers]]` nested in a job stays a
+    /// `deny_unknown_fields` refusal on [`RawJob`].
+    #[serde(default)]
+    ci_readers: Vec<CiReader>,
     #[serde(default)]
     repair: Vec<CiRepair>,
 }
@@ -322,6 +326,15 @@ pub struct CiManifest {
     /// (the default) means the dispatch makes no claim about the box's
     /// toolchains and none is checked.
     pub canonical: Option<CiCanonical>,
+    /// Repos whose CI may READ this repo through coord's OIDC broker
+    /// (`POST /coord/ci/repo-read-token`, plan
+    /// `2026-10-10-repo-onboarding-is-agent-actionable-end-to-end` Phase 4).
+    /// Top-level in both versions. The grant is honoured by coord from this
+    /// repo's DEFAULT-branch tree in its canonical mirror, never from a PR
+    /// head. The executor PARSES and VALIDATES the table so a repo can declare
+    /// it without failing every dispatch on `deny_unknown_fields`; it never
+    /// acts on it.
+    pub ci_readers: Vec<CiReader>,
     /// Mechanical repairs coord's CI-repair lane may run for this repo (plan
     /// `2026-09-24-coord-deterministic-ci-repair-lane` §5.1, Phase 2). Top-level
     /// in both versions. The executor PARSES and VALIDATES these, so a repo can
@@ -329,6 +342,97 @@ pub struct CiManifest {
     /// It never EXECUTES one: a repair runs in the repo's own
     /// `coord-repair.yml` workflow, and coord alone writes the result.
     pub repair: Vec<CiRepair>,
+}
+
+// ── Cross-repo CI read grants (`[[ci_readers]]`, plan
+// `2026-10-13-local-lane-ci-reads-a-private-sibling-through-a-dispatch-scoped-door`
+// Phase 1). Ported from the runner's `ci_node/manifest.rs`; coord's
+// `crates/coord/src/ci_readers.rs` reads the same table.
+
+/// One declared cross-repo CI reader: "the CI of `repo` may check this repo
+/// out, read-only".
+///
+/// # Land order: executor first, declarations after
+///
+/// Same coupling as `[[repair]]`, `[canonical]` and `[[siblings]]`: a
+/// `[[ci_readers]]` block is a hard parse error on any executor built before
+/// this field existed, so this lands and rolls out before any repo declares
+/// one.
+///
+/// # Field set is shared with coord
+///
+/// Coord's `crates/coord/src/ci_readers.rs` `CiReader` is the reader that
+/// ACTS on the grant. Both structs are `deny_unknown_fields`, so a field one
+/// side gains and the other lacks turns a valid declaration into a parse
+/// error on the other side (finding `0b600ab6`). Keep the two field sets
+/// equal; the shared fixture in this module's tests pins it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CiReader {
+    /// The consumer repo: a bare `name` (same owner as this repo) or
+    /// `owner/name`. Coord resolves it against the tenant's repos; the
+    /// executor only checks its shape.
+    ///
+    /// A grant is to the consumer REPO, not to a workflow or a branch: every
+    /// ref and event of the consumer is admitted, so anyone who can push a
+    /// workflow to the consumer inherits read access to this repo.
+    pub repo: String,
+    /// Admit the consumer's `pull_request_target` runs too. OFF by default:
+    /// that event runs with the base repo's identity on code a fork can
+    /// influence, so coord refuses it unless the entry opts in here.
+    #[serde(default)]
+    pub allow_pull_request_target: bool,
+}
+
+/// Upper bound on declared CI readers. Each entry is a standing read grant on
+/// a private repo, so a long list is a review smell, not a convenience. Same
+/// bound as coord's `ci_readers::MAX_CI_READERS`.
+const MAX_CI_READERS: usize = 16;
+
+fn validate_ci_readers(readers: &[CiReader]) -> Result<(), String> {
+    if readers.len() > MAX_CI_READERS {
+        return Err(format!(
+            "ci.toml declares {} [[ci_readers]] (max {MAX_CI_READERS})",
+            readers.len()
+        ));
+    }
+    let mut seen: Vec<String> = Vec::new();
+    for (i, r) in readers.iter().enumerate() {
+        let label = format!("ci_readers[{i}]");
+        validate_ci_reader_repo(&r.repo).map_err(|e| format!("{label}: {e}"))?;
+        let key = r.repo.to_ascii_lowercase();
+        if seen.contains(&key) {
+            return Err(format!(
+                "{label}: repo {:?} is declared more than once",
+                r.repo
+            ));
+        }
+        seen.push(key);
+    }
+    Ok(())
+}
+
+/// `name` or `owner/name`, each segment a GitHub-legal path segment.
+fn validate_ci_reader_repo(repo: &str) -> Result<(), String> {
+    if repo.len() > 200 {
+        return Err("repo slug too long".to_string());
+    }
+    let segs: Vec<&str> = repo.split('/').collect();
+    if segs.is_empty() || segs.len() > 2 {
+        return Err(format!("repo {repo:?} must be `name` or `owner/name`"));
+    }
+    for seg in segs {
+        if seg.is_empty() || seg == "." || seg == ".." || seg.starts_with('-') {
+            return Err(format!("repo {repo:?} has an invalid path segment {seg:?}"));
+        }
+        if !seg
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(format!("repo {repo:?} has an invalid path segment {seg:?}"));
+        }
+    }
+    Ok(())
 }
 
 /// One declared repair.
@@ -732,6 +836,7 @@ pub fn parse_and_validate(text: &str) -> Result<CiManifest, String> {
     validate_siblings(&raw.siblings)?;
     validate_tools(&raw.tools)?;
     validate_canonical(raw.canonical.as_ref())?;
+    validate_ci_readers(&raw.ci_readers)?;
     validate_repairs(&raw.repair)?;
     let jobs = match raw.version {
         1 => {
@@ -787,6 +892,7 @@ pub fn parse_and_validate(text: &str) -> Result<CiManifest, String> {
         jobs,
         limits: raw.limits,
         siblings: raw.siblings,
+        ci_readers: raw.ci_readers,
         tools: raw.tools,
         canonical: raw.canonical,
         repair: raw.repair,
@@ -1583,6 +1689,197 @@ check = ["cargo", "fmt", "--all", "--", "--check"]
         let m = parse_and_validate(text).expect("valid");
         assert_eq!(m.repair.len(), 1);
         assert_eq!(m.jobs[0].steps.len(), 1);
+    }
+
+    // ── `[[ci_readers]]` (plan
+    // `2026-10-13-local-lane-ci-reads-a-private-sibling-through-a-dispatch-scoped-door`
+    // Phase 1).
+
+    /// The grant declaration, BY COPY from coord's
+    /// `crates/coord/src/ci_readers.rs` test module (`MANIFEST`, qontinui-coord
+    /// #3097, head `0cfad49b4e`). Coord's copy must carry this same string and
+    /// point back here. Do not edit one copy alone: both `CiReader` structs are
+    /// `deny_unknown_fields`, so a declaration that one side parses and the
+    /// other refuses is exactly the executor/coord drift class of finding
+    /// `0b600ab6` — a repo whose grant coord honours would fail its own CI
+    /// here, or the reverse.
+    const COORD_CI_READERS_MANIFEST: &str = r#"
+version = 1
+
+[limits]
+cargo_build_jobs = 1
+
+[[steps]]
+name = "test"
+command = ["cargo", "test"]
+
+[[siblings]]
+repo = "example/qontinui-schemas"
+
+[[ci_readers]]
+repo = "consumer-evals"
+
+[[ci_readers]]
+repo = "other-org/consumer-two"
+"#;
+
+    #[test]
+    fn ci_readers_parse_and_are_never_steps() {
+        let m = parse_and_validate(COORD_CI_READERS_MANIFEST).expect("valid");
+        assert_eq!(
+            m.ci_readers,
+            vec![
+                CiReader {
+                    repo: "consumer-evals".to_string(),
+                    allow_pull_request_target: false,
+                },
+                CiReader {
+                    repo: "other-org/consumer-two".to_string(),
+                    allow_pull_request_target: false,
+                },
+            ]
+        );
+        assert_eq!(m.jobs.len(), 1);
+        assert_eq!(m.jobs[0].steps.len(), 1, "a reader grant is not a step");
+    }
+
+    /// `[[ci_readers]]` stays top-level under version 2, beside `[[jobs]]`.
+    #[test]
+    fn ci_readers_parse_under_version_2() {
+        let text = r#"
+version = 2
+
+[[jobs]]
+name = "lint"
+[[jobs.steps]]
+name = "fmt"
+command = ["cargo", "fmt", "--check"]
+
+[[ci_readers]]
+repo = "consumer-evals"
+allow_pull_request_target = true
+"#;
+        let m = parse_and_validate(text).expect("valid");
+        assert_eq!(
+            m.ci_readers,
+            vec![CiReader {
+                repo: "consumer-evals".to_string(),
+                allow_pull_request_target: true,
+            }]
+        );
+        assert_eq!(m.jobs.len(), 1);
+        assert_eq!(m.jobs[0].steps.len(), 1, "a reader grant is not a step");
+    }
+
+    /// A grant is a property of the repo, not of a job: nested under
+    /// `[[jobs]]` it is refused rather than silently ignored.
+    #[test]
+    fn ci_readers_nested_in_a_job_are_refused() {
+        let text = r#"
+version = 2
+
+[[jobs]]
+name = "lint"
+[[jobs.steps]]
+name = "fmt"
+command = ["cargo", "fmt", "--check"]
+[[jobs.ci_readers]]
+repo = "consumer-evals"
+"#;
+        let err = parse_and_validate(text).expect_err("job-level ci_readers");
+        assert!(
+            err.contains("unknown field") && err.contains("ci_readers"),
+            "{err}"
+        );
+    }
+
+    /// `pull_request_target` runs with the BASE repo's secrets and OIDC
+    /// identity on code a fork controls, so a grant is closed to it unless the
+    /// entry opts in explicitly.
+    #[test]
+    fn ci_reader_pull_request_target_is_an_explicit_opt_in_defaulting_off() {
+        let m = parse_and_validate(COORD_CI_READERS_MANIFEST).expect("valid");
+        assert!(!m.ci_readers[0].allow_pull_request_target);
+        let text = COORD_CI_READERS_MANIFEST.replace(
+            "repo = \"consumer-evals\"",
+            "repo = \"consumer-evals\"\nallow_pull_request_target = true",
+        );
+        let m = parse_and_validate(&text).expect("opt-in parses");
+        assert!(m.ci_readers[0].allow_pull_request_target);
+        assert!(!m.ci_readers[1].allow_pull_request_target);
+    }
+
+    #[test]
+    fn a_manifest_without_ci_readers_still_parses() {
+        let m = parse_and_validate(VALID).expect("valid");
+        assert!(m.ci_readers.is_empty());
+    }
+
+    #[test]
+    fn ci_reader_refuses_an_unknown_key() {
+        let text = COORD_CI_READERS_MANIFEST.replace(
+            "repo = \"consumer-evals\"",
+            "repo = \"consumer-evals\"\nref = \"main\"",
+        );
+        let err = parse_and_validate(&text).expect_err("unknown key");
+        assert!(
+            err.contains("unknown field") && err.contains("ref"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn ci_readers_reject_bad_declarations() {
+        let m = COORD_CI_READERS_MANIFEST;
+        let cases = [
+            (
+                m.replace("\"consumer-evals\"", "\"a/b/c\""),
+                "must be `name` or `owner/name`",
+            ),
+            (
+                m.replace("\"consumer-evals\"", "\"\""),
+                "invalid path segment",
+            ),
+            (
+                m.replace("\"consumer-evals\"", "\"../x\""),
+                "invalid path segment",
+            ),
+            (
+                m.replace("\"consumer-evals\"", "\"-flag\""),
+                "invalid path segment",
+            ),
+            (
+                m.replace("\"consumer-evals\"", "\"a b\""),
+                "invalid path segment",
+            ),
+            (
+                m.replace("\"other-org/consumer-two\"", "\"Consumer-Evals\""),
+                "declared more than once",
+            ),
+            (
+                m.replace(
+                    "[[ci_readers]]\nrepo = \"consumer-evals\"",
+                    "[[ci_readers]]",
+                ),
+                "parse error",
+            ),
+        ];
+        for (text, needle) in cases {
+            let err = parse_and_validate(&text).expect_err(needle);
+            assert!(err.contains(needle), "expected {needle:?} in {err}");
+        }
+    }
+
+    #[test]
+    fn ci_readers_are_capped() {
+        let mut text = String::from("version = 1\n[[steps]]\nname = \"t\"\ncommand = [\"true\"]\n");
+        for i in 0..MAX_CI_READERS {
+            text.push_str(&format!("[[ci_readers]]\nrepo = \"r{i}\"\n"));
+        }
+        parse_and_validate(&text).expect("exactly the cap parses");
+        text.push_str("[[ci_readers]]\nrepo = \"one-too-many\"\n");
+        let err = parse_and_validate(&text).expect_err("over cap");
+        assert!(err.contains("[[ci_readers]] (max 16)"), "{err}");
     }
 
     #[test]
