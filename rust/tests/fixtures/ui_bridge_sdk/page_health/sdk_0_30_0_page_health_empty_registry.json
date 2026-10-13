@@ -1,0 +1,25 @@
+{
+  "status": "unknown",
+  "unknown": {
+    "code": "producer_not_run",
+    "detail": "the bridge reports zero registered elements and zero registered components — nothing has registered yet (not hydrated, not mounted, or an empty registry), so there was nothing to look at"
+  },
+  "provenance": {
+    "producer": {
+      "id": "sdk/page-health",
+      "version": "0.30.0"
+    },
+    "observedAt": "2026-10-13T14:37:06.548Z",
+    "evaluatedAt": "2026-10-13T00:00:00.000Z",
+    "coverage": {
+      "considered": 0,
+      "measured": 0,
+      "unmeasured": []
+    },
+    "confidence": null,
+    "cache": null,
+    "source": {
+      "snapshotId": "ubs2_0_0_cbf29ce484222325_cbf29ce484222325"
+    }
+  }
+}
