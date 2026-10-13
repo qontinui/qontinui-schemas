@@ -1,0 +1,110 @@
+{
+  "status": "measured",
+  "value": {
+    "summary": "CRITICAL",
+    "findings": [
+      {
+        "check": "spatial_coverage",
+        "severity": "CRITICAL",
+        "detail": "Elements cover 0% of viewport. Left=0%, Right=0%",
+        "data": {
+          "coverage_pct": 0,
+          "left_half_pct": 0,
+          "right_half_pct": 0
+        }
+      },
+      {
+        "check": "layout_regions",
+        "severity": "CRITICAL",
+        "detail": "sidebar=0, header=0, content=0",
+        "data": {
+          "sidebar": 0,
+          "header": 0,
+          "content": 0
+        }
+      },
+      {
+        "check": "element_diversity",
+        "severity": "OK",
+        "detail": "2 type(s) across 3 elements",
+        "data": {
+          "types": {
+            "textarea": 1,
+            "button": 2
+          }
+        }
+      },
+      {
+        "check": "text_signals",
+        "severity": "OK",
+        "detail": "errors=0, loading=0, empty=0, css_signals=0",
+        "data": {
+          "errors": [],
+          "loading": [],
+          "empty": [],
+          "css_signals": []
+        }
+      },
+      {
+        "check": "interactive_readiness",
+        "severity": "OK",
+        "detail": "3 interactive elements, 1 disabled",
+        "data": {
+          "total": 3,
+          "disabled": 1
+        }
+      },
+      {
+        "check": "visual_anomalies",
+        "severity": "OK",
+        "detail": "zero_size=0, outside_viewport=0 (horizontal-overflow only; below/above-fold scrollable content is not an anomaly)",
+        "data": {
+          "zero_size": 0,
+          "outside_viewport": 0
+        }
+      }
+    ],
+    "heatmap": [
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "....................",
+      "...................."
+    ],
+    "element_count": 3,
+    "visible_count": 0
+  },
+  "provenance": {
+    "producer": {
+      "id": "sdk/page-health",
+      "version": "0.30.0"
+    },
+    "observedAt": "2026-09-19T13:11:23.919Z",
+    "evaluatedAt": "2026-10-13T00:00:00.000Z",
+    "coverage": {
+      "considered": 0,
+      "measured": 0,
+      "unmeasured": []
+    },
+    "confidence": null,
+    "cache": null,
+    "source": {
+      "snapshotId": "ubs2_4g_4g_8cf05f521ac8a312_9fd9a75c99edb7e9"
+    }
+  }
+}
