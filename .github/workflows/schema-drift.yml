@@ -203,6 +203,15 @@ on:
       # so this push trigger is the ONLY post-merge measurement there is.
       - "ts/src/generated/**"
       - "src/qontinui_schemas/generated/**"
+      # THE DECLARED WAITS and the code that reads them (plan
+      # 2026-10-13-schemas-check-drift-red-while-bindings-await-runner-registration).
+      # A land that only adds or removes a pending-registration row, or changes
+      # how arm 2 reads it, changes main's verdict, so it must produce a push
+      # run. Without these, such a land starts no run and coord keeps scoring
+      # main from the previous (possibly red) push baseline.
+      - "codegen/pending-registration.toml"
+      - "scripts/check-generated-drift.sh"
+      - "scripts/pending_registration.py"
   pull_request:
     branches: [main]
     # No path filter on the PR trigger so the `check-drift` required-check
@@ -673,6 +682,24 @@ jobs:
       # vacuously green from then until the change that added this script. So
       # the script also asserts the baseline exists (arm 0) and looks for
       # untracked regenerated output (arm 1), not just a diff (arm 2).
+      #
+      # The env below feeds arm 2's declared waits
+      # (codegen/pending-registration.toml, scripts/pending_registration.py).
+      # PASS-THROUGHS ONLY — the job's permissions stay `contents: read` +
+      # `pull-requests: read`:
+      #   * GITHUB_TOKEN — the module reads a qontinui-runner PR's state and
+      #     its schema_export.rs at head. It reads with this token ONLY; with no
+      #     token every entry is INERT and nothing is absorbed (an
+      #     unauthenticated read would share the 60/h anonymous limit).
+      #   * SIBLING_SOURCE — which runner tree regenerated: `none` (default
+      #     branch) is the only source that may call a produced type STALE,
+      #     and a TRAILING form switches on `require` mode.
+      #   * PR_BASE_SHA / PR_CREATED_AT — `require` mode's inputs; empty on push.
       - name: Check for drift
         working-directory: qontinui-schemas
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SIBLING_SOURCE: ${{ steps.sibling.outputs.source }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
         run: bash scripts/check-generated-drift.sh --verify

@@ -727,6 +727,95 @@ preflight() {
     return "$rc"
 }
 
+# ── pending registrations (arm 2's declared waits) ──────────────────────────
+#
+# See scripts/pending_registration.py for the contract. Two rules here:
+#
+#   * `require` runs whenever SIBLING_SOURCE names a TRAILING form, whatever
+#     the toml holds — a leading PR that forgot its entries must red now, not
+#     land green and red main afterwards. Only the absorb step short-circuits.
+#   * the absorb step is fail-closed: a missing module, a non-zero exit or an
+#     unparsable verdict falls through to today's full `git diff`.
+PENDING_REGISTRATION_TOML="codegen/pending-registration.toml"
+PENDING_REGISTRATION_PY="scripts/pending_registration.py"
+
+pending_registration_require() {
+    case "+${SIBLING_SOURCE:-}+" in
+        *+self-upstream-of+*|*+sibling-downstream-of+*) ;;
+        *) return 0 ;;
+    esac
+    local out rc=0
+    set +e
+    out="$(python3 "$PENDING_REGISTRATION_PY" require 2>&1)"
+    rc=$?
+    set -e
+    printf '%s\n' "$out"
+    if [ "$rc" -ne 0 ]; then
+        [ "$rc" -eq 1 ] || echo "::error::pending-registration require failed (exit $rc); treating as unsatisfied."
+        return 1
+    fi
+}
+
+# Today's arm-2 command, byte for byte.
+arm2_full_diff() {
+    git diff HEAD --exit-code -I '^#   timestamp:' -- "${GENERATED_DIRS[@]}"
+}
+
+arm2_diff() {
+    if [ ! -f "$PENDING_REGISTRATION_TOML" ] || ! grep -q '^\[\[pending\]\]' "$PENDING_REGISTRATION_TOML"; then
+        arm2_full_diff
+        return
+    fi
+    local verdict rc=0
+    set +e
+    verdict="$(python3 "$PENDING_REGISTRATION_PY" decide)"
+    rc=$?
+    set -e
+    if [ "$rc" -ne 0 ]; then
+        echo "::error::pending-registration module failed (exit $rc); absorbing nothing."
+        arm2_full_diff
+        return
+    fi
+    local parsed prc=0
+    set +e
+    parsed="$(printf '%s' "$verdict" | python3 -c '
+import json, sys
+v = json.load(sys.stdin)
+assert v["version"] == 1
+assert isinstance(v["exclude"], list) and all(isinstance(p, str) and p for p in v["exclude"])
+assert isinstance(v["barrel_errors"], list)
+print("BARREL_ERRORS=%d" % len(v["barrel_errors"]))
+for b in v["barrel_errors"]:
+    print("BARREL " + b)
+for p in v["exclude"]:
+    print("EXCLUDE " + p)
+print("END")
+')"
+    prc=$?
+    set -e
+    if [ "$prc" -ne 0 ] || [ "$(printf '%s\n' "$parsed" | tail -n1)" != "END" ]; then
+        echo "::error::pending-registration module failed (unparsable verdict); absorbing nothing."
+        arm2_full_diff
+        return
+    fi
+    local excludes=() line diff_rc=0
+    while IFS= read -r line; do
+        case "$line" in
+            "EXCLUDE "*) excludes+=(":(exclude)${line#EXCLUDE }") ;;
+            "BARREL "*)
+                echo "::error::${line#BARREL } differs from the regeneration beyond the absorbed pending lines."
+                diff_rc=1 ;;
+        esac
+    done <<< "$parsed"
+    if [ "${#excludes[@]}" -eq 0 ]; then
+        arm2_full_diff
+        return
+    fi
+    excludes+=(":(exclude)$TS_GENERATED_DIR/index.ts" ":(exclude)$PY_GENERATED_DIR/__init__.py")
+    git diff HEAD --exit-code -I '^#   timestamp:' -- "${GENERATED_DIRS[@]}" "${excludes[@]}" || diff_rc=1
+    return "$diff_rc"
+}
+
 # ── --verify ────────────────────────────────────────────────────────────────
 #
 # Three arms, because a diff alone covers only one of the ways codegen output
@@ -844,7 +933,17 @@ verify() {
     # a repo with no real drift. Same trick schema-pg-sql-fresh.yml uses for
     # `-- Dumped by pg_dump version` header noise. Verified still to suppress
     # exactly that, and nothing more, under `HEAD`.
-    if ! git diff HEAD --exit-code -I '^#   timestamp:' -- "${GENERATED_DIRS[@]}"; then
+    #
+    # Declared waits (codegen/pending-registration.toml). A schemas PR that
+    # adds a type lands BEFORE the runner registers it, so a regeneration
+    # against runner main deletes those bindings. pending_registration.py
+    # decides which declared waits are legitimate right now, and ONLY those
+    # may absorb their own 2 files and 3 barrel lines. Everything else is
+    # re-checked below by the same `git diff` as always. FAIL-CLOSED: any
+    # module failure absorbs nothing, which is today's full arm 2.
+    # Plan 2026-10-13-schemas-check-drift-red-while-bindings-await-runner-registration.
+    pending_registration_require || rc=1
+    if ! arm2_diff; then
         echo "::error::Checked-in generated types differ from a fresh regeneration."
         rc=1
     fi
