@@ -80,6 +80,14 @@ class FakeTrees:
     def work(self, path):
         return self._work.get(path)
 
+    def head_bytes(self, path):
+        v = self._head.get(path)
+        return None if v is None else v.encode()
+
+    def work_bytes(self, path):
+        v = self._work.get(path)
+        return None if v is None else v.encode()
+
 
 def trees(**overrides):
     head = {
@@ -101,19 +109,29 @@ def trees(**overrides):
 
 
 class Reader:
-    def __init__(self, state="open", text=REGISTERED, fail=None):
+    def __init__(self, state="open", text=REGISTERED, fail=None, merged=False, main_text=None,
+                 numbers=(1990,)):
         self.state, self.text, self.fail, self.calls = state, text, fail, 0
+        self.merged, self.main_text, self.numbers = merged, main_text, numbers
 
     def pr(self, repo, number):
         self.calls += 1
         if self.fail:
             raise pr.Unknown(self.fail)
-        return pr.PrState(self.state, HEAD_SHA)
+        return pr.PrState(self.state, HEAD_SHA, self.merged)
+
+    def prs_for_commit(self, repo, sha):
+        self.calls += 1
+        if self.fail:
+            raise pr.Unknown(self.fail)
+        return [(n, pr.PrState(self.state, sha, self.merged)) for n in self.numbers]
 
     def file_at(self, repo, path, ref):
         self.calls += 1
         if self.fail:
             raise pr.Unknown(self.fail)
+        if ref == "main" and self.main_text is not None:
+            return self.main_text
         return self.text
 
 
@@ -150,7 +168,7 @@ def test_c_a_modified_pending_binding_is_not_absorbed():
     # The regeneration PRODUCED the file (differently): nothing to absorb, and
     # the modified file is left for the git diff to red on.
     assert v["exclude"] == []
-    assert verdicts(v) == ["STALE (runner default branch produces it; delete this row)"]
+    assert verdicts(v) == ["MODIFIED (regenerated differently from HEAD; not absorbed)"]
 
 
 def test_c_a_python_binding_regenerated_while_the_ts_one_was_deleted_is_not_absorbed():
@@ -272,20 +290,26 @@ def test_i_default_branch_source_that_produces_the_type_is_stale():
     assert v["exclude"] == []
 
 
+PRODUCED_SAME = {
+    "ts/src/generated/CliProfile.d.ts": "export interface CliProfile {}\n",
+    "src/qontinui_schemas/generated/per_type/cli_profile.py": "class CliProfile: ...\n",
+}
+
+
 def test_i2_a_declared_sibling_that_produces_the_type_is_not_stale():
-    t = trees(**{"ts/src/generated/CliProfile.d.ts": "export interface CliProfile {}\n"})
+    t = trees(**PRODUCED_SAME)
     v = run([entry()], source="downstream-of+self-upstream-of", t=t)
     assert verdicts(v) == ["PRODUCED-BY-DECLARED-SIBLING"]
 
 
 def test_n_an_unset_source_never_renders_stale():
-    t = trees(**{"ts/src/generated/CliProfile.d.ts": "export interface CliProfile {}\n"})
+    t = trees(**PRODUCED_SAME)
     assert verdicts(run([entry()], source=None, t=t)) == ["PRODUCED (source not declared)"]
     assert verdicts(run([entry()], source="", t=t)) == ["PRODUCED (source not declared)"]
 
 
 def test_pinned_sibling_is_not_stale():
-    t = trees(**{"ts/src/generated/CliProfile.d.ts": "export interface CliProfile {}\n"})
+    t = trees(**PRODUCED_SAME)
     assert verdicts(run([entry()], source="none+pinned", t=t)) == ["PRODUCED (pinned sibling)"]
     assert verdicts(run([entry()], source="trailing-declined+pinned", t=t)) == ["PRODUCED (pinned sibling)"]
 
@@ -318,30 +342,64 @@ def test_one_inert_entry_does_not_stop_another_from_absorbing():
 CREATED = dt.date(2026, 10, 10)
 
 
+DECLARED = "qontinui/qontinui-runner#1990"
+
+
+def req(entries, reader=None, declared=DECLARED, created=CREATED):
+    return pr.require(entries, ["CliProfile"], created, TODAY, declared, reader or Reader())
+
+
 def test_require_missing_entry_is_a_problem():
-    assert pr.require([], ["CliProfile"], CREATED, TODAY, "x") == ["missing entry for CliProfile"]
+    assert req([]) == ["missing entry for CliProfile"]
 
 
 def test_o_require_accepts_added_between_creation_and_today():
     for d in (CREATED, dt.date(2026, 10, 11), TODAY):
-        assert pr.require([entry(added=d)], ["CliProfile"], CREATED, TODAY, "x") == []
+        assert req([entry(added=d)]) == []
 
 
 def test_o_require_rejects_added_before_the_pr_was_created():
-    probs = pr.require([entry(added=dt.date(2026, 10, 9))], ["CliProfile"], CREATED, TODAY, "x")
-    assert probs == ["CliProfile: added 2026-10-09 is outside [2026-10-10, 2026-10-13] "
-                     "(the PR's creation date to the run date)"]
+    assert req([entry(added=dt.date(2026, 10, 9))]) == [
+        "CliProfile: added 2026-10-09 is outside [2026-10-10, 2026-10-13] "
+        "(the PR's creation date to the run date)"]
 
 
 def test_o_require_rejects_added_in_the_future():
-    probs = pr.require([entry(added=dt.date(2026, 10, 14))], ["CliProfile"], CREATED, TODAY, "x")
-    assert probs == ["CliProfile: added 2026-10-14 is outside [2026-10-10, 2026-10-13] "
-                     "(the PR's creation date to the run date)"]
+    assert req([entry(added=dt.date(2026, 10, 14))]) == [
+        "CliProfile: added 2026-10-14 is outside [2026-10-10, 2026-10-13] "
+        "(the PR's creation date to the run date)"]
 
 
 def test_require_rejects_a_runner_pr_outside_the_sibling_repo():
-    probs = pr.require([entry(runner_pr="qontinui/qontinui-web#5")], ["CliProfile"], CREATED, TODAY, "x")
-    assert probs == ["CliProfile: runner_pr must be qontinui/qontinui-runner#<n>"]
+    assert req([entry(runner_pr="qontinui/qontinui-web#5")]) == [
+        "CliProfile: runner_pr must be qontinui/qontinui-runner#<n>"]
+
+
+def test_require_rejects_a_row_naming_a_different_runner_pr():
+    assert req([entry(runner_pr="qontinui/qontinui-runner#2000")]) == [
+        "CliProfile: runner_pr is qontinui/qontinui-runner#2000, but this run's declared "
+        "runner PR is qontinui/qontinui-runner#1990"]
+
+
+def test_require_rejects_a_row_whose_runner_pr_is_closed():
+    assert req([entry()], reader=Reader(state="closed")) == [
+        "CliProfile: the row would be INERT (runner PR closed)"]
+
+
+def test_require_rejects_a_row_whose_runner_pr_lacks_the_add():
+    r = Reader(text='fn x() { add!("A11yAction", a::A11yAction); }')
+    assert req([entry()], reader=r) == [
+        "CliProfile: the row would be INERT (not registered at aa63c83cce01)"]
+
+
+def test_resolve_declared_pr_from_the_sibling_sha():
+    assert pr.resolve_declared_pr(Reader(), HEAD_SHA) == ("qontinui/qontinui-runner#1990", "")
+    assert pr.resolve_declared_pr(Reader(numbers=()), HEAD_SHA) == (
+        None, "cannot resolve the declared runner PR: 0 open qontinui/qontinui-runner PRs have head aa63c83cce01")
+    assert pr.resolve_declared_pr(Reader(), "") == (
+        None, "the sibling step reported no head sha for the declared runner PR")
+    assert pr.resolve_declared_pr(Reader(fail="boom"), HEAD_SHA) == (
+        None, "cannot resolve the declared runner PR: unknown(boom)")
 
 
 def test_trailing_forms():
@@ -355,24 +413,29 @@ def test_trailing_forms():
 # ── audit ────────────────────────────────────────────────────────────────────
 
 
+NOT_ON_MAIN = "fn x() { add!(\"A11yAction\", a::A11yAction); }"
+
+
 def test_audit_flags_stale_when_runner_main_registers_it():
     out = pr.audit([entry()], Reader(), TODAY)
     assert out == [("CliProfile", "STALE (runner main registers it; delete this row)", True)]
 
 
-def test_audit_flags_near_expiry():
-    class R(Reader):
-        def file_at(self, repo, path, ref):
-            return REGISTERED if ref != "main" else "fn x() {}"
+def test_audit_flags_a_merged_runner_pr_as_stale_not_inert():
+    out = pr.audit([entry()], Reader(state="closed", merged=True, main_text=NOT_ON_MAIN), TODAY)
+    assert out == [("CliProfile", "STALE (merged; delete this row)", True)]
 
-    out = pr.audit([entry(added=TODAY - dt.timedelta(days=12))], R(), TODAY)
+
+def test_audit_flags_near_expiry():
+    r = Reader(main_text=NOT_ON_MAIN)
+    out = pr.audit([entry(added=TODAY - dt.timedelta(days=12))], r, TODAY)
     assert out == [("CliProfile", "ACTIVE, expires in 2 day(s)", True)]
-    out = pr.audit([entry(added=TODAY - dt.timedelta(days=1))], R(), TODAY)
+    out = pr.audit([entry(added=TODAY - dt.timedelta(days=1))], r, TODAY)
     assert out == [("CliProfile", "ACTIVE (13 day(s) left)", False)]
 
 
 def test_audit_flags_inert():
-    out = pr.audit([entry()], Reader(state="closed"), TODAY)
+    out = pr.audit([entry()], Reader(state="closed", main_text=NOT_ON_MAIN), TODAY)
     assert out == [("CliProfile", "INERT (runner PR closed)", True)]
 
 
@@ -394,6 +457,24 @@ def test_load_entries_rejects_a_malformed_file(tmp_path):
         pr.load_entries(tmp_path)
 
 
+def test_load_entries_rejects_duplicate_rows(tmp_path):
+    (tmp_path / "codegen").mkdir()
+    row = '[[pending]]\ntype = "CliProfile"\nrunner_pr = "qontinui/qontinui-runner#1990"\nadded = 2026-10-12\n'
+    (tmp_path / "codegen" / "pending-registration.toml").write_text(row + row)
+    with pytest.raises(pr.ModuleError, match="duplicate row for type CliProfile"):
+        pr.load_entries(tmp_path)
+
+
+def test_the_fixture_seam_is_refused_on_any_github_actions_run(tmp_path, monkeypatch):
+    f = tmp_path / "f.json"
+    f.write_text("{}")
+    monkeypatch.setenv("PENDING_REGISTRATION_FIXTURE", str(f))
+    monkeypatch.setenv("GITHUB_WORKFLOW", "qontinui-types drift")
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    with pytest.raises(pr.ModuleError, match="refused on a GitHub Actions run"):
+        pr.make_reader()
+
+
 @pytest.mark.parametrize("workflow", ["schema-drift", "pending-registration-audit"])
 def test_the_fixture_seam_is_refused_inside_the_deciding_workflows(tmp_path, monkeypatch, workflow):
     f = tmp_path / "f.json"
@@ -407,5 +488,6 @@ def test_the_fixture_seam_is_refused_inside_the_deciding_workflows(tmp_path, mon
 def test_the_fixture_seam_refuses_a_missing_file(monkeypatch, tmp_path):
     monkeypatch.setenv("PENDING_REGISTRATION_FIXTURE", str(tmp_path / "absent.json"))
     monkeypatch.delenv("GITHUB_WORKFLOW", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     with pytest.raises(pr.ModuleError, match="missing file"):
         pr.make_reader()

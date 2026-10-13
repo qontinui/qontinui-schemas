@@ -123,8 +123,9 @@ def fixture_file(tmp_path: Path, state: str = "open", text: str | None = None) -
 def verify(root: Path, fixture: Path | None, path_prefix: Path | None = None,
            **env_extra: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items()
-           if k not in ("GITHUB_WORKFLOW", "GITHUB_STEP_SUMMARY", "GITHUB_TOKEN",
-                        "SIBLING_SOURCE", "PENDING_REGISTRATION_FIXTURE")}
+           if k not in ("GITHUB_WORKFLOW", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_TOKEN",
+                        "SIBLING_SOURCE", "SIBLING_SHA", "PR_BASE_SHA", "PR_CREATED_AT",
+                        "PENDING_REGISTRATION_FIXTURE")}
     env.update(GENERATE_TYPES_SH=str(STUB_GENERATOR), QONTINUI_SCHEMAS_DIR=str(root),
                SIBLING_SOURCE="none")
     if fixture is not None:
@@ -232,12 +233,13 @@ def test_require_with_a_header_only_toml_reds_and_prints_the_rows(tmp_path):
     git(root, "add", "-A")
     git(root, "commit", "-qm", "leading PR adds CliProfile")
     # The declared trailing sibling produced the type, so the tree has no drift.
-    r = verify(root, None, SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+    r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
+               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
     out = r.stdout + r.stderr
     assert r.returncode == 1, out
     assert "missing entry for CliProfile" in out
     assert "[[pending]]" in out and 'type = "CliProfile"' in out
+    assert 'runner_pr = "qontinui/qontinui-runner#1990"' in out
 
 
 def test_require_is_satisfied_by_a_dated_entry(tmp_path):
@@ -251,7 +253,7 @@ def test_require_is_satisfied_by_a_dated_entry(tmp_path):
     git(root, "add", "-A")
     git(root, "commit", "-qm", "leading PR adds CliProfile with its entry")
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
     out = r.stdout + r.stderr
     assert r.returncode == 0, out
     assert "pending-registration: CliProfile: PRODUCED-BY-DECLARED-SIBLING" in out
@@ -267,3 +269,69 @@ def test_j_no_toml_keeps_todays_behaviour(tmp_path):
     assert r.returncode == 1, out
     assert "pending-registration" not in out
     assert errors(out) == ["::error::Checked-in generated types differ from a fresh regeneration."]
+
+
+def test_require_rejects_a_malformed_base_sha(tmp_path):
+    root = make_repo(tmp_path, toml_entry())
+    r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="sibling-downstream-of",
+               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA="main; rm -rf /",
+               PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "--base must be a 40-hex commit sha" in out
+
+
+def test_j_a_header_only_toml_with_a_non_trailing_source_keeps_todays_behaviour(tmp_path):
+    root = make_repo(tmp_path, "# header only, no rows\n")
+    r = verify(root, None, SIBLING_SOURCE="none")
+    assert r.returncode == 0, r.stdout + r.stderr
+    regenerate_without_cli_profile(root)
+    r = verify(root, None, SIBLING_SOURCE="none")
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "pending-registration" not in out
+    assert errors(out) == ["::error::Checked-in generated types differ from a fresh regeneration."]
+
+
+def test_c_a_modified_binding_with_a_row_still_reds(tmp_path):
+    root = make_repo(tmp_path, toml_entry())
+    regenerate_without_cli_profile(root)
+    write(root, "ts/src/generated/CliProfile.d.ts", "export interface CliProfile { changed: true }\n")
+    r = verify(root, fixture_file(tmp_path))
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "pending-registration: CliProfile: MODIFIED (regenerated differently from HEAD; not absorbed)" in out
+    assert "ts/src/generated/CliProfile.d.ts" in out
+
+
+def test_l2_a_crlf_barrel_reds(tmp_path):
+    root = make_repo(tmp_path, toml_entry())
+    regenerate_without_cli_profile(root)
+    p = root / "ts/src/generated/index.ts"
+    p.write_bytes(p.read_bytes().replace(b"\n", b"\r\n"))
+    r = verify(root, fixture_file(tmp_path))
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "::error::ts/src/generated/index.ts differs from the regeneration beyond the absorbed pending lines." in out
+
+
+def test_l2_a_missing_final_newline_in_a_barrel_reds(tmp_path):
+    root = make_repo(tmp_path, toml_entry())
+    regenerate_without_cli_profile(root)
+    p = root / "src/qontinui_schemas/generated/__init__.py"
+    p.write_bytes(p.read_bytes().rstrip(b"\n"))
+    r = verify(root, fixture_file(tmp_path))
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "::error::src/qontinui_schemas/generated/__init__.py differs from the regeneration beyond the absorbed pending lines." in out
+
+
+def test_l2_a_chmod_on_a_barrel_reds(tmp_path):
+    root = make_repo(tmp_path, toml_entry())
+    regenerate_without_cli_profile(root)
+    (root / "src/qontinui_schemas/generated/__init__.py").chmod(0o755)
+    r = verify(root, fixture_file(tmp_path))
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert "::error::a generated barrel's mode or existence changed:" in out
+    assert "mode change 100644 => 100755" in out

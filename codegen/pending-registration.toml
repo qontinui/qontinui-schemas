@@ -27,8 +27,9 @@
 #
 # WHO ADDS A ROW. The author of the LEADING schemas PR, in that same PR. When
 # check-drift resolves a TRAILING runner declaration it requires a row for every
-# binding the PR adds, with `added` between the PR's creation date and the run
-# date, and prints the rows to paste.
+# binding the PR adds, naming that declared runner PR, already ACTIVE-eligible,
+# with `added` between the PR's creation date and the run date, and prints the
+# rows to paste.
 #
 # ACCEPTED COST. While a row is ACTIVE, a schemas-side change to that type's own
 # shape is invisible to check-drift until the runner PR lands; the next push

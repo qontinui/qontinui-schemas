@@ -694,12 +694,15 @@ jobs:
       #   * SIBLING_SOURCE — which runner tree regenerated: `none` (default
       #     branch) is the only source that may call a produced type STALE,
       #     and a TRAILING form switches on `require` mode.
+      #   * SIBLING_SHA — the declared runner PR's head; `require` resolves it
+      #     to the PR number every new row must name.
       #   * PR_BASE_SHA / PR_CREATED_AT — `require` mode's inputs; empty on push.
       - name: Check for drift
         working-directory: qontinui-schemas
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SIBLING_SOURCE: ${{ steps.sibling.outputs.source }}
+          SIBLING_SHA: ${{ steps.sibling.outputs.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
         run: bash scripts/check-generated-drift.sh --verify

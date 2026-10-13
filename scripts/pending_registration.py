@@ -77,8 +77,6 @@ PY_DIR = "src/qontinui_schemas/generated"
 PY_BARREL = "src/qontinui_schemas/generated/__init__.py"
 BARRELS = (TS_BARREL, PY_BARREL)
 
-# Same filter check-generated-drift.sh arm 2 passes to `git diff -I`.
-TIMESTAMP_RE = re.compile(r"^#   timestamp:")
 
 # The trailing declaration forms of qontinui-runner's checkout-sibling action.
 TRAILING_FORMS = ("self-upstream-of", "sibling-downstream-of")
@@ -92,6 +90,7 @@ REFUSE_FIXTURE_IN_WORKFLOWS = ("schema-drift", "pending-registration-audit")
 
 TYPE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 RUNNER_PR_RE = re.compile(r"^([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)#([0-9]+)$")
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 class ModuleError(Exception):
@@ -122,6 +121,7 @@ def load_entries(repo_root: Path) -> list[Entry]:
     if not isinstance(rows, list):
         raise ModuleError(f"{TOML_PATH}: `pending` must be an array of tables")
     entries = []
+    seen: set[str] = set()
     for i, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ModuleError(f"{TOML_PATH}: pending[{i}] is not a table")
@@ -131,6 +131,9 @@ def load_entries(repo_root: Path) -> list[Entry]:
             raise ModuleError(f"{TOML_PATH}: pending[{i}].type must be a Rust type name")
         if not isinstance(pr, str):
             raise ModuleError(f"{TOML_PATH}: pending[{i}].runner_pr must be a string")
+        if t in seen:
+            raise ModuleError(f"{TOML_PATH}: duplicate row for type {t}")
+        seen.add(t)
         entries.append(Entry(t, pr, row.get("added"), str(row.get("schemas_pr", ""))))
     return entries
 
@@ -142,6 +145,7 @@ def load_entries(repo_root: Path) -> list[Entry]:
 class PrState:
     state: str  # "open" | "closed"
     head_sha: str
+    merged: bool = False
 
 
 class Unknown(Exception):
@@ -188,9 +192,18 @@ class GitHubReader:
     def pr(self, repo: str, number: int) -> PrState:
         data = self._get_json(f"/repos/{repo}/pulls/{number}")
         try:
-            return PrState(str(data["state"]), str(data["head"]["sha"]))
+            return PrState(str(data["state"]), str(data["head"]["sha"]), bool(data.get("merged")))
         except (KeyError, TypeError) as exc:
             raise Unknown(f"PR {repo}#{number}: unexpected shape") from exc
+
+    def prs_for_commit(self, repo: str, sha: str) -> list[tuple[int, PrState]]:
+        data = self._get_json(f"/repos/{repo}/commits/{sha}/pulls")
+        try:
+            return [(int(d["number"]), PrState(str(d["state"]), str(d["head"]["sha"]),
+                                               bool(d.get("merged_at"))))
+                    for d in data]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise Unknown(f"commit {repo}@{sha} pulls: unexpected shape") from exc
 
     def file_at(self, repo: str, path: str, ref: str) -> str:
         data = self._get_json(f"/repos/{repo}/contents/{path}?ref={ref}")
@@ -203,7 +216,7 @@ class GitHubReader:
 class FixtureReader:
     """Test-only stand-in for GitHubReader, fed from a JSON file.
 
-    Shape: {"prs": {"<owner/repo>#<n>": {"state": "open", "head_sha": "...",
+    Shape: {"prs": {"<owner/repo>#<n>": {"state": "open", "head_sha": "...", "merged": false,
              "schema_export": "<file text at head>"}},
             "main_schema_export": "<file text at the sibling's default branch>"}
     A PR or file missing from the fixture reads as Unknown, like a 404.
@@ -218,7 +231,16 @@ class FixtureReader:
         row = self.data.get("prs", {}).get(f"{repo}#{number}")
         if row is None:
             raise Unknown(f"PR {repo}#{number} not found")
-        return PrState(row["state"], row["head_sha"])
+        return PrState(row["state"], row["head_sha"], bool(row.get("merged", False)))
+
+    def prs_for_commit(self, repo: str, sha: str) -> list[tuple[int, PrState]]:
+        self.calls += 1
+        out = []
+        for key, row in self.data.get("prs", {}).items():
+            r, _, n = key.partition("#")
+            if r == repo and row.get("head_sha") == sha:
+                out.append((int(n), PrState(row["state"], row["head_sha"], bool(row.get("merged", False)))))
+        return out
 
     def file_at(self, repo: str, path: str, ref: str) -> str:
         self.calls += 1
@@ -242,6 +264,10 @@ def make_reader():
         workflow = os.environ.get("GITHUB_WORKFLOW", "")
         if workflow in REFUSE_FIXTURE_IN_WORKFLOWS:
             raise ModuleError(f"{FIXTURE_ENV} is refused inside the {workflow} workflow")
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # Covers every CI caller, the runner's `qontinui-types drift` mirror
+            # included: a decision made in CI is never made from a fixture.
+            raise ModuleError(f"{FIXTURE_ENV} is refused on a GitHub Actions run")
         path = Path(fixture)
         if not path.is_file():
             raise ModuleError(f"{FIXTURE_ENV} points at a missing file: {fixture}")
@@ -356,6 +382,17 @@ class Trees:
             return None
         return p.read_text(encoding="utf-8")
 
+    def head_bytes(self, path: str) -> bytes | None:
+        text = self.head(path)  # existence and error semantics, decoded
+        if text is None:
+            return None
+        return subprocess.run(["git", "-C", str(self.root), "show", f"HEAD:{path}"],
+                              capture_output=True, check=True).stdout
+
+    def work_bytes(self, path: str) -> bytes | None:
+        p = self.root / path
+        return p.read_bytes() if p.exists() else None
+
 
 def ts_export_line(t: str) -> str:
     return f"export type {{ {t} }} from './{t}';"
@@ -410,6 +447,25 @@ def produced(t: str, trees: Trees) -> bool:
     return trees.work(f"{TS_DIR}/{t}.d.ts") is not None
 
 
+def produced_identically(t: str, trees: Trees, head_py_barrel: str | None) -> bool:
+    """The regeneration produced T's bindings exactly as HEAD has them.
+
+    The `.d.ts` must be byte-identical; the per-type `.py`, when HEAD names its
+    module, must match apart from the `#   timestamp:` header every run rewrites.
+    """
+    ts = f"{TS_DIR}/{t}.d.ts"
+    if trees.head_bytes(ts) != trees.work_bytes(ts):
+        return False
+    module = py_module_for(t, head_py_barrel)
+    if module is None:
+        return True
+    py = f"{PY_DIR}/per_type/{module}.py"
+    h, w = trees.head_bytes(py), trees.work_bytes(py)
+    if h is None or w is None:
+        return h == w
+    return strip_ts_bytes(h) == strip_ts_bytes(w)
+
+
 def produced_label(source: str | None) -> str:
     """How to name a type the regeneration produced, by which tree regenerated it."""
     if source is None or source == "":
@@ -424,8 +480,14 @@ def produced_label(source: str | None) -> str:
     return f"PRODUCED (source {source})"
 
 
-def strip_ts(lines: list[str]) -> list[str]:
-    return [l for l in lines if not TIMESTAMP_RE.match(l)]
+# Same filter check-generated-drift.sh arm 2 passes to `git diff -I`.
+TIMESTAMP_BYTES_RE = re.compile(rb"^#   timestamp:")
+
+
+def strip_ts_bytes(data: bytes) -> list[bytes]:
+    """Split on b"\\n" ONLY, so a CR, a missing or extra final newline, or any
+    other byte difference survives the comparison. Timestamp header lines drop out."""
+    return [l for l in data.split(b"\n") if not TIMESTAMP_BYTES_RE.match(l)]
 
 
 def decide(repo_root: Path, entries: list[Entry], reader, today: dt.date,
@@ -437,7 +499,10 @@ def decide(repo_root: Path, entries: list[Entry], reader, today: dt.date,
     rows, exclude, absorbed_lines = [], [], {b: [] for b in BARRELS}
     for e in entries:
         if produced(e.type, trees):
-            rows.append((e.type, produced_label(source)))
+            if produced_identically(e.type, trees, head_barrels[PY_BARREL]):
+                rows.append((e.type, produced_label(source)))
+            else:
+                rows.append((e.type, "MODIFIED (regenerated differently from HEAD; not absorbed)"))
             continue
         ok, reason = metadata_verdict(e, reader, today)
         if not ok:
@@ -455,12 +520,18 @@ def decide(repo_root: Path, entries: list[Entry], reader, today: dt.date,
 
     barrel_errors = []
     if exclude:
-        # The barrels leave the git diff; compare them here, line by line.
+        # The barrels leave the git diff; compare them here as BYTES split on
+        # b"\n", after removing exactly the absorbed lines. (The caller checks
+        # their file modes with `git diff --summary`.)
         for b in BARRELS:
-            head = lines_of(head_barrels[b])
+            hb, wb = trees.head_bytes(b), trees.work_bytes(b)
+            if hb is None or wb is None:
+                barrel_errors.append(b)
+                continue
+            head = hb.split(b"\n")
             for line in absorbed_lines[b]:
-                head.remove(line)
-            if strip_ts(head) != strip_ts(lines_of(work_barrels[b])):
+                head.remove(line.encode("utf-8"))
+            if strip_ts_bytes(b"\n".join(head)) != strip_ts_bytes(wb):
                 barrel_errors.append(b)
     return {
         "version": 1,
@@ -503,9 +574,35 @@ def added_types(repo_root: Path, base: str) -> list[str]:
     return sorted(Path(p).name[: -len(".d.ts")] for p in r.stdout.split())
 
 
+def resolve_declared_pr(reader, sibling_sha: str | None) -> tuple[str | None, str]:
+    """The trailing runner PR this run regenerated against, from the sibling sha.
+
+    (ref, "") on success, else (None, reason). The checkout-sibling action
+    reports the declared PR's head sha; the open PR whose head is that sha is
+    the one the rows must name.
+    """
+    if not sibling_sha or not SHA_RE.match(sibling_sha):
+        return None, "the sibling step reported no head sha for the declared runner PR"
+    try:
+        prs = reader.prs_for_commit(SIBLING_REPO, sibling_sha)
+    except Unknown as exc:
+        return None, f"cannot resolve the declared runner PR: unknown({exc})"
+    matches = sorted(n for n, st in prs if st.state == "open" and st.head_sha == sibling_sha)
+    if len(matches) != 1:
+        return None, (f"cannot resolve the declared runner PR: {len(matches)} open "
+                      f"{SIBLING_REPO} PRs have head {sibling_sha[:12]}")
+    return f"{SIBLING_REPO}#{matches[0]}", ""
+
+
 def require(entries: list[Entry], new_types: list[str], pr_created: dt.date,
-            today: dt.date, runner_pr_hint: str) -> list[str]:
-    """Problems with a trailing-sibling PR's entries; empty means satisfied."""
+            today: dt.date, declared_pr: str | None, reader) -> list[str]:
+    """Problems with a trailing-sibling PR's entries; empty means satisfied.
+
+    Each row a new binding needs must name the DECLARED runner PR and must
+    already be ACTIVE-eligible (open, registering the type, readable) — a row
+    that passes here and reads INERT on main's next push would re-open the very
+    red window this exists to close.
+    """
     by_type = {e.type: e for e in entries}
     problems = []
     for t in new_types:
@@ -513,14 +610,25 @@ def require(entries: list[Entry], new_types: list[str], pr_created: dt.date,
         if e is None:
             problems.append(f"missing entry for {t}")
             continue
-        if not RUNNER_PR_RE.match(e.runner_pr) or RUNNER_PR_RE.match(e.runner_pr).group(1) != SIBLING_REPO:
+        m = RUNNER_PR_RE.match(e.runner_pr)
+        if not m or m.group(1) != SIBLING_REPO:
             problems.append(f"{t}: runner_pr must be {SIBLING_REPO}#<n>")
+            continue
+        if declared_pr is not None and e.runner_pr != declared_pr:
+            problems.append(f"{t}: runner_pr is {e.runner_pr}, but this run's declared "
+                            f"runner PR is {declared_pr}")
+            continue
         a = e.added
         if not isinstance(a, dt.date) or isinstance(a, dt.datetime):
             problems.append(f"{t}: added must be a date")
-        elif not (pr_created <= a <= today):
+            continue
+        if not (pr_created <= a <= today):
             problems.append(f"{t}: added {a} is outside [{pr_created}, {today}] "
                             "(the PR's creation date to the run date)")
+            continue
+        ok, reason = metadata_verdict(e, reader, today)
+        if not ok:
+            problems.append(f"{t}: the row would be INERT ({reason})")
     return problems
 
 
@@ -540,22 +648,36 @@ def paste_rows(types: list[str], runner_pr_hint: str, today: dt.date) -> str:
 
 
 def audit(entries: list[Entry], reader, today: dt.date) -> list[tuple[str, str, bool]]:
-    """(type, verdict, is_problem) per entry."""
+    """(type, verdict, is_problem) per entry.
+
+    STALE is decided FIRST: a merged runner PR, or runner main registering the
+    type, means the wait is over and the row should go — reported as STALE, not
+    as the INERT(runner PR closed) a merged PR would otherwise read as.
+    """
     out = []
-    main_text = None
+    try:
+        main_text = reader.file_at(SIBLING_REPO, SCHEMA_EXPORT_PATH, "main")
+    except Unknown as exc:
+        main_text, main_err = None, str(exc)
     for e in entries:
+        if main_text is not None and registers(main_text, e.type):
+            out.append((e.type, "STALE (runner main registers it; delete this row)", True))
+            continue
+        m = RUNNER_PR_RE.match(e.runner_pr)
+        if m and m.group(1) == SIBLING_REPO:
+            try:
+                st = reader.pr(SIBLING_REPO, int(m.group(2)))
+                if st.state != "open" and st.merged:
+                    out.append((e.type, "STALE (merged; delete this row)", True))
+                    continue
+            except Unknown:
+                pass  # metadata_verdict below reports it
         ok, reason = metadata_verdict(e, reader, today)
         if not ok:
             out.append((e.type, f"INERT ({reason})", True))
             continue
         if main_text is None:
-            try:
-                main_text = reader.file_at(SIBLING_REPO, SCHEMA_EXPORT_PATH, "main")
-            except Unknown as exc:
-                out.append((e.type, f"INERT (unknown({exc}))", True))
-                continue
-        if registers(main_text, e.type):
-            out.append((e.type, "STALE (runner main registers it; delete this row)", True))
+            out.append((e.type, f"INERT (unknown({main_err}))", True))
             continue
         left = MAX_AGE_DAYS - (today - e.added).days
         if left < EXPIRY_WARNING_DAYS:
@@ -596,6 +718,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--source", default=os.environ.get("SIBLING_SOURCE"))
     ap.add_argument("--base", default=os.environ.get("PR_BASE_SHA"))
     ap.add_argument("--pr-created-at", default=os.environ.get("PR_CREATED_AT"))
+    ap.add_argument("--sibling-sha", default=os.environ.get("SIBLING_SHA"))
     args = ap.parse_args(argv)
     root = Path(args.repo_root)
     today = _today()
@@ -619,13 +742,19 @@ def main(argv: list[str]) -> int:
                 return 0
             if not args.base or not args.pr_created_at:
                 raise ModuleError("require needs --base and --pr-created-at")
+            if not SHA_RE.match(args.base):
+                raise ModuleError(f"--base must be a 40-hex commit sha, got {args.base!r}")
             try:
                 created = dt.datetime.fromisoformat(args.pr_created_at.replace("Z", "+00:00")).date()
             except ValueError as exc:
                 raise ModuleError(f"--pr-created-at is not ISO-8601: {args.pr_created_at}") from exc
             new_types = added_types(root, args.base)
-            hint = f"{SIBLING_REPO}#<runner PR number>"
-            problems = require(entries, new_types, created, today, hint)
+            reader = make_reader()
+            declared, why = resolve_declared_pr(reader, args.sibling_sha)
+            problems = require(entries, new_types, created, today, declared, reader) if new_types else []
+            if new_types and declared is None:
+                problems.insert(0, why)
+            hint = declared or f"{SIBLING_REPO}#<runner PR number>"
             if not problems:
                 print(f"pending-registration require: {len(new_types)} added binding(s), all declared")
                 return 0

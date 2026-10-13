@@ -813,6 +813,18 @@ print("END")
     fi
     excludes+=(":(exclude)$TS_GENERATED_DIR/index.ts" ":(exclude)$PY_GENERATED_DIR/__init__.py")
     git diff HEAD --exit-code -I '^#   timestamp:' -- "${GENERATED_DIRS[@]}" "${excludes[@]}" || diff_rc=1
+    # The module compared the two barrels' CONTENT; a mode change (or a
+    # delete/create) is not content, so check it here or it would slip past.
+    local summary
+    summary="$(git diff HEAD --summary -- "$TS_GENERATED_DIR/index.ts" "$PY_GENERATED_DIR/__init__.py")" || {
+        echo "::error::could not read the barrels' git summary; treating as drift."
+        return 1
+    }
+    if [ -n "$summary" ]; then
+        echo "::error::a generated barrel's mode or existence changed:"
+        printf '%s\n' "$summary"
+        diff_rc=1
+    fi
     return "$diff_rc"
 }
 
