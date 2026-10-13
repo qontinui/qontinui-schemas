@@ -68,6 +68,9 @@ pub const COORD_REFUSALS: &[&str] = &[
     "rate_capped",
     "already_evaluated",
     "schema_pending",
+    // Coord could not read an input it needs, or could not record the grant
+    // it made; its `detail` names which, and goes to the log only.
+    "grant_unavailable",
 ];
 
 /// Refusal reasons the node decides (D12).

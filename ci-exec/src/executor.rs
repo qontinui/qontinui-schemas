@@ -636,7 +636,7 @@ pub async fn run_dispatch(
     // The broker stops BEFORE capture, report and cleanup: no call can be in
     // flight while the worktree goes, and the ledger it hands back rides the
     // verdict.
-    let (model_section, model_ledger) = model_access.finish().await;
+    let (model_section, model_ledger) = model_access.finish(sink.as_ref()).await;
 
     let conclusion = overall.conclusion();
     sink.push(&format!(

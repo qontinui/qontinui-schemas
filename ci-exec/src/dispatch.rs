@@ -90,6 +90,13 @@ pub struct ModelAccessGrant {
     /// `live`, `last_known` or `unknown` — how coord read the preference.
     #[serde(default)]
     pub basis: Option<String>,
+    /// Coord's own account of a failed read behind a refusal (always with
+    /// `grant_unavailable`, sometimes with `fork_status_unknown`,
+    /// `preference_unknown` or `rate_capped`). Free text: it goes to the
+    /// dispatch log only, never into a step's environment, where only the
+    /// closed `reason` is exported.
+    #[serde(default)]
+    pub detail: Option<String>,
 }
 
 /// `""` / whitespace-only → `None`; anything else is kept as sent.
@@ -289,6 +296,43 @@ mod tests {
         granted["model_access"] = serde_json::json!({"granted": true, "basis": "live"});
         let granted: DispatchPayload = serde_json::from_value(granted).unwrap();
         assert!(granted.model_access.unwrap().granted);
+    }
+
+    /// The exact grant objects coord's `ModelAccess::to_json` writes (the
+    /// shared fixture qontinui-coord asserts it produces, at
+    /// `crates/coord/testdata/ci_model_access/model_access_grants.json`)
+    /// parse here, `null` reason and `detail` included.
+    #[test]
+    fn coord_grant_fixture_parses() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../testdata/model/model_access_grants.json"))
+                .unwrap();
+        let parse = |key: &str| -> ModelAccessGrant {
+            serde_json::from_value(fixture[key].clone()).unwrap_or_else(|e| panic!("{key}: {e}"))
+        };
+        let granted = parse("granted");
+        assert!(granted.granted);
+        assert_eq!(granted.reason, None);
+        assert_eq!(granted.basis.as_deref(), Some("live"));
+        assert_eq!(granted.detail, None);
+        let unavailable = parse("grant_unavailable");
+        assert!(!unavailable.granted);
+        assert_eq!(unavailable.reason.as_deref(), Some("grant_unavailable"));
+        assert_eq!(unavailable.basis.as_deref(), Some("unknown"));
+        assert_eq!(
+            unavailable.detail.as_deref(),
+            Some("tenant_repos:pg_error:57P01")
+        );
+        let off = parse("preference_off_repo");
+        assert_eq!(off.reason.as_deref(), Some("preference_off_repo"));
+        assert_eq!(off.detail, None);
+        for key in ["grant_unavailable", "preference_off_repo"] {
+            let reason = parse(key).reason.unwrap();
+            assert!(
+                crate::model::COORD_REFUSALS.contains(&reason.as_str()),
+                "{reason} is a coord reason ci-exec does not know"
+            );
+        }
     }
 
     #[derive(Default)]

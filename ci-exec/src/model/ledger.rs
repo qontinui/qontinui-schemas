@@ -17,6 +17,18 @@
 //! - **Bounded.** Serialized, it stays under [`MODEL_LEDGER_MAX_BYTES`]; when
 //!   rows have to go, the aggregates still count every call and the ledger
 //!   says how many rows it omitted.
+//! - **UNKNOWN is an absent key, never `null`.** Coord's ingest refuses a
+//!   `null` where a number belongs, because that is how serde_json writes a
+//!   NaN or an infinity; so an unreported figure is left out, and coord reads
+//!   an absent optional key as unreported.
+//!
+//! # The wire contract is a fixture
+//!
+//! `ci-exec/testdata/model/model_ledger_v1.json` is the exact JSON the
+//! `fixture_ledger` test produces, and qontinui-coord carries the same file
+//! (`crates/coord/testdata/ci_model_access/model_ledger_v1.json`) and asserts
+//! its ingest validator accepts it. A change to this module's shape breaks the
+//! test here; the same change to the copy breaks coord's.
 
 use std::collections::BTreeMap;
 
@@ -56,15 +68,22 @@ pub struct CallRow {
     pub step: String,
     /// The model name as requested.
     pub requested: String,
-    /// The concrete id the provider reported; `None` is UNKNOWN.
+    /// The concrete id the provider reported; absent is UNKNOWN.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<String>,
-    /// Token counts as reported; `None` means the provider reported none (or
+    /// Token counts as reported; absent means the provider reported none (or
     /// the call never reached it), which is UNKNOWN, not zero.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_creation_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_read_tokens: Option<u64>,
     pub latency_ms: u64,
     /// `ok`, or the error subtype (`budget_exhausted:calls`, `cancelled`, …).
@@ -168,8 +187,9 @@ pub struct Coverage {
     pub calls: u64,
     /// Of those, the calls that reported the figure.
     pub reported: u64,
-    /// `reported / calls`, or `None` when no call reached the host (UNKNOWN,
+    /// `reported / calls`, or absent when no call reached the host (UNKNOWN,
     /// not 0 % and not 100 %).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub share: Option<f64>,
 }
 
@@ -217,6 +237,28 @@ pub struct ModelLedger {
     pub budget: BudgetReport,
     pub token_coverage: Coverage,
     pub cost: CostReport,
+}
+
+impl ModelLedger {
+    /// The serialized size coord measures against its ingest cap.
+    pub fn serialized_len(&self) -> usize {
+        serde_json::to_vec(self)
+            .map(|v| v.len())
+            .unwrap_or(usize::MAX)
+    }
+
+    /// The ledger, if its serialized size is within [`MODEL_LEDGER_MAX_BYTES`];
+    /// otherwise its size. Row omission keeps every ledger under the bound
+    /// except one whose aggregates alone exceed it (thousands of distinct,
+    /// very long model ids or account labels). Such a ledger is not sent at
+    /// all, so it can never push the result body past coord's ceiling and
+    /// cost the verdict.
+    pub fn transmittable(self) -> Result<Self, usize> {
+        match self.serialized_len() {
+            n if n <= MODEL_LEDGER_MAX_BYTES => Ok(self),
+            n => Err(n),
+        }
+    }
 }
 
 /// How many rows of requests refused before they reached the host a ledger
@@ -459,9 +501,10 @@ mod tests {
         let v = serde_json::to_value(&l).unwrap();
         assert_eq!(v["calls"][2]["outcome"], "budget_exhausted:calls");
         assert!(
-            v["calls"][2]["input_tokens"].is_null(),
-            "unreported is null, not 0"
+            v["calls"][2].get("input_tokens").is_none(),
+            "unreported is absent, not 0 and not null"
         );
+        assert!(v["calls"][2].get("model_id").is_none());
         for key in ["tenant", "repo", "sha", "lane"] {
             assert!(
                 v.get(key).is_none(),
@@ -475,6 +518,11 @@ mod tests {
     fn an_empty_ledger_has_unknown_coverage() {
         let l = LedgerBuilder::default().finish(BudgetReport::default());
         assert_eq!(l.token_coverage.share, None);
+        let v = serde_json::to_value(&l).unwrap();
+        assert!(
+            v["token_coverage"].get("share").is_none(),
+            "an UNKNOWN share is absent: coord reads a null number as non-finite"
+        );
         assert!(l.calls.is_empty());
         assert!(l.rows_complete);
     }
@@ -526,12 +574,131 @@ mod tests {
         assert_eq!(l.by_account[NO_ACCOUNT].calls, 1000);
     }
 
+    /// The wire contract, byte-for-shape: every row kind (ok with and
+    /// without a reported cost, an error that reached the host with nothing
+    /// reported, a refusal before the host), both aggregate maps, the
+    /// refusal counts, the budget with an overshoot, and fractional
+    /// coverage shares.
+    fn fixture_ledger() -> ModelLedger {
+        let mut b = LedgerBuilder::default();
+        b.push(ok_row(1, "claude-sonnet-4-5", "acct-a", 1200, Some(4200)));
+        let mut haiku = ok_row(2, "claude-haiku-4-5", "acct-b", 800, None);
+        haiku.step = "grade".to_string();
+        haiku.requested = "claude-haiku".to_string();
+        haiku.cache_read_tokens = Some(512);
+        haiku.attempts = 2;
+        b.push(haiku);
+        let mut error = CallRow::refused(3, "b2", "claude-sonnet", "provider_error".to_string());
+        error.route = Some("subscription".to_string());
+        error.account = Some("acct-b".to_string());
+        error.latency_ms = 30_000;
+        error.attempts = 1;
+        b.push(error);
+        let mut exhausted = CallRow::refused(
+            4,
+            "b2",
+            "claude-sonnet",
+            "all_accounts_exhausted".to_string(),
+        );
+        exhausted.latency_ms = 12;
+        exhausted.attempts = 1;
+        b.push(exhausted);
+        b.push(CallRow::refused(
+            5,
+            "b2",
+            "claude-sonnet",
+            "budget_exhausted:tokens".to_string(),
+        ));
+        b.push(CallRow::refused(
+            6,
+            "grade",
+            "claude-opus",
+            "model_not_declared".to_string(),
+        ));
+        b.finish(BudgetReport {
+            max_calls: 400,
+            max_tokens: 2000,
+            max_wall_secs: 3600,
+            calls_used: 4,
+            tokens_used: 2512 + 2,
+            wall_secs_used: 41,
+            tokens_overshoot: 514,
+        })
+    }
+
+    const LEDGER_FIXTURE: &str = include_str!("../../testdata/model/model_ledger_v1.json");
+
+    /// What this module sends is exactly the fixture coord's ingest test
+    /// accepts. On a deliberate shape change, regenerate the fixture from the
+    /// panic message AND copy it to qontinui-coord's
+    /// `crates/coord/testdata/ci_model_access/model_ledger_v1.json`.
+    #[test]
+    fn the_ledger_matches_the_shared_wire_fixture() {
+        let fixture: serde_json::Value = serde_json::from_str(LEDGER_FIXTURE).unwrap();
+        let ours = serde_json::to_value(fixture_ledger()).unwrap();
+        assert_eq!(
+            ours,
+            fixture,
+            "the ledger's wire shape drifted from the shared fixture; produced:\n{}",
+            serde_json::to_string_pretty(&ours).unwrap()
+        );
+        assert_eq!(fixture["schema"], LEDGER_SCHEMA);
+    }
+
+    /// A ledger whose aggregates alone exceed the bound is not transmittable;
+    /// an ordinary one is, unchanged.
+    #[test]
+    fn only_a_ledger_within_the_bound_is_transmittable() {
+        let small = fixture_ledger();
+        assert_eq!(small.clone().transmittable(), Ok(small));
+        let mut b = LedgerBuilder::default();
+        // Distinct ids too long to fit even with every row omitted.
+        for i in 1..=600u64 {
+            let id = format!("{i:04}-{}", "x".repeat(4096));
+            b.push(ok_row(i, &id, "acct-a", 1, None));
+        }
+        let big = b.finish(BudgetReport::default());
+        assert!(big.calls.is_empty(), "every row was omitted");
+        let size = big.serialized_len();
+        assert!(size > MODEL_LEDGER_MAX_BYTES);
+        assert_eq!(big.transmittable(), Err(size));
+    }
+
     #[test]
     fn cost_conversion_refuses_what_is_not_a_cost() {
         assert_eq!(usd_to_microusd(0.0123), Some(12_300));
         assert_eq!(usd_to_microusd(-1.0), None);
         assert_eq!(usd_to_microusd(f64::NAN), None);
         assert_eq!(usd_to_microusd(f64::INFINITY), None);
+    }
+
+    /// `summary.model` stays a small block (plan R6): coord caps the whole
+    /// stored summary at 64 KiB and replaces an oversize one, step rows
+    /// included. Its largest form — the longest closed reason, the widest
+    /// integers — is a few dozen bytes; 256 is the bound this test holds.
+    #[test]
+    fn the_section_is_small_in_every_form() {
+        let reasons = crate::model::COORD_REFUSALS
+            .iter()
+            .chain(crate::model::RUNNER_REFUSALS);
+        let mut forms: Vec<ModelSection> = reasons
+            .map(|r| ModelSection::Refused {
+                reason: r.to_string(),
+            })
+            .collect();
+        forms.extend([
+            ModelSection::NotEvaluated,
+            ModelSection::NotRequested,
+            ModelSection::Granted { calls: u64::MAX },
+            ModelSection::Exhausted {
+                calls: u64::MAX,
+                reset_at: u64::MAX,
+            },
+        ]);
+        for form in forms {
+            let n = serde_json::to_vec(&form).unwrap().len();
+            assert!(n <= 256, "{form:?} serializes to {n} bytes");
+        }
     }
 
     #[test]

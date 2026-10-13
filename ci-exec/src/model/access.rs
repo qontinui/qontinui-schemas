@@ -24,7 +24,7 @@ use crate::host::Host;
 use crate::manifest::{CiJob, CiStep};
 use crate::model::broker::{Broker, BrokerConfig};
 use crate::model::declaration::ModelDeclaration;
-use crate::model::ledger::{ModelLedger, ModelSection};
+use crate::model::ledger::{ModelLedger, ModelSection, MODEL_LEDGER_MAX_BYTES};
 use crate::model::{
     COORD_REFUSALS, DISPATCH_ID_ENV, MODEL_CMD_ENV, MODEL_REFUSED_ENV, MODEL_TOKEN_ENV,
     MODEL_URL_ENV, RUNNER_REFUSALS,
@@ -64,6 +64,18 @@ fn closed_reason(reason: &str, allowed: &[&str], fallback: &str) -> String {
         reason.to_string()
     } else {
         fallback.to_string()
+    }
+}
+
+/// The longest coord `detail` the dispatch log carries; the text is coord's,
+/// but the log line is ours to bound.
+const MAX_DETAIL_CHARS: usize = 256;
+
+/// `detail` cut to [`MAX_DETAIL_CHARS`] characters, saying so when cut.
+fn bounded_detail(detail: &str) -> String {
+    match detail.char_indices().nth(MAX_DETAIL_CHARS) {
+        Some((cut, _)) => format!("{}… (cut)", &detail[..cut]),
+        None => detail.to_string(),
     }
 }
 
@@ -162,11 +174,18 @@ async fn decide(
     match grant {
         None => return refused("not_offered_by_coord"),
         Some(g) if !g.granted => {
-            return refused(&closed_reason(
+            let reason = closed_reason(
                 g.reason.as_deref().unwrap_or(""),
                 COORD_REFUSALS,
                 "not_offered_by_coord",
-            ))
+            );
+            if let Some(detail) = g.detail.as_deref().filter(|d| !d.trim().is_empty()) {
+                sink.push(&format!(
+                    "[ci-node] coord withheld model access ({reason}): {}",
+                    bounded_detail(detail)
+                ));
+            }
+            return refused(&reason);
         }
         Some(_) => {}
     }
@@ -234,7 +253,12 @@ impl ModelAccess {
 
     /// Stop the broker (if one runs) and produce the result's model section
     /// and ledger. Must run BEFORE the dispatch's cleanup.
-    pub(crate) async fn finish(self) -> (ModelSection, Option<ModelLedger>) {
+    ///
+    /// A ledger coord's ingest cap would reject is not sent at all (and the
+    /// dispatch log says so): an over-cap ledger is the one part of the
+    /// result body whose size the executor does not otherwise bound, and the
+    /// body ceiling is what keeps the VERDICT from a 413.
+    pub(crate) async fn finish(self, sink: &dyn LogSink) -> (ModelSection, Option<ModelLedger>) {
         match self {
             ModelAccess::NotRequested => (ModelSection::NotRequested, None),
             ModelAccess::Refused { reason } => (ModelSection::Refused { reason }, None),
@@ -249,7 +273,18 @@ impl ModelAccess {
                         calls: out.calls_used,
                     },
                 };
-                (section, Some(out.ledger))
+                let ledger = match out.ledger.transmittable() {
+                    Ok(ledger) => Some(ledger),
+                    Err(bytes) => {
+                        sink.push(&format!(
+                            "[ci-node] model ledger not sent: {bytes} bytes serialized, over \
+                             coord's {MODEL_LEDGER_MAX_BYTES}-byte ingest cap even with every \
+                             call row omitted; the verdict and summary.model are unaffected"
+                        ));
+                        None
+                    }
+                };
+                (section, ledger)
             }
         }
     }
@@ -303,6 +338,7 @@ mod tests {
             granted: true,
             reason: None,
             basis: Some("live".to_string()),
+            detail: None,
         }
     }
 
@@ -336,6 +372,7 @@ mod tests {
             granted: false,
             reason: Some(reason.to_string()),
             basis: Some("live".to_string()),
+            detail: None,
         };
         let zero_dir = tempfile::tempdir().unwrap();
         let zero_shim = shim_file(zero_dir.path(), b"");
@@ -362,6 +399,15 @@ mod tests {
                 "fork_pr",
                 host_with(Some(ready_inv(Some(good_shim.clone()), Ok(()))), true),
                 Some(refusal("fork_pr")),
+                loopback,
+            ),
+            (
+                "grant_unavailable",
+                host_with(Some(ready_inv(Some(good_shim.clone()), Ok(()))), true),
+                Some(ModelAccessGrant {
+                    detail: Some("tenant_repos:pg_error:57P01".to_string()),
+                    ..refusal("grant_unavailable")
+                }),
                 loopback,
             ),
             (
@@ -450,7 +496,10 @@ mod tests {
             access.step_env(&job.steps[0], "d-1"),
             vec![(DISPATCH_ID_ENV.to_string(), "d-1".to_string())]
         );
-        assert_eq!(access.finish().await.0, ModelSection::NotRequested);
+        assert_eq!(
+            access.finish(&Lines::default()).await.0,
+            ModelSection::NotRequested
+        );
     }
 
     /// On a grant only `model = true` steps get the broker variables; every
@@ -497,7 +546,7 @@ mod tests {
         );
         assert_eq!(get(DISPATCH_ID_ENV).as_deref(), Some("d-1"));
         assert!(get(MODEL_REFUSED_ENV).is_none());
-        let (section, ledger) = access.finish().await;
+        let (section, ledger) = access.finish(&Lines::default()).await;
         assert_eq!(section, ModelSection::Granted { calls: 0 });
         assert!(ledger.is_some());
     }
@@ -520,6 +569,47 @@ mod tests {
         );
     }
 
+    /// Coord's `detail` reaches the dispatch log, bounded, and never the
+    /// step's environment: a step sees only the closed reason.
+    #[tokio::test]
+    async fn coord_detail_goes_to_the_log_not_the_env() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut inv = FakeInvoker::answering("x", 1);
+        inv.shim = Some(shim_file(tmp.path(), b"x"));
+        let host = host_with(Some(inv), true);
+        let decl = declaration(5, 100, 60);
+        let job = job(true);
+        let lines = Lines::default();
+        let sink: Arc<dyn LogSink> = Arc::new(lines.clone());
+        let long = format!("tenant_repos:{}", "e".repeat(1000));
+        let grant = ModelAccessGrant {
+            granted: false,
+            reason: Some("grant_unavailable".to_string()),
+            basis: Some("unknown".to_string()),
+            detail: Some(long.clone()),
+        };
+        let access = prepare(&host, Some(&grant), Some(&decl), &job, sink).await;
+        let env = access.step_env(&job.steps[0], "d-1");
+        assert!(env.contains(&(
+            MODEL_REFUSED_ENV.to_string(),
+            "grant_unavailable".to_string()
+        )));
+        assert!(
+            !env.iter().any(|(_, v)| v.contains("tenant_repos")),
+            "detail never enters the env: {env:?}"
+        );
+        let logged: Vec<String> = lines
+            .all()
+            .into_iter()
+            .filter(|l| l.contains("coord withheld model access (grant_unavailable)"))
+            .collect();
+        assert_eq!(logged.len(), 1, "{:?}", lines.all());
+        assert!(logged[0].contains("tenant_repos:eee"));
+        assert!(logged[0].ends_with("… (cut)"), "{}", logged[0]);
+        assert!(logged[0].len() < long.len());
+        assert_eq!(bounded_detail("short"), "short");
+    }
+
     /// D12's closed vocabulary is enforced on both sources: coord's reason
     /// must be a coord reason, and `ready()`'s a runner reason.
     #[tokio::test]
@@ -532,6 +622,7 @@ mod tests {
         for (coord_reason, want) in [
             ("fork_pr", "fork_pr"),
             ("rate_capped", "rate_capped"),
+            ("grant_unavailable", "grant_unavailable"),
             ("made_up_reason", "not_offered_by_coord"),
             ("cli_missing", "not_offered_by_coord"),
             ("a b\nEVIL=1", "not_offered_by_coord"),
@@ -544,6 +635,7 @@ mod tests {
                 granted: false,
                 reason: Some(coord_reason.to_string()),
                 basis: None,
+                detail: None,
             };
             let access = prepare(&host, Some(&grant), Some(&decl), &job, sink.clone()).await;
             assert_eq!(reason_of(access).await, want, "coord {coord_reason:?}");
