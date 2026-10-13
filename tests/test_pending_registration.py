@@ -395,7 +395,10 @@ def test_require_rejects_a_row_whose_runner_pr_lacks_the_add():
 def test_resolve_declared_pr_from_the_sibling_sha():
     assert pr.resolve_declared_pr(Reader(), HEAD_SHA) == ("qontinui/qontinui-runner#1990", "")
     assert pr.resolve_declared_pr(Reader(numbers=()), HEAD_SHA) == (
-        None, "cannot resolve the declared runner PR: 0 open qontinui/qontinui-runner PRs have head aa63c83cce01")
+        None, "cannot resolve the declared runner PR: 0 open qontinui/qontinui-runner PRs have head aa63c83cce01"
+              "; the declared runner PR's head may have moved since the sibling checkout; re-run")
+    assert pr.resolve_declared_pr(Reader(numbers=(1990, 2000)), HEAD_SHA) == (
+        None, "cannot resolve the declared runner PR: 2 open qontinui/qontinui-runner PRs have head aa63c83cce01")
     assert pr.resolve_declared_pr(Reader(), "") == (
         None, "the sibling step reported no head sha for the declared runner PR")
     assert pr.resolve_declared_pr(Reader(fail="boom"), HEAD_SHA) == (

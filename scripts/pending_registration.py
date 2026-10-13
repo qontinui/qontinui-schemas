@@ -589,8 +589,11 @@ def resolve_declared_pr(reader, sibling_sha: str | None) -> tuple[str | None, st
         return None, f"cannot resolve the declared runner PR: unknown({exc})"
     matches = sorted(n for n, st in prs if st.state == "open" and st.head_sha == sibling_sha)
     if len(matches) != 1:
-        return None, (f"cannot resolve the declared runner PR: {len(matches)} open "
-                      f"{SIBLING_REPO} PRs have head {sibling_sha[:12]}")
+        why = (f"cannot resolve the declared runner PR: {len(matches)} open "
+               f"{SIBLING_REPO} PRs have head {sibling_sha[:12]}")
+        if not matches:
+            why += "; the declared runner PR's head may have moved since the sibling checkout; re-run"
+        return None, why
     return f"{SIBLING_REPO}#{matches[0]}", ""
 
 
