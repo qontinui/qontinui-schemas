@@ -110,9 +110,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
-use crate::checkout::run_git;
 use crate::host::{GithubAccess, ProcessSpawn};
 use crate::manifest::{CiSibling, SiblingPin};
+use crate::sibling_git::{require_git_floor, run_sibling_git, SiblingGitEnv};
 
 /// Budget for the sibling fetch (a `--depth 1` fetch of one commit).
 const SIBLING_FETCH_TIMEOUT: Duration = Duration::from_secs(600);
@@ -651,10 +651,12 @@ fn read_pin(worktree: &Path, repo: &str) -> Result<String, String> {
     }
 }
 
-/// Clone URL for a sibling slug. Public HTTPS only: the sibling repos this
-/// lane provisions are public, and reaching for a credential here would put
-/// the user's GitHub token on a network path the manifest chose.
-fn clone_url(repo: &str) -> String {
+/// Clone URL for a sibling slug. It never carries a credential: a granted
+/// sibling authenticates through a URL-scoped `http.<this url>.extraHeader`
+/// in its isolated git environment ([`crate::sibling_git`]), whose key is
+/// spelled from THIS function so the header matches exactly this URL. Nothing
+/// from the node owner's git config (helper, `insteadOf`) reaches the fetch.
+pub(crate) fn clone_url(repo: &str) -> String {
     format!("https://github.com/{repo}.git")
 }
 
@@ -902,14 +904,16 @@ async fn ls_remote_branch_sha(
     cwd: &Path,
     repo: &str,
     branch: &str,
+    git_env: &SiblingGitEnv,
 ) -> Result<String, String> {
     let url = clone_url(repo);
     let refspec = format!("refs/heads/{branch}");
-    let out = run_git(
+    let out = run_sibling_git(
         process,
         cwd,
         &["ls-remote", "--exit-code", &url, &refspec],
         SIBLING_FETCH_TIMEOUT,
+        git_env,
     )
     .await
     .map_err(|e| format!("resolving {repo}@{branch}: {e}"))?;
@@ -955,6 +959,7 @@ async fn no_declaration(
     worktree: &Path,
     sibling: &CiSibling,
     why: &str,
+    git_env: &SiblingGitEnv,
 ) -> Result<ResolvedSibling, String> {
     if sibling.pin == SiblingPin::PinFile {
         let sha = read_pin(worktree, &sibling.repo)?;
@@ -964,7 +969,7 @@ async fn no_declaration(
             provenance: format!("pinned in {SIBLING_PIN_FILE} ({why}; no declaration applied)"),
         });
     }
-    let sha = ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch).await?;
+    let sha = ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch, git_env).await?;
     Ok(ResolvedSibling {
         repo: sibling.repo.clone(),
         sha,
@@ -975,6 +980,7 @@ async fn no_declaration(
 /// Resolve one sibling to an exact commit. `worktree` is the dispatched
 /// repo's checkout — where [`SIBLING_PIN_FILE`] is read from, at the
 /// dispatched commit, exactly as `.qontinui/ci.toml` itself was.
+#[allow(clippy::too_many_arguments)]
 async fn resolve_one(
     process: &dyn ProcessSpawn,
     api: &Api<'_>,
@@ -983,9 +989,11 @@ async fn resolve_one(
     sibling: &CiSibling,
     this_repo: &str,
     pr_number: Option<u64>,
+    git_env: &SiblingGitEnv,
 ) -> Result<ResolvedSibling, String> {
     if sibling.pin == SiblingPin::DefaultBranch {
-        let sha = ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch).await?;
+        let sha =
+            ls_remote_branch_sha(process, cwd, &sibling.repo, &sibling.branch, git_env).await?;
         return Ok(ResolvedSibling {
             repo: sibling.repo.clone(),
             sha,
@@ -1002,6 +1010,7 @@ async fn resolve_one(
             worktree,
             sibling,
             "no pull request on this dispatch — no declaration probe",
+            git_env,
         )
         .await;
     };
@@ -1020,7 +1029,7 @@ async fn resolve_one(
         &inputs,
     )? {
         DeclaredTarget::None => {
-            no_declaration(process, cwd, worktree, sibling, "no declaration").await
+            no_declaration(process, cwd, worktree, sibling, "no declaration", git_env).await
         }
         DeclaredTarget::TrailingSiblingDeclined { number, forms } => {
             no_declaration(
@@ -1035,6 +1044,7 @@ async fn resolve_one(
                     forms_label(&forms),
                     short_name(&sibling.repo),
                 ),
+                git_env,
             )
             .await
         }
@@ -1063,6 +1073,7 @@ async fn materialise(
     process: &dyn ProcessSpawn,
     dest: &Path,
     resolved: &ResolvedSibling,
+    git_env: &SiblingGitEnv,
 ) -> Result<(), String> {
     if dest.exists() {
         return Err(format!(
@@ -1077,21 +1088,23 @@ async fn materialise(
     let dest_str = dest.to_string_lossy().to_string();
     let url = clone_url(&resolved.repo);
 
-    run_git(
+    run_sibling_git(
         process,
         parent,
         &["init", "-q", &dest_str],
         GIT_LOCAL_TIMEOUT,
+        git_env,
     )
     .await?;
-    run_git(
+    run_sibling_git(
         process,
         dest,
         &["remote", "add", "origin", &url],
         GIT_LOCAL_TIMEOUT,
+        git_env,
     )
     .await?;
-    run_git(
+    run_sibling_git(
         process,
         dest,
         &[
@@ -1103,6 +1116,7 @@ async fn materialise(
             &resolved.sha,
         ],
         SIBLING_FETCH_TIMEOUT,
+        git_env,
     )
     .await
     .map_err(|e| {
@@ -1111,15 +1125,23 @@ async fn materialise(
             resolved.repo, resolved.sha
         )
     })?;
-    run_git(
+    run_sibling_git(
         process,
         dest,
         &["checkout", "-q", "FETCH_HEAD"],
         GIT_LOCAL_TIMEOUT,
+        git_env,
     )
     .await?;
 
-    let got = run_git(process, dest, &["rev-parse", "HEAD"], GIT_LOCAL_TIMEOUT).await?;
+    let got = run_sibling_git(
+        process,
+        dest,
+        &["rev-parse", "HEAD"],
+        GIT_LOCAL_TIMEOUT,
+        git_env,
+    )
+    .await?;
     if got.trim() != resolved.sha {
         return Err(format!(
             "asked for {} but checked out {} — refusing a substituted tree",
@@ -1187,8 +1209,13 @@ pub(crate) async fn provision(
         token: token.as_deref(),
     };
 
+    // Once per provision: a git too old to honour the isolation would ignore
+    // it SILENTLY and read the owner's helper again, so it is refused here.
+    require_git_floor(process, dispatch_root).await?;
+
     let mut resolved_all = Vec::with_capacity(siblings.len());
     for sibling in siblings {
+        let git_env = SiblingGitEnv::isolated(dispatch_root, None)?;
         let resolved = resolve_one(
             process,
             &api,
@@ -1197,6 +1224,7 @@ pub(crate) async fn provision(
             sibling,
             this_repo,
             pr_number,
+            &git_env,
         )
         .await?;
         let dest = sibling_dest(dispatch_root, sibling);
@@ -1207,7 +1235,7 @@ pub(crate) async fn provision(
             resolved.sha,
             resolved.provenance
         ));
-        materialise(process, &dest, &resolved).await?;
+        materialise(process, &dest, &resolved, &git_env).await?;
         info!(
             "ci_node: sibling {} materialised at {} ({})",
             sibling.repo,
@@ -1735,12 +1763,65 @@ mod tests {
         assert!(!is_full_sha(""));
     }
 
+    /// The clone URL never carries a credential — not for a public sibling,
+    /// and not for a granted one either: the grant travels in the isolated
+    /// env's URL-scoped header, so the URL (and the remote git records from
+    /// it) holds no userinfo.
     #[test]
-    fn clone_urls_are_public_https() {
+    fn clone_urls_carry_no_credential() {
         assert_eq!(
             clone_url(SCHEMAS),
             "https://github.com/qontinui/qontinui-schemas.git"
         );
+        let token = crate::sibling_git::ReadToken::new("ghs_GRANTEDtoken");
+        let dir = tempfile::tempdir().unwrap();
+        let url = clone_url(SCHEMAS);
+        let env = SiblingGitEnv::isolated(dir.path(), Some((&url, &token))).unwrap();
+        let authority = url
+            .strip_prefix("https://")
+            .and_then(|rest| rest.split('/').next())
+            .unwrap();
+        assert_eq!(authority, "github.com", "userinfo in {url}");
+        assert!(!url.contains("ghs_GRANTEDtoken"));
+        assert!(!format!("{env:?}").contains("ghs_GRANTEDtoken"));
+    }
+
+    /// git matches `http.<url>.*` on whole path segments, so the header key is
+    /// asserted the way git itself reads it — `git config --get-urlmatch`
+    /// under the BUILT env — not by comparing strings: it must match the
+    /// granted sibling's clone URL, and must not match a second repo's.
+    #[tokio::test]
+    async fn the_auth_header_matches_the_granted_clone_url_and_no_other() {
+        let token = crate::sibling_git::ReadToken::new("ghs_URLMATCHtoken");
+        let dir = tempfile::tempdir().unwrap();
+        let granted = clone_url("qontinui/qontinui-docs-reference");
+        let env = SiblingGitEnv::isolated(dir.path(), Some((&granted, &token))).unwrap();
+        let urlmatch = |url: String| {
+            let mut cmd = crate::sibling_git::sibling_git_command(&PlainSpawn, &env);
+            cmd.current_dir(dir.path())
+                .args(["config", "--get-urlmatch", "http.extraHeader"])
+                .arg(url);
+            async move { cmd.output().await.unwrap() }
+        };
+        let hit = urlmatch(granted.clone()).await;
+        assert!(hit.status.success(), "no header for the granted URL");
+        let value = String::from_utf8_lossy(&hit.stdout).trim().to_string();
+        assert!(
+            value.starts_with("Authorization: Basic "),
+            "got a non-auth value"
+        );
+        for other in [
+            clone_url("qontinui/qontinui-docs-evals"),
+            clone_url("qontinui/qontinui-docs-reference-fork"),
+            "https://github.com/qontinui/qontinui-docs-reference".to_string(),
+            "https://example.com/qontinui/qontinui-docs-reference.git".to_string(),
+        ] {
+            let miss = urlmatch(other.clone()).await;
+            assert!(
+                String::from_utf8_lossy(&miss.stdout).trim().is_empty(),
+                "the header leaked to {other}"
+            );
+        }
     }
 
     // ── the recorded pin (`.github/sibling-pins.conf`) ──────────────────
@@ -1896,6 +1977,7 @@ mod tests {
             dir.path(),
             &sibling,
             "no declaration",
+            &SiblingGitEnv::isolated(dir.path(), None).unwrap(),
         )
         .await
         .unwrap();
@@ -1917,6 +1999,7 @@ mod tests {
             dir.path(),
             &sibling,
             "no declaration",
+            &SiblingGitEnv::isolated(dir.path(), None).unwrap(),
         )
         .await
         .unwrap_err();
