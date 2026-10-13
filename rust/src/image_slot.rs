@@ -156,10 +156,6 @@ pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 /// `f64`. Bounding it keeps infinity out of the schema's range as well as
 /// `validate`'s, so a validator generated from the schema refuses it too.
 pub const FINITE_MAX: f64 = f64::MAX;
-/// The slack a region's far edge gets: `x + width` (or `y + height`) may
-/// exceed 1 by at most this much and still lie inside the box, because the sum
-/// of two fractions written in decimal can round a hair above the true total.
-pub const REGION_EPSILON: f64 = 1e-9;
 
 // ============================================================================
 // The spec
@@ -1002,8 +998,10 @@ pub enum ImageSlotProblem {
     /// The same entry is both required and forbidden content, compared after
     /// trimming surrounding whitespace and lowercasing.
     Contradictory,
-    /// A region with no area, or one whose far edge passes its reference box by
-    /// more than [`REGION_EPSILON`].
+    /// A region with no area, or one whose far edge (`x + width`, `y + height`)
+    /// passes its reference box, compared exactly against 1. Decimal fractions
+    /// whose true sum is at most 1 never sum above 1.0 in `f64`, so no slack is
+    /// needed; a pipeline that computes coordinates rounds or clamps its own.
     RegionOutsideBox,
     /// `thresholds` is `overrides` but names no threshold.
     NoOverride,
@@ -1295,12 +1293,7 @@ fn check_rect(c: &mut Checker, path: &str, x: f64, y: f64, width: f64, height: f
     for (name, value) in [("x", x), ("y", y), ("width", width), ("height", height)] {
         in_range &= c.range(&format!("{path}.{name}"), value, 0.0, 1.0);
     }
-    if in_range
-        && (width <= 0.0
-            || height <= 0.0
-            || x + width > 1.0 + REGION_EPSILON
-            || y + height > 1.0 + REGION_EPSILON)
-    {
+    if in_range && (width <= 0.0 || height <= 0.0 || x + width > 1.0 || y + height > 1.0) {
         c.push(path, ImageSlotProblem::RegionOutsideBox);
     }
 }
@@ -2737,6 +2730,55 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn a_far_edge_exactly_at_one_is_inside_and_one_ulp_past_is_outside() {
+        let mut spec = empty_state();
+        spec.focal.region = region(0.25, 0.5, 0.75, 0.5);
+        spec.safe_areas = ImageSlotSafeAreas::Explicit {
+            regions: vec![area(0.5, 0.25, 0.5, 0.75)],
+        };
+        assert_eq!(spec.validate(), Ok(()));
+
+        for (path, mutate) in [
+            (
+                "focal.region",
+                (|s: &mut ImageSlotSpec| s.focal.region = region(f64::EPSILON, 0.0, 1.0, 0.5))
+                    as fn(&mut ImageSlotSpec),
+            ),
+            ("focal.region", |s| {
+                s.focal.region = region(0.0, f64::EPSILON, 0.5, 1.0)
+            }),
+            ("safe_areas.regions[0]", |s| {
+                s.safe_areas = ImageSlotSafeAreas::Explicit {
+                    regions: vec![area(f64::EPSILON, 0.0, 1.0, 1.0)],
+                }
+            }),
+        ] {
+            let mut spec = empty_state();
+            mutate(&mut spec);
+            assert_eq!(
+                issues(&spec),
+                [(path.to_owned(), ImageSlotProblem::RegionOutsideBox)]
+            );
+        }
+    }
+
+    #[test]
+    fn decimal_edges_that_sum_to_one_are_never_outside() {
+        // Each `k / d` is the correctly rounded f64 of the decimal an author
+        // writes (`0.37`), so this walks every two- and three-place split of 1.
+        // A zero-size region is refused for its area, so the split stops short.
+        for denominator in [100_u32, 1_000] {
+            for k in 0..denominator {
+                let near = f64::from(k) / f64::from(denominator);
+                let far = f64::from(denominator - k) / f64::from(denominator);
+                let mut spec = empty_state();
+                spec.focal.region = region(near, near, far, far);
+                assert_eq!(spec.validate(), Ok(()), "{near} + {far}");
+            }
+        }
     }
 
     #[test]
