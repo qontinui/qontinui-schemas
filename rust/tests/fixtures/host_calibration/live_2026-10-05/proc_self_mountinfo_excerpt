@@ -1,0 +1,4 @@
+30 1 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw,errors=remount-ro
+32 26 0:27 / /dev/shm rw,nosuid,nodev shared:4 - tmpfs tmpfs rw,inode64
+33 24 0:28 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:8 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot
+44 30 0:35 / /tmp rw,nosuid,nodev shared:47 - tmpfs tmpfs rw,nr_inodes=1048576,inode64
