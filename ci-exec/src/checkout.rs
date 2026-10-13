@@ -52,7 +52,19 @@ pub(crate) async fn run_git(
     args: &[&str],
     timeout: Duration,
 ) -> Result<String, String> {
-    let mut cmd = process.command("git");
+    run_git_command(process, process.command("git"), repo_dir, args, timeout).await
+}
+
+/// [`run_git`] on a git command the caller has already built — the seam
+/// [`crate::sibling_git`] uses to run a sibling's git under its isolated
+/// environment while sharing this one spawn/reap/timeout body.
+pub(crate) async fn run_git_command(
+    process: &dyn ProcessSpawn,
+    mut cmd: tokio::process::Command,
+    repo_dir: &Path,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<String, String> {
     // A git call raced against cancellation or cut off by a timeout is
     // DROPPED mid-flight, and what must die with it is the whole process
     // TREE, not only `git` itself: a fetch runs `git-remote-https`,
