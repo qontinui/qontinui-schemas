@@ -12,7 +12,9 @@
 //!   containment — see [`PlainSpawn`];
 //! - no declared removable volumes;
 //! - no canonical-configuration source, so a manifest that declares
-//!   `[canonical]` is REFUSED here rather than run unchecked.
+//!   `[canonical]` is REFUSED here rather than run unchecked;
+//! - no model invoker, so a `model = true` step runs refused with
+//!   `host_has_no_broker`.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -246,6 +248,9 @@ pub fn host(root: PathBuf, label: String) -> Host {
         volume: Arc::new(NoVolumes),
         identity: Arc::new(FixedIdentity { root, label }),
         canonical: Arc::new(NoCanonical),
+        // A plain shell holds no model invoker: a `model = true` step runs
+        // with `QONTINUI_CI_MODEL_REFUSED=host_has_no_broker`.
+        model: None,
     }
 }
 
