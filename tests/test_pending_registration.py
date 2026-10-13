@@ -494,3 +494,164 @@ def test_the_fixture_seam_refuses_a_missing_file(monkeypatch, tmp_path):
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     with pytest.raises(pr.ModuleError, match="missing file"):
         pr.make_reader()
+
+
+# ── require: which base "added by this PR" is measured against ───────────────
+#
+# Measured on qontinui-schemas#223 (run 38170545544, 2026-10-13): a pull_request
+# run checks out the MERGE commit (PR head merged into the base's CURRENT tip),
+# but `github.event.pull_request.base.sha` is the base as of the PR's last sync.
+# Diffing that stale sha..HEAD counted main's own newer bindings
+# (CapabilityState/CliProfile/SessionFailure -> runner#1990) as "added by this
+# PR" and demanded they name the PR's declared runner#2118 instead.
+
+RUNNER_1990_HEAD = "1" * 40
+RUNNER_2118_HEAD = "2" * 40
+
+_TOML_1990 = (
+    '[[pending]]\ntype = "CliProfile"\nrunner_pr = "qontinui/qontinui-runner#1990"\n'
+    "added = 2026-10-13\n"
+)
+_TOML_2118 = (
+    '[[pending]]\ntype = "NewThing"\nrunner_pr = "qontinui/qontinui-runner#2118"\n'
+    "added = 2026-10-13\n"
+)
+
+
+def _git(cwd, *args):
+    import subprocess
+    r = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+    assert r.returncode == 0, (args, r.stderr)
+    return r.stdout.strip()
+
+
+def _commit(repo, files: dict, msg: str) -> str:
+    for rel, text in files.items():
+        p = repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        _git(repo, "add", rel)
+    _git(repo, "commit", "-q", "-m", msg)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def stale_base_repo(tmp_path):
+    """(repo, stale_base, base_tip, pr_head, merge) — the #223 shape.
+
+    stale_base  the base the PR last synced against (pull_request.base.sha)
+    base_tip    main AFTER that: adds CliProfile + its #1990 row
+    pr_head     the PR, branched from stale_base: adds NewThing + its #2118 row
+    merge       refs/pull/N/merge — parents [base_tip, pr_head]
+    """
+    repo = tmp_path / "schemas"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "t")
+    _git(repo, "config", "uploadpack.allowAnySHA1InWant", "true")
+    stale = _commit(repo, {"ts/src/generated/A11yAction.d.ts": "a\n",
+                           "codegen/pending-registration.toml": ""}, "base")
+    tip = _commit(repo, {"ts/src/generated/CliProfile.d.ts": "c\n",
+                         "codegen/pending-registration.toml": _TOML_1990}, "main moves on")
+    _git(repo, "checkout", "-q", "-b", "pr", stale)
+    head = _commit(repo, {"ts/src/generated/NewThing.d.ts": "n\n",
+                          "codegen/pending-registration.toml": _TOML_2118}, "the PR")
+    _git(repo, "checkout", "-q", "--detach", tip)
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "merge", "-q", "--no-ff", "--no-commit", head],
+                   capture_output=True, text=True)  # the toml conflicts, by design
+    _git(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")  # still mid-merge
+    (repo / "codegen" / "pending-registration.toml").write_text(_TOML_1990 + "\n" + _TOML_2118)
+    _git(repo, "add", "codegen/pending-registration.toml")
+    _git(repo, "commit", "-q", "-m", "Merge pr into main")
+    merge = _git(repo, "rev-parse", "HEAD")
+    return repo, stale, tip, head, merge
+
+
+def _fixture(tmp_path):
+    reg = 'fn b() {{ add!("{t}", x::{t}); }}'
+    f = tmp_path / "gh.json"
+    f.write_text(json.dumps({"prs": {
+        "qontinui/qontinui-runner#1990": {"state": "open", "head_sha": RUNNER_1990_HEAD,
+                                          "schema_export": reg.format(t="CliProfile")},
+        "qontinui/qontinui-runner#2118": {"state": "open", "head_sha": RUNNER_2118_HEAD,
+                                          "schema_export": reg.format(t="NewThing")},
+    }}))
+    return f
+
+
+def _require_env(monkeypatch, tmp_path, stale, head):
+    monkeypatch.setenv("PENDING_REGISTRATION_FIXTURE", str(_fixture(tmp_path)))
+    for k in ("GITHUB_WORKFLOW", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("SIBLING_SOURCE", "sibling-downstream-of")
+    monkeypatch.setenv("SIBLING_SHA", RUNNER_2118_HEAD)
+    # The stale pull_request.base.sha the workflow used to export: set, to prove
+    # nothing reads it any more.
+    monkeypatch.setenv("PR_BASE_SHA", stale)
+    monkeypatch.setenv("PR_HEAD_SHA", head)
+    monkeypatch.setenv("PR_CREATED_AT", "2026-10-10T12:00:00Z")
+    monkeypatch.setattr(pr, "_today", lambda: TODAY)
+
+
+def test_require_does_not_count_bindings_the_base_added_after_the_prs_recorded_base(
+        tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    rc = pr.main(["require", "--repo-root", str(repo)])
+    out = capsys.readouterr()
+    assert "CliProfile" not in out.out + out.err
+    assert rc == 0, out.out + out.err
+    assert "pending-registration require: 1 added binding(s), all declared" in out.out
+
+
+def test_require_still_demands_a_row_for_a_binding_the_pr_adds(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    (repo / "codegen" / "pending-registration.toml").write_text(_TOML_1990)
+    _git(repo, "commit", "-q", "--amend", "-a", "--no-edit")
+    _require_env(monkeypatch, tmp_path, stale, head)
+    rc = pr.main(["require", "--repo-root", str(repo)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "  - missing entry for NewThing" in out
+    assert "CliProfile" not in out
+
+
+def test_require_finds_the_base_in_a_depth_1_merge_checkout(tmp_path, monkeypatch, capsys):
+    # actions/checkout@v5 on pull_request: the merge commit alone, depth 1.
+    repo, stale, tip, head, merge = stale_base_repo(tmp_path)
+    ci = tmp_path / "ci"
+    ci.mkdir()
+    _git(ci, "init", "-q")
+    _git(ci, "remote", "add", "origin", f"file://{repo}")
+    _git(ci, "fetch", "-q", "--no-tags", "--depth=1", "origin", merge)
+    _git(ci, "checkout", "-q", "--detach", merge)
+    assert pr.merge_base_parent(ci, head) == tip
+    _require_env(monkeypatch, tmp_path, stale, head)
+    assert pr.main(["require", "--repo-root", str(ci)]) == 0, capsys.readouterr()
+
+
+def test_require_fails_closed_when_head_is_not_a_merge(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _git(repo, "checkout", "-q", "--detach", head)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    assert pr.main(["require", "--repo-root", str(repo)]) == 2
+    assert ("::error::pending-registration: cannot establish the base this PR merges into: "
+            "HEAD has 1 parent(s), so it is not the PR merged into its base (require needs "
+            "the pull_request merge ref checked out)") in capsys.readouterr().err
+
+
+def test_require_fails_closed_when_the_merge_is_not_of_the_pr_head(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, "f" * 40)
+    assert pr.main(["require", "--repo-root", str(repo)]) == 2
+    assert (f"HEAD's second parent {head[:12]} is not the PR head ffffffffffff"
+            in capsys.readouterr().err)
+
+
+def test_require_needs_the_pr_head(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    monkeypatch.delenv("PR_HEAD_SHA")
+    assert pr.main(["require", "--repo-root", str(repo)]) == 2
+    assert "require needs --pr-head and --pr-created-at" in capsys.readouterr().err

@@ -111,6 +111,17 @@ def regenerate_without_cli_profile(root: Path) -> None:
               TIMESTAMPED.format(ts="2026-10-13T09:09:09", i=i))
 
 
+def merge_pr_into(root: Path, base: str) -> str:
+    """What a pull_request run checks out: the PR (HEAD) merged into `base`.
+
+    Leaves HEAD at the merge commit, parents [base, PR head]; returns the PR head.
+    """
+    head = git(root, "rev-parse", "HEAD")
+    git(root, "checkout", "-q", "--detach", base)
+    git(root, "merge", "-q", "--no-ff", "--no-edit", head)
+    return head
+
+
 def fixture_file(tmp_path: Path, state: str = "open", text: str | None = None) -> Path:
     f = tmp_path / "github.json"
     f.write_text(json.dumps({"prs": {"qontinui/qontinui-runner#1990": {
@@ -124,7 +135,7 @@ def verify(root: Path, fixture: Path | None, path_prefix: Path | None = None,
            **env_extra: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items()
            if k not in ("GITHUB_WORKFLOW", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_TOKEN",
-                        "SIBLING_SOURCE", "SIBLING_SHA", "PR_BASE_SHA", "PR_CREATED_AT",
+                        "SIBLING_SOURCE", "SIBLING_SHA", "PR_HEAD_SHA", "PR_CREATED_AT",
                         "PENDING_REGISTRATION_FIXTURE")}
     env.update(GENERATE_TYPES_SH=str(STUB_GENERATOR), QONTINUI_SCHEMAS_DIR=str(root),
                SIBLING_SOURCE="none")
@@ -232,9 +243,10 @@ def test_require_with_a_header_only_toml_reds_and_prints_the_rows(tmp_path):
     write(root, "src/qontinui_schemas/generated/__init__.py", PY_INIT)
     git(root, "add", "-A")
     git(root, "commit", "-qm", "leading PR adds CliProfile")
+    head = merge_pr_into(root, base)
     # The declared trailing sibling produced the type, so the tree has no drift.
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
     out = r.stdout + r.stderr
     assert r.returncode == 1, out
     assert "missing entry for CliProfile" in out
@@ -252,8 +264,9 @@ def test_require_is_satisfied_by_a_dated_entry(tmp_path):
     write(root, "codegen/pending-registration.toml", toml_entry())
     git(root, "add", "-A")
     git(root, "commit", "-qm", "leading PR adds CliProfile with its entry")
+    head = merge_pr_into(root, base)
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA=base, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
     out = r.stdout + r.stderr
     assert r.returncode == 0, out
     assert "pending-registration: CliProfile: PRODUCED-BY-DECLARED-SIBLING" in out
@@ -271,14 +284,14 @@ def test_j_no_toml_keeps_todays_behaviour(tmp_path):
     assert errors(out) == ["::error::Checked-in generated types differ from a fresh regeneration."]
 
 
-def test_require_rejects_a_malformed_base_sha(tmp_path):
+def test_require_rejects_a_malformed_pr_head_sha(tmp_path):
     root = make_repo(tmp_path, toml_entry())
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="sibling-downstream-of",
-               SIBLING_SHA=HEAD_SHA, PR_BASE_SHA="main; rm -rf /",
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA="main; rm -rf /",
                PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
     out = r.stdout + r.stderr
     assert r.returncode == 1, out
-    assert "--base must be a 40-hex commit sha" in out
+    assert "--pr-head must be a 40-hex commit sha" in out
 
 
 def test_j_a_header_only_toml_with_a_non_trailing_source_keeps_todays_behaviour(tmp_path):
