@@ -1905,4 +1905,32 @@ command = ["git", "--version"]
         assert_eq!(step_out(&lines, "s2"), ["S2-DONE"], "empty for s2");
         assert_eq!(step_out(&lines, "s3"), ["S3-DONE"], "emptied again for s3");
     }
+
+    /// Arming test for the every-step scrub, written against base-era API
+    /// only (`run` drives `run_dispatch`; no model symbol is named), so it is
+    /// RED on the pre-scrub executor rather than failing to compile: an
+    /// inherited `*_MODEL_CMD` reached every step, and no step saw a pinned
+    /// `CLAUDE_CONFIG_DIR`.
+    #[tokio::test]
+    async fn arming_an_inherited_model_command_never_reaches_a_ci_step() {
+        const KEY: &str = "ARMING_PROBE_MODEL_CMD";
+        std::env::set_var(KEY, "arming-planted-model-cmd");
+        let (_tmp, root, head) = repo_with(
+            "version = 1\n[[steps]]\nname = \"probe\"\ncommand = [\"sh\", \"-c\", \"echo seen=${ARMING_PROBE_MODEL_CMD:-absent}; echo cfg=${CLAUDE_CONFIG_DIR:-unset}\"]\n",
+        );
+        let (c, rec) = run(&root, &head, None).await;
+        std::env::remove_var(KEY);
+        let lines = rec.lines.lock().unwrap().clone();
+        assert_eq!(c, Conclusion::Success, "{lines:#?}");
+        assert!(
+            lines.iter().any(|l| l.ends_with("seen=absent")),
+            "an inherited *_MODEL_CMD reached the step: {lines:#?}"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("cfg=") && l.ends_with(".ci-claude-config")),
+            "the step did not get the pinned empty CLAUDE_CONFIG_DIR: {lines:#?}"
+        );
+    }
 }
