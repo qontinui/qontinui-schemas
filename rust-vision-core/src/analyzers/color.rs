@@ -738,6 +738,52 @@ mod tests {
         );
     }
 
+    /// A text element whose box is EMPTY on one axis covers no pixel at any
+    /// DPR, so nothing can be sampled and the colour verdict must stay
+    /// BLOCKED. Rounding a fractional ratio outward used to give such a box a
+    /// one-pixel column (CSS x 3, w 0 at 1.5 became buffer x 4..5), which
+    /// sampled a single colour and turned the verdict CHECKED with a fabricated
+    /// ratio of about 1.00:1 at confidence 1.0.
+    #[test]
+    fn an_empty_box_stays_unsampled_at_a_fractional_dpr() {
+        for scale in [1.5, 2.625] {
+            for css in [
+                Region {
+                    x: 3,
+                    y: 1,
+                    w: 0,
+                    h: 20,
+                },
+                Region {
+                    x: 3,
+                    y: 1,
+                    w: 20,
+                    h: 0,
+                },
+            ] {
+                let mut frame = solid_frame(100, 100, [0xff, 0xff, 0xff, 0xff]);
+                frame.source.scale_factor = scale;
+                let snap = ElementSnapshot {
+                    elements: vec![Element {
+                        id: "empty-box".to_string(),
+                        bbox: Some(css),
+                        text: Some("label".to_string()),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                };
+                let result = run(&frame, &snap);
+                assert!(
+                    result.verdict.is_blocked(),
+                    "{css:?} at DPR {scale} covers no pixel, so no ratio exists: {:?} / {:?}",
+                    result.verdict,
+                    result.findings
+                );
+                assert!(result.findings.is_empty(), "{:?}", result.findings);
+            }
+        }
+    }
+
     #[test]
     fn an_unusable_scale_factor_blocks_and_says_why() {
         let (mut frame, snap) = hidpi_fixture(2.0);

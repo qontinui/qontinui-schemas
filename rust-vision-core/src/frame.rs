@@ -37,9 +37,14 @@ impl Frame {
     /// up and to the left of it.
     ///
     /// The mapping rounds OUTWARD (floor the near edge, ceil the far edge), so
-    /// a fractional ratio covers every buffer pixel the CSS box touches. The
-    /// result is still a [`Region`] that may lie partly or wholly outside the
-    /// frame; pixel readers narrow it with [`Region::clamp_to_frame`] as before.
+    /// a fractional ratio covers every buffer pixel the CSS box touches. An
+    /// EMPTY axis stays empty: a box with `w == 0` (or `h == 0`) covers no
+    /// pixel at any ratio, yet rounding outward around a fractional edge would
+    /// give it one — at 1.5, CSS `x = 3` is buffer `4.5`, and floor 4 .. ceil 5
+    /// is a column the element never painted. That axis maps to a zero extent
+    /// at the scaled origin instead, exactly as it does at DPR 1. The result is
+    /// still a [`Region`] that may lie partly or wholly outside the frame;
+    /// pixel readers narrow it with [`Region::clamp_to_frame`] as before.
     ///
     /// `None` when the scale factor is not a positive finite number — no pixel
     /// can be located through it, and pretending `1.0` would sample the wrong
@@ -52,8 +57,17 @@ impl Frame {
         }
         let x0 = (css.x as f64 * s).floor();
         let y0 = (css.y as f64 * s).floor();
-        let x1 = (css.right() as f64 * s).ceil();
-        let y1 = (css.bottom() as f64 * s).ceil();
+        // An empty CSS axis maps to an empty buffer axis (see above).
+        let x1 = if css.w == 0 {
+            x0
+        } else {
+            (css.right() as f64 * s).ceil()
+        };
+        let y1 = if css.h == 0 {
+            y0
+        } else {
+            (css.bottom() as f64 * s).ceil()
+        };
         let fits_i32 = |v: f64| v >= i32::MIN as f64 && v <= i32::MAX as f64;
         let fits_u32 = |v: f64| v >= 0.0 && v <= u32::MAX as f64;
         if !(fits_i32(x0) && fits_i32(y0) && fits_u32(x1 - x0) && fits_u32(y1 - y0)) {
@@ -239,6 +253,33 @@ mod tests {
         assert_eq!(
             frame_at(2.625).css_region_to_pixels(r(3, 1, 5, 1)),
             Some(r(7, 2, 14, 4))
+        );
+    }
+
+    #[test]
+    fn an_empty_axis_stays_empty_at_a_fractional_dpr() {
+        // The review's case: CSS x 3, w 0 at 1.5 is buffer 4.5, and rounding
+        // outward around it would invent the one-pixel column 4..5.
+        assert_eq!(
+            frame_at(1.5).css_region_to_pixels(r(3, 1, 0, 20)),
+            Some(r(4, 1, 0, 31))
+        );
+        assert_eq!(
+            frame_at(1.5).css_region_to_pixels(r(3, 1, 20, 0)),
+            Some(r(4, 1, 31, 0))
+        );
+        // 2.625: x 7.875 -> 7, y 2.625 -> 2, far edge 21 x 2.625 = 55.125 -> 56.
+        assert_eq!(
+            frame_at(2.625).css_region_to_pixels(r(3, 1, 0, 20)),
+            Some(r(7, 2, 0, 54))
+        );
+        assert_eq!(
+            frame_at(2.625).css_region_to_pixels(r(3, 1, 20, 0)),
+            Some(r(7, 2, 54, 0))
+        );
+        assert_eq!(
+            frame_at(2.625).css_region_to_pixels(r(3, 1, 0, 0)),
+            Some(r(7, 2, 0, 0))
         );
     }
 
