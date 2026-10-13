@@ -24,13 +24,61 @@ impl Frame {
             source,
         }
     }
+
+    /// Map a CSS-pixel region — the coordinate space of every
+    /// [`crate::ElementSnapshot`] bbox — onto this frame's buffer pixels,
+    /// through [`FrameSource::scale_factor`].
+    ///
+    /// A snapshot's boxes come from `getBoundingClientRect()` and are CSS
+    /// pixels; a frame captured at device pixel ratio `s` holds `s` buffer
+    /// pixels per CSS pixel on each axis. Sampling a box without this mapping
+    /// reads the wrong pixels on every HiDPI capture — at DPR 2 a button at CSS
+    /// `(50,40)` is at buffer `(100,80)`, and buffer `(50,40)` is whatever sits
+    /// up and to the left of it.
+    ///
+    /// The mapping rounds OUTWARD (floor the near edge, ceil the far edge), so
+    /// a fractional ratio covers every buffer pixel the CSS box touches. The
+    /// result is still a [`Region`] that may lie partly or wholly outside the
+    /// frame; pixel readers narrow it with [`Region::clamp_to_frame`] as before.
+    ///
+    /// `None` when the scale factor is not a positive finite number — no pixel
+    /// can be located through it, and pretending `1.0` would sample the wrong
+    /// ones silently — or when the mapped region does not fit [`Region`]'s
+    /// integer range.
+    pub fn css_region_to_pixels(&self, css: Region) -> Option<Region> {
+        let s = self.source.scale_factor;
+        if !s.is_finite() || s <= 0.0 {
+            return None;
+        }
+        let x0 = (css.x as f64 * s).floor();
+        let y0 = (css.y as f64 * s).floor();
+        let x1 = (css.right() as f64 * s).ceil();
+        let y1 = (css.bottom() as f64 * s).ceil();
+        let fits_i32 = |v: f64| v >= i32::MIN as f64 && v <= i32::MAX as f64;
+        let fits_u32 = |v: f64| v >= 0.0 && v <= u32::MAX as f64;
+        if !(fits_i32(x0) && fits_i32(y0) && fits_u32(x1 - x0) && fits_u32(y1 - y0)) {
+            return None;
+        }
+        Some(Region {
+            x: x0 as i32,
+            y: y0 as i32,
+            w: (x1 - x0) as u32,
+            h: (y1 - y0) as u32,
+        })
+    }
 }
 
 /// Source metadata for a [`Frame`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrameSource {
     pub kind: FrameSourceKind,
-    /// Device pixel ratio. 1.0 for unscaled captures, 2.0 for Retina, etc.
+    /// Device pixel ratio: buffer pixels per CSS pixel on each axis. 1.0 for
+    /// unscaled captures, 2.0 for Retina, 2.625 for many phones.
+    ///
+    /// Load-bearing, not decorative: every analyzer that reads pixels under a
+    /// snapshot bbox maps the CSS-pixel box onto the buffer through this value
+    /// ([`Frame::css_region_to_pixels`]). A wrong value samples the wrong
+    /// pixels; a non-positive or non-finite one samples none.
     pub scale_factor: f64,
     pub captured_at: DateTime<Utc>,
     /// Which capture backend produced this frame, when the source is the
@@ -74,6 +122,13 @@ pub enum FrameSourceKind {
 }
 
 /// A pixel-space rectangle.
+///
+/// **Two pixel spaces use this type, and they differ by the device pixel
+/// ratio.** An [`crate::ElementSnapshot`] bbox is in CSS pixels; a region
+/// passed to a pixel reader such as [`crate::analyzers::color::sample_dominant_two`]
+/// or to a pipeline stage is in BUFFER pixels of a specific [`Frame`]. Convert
+/// the first into the second with [`Frame::css_region_to_pixels`]; the two
+/// coincide only at `scale_factor == 1.0`.
 ///
 /// The ORIGIN (`x`, `y`) is **signed**: a UI element can legitimately sit
 /// left of / above the viewport origin — `getBoundingClientRect()` returns
@@ -138,5 +193,80 @@ impl Region {
             (right - left) as u32,
             (bottom - top) as u32,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame_at(scale_factor: f64) -> Frame {
+        Frame::from_rgba(
+            image::RgbaImage::new(4, 4),
+            FrameSource {
+                kind: FrameSourceKind::Synthetic,
+                scale_factor,
+                captured_at: Utc::now(),
+                capture_backend: None,
+            },
+        )
+    }
+
+    fn r(x: i32, y: i32, w: u32, h: u32) -> Region {
+        Region { x, y, w, h }
+    }
+
+    #[test]
+    fn dpr_one_is_the_identity() {
+        assert_eq!(
+            frame_at(1.0).css_region_to_pixels(r(50, 40, 100, 60)),
+            Some(r(50, 40, 100, 60))
+        );
+    }
+
+    #[test]
+    fn dpr_two_doubles_origin_and_extent() {
+        assert_eq!(
+            frame_at(2.0).css_region_to_pixels(r(50, 40, 100, 60)),
+            Some(r(100, 80, 200, 120))
+        );
+    }
+
+    #[test]
+    fn a_fractional_dpr_rounds_outward_so_every_touched_pixel_is_covered() {
+        // 2.625 x [3, 8) = [7.875, 21.0) -> floor 7 .. ceil 21 = 14 wide.
+        // 2.625 x [1, 2) = [2.625, 5.25)  -> floor 2 .. ceil 6  = 4 high.
+        assert_eq!(
+            frame_at(2.625).css_region_to_pixels(r(3, 1, 5, 1)),
+            Some(r(7, 2, 14, 4))
+        );
+    }
+
+    #[test]
+    fn a_negative_origin_stays_negative_and_scaled() {
+        // Off-screen geometry is real geometry; clamping is the reader's job.
+        assert_eq!(
+            frame_at(2.0).css_region_to_pixels(r(-20, -10, 40, 40)),
+            Some(r(-40, -20, 80, 80))
+        );
+    }
+
+    #[test]
+    fn an_unusable_scale_factor_maps_nothing() {
+        for bad in [0.0, -2.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                frame_at(bad).css_region_to_pixels(r(1, 1, 1, 1)),
+                None,
+                "scale_factor {bad} must not locate a pixel"
+            );
+        }
+    }
+
+    #[test]
+    fn a_region_that_overflows_the_integer_range_maps_to_none() {
+        assert_eq!(
+            frame_at(8.0).css_region_to_pixels(r(i32::MAX - 1, 0, 1, 1)),
+            None
+        );
     }
 }
