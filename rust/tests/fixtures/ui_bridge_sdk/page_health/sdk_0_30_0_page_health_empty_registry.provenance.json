@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_0_30_0_page_health_empty_registry.json",
+  "sha256": "750cf516286b3b79daebad40643d6a36f483e7d7030333449c792f758357354b",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.30.0 (packages/ui-bridge/package.json at the commit below; the producer version the SDK stamps, read from __SDK_VERSION__, which vitest defines from that package.json)",
+  "sdk_commit": "qontinui/ui-bridge d6ff3940a09fd61ec31ddf0c1e7bb2616ba89c18 (the commit @qontinui/ui-bridge 0.30.0 is published from)",
+  "source": "diagnosePageHealth() run under the capture harness in capture/, with the same handler input mapping, over `new UIBridgeRegistry().createSnapshot()` — an empty registry: zero elements, zero registered components.",
+  "capture_command": "In a ui-bridge checkout detached at d6ff394: npm ci --ignore-scripts -w packages/ui-bridge && cp <schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/capture/page-health.capture.test.ts packages/ui-bridge/src/server/ && cd packages/ui-bridge && PAGE_HEALTH_SNAPSHOT_IN=<schemas>/rust/tests/fixtures/ui_bridge_sdk/runner_live_sdk_0_27_0_control_snapshot.json PAGE_HEALTH_POPULATED_OUT=<schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/sdk_0_30_0_page_health_populated.json PAGE_HEALTH_EMPTY_OUT=<schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/sdk_0_30_0_page_health_empty_registry.json PAGE_HEALTH_EVALUATED_AT=2026-10-13T00:00:00.000Z npx vitest run src/server/page-health.capture.test.ts",
+  "captured_at": "2026-10-13",
+  "trim": "None. Written verbatim as a JSON round-trip, pretty-printed with 2-space indent. evaluatedAt is PINNED to 2026-10-13T00:00:00.000Z; observedAt and provenance.source.snapshotId are the empty registry's own timestamp and snapshot id at capture time.",
+  "notes": "status=unknown, unknown.code=producer_not_run, no `value` key: the SDK's \"nothing has registered yet\" answer, which before the Observation envelope rendered as a CRITICAL report over zero elements."
+}

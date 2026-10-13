@@ -25,6 +25,7 @@ pub mod encode;
 pub mod error;
 pub mod frame;
 pub mod observation;
+pub mod page_health;
 pub mod pipeline;
 pub mod stage;
 pub mod strip;
@@ -55,6 +56,7 @@ pub use observation::{
     CacheProvenance, Observation, ObservationCoverage, ObservationError, ObservationState,
     ObservationStatus, Producer, Provenance, UnknownCode, UnknownInfo, UnmeasuredDimension,
 };
+pub use page_health::{PageHealthFinding, PageHealthSeverity, PageHealthValue};
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};
 pub use timeline::{

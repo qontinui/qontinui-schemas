@@ -32,6 +32,10 @@ src/qontinui_schemas/generated/** text eol=lf
 # them to CRLF and fail the digest test locally. `-text` stores and checks them
 # out byte-for-byte; the committed blobs are LF already.
 rust/tests/fixtures/ui_bridge_sdk/*.json -text
+# The page-health pair (rust-vision-core/tests/ui_bridge_sdk_page_health_wire.rs)
+# sits one directory down, which the pattern above does not reach (`*` stops at
+# `/`); same reason, same rule.
+rust/tests/fixtures/ui_bridge_sdk/page_health/*.json -text
 
 # The glossary source and the Rust table generated from it
 # (rust/tests/glossary_source.rs). The test normalises CRLF before hashing and
