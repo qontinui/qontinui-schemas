@@ -662,12 +662,6 @@ fn clone_url_at(base: &str, repo: &str) -> String {
     format!("{base}/{repo}.git")
 }
 
-/// The production clone URL ([`clone_url_at`] on GitHub).
-#[cfg(test)]
-fn clone_url(repo: &str) -> String {
-    clone_url_at(GITHUB_WEB, repo)
-}
-
 const GITHUB_WEB: &str = "https://github.com";
 const GITHUB_API: &str = "https://api.github.com";
 
@@ -1602,6 +1596,13 @@ pub(crate) async fn provision_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The production clone URL ([`clone_url_at`] on GitHub). Test-only, and
+    /// kept inside this module so no `#[cfg(test)]` item sits among the
+    /// production definitions above it.
+    fn clone_url(repo: &str) -> String {
+        clone_url_at(GITHUB_WEB, repo)
+    }
     use crate::standalone::PlainSpawn;
 
     /// Shim shadowing [`super::resolve_declaration`] with the SAFE default —
