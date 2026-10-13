@@ -1,8 +1,11 @@
-# A binding left STALE by a later edit: the asset was bound while `alt` was
-# `decorative` (its spec_sha256 is that earlier version's hash), so it records no
-# alt_text and no exemplar digest. A current binding would owe both; a stale one
-# owes the spec only its own consistency, so this spec is valid.
+# A binding left STALE by a later edit. The asset was bound to the earlier
+# version declared below, where `alt` was `decorative`: its spec_sha256 is that
+# version's hash, and it met every obligation then (a decorative image owes no
+# alt_text). `alt` has since become `required`. A current binding would owe an
+# alt_text; a stale one owes the spec only its own consistency, so this spec is
+# valid. The fixture test rebuilds the earlier version and checks all of that.
 # binding: stale
+# earlier-version: alt = {"kind": "decorative"}
 # content-sha256: bd6fb9e376a7885f5b98a365987fa98eb114bb399bdf16245e2217e6ecda8eeb
 slot: settings.runners.empty-state
 role: empty_state
@@ -41,3 +44,4 @@ provenance:
   ai_generated: true
   recipe_sha256: ff672a4af7ba8919391afa79feac64fde4f54394f2ef557b9ba69b9218f09f4b
   imagery_sha256: 4640a0de5eb6e934121f6615843871f4bfd33a023197946cb4577ac542e75c81
+  exemplars_sha256: 70258cfa680863e17853e0073f62080d7de54036a91ec1bc463e896814ee8b13

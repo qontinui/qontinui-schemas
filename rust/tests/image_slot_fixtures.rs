@@ -8,10 +8,14 @@
 //!   vector for another language's implementation of
 //!   `ImageSlotSpec::content_sha256`. A bound fixture's
 //!   `provenance.spec_sha256` is that same hash (a current binding), unless
-//!   its header says `# binding: stale`: then the binding was made for an
-//!   earlier version of the spec, the spec is still valid, and the same spec
-//!   with its binding made current is refused. That pins the stale exemption a
-//!   mirror of the binding obligations must honour.
+//!   its header says `# binding: stale`. Such a fixture also declares the
+//!   earlier version its binding was made for, as one changed top-level field
+//!   (`# earlier-version: alt = {"kind": "decorative"}`), and the test checks
+//!   its whole history: the earlier version hashes to the binding's
+//!   `spec_sha256` and validates with that binding; the spec as written is
+//!   valid while the binding is stale; and the same spec with its binding made
+//!   current is refused. That pins the stale exemption a mirror of the binding
+//!   obligations must honour.
 //! - `fixtures/image_slot/invalid/*.yaml` each break exactly ONE rule, named on
 //!   the first line:
 //!   - `# refused-by: serde <text>`: deserialization fails, with `<text>` in
@@ -124,6 +128,32 @@ fn declares_stale_binding(path: &Path) -> bool {
         .any(|line| line == "# binding: stale")
 }
 
+/// The earlier version a stale fixture's binding was made for: the spec with
+/// the one top-level field its `# earlier-version: <field> = <json>` header
+/// line names set to that JSON value.
+fn earlier_version(path: &Path, spec: &ImageSlotSpec) -> Result<ImageSlotSpec, String> {
+    let text = fs::read_to_string(path).unwrap();
+    let declared = text
+        .lines()
+        .take_while(|line| line.starts_with('#'))
+        .find_map(|line| line.strip_prefix("# earlier-version: "))
+        .ok_or("a stale fixture must declare `# earlier-version: <field> = <json>`")?;
+    let (field, value) = declared
+        .split_once(" = ")
+        .ok_or(format!("{declared:?} is not `<field> = <json>`"))?;
+    let value: Value =
+        serde_json::from_str(value).map_err(|e| format!("{value:?} is not JSON: {e}"))?;
+    let mut wire = serde_json::to_value(spec).unwrap();
+    let slot = wire
+        .get_mut(field)
+        .ok_or(format!("the spec has no field `{field}`"))?;
+    if *slot == value {
+        return Err(format!("`{field}` already reads {value} in the spec"));
+    }
+    *slot = value;
+    serde_json::from_value(wire).map_err(|e| format!("the earlier version does not parse: {e}"))
+}
+
 #[test]
 fn every_valid_fixture_pins_its_hash_and_declares_its_binding() {
     let (mut current, mut stale) = (0, 0);
@@ -156,6 +186,27 @@ fn every_valid_fixture_pins_its_hash_and_declares_its_binding() {
                     mismatches.push(format!(
                         "{name}: declared stale, but the binding is current"
                     ));
+                }
+                // The binding's own history: made for the earlier version, it
+                // was current there and met every obligation.
+                match earlier_version(&path, &spec) {
+                    Err(why) => mismatches.push(format!("{name}: {why}")),
+                    Ok(earlier) => {
+                        let earlier_hash = earlier.content_sha256().unwrap();
+                        if earlier_hash != binding.spec_sha256 {
+                            mismatches.push(format!(
+                                "{name}: the earlier version hashes to {earlier_hash}, not the \
+                                 binding's {}",
+                                binding.spec_sha256
+                            ));
+                        }
+                        if let Err(refusal) = earlier.validate() {
+                            mismatches.push(format!(
+                                "{name}: the earlier version does not validate with its \
+                                 binding: {refusal}"
+                            ));
+                        }
+                    }
                 }
                 // Made current, the same binding must break an obligation, or
                 // the fixture would not exercise the stale exemption at all.
