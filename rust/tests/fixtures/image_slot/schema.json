@@ -1,0 +1,787 @@
+{
+  "$defs": {
+    "ImageSlotAlt": {
+      "description": "The image's text alternative.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Decorative: rendered with an empty `alt`, conveying nothing a reader\nneeds.",
+          "properties": {
+            "kind": {
+              "const": "decorative",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Informative, with a text alternative written for the bound asset, since\nonly that image can be described. The pipeline records it in\n`provenance.alt_text`.",
+          "properties": {
+            "kind": {
+              "const": "required",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Informative, with this fixed text alternative.",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            },
+            "text": {
+              "description": "The text alternative.",
+              "pattern": "^\\s*\\S[\\s\\S]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImageSlotAspect": {
+      "additionalProperties": false,
+      "description": "The aspect ratios the image's rendered box may take.",
+      "properties": {
+        "allowed": {
+          "description": "Other ratios a layout may give the box, in the same form. None may equal\n`preferred` or another entry in value (`8/6` equals `4/3`). Required:\nan author states `[]` when only `preferred` is allowed.",
+          "items": {
+            "pattern": "^[1-9][0-9]{0,3}/[1-9][0-9]{0,3}$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preferred": {
+          "description": "The ratio the box takes by default, as `W/H` with W and H whole numbers\nfrom 1 to 9999 (`4/3`, `1200/630`). The placeholder reserves it.",
+          "pattern": "^[1-9][0-9]{0,3}/[1-9][0-9]{0,3}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "preferred",
+        "allowed"
+      ],
+      "type": "object"
+    },
+    "ImageSlotAssetSource": {
+      "description": "How a bound asset was obtained.",
+      "oneOf": [
+        {
+          "const": "generated",
+          "description": "A generative model produced it from a prompt and a recipe.",
+          "type": "string"
+        },
+        {
+          "const": "edited",
+          "description": "A generative model edited a parent asset (an edit or inpaint recipe).",
+          "type": "string"
+        },
+        {
+          "const": "traced",
+          "description": "Vectorised from a raster.",
+          "type": "string"
+        },
+        {
+          "const": "authored",
+          "description": "Written as code: an SVG using `currentColor` and token variables, or a\ncode-rendered card.",
+          "type": "string"
+        },
+        {
+          "const": "selected",
+          "description": "Taken from an existing set or library, such as an icon set or an\napproved asset.",
+          "type": "string"
+        },
+        {
+          "const": "captured",
+          "description": "Captured from the running product.",
+          "type": "string"
+        },
+        {
+          "const": "supplied",
+          "description": "Supplied by a person, such as the operator's own photograph or mark.",
+          "type": "string"
+        }
+      ]
+    },
+    "ImageSlotContent": {
+      "additionalProperties": false,
+      "description": "What the image must and must not depict. Each entry becomes a yes/no\nquestion for the judges; an entry may not appear in both lists.",
+      "properties": {
+        "must": {
+          "description": "Things the image must depict, one per entry. May be empty.",
+          "items": {
+            "pattern": "^\\s*\\S[\\s\\S]*$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "must_not": {
+          "description": "Things the image must not depict, one per entry. May be empty.",
+          "items": {
+            "pattern": "^\\s*\\S[\\s\\S]*$",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "must",
+        "must_not"
+      ],
+      "type": "object"
+    },
+    "ImageSlotContexts": {
+      "additionalProperties": false,
+      "description": "Where the image renders. Every combination is a context the image is\ncaptured and judged in.",
+      "properties": {
+        "breakpoints": {
+          "description": "Viewport widths in CSS pixels, strictly ascending (`[360, 768, 1280]`).",
+          "items": {
+            "format": "uint32",
+            "maximum": 16384,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "dpr": {
+          "description": "Device pixel ratios from 0.5 to 8, strictly ascending (`[1, 2]`).",
+          "items": {
+            "format": "double",
+            "maximum": 8.0,
+            "minimum": 0.5,
+            "type": "number"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "themes": {
+          "description": "Colour schemes, each at most once.",
+          "items": {
+            "$ref": "#/$defs/ImageSlotTheme"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "breakpoints",
+        "themes",
+        "dpr"
+      ],
+      "type": "object"
+    },
+    "ImageSlotFocal": {
+      "additionalProperties": false,
+      "description": "Where the subject sits in the image.",
+      "properties": {
+        "must_survive_crop": {
+          "description": "True when every rendered crop (object-fit and object-position in every\ncontext) must keep the whole focal region visible.",
+          "type": "boolean"
+        },
+        "region": {
+          "$ref": "#/$defs/ImageSlotRegion",
+          "description": "The subject's region in the image's natural frame. An image with no\nsingle subject, such as a texture, declares the whole frame with\n`must_survive_crop: false`."
+        }
+      },
+      "required": [
+        "region",
+        "must_survive_crop"
+      ],
+      "type": "object"
+    },
+    "ImageSlotProvenance": {
+      "additionalProperties": false,
+      "description": "The asset bound to a slot, as the asset pipeline records it; never\nauthored. It describes the binding made for the spec whose content hash was\n`spec_sha256`. When the spec's current content hash differs, the binding is\nstale (the spec changed since), not invalid. A current binding also meets\nthe obligations stated on its fields and on [`ImageSlotRole`].",
+      "properties": {
+        "ai_generated": {
+          "description": "True when a model generated or edited the pixels. Such an asset, and\nevery derivative of it, carries the IPTC `trainedAlgorithmicMedia`\nmarker. Always true for `generated` and `edited`.",
+          "type": "boolean"
+        },
+        "alt_text": {
+          "description": "The text alternative written for this asset. Required in a current\nbinding whenever the slot's `alt` is `required`.",
+          "pattern": "^\\s*\\S[\\s\\S]*$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asset_sha256": {
+          "description": "sha256 of the bound asset's original bytes: its content address in the\ntenant's image store, which keys its generation record (prompt, seed,\nweights, licence) and its judging record.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "exemplars_sha256": {
+          "description": "sha256 identifying the version of the exemplar set in force when the\nasset was produced. Required in a current binding whenever the slot names\na set.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imagery_sha256": {
+          "description": "sha256 of the imagery treatment's text as read when the asset was\nproduced. Required for `generated` and `edited`.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lora_sha256": {
+          "description": "sha256 of the LoRA weights applied. Required in a current binding of a\nmodel-made asset whenever the slot names a LoRA.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recipe_sha256": {
+          "description": "Hash of the generation recipe. Required for `generated` and `edited`.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/ImageSlotAssetSource",
+          "description": "How the asset was obtained."
+        },
+        "spec_sha256": {
+          "description": "The spec's content hash when the asset was bound: sha256 of the spec's\nRFC 8785 canonical JSON with `provenance` left out.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_sha256",
+        "spec_sha256",
+        "source",
+        "ai_generated"
+      ],
+      "type": "object"
+    },
+    "ImageSlotRegion": {
+      "additionalProperties": false,
+      "description": "A rectangle in the image's NATURAL (intrinsic) frame, as fractions (0 to 1)\nof its width and height: `x` and `y` are the top-left corner, `width` and\n`height` the size. It has a positive area and lies inside the frame.",
+      "properties": {
+        "height": {
+          "description": "Height, as a fraction of the frame's height.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "width": {
+          "description": "Width, as a fraction of the frame's width.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "x": {
+          "description": "Left edge, as a fraction of the frame's width.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "y": {
+          "description": "Top edge, as a fraction of the frame's height.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "ImageSlotRole": {
+      "description": "What an image is on its page. Production rules and per-role taste models\ngroup slots by it.",
+      "oneOf": [
+        {
+          "const": "hero",
+          "description": "The dominant image of a page or section.",
+          "type": "string"
+        },
+        {
+          "const": "empty_state",
+          "description": "Shown while a view has nothing to list yet.",
+          "type": "string"
+        },
+        {
+          "const": "feature",
+          "description": "Illustrates one feature or benefit beside its copy.",
+          "type": "string"
+        },
+        {
+          "const": "onboarding",
+          "description": "Accompanies a first-run or onboarding step.",
+          "type": "string"
+        },
+        {
+          "const": "og_card",
+          "description": "A social preview card (Open Graph, Twitter), read by link crawlers\nrather than rendered on the page.",
+          "type": "string"
+        },
+        {
+          "const": "background",
+          "description": "A background or texture behind other content.",
+          "type": "string"
+        },
+        {
+          "const": "avatar_fallback",
+          "description": "Stands in for a person's missing avatar.",
+          "type": "string"
+        },
+        {
+          "const": "scene",
+          "description": "A rich composed illustration or photograph that no other role describes.",
+          "type": "string"
+        },
+        {
+          "const": "logo",
+          "description": "An identity mark. Identity assets are selected or supplied, never\ngenerated: a current binding here is never `ai_generated`.",
+          "type": "string"
+        },
+        {
+          "const": "screenshot",
+          "description": "A capture of the running product: a current binding here has the source\n`captured`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ImageSlotSafeArea": {
+      "additionalProperties": false,
+      "description": "A rectangle in the image's RENDERED box (the element's box, where page\ncontent is positioned), as fractions (0 to 1) of its width and height: `x`\nand `y` are the top-left corner, `width` and `height` the size. It has a\npositive area and lies inside the box.\n\nA distinct type from [`ImageSlotRegion`] because the two coordinate spaces\ndiffer whenever object-fit crops or letterboxes the image.",
+      "properties": {
+        "height": {
+          "description": "Height, as a fraction of the box's height.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "width": {
+          "description": "Width, as a fraction of the box's width.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "x": {
+          "description": "Left edge, as a fraction of the box's width.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "y": {
+          "description": "Top edge, as a fraction of the box's height.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "ImageSlotSafeAreas": {
+      "description": "The parts of the rendered image that page content (headings, copy, calls to\naction) is laid over.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Derived in each context, at capture time, from the UI Bridge geometry of\nthe elements laid over the image.",
+          "properties": {
+            "kind": {
+              "const": "derived",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Declared areas that hold in every context.",
+          "properties": {
+            "kind": {
+              "const": "explicit",
+              "type": "string"
+            },
+            "regions": {
+              "description": "The areas, in the image's rendered box.",
+              "items": {
+                "$ref": "#/$defs/ImageSlotSafeArea"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "regions"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImageSlotStyle": {
+      "additionalProperties": false,
+      "description": "The declared style the image follows.",
+      "properties": {
+        "exemplars": {
+          "description": "The exemplar set (approved and rejected examples) the image is compared\nwith, by id. Absent: none.",
+          "maxLength": 128,
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imagery": {
+          "description": "The imagery treatment it follows: a section of one of the tenant's\n`domain_spec` prompt documents (`domain_spec/visual-system#imagery`), or\na `decision_record` that settled a style fork.",
+          "pattern": "^(?:domain_spec|decision_record)/[a-z0-9]+(?:-[a-z0-9]+)*(?:#[a-z0-9]+(?:-[a-z0-9]+)*)?$",
+          "type": "string"
+        },
+        "lora": {
+          "description": "The house LoRA applied when generating, by its id in the image licence\nmanifest. Absent: none.",
+          "maxLength": 128,
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "imagery"
+      ],
+      "type": "object"
+    },
+    "ImageSlotTextInImage": {
+      "description": "Whether the image may carry text.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "No text in the image. Copy belongs in the page, where it can be\ntranslated, read by assistive technology and spell-checked.",
+          "properties": {
+            "kind": {
+              "const": "forbidden",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The image must carry exactly this text. OCR reads the image and reports\nits edit distance from `text`.",
+          "properties": {
+            "kind": {
+              "const": "expected",
+              "type": "string"
+            },
+            "locale": {
+              "description": "Its language, as a BCP 47 tag (`en`, `de-CH`).",
+              "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$",
+              "type": "string"
+            },
+            "text": {
+              "description": "The text as it must read.",
+              "pattern": "^\\s*\\S[\\s\\S]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "locale"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Incidental text is allowed and not checked.",
+          "properties": {
+            "kind": {
+              "const": "allowed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImageSlotTheme": {
+      "description": "The colour scheme a context renders in (`prefers-color-scheme`).",
+      "oneOf": [
+        {
+          "const": "dark",
+          "description": "Dark colour scheme.",
+          "type": "string"
+        },
+        {
+          "const": "light",
+          "description": "Light colour scheme.",
+          "type": "string"
+        }
+      ]
+    },
+    "ImageSlotThresholds": {
+      "description": "Where the thresholds of the slot's deterministic image checks come from. A\nthreshold that is neither overridden here nor declared in the tenant's visual\nsystem is UNKNOWN: its check answers unknown, never a pass.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Every threshold comes from the tenant's declared visual system.",
+          "properties": {
+            "kind": {
+              "const": "from_visual_system",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "These values override the visual system for this slot. A threshold not\nnamed here still comes from it. At least one must be set.",
+          "properties": {
+            "kind": {
+              "const": "overrides",
+              "type": "string"
+            },
+            "max_aspect_delta": {
+              "description": "Tolerated relative difference between the natural and rendered\naspect ratios: the `max_aspect_delta` of `image_not_distorted`.",
+              "format": "double",
+              "maximum": 1.7976931348623157e+308,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max_bytes": {
+              "description": "Encoded byte budget, at most 2^53 − 1: the `max_bytes` of\n`image_weight_within`.",
+              "format": "uint64",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "max_effective_resolution": {
+              "description": "Ceiling on effective resolution, against oversized images: the\n`max_effective` of `image_not_oversized`.",
+              "format": "double",
+              "maximum": 1.7976931348623157e+308,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max_palette_delta_e": {
+              "description": "Largest CIEDE2000 distance from the declared palette that still\ncounts as on-palette: the `max_delta_e` of `image_palette_within`.",
+              "format": "double",
+              "maximum": 1.7976931348623157e+308,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_effective_resolution": {
+              "description": "Floor on effective resolution, natural ÷ (rendered × DPR): the\n`min_effective` of `image_resolution_sufficient`.",
+              "format": "double",
+              "maximum": 1.7976931348623157e+308,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_palette_coverage": {
+              "description": "Least fraction (0 to 1) of the image's pixels that must be\non-palette: the `min_coverage` of `image_palette_within`.",
+              "format": "double",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_text_over_image_contrast": {
+              "description": "Least WCAG contrast ratio (1 to 21) of text laid over the image: the\n`min_ratio` of `text_over_image_contrast`.",
+              "format": "double",
+              "maximum": 21.0,
+              "minimum": 1.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_transparent_edge_contrast": {
+              "description": "Least WCAG contrast ratio (1 to 21) of a transparent image's edge\nand stroke pixels against what surrounds it: the `min_ratio` of\n`transparent_image_legible`.",
+              "format": "double",
+              "maximum": 21.0,
+              "minimum": 1.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "text_over_image_percentile": {
+              "description": "Which percentile (0 to 100) of glyph-pixel contrast is compared with\nthat floor: the `percentile` of `text_over_image_contrast`.",
+              "format": "double",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One image placement's declared contract: what the image is for, where it\nrenders, and what it must and must not be.",
+  "properties": {
+    "alt": {
+      "$ref": "#/$defs/ImageSlotAlt",
+      "description": "The image's text alternative."
+    },
+    "aspect": {
+      "$ref": "#/$defs/ImageSlotAspect",
+      "description": "The aspect ratios the rendered box may take."
+    },
+    "audience": {
+      "description": "Who it is for: a reference to one of the tenant's `audience_profile`\nprompt documents (`audience_profile/external-operator`).",
+      "pattern": "^audience_profile/[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "content": {
+      "$ref": "#/$defs/ImageSlotContent",
+      "description": "What the image must and must not depict."
+    },
+    "contexts": {
+      "$ref": "#/$defs/ImageSlotContexts",
+      "description": "Every breakpoint × theme × device pixel ratio the image renders, is\ncaptured and is judged at."
+    },
+    "focal": {
+      "$ref": "#/$defs/ImageSlotFocal",
+      "description": "Where the subject sits in the image, and whether every crop must keep it."
+    },
+    "job": {
+      "description": "The image's job, in plain sentences: what it must achieve for the person\nlooking at it. Judges derive yes/no questions from it.",
+      "pattern": "^\\s*\\S[\\s\\S]*$",
+      "type": "string"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImageSlotProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The asset bound to the slot, written by the asset pipeline and never by\nthe author. Absent until an asset is chosen; until then the UI renders\nthe slot's placeholder."
+    },
+    "requirement_ref": {
+      "description": "The requirement this slot traces to, for requirement-level traceability:\none token with no whitespace, at most 256 characters.",
+      "maxLength": 256,
+      "pattern": "^\\S+$",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "role": {
+      "$ref": "#/$defs/ImageSlotRole",
+      "description": "What the image is on its page."
+    },
+    "safe_areas": {
+      "$ref": "#/$defs/ImageSlotSafeAreas",
+      "description": "The parts of the rendered image that page content is laid over, which\nmust therefore stay calm enough for that content to read."
+    },
+    "slot": {
+      "description": "Stable slot id (`sessions.empty-state`): lowercase letters and digits in\nsegments joined by `.`, `-` or `_`, at most 128 characters. The UI marks\nthe rendered element `data-ui-bridge-image-slot=\"<slot>\"`, and the asset\nstore, the candidate records and the judges key on it.",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "type": "string"
+    },
+    "style": {
+      "$ref": "#/$defs/ImageSlotStyle",
+      "description": "The declared style the image follows."
+    },
+    "text_in_image": {
+      "$ref": "#/$defs/ImageSlotTextInImage",
+      "description": "Whether the image may carry text, and which."
+    },
+    "thresholds": {
+      "$ref": "#/$defs/ImageSlotThresholds",
+      "description": "Where the thresholds of the slot's deterministic image checks come from."
+    }
+  },
+  "required": [
+    "slot",
+    "role",
+    "job",
+    "audience",
+    "contexts",
+    "aspect",
+    "safe_areas",
+    "focal",
+    "style",
+    "content",
+    "text_in_image",
+    "alt",
+    "thresholds"
+  ],
+  "title": "ImageSlotSpec",
+  "type": "object"
+}

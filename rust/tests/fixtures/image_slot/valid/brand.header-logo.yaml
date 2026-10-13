@@ -1,6 +1,7 @@
 # An identity mark: supplied by a person, never generated, so the binding is not
 # ai_generated and records no generation inputs. A mark has no single subject to
 # protect from cropping, so its focal region is the whole frame.
+# content-sha256: 3b3a7822d70a4e5ebdac4560a4c056c8e91210c7fc7b502742637df9027d0e3f
 slot: brand.header-logo
 role: logo
 job: Identify the product in the page header.
@@ -11,6 +12,7 @@ contexts:
   dpr: [1, 2, 3]
 aspect:
   preferred: 152/177
+  allowed: []
 safe_areas:
   kind: derived
 focal:

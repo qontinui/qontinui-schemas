@@ -1,6 +1,7 @@
 # The example spec of report 2026-10-13-image-generation-and-visual-judgment-brainstorm
 # (section 4.1), in the contract's own spelling. Unbound: no asset yet, so the UI
 # renders the slot's placeholder.
+# content-sha256: dea066ce133b8c37c3ac4b71ff6ebc1425178b835536305bc4595d52d9dc45ae
 slot: sessions.empty-state
 role: empty_state
 job: "Reassure a first-time operator that nothing is broken; point at 'Start a session'."
