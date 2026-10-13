@@ -41,7 +41,8 @@
 //! is not anybody's alt text.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+
+use crate::cache::{hex_encode, sha256_of};
 
 /// What kind of media element a snapshot element is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -152,13 +153,16 @@ pub enum MediaLoadState {
 /// unread one and a text-alternative check could never fail on it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MediaAlt {
-    /// Presentation only: an empty `alt=""`, `role="presentation"`, an
-    /// `aria-hidden` SVG, or a CSS background. A decorative image needs no
-    /// text, so its `text` carries no defect either way.
+    /// Presentation only: an `alt` that is present and empty after stripping
+    /// ASCII whitespace (HTML's definition: tab, LF, FF, CR, space — `alt=""`
+    /// and `alt="  "` alike), `role="presentation"`, an `aria-hidden` SVG, or
+    /// a CSS background. A decorative image needs no text, so its `text`
+    /// carries no defect either way.
     pub decorative: bool,
     /// The text alternative: `alt` for an `<img>` / `<picture>`, the accessible
     /// label (`aria-label`, an SVG `<title>`, a canvas's fallback content) for
-    /// the others, a native image's `accessibilityLabel`.
+    /// the others, a native image's `accessibilityLabel` — stripped of ASCII
+    /// whitespace, never empty (an alt that strips to nothing is decorative).
     ///
     /// **`None` is MEASURED here**: the producer read the element and it
     /// carries no text alternative at all. A producer that could not read the
@@ -173,16 +177,12 @@ pub struct MediaAlt {
 /// The URL is hashed exactly as emitted, QUERY INCLUDED: every `next/image`
 /// source is `/_next/image?url=…&w=…`, so stripping the query would make every
 /// optimized image on a page one image.
+///
+/// A Rust `&str` cannot hold a lone UTF-16 surrogate. A JavaScript producer
+/// can (a JSON `"\ud800"`), and every producer encodes one as U+FFFD before
+/// hashing, as `TextEncoder` and Node's `Buffer` do.
 pub fn src_digest_of(src: &str) -> String {
-    use std::fmt::Write as _;
-
-    let digest = Sha256::digest(src.as_bytes());
-    let mut hex = String::with_capacity(64);
-    for byte in digest {
-        // `write!` into a String is infallible.
-        let _ = write!(hex, "{byte:02x}");
-    }
-    hex
+    hex_encode(&sha256_of(src.as_bytes()))
 }
 
 /// Media facts of one snapshot element. Present on [`crate::Element::media`]
@@ -195,15 +195,30 @@ pub struct ElementMedia {
     pub kind: MediaKind,
 
     // ---- Size and resolution ---------------------------------------------
-    /// Intrinsic size in SOURCE pixels: `naturalWidth/Height` for an image,
-    /// `videoWidth/Height` for a video, the backing store for a canvas.
-    /// Absent for an image that has not loaded (unknown yet), for a broken
-    /// image (there is no image), and for kinds with no intrinsic raster size
-    /// (inline SVG, CSS backgrounds — CSS exposes none).
+    /// The image RESOURCE's own pixel size — the width × height of the file
+    /// the element displays (`videoWidth/Height` for a video, the backing
+    /// store for a canvas).
+    ///
+    /// **Never the browser's density-corrected `naturalWidth`.** For a
+    /// `srcset` candidate the browser divides the resource's size by the
+    /// candidate's density: a 1280w source picked by a `w` descriptor at
+    /// DPR 2 reads `naturalWidth` ≈ 640, and a `2x` candidate reads half its
+    /// size. Read raw, every responsive image (every `next/image`) would look
+    /// half as sharp as it is. A producer de-corrects it by the matched
+    /// candidate's descriptor, and a producer that cannot establish the
+    /// resource's own size OMITS this field — and
+    /// [`Self::effective_resolution`] with it.
+    ///
+    /// Also absent for an image that has not loaded (unknown yet), for a
+    /// broken image (there is no image), and for kinds with no intrinsic
+    /// raster size (inline SVG, CSS backgrounds — CSS exposes none).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub natural_px: Option<MediaSize>,
-    /// Laid-out border-box size in LAYOUT units — CSS px on the web, dp on
-    /// native — before any device-pixel scaling.
+    /// The element's DRAWN box: on the web, the `getBoundingClientRect()`
+    /// size in CSS px — the border box with CSS transforms included, so a
+    /// `transform: scale(2)` image reads twice its layout size; on native,
+    /// the view's measured size in dp (`onLayout` / `measureInWindow`). Not
+    /// the layout box, and before any device-pixel scaling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rendered_px: Option<MediaSize>,
     /// Source pixels per DEVICE pixel actually displayed: natural ÷ (displayed
@@ -216,6 +231,8 @@ pub struct ElementMedia {
     /// Never the DPR-blind natural ÷ rendered ratio (an older SDK's
     /// `oversizeRatio`): on a 2× screen that reads every correctly sized image
     /// as 2× oversized, so a converter omits this field rather than project it.
+    /// Omitted, with [`Self::natural_px`], whenever the resource's own pixel
+    /// size cannot be established — it is computed from that size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective_resolution: Option<f32>,
     /// The computed `object-fit`.
@@ -284,7 +301,10 @@ pub struct ElementMedia {
     pub slot_id: Option<String>,
     /// Whether the slot still renders its placeholder
     /// (`data-ui-bridge-placeholder="true"`). `Some(false)` is measured: the
-    /// producer read the markers and the element carries none.
+    /// producer read the markers and the element carries none. It is carried
+    /// here because the Phase 5 SDK already emits it and Phase 14's
+    /// placeholder inventory needs it (plan
+    /// 2026-10-13-image-generation-and-visual-judgment).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub placeholder: Option<bool>,
 
@@ -350,9 +370,21 @@ mod tests {
         "http://localhost:3001/_next/image?url=%2Fimages%2Fhero.png&w=1920&q=75";
     const SHARED_DIGEST: &str = "a846bcf412cf708ec0a4ac6a972307cbcb250b75509765fd44c49caecbd01f94";
 
+    /// The second shared vector: a JavaScript producer's lone surrogate
+    /// (`.../img/\ud800.png`) is encoded as U+FFFD before hashing, so every
+    /// suite digests it as this `&str`, which spells the U+FFFD form.
+    const SHARED_SURROGATE_SRC: &str = "http://localhost:3001/img/\u{FFFD}.png";
+    const SHARED_SURROGATE_DIGEST: &str =
+        "6f45e1fb51856d9f4f25eea51558783cc2c060af2ba43ea46c8bdab5dbdf23a6";
+
     #[test]
     fn src_digest_matches_the_shared_vector() {
         assert_eq!(src_digest_of(SHARED_SRC), SHARED_DIGEST);
+    }
+
+    #[test]
+    fn src_digest_matches_the_shared_surrogate_vector() {
+        assert_eq!(src_digest_of(SHARED_SURROGATE_SRC), SHARED_SURROGATE_DIGEST);
     }
 
     #[test]
