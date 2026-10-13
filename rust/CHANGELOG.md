@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.5.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.0...rust-v4.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* address pre-PR review of the glossary v2 corrections ([e797a9b](https://github.com/qontinui/qontinui-schemas/commit/e797a9b443121d3580b7d6129b4ed961378639b7))
+* correct seven glossary terms that disagree with the services (glossary v2) ([2253e55](https://github.com/qontinui/qontinui-schemas/commit/2253e55cc8d40a90508484dc3ff65d3231616b68))
+
 ## [4.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.4.0...rust-v4.5.0) (2026-10-13)
 
 
