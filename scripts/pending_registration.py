@@ -562,6 +562,37 @@ def ensure_commit(repo_root: Path, sha: str) -> None:
         raise ModuleError(f"cannot fetch base {sha}: {r.stderr.strip()}")
 
 
+def merge_base_parent(repo_root: Path, pr_head: str) -> str:
+    """The base this run's HEAD merges the PR into: HEAD's FIRST parent.
+
+    A pull_request run checks out refs/pull/<n>/merge — the PR head merged into
+    the base branch's tip as of this event, parents [base tip, PR head]. "Added
+    by this PR" is the diff from that first parent. NOT
+    `github.event.pull_request.base.sha`: that is the base as of the PR's last
+    sync and can be days stale, so diffing from it counts every binding the
+    base gained since as the PR's own (qontinui-schemas#223, 2026-10-13).
+
+    Read from the raw commit object, which carries its parent lines even in the
+    depth-1 checkout CI makes. Fails closed — never a fallback to another sha —
+    unless HEAD has exactly two parents and the second is the PR head.
+    """
+    r = subprocess.run(["git", "-C", str(repo_root), "cat-file", "commit", "HEAD"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ModuleError(f"cannot establish the base this PR merges into: "
+                          f"cannot read HEAD: {r.stderr.strip()}")
+    header = r.stdout.split("\n\n", 1)[0]
+    parents = [ln.split()[1] for ln in header.splitlines() if ln.startswith("parent ")]
+    if len(parents) != 2:
+        raise ModuleError(f"cannot establish the base this PR merges into: HEAD has "
+                          f"{len(parents)} parent(s), so it is not the PR merged into its "
+                          "base (require needs the pull_request merge ref checked out)")
+    if parents[1] != pr_head:
+        raise ModuleError(f"cannot establish the base this PR merges into: HEAD's second "
+                          f"parent {parents[1][:12]} is not the PR head {pr_head[:12]}")
+    return parents[0]
+
+
 def added_types(repo_root: Path, base: str) -> list[str]:
     ensure_commit(repo_root, base)
     r = subprocess.run(
@@ -719,7 +750,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("mode", choices=["decide", "require", "audit"])
     ap.add_argument("--repo-root", default=".")
     ap.add_argument("--source", default=os.environ.get("SIBLING_SOURCE"))
-    ap.add_argument("--base", default=os.environ.get("PR_BASE_SHA"))
+    ap.add_argument("--pr-head", default=os.environ.get("PR_HEAD_SHA"))
     ap.add_argument("--pr-created-at", default=os.environ.get("PR_CREATED_AT"))
     ap.add_argument("--sibling-sha", default=os.environ.get("SIBLING_SHA"))
     args = ap.parse_args(argv)
@@ -743,15 +774,15 @@ def main(argv: list[str]) -> int:
             if not is_trailing(args.source):
                 print("pending-registration require: source is not a trailing declaration; nothing to require")
                 return 0
-            if not args.base or not args.pr_created_at:
-                raise ModuleError("require needs --base and --pr-created-at")
-            if not SHA_RE.match(args.base):
-                raise ModuleError(f"--base must be a 40-hex commit sha, got {args.base!r}")
+            if not args.pr_head or not args.pr_created_at:
+                raise ModuleError("require needs --pr-head and --pr-created-at")
+            if not SHA_RE.match(args.pr_head):
+                raise ModuleError(f"--pr-head must be a 40-hex commit sha, got {args.pr_head!r}")
             try:
                 created = dt.datetime.fromisoformat(args.pr_created_at.replace("Z", "+00:00")).date()
             except ValueError as exc:
                 raise ModuleError(f"--pr-created-at is not ISO-8601: {args.pr_created_at}") from exc
-            new_types = added_types(root, args.base)
+            new_types = added_types(root, merge_base_parent(root, args.pr_head))
             reader = make_reader()
             declared, why = resolve_declared_pr(reader, args.sibling_sha)
             problems = require(entries, new_types, created, today, declared, reader) if new_types else []
