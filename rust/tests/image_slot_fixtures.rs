@@ -4,10 +4,14 @@
 //!
 //! - `fixtures/image_slot/valid/<slot>.yaml` must parse, validate and survive
 //!   YAML and JSON round trips unchanged. Each pins its own content hash on a
-//!   `# content-sha256: <hex>` header line, and a bound fixture's
-//!   `provenance.spec_sha256` is that same hash (a current binding), so every
-//!   valid fixture is a golden vector for another language's implementation of
-//!   `ImageSlotSpec::content_sha256`.
+//!   `# content-sha256: <hex>` header line, so every valid fixture is a golden
+//!   vector for another language's implementation of
+//!   `ImageSlotSpec::content_sha256`. A bound fixture's
+//!   `provenance.spec_sha256` is that same hash (a current binding), unless
+//!   its header says `# binding: stale`: then the binding was made for an
+//!   earlier version of the spec, the spec is still valid, and the same spec
+//!   with its binding made current is refused. That pins the stale exemption a
+//!   mirror of the binding obligations must honour.
 //! - `fixtures/image_slot/invalid/*.yaml` each break exactly ONE rule, named on
 //!   the first line:
 //!   - `# refused-by: serde <text>`: deserialization fails, with `<text>` in
@@ -26,12 +30,16 @@
 //!   output with its object keys sorted, compared byte for byte, so loosening
 //!   any schema rule (a dropped `minItems`, `pattern` or range) fails here even
 //!   where no fixture exercises it. To accept a deliberate schema change,
-//!   regenerate it and review the diff:
+//!   regenerate it over the whole suite and review the diff:
 //!
 //!   ```text
 //!   IMAGE_SLOT_SCHEMA_UPDATE=1 bash <qontinui-claude-config>/scripts/cargo-verify.sh \
-//!     test -p qontinui-types -- the_schema_matches_its_golden_snapshot
+//!     test -p qontinui-types
 //!   ```
+//!
+//!   No test-name filter: a filtered run falls below cargo-verify's coverage
+//!   floor and exits 3 after the snapshot is already rewritten. Only the value
+//!   `1` regenerates; any other value, `0` included, compares as usual.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -107,32 +115,67 @@ fn every_valid_fixture_parses_validates_and_round_trips() {
     }
 }
 
+/// Whether a valid fixture's header declares its binding stale.
+fn declares_stale_binding(path: &Path) -> bool {
+    fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .take_while(|line| line.starts_with('#'))
+        .any(|line| line == "# binding: stale")
+}
+
 #[test]
-fn every_valid_fixture_pins_its_content_hash_and_every_binding_is_current() {
-    let mut bound = 0;
+fn every_valid_fixture_pins_its_hash_and_declares_its_binding() {
+    let (mut current, mut stale) = (0, 0);
     let mut mismatches = Vec::new();
     for path in fixtures("valid") {
+        let name = path.display();
         let spec = parse(&path).unwrap();
         let hash = spec.content_sha256().unwrap();
         let pinned = pinned_hash(&path);
         if pinned != hash {
-            mismatches.push(format!(
-                "{}: pins {pinned} but hashes to {hash}",
-                path.display()
-            ));
+            mismatches.push(format!("{name}: pins {pinned} but hashes to {hash}"));
         }
-        if let Some(provenance) = &spec.provenance {
-            bound += 1;
-            if provenance.spec_sha256 != hash {
-                mismatches.push(format!(
-                    "{}: binding records {} but the spec hashes to {hash}",
-                    path.display(),
-                    provenance.spec_sha256
-                ));
+        match (&spec.provenance, declares_stale_binding(&path)) {
+            (None, false) => {}
+            (None, true) => {
+                mismatches.push(format!("{name}: declares a stale binding but has none"))
+            }
+            (Some(binding), false) => {
+                current += 1;
+                if binding.spec_sha256 != hash {
+                    mismatches.push(format!(
+                        "{name}: binding records {} but the spec hashes to {hash}",
+                        binding.spec_sha256
+                    ));
+                }
+            }
+            (Some(binding), true) => {
+                stale += 1;
+                if binding.spec_sha256 == hash {
+                    mismatches.push(format!(
+                        "{name}: declared stale, but the binding is current"
+                    ));
+                }
+                // Made current, the same binding must break an obligation, or
+                // the fixture would not exercise the stale exemption at all.
+                let mut made_current = spec.clone();
+                if let Some(binding) = &mut made_current.provenance {
+                    binding.spec_sha256 = hash.clone();
+                }
+                if made_current.validate().is_ok() {
+                    mismatches.push(format!(
+                        "{name}: its binding breaks no obligation even when current"
+                    ));
+                }
             }
         }
     }
-    assert!(bound >= 4, "only {bound} bound fixtures");
+    assert!(
+        current >= 4,
+        "only {current} fixtures with a current binding"
+    );
+    assert!(stale >= 1, "no fixture with a stale binding");
     assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }
 
@@ -269,7 +312,7 @@ fn the_schema_matches_its_golden_snapshot() {
     let schema = serde_json::to_value(schemars::schema_for!(ImageSlotSpec)).unwrap();
     let actual = serde_json::to_string_pretty(&sorted_keys(&schema)).unwrap() + "\n";
     let path = fixture_dir().join("schema.json");
-    if std::env::var_os(SCHEMA_UPDATE_VAR).is_some() {
+    if regenerate_requested(std::env::var(SCHEMA_UPDATE_VAR).ok().as_deref()) {
         fs::write(&path, &actual).unwrap();
         eprintln!(
             "{SCHEMA_UPDATE_VAR} is set: rewrote {}; review its diff",
@@ -278,17 +321,38 @@ fn the_schema_matches_its_golden_snapshot() {
     }
     let expected = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}; generate it with {SCHEMA_UPDATE_VAR}=1",
+            "{}: {e}; generate it with {SCHEMA_UPDATE_VAR}=1 over the whole suite",
             path.display()
         )
     });
     assert!(
         actual == expected,
         "the ImageSlotSpec schema no longer matches {} (- snapshot, + now):\n{}\n\
-         If the change is deliberate, regenerate with {SCHEMA_UPDATE_VAR}=1 and review the diff.",
+         If the change is deliberate, regenerate with {SCHEMA_UPDATE_VAR}=1 over the whole suite \
+         (this file's header has the command) and review the diff.",
         path.display(),
         line_diff(&expected, &actual)
     );
+}
+
+/// Regenerate the snapshot only when the variable is exactly `1`.
+fn regenerate_requested(value: Option<&str>) -> bool {
+    value == Some("1")
+}
+
+#[test]
+fn regeneration_runs_only_on_exactly_one() {
+    assert!(regenerate_requested(Some("1")));
+    for value in [
+        None,
+        Some("0"),
+        Some(""),
+        Some("true"),
+        Some(" 1"),
+        Some("10"),
+    ] {
+        assert!(!regenerate_requested(value), "{value:?}");
+    }
 }
 
 #[test]
