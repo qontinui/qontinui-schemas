@@ -56,3 +56,57 @@ type = "SessionFailure"
 runner_pr = "qontinui/qontinui-runner#1990"
 added = 2026-10-13
 schemas_pr = "qontinui/qontinui-schemas#212"
+
+[[pending]]
+type = "CacheProvenance"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "Observation"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "ObservationCoverage"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "ObservationStatus"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "Producer"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "Provenance"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "UnknownCode"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "UnknownInfo"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "UnmeasuredDimension"
+runner_pr = "qontinui/qontinui-runner#1890"
+added = 2026-10-13
+schemas_pr = "qontinui/qontinui-schemas#202"
