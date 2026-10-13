@@ -488,7 +488,8 @@ mod tests {
         let get = |k: &str| llm.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone());
         assert_eq!(get(MODEL_URL_ENV), Some(broker.url()));
         assert_eq!(get(MODEL_TOKEN_ENV).as_deref(), Some(broker.token()));
-        assert!(get(MODEL_CMD_ENV).unwrap().ends_with("qontinui-ci-model"));
+        // The spelling is quoted and carries `.exe` on Windows; the shim name is what matters.
+        assert!(get(MODEL_CMD_ENV).unwrap().contains("qontinui-ci-model"));
         assert_eq!(get(DISPATCH_ID_ENV).as_deref(), Some("d-1"));
         assert!(get(MODEL_REFUSED_ENV).is_none());
         let (section, ledger) = access.finish().await;
