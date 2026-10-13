@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.6.0...rust-v4.7.0) (2026-10-13)
+
+
+### Features
+
+* **cloud_twin:** add cloud twin contract module ([8e40ed8](https://github.com/qontinui/qontinui-schemas/commit/8e40ed8f4ccd15a20dc1a94c40f61e70483b1eb1))
+* **cloud_twin:** compute SubstitutionBlock here and validate wire invariants ([eda1fff](https://github.com/qontinui/qontinui-schemas/commit/eda1fff782851dc8ca0d19b6391b09d23aa466a4))
+
+
+### Bug Fixes
+
+* **cloud_twin:** bound n and oracle_share of unknown-op blocks on the wire ([490fb97](https://github.com/qontinui/qontinui-schemas/commit/490fb97541eee52d28d6fecb3d780947780b3145))
+* **cloud_twin:** check substitution blocks against their exercised ops ([fe01f37](https://github.com/qontinui/qontinui-schemas/commit/fe01f37975d0baa7d1eb0299360c4a2717e62a3d))
+* **cloud_twin:** close remaining wire gaps and refuse misspelled fields ([13cd143](https://github.com/qontinui/qontinui-schemas/commit/13cd1437957555c6dad7b26460122dc4fae24609))
+
 ## [4.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.1...rust-v4.6.0) (2026-10-13)
 
 
