@@ -166,6 +166,7 @@ async fn a_model_step_reaches_the_invoker_through_the_real_shim_and_broker() {
             granted: true,
             reason: None,
             basis: Some("live".to_string()),
+            detail: None,
         }),
     };
     let conclusion = executor::run_dispatch(

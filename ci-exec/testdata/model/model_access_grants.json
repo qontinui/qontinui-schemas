@@ -1,0 +1,33 @@
+{
+  "granted": {
+    "granted": true,
+    "reason": null,
+    "basis": "live",
+    "dial": {
+      "level": "on",
+      "resolved_scope": "none",
+      "unknown_reason": null
+    }
+  },
+  "grant_unavailable": {
+    "granted": false,
+    "reason": "grant_unavailable",
+    "basis": "unknown",
+    "dial": {
+      "level": null,
+      "resolved_scope": null,
+      "unknown_reason": "pg_error:57P01"
+    },
+    "detail": "tenant_repos:pg_error:57P01"
+  },
+  "preference_off_repo": {
+    "granted": false,
+    "reason": "preference_off_repo",
+    "basis": "live",
+    "dial": {
+      "level": "off",
+      "resolved_scope": "repo",
+      "unknown_reason": null
+    }
+  }
+}
