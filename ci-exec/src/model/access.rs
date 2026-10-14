@@ -71,11 +71,20 @@ fn closed_reason(reason: &str, allowed: &[&str], fallback: &str) -> String {
 /// but the log line is ours to bound.
 const MAX_DETAIL_CHARS: usize = 256;
 
-/// `detail` cut to [`MAX_DETAIL_CHARS`] characters, saying so when cut.
+/// `detail` made safe for one log line, then cut to [`MAX_DETAIL_CHARS`]
+/// characters (saying so when cut). Control characters — a newline, a
+/// carriage return, an ESC starting an ANSI sequence — become a visible `?`
+/// FIRST, so coord's text can never forge an executor-looking line or
+/// recolour the log, and the cut that follows lands on a char boundary of the
+/// sanitized text.
 fn bounded_detail(detail: &str) -> String {
-    match detail.char_indices().nth(MAX_DETAIL_CHARS) {
-        Some((cut, _)) => format!("{}… (cut)", &detail[..cut]),
-        None => detail.to_string(),
+    let safe: String = detail
+        .chars()
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect();
+    match safe.char_indices().nth(MAX_DETAIL_CHARS) {
+        Some((cut, _)) => format!("{}… (cut)", &safe[..cut]),
+        None => safe,
     }
 }
 
@@ -262,32 +271,41 @@ impl ModelAccess {
         match self {
             ModelAccess::NotRequested => (ModelSection::NotRequested, None),
             ModelAccess::Refused { reason } => (ModelSection::Refused { reason }, None),
-            ModelAccess::Granted { broker, .. } => {
-                let out = broker.stop().await;
-                let section = match out.exhausted_reset_at {
-                    Some(reset_at) => ModelSection::Exhausted {
-                        calls: out.calls_used,
-                        reset_at,
-                    },
-                    None => ModelSection::Granted {
-                        calls: out.calls_used,
-                    },
-                };
-                let ledger = match out.ledger.transmittable() {
-                    Ok(ledger) => Some(ledger),
-                    Err(bytes) => {
-                        sink.push(&format!(
-                            "[ci-node] model ledger not sent: {bytes} bytes serialized, over \
-                             coord's {MODEL_LEDGER_MAX_BYTES}-byte ingest cap even with every \
-                             call row omitted; the verdict and summary.model are unaffected"
-                        ));
-                        None
-                    }
-                };
-                (section, ledger)
-            }
+            ModelAccess::Granted { broker, .. } => conclude(broker.stop().await, sink),
         }
     }
+}
+
+/// The section and ledger a stopped broker's outcome produces. A ledger over
+/// coord's ingest cap is not sent, and the section says so
+/// (`ledger_omitted_bytes`) as well as the dispatch log.
+fn conclude(
+    out: crate::model::broker::BrokerOutcome,
+    sink: &dyn LogSink,
+) -> (ModelSection, Option<ModelLedger>) {
+    let (ledger, ledger_omitted_bytes) = match out.ledger.transmittable() {
+        Ok(ledger) => (Some(ledger), None),
+        Err(bytes) => {
+            sink.push(&format!(
+                "[ci-node] model ledger not sent: {bytes} bytes serialized, over coord's \
+                 {MODEL_LEDGER_MAX_BYTES}-byte ingest cap even with every call row omitted; \
+                 summary.model records the omission and the verdict is unaffected"
+            ));
+            (None, Some(bytes as u64))
+        }
+    };
+    let section = match out.exhausted_reset_at {
+        Some(reset_at) => ModelSection::Exhausted {
+            calls: out.calls_used,
+            reset_at,
+            ledger_omitted_bytes,
+        },
+        None => ModelSection::Granted {
+            calls: out.calls_used,
+            ledger_omitted_bytes,
+        },
+    };
+    (section, ledger)
 }
 
 #[cfg(test)]
@@ -547,7 +565,13 @@ mod tests {
         assert_eq!(get(DISPATCH_ID_ENV).as_deref(), Some("d-1"));
         assert!(get(MODEL_REFUSED_ENV).is_none());
         let (section, ledger) = access.finish(&Lines::default()).await;
-        assert_eq!(section, ModelSection::Granted { calls: 0 });
+        assert_eq!(
+            section,
+            ModelSection::Granted {
+                calls: 0,
+                ledger_omitted_bytes: None
+            }
+        );
         assert!(ledger.is_some());
     }
 
@@ -608,6 +632,99 @@ mod tests {
         assert!(logged[0].ends_with("… (cut)"), "{}", logged[0]);
         assert!(logged[0].len() < long.len());
         assert_eq!(bounded_detail("short"), "short");
+    }
+
+    /// Coord's `detail` cannot forge a log line: control characters are made
+    /// visible before the cut, and the cut stays on a char boundary.
+    #[test]
+    fn a_detail_with_a_newline_or_an_escape_cannot_forge_a_log_line() {
+        let forged = "repo off\n[ci-node] model access: granted\r\u{1b}[31mred\u{7}";
+        let safe = bounded_detail(forged);
+        assert!(!safe.chars().any(char::is_control), "{safe:?}");
+        assert_eq!(safe, "repo off?[ci-node] model access: granted??[31mred?");
+        // Controls straddling the cut, beside multi-byte characters.
+        let long = format!(
+            "{}\n\u{1b}é{}",
+            "é".repeat(MAX_DETAIL_CHARS - 1),
+            "x".repeat(10)
+        );
+        let cut = bounded_detail(&long);
+        assert!(!cut.chars().any(char::is_control), "{cut:?}");
+        assert!(cut.ends_with("?… (cut)"), "{cut:?}");
+        assert_eq!(
+            cut.chars().count(),
+            MAX_DETAIL_CHARS + "… (cut)".chars().count()
+        );
+    }
+
+    /// A ledger over coord's ingest cap is not sent, and the section records
+    /// how large it was; an ordinary ledger is sent with no marker.
+    #[test]
+    fn a_dropped_ledger_is_marked_in_the_section() {
+        use crate::model::broker::BrokerOutcome;
+        use crate::model::ledger::{BudgetReport, CallRow, LedgerBuilder};
+        let row = |i: u64, id: String| CallRow {
+            index: i,
+            step: "b2".to_string(),
+            requested: "claude-sonnet".to_string(),
+            model_id: Some(id),
+            route: Some("subscription".to_string()),
+            account: Some("acct-a".to_string()),
+            input_tokens: Some(1),
+            output_tokens: Some(1),
+            cache_creation_tokens: Some(0),
+            cache_read_tokens: Some(0),
+            latency_ms: 1,
+            outcome: "ok".to_string(),
+            attempts: 1,
+            cost_microusd: None,
+        };
+        let mut big = LedgerBuilder::default();
+        for i in 1..=600u64 {
+            big.push(row(i, format!("{i:04}-{}", "x".repeat(4096))));
+        }
+        let lines = Lines::default();
+        let (section, ledger) = conclude(
+            BrokerOutcome {
+                ledger: big.finish(BudgetReport::default()),
+                calls_used: 600,
+                exhausted_reset_at: Some(42),
+            },
+            &lines,
+        );
+        assert!(ledger.is_none());
+        let ModelSection::Exhausted {
+            ledger_omitted_bytes: Some(bytes),
+            ..
+        } = section
+        else {
+            panic!("expected the omission marker: {section:?}");
+        };
+        assert!(bytes > crate::model::ledger::MODEL_LEDGER_MAX_BYTES as u64);
+        assert!(section.summary_line().contains("ledger not sent"));
+        assert!(lines
+            .all()
+            .iter()
+            .any(|l| l.contains("model ledger not sent")));
+
+        let mut small = LedgerBuilder::default();
+        small.push(row(1, "claude-sonnet-4-5".to_string()));
+        let (section, ledger) = conclude(
+            BrokerOutcome {
+                ledger: small.finish(BudgetReport::default()),
+                calls_used: 1,
+                exhausted_reset_at: None,
+            },
+            &Lines::default(),
+        );
+        assert!(ledger.is_some());
+        assert_eq!(
+            section,
+            ModelSection::Granted {
+                calls: 1,
+                ledger_omitted_bytes: None
+            }
+        );
     }
 
     /// D12's closed vocabulary is enforced on both sources: coord's reason

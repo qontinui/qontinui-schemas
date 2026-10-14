@@ -411,13 +411,27 @@ pub enum ModelSection {
     /// The job has no `model = true` step.
     NotRequested,
     /// Model access was granted; `calls` reached the host.
-    Granted { calls: u64 },
+    /// `ledger_omitted_bytes` is set — and only then serialized — when the
+    /// ledger was NOT sent because it serialized to that many bytes, over
+    /// coord's ingest cap: a reader of the stored result can tell "dropped
+    /// for size" from "lost".
+    Granted {
+        calls: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ledger_omitted_bytes: Option<u64>,
+    },
     /// Model access was withheld for the closed `reason`; the steps ran
     /// without it.
     Refused { reason: String },
     /// Access was granted, but at least one call failed because every model
     /// account was exhausted past the wall budget.
-    Exhausted { calls: u64, reset_at: u64 },
+    /// `ledger_omitted_bytes` as for `Granted`.
+    Exhausted {
+        calls: u64,
+        reset_at: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ledger_omitted_bytes: Option<u64>,
+    },
 }
 
 impl ModelSection {
@@ -426,12 +440,34 @@ impl ModelSection {
         match self {
             ModelSection::NotEvaluated => "model: not evaluated".to_string(),
             ModelSection::NotRequested => "model: not requested".to_string(),
-            ModelSection::Granted { calls } => format!("model: granted ({calls} call(s))"),
+            ModelSection::Granted {
+                calls,
+                ledger_omitted_bytes,
+            } => format!(
+                "model: granted ({calls} call(s)){}",
+                ledger_note(*ledger_omitted_bytes)
+            ),
             ModelSection::Refused { reason } => format!("model: refused ({reason})"),
-            ModelSection::Exhausted { calls, reset_at } => format!(
-                "model: every account exhausted ({calls} call(s); earliest reset at unix {reset_at})"
+            ModelSection::Exhausted {
+                calls,
+                reset_at,
+                ledger_omitted_bytes,
+            } => format!(
+                "model: every account exhausted ({calls} call(s); earliest reset at unix \
+                 {reset_at}){}",
+                ledger_note(*ledger_omitted_bytes)
             ),
         }
+    }
+}
+
+/// The summary-line suffix for a ledger dropped for size.
+fn ledger_note(omitted: Option<u64>) -> String {
+    match omitted {
+        Some(bytes) => {
+            format!("; ledger not sent: {bytes} bytes, over the {MODEL_LEDGER_MAX_BYTES}-byte cap")
+        }
+        None => String::new(),
     }
 }
 
@@ -689,10 +725,14 @@ mod tests {
         forms.extend([
             ModelSection::NotEvaluated,
             ModelSection::NotRequested,
-            ModelSection::Granted { calls: u64::MAX },
+            ModelSection::Granted {
+                calls: u64::MAX,
+                ledger_omitted_bytes: Some(u64::MAX),
+            },
             ModelSection::Exhausted {
                 calls: u64::MAX,
                 reset_at: u64::MAX,
+                ledger_omitted_bytes: Some(u64::MAX),
             },
         ]);
         for form in forms {
@@ -706,7 +746,27 @@ mod tests {
         let v = |s: ModelSection| serde_json::to_value(s).unwrap();
         assert_eq!(v(ModelSection::NotRequested)["status"], "not_requested");
         assert_eq!(v(ModelSection::NotEvaluated)["status"], "not_evaluated");
-        assert_eq!(v(ModelSection::Granted { calls: 2 })["status"], "granted");
+        let granted = v(ModelSection::Granted {
+            calls: 2,
+            ledger_omitted_bytes: None,
+        });
+        assert_eq!(granted["status"], "granted");
+        assert!(
+            granted.get("ledger_omitted_bytes").is_none(),
+            "the marker is serialized only when set: {granted}"
+        );
+        let dropped = ModelSection::Granted {
+            calls: 2,
+            ledger_omitted_bytes: Some(2_000_000),
+        };
+        assert_eq!(v(dropped.clone())["ledger_omitted_bytes"], 2_000_000);
+        assert!(
+            dropped
+                .summary_line()
+                .contains("ledger not sent: 2000000 bytes"),
+            "{}",
+            dropped.summary_line()
+        );
         let refused = v(ModelSection::Refused {
             reason: "fork_pr".to_string(),
         });
@@ -715,8 +775,19 @@ mod tests {
         let ex = v(ModelSection::Exhausted {
             calls: 1,
             reset_at: 9,
+            ledger_omitted_bytes: None,
         });
         assert_eq!(ex["status"], "exhausted");
         assert_eq!(ex["reset_at"], 9);
+        assert!(ex.get("ledger_omitted_bytes").is_none());
+        let ex_dropped = ModelSection::Exhausted {
+            calls: 1,
+            reset_at: 9,
+            ledger_omitted_bytes: Some(7),
+        };
+        assert_eq!(v(ex_dropped.clone())["ledger_omitted_bytes"], 7);
+        assert!(ex_dropped
+            .summary_line()
+            .contains("ledger not sent: 7 bytes"));
     }
 }
