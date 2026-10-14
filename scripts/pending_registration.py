@@ -39,7 +39,8 @@ it never grants it. Any failure of this module makes the caller absorb nothing.
 
 Modes (all print to stdout; the caller treats a non-zero exit as failure):
   decide   JSON verdict for check-generated-drift.sh arm 2
-  require  a leading PR with a TRAILING sibling must carry entries for the bindings it adds
+  require  a leading PR with a TRAILING sibling must carry entries for the bindings it adds,
+           each naming the declared runner PR and this PR (`schemas_pr`)
   audit    the scheduled check: red on any INERT, STALE or near-expiry entry
 """
 
@@ -68,6 +69,8 @@ MAX_AGE_DAYS = 14
 EXPIRY_WARNING_DAYS = 3
 
 SIBLING_REPO = "qontinui/qontinui-runner"
+# The repo whose PRs add the bindings; a row's `schemas_pr` names one of them.
+THIS_REPO = "qontinui/qontinui-schemas"
 SCHEMA_EXPORT_PATH = "src-tauri/src/schema_export.rs"
 
 TOML_PATH = "codegen/pending-registration.toml"
@@ -91,6 +94,7 @@ REFUSE_FIXTURE_IN_WORKFLOWS = ("schema-drift", "pending-registration-audit")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 RUNNER_PR_RE = re.compile(r"^([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)#([0-9]+)$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+PR_NUMBER_RE = re.compile(r"^[1-9][0-9]*$")
 
 
 class ModuleError(Exception):
@@ -629,13 +633,19 @@ def resolve_declared_pr(reader, sibling_sha: str | None) -> tuple[str | None, st
 
 
 def require(entries: list[Entry], new_types: list[str], pr_created: dt.date,
-            today: dt.date, declared_pr: str | None, reader) -> list[str]:
+            today: dt.date, declared_pr: str | None, reader,
+            this_pr: str | None = None) -> list[str]:
     """Problems with a trailing-sibling PR's entries; empty means satisfied.
 
     Each row a new binding needs must name the DECLARED runner PR and must
     already be ACTIVE-eligible (open, registering the type, readable) — a row
     that passes here and reads INERT on main's next push would re-open the very
     red window this exists to close.
+
+    Each such row must also name THIS PR as its `schemas_pr` — the provenance
+    the daily audit's STALE row points a reader back to. `this_pr` is
+    `qontinui/qontinui-schemas#<n>` when the run knows its PR number; without
+    it only the field's shape is checked.
     """
     by_type = {e.type: e for e in entries}
     problems = []
@@ -652,6 +662,16 @@ def require(entries: list[Entry], new_types: list[str], pr_created: dt.date,
             problems.append(f"{t}: runner_pr is {e.runner_pr}, but this run's declared "
                             f"runner PR is {declared_pr}")
             continue
+        if this_pr is not None:
+            if e.schemas_pr != this_pr:
+                problems.append(f"{t}: schemas_pr is {e.schemas_pr or '(absent)'}, "
+                                f"but this PR is {this_pr}")
+                continue
+        else:
+            sm = RUNNER_PR_RE.match(e.schemas_pr)
+            if not sm or sm.group(1) != THIS_REPO:
+                problems.append(f"{t}: schemas_pr must be {THIS_REPO}#<n> (this PR)")
+                continue
         a = e.added
         if not isinstance(a, dt.date) or isinstance(a, dt.datetime):
             problems.append(f"{t}: added must be a date")
@@ -666,14 +686,16 @@ def require(entries: list[Entry], new_types: list[str], pr_created: dt.date,
     return problems
 
 
-def paste_rows(types: list[str], runner_pr_hint: str, today: dt.date) -> str:
+def paste_rows(types: list[str], runner_pr_hint: str, today: dt.date,
+               schemas_pr_hint: str | None = None) -> str:
+    schemas_pr_hint = schemas_pr_hint or f"{THIS_REPO}#<this PR>"
     out = []
     for t in types:
         out.append("[[pending]]")
         out.append(f'type = "{t}"')
         out.append(f'runner_pr = "{runner_pr_hint}"')
         out.append(f"added = {today.isoformat()}")
-        out.append('schemas_pr = "qontinui/qontinui-schemas#<this PR>"')
+        out.append(f'schemas_pr = "{schemas_pr_hint}"')
         out.append("")
     return "\n".join(out)
 
@@ -753,6 +775,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--pr-head", default=os.environ.get("PR_HEAD_SHA"))
     ap.add_argument("--pr-created-at", default=os.environ.get("PR_CREATED_AT"))
     ap.add_argument("--sibling-sha", default=os.environ.get("SIBLING_SHA"))
+    ap.add_argument("--pr-number", default=os.environ.get("PR_NUMBER"))
     args = ap.parse_args(argv)
     root = Path(args.repo_root)
     today = _today()
@@ -774,18 +797,22 @@ def main(argv: list[str]) -> int:
             if not is_trailing(args.source):
                 print("pending-registration require: source is not a trailing declaration; nothing to require")
                 return 0
-            if not args.pr_head or not args.pr_created_at:
-                raise ModuleError("require needs --pr-head and --pr-created-at")
+            if not args.pr_head or not args.pr_created_at or not args.pr_number:
+                raise ModuleError("require needs --pr-head, --pr-created-at and --pr-number")
             if not SHA_RE.match(args.pr_head):
                 raise ModuleError(f"--pr-head must be a 40-hex commit sha, got {args.pr_head!r}")
             try:
                 created = dt.datetime.fromisoformat(args.pr_created_at.replace("Z", "+00:00")).date()
             except ValueError as exc:
                 raise ModuleError(f"--pr-created-at is not ISO-8601: {args.pr_created_at}") from exc
+            if not PR_NUMBER_RE.match(args.pr_number):
+                raise ModuleError(f"--pr-number must be a PR number, got {args.pr_number!r}")
+            this_pr = f"{THIS_REPO}#{args.pr_number}"
             new_types = added_types(root, merge_base_parent(root, args.pr_head))
             reader = make_reader()
             declared, why = resolve_declared_pr(reader, args.sibling_sha)
-            problems = require(entries, new_types, created, today, declared, reader) if new_types else []
+            problems = (require(entries, new_types, created, today, declared, reader, this_pr)
+                        if new_types else [])
             if new_types and declared is None:
                 problems.insert(0, why)
             hint = declared or f"{SIBLING_REPO}#<runner PR number>"
@@ -799,7 +826,7 @@ def main(argv: list[str]) -> int:
             missing = [t for t in new_types if t not in {e.type for e in entries}]
             if missing:
                 print("Add these rows to codegen/pending-registration.toml:\n")
-                print(paste_rows(missing, hint, today))
+                print(paste_rows(missing, hint, today, this_pr))
             return 1
 
         # audit

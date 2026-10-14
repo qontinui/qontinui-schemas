@@ -392,6 +392,80 @@ def test_require_rejects_a_row_whose_runner_pr_lacks_the_add():
         "CliProfile: the row would be INERT (not registered at aa63c83cce01)"]
 
 
+THIS_PR = "qontinui/qontinui-schemas#212"
+
+
+def test_require_accepts_a_row_naming_this_pr():
+    assert pr.require([entry()], ["CliProfile"], CREATED, TODAY, DECLARED, Reader(),
+                      this_pr=THIS_PR) == []
+
+
+def test_require_rejects_a_row_naming_another_schemas_pr():
+    assert pr.require([entry(schemas_pr="qontinui/qontinui-schemas#200")], ["CliProfile"],
+                      CREATED, TODAY, DECLARED, Reader(), this_pr=THIS_PR) == [
+        "CliProfile: schemas_pr is qontinui/qontinui-schemas#200, "
+        "but this PR is qontinui/qontinui-schemas#212"]
+
+
+def test_require_rejects_a_row_without_schemas_pr_when_the_pr_is_known():
+    assert pr.require([entry(schemas_pr="")], ["CliProfile"],
+                      CREATED, TODAY, DECLARED, Reader(), this_pr=THIS_PR) == [
+        "CliProfile: schemas_pr is (absent), but this PR is qontinui/qontinui-schemas#212"]
+
+
+def test_require_checks_the_schemas_pr_shape_when_the_pr_is_unknown():
+    for bad in ("", "qontinui/qontinui-schemas#<this PR>", "qontinui/qontinui-runner#212"):
+        assert req([entry(schemas_pr=bad)]) == [
+            "CliProfile: schemas_pr must be qontinui/qontinui-schemas#<n> (this PR)"], bad
+
+
+def test_paste_rows_fill_in_this_pr_when_known():
+    rows = pr.paste_rows(["CliProfile"], DECLARED, TODAY, THIS_PR)
+    assert 'schemas_pr = "qontinui/qontinui-schemas#212"' in rows
+    assert "<this PR>" not in rows
+    assert 'schemas_pr = "qontinui/qontinui-schemas#<this PR>"' in pr.paste_rows(
+        ["CliProfile"], DECLARED, TODAY)
+
+
+def test_require_rejects_a_malformed_pr_number(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    for bad in ("230; x", "\u00b2", "\u0663", "007", "0"):
+        monkeypatch.setenv("PR_NUMBER", bad)
+        assert pr.main(["require", "--repo-root", str(repo)]) == 2, bad
+        assert f"--pr-number must be a PR number, got {bad!r}" in capsys.readouterr().err
+
+
+def test_require_needs_the_pr_number(tmp_path, monkeypatch, capsys):
+    # Unknown input withholds the tolerance: no fallback to a shape-only check.
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    for unset in (None, ""):
+        if unset is None:
+            monkeypatch.delenv("PR_NUMBER")
+        else:
+            monkeypatch.setenv("PR_NUMBER", unset)
+        assert pr.main(["require", "--repo-root", str(repo)]) == 2
+        assert ("require needs --pr-head, --pr-created-at and --pr-number"
+                in capsys.readouterr().err)
+
+
+def test_schema_drift_passes_the_pr_number_to_the_drift_step():
+    wf = (Path(__file__).resolve().parents[1] / ".github/workflows/schema-drift.yml").read_text()
+    step = wf[wf.index("- name: Check for drift"):]
+    step = step[:step.index("run: bash scripts/check-generated-drift.sh --verify")]
+    assert "PR_NUMBER: ${{ github.event.pull_request.number }}" in step
+
+
+def test_require_reds_when_the_new_row_names_another_schemas_pr(tmp_path, monkeypatch, capsys):
+    repo, stale, _tip, head, _merge = stale_base_repo(tmp_path)
+    _require_env(monkeypatch, tmp_path, stale, head)
+    monkeypatch.setenv("PR_NUMBER", "231")
+    assert pr.main(["require", "--repo-root", str(repo)]) == 1
+    assert ("  - NewThing: schemas_pr is qontinui/qontinui-schemas#230, "
+            "but this PR is qontinui/qontinui-schemas#231") in capsys.readouterr().out
+
+
 def test_resolve_declared_pr_from_the_sibling_sha():
     assert pr.resolve_declared_pr(Reader(), HEAD_SHA) == ("qontinui/qontinui-runner#1990", "")
     assert pr.resolve_declared_pr(Reader(numbers=()), HEAD_SHA) == (
@@ -510,11 +584,11 @@ RUNNER_2118_HEAD = "2" * 40
 
 _TOML_1990 = (
     '[[pending]]\ntype = "CliProfile"\nrunner_pr = "qontinui/qontinui-runner#1990"\n'
-    "added = 2026-10-13\n"
+    'added = 2026-10-13\nschemas_pr = "qontinui/qontinui-schemas#212"\n'
 )
 _TOML_2118 = (
     '[[pending]]\ntype = "NewThing"\nrunner_pr = "qontinui/qontinui-runner#2118"\n'
-    "added = 2026-10-13\n"
+    'added = 2026-10-13\nschemas_pr = "qontinui/qontinui-schemas#230"\n'
 )
 
 
@@ -591,6 +665,7 @@ def _require_env(monkeypatch, tmp_path, stale, head):
     monkeypatch.setenv("PR_BASE_SHA", stale)
     monkeypatch.setenv("PR_HEAD_SHA", head)
     monkeypatch.setenv("PR_CREATED_AT", "2026-10-10T12:00:00Z")
+    monkeypatch.setenv("PR_NUMBER", "230")
     monkeypatch.setattr(pr, "_today", lambda: TODAY)
 
 
@@ -654,4 +729,4 @@ def test_require_needs_the_pr_head(tmp_path, monkeypatch, capsys):
     _require_env(monkeypatch, tmp_path, stale, head)
     monkeypatch.delenv("PR_HEAD_SHA")
     assert pr.main(["require", "--repo-root", str(repo)]) == 2
-    assert "require needs --pr-head and --pr-created-at" in capsys.readouterr().err
+    assert "require needs --pr-head, --pr-created-at and --pr-number" in capsys.readouterr().err

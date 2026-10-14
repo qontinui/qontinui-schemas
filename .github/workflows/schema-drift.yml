@@ -702,6 +702,8 @@ jobs:
       #     second parent. Deliberately NOT pull_request.base.sha: that is the
       #     base as of the PR's last sync, and diffing from it counted bindings
       #     main added since as this PR's own (schemas#223, 2026-10-13).
+      #   * PR_NUMBER — `require` checks each new row's `schemas_pr` names this
+      #     PR, and fills the number into the rows it prints. Empty on push.
       - name: Check for drift
         working-directory: qontinui-schemas
         env:
@@ -710,4 +712,5 @@ jobs:
           SIBLING_SHA: ${{ steps.sibling.outputs.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash scripts/check-generated-drift.sh --verify

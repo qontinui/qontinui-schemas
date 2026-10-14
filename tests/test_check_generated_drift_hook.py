@@ -135,7 +135,7 @@ def verify(root: Path, fixture: Path | None, path_prefix: Path | None = None,
            **env_extra: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items()
            if k not in ("GITHUB_WORKFLOW", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_TOKEN",
-                        "SIBLING_SOURCE", "SIBLING_SHA", "PR_HEAD_SHA", "PR_CREATED_AT",
+                        "SIBLING_SOURCE", "SIBLING_SHA", "PR_HEAD_SHA", "PR_CREATED_AT", "PR_NUMBER",
                         "PENDING_REGISTRATION_FIXTURE")}
     env.update(GENERATE_TYPES_SH=str(STUB_GENERATOR), QONTINUI_SCHEMAS_DIR=str(root),
                SIBLING_SOURCE="none")
@@ -246,12 +246,14 @@ def test_require_with_a_header_only_toml_reds_and_prints_the_rows(tmp_path):
     head = merge_pr_into(root, base)
     # The declared trailing sibling produced the type, so the tree has no drift.
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z",
+               PR_NUMBER="230")
     out = r.stdout + r.stderr
     assert r.returncode == 1, out
     assert "missing entry for CliProfile" in out
     assert "[[pending]]" in out and 'type = "CliProfile"' in out
     assert 'runner_pr = "qontinui/qontinui-runner#1990"' in out
+    assert 'schemas_pr = "qontinui/qontinui-schemas#230"' in out
 
 
 def test_require_is_satisfied_by_a_dated_entry(tmp_path):
@@ -266,10 +268,19 @@ def test_require_is_satisfied_by_a_dated_entry(tmp_path):
     git(root, "commit", "-qm", "leading PR adds CliProfile with its entry")
     head = merge_pr_into(root, base)
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
-               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z",
+               PR_NUMBER="212")
     out = r.stdout + r.stderr
     assert r.returncode == 0, out
     assert "pending-registration: CliProfile: PRODUCED-BY-DECLARED-SIBLING" in out
+    # The same row on a different PR names the wrong schemas PR: red.
+    r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="downstream-of+sibling-downstream-of",
+               SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA=head, PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z",
+               PR_NUMBER="230")
+    out = r.stdout + r.stderr
+    assert r.returncode == 1, out
+    assert ("CliProfile: schemas_pr is qontinui/qontinui-schemas#212, "
+            "but this PR is qontinui/qontinui-schemas#230") in out
 
 
 def test_j_no_toml_keeps_todays_behaviour(tmp_path):
@@ -288,7 +299,7 @@ def test_require_rejects_a_malformed_pr_head_sha(tmp_path):
     root = make_repo(tmp_path, toml_entry())
     r = verify(root, fixture_file(tmp_path), SIBLING_SOURCE="sibling-downstream-of",
                SIBLING_SHA=HEAD_SHA, PR_HEAD_SHA="main; rm -rf /",
-               PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z")
+               PR_CREATED_AT=f"{TODAY.isoformat()}T00:00:00Z", PR_NUMBER="212")
     out = r.stdout + r.stderr
     assert r.returncode == 1, out
     assert "--pr-head must be a 40-hex commit sha" in out
