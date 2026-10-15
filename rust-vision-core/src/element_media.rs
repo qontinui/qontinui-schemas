@@ -177,7 +177,8 @@ pub struct MediaAlt {
     /// The text alternative: `alt` for an `<img>` / `<picture>`, the accessible
     /// label (`aria-label`, an SVG `<title>`, a canvas's fallback content) for
     /// the others, a native image's announced label (RN's own order:
-    /// `aria-label ?? accessibilityLabel ?? alt`) — stripped of ASCII
+    /// `aria-label ?? accessibilityLabel ?? alt`, then the registry's label,
+    /// only when the host recorded no props) — stripped of ASCII
     /// whitespace, never empty. A label that strips to nothing is decorative on
     /// the web (as `alt=""` is) and omits the record on native (see
     /// [`Self::decorative`]).
