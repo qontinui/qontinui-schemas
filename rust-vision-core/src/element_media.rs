@@ -160,19 +160,24 @@ pub struct MediaAlt {
     ///   space — `alt=""` and a whitespace-only `alt="  "` alike),
     ///   `role="presentation"`, an `aria-hidden` SVG, or a CSS background.
     /// - **Native (React Native):** ONLY an explicit signal that takes the
-    ///   element out of the accessibility tree — `accessible={false}`,
-    ///   `importantForAccessibility` `"no"` / `"no-hide-descendants"`,
-    ///   `accessibilityElementsHidden`, or `aria-hidden`. RN has no `alt=""`
-    ///   convention, so an empty or whitespace-only `accessibilityLabel` is
-    ///   NOT decorative: it is read like a missing label, and the whole
-    ///   [`ElementMedia::alt`] is omitted (unmeasured).
+    ///   image out of the accessibility tree, read as RN's `Image` reads it:
+    ///   `accessible={false}` when the image has no `alt` (an `Image` with an
+    ///   `alt` is always accessible), `importantForAccessibility` `"no"` /
+    ///   `"no-hide-descendants"`, or `accessibilityElementsHidden`. The last
+    ///   two are platform props (Android and iOS) and count as the developer's
+    ///   stated intent on both platforms. `aria-hidden` is NOT a signal: RN
+    ///   maps it on `View` only, and an `Image` carrying it is still
+    ///   announced. RN has no `alt=""` convention, so an empty or
+    ///   whitespace-only label is NOT decorative: it is read like a missing
+    ///   label, and the whole [`ElementMedia::alt`] is omitted (unmeasured).
     ///
     /// A decorative image needs no text, so its `text` carries no defect
     /// either way.
     pub decorative: bool,
     /// The text alternative: `alt` for an `<img>` / `<picture>`, the accessible
     /// label (`aria-label`, an SVG `<title>`, a canvas's fallback content) for
-    /// the others, a native image's `accessibilityLabel` — stripped of ASCII
+    /// the others, a native image's announced label (RN's own order:
+    /// `aria-label ?? accessibilityLabel ?? alt`) — stripped of ASCII
     /// whitespace, never empty. A label that strips to nothing is decorative on
     /// the web (as `alt=""` is) and omits the record on native (see
     /// [`Self::decorative`]).
