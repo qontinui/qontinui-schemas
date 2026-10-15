@@ -153,16 +153,29 @@ pub enum MediaLoadState {
 /// unread one and a text-alternative check could never fail on it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MediaAlt {
-    /// Presentation only: an `alt` that is present and empty after stripping
-    /// ASCII whitespace (HTML's definition: tab, LF, FF, CR, space — `alt=""`
-    /// and `alt="  "` alike), `role="presentation"`, an `aria-hidden` SVG, or
-    /// a CSS background. A decorative image needs no text, so its `text`
-    /// carries no defect either way.
+    /// Presentation only. What sets it depends on the producer's platform:
+    ///
+    /// - **Web (the HTML converters):** an `alt` that is present and empty
+    ///   after stripping ASCII whitespace (HTML's definition: tab, LF, FF, CR,
+    ///   space — `alt=""` and a whitespace-only `alt="  "` alike),
+    ///   `role="presentation"`, an `aria-hidden` SVG, or a CSS background.
+    /// - **Native (React Native):** ONLY an explicit signal that takes the
+    ///   element out of the accessibility tree — `accessible={false}`,
+    ///   `importantForAccessibility` `"no"` / `"no-hide-descendants"`,
+    ///   `accessibilityElementsHidden`, or `aria-hidden`. RN has no `alt=""`
+    ///   convention, so an empty or whitespace-only `accessibilityLabel` is
+    ///   NOT decorative: it is read like a missing label, and the whole
+    ///   [`ElementMedia::alt`] is omitted (unmeasured).
+    ///
+    /// A decorative image needs no text, so its `text` carries no defect
+    /// either way.
     pub decorative: bool,
     /// The text alternative: `alt` for an `<img>` / `<picture>`, the accessible
     /// label (`aria-label`, an SVG `<title>`, a canvas's fallback content) for
     /// the others, a native image's `accessibilityLabel` — stripped of ASCII
-    /// whitespace, never empty (an alt that strips to nothing is decorative).
+    /// whitespace, never empty. A label that strips to nothing is decorative on
+    /// the web (as `alt=""` is) and omits the record on native (see
+    /// [`Self::decorative`]).
     ///
     /// **`None` is MEASURED here**: the producer read the element and it
     /// carries no text alternative at all. A producer that could not read the
