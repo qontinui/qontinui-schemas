@@ -857,8 +857,19 @@ fn resolve_step_cwd(worktree: &Path, step: &CiStep) -> Result<PathBuf, String> {
 /// Build the tokio Command for a step's argv. On Windows the creation
 /// flags combine `CREATE_NO_WINDOW` with `BELOW_NORMAL_PRIORITY_CLASS` so a
 /// CI build never steals the foreground from the developer.
-fn build_step_command(program: &str, args: &[String]) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new(program);
+///
+/// Built through the host's [`ProcessSpawn::command`], like every other
+/// process the executor starts, so a step whose argv starts with `git` gets
+/// the host's git posture: prompt-proof, and (on the runner) scrubbed of a
+/// repository-local env (`GIT_DIR`, …) inherited from whoever launched the
+/// host — which would otherwise point the step at the launcher's repo instead
+/// of the worktree it runs in.
+fn build_step_command(
+    process: &dyn ProcessSpawn,
+    program: &str,
+    args: &[String],
+) -> tokio::process::Command {
+    let mut cmd = process.command(program);
     cmd.args(args);
     #[cfg(target_os = "windows")]
     {
@@ -880,6 +891,7 @@ fn build_step_command(program: &str, args: &[String]) -> tokio::process::Command
 /// scrub, see [`crate::model::scrub`]); `envs` are applied after, so an
 /// executor-owned value such as `CLAUDE_CONFIG_DIR` is set, not removed.
 fn spawn_step_child(
+    process: &dyn ProcessSpawn,
     step: &CiStep,
     cwd: &Path,
     removals: &[String],
@@ -897,14 +909,14 @@ fn spawn_step_child(
             cmd.env(k, v);
         }
     };
-    let mut direct = build_step_command(&step.command[0], &step.command[1..]);
+    let mut direct = build_step_command(process, &step.command[0], &step.command[1..]);
     apply(&mut direct);
     match direct.spawn() {
         Ok(child) => Ok(child),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && cfg!(target_os = "windows") => {
             let mut argv: Vec<String> = vec!["/C".to_string()];
             argv.extend(step.command.iter().cloned());
-            let mut shim = build_step_command("cmd.exe", &argv);
+            let mut shim = build_step_command(process, "cmd.exe", &argv);
             apply(&mut shim);
             shim.spawn()
                 .map_err(|e2| format!("spawn {:?} (direct: {e}; cmd /C: {e2})", step.command))
@@ -1038,7 +1050,7 @@ async fn run_step(
     // The scrub: no step inherits a model credential, a model command or the
     // host's credential values (D11).
     let removals = crate::model::scrub::current_step_env_removals(process.scrubbed_env());
-    let mut child = match spawn_step_child(step, &cwd, &removals, &envs) {
+    let mut child = match spawn_step_child(process, step, &cwd, &removals, &envs) {
         Ok(c) => c,
         Err(e) => {
             sink.push(&format!("[ci-node] step {}: {e}", step.name));
@@ -1121,6 +1133,31 @@ async fn pump_lines<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
 mod tests {
     use super::*;
     use crate::standalone::PlainSpawn;
+
+    /// A step's command is built by the HOST, so the host's git posture
+    /// reaches a step whose argv starts with `git`. `PlainSpawn` sets the
+    /// prompt-proof env on git; a bare `Command::new(program)` would not.
+    #[test]
+    fn a_git_step_is_built_through_the_host_spawner() {
+        let cmd = build_step_command(&PlainSpawn, "git", &["status".to_string()]);
+        let set: Vec<(String, Option<String>)> = cmd
+            .as_std()
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.map(|v| v.to_string_lossy().into_owned()),
+                )
+            })
+            .collect();
+        for (k, v) in crate::standalone::PROMPT_PROOF_GIT_ENV {
+            assert!(
+                set.iter()
+                    .any(|(sk, sv)| sk == k && sv.as_deref() == Some(*v)),
+                "a git CI step must carry the host's {k}={v}; env: {set:?}"
+            );
+        }
+    }
 
     #[test]
     fn step_outcome_conclusions() {
