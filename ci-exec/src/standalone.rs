@@ -94,6 +94,27 @@ pub const PROMPT_PROOF_GIT_ENV: &[(&str, &str)] = &[
     ("GIT_ASKPASS", "/qontinui-runner/askpass-disabled"),
 ];
 
+/// git's repository-LOCATION variables (a subset of `git rev-parse
+/// --local-env-vars`): inherited from a launcher such as a git hook, any one of
+/// them points a child git at the launcher's repository instead of the
+/// worktree it was started in. Removed from every `git` this host spawns — the
+/// same list the Qontinui runner scrubs (its `git_posture::REPO_LOCAL_GIT_ENV`).
+pub const REPO_LOCAL_GIT_ENV: &[&str] = &[
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+];
+
 /// Is `program` git? Matched on the final path component, case-insensitively
 /// and with an optional `.exe`, splitting on BOTH separators so a Windows git
 /// path is recognised wherever this runs.
@@ -103,7 +124,8 @@ fn program_is_git(program: &str) -> bool {
     lower == "git" || lower == "git.exe"
 }
 
-/// Plain spawning with the prompt-proof git posture.
+/// Plain spawning with the prompt-proof git posture, and a `git` child
+/// scrubbed of [`REPO_LOCAL_GIT_ENV`].
 ///
 /// The child-TREE reaper is real on Unix: [`ProcessSpawn::arm_tree`] makes the
 /// child the leader of its own process group, and dropping the guard
@@ -160,6 +182,9 @@ impl ProcessSpawn for PlainSpawn {
         let mut cmd = tokio::process::Command::new(program);
         if program_is_git(program) {
             cmd.envs(PROMPT_PROOF_GIT_ENV.iter().copied());
+            for var in REPO_LOCAL_GIT_ENV {
+                cmd.env_remove(var);
+            }
         }
         cmd
     }
@@ -167,6 +192,9 @@ impl ProcessSpawn for PlainSpawn {
         let mut cmd = std::process::Command::new(program);
         if program_is_git(program) {
             cmd.envs(PROMPT_PROOF_GIT_ENV.iter().copied());
+            for var in REPO_LOCAL_GIT_ENV {
+                cmd.env_remove(var);
+            }
         }
         cmd
     }
@@ -257,6 +285,28 @@ pub fn host(root: PathBuf, label: String) -> Host {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `git` child of the standalone host is prompt-proof AND scrubbed of
+    /// every repository-local variable (`get_envs` reports a removal as
+    /// `None`), so a `GIT_DIR` inherited from a git hook cannot point it at the
+    /// launcher's repo. A non-git child is left alone.
+    #[test]
+    fn a_git_child_is_scrubbed_of_the_repo_local_env() {
+        let async_cmd = PlainSpawn.command("git");
+        let sync_cmd = PlainSpawn.std_command("git");
+        for envs in [
+            async_cmd.as_std().get_envs().collect::<Vec<_>>(),
+            sync_cmd.get_envs().collect::<Vec<_>>(),
+        ] {
+            for var in REPO_LOCAL_GIT_ENV {
+                assert!(
+                    envs.iter().any(|(k, v)| *k == *var && v.is_none()),
+                    "a git child must not inherit {var}"
+                );
+            }
+        }
+        assert_eq!(PlainSpawn.std_command("cargo").get_envs().count(), 0);
+    }
 
     /// The standalone host never authorises convergence and has no canonical
     /// source — so a `[canonical]` manifest is refused here, not run unchecked.

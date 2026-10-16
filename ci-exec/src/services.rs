@@ -2204,7 +2204,7 @@ mod tests {
     //
     // `#[ignore]`d because it requires Docker/podman and a network-or-cached
     // image. Run explicitly:
-    //   cargo test --bin qontinui-runner ci_node::services::tests::real_ -- \
+    //   cargo test -p qontinui-ci-exec services::tests::real_ -- \
     //       --ignored --nocapture
     //
     // It is dispatch-id-scoped like every other dispatch, so it can never
@@ -2359,10 +2359,15 @@ mod tests {
             2,
             "both the started and the attempted container must be registered for teardown"
         );
+        // The runtime the stack actually chose, which may be podman.
+        let runtime = stack
+            .runtime
+            .clone()
+            .expect("a stack that started a container has a runtime");
         stack.teardown().await;
         let leftovers = run_capture(
             &PlainSpawn,
-            "docker",
+            &runtime,
             &[
                 "ps",
                 "-aq",

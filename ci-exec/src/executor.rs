@@ -1135,8 +1135,9 @@ mod tests {
     use crate::standalone::PlainSpawn;
 
     /// A step's command is built by the HOST, so the host's git posture
-    /// reaches a step whose argv starts with `git`. `PlainSpawn` sets the
-    /// prompt-proof env on git; a bare `Command::new(program)` would not.
+    /// reaches a step whose argv starts with `git`: `PlainSpawn` sets the
+    /// prompt-proof env on git and removes the repository-local env; a bare
+    /// `Command::new(program)` does neither.
     #[test]
     fn a_git_step_is_built_through_the_host_spawner() {
         let cmd = build_step_command(&PlainSpawn, "git", &["status".to_string()]);
@@ -1155,6 +1156,12 @@ mod tests {
                 set.iter()
                     .any(|(sk, sv)| sk == k && sv.as_deref() == Some(*v)),
                 "a git CI step must carry the host's {k}={v}; env: {set:?}"
+            );
+        }
+        for var in crate::standalone::REPO_LOCAL_GIT_ENV {
+            assert!(
+                set.iter().any(|(k, v)| k == var && v.is_none()),
+                "a git CI step must not inherit {var}; env: {set:?}"
             );
         }
     }
