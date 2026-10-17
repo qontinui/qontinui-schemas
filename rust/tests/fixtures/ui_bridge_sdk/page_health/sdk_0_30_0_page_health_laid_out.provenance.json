@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_0_30_0_page_health_laid_out.json",
+  "sha256": "c05affcdb375067eda24156c535ebab457b401ed761646ed5e56890c29a93bb1",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.30.0 (packages/ui-bridge/package.json at the commit below; the producer version the SDK stamps, read from __SDK_VERSION__, which vitest defines from that package.json)",
+  "sdk_commit": "qontinui/ui-bridge d6ff3940a09fd61ec31ddf0c1e7bb2616ba89c18 (the commit @qontinui/ui-bridge 0.30.0 is published from)",
+  "source": "diagnosePageHealth() run under the capture harness in capture/, with the same handler input mapping, over the REAL UIBridgeRegistry.createSnapshot() of a jsdom registry holding a laid-out page (LAID_OUT in the harness: a 3-link sidebar, a heading, three content cards one of which reads 'Loading queue…', a disabled and an enabled button) in a 1280x800 viewport. jsdom has no layout engine, so each element's getBoundingClientRect and window.innerWidth/innerHeight are stubbed; visibility, normalizedRect, categories and every page-health check are SDK code.",
+  "capture_command": "In a ui-bridge checkout detached at d6ff394: npm ci --ignore-scripts -w packages/ui-bridge && cp <schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/capture/page-health.capture.test.ts packages/ui-bridge/src/server/ && cd packages/ui-bridge && PAGE_HEALTH_SNAPSHOT_IN=<schemas>/rust/tests/fixtures/ui_bridge_sdk/runner_live_sdk_0_27_0_control_snapshot.json PAGE_HEALTH_POPULATED_OUT=<out>/sdk_0_30_0_page_health_populated.json PAGE_HEALTH_EMPTY_OUT=<out>/sdk_0_30_0_page_health_empty_registry.json PAGE_HEALTH_LAID_OUT_OUT=<out>/sdk_0_30_0_page_health_laid_out.json PAGE_HEALTH_EVALUATED_AT=2026-10-13T00:00:00.000Z npx vitest run src/server/page-health.capture.test.ts",
+  "captured_at": "2026-10-13",
+  "trim": "None. Written verbatim as a JSON round-trip, pretty-printed with 2-space indent. evaluatedAt is PINNED to 2026-10-13T00:00:00.000Z; observedAt and provenance.source.snapshotId are the registry's own at capture time.",
+  "notes": "status=measured, summary=WARNING (text_signals: one loading phrase), coverage {considered: 9, measured: 9}, a heatmap with `#` cells, and per-check data. This is the capture that pins the WARNING spelling and a non-degenerate report. It does NOT exercise a non-empty coverage.unmeasured: the registry always stamps normalizedRect when the viewport has a size, so that shape is unreachable through createSnapshot()."
+}
