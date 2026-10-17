@@ -28,6 +28,16 @@ hex = "0.4"
 serde_jcs = "0.1"
 thiserror = "2"
 base64 = "0.22"
+# Optional: only `host_sizing::probe` reads the live host. Enable with the
+# `host-probe` feature; the pure sizing arithmetic needs nothing.
+sysinfo = { version = "0.32", default-features = false, features = ["system"], optional = true }
+
+[features]
+default = []
+# `host_sizing::probe` — read the host's memory (sysinfo) and parallelism.
+# Consumers that size builds against the live host (runner, supervisor)
+# enable this; the rest of the crate never touches the host.
+host-probe = ["dep:sysinfo"]
 
 [dev-dependencies]
 # tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.
