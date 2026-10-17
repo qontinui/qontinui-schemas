@@ -132,7 +132,7 @@ export type ScheduledTaskType =
       command: string;
       task_type: "Script";
       /**
-       * Wall-clock timeout in seconds. `None` = runner default
+       * Wall-clock timeout in seconds. `None` (or 0) = runner default
        * (600s = 10 min).
        */
       timeout_seconds?: number | null;

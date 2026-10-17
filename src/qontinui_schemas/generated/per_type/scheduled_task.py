@@ -414,7 +414,7 @@ class ScheduledTaskType7(BaseModel):
     timeout_seconds: Annotated[
         int | None,
         Field(
-            description='Wall-clock timeout in seconds. `None` = runner default\n(600s = 10 min).',
+            description='Wall-clock timeout in seconds. `None` (or 0) = runner default\n(600s = 10 min).',
             ge=0,
         ),
     ] = None
