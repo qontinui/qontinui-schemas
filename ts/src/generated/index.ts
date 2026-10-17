@@ -221,6 +221,7 @@ export type { HistoricalActionResult } from './HistoricalActionResult';
 export type { HttpConfig } from './HttpConfig';
 export type { HttpMethod } from './HttpMethod';
 export type { IdleCondition } from './IdleCondition';
+export type { ImageSlotSpec } from './ImageSlotSpec';
 export type { ImplementFixesConfig } from './ImplementFixesConfig';
 export type { IndividualCheckResult } from './IndividualCheckResult';
 export type { InitialStateRef } from './InitialStateRef';
