@@ -122,7 +122,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import -- -D warnings
+        run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe -- -D warnings
 
       # The library as its consumers (runner, coord) build it: WITHOUT the
       # `import` feature, so dead code behind the feature gate is caught.
@@ -130,7 +130,7 @@ jobs:
         run: cargo clippy -p qontinui-ci-exec --all-targets -- -D warnings
 
       - name: cargo build
-        run: cargo build --workspace --all-targets --features qontinui-ci-exec/import
+        run: cargo build --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe
 
       # The vacuity parser below is a COPY. Its source of record is
       # qontinui-claude-config/scripts/lib/cargo-vacuity.sh, which this runner
@@ -161,7 +161,9 @@ jobs:
           # --features qontinui-ci-exec/import: the `qontinui-ci` binary, the
           # workflow importer/generator and their golden tests sit behind that
           # non-default feature (library consumers do not pull in libyaml).
-          cargo test --workspace --features qontinui-ci-exec/import 2>&1 | tee /tmp/cargo-test.out
+          # qontinui-types/host-probe: `host_sizing::probe` and its test sit
+          # behind that non-default feature (it pulls in sysinfo).
+          cargo test --workspace --features qontinui-ci-exec/import,qontinui-types/host-probe 2>&1 | tee /tmp/cargo-test.out
           SUBRC=${PIPESTATUS[0]}
           set -e
 

@@ -131,6 +131,15 @@ pub mod glossary;
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
+/// Host-derived cargo sizing — the ONE formula for `CARGO_BUILD_JOBS`, test
+/// threads, a host's share across N concurrent builds, and the suggested
+/// concurrent-build count. Moved from the runner's `ci_node::host_sizing` so the
+/// runner, the supervisor and the bash wrappers (via a golden table) agree.
+/// Pure arithmetic; only `host_sizing::probe` reads the host, behind the
+/// `host-probe` feature. Not a schema type — nothing here is exported to TS or
+/// Python. See
+/// `2026-10-02-cargo-jobs-supervisor-build-pool-and-physical-disk-floors-follow-the-machine.md`.
+pub mod host_sizing;
 /// Image-slot specs — [`image_slot::ImageSlotSpec`], the declared contract of
 /// one image placement (job, audience, contexts, geometry, style, content,
 /// text and alt policy, check thresholds, and the asset bound to it). See
