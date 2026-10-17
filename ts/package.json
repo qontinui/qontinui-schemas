@@ -1,6 +1,6 @@
 {
   "name": "@qontinui/shared-types",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Shared TypeScript types for the Qontinui ecosystem",
   "type": "module",
   "main": "./dist/index.js",

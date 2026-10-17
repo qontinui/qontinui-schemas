@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.1...ts-v2.4.0) (2026-10-17)
+
+
+### Features
+
+* add ScheduledTaskType::Script (command, working_directory, timeout_seconds) ([20c02a8](https://github.com/qontinui/qontinui-schemas/commit/20c02a87d257a34fbff761c8f8f82f3a2c9fa44a))
+
+
+### Bug Fixes
+
+* **vision-core:** absent requires considered &gt; 0; bindings documented as types, not validators ([37f3530](https://github.com/qontinui/qontinui-schemas/commit/37f3530606a895adfa463295405b50c270aaf9e2))
+
 ## [2.3.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.0...ts-v2.3.1) (2026-10-13)
 
 
