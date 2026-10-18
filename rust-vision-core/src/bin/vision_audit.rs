@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `vision-audit` — standalone, runner-less analyzer CLI for CI style gating.
 //!
 //! A hermetic, version-pinned wrapper over `qontinui-vision-core`'s analyzer +

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Content-addressed disk cache with LRU eviction.
 //!
 //! Phase 3 of the UI Bridge vision pipeline plan. Caller composes the cache

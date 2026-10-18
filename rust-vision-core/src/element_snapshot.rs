@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Source-agnostic structural snapshot of a UI page.
 //!
 //! [`ElementSnapshot`] is the input the analyzers + assertion DSL consume.

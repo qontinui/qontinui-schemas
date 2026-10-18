@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Every observation carries its provenance, and says whether it is an
 //! estimate or a deduction.
 //!

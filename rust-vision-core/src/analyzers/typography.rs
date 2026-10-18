@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Typography analyzer — clusters elements by font characteristics and
 //! flags inconsistencies. e.g., "16 text elements but 4 distinct
 //! font-family declarations" usually indicates an unsynced design system.

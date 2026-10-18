@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Color analyzer — dominant-color extraction (sampling, not k-means in
 //! Phase 6 first pass) + contrast distribution. Pure pixel math on the
 //! frame buffer, no external CV deps.

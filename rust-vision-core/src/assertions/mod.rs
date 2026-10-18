@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Phase 6 assertion DSL — declarative "should this be true?" checks
 //! over a captured [`Frame`] + [`ElementSnapshot`].
 //!

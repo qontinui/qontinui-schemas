@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Corpus integration test — Phase 6.0 scaffolding.
 //!
 //! Walks `tests/fixtures/analyzer_corpus/{frames,golden}/`, loads each

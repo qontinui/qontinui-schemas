@@ -12,6 +12,8 @@ What this means for you as a contributor:
 - If you (or anyone else) runs a modified version of qontinui as a network service, the AGPL requires you to publish your modifications under AGPL too — this is the "network copyleft" provision and the reason this project chose AGPL.
 - For typical self-hosting, internal use, forking, or contributing back, AGPL is no different from GPL in practice.
 
+**Exception — `rust-vision-core/` is MIT.** The `qontinui-vision-core` crate and its `vision-audit` binary are licensed under the MIT License ([`rust-vision-core/LICENSE`](rust-vision-core/LICENSE)); every Rust source file in it carries `SPDX-License-Identifier: MIT`. Contributions to that directory are licensed inbound under MIT; contributions anywhere else are AGPL-3.0-or-later. Keep `rust-vision-core` free of path dependencies on the AGPL crates in this workspace, or it can no longer be distributed under MIT.
+
 If your employer has policies about contributing to AGPL projects, please confirm with them before you submit a PR.
 
 ## Developer Certificate of Origin (DCO)
@@ -20,7 +22,7 @@ Contributions are accepted under the **Developer Certificate of Origin (DCO) 1.1
 
     git commit -s -m "your message"
 
-This appends `Signed-off-by: Your Name <your@email>` from your `git config user.name` / `user.email`. The DCO bot verifies the trailer on every PR commit. Your contributions are licensed inbound under the same `AGPL-3.0-or-later` as the project (inbound = outbound); you retain copyright in your contributions. No relicensing rights are granted — the apps/libraries in this repository keep no dual-/commercial-license lever (the embeddable `ui-bridge` library, which used to keep one through a CLA, is now MIT-licensed and takes contributions under the DCO as well).
+This appends `Signed-off-by: Your Name <your@email>` from your `git config user.name` / `user.email`. The DCO bot verifies the trailer on every PR commit. Your contributions are licensed inbound under the same licence as the code they change — `AGPL-3.0-or-later`, or MIT inside `rust-vision-core/` (inbound = outbound); you retain copyright in your contributions. No relicensing rights are granted — the apps/libraries in this repository keep no dual-/commercial-license lever (the embeddable `ui-bridge` library, which used to keep one through a CLA, is now MIT-licensed and takes contributions under the DCO as well).
 
 Trivial changes (typo fixes, single-line documentation tweaks) still benefit from a sign-off but the maintainer may waive it at their discretion.
 

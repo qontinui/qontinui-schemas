@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Dynamic analyzer — compares two frames and flags large pixel deltas.
 //! Pixel-level only; doesn't try to attribute changes to specific elements
 //! (that's the `elements` analyzer's job once it gets baseline support).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Pipeline stages: operations on [`Frame`](crate::Frame) plus terminal byte-emitting stages.
 
 use crate::contract::{EncodedFormat, OutputContract};

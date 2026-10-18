@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Elements analyzer — coverage + interactivity statistics over an
 //! [`ElementSnapshot`]. Pure structural; no pixels.
 

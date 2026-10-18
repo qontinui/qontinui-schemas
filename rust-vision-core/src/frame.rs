@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! [`Frame`] — an RGBA image buffer plus the metadata that says where it came from.
 
 use chrono::{DateTime, Utc};
