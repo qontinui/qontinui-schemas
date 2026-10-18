@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A DPR-2 frame, entered where every caller enters the analyzers: the public
 //! dispatcher. The colour analyzer must read the pixels a snapshot box was
 //! actually rendered on — the box's CSS coordinates times the frame's scale

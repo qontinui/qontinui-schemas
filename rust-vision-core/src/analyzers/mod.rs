@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Phase 6 vision analyzers — declarative geometry + appearance queries
 //! over a captured frame + [`crate::ElementSnapshot`].
 //!

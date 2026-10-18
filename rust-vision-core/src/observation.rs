@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! [`Observation`] — the envelope every UI Bridge observation surface
 //! answers in: WHAT was seen, or that nothing was there, or that the
 //! producer could not look — and, in every case, where the answer came from.

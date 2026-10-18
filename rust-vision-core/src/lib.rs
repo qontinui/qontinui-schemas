@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `qontinui-vision-core` — image pipeline + output contract.
 //!
 //! Composable image stages that produce bytes guaranteed to satisfy a declared
