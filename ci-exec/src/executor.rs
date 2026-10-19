@@ -1722,10 +1722,21 @@ command = ["git", "--version"]
     /// enters — `run_dispatch`: a step appends an entry to
     /// `$QONTINUI_CI_RUN_OUTCOMES`, the verdict carries it, the file lived
     /// inside the cleanup unit, and cleanup still ran. A second, invalid entry
-    /// sends nothing and leaves the verdict green.
-    #[cfg(unix)]
+    /// sends nothing and leaves the verdict green. Runs on both lanes: the
+    /// step copies a committed file to the exported path with the platform's
+    /// own shell (`sh -c cp` / `cmd /V:ON /C copy`, delayed expansion because
+    /// `%` is a banned argv character).
     #[tokio::test]
     async fn a_step_appended_outcome_reaches_the_verdict_before_cleanup() {
+        fn copy_step(file: &str) -> String {
+            if cfg!(windows) {
+                format!(
+                    "[\"cmd\", \"/V:ON\", \"/C\", \"copy /Y {file} !QONTINUI_CI_RUN_OUTCOMES!\"]"
+                )
+            } else {
+                format!("[\"sh\", \"-c\", \"cp {file} $QONTINUI_CI_RUN_OUTCOMES\"]")
+            }
+        }
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("root");
         let repo = root.join("demo");
@@ -1738,11 +1749,13 @@ command = ["git", "--version"]
         std::fs::write(repo.join("bad.jsonl"), "{\"repo\":\"forged\"}\n").unwrap();
         std::fs::write(
             repo.join(".qontinui").join("ci.toml"),
-            "version = 2\n\
-             [[jobs]]\nname = \"ok\"\n[[jobs.steps]]\nname = \"emit\"\n\
-             command = [\"sh\", \"-c\", \"cp ok.jsonl $QONTINUI_CI_RUN_OUTCOMES\"]\n\
-             [[jobs]]\nname = \"bad\"\n[[jobs.steps]]\nname = \"emit\"\n\
-             command = [\"sh\", \"-c\", \"cp bad.jsonl $QONTINUI_CI_RUN_OUTCOMES\"]\n",
+            format!(
+                "version = 2\n\
+                 [[jobs]]\nname = \"ok\"\n[[jobs.steps]]\nname = \"emit\"\ncommand = {}\n\
+                 [[jobs]]\nname = \"bad\"\n[[jobs.steps]]\nname = \"emit\"\ncommand = {}\n",
+                copy_step("ok.jsonl"),
+                copy_step("bad.jsonl")
+            ),
         )
         .unwrap();
         git(&repo, &["init", "-q", "-b", "main"]);

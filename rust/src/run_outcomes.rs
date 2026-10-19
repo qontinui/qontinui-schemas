@@ -534,7 +534,14 @@ mod tests {
 
     #[test]
     fn case_count_must_be_a_non_negative_integer() {
-        for bad in [json!(-1), json!(1.5), json!("3"), Value::Null] {
+        for bad in [
+            json!(-1),
+            json!(1.5),
+            json!("3"),
+            Value::Null,
+            // Above i64::MAX: a u64 the count column cannot hold.
+            json!(9_223_372_036_854_775_808u64),
+        ] {
             let mut e = entry();
             e["executed_case_count"] = bad.clone();
             assert_eq!(
