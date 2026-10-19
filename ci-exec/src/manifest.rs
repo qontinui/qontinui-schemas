@@ -199,6 +199,15 @@ const EXECUTOR_OWNED_ENV: &[(&str, &str)] = &[
         "nothing: the executor sets it to an empty per-dispatch directory for every step; \
          declare [model] and set `model = true` on the step to use a model",
     ),
+    // The run-outcomes output file (plan
+    // `2026-10-13-ci-node-forwards-run-outcomes-into-the-dispatch-result` F1).
+    // It sits outside the worktree and is created empty per dispatch, so a
+    // manifest pointing it anywhere else could only make a committed file
+    // read as this run's numbers.
+    (
+        crate::outcomes::RUN_OUTCOMES_ENV,
+        "the executor's run-outcomes output path (not settable)",
+    ),
     // NOTE: the SERVICE connection variables (`DATABASE_URL`, the libpq `PG*`
     // family, `REDIS_URL`/`REDIS_HOST`/`REDIS_PORT`) are executor-owned too,
     // but they are not restated here — they are derived from
@@ -2571,6 +2580,7 @@ command = ["true"]
             ("NEXTEST_TEST_THREADS", "[limits].test_threads"),
             ("CARGO_TARGET_DIR", "per-repo CI target dir"),
             ("CI", "always exports CI=true"),
+            ("QONTINUI_CI_RUN_OUTCOMES", "run-outcomes output path"),
         ] {
             let text = format!(
                 "version = 1\n[[steps]]\nname = \"x\"\ncommand = [\"true\"]\nenv = {{ {key} = \"4\" }}\n"
