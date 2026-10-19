@@ -24,7 +24,6 @@ use crate::canonical::Outcome as CanonicalOutcome;
 use crate::host::BoxFuture;
 use crate::junit::TestArtifact;
 use crate::model::ledger::{ModelLedger, ModelSection};
-use qontinui_types::run_outcomes::RunOutcomeEntry;
 
 /// A run's final conclusion, in the wire vocabulary coord's result route and
 /// a GitHub check run both speak.
@@ -74,13 +73,6 @@ pub struct Verdict<'a> {
     /// parameter with a default is exactly how the artifact went missing
     /// before.
     pub test_results: Option<&'a TestArtifact>,
-    /// This run's validated `run_outcomes` entries (plan
-    /// `2026-10-13-ci-node-forwards-run-outcomes-into-the-dispatch-result`).
-    /// `None` is spelled at every exit that has none — no step ran, the file
-    /// held nothing, or it was invalid (the reason is on the log). A coord
-    /// reporter sends it as the result POST's `run_outcomes` field; a reporter
-    /// with no coord logs it and forwards nothing.
-    pub run_outcomes: Option<&'a [RunOutcomeEntry]>,
     /// The canonical-configuration verdict. `None` means the gate had not run
     /// yet at this exit (the manifest was not even parsed), which a reporter
     /// renders as `not_evaluated` — a different statement from
@@ -211,7 +203,6 @@ mod tests {
                 steps: &steps,
                 reason: Some("why"),
                 test_results: None,
-                run_outcomes: None,
                 canonical: None,
                 model: &ModelSection::NotEvaluated,
                 model_ledger: None,

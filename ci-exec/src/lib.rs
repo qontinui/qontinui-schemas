@@ -19,7 +19,6 @@
 //! | [`tools`] | the closed tool registry and its version-keyed cache |
 //! | [`services`] | the closed container-service registry and its lifecycle |
 //! | [`junit`] | capturing a run's test report before cleanup removes it |
-//! | [`outcomes`] | capturing a run's `run_outcomes` entries before cleanup removes them |
 //! | [`host_sizing`] | build/test parallelism sized from the host |
 //! | [`canonical`] | the `[canonical]` toolchain gate |
 //! | [`dispatch`] | the dispatch payload and the [`dispatch::Admission`] seam |
@@ -47,7 +46,6 @@ pub mod import;
 pub mod junit;
 pub mod manifest;
 pub mod model;
-pub mod outcomes;
 pub mod report;
 pub mod services;
 #[cfg(feature = "import")]

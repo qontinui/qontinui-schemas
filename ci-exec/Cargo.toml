@@ -39,9 +39,6 @@ import = ["dep:serde_yaml_ng"]
 bytes = "1"
 flate2 = "1"
 hex = "0.4"
-# The run-outcomes validator coord itself runs (plan
-# `2026-10-13-ci-node-forwards-run-outcomes-into-the-dispatch-result` F2).
-qontinui-types = { path = "../rust" }
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -60,7 +57,7 @@ tokio-util = "0.7"
 toml = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
-zip = "8"
+zip = "9"
 
 [target.'cfg(unix)'.dependencies]
 # killpg for the standalone host's child-tree reaper.
