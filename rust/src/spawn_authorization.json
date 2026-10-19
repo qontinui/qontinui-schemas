@@ -58,6 +58,11 @@
       "agent_name": "onboarding_audit",
       "spawn_path": "standing_continuation",
       "purpose": "Audit a newly connected repo to propose a starter merge profile."
+    },
+    {
+      "agent_name": "operator_page_remediation",
+      "spawn_path": "standing_continuation",
+      "purpose": "Dispatch the steward that owns a paged condition to make one alert-bound pass (`/merge-train-steward` or `/dev-ops-steward` `--respond-to-alert <id> --once`) before the operator page names it."
     }
   ],
   "class_seeds": [
