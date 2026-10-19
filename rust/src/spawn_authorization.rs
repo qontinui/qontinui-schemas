@@ -420,6 +420,20 @@ mod tests {
         );
     }
 
+    /// The operator pager's remediation dispatch outlives the request that
+    /// started it, so it must sit under the standing-continuation class —
+    /// the counts above would not notice it moving to another path.
+    #[test]
+    fn operator_page_remediation_is_a_standing_continuation() {
+        let c = contract();
+        let k = c
+            .kind_seeds
+            .iter()
+            .find(|k| k.agent_name == "operator_page_remediation")
+            .expect("operator_page_remediation is seeded");
+        assert_eq!(k.spawn_path, "standing_continuation");
+    }
+
     /// Every seeded key is unique and every kind's path is a declared path.
     #[test]
     fn seeded_keys_are_well_formed() {
