@@ -223,6 +223,7 @@ from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
+from .per_type.image_slot_spec import ImageSlotSpec
 from .per_type.implement_fixes_config import ImplementFixesConfig
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
@@ -806,6 +807,7 @@ __all__ = [
     "HttpConfig",
     "HttpMethod",
     "IdleCondition",
+    "ImageSlotSpec",
     "ImplementFixesConfig",
     "IndividualCheckResult",
     "InitialStateRef",
