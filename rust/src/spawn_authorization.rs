@@ -354,7 +354,7 @@ mod tests {
     #[test]
     fn the_embedded_contract_parses_and_validates() {
         let c = contract();
-        assert_eq!(c.kind_seeds.len(), 9, "the nine coord spawn kinds");
+        assert_eq!(c.kind_seeds.len(), 10, "the ten coord spawn kinds");
         assert_eq!(c.spawn_paths.len(), 3);
         assert_eq!(c.dispositions, vec!["block", "degrade", "warn_proceed"]);
     }
@@ -425,7 +425,7 @@ mod tests {
     fn seeded_keys_are_well_formed() {
         let c = contract();
         let keys = c.seeded_keys();
-        assert_eq!(keys.len(), 9 + 2, "9 kinds + 2 seeded classes");
+        assert_eq!(keys.len(), 10 + 2, "10 kinds + 2 seeded classes");
         for (_, path) in &keys {
             assert!(c.spawn_paths.contains(path), "unknown path {path}");
         }
