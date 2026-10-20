@@ -169,6 +169,9 @@ pub mod rag;
 /// The next-action contract: [`refusal::Refusal`], one envelope for every
 /// operator-facing refusal, whose `next_action` is typed and never absent.
 pub mod refusal;
+/// The `run_outcomes` wire contract of coord's CI result door and its one
+/// validator, shared by coord and the CI executor.
+pub mod run_outcomes;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
