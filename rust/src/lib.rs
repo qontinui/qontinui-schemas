@@ -70,6 +70,11 @@ pub mod apps;
 /// a host's verdicts). No I/O. See
 /// `2026-10-06-builds-are-admitted-per-invocation-against-measured-host-memory.md`.
 pub mod build_admission;
+/// Build census — the PURE core that classifies who owns a build, rolls
+/// builds up per owner class, and attributes a stalled host's capacity to a
+/// class on positive evidence only. No I/O. See
+/// `2026-10-21-every-build-on-a-box-has-an-owner-a-cost-and-a-bound.md`.
+pub mod build_census;
 pub mod canonical_hash;
 /// Per-CLI AI-session handling — the [`cli_session::CliProfile`] manifest (one
 /// record of session-behaviour facts per AI CLI), the
