@@ -185,8 +185,8 @@ pub fn share(cap: HostCapacity, n: u32) -> HostCapacity {
 /// This is `derive(share(cap, others + 1)).cargo_build_jobs`: the host is split
 /// evenly across every build running at once (this one plus `others`) and the
 /// build sizes itself against its share — so `others = 0` is the whole-host
-/// answer, and the job counts of N concurrent builds sum to no more than the
-/// host's cores (plan `2026-10-02-cargo-jobs-…`, design decision D1, options
+/// answer, and while N <= cpus the job counts of N concurrent builds sum to no
+/// more than the host's cores; past that every build still gets 1 job (plan `2026-10-02-cargo-jobs-…`, design decision D1, options
 /// B/C). Every floor of [`derive`] applies to the share: unreadable memory
 /// yields 1, a share at or below 8 GiB yields 1, and the answer is never 0.
 ///

@@ -57,3 +57,8 @@ ci-exec/tests/fixtures/** text eol=lf
 # Rust half on every Windows box for a reason unrelated to the contract.
 # `-text` checks them out byte-for-byte; the committed blobs are LF already.
 tests/fixtures/bounded_read_meta_*.json -text
+
+# The cargo build-jobs golden table (rust/tests/build_jobs_golden.rs). Its sha256
+# is pinned in qontinui-claude-config (scripts/lib/build-jobs-golden.tsv.sha256),
+# so a CRLF checkout must not change its bytes.
+rust/tests/fixtures/build-jobs-golden.tsv -text

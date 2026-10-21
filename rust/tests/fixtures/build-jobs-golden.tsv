@@ -1,5 +1,6 @@
 # build-jobs golden table: mem_bytes	cpus	others	jobs	note
 # jobs = cargo_build_jobs of derive(share(host, others+1)); mem_bytes 'unknown' = unreadable memory
+# Keep every value inside bash's signed 64-bit integer range: the bash engine reads these rows too.
 unknown	64	0	1	unknown memory -> 1
 0	64	0	1	zero memory reads as unknown -> 1
 7516192768	8	0	1	small host pinned to 1
@@ -16,3 +17,8 @@ unknown	64	0	1	unknown memory -> 1
 396000000000	48	11	4	merytshost 12-way share
 396000000000	48	47	1	merytshost 48-way share hits small-share pin
 68719476736	4	11	1	more builds than cores keeps 1
+8589934593	64	0	2	one byte over the 8 GiB pin -> 2
+137438953472	32	2	10	cpus share rounds down: 32 / 3 = 10
+17179869185	64	1	1	memory share rounds down to exactly 8 GiB -> pinned 1
+unknown	64	3	1	unknown memory with others stays 1
+5	8	9	1	memory share floors to 0 -> reads as unknown -> 1
