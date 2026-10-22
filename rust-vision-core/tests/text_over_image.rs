@@ -996,11 +996,14 @@ fn a_panel_moving_just_under_the_text_is_unknown() {
     let moved = alt_twin("panel", "text_hidden_moved");
     let r = c.assert_with(Some(&moved), Some(4.5), None);
     assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    let d = r.detail.as_deref().unwrap();
+    assert!(d.contains("displaced"), "{d}");
+    // The refusal names where, so a producer can find the moving thing.
     assert!(
-        r.detail.as_deref().unwrap().contains("displaced"),
-        "{:?}",
-        r.detail
+        d.contains("right beside the text, the first at buffer px ("),
+        "{d}"
     );
+    assert!(d.contains("pause animations"), "{d}");
     let control = c.assert_aa();
     assert_ne!(
         control.outcome,
@@ -1115,4 +1118,57 @@ fn a_reported_hide_list_decides_which_text_is_measured() {
     .unwrap();
     let tc = v.images[0].text_contrast.as_ref().unwrap();
     assert_eq!(tc.status(), ObservationStatus::Unknown);
+}
+
+// ---------------------------------------------------------------- final
+
+/// A true hairline face: no ink pixel reaches 50% coverage (here every glyph
+/// pixel is 45% white over a dark card). The coverage floor is relative to
+/// the mask's best-covered pixel, so it is measured, not Unknown.
+#[test]
+fn a_hairline_face_whose_ink_peaks_under_half_coverage_is_measured() {
+    let (w, h) = (200u32, 100u32);
+    let bg = 60u8;
+    let b = image::RgbaImage::from_pixel(w, h, image::Rgba([bg, bg, bg, 255]));
+    let mut a = b.clone();
+    // 45% coverage of white over 60: 60 + 0.45 * 195 = 148.
+    let ink = image::Rgba([148, 148, 148, 255]);
+    for (x0, y0, sw, sh) in [
+        (20u32, 40u32, 1u32, 16u32),
+        (30, 40, 1, 16),
+        (20, 47, 11, 1),
+        (50, 40, 1, 16),
+        (60, 40, 1, 16),
+        (50, 40, 11, 1),
+    ] {
+        for y in y0..y0 + sh {
+            for x in x0..x0 + sw {
+                a.put_pixel(x, y, ink);
+            }
+        }
+    }
+    let text = Element {
+        id: "label".into(),
+        bbox: Some(Region {
+            x: 14,
+            y: 34,
+            w: 56,
+            h: 28,
+        }),
+        text: Some("HH".into()),
+        fg_color: Some(Rgb::new(255, 255, 255)),
+        ..Default::default()
+    };
+    let c = Case {
+        a: Frame::from_rgba(a, FrameSource::synthetic_now()),
+        b: Frame::from_rgba(b, FrameSource::synthetic_now()),
+        snap: ElementSnapshot {
+            elements: vec![hero(Region { x: 0, y: 0, w, h }), text],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_ne!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    let v = c.reading();
+    assert!(v.sampled_px >= 60, "{v:?}");
 }
