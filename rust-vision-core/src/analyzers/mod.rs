@@ -460,12 +460,20 @@ impl From<AnalyzerResultWire> for AnalyzerResult {
 /// `layout` works with snapshot-only, `dynamic` works with frame(s)
 /// only — but the run() dispatcher accepts both so callers don't have to
 /// pre-route.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AnalyzeInput<'a> {
     pub frame: Option<&'a Frame>,
     pub snapshot: Option<&'a ElementSnapshot>,
     /// Optional second frame (for `dynamic` analyzer: diff vs this).
     pub prior_frame: Option<&'a Frame>,
+    /// Optional text-hidden twin of `frame`: the same page and snapshot,
+    /// captured with the text made transparent (the SDK's dev-only
+    /// `control/text-visibility`). Read only by [`Analyzer::Image`] for
+    /// [`image::ImageElementValues::text_contrast`] (plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16). It must
+    /// share `frame`'s size and scale factor; see
+    /// [`image::text_contrast::pair_frames`].
+    pub text_hidden_frame: Option<&'a Frame>,
 }
 
 /// Dispatcher. Calls the named analyzer with whatever it needs from
@@ -543,7 +551,7 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
         // a finding (the Blocked verdict itself is what a gate reads). A
         // missing snapshot is not a block — see `image::run`.
         Analyzer::Image => match input.frame {
-            Some(f) => image::run(f, input.snapshot),
+            Some(f) => image::run(f, input.snapshot, input.text_hidden_frame),
             None => missing_input_at(
                 "image analyzer requires a Frame: every value it measures is read from pixels",
                 input.snapshot,

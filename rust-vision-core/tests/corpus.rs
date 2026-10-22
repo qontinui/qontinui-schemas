@@ -116,6 +116,7 @@ fn check_one(stem: &str, frame_path: &Path, golden_path: &Path) -> Result<(), St
         frame: None,
         snapshot: Some(&snapshot),
         prior_frame: None,
+        text_hidden_frame: None,
     };
 
     for (analyzer_name, expectation) in &golden.analyzers {

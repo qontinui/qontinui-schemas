@@ -68,3 +68,8 @@ rust/tests/fixtures/build-jobs-golden.tsv -text
 # expected_hashes.json, so no checkout may touch their bytes.
 rust-vision-core/tests/fixtures/image_corpus/*.png binary
 rust-vision-core/tests/fixtures/image_corpus/*.jpg binary
+
+# The text-over-image frame pairs (rust-vision-core/tests/text_over_image.rs).
+# Their pixels are the test data: frame A and frame B must differ exactly
+# where the glyphs paint, so no checkout may touch their bytes.
+rust-vision-core/tests/fixtures/text_over_image/*.png binary

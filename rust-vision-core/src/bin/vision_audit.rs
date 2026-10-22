@@ -19,14 +19,20 @@
 //! | 1    | usage / IO / parse error                                      |
 //!
 //! Modes:
-//!   * `vision-audit analyze  --snapshot S [--frame F --scale-factor N] [--analyzer A] [--fail-on L]`
-//!   * `vision-audit assert   --snapshot S [--frame F --scale-factor N] --assertions A [--baseline-dir D]`
+//!   * `vision-audit analyze  --snapshot S [--frame F --scale-factor N [--frame-text-hidden T]] [--analyzer A] [--fail-on L]`
+//!   * `vision-audit assert   --snapshot S [--frame F --scale-factor N [--frame-text-hidden T]] --assertions A [--baseline-dir D]`
 //!   * `vision-audit baseline --snapshot S --name N --baseline-dir D`
 //!
 //! A frame always travels with its scale factor: snapshot bboxes are CSS
 //! pixels, the frame is device pixels, and the analyzers map one onto the
 //! other through `FrameSource::scale_factor`. The report echoes the frame it
 //! analyzed (`frame: {width, height, scaleFactor}`, or `null`).
+//!
+//! `--frame-text-hidden` is the same page captured with its text hidden
+//! (plan 2026-10-13-image-generation-and-visual-judgment, Phase 16), read at
+//! the same `--scale-factor`. It feeds the image analyzer's per-image
+//! `textContrast` value and the `text_over_image_contrast` assertion, and is
+//! echoed as `frameTextHidden` (or `null`).
 //!
 //! SCOPE: OCR / VLM clients live runner-side; this bin runs the snapshot-text
 //! path only and emits an `ocr_unavailable` note rather than pretending to OCR.
@@ -79,8 +85,8 @@ const USAGE: &str = "\
 vision-audit — runner-less vision analyzer / assertion gate for CI
 
 USAGE:
-    vision-audit analyze  --snapshot <file> [--frame <file> --scale-factor <n>] [--analyzer <a>] [--fail-on <level>]
-    vision-audit assert   --snapshot <file> [--frame <file> --scale-factor <n>] --assertions <file> [--baseline-dir <dir>]
+    vision-audit analyze  --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file>]] [--analyzer <a>] [--fail-on <level>]
+    vision-audit assert   --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file>]] --assertions <file> [--baseline-dir <dir>]
     vision-audit baseline --snapshot <file> --name <name> --baseline-dir <dir>
 
 FRAME:
@@ -92,6 +98,12 @@ FRAME:
                     REQUIRED with --frame, refused without one. Snapshot bboxes are
                     CSS pixels and every pixel read maps them onto the frame
                     through this value; the report echoes it as frame.scaleFactor.
+    --frame-text-hidden  The same page captured with its text hidden (UI Bridge
+                    control/text-visibility), read at the same --scale-factor.
+                    Optional, and only with --frame. The glyphs of text over an
+                    image are where the two frames differ; text_over_image_contrast
+                    answers unknown (needs_multi_frame_input) without it, and the
+                    image analyzer's textContrast value too. Echoed as frameTextHidden.
 
 ANALYZE:
     --analyzer   layout | typography | color | elements | image | all   (default: all)
@@ -323,6 +335,23 @@ fn load_frame_flags(flags: &HashMap<String, String>) -> Result<Option<Frame>, Cl
     }
 }
 
+/// `--frame-text-hidden`: the frame's text-hidden twin, read at the frame's
+/// scale factor. Refused without `--frame` — a twin of nothing. Whether it
+/// PAIRS with the frame (one size) is the library's question, not a usage
+/// error: the image value and the assertion answer unknown with the reason.
+fn load_text_hidden_flag(
+    flags: &HashMap<String, String>,
+    frame: Option<&Frame>,
+) -> Result<Option<Frame>, CliError> {
+    match (flags.get("frame-text-hidden"), frame) {
+        (None, _) => Ok(None),
+        (Some(path), Some(f)) => Ok(Some(load_frame(Path::new(path), f.source.scale_factor)?)),
+        (Some(_), None) => Err(CliError::usage(
+            "--frame-text-hidden is the text-hidden twin of --frame, and no --frame was given",
+        )),
+    }
+}
+
 /// What a report says about the frame it analyzed: `null` on the wire when
 /// there was none, so a reader can tell "no pixels were read" from silence.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -413,7 +442,14 @@ fn parse_analyzer(value: Option<&str>) -> Result<Vec<Analyzer>, String> {
 fn run_analyze(args: &[String]) -> Result<u8, CliError> {
     let flags = parse_flags(
         args,
-        &["snapshot", "frame", "scale-factor", "analyzer", "fail-on"],
+        &[
+            "snapshot",
+            "frame",
+            "scale-factor",
+            "frame-text-hidden",
+            "analyzer",
+            "fail-on",
+        ],
     )?;
     let snapshot = load_snapshot(Path::new(require(&flags, "snapshot")?))?;
     // `--frame` is OPTIONAL. Three of the six analyzers — layout,
@@ -424,12 +460,18 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
     // or a headless probe holding a snapshot and no screenshot. When it IS
     // given, `--scale-factor` must come with it — see `load_frame_flags`.
     let frame = load_frame_flags(&flags)?;
+    let text_hidden = load_text_hidden_flag(&flags, frame.as_ref())?;
     let analyzers_to_run =
         parse_analyzer(flags.get("analyzer").map(String::as_str)).map_err(CliError::usage)?;
     let fail_on =
         parse_fail_on(flags.get("fail-on").map(String::as_str)).map_err(CliError::usage)?;
 
-    let report = analyze(&snapshot, frame.as_ref(), &analyzers_to_run);
+    let report = analyze_frames(
+        &snapshot,
+        frame.as_ref(),
+        text_hidden.as_ref(),
+        &analyzers_to_run,
+    );
     let exit = analyze_exit_code(&report, fail_on);
 
     println!(
@@ -472,6 +514,8 @@ pub struct AnalyzeReport {
     /// The frame the pixel analyzers read, or `null` when none was given —
     /// its size and the scale factor every CSS-pixel bbox was mapped through.
     frame: Option<FrameEcho>,
+    /// The text-hidden twin of `frame` (`--frame-text-hidden`), or `null`.
+    frame_text_hidden: Option<FrameEcho>,
     /// Which snapshot these findings describe — echoed verbatim from
     /// [`ElementSnapshot::snapshot_id`], exactly as [`AssertReport`] does.
     /// The two report shapes are the same surface to a caller, so attribution
@@ -501,10 +545,22 @@ pub fn analyze(
     frame: Option<&Frame>,
     which: &[Analyzer],
 ) -> AnalyzeReport {
+    analyze_frames(snapshot, frame, None, which)
+}
+
+/// [`analyze`] with the frame's text-hidden twin (`--frame-text-hidden`),
+/// which only the image analyzer reads.
+pub fn analyze_frames(
+    snapshot: &ElementSnapshot,
+    frame: Option<&Frame>,
+    text_hidden: Option<&Frame>,
+    which: &[Analyzer],
+) -> AnalyzeReport {
     let input = AnalyzeInput {
         frame,
         snapshot: Some(snapshot),
         prior_frame: None,
+        text_hidden_frame: text_hidden,
     };
     let mut findings = HashMap::new();
     let mut verdicts = HashMap::new();
@@ -539,6 +595,7 @@ pub fn analyze(
         total,
         counts,
         frame: FrameEcho::of(frame),
+        frame_text_hidden: FrameEcho::of(text_hidden),
         snapshot_id: snapshot.snapshot_id.clone(),
         image_values,
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
@@ -611,6 +668,12 @@ fn analyze_summary(report: &AnalyzeReport, fail_on: Option<u8>, exit: u8) -> Str
     // reading one sentence rather than two dialects of it.
     lines.push(format!("  coverage: {}", report.coverage.summary()));
     lines.push(FrameEcho::summary(report.frame.as_ref()));
+    if let Some(t) = report.frame_text_hidden.as_ref() {
+        lines.push(format!(
+            "  frame-text-hidden: {}x{} px at scale factor {}",
+            t.width, t.height, t.scale_factor
+        ));
+    }
     // Name every analyzer that did not reach a conclusion, and why. Ordered
     // so the same run prints the same lines — a HashMap iteration order in a
     // CI log is a diff nobody can read.
@@ -668,6 +731,7 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
             "snapshot",
             "frame",
             "scale-factor",
+            "frame-text-hidden",
             "assertions",
             "baseline-dir",
         ],
@@ -681,13 +745,20 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
     // consult. Given, it is paired with `--scale-factor` exactly as in
     // `analyze`.
     let frame = load_frame_flags(&flags)?;
+    let text_hidden = load_text_hidden_flag(&flags, frame.as_ref())?;
     let assertions = load_assertions(Path::new(require(&flags, "assertions")?))?;
     let baselines = match flags.get("baseline-dir") {
         Some(dir) => load_baselines(Path::new(dir))?,
         None => HashMap::new(),
     };
 
-    let report = assert_all(&snapshot, frame.as_ref(), &assertions, &baselines);
+    let report = assert_all_frames(
+        &snapshot,
+        frame.as_ref(),
+        text_hidden.as_ref(),
+        &assertions,
+        &baselines,
+    );
     let exit = if report.all_passed {
         EXIT_OK
     } else {
@@ -744,6 +815,8 @@ pub struct AssertReport {
     results: Vec<AssertionResult>,
     /// The frame handed to the evaluators, or `null` — see [`AnalyzeReport`].
     frame: Option<FrameEcho>,
+    /// The text-hidden twin handed to the evaluators, or `null`.
+    frame_text_hidden: Option<FrameEcho>,
     /// Which snapshot this verdict judged — echoed verbatim from
     /// [`ElementSnapshot::snapshot_id`]. `None` when the snapshot carried no
     /// id, which is the honest answer: the verdict is real but unattributable,
@@ -761,9 +834,22 @@ pub fn assert_all(
     assertions: &[Assertion],
     baselines: &HashMap<String, BaselineEntry>,
 ) -> AssertReport {
+    assert_all_frames(snapshot, frame, None, assertions, baselines)
+}
+
+/// [`assert_all`] with the frame's text-hidden twin (`--frame-text-hidden`),
+/// which only `text_over_image_contrast` reads.
+pub fn assert_all_frames(
+    snapshot: &ElementSnapshot,
+    frame: Option<&Frame>,
+    text_hidden: Option<&Frame>,
+    assertions: &[Assertion],
+    baselines: &HashMap<String, BaselineEntry>,
+) -> AssertReport {
     let ctx = EvalContext {
         snapshot: Some(snapshot),
         frame,
+        text_hidden_frame: text_hidden,
         ocr_blocks: None, // runner-side only
         baselines: Some(baselines),
     };
@@ -786,6 +872,7 @@ pub fn assert_all(
         unknown,
         results,
         frame: FrameEcho::of(frame),
+        frame_text_hidden: FrameEcho::of(text_hidden),
         snapshot_id: snapshot.snapshot_id.clone(),
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
                      contains_text uses snapshot text"
@@ -813,6 +900,12 @@ fn assert_summary(report: &AssertReport) -> String {
         lines.push(format!("  snapshot: {}", display_snapshot_id(id)));
     }
     lines.push(FrameEcho::summary(report.frame.as_ref()));
+    if let Some(t) = report.frame_text_hidden.as_ref() {
+        lines.push(format!(
+            "  frame-text-hidden: {}x{} px at scale factor {}",
+            t.width, t.height, t.scale_factor
+        ));
+    }
     // Label the two red kinds apart. A reader triaging a red gate needs to
     // know which lines send them to the UI and which send them to the
     // producer; before the tri-state both said FAIL.
@@ -2017,5 +2110,171 @@ mod tests {
         );
         let r = assert_all(&snap, Some(&frame), &[a], &HashMap::new());
         assert_eq!(r.failed, 1, "{:?}", r.results[0].detail);
+    }
+
+    // ---- --frame-text-hidden (plan Phase 16) ----
+
+    /// A fixture pair from `tests/fixtures/text_over_image/`, written out as a
+    /// snapshot the CLI reads: the hero image and the heading over it.
+    fn text_over_image_inputs(dir: &Path, case: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/text_over_image");
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(fixtures.join("manifest.json")).unwrap())
+                .unwrap();
+        let c = &manifest["cases"][case];
+        let snap = serde_json::json!({"elements": [
+            {"id": "hero", "bbox": c["image"],
+             "media": {"kind": "img", "object_fit": "fill"}},
+            {"id": "heading", "bbox": c["text"], "text": manifest["text"],
+             "fg_color": {"r": c["fg"][0], "g": c["fg"][1], "b": c["fg"][2]}},
+        ]});
+        let snap_path = dir.join(format!("{case}.json"));
+        std::fs::write(&snap_path, serde_json::to_vec(&snap).unwrap()).unwrap();
+        (
+            snap_path,
+            fixtures.join(c["frame"].as_str().unwrap()),
+            fixtures.join(c["text_hidden"].as_str().unwrap()),
+        )
+    }
+
+    fn text_over_image_args(
+        mode: &str,
+        snap: &Path,
+        frame: &Path,
+        hidden: Option<&Path>,
+        dir: &Path,
+    ) -> Vec<String> {
+        let mut args = vec![
+            s(mode),
+            s("--snapshot"),
+            snap.display().to_string(),
+            s("--frame"),
+            frame.display().to_string(),
+            s("--scale-factor"),
+            s("1"),
+        ];
+        if let Some(h) = hidden {
+            args.extend([s("--frame-text-hidden"), h.display().to_string()]);
+        }
+        if mode == "assert" {
+            let spec = dir.join("toic.json");
+            std::fs::write(
+                &spec,
+                br#"[{"type":"text_over_image_contrast","min_ratio":4.5}]"#,
+            )
+            .unwrap();
+            args.extend([s("--assertions"), spec.display().to_string()]);
+        } else {
+            args.extend([s("--analyzer"), s("all"), s("--fail-on"), s("critical")]);
+        }
+        args
+    }
+
+    #[test]
+    fn the_usage_names_the_text_hidden_flag() {
+        assert!(USAGE.contains("[--frame-text-hidden <file>]"));
+    }
+
+    #[test]
+    fn a_text_hidden_frame_without_a_frame_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (snap, _, hidden) = text_over_image_inputs(dir.path(), "scrim");
+        let args = vec![
+            s("analyze"),
+            s("--snapshot"),
+            snap.display().to_string(),
+            s("--frame-text-hidden"),
+            hidden.display().to_string(),
+        ];
+        assert!(matches!(run(&args), Err(CliError::Usage(m)) if m.contains("no --frame")));
+    }
+
+    /// End to end through the CLI: the low-contrast overlay gates (exit 2),
+    /// the scrim passes (exit 0), and without the twin the assertion is not a
+    /// pass (exit 2, outcome unknown).
+    #[test]
+    fn assert_reads_the_text_hidden_frame() {
+        let dir = tempfile::tempdir().unwrap();
+        for (case, hidden, want) in [
+            ("low_contrast", true, EXIT_GATE_FAILED),
+            ("scrim", true, EXIT_OK),
+            ("scrim", false, EXIT_GATE_FAILED),
+        ] {
+            let (snap, a, b) = text_over_image_inputs(dir.path(), case);
+            let args = text_over_image_args(
+                "assert",
+                &snap,
+                &a,
+                hidden.then_some(b.as_path()),
+                dir.path(),
+            );
+            assert_eq!(run(&args).unwrap(), want, "{case} hidden={hidden}");
+        }
+        let (snap, a, b) = text_over_image_inputs(dir.path(), "low_contrast");
+        let report = assert_all_frames(
+            &load_snapshot(&snap).unwrap(),
+            Some(&load_frame(&a, 1.0).unwrap()),
+            Some(&load_frame(&b, 1.0).unwrap()),
+            &parse_assertions(br#"[{"type":"text_over_image_contrast","min_ratio":4.5}]"#).unwrap(),
+            &HashMap::new(),
+        );
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire["results"][0]["outcome"], "failed");
+        assert_eq!(
+            wire["frameTextHidden"],
+            serde_json::json!({"width": 320, "height": 180, "scaleFactor": 1.0})
+        );
+    }
+
+    /// The no-gating rule: `analyze --analyzer all --fail-on critical` exits
+    /// the same with and without `--frame-text-hidden` — on a failing overlay,
+    /// a passing scrim, and a twin of the wrong size — and the image analyzer
+    /// stays conclusive and Info-only.
+    #[test]
+    fn the_text_hidden_frame_newly_fails_no_style_gate_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let critical = parse_fail_on(Some("critical")).unwrap();
+        let all = parse_analyzer(Some("all")).unwrap();
+        for case in ["low_contrast", "scrim"] {
+            let (snap_path, a, b) = text_over_image_inputs(dir.path(), case);
+            let snap = load_snapshot(&snap_path).unwrap();
+            let frame = load_frame(&a, 1.0).unwrap();
+            let twin = load_frame(&b, 1.0).unwrap();
+            let wrong = Frame::from_rgba(
+                image::imageops::crop_imm(&twin.buffer, 0, 0, 50, 50).to_image(),
+                FrameSource::synthetic_now(),
+            );
+            let without = analyze_exit_code(&analyze(&snap, Some(&frame), &all), critical);
+            for t in [&twin, &wrong] {
+                let report = analyze_frames(&snap, Some(&frame), Some(t), &all);
+                assert_eq!(analyze_exit_code(&report, critical), without, "{case}");
+                assert!(report.verdicts["image"].conclusive());
+                assert!(report.findings["image"]
+                    .iter()
+                    .all(|f| f.severity == Severity::Info));
+            }
+            // And through the CLI's own flag handling.
+            let args = text_over_image_args("analyze", &snap_path, &a, Some(&b), dir.path());
+            assert_eq!(run(&args).unwrap(), without, "{case} via the CLI");
+        }
+    }
+
+    /// `AnalyzeReport` forwards the per-image `textContrast` value.
+    #[test]
+    fn the_analyze_report_forwards_text_contrast() {
+        let dir = tempfile::tempdir().unwrap();
+        let (snap, a, b) = text_over_image_inputs(dir.path(), "scrim");
+        let report = analyze_frames(
+            &load_snapshot(&snap).unwrap(),
+            Some(&load_frame(&a, 1.0).unwrap()),
+            Some(&load_frame(&b, 1.0).unwrap()),
+            &[Analyzer::Image],
+        );
+        let wire = serde_json::to_value(&report).unwrap();
+        let tc = &wire["imageValues"]["images"][0]["textContrast"];
+        assert_eq!(tc["status"], "measured", "{tc}");
+        assert_eq!(tc["value"][0]["element"], "heading");
+        assert_eq!(tc["value"][0]["method"], "glyph_mask");
+        assert!(tc["value"][0]["percentileRatio"].as_f64().unwrap() > 4.5);
     }
 }

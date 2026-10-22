@@ -8,10 +8,15 @@
 //! system or a slot spec, and an undeclared threshold answers
 //! `Unknown{input_missing}` — never a pass.
 //!
+//! [`Assertion::TextOverImageContrast`] (Phase 16) lives here too: it reads
+//! [`EvalContext::frame`] and its text-hidden twin, and measures through
+//! [`crate::analyzers::image::text_contrast`].
+//!
 //! Confidence: see [`AssertionResult::confidence`]. Each evaluator that
 //! reads pixels sets it; each one's doc says what scales it.
 
 use super::{missing_operand, require_snapshot, Assertion, AssertionResult, EvalContext};
+use crate::analyzers::image::text_contrast::{self as tc, TextOverImageContrast};
 use crate::analyzers::image::{self as img, pixels, Crop, NaturalRegion};
 use crate::element_media::{ElementMedia, MediaKind};
 use crate::element_snapshot::{region_contains, Element, ElementSnapshot, Rgb};
@@ -43,6 +48,10 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             element,
             max_blockiness,
         } => blockiness_within(a, &element, max_blockiness, ctx),
+        Assertion::TextOverImageContrast {
+            min_ratio,
+            percentile,
+        } => text_over_image(a, min_ratio, percentile, ctx),
         other => unreachable!("not an image assertion: {other:?}"),
     }
 }
@@ -790,4 +799,133 @@ fn blockiness_within(
     } else {
         AssertionResult::pass_with(a, format!("'{id}' blockiness {v:.2}")).with_confidence(conf)
     }
+}
+
+/// Confidence: the deciding reading's on a failure (the worst text over an
+/// image); the lowest reading's on a pass, which rests on all of them. Each
+/// reading's confidence is [`TextOverImageContrast::confidence`].
+///
+/// Checked in this order, each an Unknown: `min_ratio` declared and finite;
+/// the percentile in 0..=100; the text-hidden frame present
+/// (`needs_multi_frame_input`); the frame present; the two paired (one size,
+/// one scale factor); a snapshot. Text over an unrendered or unreadable
+/// image, or reported not visible itself, is skipped and disclosed; text
+/// whose box touches an image while its glyphs do not is not text over it.
+fn text_over_image(
+    a: Assertion,
+    min_ratio: Option<f64>,
+    percentile: Option<f64>,
+    ctx: &EvalContext<'_>,
+) -> AssertionResult {
+    let min = tri!(threshold(&a, min_ratio, "min_ratio"));
+    let pct = match tc::valid_percentile(percentile.unwrap_or(tc::DEFAULT_PERCENTILE)) {
+        Ok(p) => p,
+        Err((code, detail)) => return AssertionResult::unknown(a, code, detail),
+    };
+    let Some(hidden) = ctx.text_hidden_frame else {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::NeedsMultiFrameInput,
+            "no text-hidden frame supplied: the glyphs are found only where the frame and a \
+             capture of the same page with its text hidden differ, so no contrast was measured",
+        );
+    };
+    let frame = tri!(require_frame(&a, ctx));
+    if let Err((code, detail)) = tc::pair_frames(frame, hidden) {
+        return AssertionResult::unknown(a, code, detail);
+    }
+    let snap = tri!(require_snapshot(ctx, &a));
+    let page = tc::page_pairs(snap);
+    let mut readings: Vec<TextOverImageContrast> = Vec::new();
+    let mut not_over = 0usize;
+    let mut unmeasured = Vec::new();
+    for p in &page.pairs {
+        match tc::measure(frame, hidden, p, pct) {
+            Ok(Some(r)) => readings.push(r),
+            Ok(None) => not_over += 1,
+            Err((_, why)) => unmeasured.push(why),
+        }
+    }
+    let mut note = page.note();
+    if not_over > 0 {
+        note.push_str(&format!(
+            " ({not_over} text box(es) touch an image while their glyphs do not reach it)"
+        ));
+    }
+    let worst = readings
+        .iter()
+        .min_by(|x, y| x.percentile_ratio.total_cmp(&y.percentile_ratio));
+    let describe = |r: &TextOverImageContrast| {
+        format!(
+            "p{} {:.2}:1, minimum {:.2}:1 over {} {} pixel(s) against its {} glyph colour \
+             rgb({},{},{})",
+            r.percentile,
+            r.percentile_ratio,
+            r.min_ratio,
+            r.sampled_px,
+            match r.method {
+                tc::SampleMethod::GlyphMask => "glyph",
+                tc::SampleMethod::BboxFallback => "box (no usable glyph mask: fallback)",
+            },
+            match r.glyph_colour_source {
+                tc::GlyphColourSource::Declared => "declared",
+                tc::GlyphColourSource::Measured => "measured",
+            },
+            r.glyph_colour.r,
+            r.glyph_colour.g,
+            r.glyph_colour.b
+        )
+    };
+    if let Some(w) = worst.filter(|w| w.percentile_ratio < min) {
+        let also = if unmeasured.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " ({} other text element(s) could not be measured)",
+                unmeasured.len()
+            )
+        };
+        return AssertionResult::fail(
+            a,
+            format!(
+                "text '{}' over image '{}' reads {}, below {min:.2}:1{also}{note}",
+                w.element,
+                w.image,
+                describe(w)
+            ),
+        )
+        .with_confidence(w.confidence);
+    }
+    if !unmeasured.is_empty() {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!(
+                "{} text element(s) over an image could not be measured, so the page was not \
+                 fully examined: {}{note}",
+                unmeasured.len(),
+                unmeasured.join("; ")
+            ),
+        );
+    }
+    let Some(w) = worst else {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!("no text lies over a readable image, so no contrast was measured{note}"),
+        );
+    };
+    let conf = readings.iter().map(|r| r.confidence).fold(1.0, f64::min);
+    AssertionResult::pass_with(
+        a,
+        format!(
+            "{} text-over-image reading(s) reach {min:.2}:1; the lowest, text '{}' over '{}', \
+             reads {}{note}",
+            readings.len(),
+            w.element,
+            w.image,
+            describe(w)
+        ),
+    )
+    .with_confidence(conf)
 }
