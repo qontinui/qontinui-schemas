@@ -708,35 +708,40 @@ fn with_a_noisy_capture_invisible_glyphs_are_unknown_not_a_pass() {
     assert!(v.percentile_ratio_with_hidden < 4.5, "{v:?}");
 }
 
-/// A wide heading whose box runs over a glyph-free near-white region: the
-/// mask cannot rule out ink there, so a reading that passes on the glyphs it
-/// sees is Unknown, not a pass.
+/// A wide heading whose box runs over a glyph-free white region.
+///
+/// Near-white (253) but not the glyph colour: on a noise-free capture a glyph
+/// there would differ, and none does, so the region is MEASURED as empty and
+/// the heading passes on its glyphs. Exactly the glyph colour (255): a glyph
+/// there would be invisible to every difference, so the ink it could hold is
+/// estimated at the glyphs' own density and the answer is Unknown — never a
+/// pass.
 #[test]
-fn a_box_over_a_glyph_free_white_region_is_unknown_not_a_pass() {
-    let mut wide = case("wide_heading");
-    let t = wide.snap.elements[1].bbox.unwrap();
-    for y in t.y as u32..(t.y as u32 + t.h) {
-        for x in 240..300u32 {
-            for f in [&mut wide.a, &mut wide.b] {
-                f.buffer.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+fn a_box_over_a_glyph_free_white_region_never_falsely_passes() {
+    for (v, want) in [
+        (253u8, AssertionOutcome::Passed),
+        (255, AssertionOutcome::Unknown),
+    ] {
+        let mut wide = case("wide_heading");
+        let t = wide.snap.elements[1].bbox.unwrap();
+        for y in t.y as u32..(t.y as u32 + t.h) {
+            for x in 240..300u32 {
+                for f in [&mut wide.a, &mut wide.b] {
+                    f.buffer.put_pixel(x, y, image::Rgba([v, v, v, 255]));
+                }
             }
         }
+        let r = wide.assert_aa();
+        assert_eq!(r.outcome, want, "{v}: {:?}", r.detail);
+        let est = wide.reading().hidden_px_estimate;
+        if v == 255 {
+            let d = r.detail.as_deref().unwrap();
+            assert!(d.contains("matches its glyph colour"), "{d}");
+            assert!(est > 0);
+        } else {
+            assert_eq!(est, 0, "a 253 region hides no undetectable ink");
+        }
     }
-    let r = wide.assert_aa();
-    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
-    assert!(
-        r.detail
-            .as_deref()
-            .unwrap()
-            .contains("matches its glyph colour"),
-        "{:?}",
-        r.detail
-    );
-    let v = wide.reading();
-    assert!(
-        v.percentile_ratio >= 4.5 && v.hidden_px_estimate > 0,
-        "{v:?}"
-    );
 }
 
 /// A dark `text-shadow` glow under white text: the hide removes it, so every
@@ -816,4 +821,84 @@ fn a_twin_that_still_paints_the_glyphs_is_unknown() {
         "{:?}",
         r.detail
     );
+}
+
+// ---------------------------------------------------------------- round 4
+
+/// A white heading in a FULL-WIDTH block box, with a clipped 255 highlight
+/// under its last ~12% of ink. Averaged over the box's blank run, the hidden
+/// ink's density was diluted into a pass; taken in the densest column band
+/// (where the glyphs are), it is not. Must never pass.
+#[test]
+fn a_clipped_highlight_under_the_last_word_never_passes_in_a_full_width_box() {
+    let c = case("clipped");
+    let r = c.assert_aa();
+    assert_ne!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let v = c.reading();
+    assert!(v.hidden_px_estimate > 0, "{v:?}");
+    assert!(v.percentile_ratio_with_hidden < 4.5, "{v:?}");
+}
+
+/// A parallax layer — the left 45% of the hero, under the text — moved 2 px
+/// between the captures. Under half the image's tiles, so the global check
+/// passes it; the LOCAL ring around the text sees content a shift lines up,
+/// and the answer is Unknown. The registered twin of the same page is judged.
+#[test]
+fn a_parallax_layer_under_the_text_is_unknown() {
+    let c = case("parallax");
+    let moved = alt_twin("parallax", "text_hidden_parallax");
+    let r = c.assert_with(Some(&moved), Some(4.5), None);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("displaced"),
+        "{:?}",
+        r.detail
+    );
+    let control = c.assert_aa();
+    assert_ne!(
+        control.outcome,
+        AssertionOutcome::Unknown,
+        "{:?}",
+        control.detail
+    );
+}
+
+/// Glyph-coloured speckle that belongs to the IMAGE (a 253 / 225 mottle under
+/// white text) is not a glyph frame B still paints: it is unchanged in frame
+/// A. The text is judged — and fails, as it should.
+#[test]
+fn glyph_coloured_speckle_in_the_image_is_not_a_still_painted_glyph() {
+    let c = case("mottled");
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+}
+
+/// One flat tile that differs (untracked content on a flat patch of an
+/// otherwise textured hero) is no evidence of a different capture: the flat
+/// arm of the global check needs at least four flat tiles. The `parallax`
+/// hero (registered twin) is finely textured everywhere, so the patch is its
+/// only flat tile, and the verdict must be the one the page has without it.
+#[test]
+fn a_single_differing_flat_tile_does_not_unregister_the_frames() {
+    let mut c = case("parallax");
+    let control = c.assert_aa().outcome;
+    assert_ne!(control, AssertionOutcome::Unknown);
+    // A tile of the image's 16 px grid (the hero starts at y = 10), far from
+    // the text and its local ring, made flat in both frames.
+    for y in 106..122u32 {
+        for x in 288..304u32 {
+            for f in [&mut c.a, &mut c.b] {
+                f.buffer.put_pixel(x, y, image::Rgba([60, 60, 60, 255]));
+            }
+        }
+    }
+    // Untracked content in frame A only: a 4x4 mark, 6% of the tile.
+    for y in 112..116u32 {
+        for x in 294..298u32 {
+            c.a.buffer
+                .put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+        }
+    }
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, control, "{:?}", r.detail);
 }

@@ -26,7 +26,15 @@
 //! carry (a photo credit, a tagline) forms a compact cluster of a few tiles
 //! and is tolerated. A differing pixel that moved AWAY from the colour of
 //! every text over the image is a removed `text-shadow` glow, not
-//! misregistration, and is not counted.
+//! misregistration, and is not counted. The flat arm needs at least
+//! [`MIN_FLAT_TILES`] flat tiles.
+//!
+//! That global check cannot see a layer displaced under PART of the image (a
+//! parallax layer moving a few px under the text). So each text element is
+//! also checked LOCALLY ([`Registration::local`]): the ring of tiles around
+//! its box must not show content that a small shift of frame B lines up.
+//! Untracked text that only frame A carries matches B under no shift, so it
+//! is still tolerated.
 //!
 //! # Where the glyphs are
 //!
@@ -63,8 +71,13 @@
 //! that differs at all and moved toward the glyph colour is a FAINT glyph
 //! pixel and is sampled like any other — when the registration check found
 //! the capture free of sub-threshold noise ([`FAINT_NOISE_MAX`]); otherwise
-//! it is treated as undetectable. The undetectable rest is estimated as the
-//! mask's density over the non-blind overlap times the blind count, and
+//! it is treated as undetectable. With a noise-free capture only a blind
+//! pixel EXACTLY the glyph colour can hide a glyph (on any other background
+//! the glyph's core differs, and was seen), so only those are undetectable;
+//! with a noisy one, every blind pixel is. The undetectable pixels' ink is
+//! estimated at the mask's density in the DENSEST column band about one line
+//! height wide (where the glyphs are — never averaged over a block box's
+//! blank run, which would dilute it), times their count, and
 //! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the percentile
 //! with that many samples added at the blind pixels' own contrasts. A check
 //! passes only on that value, fails on the measured one, and is Unknown in
@@ -161,11 +174,29 @@ pub const TEXTURE_LUMA_RANGE: u8 = 16;
 pub const FAINT_NOISE_MAX: f64 = 0.001;
 
 /// Share of glyph-mask pixels with a glyph-coloured frame-B pixel within
-/// one CSS px above which frame B still paints the glyphs (an unhidden twin
-/// whose raster moved a sub-pixel). Where the text was hidden, B around a
-/// mask pixel is the background: measured 0% on every hidden fixture, 1% with
-/// half the glyphs over near-white, and 75% on a quarter-pixel re-raster.
-pub const STILL_PAINTED_SHARE: f64 = 0.5;
+/// one CSS px — one that ALSO differs in frame A, so a glyph-coloured speckle
+/// of the image itself does not count — above which frame B still paints the
+/// glyphs (an unhidden twin whose raster moved a sub-pixel). Measured 0% on
+/// every hidden fixture, 1.2% with half the glyphs over near-white, and 45.6%
+/// on a quarter-pixel re-raster. Read as an EXCESS over the rate the image's
+/// own glyph-coloured pixels away from the glyphs explain (a 253 / 225 mottle
+/// explains nearly all of it), relative to the headroom left.
+pub const STILL_PAINTED_SHARE: f64 = 0.2;
+
+/// Fewest flat tiles before the flat arm of the global registration check
+/// can refuse: one flat tile is no evidence of a different capture.
+pub const MIN_FLAT_TILES: usize = 4;
+
+/// Width, in tiles, of the ring around each text box that the LOCAL
+/// registration check reads ([`Registration::local`]).
+pub const LOCAL_RING_TILES: i64 = 2;
+
+/// Largest displacement, in CSS px, the local check tries.
+pub const LOCAL_MAX_SHIFT_CSS: f64 = 3.0;
+
+/// Share of the ring's tiles that must show displaced content for the local
+/// check to refuse.
+pub const LOCAL_DISPLACED_TILE_SHARE: f64 = 0.1;
 
 /// RGB distance within which a core glyph pixel agrees with the measured
 /// glyph colour.
@@ -563,12 +594,19 @@ fn diff_mask(
     Some((mask, raw))
 }
 
-/// What [`registered`] found about the capture, besides that it lines up.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// What [`registered`] found about the capture over one image, and what the
+/// per-text LOCAL check ([`Registration::local`]) needs: the image's buffer
+/// rect, its hole bitmap (the widened text boxes, computed once) and the
+/// text colours a removed glow moved away from.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Registration {
     /// Share of the image's pixels away from the text that differ below
     /// [`GLYPH_DIFF_MIN`]: the capture's noise.
     pub noise_share: f64,
+    rect: (u32, u32, u32, u32),
+    holes: Vec<bool>,
+    colours: Vec<Rgb>,
+    tile: u32,
 }
 
 impl Registration {
@@ -576,13 +614,129 @@ impl Registration {
     pub fn faint_trusted(&self) -> bool {
         self.noise_share <= FAINT_NOISE_MAX
     }
+
+    /// Whether buffer pixel `(x, y)` lies in a hole (a widened text box).
+    /// Pixels outside the image rect are not the image's: treated as holes.
+    fn hole(&self, x: u32, y: u32) -> bool {
+        let (ix, iy, iw, ih) = self.rect;
+        if x < ix || y < iy || x >= ix + iw || y >= iy + ih {
+            return true;
+        }
+        self.holes[((y - iy) * iw + (x - ix)) as usize]
+    }
+
+    /// The LOCAL registration check for one text element: the tiles in a
+    /// ring [`LOCAL_RING_TILES`] tiles wide around its widened box, inside
+    /// the image, must not show content DISPLACED between the frames. A
+    /// differing textured tile is displaced when shifting frame B by up to
+    /// [`LOCAL_MAX_SHIFT_CSS`] CSS px halves its difference: a parallax layer
+    /// or a scroll-linked transform moved, while text that only frame A
+    /// carries (an untracked tagline) matches B under no shift. Refused when
+    /// at least [`LOCAL_DISPLACED_TILE_SHARE`] of the ring's tiles (and at
+    /// least one) are displaced. The global check cannot see this: a layer
+    /// under part of the hero is under half its tiles.
+    pub fn local(&self, a: &Frame, b: &Frame, text_box: Region) -> Result<(), LocateError> {
+        let s = a.source.scale_factor;
+        let ts = self.tile as i64;
+        let Some(r) = a.css_region_to_pixels(text_box) else {
+            return Ok(());
+        };
+        let margin = (REGISTRATION_MARGIN_CSS * s).ceil() as i64 + LOCAL_RING_TILES * ts;
+        let (ix, iy, iw, ih) = self.rect;
+        let x0 = (r.x as i64 - margin).max(ix as i64);
+        let y0 = (r.y as i64 - margin).max(iy as i64);
+        let x1 = (r.right() + margin).min((ix + iw) as i64);
+        let y1 = (r.bottom() + margin).min((iy + ih) as i64);
+        let reach = (LOCAL_MAX_SHIFT_CSS * s).ceil().max(1.0) as i64;
+        let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
+        let (fw, fh) = (a.width as i64, a.height as i64);
+        let (mut tiles, mut displaced) = (0usize, 0usize);
+        let mut ty = y0;
+        while ty < y1 {
+            let mut tx = x0;
+            while tx < x1 {
+                let mut px: Vec<(u32, u32)> = Vec::new();
+                let (mut lo, mut hi, mut differing) = (u8::MAX, u8::MIN, 0usize);
+                for y in ty..(ty + ts).min(y1) {
+                    for x in tx..(tx + ts).min(x1) {
+                        let (x, y) = (x as u32, y as u32);
+                        if self.hole(x, y) {
+                            continue;
+                        }
+                        px.push((x, y));
+                        let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
+                        let l = luma(pb);
+                        lo = lo.min(l);
+                        hi = hi.max(l);
+                        if dist2(pa, pb) > min2 && !self.halo(pa, pb) {
+                            differing += 1;
+                        }
+                    }
+                }
+                tx += ts;
+                if px.len() * 4 < (ts * ts) as usize {
+                    continue;
+                }
+                tiles += 1;
+                if differing as f64 <= TILE_DIFFERS_SHARE * px.len() as f64
+                    || hi.saturating_sub(lo) < TEXTURE_LUMA_RANGE
+                {
+                    continue;
+                }
+                let base = px
+                    .iter()
+                    .filter(|(x, y)| dist2(rgb_at(a, *x, *y), rgb_at(b, *x, *y)) > min2)
+                    .count();
+                let best = (-reach..=reach)
+                    .flat_map(|dy| (-reach..=reach).map(move |dx| (dx, dy)))
+                    .filter(|d| *d != (0, 0))
+                    .map(|(dx, dy)| {
+                        px.iter()
+                            .filter(|(x, y)| {
+                                let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
+                                nx < 0
+                                    || ny < 0
+                                    || nx >= fw
+                                    || ny >= fh
+                                    || dist2(rgb_at(a, *x, *y), rgb_at(b, nx as u32, ny as u32))
+                                        > min2
+                            })
+                            .count()
+                    })
+                    .min()
+                    .unwrap_or(base);
+                if best * 2 < base {
+                    displaced += 1;
+                }
+            }
+            ty += ts;
+        }
+        if displaced > 0 && displaced as f64 >= LOCAL_DISPLACED_TILE_SHARE * tiles as f64 {
+            return Err((
+                UnknownCode::InputMissing,
+                format!(
+                    "the text-hidden frame is not registered with the frame around this text: \
+                     {displaced} of the {tiles} {REGISTRATION_TILE_CSS}-CSS-px tile(s) around it \
+                     ({:.1}%) show the image displaced by up to {LOCAL_MAX_SHIFT_CSS} CSS px \
+                     between the captures (a parallax layer or a scroll-linked transform)",
+                    displaced as f64 * 100.0 / tiles.max(1) as f64
+                ),
+            ));
+        }
+        Ok(())
+    }
+
+    /// A removed glow: the pixel moved AWAY from every text colour.
+    fn halo(&self, pa: Rgb, pb: Rgb) -> bool {
+        !self.colours.is_empty() && self.colours.iter().all(|c| !toward(pa, pb, *c))
+    }
 }
 
 /// Whether frames `a` and `b` are REGISTERED over `image` (module docs: the
 /// tile test). Every painted text box over the image counts as a hole,
 /// wrappers and not-visible ones included, so no glyph is mistaken for
 /// misregistration. The caller has already paired the frames
-/// ([`pair_frames`]).
+/// ([`pair_frames`]). The per-text local check is [`Registration::local`].
 pub fn registered(
     a: &Frame,
     b: &Frame,
@@ -609,7 +763,7 @@ pub fn registered(
         )
     })?;
     let margin = (REGISTRATION_MARGIN_CSS * s).ceil() as i64;
-    let mut holes: Vec<(i64, i64, i64, i64)> = Vec::new();
+    let mut holes = vec![false; iw as usize * ih as usize];
     let mut colours: Vec<Rgb> = Vec::new();
     for t in &snapshot.elements {
         if t.id == image.id || !paints_text(snapshot, t) {
@@ -622,16 +776,29 @@ pub fn registered(
         if let Some(c) = t.fg_color {
             colours.push(c);
         }
-        if let Some(r) = a.css_region_to_pixels(tb) {
-            holes.push((
-                r.x as i64 - margin,
-                r.y as i64 - margin,
-                r.right() + margin,
-                r.bottom() + margin,
-            ));
+        let Some(r) = a.css_region_to_pixels(tb) else {
+            continue;
+        };
+        // The widened box, clipped to the image rect, marked once.
+        let hx0 = (r.x as i64 - margin).max(ix as i64) - ix as i64;
+        let hy0 = (r.y as i64 - margin).max(iy as i64) - iy as i64;
+        let hx1 = (r.right() + margin).min((ix + iw) as i64) - ix as i64;
+        let hy1 = (r.bottom() + margin).min((iy + ih) as i64) - iy as i64;
+        for y in hy0.max(0)..hy1 {
+            let row = y as usize * iw as usize;
+            for x in hx0.max(0)..hx1 {
+                holes[row + x as usize] = true;
+            }
         }
     }
     let ts = ((REGISTRATION_TILE_CSS * s).ceil() as u32).max(1);
+    let mut reg = Registration {
+        noise_share: 0.0,
+        rect: (ix, iy, iw, ih),
+        holes,
+        colours,
+        tile: ts,
+    };
     let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
     let (mut considered_all, mut noisy) = (0usize, 0usize);
     // (textured tiles, of them differing, flat tiles, of them differing)
@@ -646,11 +813,7 @@ pub fn registered(
             let (mut lo, mut hi) = (u8::MAX, u8::MIN);
             for y in ty..ty + th {
                 for x in tx..tx + tw {
-                    let (xi, yi) = (x as i64, y as i64);
-                    if holes
-                        .iter()
-                        .any(|(x0, y0, x1, y1)| xi >= *x0 && xi < *x1 && yi >= *y0 && yi < *y1)
-                    {
+                    if reg.hole(x, y) {
                         continue;
                     }
                     considered += 1;
@@ -660,10 +823,7 @@ pub fn registered(
                     hi = hi.max(l);
                     let d = dist2(pa, pb);
                     if d > min2 {
-                        // A removed glow moved AWAY from every text colour.
-                        let halo =
-                            !colours.is_empty() && colours.iter().all(|c| !toward(pa, pb, *c));
-                        if !halo {
+                        if !reg.halo(pa, pb) {
                             differing += 1;
                         }
                     } else if d > 0.0 {
@@ -697,7 +857,10 @@ pub fn registered(
     }
     let share = |d: usize, n: usize| if n == 0 { 0.0 } else { d as f64 / n as f64 };
     let (textured, flat) = (share(td, te), share(fd, fe));
-    if textured > MAX_DIFFERING_TILE_SHARE || flat > MAX_DIFFERING_TILE_SHARE {
+    // A single flat tile is no evidence of a different capture: the flat arm
+    // needs MIN_FLAT_TILES of them.
+    let flat_refuses = fe >= MIN_FLAT_TILES && flat > MAX_DIFFERING_TILE_SHARE;
+    if textured > MAX_DIFFERING_TILE_SHARE || flat_refuses {
         return Err((
             UnknownCode::InputMissing,
             format!(
@@ -711,9 +874,8 @@ pub fn registered(
             ),
         ));
     }
-    Ok(Registration {
-        noise_share: share(noisy, considered_all),
-    })
+    reg.noise_share = share(noisy, considered_all);
+    Ok(reg)
 }
 
 /// The glyph colour measured from frame A over the mask's core, and how far
@@ -816,21 +978,53 @@ pub fn measure(
             (-reach..=reach).any(|dy| {
                 (-reach..=reach).any(|dx| {
                     let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
-                    nx >= 0
-                        && ny >= 0
-                        && nx < fw
-                        && ny < fh
-                        && dist2(rgb_at(b, nx as u32, ny as u32), glyph_colour) <= near
+                    if nx < 0 || ny < 0 || nx >= fw || ny >= fh {
+                        return false;
+                    }
+                    let (na, nb) = (
+                        rgb_at(a, nx as u32, ny as u32),
+                        rgb_at(b, nx as u32, ny as u32),
+                    );
+                    na != nb && dist2(nb, glyph_colour) <= near
                 })
             })
         })
         .count();
-    if still as f64 > STILL_PAINTED_SHARE * mask.len() as f64 {
+    // The rate the IMAGE itself explains: how often a pixel of the box away
+    // from every glyph is glyph-coloured in B (a mottle, a near-white sky).
+    // A neighbourhood of n such pixels holds one by chance with probability
+    // 1 - (1 - q)^n; only the excess over that is a still-painted glyph.
+    let (bx0, by0, bw, bh) = box_px;
+    let mut near_glyph = vec![false; bw as usize * bh as usize];
+    for (x, y, _) in &mask {
+        for dy in -reach..=reach {
+            for dx in -reach..=reach {
+                let (nx, ny) = (*x as i64 + dx - bx0 as i64, *y as i64 + dy - by0 as i64);
+                if nx >= 0 && ny >= 0 && nx < bw as i64 && ny < bh as i64 {
+                    near_glyph[ny as usize * bw as usize + nx as usize] = true;
+                }
+            }
+        }
+    }
+    let (mut off, mut off_glyph_coloured) = (0usize, 0usize);
+    for y in by0..by0 + bh {
+        for x in bx0..bx0 + bw {
+            if !near_glyph[((y - by0) * bw + (x - bx0)) as usize] {
+                off += 1;
+                off_glyph_coloured += (dist2(rgb_at(b, x, y), glyph_colour) <= near) as usize;
+            }
+        }
+    }
+    let q = off_glyph_coloured as f64 / off.max(1) as f64;
+    let chance = 1.0 - (1.0 - q).powi(((2 * reach + 1) * (2 * reach + 1)) as i32);
+    let observed = still as f64 / mask.len() as f64;
+    if observed - chance > STILL_PAINTED_SHARE * (1.0 - chance) {
         return Err(unknown(format!(
             "frame B still paints text '{id}': {still} of its {} glyph-mask pixel(s) have a \
-             glyph-coloured pixel beside them in frame B, so the text was not hidden (a \
-             re-rasterised twin), and no contrast was measured",
-            mask.len()
+             glyph-coloured pixel beside them in frame B (the image alone explains {:.1}%), so \
+             the text was not hidden (a re-rasterised twin), and no contrast was measured",
+            mask.len(),
+            chance * 100.0
         )));
     }
 
@@ -839,37 +1033,56 @@ pub fn measure(
     if mask.iter().filter(|(x, y, _)| over(*x, *y)).count() < floor {
         return Ok(None);
     }
+    // The image displaced under THIS text (a parallax layer) is invisible to
+    // the global check; the ring around the text is read here.
+    reg.local(a, b, text_box)?;
 
     let lg = luminance(glyph_colour);
     let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
+    let trusted = reg.faint_trusted();
+    // Column bands about one line height wide: the hidden ink's density is
+    // taken where the glyphs are, not averaged over a block box's blank run.
+    let band = box_px.3.max(1);
+    let bands = ow.div_ceil(band) as usize;
+    let (mut band_mask, mut band_open) = (vec![0usize; bands], vec![0usize; bands]);
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
-    let (mut faint, mut blind, mut strong_unblind) = (0usize, 0usize, 0usize);
+    let mut faint = 0usize;
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
             let is_blind = dist2(pb, glyph_colour) <= near;
+            let j = ((x - ox0) / band) as usize;
             let r = || contrast(lg, luminance(pb));
             if is_mask.contains(&(x, y)) {
                 ratios.push(r());
-                strong_unblind += (!is_blind) as usize;
+                if !is_blind {
+                    band_mask[j] += 1;
+                    band_open[j] += 1;
+                }
             } else if is_blind {
-                blind += 1;
-                if reg.faint_trusted() && pa != pb && toward(pa, pb, glyph_colour) {
+                if trusted && pa != pb && toward(pa, pb, glyph_colour) {
                     faint += 1;
                     ratios.push(r());
-                } else {
+                } else if !trusted || pb == glyph_colour {
+                    // With a noise-free capture a glyph on any background
+                    // but the glyph colour itself differs, and was seen.
                     hidden.push(r());
                 }
+            } else {
+                band_open[j] += 1;
             }
         }
     }
-    // The undetectable blind pixels' share of ink, at the density the mask
-    // shows where the image does not match the glyph colour.
-    let unblind =
-        (ow as usize * oh as usize).saturating_sub(blind + (ratios.len() - faint - strong_unblind));
-    let density = strong_unblind as f64 / unblind.max(1) as f64;
-    let estimate = ((density * hidden.len() as f64).round() as usize).min(hidden.len());
+    // The densest band that shows glyphs over enough open (non-blind) image.
+    // Over-counting is the safe direction: no band qualifying counts every
+    // undetectable pixel as ink.
+    let density = (0..bands)
+        .filter(|j| band_mask[*j] > 0 && band_open[*j] * 4 >= band as usize * oh as usize)
+        .map(|j| band_mask[j] as f64 / band_open[j] as f64)
+        .fold(None, |m: Option<f64>, d| Some(m.map_or(d, |m| m.max(d))))
+        .unwrap_or(1.0);
+    let estimate = ((density * hidden.len() as f64).ceil() as usize).min(hidden.len());
     ratios.sort_by(f64::total_cmp);
     hidden.sort_by(f64::total_cmp);
     let mut with_hidden = ratios.clone();

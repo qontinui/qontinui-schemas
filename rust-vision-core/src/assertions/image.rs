@@ -852,14 +852,14 @@ fn text_over_image(
         .collect();
     for p in &page.pairs {
         let reg = match registration.iter().find(|(id, _)| *id == p.image.id) {
-            Some((_, Ok(r))) => *r,
+            Some((_, Ok(r))) => r,
             Some((_, Err(why))) => {
                 unmeasured.push(format!("text '{}': {why}", p.text.id));
                 continue;
             }
             None => unreachable!("every pair's image was registered above"),
         };
-        match tc::measure(frame, hidden, p, pct, &reg) {
+        match tc::measure(frame, hidden, p, pct, reg) {
             Ok(Some(r)) => readings.push(r),
             Ok(None) => not_over += 1,
             Err((_, why)) => unmeasured.push(why),
