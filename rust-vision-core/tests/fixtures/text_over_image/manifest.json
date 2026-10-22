@@ -196,6 +196,70 @@
         255,
         255
       ]
+    },
+    "clipped": {
+      "frame": "clipped_a.png",
+      "text_hidden": "clipped_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 960,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 62,
+        "w": 960,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "parallax": {
+      "frame": "parallax_a.png",
+      "text_hidden": "parallax_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_parallax": "parallax_b_moved.png"
+    },
+    "mottled": {
+      "frame": "mottled_a.png",
+      "text_hidden": "mottled_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
     }
   }
 }

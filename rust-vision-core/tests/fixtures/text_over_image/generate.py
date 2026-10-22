@@ -36,7 +36,7 @@ import math
 import pathlib
 import random
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 HERE = pathlib.Path(__file__).resolve().parent
 W, H = 320, 180
@@ -187,6 +187,63 @@ def main() -> None:
     # halo reaches ~16 px past the line box. Over a banner-sized image box
     # every tile away from the text lies in it.
     write_case("glow_strong", page_with(light), (255, 255, 255), box, cases, shadow=(16, 255))
+
+    # Round 4 (review of f4c2e2df).
+
+    # clipped: a white heading in a FULL-WIDTH block box on a 960 px hero,
+    # with a clipped 255 highlight under the last ~12% of its ink. The ink
+    # there is invisible and no difference shows it; averaged over the blank
+    # run of the box its estimate was diluted into a pass. Must NOT pass.
+    wide_w = 960
+    rng = random.Random(22)
+    wide_hero = Image.new("RGB", (wide_w, HERO[3]))
+    wpx = wide_hero.load()
+    for y in range(HERO[3]):
+        for x in range(wide_w):
+            v = 55.0 + 22.0 * (math.sin(x / 23) + math.cos(y / 17) + math.sin((x + y) / 31)) / 3
+            n = rng.uniform(-6, 6)
+            wpx[x, y] = tuple(max(0, min(255, round(v + n + t))) for t in (-8.0, 0.0, 10.0))
+    l, t, r, b = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox(TEXT_AT, TEXT, font=FONT)
+    x0 = int(r - (r - l) * 0.12) - 2
+    ImageDraw.Draw(wide_hero).rectangle(
+        [x0, t - 4 - HERO[1], r + 3, b + 4 - HERO[1]], fill=(255, 255, 255)
+    )
+    wide_page = Image.new("RGB", (wide_w, H), PAGE)
+    wide_page.paste(wide_hero, (HERO[0], HERO[1]))
+    full = {"x": 0, "y": box["y"], "w": wide_w, "h": box["h"]}
+    write_case("clipped", wide_page, (255, 255, 255), full, cases,
+               image=(0, HERO[1], wide_w, HERO[3]))
+
+    # parallax: white text over a finely textured mid-dark hero; its
+    # text_hidden_parallax twin has the left 45% of the page moved 2 px to the
+    # right between the captures, under the text. Must be Unknown with that
+    # twin.
+    rng = random.Random(23)
+    tex = Image.new("RGB", (HERO[2], HERO[3]))
+    tpx = tex.load()
+    for y in range(HERO[3]):
+        for x in range(HERO[2]):
+            v = 105 + 40 * (math.sin(x / 9) + math.cos(y / 7) + math.sin((x + y) / 13)) / 3
+            v += rng.uniform(-6, 6)
+            tpx[x, y] = (max(0, min(255, round(v))),) * 3
+    tex_page = page_with(tex)
+    write_case("parallax", tex_page, (255, 255, 255), box, cases)
+    strip = (0, 0, int(W * 0.45), H)
+    moved = tex_page.copy()
+    moved.paste(ImageChops.offset(tex_page, 2, 0).crop(strip), strip[:2])
+    moved.save(HERE / "parallax_b_moved.png", optimize=True)
+    cases["parallax"]["text_hidden_parallax"] = "parallax_b_moved.png"
+
+    # mottled: white text over a band of glyph-coloured speckle (a 253 / 225
+    # mottle) in the IMAGE. Frame B's 253 pixels beside a glyph are the
+    # image's own, unchanged in A: not a still-painted glyph.
+    mot = photo(random.Random(24), base=55.0, amp=22.0)
+    mpx = mot.load()
+    rng = random.Random(25)
+    for y in range(box["y"] - HERO[1] - 4, box["y"] - HERO[1] + box["h"] + 4):
+        for x in range(box["x"] - 4, box["x"] + box["w"] + 4):
+            mpx[x, y] = (253, 253, 253) if rng.random() < 0.5 else (225, 225, 225)
+    write_case("mottled", page_with(mot), (255, 255, 255), box, cases)
 
     manifest = {
         "generator": "generate.py",
