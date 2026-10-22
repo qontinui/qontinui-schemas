@@ -808,8 +808,11 @@ fn blockiness_within(
 /// Checked in this order, each an Unknown: `min_ratio` declared and finite;
 /// the percentile in 0..=100; the text-hidden frame present
 /// (`needs_multi_frame_input`); the frame present; the two paired (one size,
-/// one scale factor); a snapshot. Text over an unrendered or unreadable
-/// image, or reported not visible itself, is skipped and disclosed; text
+/// one scale factor); a snapshot. Then, per image with text over it, the two
+/// frames must be registered over it ([`tc::registered`]); its text is
+/// unmeasured otherwise. Text over an unrendered image, or reported not
+/// visible itself, is skipped and disclosed; text over an OCCLUDED image is
+/// measured (frame B is read under the glyphs, never the image's crop); text
 /// whose box touches an image while its glyphs do not is not text over it.
 fn text_over_image(
     a: Assertion,
@@ -839,7 +842,20 @@ fn text_over_image(
     let mut readings: Vec<TextOverImageContrast> = Vec::new();
     let mut not_over = 0usize;
     let mut unmeasured = Vec::new();
+    let unregistered: Vec<(&str, String)> = page
+        .images()
+        .into_iter()
+        .filter_map(|img| {
+            tc::registered(frame, hidden, snap, img)
+                .err()
+                .map(|(_, why)| (img.id.as_str(), why))
+        })
+        .collect();
     for p in &page.pairs {
+        if let Some((_, why)) = unregistered.iter().find(|(id, _)| *id == p.image.id) {
+            unmeasured.push(format!("text '{}': {why}", p.text.id));
+            continue;
+        }
         match tc::measure(frame, hidden, p, pct) {
             Ok(Some(r)) => readings.push(r),
             Ok(None) => not_over += 1,
@@ -857,16 +873,12 @@ fn text_over_image(
         .min_by(|x, y| x.percentile_ratio.total_cmp(&y.percentile_ratio));
     let describe = |r: &TextOverImageContrast| {
         format!(
-            "p{} {:.2}:1, minimum {:.2}:1 over {} {} pixel(s) against its {} glyph colour \
+            "p{} {:.2}:1, minimum {:.2}:1 over {} glyph pixel(s) against its {} glyph colour \
              rgb({},{},{})",
             r.percentile,
             r.percentile_ratio,
             r.min_ratio,
             r.sampled_px,
-            match r.method {
-                tc::SampleMethod::GlyphMask => "glyph",
-                tc::SampleMethod::BboxFallback => "box (no usable glyph mask: fallback)",
-            },
             match r.glyph_colour_source {
                 tc::GlyphColourSource::Declared => "declared",
                 tc::GlyphColourSource::Measured => "measured",
@@ -912,7 +924,7 @@ fn text_over_image(
         return AssertionResult::unknown(
             a,
             UnknownCode::InputMissing,
-            format!("no text lies over a readable image, so no contrast was measured{note}"),
+            format!("no text lies over a rendered image, so no contrast was measured{note}"),
         );
     };
     let conf = readings.iter().map(|r| r.confidence).fold(1.0, f64::min);
