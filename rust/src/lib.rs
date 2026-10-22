@@ -196,6 +196,10 @@ pub mod sdk_features;
 pub mod spawn_authorization;
 pub mod spec_api_events;
 pub mod spec_check;
+/// Spec model — the typed YAML frontmatter of a specification artifact
+/// (request, requirement, interface mapping, story) and the EARS vocabulary.
+/// `parse` / `render` need the `spec-yaml` feature.
+pub mod spec_model;
 pub mod state_machine;
 pub mod targets;
 pub mod task_run;
