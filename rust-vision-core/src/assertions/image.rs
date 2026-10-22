@@ -842,21 +842,24 @@ fn text_over_image(
     let mut readings: Vec<TextOverImageContrast> = Vec::new();
     let mut not_over = 0usize;
     let mut unmeasured = Vec::new();
-    let unregistered: Vec<(&str, String)> = page
+    let registration: Vec<(&str, Result<tc::Registration, String>)> = page
         .images()
         .into_iter()
-        .filter_map(|img| {
-            tc::registered(frame, hidden, snap, img)
-                .err()
-                .map(|(_, why)| (img.id.as_str(), why))
+        .map(|img| {
+            let r = tc::registered(frame, hidden, snap, img).map_err(|(_, why)| why);
+            (img.id.as_str(), r)
         })
         .collect();
     for p in &page.pairs {
-        if let Some((_, why)) = unregistered.iter().find(|(id, _)| *id == p.image.id) {
-            unmeasured.push(format!("text '{}': {why}", p.text.id));
-            continue;
-        }
-        match tc::measure(frame, hidden, p, pct) {
+        let reg = match registration.iter().find(|(id, _)| *id == p.image.id) {
+            Some((_, Ok(r))) => *r,
+            Some((_, Err(why))) => {
+                unmeasured.push(format!("text '{}': {why}", p.text.id));
+                continue;
+            }
+            None => unreachable!("every pair's image was registered above"),
+        };
+        match tc::measure(frame, hidden, p, pct, &reg) {
             Ok(Some(r)) => readings.push(r),
             Ok(None) => not_over += 1,
             Err((_, why)) => unmeasured.push(why),
@@ -927,6 +930,32 @@ fn text_over_image(
             format!("no text lies over a rendered image, so no contrast was measured{note}"),
         );
     };
+    // A pass needs the reading WITH the glyphs the mask cannot see.
+    if let Some(h) = readings
+        .iter()
+        .filter(|r| r.percentile_ratio_with_hidden < min)
+        .min_by(|x, y| {
+            x.percentile_ratio_with_hidden
+                .total_cmp(&y.percentile_ratio_with_hidden)
+        })
+    {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!(
+                "text '{}' over image '{}' reads {} on the glyph pixels it shows, but about {} \
+                 more may lie where the image matches its glyph colour, which no difference \
+                 reveals; with them p{} would be {:.2}:1, below {min:.2}:1, so whether it holds \
+                 is unknown{note}",
+                h.element,
+                h.image,
+                describe(h),
+                h.hidden_px_estimate,
+                h.percentile,
+                h.percentile_ratio_with_hidden
+            ),
+        );
+    }
     let conf = readings.iter().map(|r| r.confidence).fold(1.0, f64::min);
     AssertionResult::pass_with(
         a,
