@@ -97,6 +97,7 @@ fn parse_analyzer(name: &str) -> Option<Analyzer> {
         "color" => Some(Analyzer::Color),
         "dynamic" => Some(Analyzer::Dynamic),
         "elements" => Some(Analyzer::Elements),
+        "image" => Some(Analyzer::Image),
         _ => None,
     }
 }

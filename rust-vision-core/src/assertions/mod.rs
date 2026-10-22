@@ -58,6 +58,10 @@ use crate::element_snapshot::{
 use crate::frame::{Frame, Region};
 use crate::observation::UnknownCode;
 
+pub use crate::analyzers::image::NaturalRegion;
+
+mod image;
+
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -120,8 +124,12 @@ pub enum Assertion {
         axis_tolerance_px: Option<u32>,
     },
     /// Element's foreground color is within ΔE_76 of expected RGB.
-    /// (ΔE_2000 is more perceptually accurate but materially harder to
-    /// compute — ΔE_76 is the Phase 6 first-pass tradeoff.)
+    ///
+    /// Still ΔE_76, deliberately, although [`delta_e_2000`] now exists: the
+    /// two scales differ, and moving this variant to ΔE_2000 would silently
+    /// re-mean every `delta_e_max` a caller has already written. A ΔE_2000
+    /// colour check is a new variant, not a changed one —
+    /// [`Assertion::ImagePaletteWithin`] is the first.
     ColorWithin {
         element: String,
         expected: Rgb,
@@ -161,6 +169,93 @@ pub enum Assertion {
         element: String,
         #[serde(default = "default_wcag_aa")]
         level: WcagLevel,
+    },
+
+    // ---- L1 image assertions (plan 2026-10-13-image-generation-and-visual-
+    // judgment, Phase 15) ------------------------------------------------
+    //
+    // The first evaluators that read [`EvalContext::frame`]. Each one that
+    // does sets [`AssertionResult::confidence`] (see that field). Thresholds
+    // are the CALLER's — the visual system or the slot spec — and an
+    // undeclared one answers `Unknown{input_missing}`, never a pass.
+    /// At least `min_coverage` (0..=1) of the image's pixels, as read from
+    /// the frame, lie within `max_delta_e` (CIEDE2000) of some colour in the
+    /// declared `palette` (a slot spec's `thresholds.min_palette_coverage` /
+    /// `max_palette_delta_e`).
+    ///
+    /// `palette` is a boxed slice rather than a `Vec` only to keep
+    /// [`Assertion`] (and so every `AssertionResult`) under clippy's
+    /// large-error threshold; the wire is the same JSON array.
+    ImagePaletteWithin {
+        element: String,
+        palette: Box<[Rgb]>,
+        #[serde(default)]
+        max_delta_e: Option<f64>,
+        #[serde(default)]
+        min_coverage: Option<f64>,
+    },
+    /// No two images on the page have pHashes within `max_hamming` bits of
+    /// each other.
+    ///
+    /// **Unknown on most real captures today, by design.** An image the
+    /// producer reports `visible: false` without a `visibility_reason` — every
+    /// off-screen image of a viewport-only frame, from every producer that
+    /// does not yet send the reason — cannot be told from one hidden under a
+    /// transparent overlay, so this answers Unknown rather than pass over it.
+    /// Phase 26 must not promote this check to a gate before the producers
+    /// (the style-gate `normalize.ts` and the ccfg converter) send
+    /// `visibility_reason`. Perceptual, so a re-encoded or rescaled copy is caught; a
+    /// distinct variant from Phase 8's `no_duplicate_images`, which compares
+    /// `src_digest`. Flat fills are excluded (see
+    /// [`Assertion::NoPlaceholderImages`]).
+    NoNearDuplicateImages {
+        #[serde(default)]
+        max_hamming: Option<u32>,
+    },
+    /// No image (or the named one) renders a placeholder: the slot's
+    /// placeholder marker, a low-entropy fill, or the crossed-box pattern.
+    ///
+    /// **Unknown on most real captures today, by design** — page-wide, for
+    /// the same reason as [`Assertion::NoNearDuplicateImages`]: an image
+    /// reported `visible: false` with no `visibility_reason` is unreadable,
+    /// not left out. Phase 26 must not promote this check to a gate before
+    /// the producers send `visibility_reason`.
+    NoPlaceholderImages {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// The whole `focal` region (natural-frame fractions — a slot spec's
+    /// `focal.region`, passed verbatim) survives object-fit/object-position.
+    /// Reads the snapshot's media facts, not the frame.
+    ImageFocalVisible {
+        element: String,
+        focal: NaturalRegion,
+    },
+    /// The image's edge and stroke pixels reach `min_ratio` WCAG contrast
+    /// against what surrounds them on this frame — a transparent icon that
+    /// vanishes on one theme's background fails on that theme's frame.
+    TransparentImageLegible {
+        element: String,
+        #[serde(default)]
+        min_ratio: Option<f64>,
+    },
+    /// `cta_id` is the most salient element on the frame (spectral-residual
+    /// saliency, mean over its box) among the interactive and media elements
+    /// that neither contain it nor sit inside it.
+    SalienceOrder { cta_id: String },
+    /// The image's sharpness at its rendered scale — variance of the
+    /// Laplacian over its frame crop — is at least `min_sharpness`.
+    ImageSharpnessAtLeast {
+        element: String,
+        #[serde(default)]
+        min_sharpness: Option<f64>,
+    },
+    /// The image's compression blockiness (block-edge step ÷ other step,
+    /// ~1.0 clean) is at most `max_blockiness`.
+    ImageBlockinessWithin {
+        element: String,
+        #[serde(default)]
+        max_blockiness: Option<f64>,
     },
 }
 
@@ -319,7 +414,8 @@ pub struct AssertionResult {
     /// the second, and that is what a payload written before this field
     /// existed means.
     ///
-    /// `Some(c)` is in `0.0..=1.0`. Today exactly one evaluator sets it:
+    /// `Some(c)` is in `0.0..=1.0`. Two families of evaluator set it: the L1
+    /// image assertions that read [`EvalContext::frame`] (below), and
     /// [`Assertion::ContainsText`]'s OCR fallback, which reports the LOWEST
     /// [`OcrBlockRef::confidence`] among the blocks whose text it actually
     /// read. Lowest, not mean: the aggregate string is only as trustworthy
@@ -345,10 +441,25 @@ pub struct AssertionResult {
     ///
     /// Note what does NOT set it, and that the two reasons are different.
     ///
-    /// Every other evaluator is exact, and there is a MECHANICAL reason to
-    /// trust that rather than a hand-maintained list: **no evaluator reads
-    /// [`EvalContext::frame`] at all**, so none of them samples a pixel.
-    /// They compare declared snapshot values ([`Assertion::ContrastMeetsWcag`],
+    /// **The frame readers.** The L1 image assertions
+    /// ([`Assertion::ImagePaletteWithin`], [`Assertion::NoNearDuplicateImages`],
+    /// [`Assertion::NoPlaceholderImages`], [`Assertion::TransparentImageLegible`],
+    /// [`Assertion::SalienceOrder`], [`Assertion::ImageSharpnessAtLeast`],
+    /// [`Assertion::ImageBlockinessWithin`]) are the ONLY evaluators that read
+    /// [`EvalContext::frame`], and a pixel read from a composited frame is an
+    /// estimate of the image under it. Each sets this field from
+    /// [`crate::analyzers::image::Crop::confidence`] — the share of the
+    /// image's box that was inside the frame and not painted over — scaled
+    /// where its own doc says so (the ring of surround pixels for
+    /// `transparent_image_legible`; the saliency map's peakedness and the
+    /// winning margin for `salience_order`). A verdict that rests on the
+    /// slot's placeholder MARKER alone, and [`Assertion::ImageFocalVisible`]
+    /// (media facts, no pixels), are deductions and state `None`.
+    ///
+    /// Every OTHER evaluator is exact, and the reason is mechanical rather
+    /// than a hand-maintained list: none of them reads
+    /// [`EvalContext::frame`], so none samples a pixel. They compare declared
+    /// snapshot values ([`Assertion::ContrastMeetsWcag`],
     /// [`Assertion::ColorWithin`], [`Assertion::TypographyConsistent`]),
     /// recorded baselines ([`Assertion::NoLayoutShiftSince`]) and bboxes.
     /// `ContrastMeetsWcag` in particular returns `Unknown` when a colour is
@@ -550,11 +661,12 @@ impl BaselineEntry {
 #[derive(Debug, Default)]
 pub struct EvalContext<'a> {
     pub snapshot: Option<&'a ElementSnapshot>,
-    /// **No evaluator reads this today**, and that absence is what makes
-    /// [`AssertionResult::confidence`]'s enumeration checkable by grep rather
-    /// than by hand: nothing here samples a pixel, so nothing here estimates
-    /// a colour. The first evaluator that does read it will be producing an
-    /// ESTIMATE and owes a confidence — see that field.
+    /// **Only the L1 image assertions read this** (the evaluators in
+    /// `assertions/image.rs`), which keeps [`AssertionResult::confidence`]'s
+    /// enumeration checkable by grep rather than by hand: every evaluator that
+    /// samples a pixel lives in that one file, and each states a confidence.
+    /// Any other evaluator that starts reading it is producing an ESTIMATE
+    /// and owes one too — see that field.
     pub frame: Option<&'a Frame>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
@@ -641,6 +753,14 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
             )
         }
         Assertion::ContrastMeetsWcag { element, level } => eval_contrast(element, level, ctx),
+        Assertion::ImagePaletteWithin { .. }
+        | Assertion::NoNearDuplicateImages { .. }
+        | Assertion::NoPlaceholderImages { .. }
+        | Assertion::ImageFocalVisible { .. }
+        | Assertion::TransparentImageLegible { .. }
+        | Assertion::SalienceOrder { .. }
+        | Assertion::ImageSharpnessAtLeast { .. }
+        | Assertion::ImageBlockinessWithin { .. } => image::evaluate(a, ctx),
     }
 }
 
@@ -1327,6 +1447,76 @@ pub fn delta_e_76(a: Rgb, b: Rgb) -> f64 {
     let da = la.1 - lb.1;
     let db = la.2 - lb.2;
     (dl * dl + da * da + db * db).sqrt()
+}
+
+/// CIEDE2000 (Sharma, Wu & Dalal 2005) between two sRGB colours, through
+/// CIELAB D65. The perceptual distance [`delta_e_76`] approximates: ΔE_2000
+/// corrects the hue rotation in the blues and the compressed chroma scale, so
+/// a just-noticeable difference is ~1 everywhere in the gamut.
+pub fn delta_e_2000(a: Rgb, b: Rgb) -> f64 {
+    delta_e_2000_lab(rgb_to_lab(a), rgb_to_lab(b))
+}
+
+/// [`delta_e_2000`] over CIELAB triples `(L*, a*, b*)` (kL = kC = kH = 1).
+pub fn delta_e_2000_lab(lab1: (f64, f64, f64), lab2: (f64, f64, f64)) -> f64 {
+    let (l1, a1, b1) = lab1;
+    let (l2, a2, b2) = lab2;
+    let pow7 = |v: f64| v.powi(7);
+    let c_bar = (a1.hypot(b1) + a2.hypot(b2)) / 2.0;
+    let g = 0.5 * (1.0 - (pow7(c_bar) / (pow7(c_bar) + pow7(25.0))).sqrt());
+    let a1p = (1.0 + g) * a1;
+    let a2p = (1.0 + g) * a2;
+    let c1p = a1p.hypot(b1);
+    let c2p = a2p.hypot(b2);
+    let hue = |b: f64, ap: f64| {
+        if b == 0.0 && ap == 0.0 {
+            0.0
+        } else {
+            b.atan2(ap).to_degrees().rem_euclid(360.0)
+        }
+    };
+    let h1p = hue(b1, a1p);
+    let h2p = hue(b2, a2p);
+    let dl = l2 - l1;
+    let dc = c2p - c1p;
+    let dh_deg = if c1p * c2p == 0.0 {
+        0.0
+    } else {
+        let d = h2p - h1p;
+        if d.abs() <= 180.0 {
+            d
+        } else if d > 180.0 {
+            d - 360.0
+        } else {
+            d + 360.0
+        }
+    };
+    let dh = 2.0 * (c1p * c2p).sqrt() * (dh_deg / 2.0).to_radians().sin();
+    let l_bar = (l1 + l2) / 2.0;
+    let c_bar_p = (c1p + c2p) / 2.0;
+    let h_bar = if c1p * c2p == 0.0 {
+        h1p + h2p
+    } else if (h1p - h2p).abs() <= 180.0 {
+        (h1p + h2p) / 2.0
+    } else if h1p + h2p < 360.0 {
+        (h1p + h2p + 360.0) / 2.0
+    } else {
+        (h1p + h2p - 360.0) / 2.0
+    };
+    let cosd = |d: f64| d.to_radians().cos();
+    let t =
+        1.0 - 0.17 * cosd(h_bar - 30.0) + 0.24 * cosd(2.0 * h_bar) + 0.32 * cosd(3.0 * h_bar + 6.0)
+            - 0.20 * cosd(4.0 * h_bar - 63.0);
+    let d_theta = 30.0 * (-((h_bar - 275.0) / 25.0).powi(2)).exp();
+    let r_c = 2.0 * (pow7(c_bar_p) / (pow7(c_bar_p) + pow7(25.0))).sqrt();
+    let s_l = 1.0 + 0.015 * (l_bar - 50.0).powi(2) / (20.0 + (l_bar - 50.0).powi(2)).sqrt();
+    let s_c = 1.0 + 0.045 * c_bar_p;
+    let s_h = 1.0 + 0.015 * c_bar_p * t;
+    let r_t = -(2.0 * d_theta).to_radians().sin() * r_c;
+    let (tl, tc, th) = (dl / s_l, dc / s_c, dh / s_h);
+    (tl * tl + tc * tc + th * th + r_t * tc * th)
+        .max(0.0)
+        .sqrt()
 }
 
 /// sRGB → Lab (D65 illuminant). Pure math, no dependencies.

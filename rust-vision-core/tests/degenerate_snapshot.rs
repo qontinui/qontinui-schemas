@@ -18,8 +18,8 @@
 //! that says which one broke is worth more than a table.
 
 use qontinui_vision_core::{
-    analyzers, AnalyzeInput, Analyzer, AnalyzerVerdict, Element, ElementSnapshot, Region,
-    SnapshotCoverage,
+    analyzers, AnalyzeInput, Analyzer, AnalyzerVerdict, Element, ElementSnapshot, Frame,
+    FrameSource, Region, SnapshotCoverage, UnknownCode,
 };
 
 /// A fully-projected element: geometry, text, interactivity.
@@ -55,6 +55,24 @@ fn snapshot(elements: Vec<Element>) -> ElementSnapshot {
         elements,
         ..Default::default()
     }
+}
+
+/// The image analyzer reads pixels, so it is run WITH a frame: without one it
+/// blocks on the frame (its one blocking input), which says nothing about the
+/// snapshot under test.
+fn run_image_framed(snap: &ElementSnapshot) -> analyzers::AnalyzerResult {
+    let frame = Frame::from_rgba(
+        image::RgbaImage::from_pixel(600, 80, image::Rgba([0xf0, 0xf0, 0xf0, 0xff])),
+        FrameSource::synthetic_now(),
+    );
+    analyzers::run(
+        Analyzer::Image,
+        &AnalyzeInput {
+            frame: Some(&frame),
+            snapshot: Some(snap),
+            prior_frame: None,
+        },
+    )
 }
 
 fn run(analyzer: Analyzer, snap: &ElementSnapshot) -> analyzers::AnalyzerResult {
@@ -180,6 +198,24 @@ fn a_partial_projection_blocks_layout_but_not_typography() {
         "…but `tiny_target` could not be evaluated, and that must be said: {:?}",
         elements.verdict
     );
+
+    // `image` never blocks on snapshot coverage either — only on a missing
+    // frame — so the style gate's `--analyzer all` cannot newly exit 2 on a
+    // degenerate snapshot because of it. No element carries media, and it
+    // says so as a green Degraded.
+    let image = run_image_framed(&degenerate);
+    assert!(image.conclusive, "{:?}", image.verdict);
+    assert!(
+        matches!(
+            image.verdict,
+            AnalyzerVerdict::Degraded {
+                code: UnknownCode::InputMissing,
+                ..
+            }
+        ),
+        "{:?}",
+        image.verdict
+    );
 }
 
 #[test]
@@ -224,6 +260,9 @@ fn a_healthy_snapshot_is_checked() {
         healthy_el("title", 400),
     ]);
 
+    // `image` is not in this list: a page with no media element is DEGRADED
+    // for it (green, and saying no image was measured), never `Checked`; its
+    // healthy-page behaviour is pinned in `tests/image_corpus.rs`.
     for analyzer in [Analyzer::Layout, Analyzer::Typography, Analyzer::Elements] {
         let result = run(analyzer, &healthy);
         assert_eq!(
