@@ -234,16 +234,84 @@ def main() -> None:
     moved.save(HERE / "parallax_b_moved.png", optimize=True)
     cases["parallax"]["text_hidden_parallax"] = "parallax_b_moved.png"
 
-    # mottled: white text over a band of glyph-coloured speckle (a 253 / 225
-    # mottle) in the IMAGE. Frame B's 253 pixels beside a glyph are the
-    # image's own, unchanged in A: not a still-painted glyph.
+    # mottled: white text over a broad band of glyph-coloured speckle (a
+    # 253 / 225 mottle) in the IMAGE, reaching well past the text box. Frame
+    # B's 253 pixels beside a glyph are the image's own: not a still-painted
+    # glyph.
     mot = photo(random.Random(24), base=55.0, amp=22.0)
     mpx = mot.load()
     rng = random.Random(25)
-    for y in range(box["y"] - HERO[1] - 4, box["y"] - HERO[1] + box["h"] + 4):
-        for x in range(box["x"] - 4, box["x"] + box["w"] + 4):
+    for y in range(max(0, box["y"] - HERO[1] - 50), min(HERO[3], box["y"] - HERO[1] + box["h"] + 50)):
+        for x in range(0, min(HERO[2], box["x"] + box["w"] + 60)):
             mpx[x, y] = (253, 253, 253) if rng.random() < 0.5 else (225, 225, 225)
     write_case("mottled", page_with(mot), (255, 255, 255), box, cases)
+
+    # Round 5 (review of 4a90023c).
+
+    # parallax at 4 and 6 px: beyond the local check's 3 px shift search.
+    for dx in (4, 6):
+        moved = tex_page.copy()
+        moved.paste(ImageChops.offset(tex_page, dx, 0).crop(strip), strip[:2])
+        moved.save(HERE / f"parallax_b_moved{dx}.png", optimize=True)
+        cases["parallax"][f"text_hidden_parallax{dx}"] = f"parallax_b_moved{dx}.png"
+
+    # tagline: the parallax hero (registered) with an UNTRACKED 14 px tagline
+    # just under the heading, inside its local ring, in frame A only.
+    def tagline(page: Image.Image) -> None:
+        f = ImageFont.load_default(size=14)
+        ImageDraw.Draw(page).text((24, 104), "Limited stock - order now", font=f, fill=(255, 255, 255))
+
+    write_case("tagline", tex_page, (255, 255, 255), box, cases, extra=tagline)
+
+    # card: a plain dark card, white text, and a re-rasterised UNHIDDEN twin.
+    card = page_with(Image.new("RGB", (HERO[2], HERO[3]), (32, 36, 44)))
+    write_case("card", card, (255, 255, 255), box, cases)
+    card_big = card.resize((W * 4, H * 4), Image.NEAREST)
+    ImageDraw.Draw(card_big).text(
+        (TEXT_AT[0] * 4 + 1, TEXT_AT[1] * 4), TEXT, font=ImageFont.load_default(size=112),
+        fill=(255, 255, 255),
+    )
+    card_rr = card.copy()
+    card_rr.paste(card_big.resize((W, H), Image.BOX).crop(tb), tb[:2])
+    card_rr.save(HERE / "card_b_rerastered.png", optimize=True)
+    cases["card"]["text_hidden_rerastered"] = "card_b_rerastered.png"
+
+    # heavy: a long regular line, then a HEAVY word ("M", stroke 5) wholly on
+    # a clipped 255 patch, in a full-width box on a 1280 px hero. The hidden
+    # word is denser than any visible band: at the regular line's densest band
+    # density its ink reads as 4% of the samples (a pass at p5); counted in
+    # full, 8%. Must NOT pass.
+    heavy_w = 1280
+    hv_b = Image.new("RGB", (heavy_w, H), PAGE)
+    hv_hero = Image.new("RGB", (heavy_w, HERO[3]))
+    rng = random.Random(26)
+    hpx = hv_hero.load()
+    for y in range(HERO[3]):
+        for x in range(heavy_w):
+            v = 55.0 + 22.0 * (math.sin(x / 23) + math.cos(y / 17) + math.sin((x + y) / 31)) / 3
+            n = rng.uniform(-6, 6)
+            hpx[x, y] = tuple(max(0, min(255, round(v + n + t))) for t in (-8.0, 0.0, 10.0))
+    hv_b.paste(hv_hero, (HERO[0], HERO[1]))
+    d0 = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    prefix, word, sw = "free delivery on every order placed this week only, while stocks last ", "M", 5
+    pl, pt, pr, pb = d0.textbbox(TEXT_AT, prefix, font=FONT)
+    word_at = (pr + 4, TEXT_AT[1])
+    wl, wt, wr, wb = d0.textbbox(word_at, word, font=FONT, stroke_width=sw)
+    ImageDraw.Draw(hv_b).rectangle([wl - 1, wt - 2, wr + 1, wb + 2], fill=(255, 255, 255))
+    hv_a = hv_b.copy()
+    da = ImageDraw.Draw(hv_a)
+    da.text(TEXT_AT, prefix, font=FONT, fill=(255, 255, 255))
+    da.text(word_at, word, font=FONT, fill=(255, 255, 255), stroke_width=sw,
+            stroke_fill=(255, 255, 255))
+    hv_a.save(HERE / "heavy_a.png", optimize=True)
+    hv_b.save(HERE / "heavy_b.png", optimize=True)
+    cases["heavy"] = {
+        "frame": "heavy_a.png",
+        "text_hidden": "heavy_b.png",
+        "image": {"x": 0, "y": HERO[1], "w": heavy_w, "h": HERO[3]},
+        "text": {"x": 0, "y": min(pt, wt) - 6, "w": heavy_w, "h": max(pb, wb) - min(pt, wt) + 12},
+        "fg": [255, 255, 255],
+    }
 
     manifest = {
         "generator": "generate.py",
