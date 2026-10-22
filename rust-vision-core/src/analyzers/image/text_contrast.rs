@@ -8,53 +8,77 @@
 //!
 //! - frame A, the page as it renders;
 //! - frame B, the same page with the text hidden (the SDK's dev-only
-//!   `control/text-visibility` makes glyphs transparent and restores them).
+//!   `control/text-visibility` makes glyphs transparent, removes
+//!   `text-shadow`, and restores both).
 //!
 //! # The two frames must be one layout
 //!
 //! [`pair_frames`] refuses a pair of different sizes or scale factors, and
-//! [`registered`] refuses one whose IMAGE pixels differ away from the text:
-//! inside the image's box, outside every text box (each widened by
-//! [`REGISTRATION_MARGIN_CSS`] for anti-aliasing and shadows), at most
-//! [`MAX_UNREGISTERED_SHARE`] of the pixels may differ. A frame B shifted by
-//! one pixel, zoomed, captured mid-animation or taken from another page would
-//! otherwise turn the image's own texture into a "glyph mask" and fail the
-//! text at full confidence. Text over the image that the snapshot does not
-//! carry also differs there, and is refused the same way: what hid is not
-//! known.
+//! [`registered`] refuses one whose IMAGE content differs away from the text.
+//! The image's box, outside every text box over it (each widened by
+//! [`REGISTRATION_MARGIN_CSS`]), is cut into tiles of
+//! [`REGISTRATION_TILE_CSS`] CSS px. A tile DIFFERS when more than
+//! [`TILE_DIFFERS_SHARE`] of its pixels do. Misregistration — a one-pixel
+//! shift, a zoom, a capture of another page — spreads across the image, so
+//! the frames are refused when more than [`MAX_DIFFERING_TILE_SHARE`] of the
+//! textured tiles differ, or of the flat ones (a flat tile hides a shift but
+//! not a different page). Text over the image that the snapshot does not
+//! carry (a photo credit, a tagline) forms a compact cluster of a few tiles
+//! and is tolerated. A differing pixel that moved AWAY from the colour of
+//! every text over the image is a removed `text-shadow` glow, not
+//! misregistration, and is not counted.
 //!
 //! # Where the glyphs are
 //!
-//! The two frames differ exactly where glyphs paint, so the GLYPH MASK of a
-//! text element is the set of buffer pixels inside its box where frames A and
-//! B differ by more than [`GLYPH_DIFF_MIN`]. The pixels sampled are the
-//! mask's pixels over the image that MOVED TOWARD THE GLYPH COLOUR (closer to
-//! it in A than in B): a glyph and its anti-aliased edge did, while a dark
-//! `text-shadow` halo over a light image moved away and is left out. Frame B
-//! is sampled under them: what the glyphs actually sit on. Sampling the whole
-//! box instead would read unrelated parts of the image — a block-level
-//! heading's box spans the hero's full width while its glyphs cover the left
-//! third.
+//! The two frames differ exactly where glyphs paint. The GLYPH MASK of a
+//! text element is the set of pixels inside its box where frames A and B
+//! differ by more than [`GLYPH_DIFF_MIN`] AND the pixel moved TOWARD THE
+//! GLYPH COLOUR (closer to it in A than in B): a glyph and its alpha-blended
+//! edge always do, while a dark `text-shadow` halo over a light image moved
+//! away and is left out — before the density checks, so a glow neither
+//! fills the mask nor counts toward its ceiling. Frame B is sampled under the
+//! mask's pixels over the image: what the glyphs actually sit on. Sampling
+//! the whole box instead would read unrelated parts of the image — a
+//! block-level heading's box spans the hero's full width while its glyphs
+//! cover the left third.
 //!
 //! A mask is usable when it holds at least [`MIN_GLYPH_CSS_PX2`] CSS px² of
-//! glyphs (scaled by the frame's scale factor squared, so it means the same at
-//! every DPR) and covers at most [`MAX_GLYPH_SHARE`] of the box. There is no
-//! floor on the SHARE: a two-letter label in a full-width block box covers a
-//! fraction of a percent of it. An unusable mask is UNKNOWN, never sampled
-//! some other way: an empty or sparse one means the text was not hidden in
-//! frame B (a hide that missed gradient, canvas or iframe text, a restore
-//! before the capture, a capture without hiding) or that the text is invisible
-//! against the image, and the two cannot be told apart — sampling the box of
-//! a text that was not hidden reads its own glyphs and reports ~1:1.
+//! glyphs (scaled by the frame's scale factor squared) and covers at most
+//! [`MAX_GLYPH_SHARE`] of the box. There is no floor on the SHARE: a
+//! two-letter label in a full-width block box covers a fraction of a percent
+//! of it. An unusable mask is UNKNOWN: an empty or sparse one means the text
+//! was not hidden in frame B or that it is invisible against the image, and
+//! the two cannot be told apart. Frame B that STILL PAINTS the glyphs (a
+//! non-deterministic raster of an unhidden twin) is Unknown too: when more
+//! than [`STILL_PAINTED_SHARE`] of the mask's pixels have a glyph-coloured
+//! frame-B pixel within one CSS px, the glyph is still there.
 //!
-//! When the box shows glyphs and fewer than that floor of them reach the
+//! # Glyphs the mask cannot see
+//!
+//! Where the image under a glyph is within [`GLYPH_DIFF_MIN`] of the glyph
+//! colour (blown-out sky, snow, a white studio backdrop under white text;
+//! crushed shadows under black), A and B differ by less than the mask's
+//! threshold, and those are exactly the invisible glyph pixels. They are
+//! found from frame B alone: the BLIND pixels of the overlap. A blind pixel
+//! that differs at all and moved toward the glyph colour is a FAINT glyph
+//! pixel and is sampled like any other — when the registration check found
+//! the capture free of sub-threshold noise ([`FAINT_NOISE_MAX`]); otherwise
+//! it is treated as undetectable. The undetectable rest is estimated as the
+//! mask's density over the non-blind overlap times the blind count, and
+//! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the percentile
+//! with that many samples added at the blind pixels' own contrasts. A check
+//! passes only on that value, fails on the measured one, and is Unknown in
+//! between: the hidden ink may or may not be there.
+//!
+//! When the box shows glyphs and fewer than the floor of them reach the
 //! image, the text is not over the image (a label whose line box overhangs a
 //! thumbnail), and is not measured.
 //!
 //! Only LEAF text elements are measured ([`TextIndex`]): a wrapper whose
 //! innerText includes a child's is measured through the child, against the
 //! child's colour. Text a wrapper paints directly beside its children is not
-//! measured; the snapshot does not separate it.
+//! measured, and a wrapper over an image is disclosed as such
+//! ([`PagePairs::wrappers`]).
 //!
 //! # Against which colour
 //!
@@ -64,21 +88,21 @@
 //! it is exact, and it is free of the anti-aliasing that blends every edge
 //! pixel of a glyph in frame A into the background. Only where `fg_color` is
 //! absent is the colour MEASURED from frame A, as the per-channel median of
-//! the mask's core (the quarter of mask pixels that differ most between the
-//! frames, i.e. the least blended); that reading is an estimate, and its
-//! confidence is the share of core pixels within [`GLYPH_COLOUR_TOLERANCE`]
-//! of the median. A heavy `text-shadow` on a light image differs from frame B
-//! by more than the glyph does and can take the core, so a measured colour
-//! under such a shadow reads the shadow's colour: declare `fg_color`. The
-//! declared colour cannot see a translucent ancestor (`opacity`) or a blend
-//! mode; that is the price of preferring it.
+//! the raw difference's core (the quarter of differing pixels that differ
+//! most); that reading is an estimate, and its confidence is the share of
+//! core pixels within [`GLYPH_COLOUR_TOLERANCE`] of the median. A heavy
+//! `text-shadow` on a light image differs from frame B by more than the
+//! glyph does and can take the core, so a measured colour under such a
+//! shadow reads the shadow's colour: declare `fg_color`. The declared colour
+//! cannot see a translucent ancestor (`opacity`) or a blend mode; that is the
+//! price of preferring it.
 //!
 //! # What is reported
 //!
 //! The minimum ratio and the `percentile`-th percentile (nearest rank;
-//! [`DEFAULT_PERCENTILE`] = 5) over the sampled pixels. The minimum is one
-//! pixel's word — a single bright speck under a stroke sets it — so a check
-//! gates on the percentile, and the minimum is reported beside it.
+//! [`DEFAULT_PERCENTILE`] = 5) over the sampled pixels, and the percentile
+//! with the estimated hidden ink. The minimum is one pixel's word — a single
+//! bright speck under a stroke sets it — so a check gates on the percentile.
 //!
 //! APCA is not computed: the APCA-W3 reference implementation is not under a
 //! permissive open-source licence, and the plan adds it only after a licence
@@ -99,8 +123,9 @@ pub const DEFAULT_PERCENTILE: f64 = 5.0;
 
 /// Smallest RGB (Euclidean) distance between frames A and B that marks a
 /// glyph pixel. The same 8 the image analyzer's `edge_contrast` uses to tell
-/// stroke pixels from their surround: above lossless-capture noise, below
-/// the difference any visible glyph paints.
+/// stroke pixels from their surround: above capture noise, below the
+/// difference any visible glyph paints. Glyph pixels on a background within
+/// this distance of the glyph colour are the BLIND ones (module docs).
 pub const GLYPH_DIFF_MIN: f64 = 8.0;
 
 /// Fewest glyph pixels a usable mask holds, in CSS px² (a dot of a 6 px
@@ -108,22 +133,39 @@ pub const GLYPH_DIFF_MIN: f64 = 8.0;
 pub const MIN_GLYPH_CSS_PX2: f64 = 6.0;
 
 /// Largest share of the text box a usable mask covers. Glyphs of even a
-/// heavy face in a tight box cover well under this; a larger difference is
-/// not glyphs.
+/// heavy face in a tight box cover well under this; a larger difference
+/// toward the glyph colour is not glyphs.
 pub const MAX_GLYPH_SHARE: f64 = 0.70;
 
-/// Largest share of an image's pixels outside its text that may differ
-/// between frames A and B for the two to count as registered.
-pub const MAX_UNREGISTERED_SHARE: f64 = 0.005;
-
 /// How far, in CSS px, each text box is widened before the registration
-/// check, so anti-aliasing and a modest `text-shadow` are not counted as
-/// misregistration.
+/// check, for anti-aliasing.
 pub const REGISTRATION_MARGIN_CSS: f64 = 4.0;
 
-/// Fewest image pixels outside the text, in CSS px², the registration check
-/// needs before it can confirm anything.
-pub const MIN_REGISTRATION_CSS_PX2: f64 = 64.0;
+/// The registration check's tile side, in CSS px.
+pub const REGISTRATION_TILE_CSS: f64 = 16.0;
+
+/// Share of a tile's pixels that must differ for the tile to differ.
+pub const TILE_DIFFERS_SHARE: f64 = 0.05;
+
+/// Largest share of textured (or of flat) tiles that may differ for the two
+/// frames to count as registered.
+pub const MAX_DIFFERING_TILE_SHARE: f64 = 0.5;
+
+/// Luma range (max − min) at or above which a tile is TEXTURED: a shift or a
+/// zoom shows there, while a flat tile reads the same either way.
+pub const TEXTURE_LUMA_RANGE: u8 = 16;
+
+/// Largest share of the image's pixels away from the text that may differ
+/// below [`GLYPH_DIFF_MIN`] (capture noise) for FAINT glyph pixels to be
+/// trusted. A lossless capture of a static page reads 0.
+pub const FAINT_NOISE_MAX: f64 = 0.001;
+
+/// Share of glyph-mask pixels with a glyph-coloured frame-B pixel within
+/// one CSS px above which frame B still paints the glyphs (an unhidden twin
+/// whose raster moved a sub-pixel). Where the text was hidden, B around a
+/// mask pixel is the background: measured 0% on every hidden fixture, 1% with
+/// half the glyphs over near-white, and 75% on a quarter-pixel re-raster.
+pub const STILL_PAINTED_SHARE: f64 = 0.5;
 
 /// RGB distance within which a core glyph pixel agrees with the measured
 /// glyph colour.
@@ -151,13 +193,27 @@ pub struct TextOverImageContrast {
     pub min_ratio: f64,
     /// The percentile reported in [`Self::percentile_ratio`] (0..=100).
     pub percentile: f64,
-    /// The `percentile`-th percentile WCAG ratio (nearest rank).
+    /// The `percentile`-th percentile WCAG ratio (nearest rank) over the
+    /// sampled glyph pixels. A FAILURE is decided on this.
     pub percentile_ratio: f64,
+    /// The same percentile with [`Self::hidden_px_estimate`] samples added
+    /// at the blind pixels' contrasts: the reading if the glyphs the mask
+    /// cannot see are there. A PASS is decided on this; it equals
+    /// [`Self::percentile_ratio`] when nothing is hidden.
+    pub percentile_ratio_with_hidden: f64,
     /// The colour the ratios are computed against.
     pub glyph_colour: Rgb,
     pub glyph_colour_source: GlyphColourSource,
-    /// How many frame-B pixels were sampled (glyph pixels over the image).
+    /// How many frame-B pixels were sampled (glyph pixels over the image),
+    /// faint ones included.
     pub sampled_px: u64,
+    /// Of [`Self::sampled_px`], the FAINT glyph pixels: on a background
+    /// within [`GLYPH_DIFF_MIN`] of the glyph colour, found by any
+    /// difference at all.
+    pub faint_px: u64,
+    /// The estimated glyph pixels on such a background that no difference
+    /// shows (module docs).
+    pub hidden_px_estimate: u64,
     /// The examined buffer region: the text box clipped to the image box,
     /// mapped onto the frame and clamped to it.
     pub region: Region,
@@ -255,11 +311,23 @@ impl<'a> TextIndex<'a> {
     }
 }
 
-/// The LEAF text elements laid over `image` ([`TextIndex`]), each with the
-/// overlap region, and how many were left out because the TEXT cannot be
-/// attributed to the frame ([`unreadable`]). A text box that contains the
-/// image whole is a container (a section, a card, a caption wrapper), not an
-/// overlay, as the image analyzer's busyness-under-text reads it.
+/// The text over one image ([`texts_over`]).
+#[derive(Debug, Default)]
+pub struct Over<'a> {
+    /// The leaf text elements over it, each with the overlap region.
+    pub pairs: Vec<TextOverImage<'a>>,
+    /// Leaf text elements over it that cannot themselves be attributed to
+    /// the frame ([`unreadable`]).
+    pub unreadable_texts: usize,
+    /// Wrapper text elements over it: measured through their leaf children,
+    /// so any text they paint beside those children is not measured.
+    pub wrappers: usize,
+}
+
+/// The LEAF text elements laid over `image` ([`TextIndex`]). A text box that
+/// contains the image whole is a container (a section, a card, a caption
+/// wrapper), not an overlay, as the image analyzer's busyness-under-text
+/// reads it.
 ///
 /// The image itself is gated by the caller on [`unrendered`] only: an
 /// OCCLUDED image (the usual `<img>` hero under an inset-0 scrim or text
@@ -269,14 +337,13 @@ pub fn texts_over<'a>(
     snapshot: &'a ElementSnapshot,
     image: &'a Element,
     index: &TextIndex<'_>,
-) -> (Vec<TextOverImage<'a>>, usize) {
+) -> Over<'a> {
+    let mut over = Over::default();
     let Some(img) = image.bbox else {
-        return (Vec::new(), 0);
+        return over;
     };
-    let mut out = Vec::new();
-    let mut unreadable_text = 0usize;
     for t in &snapshot.elements {
-        if t.id == image.id || !index.is_leaf(&t.id) {
+        if t.id == image.id || !paints_text(snapshot, t) {
             continue;
         }
         let Some(tb) = t.bbox else { continue };
@@ -286,17 +353,21 @@ pub fn texts_over<'a>(
         let Some(css) = intersection(tb, img) else {
             continue;
         };
-        if unreadable(snapshot, t).is_some() {
-            unreadable_text += 1;
+        if !index.is_leaf(&t.id) {
+            over.wrappers += 1;
             continue;
         }
-        out.push(TextOverImage {
+        if unreadable(snapshot, t).is_some() {
+            over.unreadable_texts += 1;
+            continue;
+        }
+        over.pairs.push(TextOverImage {
             text: t,
             image,
             css,
         });
     }
-    (out, unreadable_text)
+    over
 }
 
 /// Every text-over-image pair on the page, and what was left out.
@@ -308,6 +379,9 @@ pub struct PagePairs<'a> {
     /// Text elements over an image that cannot themselves be attributed to
     /// the frame.
     pub skipped_texts: usize,
+    /// Wrapper text elements over an image, measured through their children
+    /// only (see [`Over::wrappers`]).
+    pub wrappers: usize,
 }
 
 impl PagePairs<'_> {
@@ -324,6 +398,13 @@ impl PagePairs<'_> {
             note.push_str(&format!(
                 " ({} text element(s) over an image skipped: reported not visible)",
                 self.skipped_texts
+            ));
+        }
+        if self.wrappers > 0 {
+            note.push_str(&format!(
+                " ({} wrapper text element(s) over an image measured through their children \
+                 only: text they paint beside them is not measured)",
+                self.wrappers
             ));
         }
         note
@@ -345,15 +426,16 @@ pub fn page_pairs(snapshot: &ElementSnapshot) -> PagePairs<'_> {
     let index = TextIndex::of(snapshot);
     let mut page = PagePairs::default();
     for image in snapshot.elements.iter().filter(|e| e.media.is_some()) {
-        let (pairs, skipped_texts) = texts_over(snapshot, image, &index);
+        let over = texts_over(snapshot, image, &index);
         if unrendered(snapshot, image).is_some() {
-            if !pairs.is_empty() || skipped_texts > 0 {
+            if !over.pairs.is_empty() || over.unreadable_texts > 0 {
                 page.skipped_images += 1;
             }
             continue;
         }
-        page.skipped_texts += skipped_texts;
-        page.pairs.extend(pairs);
+        page.skipped_texts += over.unreadable_texts;
+        page.wrappers += over.wrappers;
+        page.pairs.extend(over.pairs);
     }
     page
 }
@@ -374,6 +456,16 @@ fn dist2(a: Rgb, b: Rgb) -> f64 {
         a.b as f64 - b.b as f64,
     );
     dr * dr + dg * dg + db * db
+}
+
+/// Whether a pixel moved toward `colour` between frame B and frame A: a
+/// glyph (or its alpha-blended edge) painted over B, not a halo.
+fn toward(pa: Rgb, pb: Rgb, colour: Rgb) -> bool {
+    dist2(pa, colour) < dist2(pb, colour)
+}
+
+fn luma(c: Rgb) -> u8 {
+    ((c.r as u32 * 299 + c.g as u32 * 587 + c.b as u32 * 114) / 1000) as u8
 }
 
 /// The sRGB channel linearisation, once per value: the same formula as
@@ -419,8 +511,8 @@ pub fn min_glyph_px(s: f64) -> usize {
     ((MIN_GLYPH_CSS_PX2 * s * s).ceil() as usize).max(1)
 }
 
-/// Whether a glyph mask of `glyphs` pixels over a box of `area` pixels reads
-/// as glyphs at scale factor `s` (see the module docs).
+/// Whether a glyph mask of `glyphs` toward-glyph pixels over a box of `area`
+/// pixels reads as glyphs at scale factor `s` (see the module docs).
 pub fn mask_usable(glyphs: usize, area: usize, s: f64) -> bool {
     glyphs >= min_glyph_px(s) && glyphs as f64 <= MAX_GLYPH_SHARE * area.max(1) as f64
 }
@@ -436,21 +528,31 @@ fn on_frame(frame: &Frame, css: Region) -> Option<((u32, u32, u32, u32), f64)> {
     Some((px, in_frame))
 }
 
-/// The pixels of `px` where frames `a` and `b` differ by more than
-/// [`GLYPH_DIFF_MIN`], as `(x, y, squared distance)`. `None` as soon as more
-/// than `cap` pixels differ: the caller has no use for a mask that dense.
+/// One pass over `px`: the pixels where frames `a` and `b` differ by more
+/// than [`GLYPH_DIFF_MIN`] and that moved toward `colour` (`None`: every
+/// differing pixel), as `(x, y, squared distance)`, and how many differed
+/// at all past the threshold in any direction. `None` as soon as more than
+/// `cap` pixels are kept: the caller has no use for a mask that dense.
+#[allow(clippy::type_complexity)]
 fn diff_mask(
     a: &Frame,
     b: &Frame,
     (x0, y0, w, h): (u32, u32, u32, u32),
+    colour: Option<Rgb>,
     cap: usize,
-) -> Option<Vec<(u32, u32, f64)>> {
+) -> Option<(Vec<(u32, u32, f64)>, usize)> {
     let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
     let mut mask = Vec::new();
+    let mut raw = 0usize;
     for y in y0..y0 + h {
         for x in x0..x0 + w {
-            let d = dist2(rgb_at(a, x, y), rgb_at(b, x, y));
-            if d > min2 {
+            let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
+            let d = dist2(pa, pb);
+            if d <= min2 {
+                continue;
+            }
+            raw += 1;
+            if colour.is_none_or(|c| toward(pa, pb, c)) {
                 if mask.len() == cap {
                     return None;
                 }
@@ -458,21 +560,35 @@ fn diff_mask(
             }
         }
     }
-    Some(mask)
+    Some((mask, raw))
 }
 
-/// Whether frames `a` and `b` are REGISTERED over `image`: inside its box,
-/// outside every text box over it (each widened by
-/// [`REGISTRATION_MARGIN_CSS`]), at most [`MAX_UNREGISTERED_SHARE`] of the
-/// pixels differ. Every painted text box counts here, wrappers and
-/// not-visible ones included, so no glyph is mistaken for misregistration.
-/// The caller has already paired the frames ([`pair_frames`]).
+/// What [`registered`] found about the capture, besides that it lines up.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Registration {
+    /// Share of the image's pixels away from the text that differ below
+    /// [`GLYPH_DIFF_MIN`]: the capture's noise.
+    pub noise_share: f64,
+}
+
+impl Registration {
+    /// Whether a sub-threshold difference can be read as a FAINT glyph.
+    pub fn faint_trusted(&self) -> bool {
+        self.noise_share <= FAINT_NOISE_MAX
+    }
+}
+
+/// Whether frames `a` and `b` are REGISTERED over `image` (module docs: the
+/// tile test). Every painted text box over the image counts as a hole,
+/// wrappers and not-visible ones included, so no glyph is mistaken for
+/// misregistration. The caller has already paired the frames
+/// ([`pair_frames`]).
 pub fn registered(
     a: &Frame,
     b: &Frame,
     snapshot: &ElementSnapshot,
     image: &Element,
-) -> Result<(), LocateError> {
+) -> Result<Registration, LocateError> {
     let id = &image.id;
     let s = a.source.scale_factor;
     let img = image.bbox.ok_or_else(|| {
@@ -486,71 +602,118 @@ pub fn registered(
     let (ix, iy, iw, ih) = on_frame(a, img).map(|p| p.0).ok_or_else(|| {
         (
             UnknownCode::InputMissing,
-            format!("image '{id}' lies outside the frame, so the two frames cannot be registered over it"),
+            format!(
+                "image '{id}' lies outside the frame, so the two frames cannot be registered \
+                 over it"
+            ),
         )
     })?;
     let margin = (REGISTRATION_MARGIN_CSS * s).ceil() as i64;
-    let holes: Vec<(i64, i64, i64, i64)> = snapshot
-        .elements
-        .iter()
-        .filter(|t| t.id != image.id && paints_text(snapshot, t))
-        .filter_map(|t| {
-            let tb = t.bbox?;
-            if region_contains(tb, img) {
-                return None;
-            }
-            intersection(tb, img)?;
-            let r = a.css_region_to_pixels(tb)?;
-            Some((
+    let mut holes: Vec<(i64, i64, i64, i64)> = Vec::new();
+    let mut colours: Vec<Rgb> = Vec::new();
+    for t in &snapshot.elements {
+        if t.id == image.id || !paints_text(snapshot, t) {
+            continue;
+        }
+        let Some(tb) = t.bbox else { continue };
+        if region_contains(tb, img) || intersection(tb, img).is_none() {
+            continue;
+        }
+        if let Some(c) = t.fg_color {
+            colours.push(c);
+        }
+        if let Some(r) = a.css_region_to_pixels(tb) {
+            holes.push((
                 r.x as i64 - margin,
                 r.y as i64 - margin,
                 r.right() + margin,
                 r.bottom() + margin,
-            ))
-        })
-        .collect();
-    let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
-    let (mut considered, mut differing) = (0usize, 0usize);
-    for y in iy..iy + ih {
-        for x in ix..ix + iw {
-            let (xi, yi) = (x as i64, y as i64);
-            if holes
-                .iter()
-                .any(|(x0, y0, x1, y1)| xi >= *x0 && xi < *x1 && yi >= *y0 && yi < *y1)
-            {
-                continue;
-            }
-            considered += 1;
-            if dist2(rgb_at(a, x, y), rgb_at(b, x, y)) > min2 {
-                differing += 1;
-            }
+            ));
         }
     }
-    let floor = (MIN_REGISTRATION_CSS_PX2 * s * s).ceil() as usize;
-    if considered < floor.max(1) {
+    let ts = ((REGISTRATION_TILE_CSS * s).ceil() as u32).max(1);
+    let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
+    let (mut considered_all, mut noisy) = (0usize, 0usize);
+    // (textured tiles, of them differing, flat tiles, of them differing)
+    let (mut te, mut td, mut fe, mut fd) = (0usize, 0usize, 0usize, 0usize);
+    let mut ty = iy;
+    while ty < iy + ih {
+        let th = ts.min(iy + ih - ty);
+        let mut tx = ix;
+        while tx < ix + iw {
+            let tw = ts.min(ix + iw - tx);
+            let (mut considered, mut differing) = (0usize, 0usize);
+            let (mut lo, mut hi) = (u8::MAX, u8::MIN);
+            for y in ty..ty + th {
+                for x in tx..tx + tw {
+                    let (xi, yi) = (x as i64, y as i64);
+                    if holes
+                        .iter()
+                        .any(|(x0, y0, x1, y1)| xi >= *x0 && xi < *x1 && yi >= *y0 && yi < *y1)
+                    {
+                        continue;
+                    }
+                    considered += 1;
+                    let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
+                    let l = luma(pb);
+                    lo = lo.min(l);
+                    hi = hi.max(l);
+                    let d = dist2(pa, pb);
+                    if d > min2 {
+                        // A removed glow moved AWAY from every text colour.
+                        let halo =
+                            !colours.is_empty() && colours.iter().all(|c| !toward(pa, pb, *c));
+                        if !halo {
+                            differing += 1;
+                        }
+                    } else if d > 0.0 {
+                        noisy += 1;
+                    }
+                }
+            }
+            considered_all += considered;
+            if considered * 4 >= (ts * ts) as usize {
+                let differs = differing as f64 > TILE_DIFFERS_SHARE * considered as f64;
+                if hi.saturating_sub(lo) >= TEXTURE_LUMA_RANGE {
+                    te += 1;
+                    td += differs as usize;
+                } else {
+                    fe += 1;
+                    fd += differs as usize;
+                }
+            }
+            tx += tw;
+        }
+        ty += th;
+    }
+    if te + fe == 0 {
         return Err((
             UnknownCode::InputMissing,
             format!(
-                "only {considered} pixel(s) of image '{id}' lie outside its text, under the {floor} \
-                 needed to confirm the text-hidden frame is registered with the frame"
+                "no {REGISTRATION_TILE_CSS}-CSS-px tile of image '{id}' lies mostly outside its \
+                 text, so the text-hidden frame's registration with the frame cannot be confirmed"
             ),
         ));
     }
-    let share = differing as f64 / considered as f64;
-    if share > MAX_UNREGISTERED_SHARE {
+    let share = |d: usize, n: usize| if n == 0 { 0.0 } else { d as f64 / n as f64 };
+    let (textured, flat) = (share(td, te), share(fd, fe));
+    if textured > MAX_DIFFERING_TILE_SHARE || flat > MAX_DIFFERING_TILE_SHARE {
         return Err((
             UnknownCode::InputMissing,
             format!(
                 "the text-hidden frame is not registered with the frame over image '{id}': \
-                 {:.2}% of its pixels away from any text differ (at most {:.2}% may), so it is \
-                 shifted, rescaled, mid-animation, another capture, or hides text the snapshot \
-                 does not carry",
-                share * 100.0,
-                MAX_UNREGISTERED_SHARE * 100.0
+                 {:.1}% of its textured and {:.1}% of its flat {REGISTRATION_TILE_CSS}-CSS-px \
+                 tiles away from any text differ (at most {:.0}% may), so it is shifted, \
+                 rescaled, mid-animation or another capture",
+                textured * 100.0,
+                flat * 100.0,
+                MAX_DIFFERING_TILE_SHARE * 100.0
             ),
         ));
     }
-    Ok(())
+    Ok(Registration {
+        noise_share: share(noisy, considered_all),
+    })
 }
 
 /// The glyph colour measured from frame A over the mask's core, and how far
@@ -576,29 +739,28 @@ fn measured_glyph_colour(a: &Frame, mask: &[(u32, u32, f64)]) -> (Rgb, f64) {
 
 /// Measure one text element over one image on the frame pair `(a, b)`, which
 /// the caller has already paired ([`pair_frames`]) and registered over the
-/// image ([`registered`]). See the module docs.
+/// image (`reg`, from [`registered`]). See the module docs.
 ///
 /// `Ok(None)` when the text's box shows glyphs and fewer than the glyph floor
 /// of them reach the image: not text over it. `Err` (Unknown) when the box
-/// shows no usable mask, or when the pixels over the image did not move
-/// toward the glyph colour.
+/// shows no usable mask, when the differing pixels moved away from the glyph
+/// colour, or when frame B still paints the glyphs.
 pub fn measure(
     a: &Frame,
     b: &Frame,
     pair: &TextOverImage<'_>,
     percentile: f64,
+    reg: &Registration,
 ) -> Result<Option<TextOverImageContrast>, LocateError> {
     let id = pair.text.id.as_str();
     let s = a.source.scale_factor;
+    let unknown = |detail: String| (UnknownCode::InputMissing, detail);
     let over_frame = |what: &str| {
-        (
-            UnknownCode::InputMissing,
-            format!(
-                "{what} of text '{id}' over '{}' cannot be placed on the frame (it lies outside \
-                 it, or the scale factor {s} is unusable)",
-                pair.image.id
-            ),
-        )
+        unknown(format!(
+            "{what} of text '{id}' over '{}' cannot be placed on the frame (it lies outside it, \
+             or the scale factor {s} is unusable)",
+            pair.image.id
+        ))
     };
     let text_box = pair.text.bbox.ok_or_else(|| over_frame("the box"))?;
     let (over_px, in_frame) = on_frame(a, pair.css).ok_or_else(|| over_frame("the overlap"))?;
@@ -606,77 +768,128 @@ pub fn measure(
     let area = box_px.2 as usize * box_px.3 as usize;
     let floor = min_glyph_px(s);
     let cap = (MAX_GLYPH_SHARE * area as f64) as usize;
-    let box_mask = diff_mask(a, b, box_px, cap).ok_or_else(|| {
-        (
-            UnknownCode::InputMissing,
-            format!(
-                "frames A and B differ at more than {:.0}% of text '{id}''s box, which is not \
-                 glyphs, so no contrast was measured",
-                MAX_GLYPH_SHARE * 100.0
-            ),
-        )
-    })?;
-    if !mask_usable(box_mask.len(), area, s) {
-        return Err((
-            UnknownCode::InputMissing,
-            format!(
-                "frames A and B differ at {} pixel(s) of text '{id}''s box, fewer than the {floor} \
-                 a glyph mask needs: either the text was not hidden in the text-hidden frame or it \
-                 is invisible against the image, and the two cannot be told apart, so no contrast \
-                 was measured",
-                box_mask.len()
-            ),
-        ));
+    let dense = || {
+        unknown(format!(
+            "frames A and B differ toward the glyph colour at more than {:.0}% of text '{id}''s \
+             box, which is not glyphs, so no contrast was measured",
+            MAX_GLYPH_SHARE * 100.0
+        ))
+    };
+
+    // The glyph colour first: the mask keeps only pixels that moved toward it.
+    let (glyph_colour, source, colour_conf) = match pair.text.fg_color {
+        Some(fg) => (fg, GlyphColourSource::Declared, 1.0),
+        None => {
+            let (raw, _) = diff_mask(a, b, box_px, None, area).ok_or_else(dense)?;
+            if raw.len() < floor {
+                return Err(not_hidden(id, raw.len(), floor));
+            }
+            let (c, agree) = measured_glyph_colour(a, &raw);
+            (c, GlyphColourSource::Measured, agree)
+        }
+    };
+    let (mask, raw) = diff_mask(a, b, box_px, Some(glyph_colour), cap).ok_or_else(dense)?;
+    if !mask_usable(mask.len(), area, s) {
+        if raw >= floor {
+            return Err(unknown(format!(
+                "frames A and B differ at {raw} pixel(s) of text '{id}''s box, but only {} moved \
+                 toward its glyph colour rgb({},{},{}) (under the {floor} needed): the declared \
+                 colour is not what paints, or only a shadow differs",
+                mask.len(),
+                glyph_colour.r,
+                glyph_colour.g,
+                glyph_colour.b
+            )));
+        }
+        return Err(not_hidden(id, mask.len(), floor));
+    }
+
+    // Frame B still painting the glyphs: an unhidden twin, re-rasterised.
+    // Where text was hidden, B around a mask pixel is background; where it
+    // was not, the glyph is still there, a sub-pixel away.
+    let near = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
+    let reach = s.ceil().max(1.0) as i64;
+    let (fw, fh) = (b.width as i64, b.height as i64);
+    let still = mask
+        .iter()
+        .filter(|(x, y, _)| {
+            (-reach..=reach).any(|dy| {
+                (-reach..=reach).any(|dx| {
+                    let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
+                    nx >= 0
+                        && ny >= 0
+                        && nx < fw
+                        && ny < fh
+                        && dist2(rgb_at(b, nx as u32, ny as u32), glyph_colour) <= near
+                })
+            })
+        })
+        .count();
+    if still as f64 > STILL_PAINTED_SHARE * mask.len() as f64 {
+        return Err(unknown(format!(
+            "frame B still paints text '{id}': {still} of its {} glyph-mask pixel(s) have a \
+             glyph-coloured pixel beside them in frame B, so the text was not hidden (a \
+             re-rasterised twin), and no contrast was measured",
+            mask.len()
+        )));
     }
 
     let (ox0, oy0, ow, oh) = over_px;
     let over = |x: u32, y: u32| x >= ox0 && x < ox0 + ow && y >= oy0 && y < oy0 + oh;
-    if box_mask.iter().filter(|(x, y, _)| over(*x, *y)).count() < floor {
+    if mask.iter().filter(|(x, y, _)| over(*x, *y)).count() < floor {
         return Ok(None);
     }
 
-    let (glyph_colour, source, colour_conf) = match pair.text.fg_color {
-        Some(fg) => (fg, GlyphColourSource::Declared, 1.0),
-        None => {
-            let (c, agree) = measured_glyph_colour(a, &box_mask);
-            (c, GlyphColourSource::Measured, agree)
-        }
-    };
     let lg = luminance(glyph_colour);
-    let mut ratios: Vec<f64> = box_mask
-        .iter()
-        .filter(|(x, y, _)| over(*x, *y))
-        .filter_map(|(x, y, _)| {
-            let (pa, pb) = (rgb_at(a, *x, *y), rgb_at(b, *x, *y));
-            // Moved toward the glyph colour: a glyph or its edge, not a halo.
-            (dist2(pa, glyph_colour) < dist2(pb, glyph_colour)).then(|| contrast(lg, luminance(pb)))
-        })
-        .collect();
-    if ratios.len() < floor {
-        return Err((
-            UnknownCode::InputMissing,
-            format!(
-                "the pixels where text '{id}' differs over '{}' did not move toward its glyph \
-                 colour rgb({},{},{}) ({} of them did, under the {floor} needed): the declared \
-                 colour is not what paints, or only a shadow lies over the image",
-                pair.image.id,
-                glyph_colour.r,
-                glyph_colour.g,
-                glyph_colour.b,
-                ratios.len()
-            ),
-        ));
+    let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
+    let mut ratios: Vec<f64> = Vec::new();
+    let mut hidden: Vec<f64> = Vec::new();
+    let (mut faint, mut blind, mut strong_unblind) = (0usize, 0usize, 0usize);
+    for y in oy0..oy0 + oh {
+        for x in ox0..ox0 + ow {
+            let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
+            let is_blind = dist2(pb, glyph_colour) <= near;
+            let r = || contrast(lg, luminance(pb));
+            if is_mask.contains(&(x, y)) {
+                ratios.push(r());
+                strong_unblind += (!is_blind) as usize;
+            } else if is_blind {
+                blind += 1;
+                if reg.faint_trusted() && pa != pb && toward(pa, pb, glyph_colour) {
+                    faint += 1;
+                    ratios.push(r());
+                } else {
+                    hidden.push(r());
+                }
+            }
+        }
     }
+    // The undetectable blind pixels' share of ink, at the density the mask
+    // shows where the image does not match the glyph colour.
+    let unblind =
+        (ow as usize * oh as usize).saturating_sub(blind + (ratios.len() - faint - strong_unblind));
+    let density = strong_unblind as f64 / unblind.max(1) as f64;
+    let estimate = ((density * hidden.len() as f64).round() as usize).min(hidden.len());
     ratios.sort_by(f64::total_cmp);
+    hidden.sort_by(f64::total_cmp);
+    let mut with_hidden = ratios.clone();
+    for i in 0..estimate {
+        // Spread across the blind pixels' own contrasts (quantiles).
+        with_hidden.push(hidden[(i * hidden.len()) / estimate]);
+    }
+    with_hidden.sort_by(f64::total_cmp);
     Ok(Some(TextOverImageContrast {
         element: id.to_string(),
         image: pair.image.id.clone(),
         min_ratio: ratios[0],
         percentile,
         percentile_ratio: nearest_rank(&ratios, percentile),
+        percentile_ratio_with_hidden: nearest_rank(&with_hidden, percentile),
         glyph_colour,
         glyph_colour_source: source,
         sampled_px: ratios.len() as u64,
+        faint_px: faint as u64,
+        hidden_px_estimate: estimate as u64,
         region: Region {
             x: ox0 as i32,
             y: oy0 as i32,
@@ -685,6 +898,19 @@ pub fn measure(
         },
         confidence: (in_frame * colour_conf).clamp(0.0, 1.0),
     }))
+}
+
+/// The Unknown for a mask too sparse to be glyphs.
+fn not_hidden(id: &str, n: usize, floor: usize) -> LocateError {
+    (
+        UnknownCode::InputMissing,
+        format!(
+            "frames A and B differ toward the glyph colour at {n} pixel(s) of text '{id}''s box, \
+             fewer than the {floor} a glyph mask needs: either the text was not hidden in the \
+             text-hidden frame or it is invisible against the image, and the two cannot be told \
+             apart, so no contrast was measured"
+        ),
+    )
 }
 
 /// A caller-supplied percentile, refused unless it is a finite 0..=100.

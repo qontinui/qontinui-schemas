@@ -68,7 +68,8 @@
         250,
         250,
         250
-      ]
+      ],
+      "text_hidden_rerastered": "scrim_b_rerastered.png"
     },
     "wide_heading": {
       "frame": "wide_heading_a.png",
@@ -83,6 +84,111 @@
         "x": 0,
         "y": 62,
         "w": 320,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "sky": {
+      "frame": "sky_a.png",
+      "text_hidden": "sky_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_mid": {
+      "frame": "glow_mid_a.png",
+      "text_hidden": "glow_mid_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_light": {
+      "frame": "glow_light_a.png",
+      "text_hidden": "glow_light_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "credit": {
+      "frame": "credit_a.png",
+      "text_hidden": "credit_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_strong": {
+      "frame": "glow_strong_a.png",
+      "text_hidden": "glow_strong_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
         "h": 32
       },
       "fg": [

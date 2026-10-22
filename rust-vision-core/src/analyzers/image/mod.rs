@@ -1908,7 +1908,8 @@ fn text_contrast_value(
             &built
         }
     };
-    let (pairs, hidden_texts) = text_contrast::texts_over(snapshot, el, index);
+    let over = text_contrast::texts_over(snapshot, el, index);
+    let (pairs, hidden_texts) = (over.pairs, over.unreadable_texts);
     let considered = (pairs.len() + hidden_texts) as u64;
     if considered == 0 {
         return Observation::absent(stamp.provenance(ObservationCoverage::full(1), id))
@@ -1954,14 +1955,15 @@ fn text_contrast_value(
         Some(Err(e)) => return stamp.unknown(e.clone(), DIM, id),
         Some(Ok(b)) => *b,
     };
-    if let Err(e) = text_contrast::registered(frame, b, snapshot, el) {
-        return stamp.unknown(e, DIM, id);
-    }
+    let reg = match text_contrast::registered(frame, b, snapshot, el) {
+        Ok(r) => r,
+        Err(e) => return stamp.unknown(e, DIM, id),
+    };
     let mut values = Vec::new();
     let mut not_over = 0u64;
     let mut failed = Vec::new();
     for p in &pairs {
-        match text_contrast::measure(frame, b, p, text_contrast::DEFAULT_PERCENTILE) {
+        match text_contrast::measure(frame, b, p, text_contrast::DEFAULT_PERCENTILE, &reg) {
             Ok(Some(v)) => values.push(v),
             Ok(None) => not_over += 1,
             Err(e) => failed.push(e),
