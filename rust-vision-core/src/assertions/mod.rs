@@ -280,6 +280,29 @@ pub enum Assertion {
         #[serde(default)]
         max_blockiness: Option<f64>,
     },
+
+    // ---- Text over images (plan 2026-10-13-image-generation-and-visual-
+    // judgment, Phase 16) -------------------------------------------------
+    /// Every text element laid over a readable image reaches `min_ratio`
+    /// WCAG contrast at its `percentile`-th percentile (default
+    /// [`crate::analyzers::image::text_contrast::DEFAULT_PERCENTILE`], 5),
+    /// measured on real pixels: the glyphs are where the frame and its
+    /// text-hidden twin ([`EvalContext::text_hidden_frame`]) differ, and the
+    /// twin is sampled under them. The minimum is reported beside the
+    /// percentile; `percentile: 0` gates on the minimum itself.
+    ///
+    /// `Unknown{needs_multi_frame_input}` without the text-hidden frame;
+    /// `Unknown{input_missing}` when it cannot be paired with the frame
+    /// (another size or scale factor), when `min_ratio` is undeclared, or
+    /// when no text lies over a readable image. A failure stands even when
+    /// another text element could not be measured; a pass needs them all.
+    /// See [`crate::analyzers::image::text_contrast`] for the measurement.
+    TextOverImageContrast {
+        #[serde(default)]
+        min_ratio: Option<f64>,
+        #[serde(default)]
+        percentile: Option<f64>,
+    },
 }
 
 fn default_wcag_aa() -> WcagLevel {
@@ -468,14 +491,19 @@ pub struct AssertionResult {
     /// ([`Assertion::ImagePaletteWithin`], [`Assertion::NoNearDuplicateImages`],
     /// [`Assertion::NoPlaceholderImages`], [`Assertion::TransparentImageLegible`],
     /// [`Assertion::SalienceOrder`], [`Assertion::ImageSharpnessAtLeast`],
-    /// [`Assertion::ImageBlockinessWithin`]) are the ONLY evaluators that read
-    /// [`EvalContext::frame`], and a pixel read from a composited frame is an
-    /// estimate of the image under it. Each sets this field from
-    /// [`crate::analyzers::image::Crop::confidence`] — the share of the
-    /// image's box that was inside the frame and not painted over — scaled
+    /// [`Assertion::ImageBlockinessWithin`], [`Assertion::TextOverImageContrast`])
+    /// are the ONLY evaluators that read [`EvalContext::frame`] (and the last
+    /// also [`EvalContext::text_hidden_frame`]), and a pixel read from a
+    /// composited frame is an estimate of the image under it. Each sets this
+    /// field from [`crate::analyzers::image::Crop::confidence`] — the share of
+    /// the image's box that was inside the frame and not painted over — scaled
     /// where its own doc says so (the ring of surround pixels for
     /// `transparent_image_legible`; the saliency map's peakedness and the
-    /// winning margin for `salience_order`). A verdict that rests on the
+    /// winning margin for `salience_order`), except `text_over_image_contrast`,
+    /// which reads no crop: its confidence is the reading's own
+    /// ([`crate::analyzers::image::TextOverImageContrast::confidence`] — the
+    /// share of the text's box in the frame, the measured glyph colour's
+    /// agreement, and a cap on the whole-box fallback). A verdict that rests on the
     /// slot's placeholder MARKER alone, and [`Assertion::ImageFocalVisible`]
     /// (media facts, no pixels), are deductions and state `None`.
     ///
@@ -691,6 +719,13 @@ pub struct EvalContext<'a> {
     /// Any other evaluator that starts reading it is producing an ESTIMATE
     /// and owes one too — see that field.
     pub frame: Option<&'a Frame>,
+    /// The text-hidden twin of [`Self::frame`]: the same page, captured with
+    /// its text made transparent. Read only by
+    /// [`Assertion::TextOverImageContrast`] (in `assertions/image.rs`, with
+    /// the other pixel readers); absent, that assertion answers
+    /// `Unknown{needs_multi_frame_input}`. Plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16.
+    pub text_hidden_frame: Option<&'a Frame>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
     /// from `vision/extract` output before evaluating.
@@ -771,7 +806,8 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
         | Assertion::TransparentImageLegible { .. }
         | Assertion::SalienceOrder { .. }
         | Assertion::ImageSharpnessAtLeast { .. }
-        | Assertion::ImageBlockinessWithin { .. } => image::evaluate(a, ctx),
+        | Assertion::ImageBlockinessWithin { .. }
+        | Assertion::TextOverImageContrast { .. } => image::evaluate(a, ctx),
     }
 }
 
