@@ -35,7 +35,11 @@
 //! tile in the ring around its box is DISPLACED image unless its difference
 //! reads as alpha-blended text — every differing pixel moved toward one
 //! colour — which untracked text that only frame A carries always does and
-//! moved texture, at any offset, does not.
+//! moved texture, at any offset, does not. Any displaced tile right beside
+//! the text refuses on its own, and the refusal names its position.
+//! PRODUCERS SHOULD PAUSE ANIMATIONS (spinners, carousels, chevrons, CSS
+//! transitions) for both captures: anything that moves between them near the
+//! text reads as misregistration, and the text is not measured.
 //!
 //! # Where the glyphs are
 //!
@@ -78,18 +82,22 @@
 //! with a noisy one, every blind pixel is. EVERY undetectable pixel counts
 //! as ink: no visible band bounds the density of a hidden word, which may be
 //! heavier than any visible one (a density taken from the visible line passed
-//! a heavy glyph on a tight patch at p5 7.55 where the truth was 1.00; on 2571
-//! text windows of 14 real photos counting every pixel cost 1 correct pass in
-//! 881). [`TextOverImageContrast::percentile_ratio_with_hidden`] is the
+//! a heavy glyph on a tight patch at p5 7.55 where the truth was 1.00; on 2606
+//! text windows of 14 real photos the shipped rule read 4 of 886 true passes
+//! as Unknown and 3 as conservative failures, and passed nothing falsely).
+//! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the
 //! percentile with those pixels added at their own contrasts. A check passes
 //! only on that value, fails on the measured one, and is Unknown in between:
 //! the hidden ink may or may not be there.
 //!
 //! A mask pixel is SAMPLED only where the glyph covers it at least
-//! [`MIN_GLYPH_COVERAGE`] (α = (A−B)·(c−B)/|c−B|² under alpha blending):
-//! a low-coverage edge clears the difference threshold more readily over a
-//! background far from the glyph colour, which weighted the sample toward
-//! high contrast. Faint pixels are sampled whatever their coverage.
+//! [`MIN_GLYPH_COVERAGE_SHARE`] of the best-covered pixel of its mask, and at
+//! least [`MIN_GLYPH_COVERAGE_ABS`] (α = (A−B)·(c−B)/|c−B|² under alpha
+//! blending): a low-coverage edge clears the difference threshold more
+//! readily over a background far from the glyph colour, which weighted the
+//! sample toward high contrast. Relative, so a true hairline face whose ink
+//! never reaches full coverage is still measured. Faint pixels are sampled
+//! whatever their coverage.
 //!
 //! # Evidence of the hide, and the limits without it
 //!
@@ -228,10 +236,16 @@ pub const LOCAL_TEXT_LIKE_SHARE: f64 = 0.9;
 /// check to refuse.
 pub const LOCAL_DISPLACED_TILE_SHARE: f64 = 0.1;
 
-/// Smallest estimated glyph coverage ([`coverage`]) of a mask pixel that is
-/// sampled. Faint pixels (on a background within [`GLYPH_DIFF_MIN`] of the
-/// glyph colour) are sampled whatever their coverage.
-pub const MIN_GLYPH_COVERAGE: f64 = 0.5;
+/// Smallest estimated glyph coverage ([`coverage`]) of a sampled mask pixel,
+/// as a share of the highest coverage in the mask over the image: a hairline
+/// face whose ink peaks at 45% is sampled from about 22%. Faint pixels (on a
+/// background within [`GLYPH_DIFF_MIN`] of the glyph colour) are sampled
+/// whatever their coverage.
+pub const MIN_GLYPH_COVERAGE_SHARE: f64 = 0.5;
+
+/// The absolute floor under [`MIN_GLYPH_COVERAGE_SHARE`], so a mask of
+/// nothing but faint edges or noise never qualifies on its own scale.
+pub const MIN_GLYPH_COVERAGE_ABS: f64 = 0.15;
 
 /// RGB distance within which a core glyph pixel agrees with the measured
 /// glyph colour.
@@ -762,6 +776,8 @@ impl Registration {
             )
         });
         let mut adjacent_displaced = 0usize;
+        // The first displaced first-row tile, named in the refusal.
+        let mut first_at: Option<(i64, i64)> = None;
         let reach = (LOCAL_MAX_SHIFT_CSS * s).ceil().max(1.0) as i64;
         let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
         let (fw, fh) = (a.width as i64, a.height as i64);
@@ -805,7 +821,10 @@ impl Registration {
                 }
                 if !text_like(&mut diffs) {
                     displaced += 1;
-                    adjacent_displaced += adjacent as usize;
+                    if adjacent {
+                        adjacent_displaced += 1;
+                        first_at.get_or_insert((tx - ts, ty));
+                    }
                     continue;
                 }
                 // The shift test reads only the DIFFERING pixels: whether one
@@ -838,7 +857,10 @@ impl Registration {
                     .unwrap_or(base);
                 if best * 2 < base {
                     displaced += 1;
-                    adjacent_displaced += adjacent as usize;
+                    if adjacent {
+                        adjacent_displaced += 1;
+                        first_at.get_or_insert((tx - ts, ty));
+                    }
                 }
             }
             ty += ts;
@@ -846,13 +868,25 @@ impl Registration {
         if adjacent_displaced > 0
             || (displaced > 0 && displaced as f64 >= LOCAL_DISPLACED_TILE_SHARE * tiles as f64)
         {
+            let next_to = first_at
+                .map(|(x, y)| {
+                    format!(
+                        "; {adjacent_displaced} of them right beside the text, the first at \
+                         buffer px ({x}, {y}), CSS px ({:.0}, {:.0}) — an animation there \
+                         (a spinner, a chevron) moves the same way; pause animations for \
+                         both captures",
+                        x as f64 / s,
+                        y as f64 / s
+                    )
+                })
+                .unwrap_or_default();
             return Err((
                 UnknownCode::InputMissing,
                 format!(
                     "the text-hidden frame is not registered with the frame around this text: \
                      {displaced} of the {tiles} {REGISTRATION_TILE_CSS}-CSS-px tile(s) around it \
                      ({:.1}%) show the image displaced between the captures (a parallax layer, \
-                     a scroll-linked transform), not text that only the frame carries",
+                     a scroll-linked transform), not text that only the frame carries{next_to}",
                     displaced as f64 * 100.0 / tiles.max(1) as f64
                 ),
             ));
@@ -1183,17 +1217,23 @@ pub fn measure(
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
     let mut faint = 0usize;
+    let peak = mask
+        .iter()
+        .filter(|(x, y, _)| over(*x, *y))
+        .map(|(x, y, _)| coverage(rgb_at(a, *x, *y), rgb_at(b, *x, *y), glyph_colour))
+        .fold(0.0_f64, f64::max);
+    let min_coverage = (MIN_GLYPH_COVERAGE_SHARE * peak).max(MIN_GLYPH_COVERAGE_ABS);
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
             let is_blind = dist2(pb, glyph_colour) <= near;
             let r = || contrast(lg, luminance(pb));
             if is_mask.contains(&(x, y)) {
-                // Only pixels the glyph covers at least half: a low-coverage
-                // edge clears the difference threshold more readily over a
-                // background far from the glyph colour, which would weight
-                // the sample toward high contrast.
-                if coverage(pa, pb, glyph_colour) >= MIN_GLYPH_COVERAGE {
+                // Only pixels the glyph covers at least half as well as its
+                // best-covered one: a low-coverage edge clears the difference
+                // threshold more readily over a background far from the glyph
+                // colour, which would weight the sample toward high contrast.
+                if coverage(pa, pb, glyph_colour) >= min_coverage {
                     ratios.push(r());
                 }
             } else if is_blind {
@@ -1213,7 +1253,7 @@ pub fn measure(
             "fewer than {floor} pixel(s) of text '{id}' over '{}' are covered at least {:.0}% by \
              its glyphs ({} are), so no contrast was measured",
             pair.image.id,
-            MIN_GLYPH_COVERAGE * 100.0,
+            min_coverage * 100.0,
             ratios.len()
         )));
     }
