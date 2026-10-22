@@ -326,6 +326,70 @@
         255,
         255
       ]
+    },
+    "heavy_m": {
+      "frame": "heavy_m_a.png",
+      "text_hidden": "heavy_m_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 58,
+        "w": 1280,
+        "h": 41
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "heavy_w": {
+      "frame": "heavy_w_a.png",
+      "text_hidden": "heavy_w_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 59,
+        "w": 1280,
+        "h": 40
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "panel": {
+      "frame": "panel_a.png",
+      "text_hidden": "panel_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_moved": "panel_b_moved.png"
     }
   }
 }

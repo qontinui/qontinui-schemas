@@ -73,6 +73,7 @@ fn run_image_framed(snap: &ElementSnapshot) -> analyzers::AnalyzerResult {
             snapshot: Some(snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     )
 }
@@ -85,6 +86,7 @@ fn run(analyzer: Analyzer, snap: &ElementSnapshot) -> analyzers::AnalyzerResult 
             snapshot: Some(snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     )
 }
@@ -409,6 +411,7 @@ fn dynamic_carries_no_coverage_and_a_missing_frame_is_blocked() {
             snapshot: Some(&snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     assert!(result.verdict.is_blocked(), "{:?}", result.verdict);

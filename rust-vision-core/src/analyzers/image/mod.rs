@@ -1374,6 +1374,7 @@ type TextHidden<'a> = Option<Result<&'a Frame, LocateError>>;
 /// What [`measure`] needs for the text-over-image value, built once per run.
 struct TextCtx<'a> {
     hidden: TextHidden<'a>,
+    ids: Option<&'a [String]>,
     index: Option<text_contrast::TextIndex<'a>>,
 }
 
@@ -1390,9 +1391,11 @@ pub fn run(
     frame: &Frame,
     snapshot: Option<&ElementSnapshot>,
     text_hidden: Option<&Frame>,
+    text_hidden_ids: Option<&[String]>,
 ) -> AnalyzerResult {
     let text_hidden = TextCtx {
         hidden: text_hidden.map(|b| text_contrast::pair_frames(frame, b).map(|()| b)),
+        ids: text_hidden_ids,
         index: snapshot.map(text_contrast::TextIndex::of),
     };
     let stamp = Stamp {
@@ -1963,7 +1966,22 @@ fn text_contrast_value(
     let mut not_over = 0u64;
     let mut failed = Vec::new();
     for p in &pairs {
-        match text_contrast::measure(frame, b, p, text_contrast::DEFAULT_PERCENTILE, &reg) {
+        let reported = match text.ids {
+            None => false,
+            Some(ids) if ids.contains(&p.text.id) => true,
+            Some(_) => {
+                failed.push(text_contrast::not_reported_hidden(&p.text.id));
+                continue;
+            }
+        };
+        match text_contrast::measure(
+            frame,
+            b,
+            p,
+            text_contrast::DEFAULT_PERCENTILE,
+            &reg,
+            reported,
+        ) {
             Ok(Some(v)) => values.push(v),
             Ok(None) => not_over += 1,
             Err(e) => failed.push(e),
