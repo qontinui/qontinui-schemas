@@ -373,8 +373,9 @@ fn no_near_duplicates(
         ));
     }
     if small > 0 {
+        let floor = img::PLACEHOLDER_FILL_MIN_SIDE_CSS;
         note.push_str(&format!(
-            " ({small} image(s) under 48 CSS px left out: icons, not slot images)"
+            " ({small} image(s) under {floor} CSS px left out: icons, not slot images)"
         ));
     }
     if hashed.len() < 2 {
