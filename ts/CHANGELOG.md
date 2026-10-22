@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.0...ts-v2.4.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **ci-exec:** bump zip to 9 for RUSTSEC-2026-0367..0369 ([3ac862b](https://github.com/qontinui/qontinui-schemas/commit/3ac862bcb2ed38860445a4befbd30185096d6ef0))
+* restore run-outcomes capture and ts 2.4.0 reverted by 3ac862bc ([0d2fd65](https://github.com/qontinui/qontinui-schemas/commit/0d2fd65ed1f2b7e71b7276901b0266270c167aa9))
+
 ## [2.4.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.1...ts-v2.4.0) (2026-10-19)
 
 

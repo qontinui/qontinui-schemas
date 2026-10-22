@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.7.0...rust-v4.8.0) (2026-10-22)
+
+
+### Features
+
+* add ScheduledTaskType::Script (command, working_directory, timeout_seconds) ([20c02a8](https://github.com/qontinui/qontinui-schemas/commit/20c02a87d257a34fbff761c8f8f82f3a2c9fa44a))
+* build_census pure core, owner classifier and capacity cause ([ac4b36e](https://github.com/qontinui/qontinui-schemas/commit/ac4b36e840a6ccf9223e0ca6a81ddf9ed9fe3716))
+* **ci-exec:** capture run outcomes and share coord's run_outcomes validator ([2f886a3](https://github.com/qontinui/qontinui-schemas/commit/2f886a3f2650d82a91b4cd0e7a43a4e9113578d4))
+* **spawn-authorization:** operator_page_remediation spawn kind ([9777f7e](https://github.com/qontinui/qontinui-schemas/commit/9777f7e91b7965495d7e7d2f10043dae48700f50))
+* **types:** host_sizing — shared cargo job/slot sizing + golden table ([5a75977](https://github.com/qontinui/qontinui-schemas/commit/5a75977cdfdd75fcdf16e510ee673ff31d417748))
+
+
+### Bug Fixes
+
+* **ci-exec:** bound and harden the run-outcomes capture ([d8bd1bc](https://github.com/qontinui/qontinui-schemas/commit/d8bd1bc7ce0e90b68554bc9630167e7a376defc8))
+* **ci-exec:** bump zip to 9 for RUSTSEC-2026-0367..0369 ([3ac862b](https://github.com/qontinui/qontinui-schemas/commit/3ac862bcb2ed38860445a4befbd30185096d6ef0))
+* restore run-outcomes capture and ts 2.4.0 reverted by 3ac862bc ([0d2fd65](https://github.com/qontinui/qontinui-schemas/commit/0d2fd65ed1f2b7e71b7276901b0266270c167aa9))
+* **types:** pin build_jobs rounding and the 8 GiB edge; mirror host-probe in ci.toml ([03960d9](https://github.com/qontinui/qontinui-schemas/commit/03960d9f25c4d6701d64ed97ef8b6c2ef343984c))
+
 ## [4.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.6.0...rust-v4.7.0) (2026-10-13)
 
 

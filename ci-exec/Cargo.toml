@@ -1,6 +1,6 @@
 [package]
 name = "qontinui-ci-exec"
-version = "0.1.0"
+version = "0.1.1"
 description = "The Qontinui CI executor: reads a repo's .qontinui/ci.toml, provisions its tools, siblings and services, and runs one job. Shared by the runner's CI node, the headless CI host agent and the standalone qontinui-ci CLI."
 edition.workspace = true
 license.workspace = true
