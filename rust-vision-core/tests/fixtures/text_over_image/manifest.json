@@ -238,7 +238,9 @@
         255,
         255
       ],
-      "text_hidden_parallax": "parallax_b_moved.png"
+      "text_hidden_parallax": "parallax_b_moved.png",
+      "text_hidden_parallax4": "parallax_b_moved4.png",
+      "text_hidden_parallax6": "parallax_b_moved6.png"
     },
     "mottled": {
       "frame": "mottled_a.png",
@@ -254,6 +256,70 @@
         "y": 62,
         "w": 166,
         "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "tagline": {
+      "frame": "tagline_a.png",
+      "text_hidden": "tagline_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "card": {
+      "frame": "card_a.png",
+      "text_hidden": "card_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_rerastered": "card_b_rerastered.png"
+    },
+    "heavy": {
+      "frame": "heavy_a.png",
+      "text_hidden": "heavy_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 58,
+        "w": 1280,
+        "h": 41
       },
       "fg": [
         255,
