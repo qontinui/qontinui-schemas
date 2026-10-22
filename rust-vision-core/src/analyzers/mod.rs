@@ -474,6 +474,13 @@ pub struct AnalyzeInput<'a> {
     /// share `frame`'s size and scale factor; see
     /// [`image::text_contrast::pair_frames`].
     pub text_hidden_frame: Option<&'a Frame>,
+    /// The ids of the text elements the producer REPORTS it hid in
+    /// `text_hidden_frame` (the SDK's text-visibility control). Optional:
+    /// absent, the hide is inferred from the pixels. Supplied, a text element
+    /// not in it is unmeasured ("not reported hidden"), and one in it skips
+    /// the still-painted inference. See
+    /// [`image::text_contrast`] ("Evidence of the hide").
+    pub text_hidden_ids: Option<&'a [String]>,
 }
 
 /// Dispatcher. Calls the named analyzer with whatever it needs from
@@ -551,7 +558,12 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
         // a finding (the Blocked verdict itself is what a gate reads). A
         // missing snapshot is not a block — see `image::run`.
         Analyzer::Image => match input.frame {
-            Some(f) => image::run(f, input.snapshot, input.text_hidden_frame),
+            Some(f) => image::run(
+                f,
+                input.snapshot,
+                input.text_hidden_frame,
+                input.text_hidden_ids,
+            ),
             None => missing_input_at(
                 "image analyzer requires a Frame: every value it measures is read from pixels",
                 input.snapshot,

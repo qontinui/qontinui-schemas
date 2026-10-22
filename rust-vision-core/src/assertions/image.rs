@@ -859,7 +859,15 @@ fn text_over_image(
             }
             None => unreachable!("every pair's image was registered above"),
         };
-        match tc::measure(frame, hidden, p, pct, reg) {
+        let reported = match ctx.text_hidden_ids {
+            None => false,
+            Some(ids) if ids.contains(&p.text.id) => true,
+            Some(_) => {
+                unmeasured.push(tc::not_reported_hidden(&p.text.id).1);
+                continue;
+            }
+        };
+        match tc::measure(frame, hidden, p, pct, reg, reported) {
             Ok(Some(r)) => readings.push(r),
             Ok(None) => not_over += 1,
             Err((_, why)) => unmeasured.push(why),

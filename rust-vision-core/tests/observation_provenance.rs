@@ -123,6 +123,7 @@ fn every_finding_from_a_real_run_names_its_analyzer() {
             snapshot: Some(&snap),
             prior_frame: Some(&prior),
             text_hidden_frame: None,
+            text_hidden_ids: None,
         };
         let result = analyzers::run(a, &input);
         for f in &result.findings {
@@ -164,6 +165,7 @@ fn a_blocked_verdict_still_carries_its_provenance() {
             snapshot: None,
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         };
         let result = analyzers::run(a, &input);
 
@@ -219,6 +221,7 @@ fn a_pixel_sampled_contrast_finding_carries_a_confidence() {
             snapshot: Some(&snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
 
@@ -263,6 +266,7 @@ fn a_declared_contrast_finding_states_that_it_is_a_deduction() {
             snapshot: Some(&snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
 
@@ -293,6 +297,7 @@ fn geometry_findings_state_that_they_are_deductions() {
             snapshot: Some(&snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     assert!(
@@ -603,6 +608,7 @@ fn finding_round_trips_its_analyzer_and_confidence() {
             snapshot: None,
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     // Sanity: the dispatcher's own blocked finding is attributed, and that
@@ -638,6 +644,7 @@ fn an_analyzer_result_round_trips_with_its_findings_attributed() {
             snapshot: Some(&snap),
             prior_frame: None,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     let json = serde_json::to_string(&result).unwrap();

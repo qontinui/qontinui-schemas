@@ -962,3 +962,157 @@ fn a_heavy_word_on_a_clipped_patch_never_passes() {
     let v = c.reading();
     assert!(v.percentile_ratio_with_hidden < 4.5, "{v:?}");
 }
+
+// ---------------------------------------------------------------- round 6
+
+/// A heavy "M" (stroke 5) or "W" (stroke 4) on a TIGHT 255 patch after a
+/// 71-character regular line, in a full-width box. At the regular line's
+/// band density (~0.2) the hidden ink is under 5% of the samples and p5
+/// passes; with every hidden pixel counted as ink it is well over, and it
+/// does not. Must never pass.
+#[test]
+fn a_heavy_glyph_on_a_tight_patch_never_passes() {
+    for name in ["heavy_m", "heavy_w"] {
+        let c = case(name);
+        let r = c.assert_aa();
+        assert_ne!(
+            r.outcome,
+            AssertionOutcome::Passed,
+            "{name}: {:?}",
+            r.detail
+        );
+        let v = c.reading();
+        assert!(v.percentile_ratio_with_hidden < 4.5, "{name}: {v:?}");
+    }
+}
+
+/// A textured panel behind the first letters, reaching 8 px past the text
+/// box on one side, moved 5 px between the captures: it touches only a few
+/// tiles of the ring's FIRST row — under the ring share — and one displaced
+/// tile there is enough. The registered twin is judged.
+#[test]
+fn a_panel_moving_just_under_the_text_is_unknown() {
+    let c = case("panel");
+    let moved = alt_twin("panel", "text_hidden_moved");
+    let r = c.assert_with(Some(&moved), Some(4.5), None);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("displaced"),
+        "{:?}",
+        r.detail
+    );
+    let control = c.assert_aa();
+    assert_ne!(
+        control.outcome,
+        AssertionOutcome::Unknown,
+        "{:?}",
+        control.detail
+    );
+}
+
+/// Only pixels the glyph covers at least half are sampled. Here most of the
+/// "glyph" is a 30%-coverage veil over a LIGHT region (a low-coverage edge
+/// clears the difference threshold easily far from the glyph colour), while
+/// its fully covered core sits over a mid-grey one. Sampled whole, the light
+/// region dominates and p5 passes; sampled by coverage, the core decides and
+/// it fails at about 4:1.
+#[test]
+fn low_coverage_edge_pixels_are_not_sampled() {
+    let (w, h) = (200u32, 100u32);
+    let b = image::RgbaImage::from_fn(w, h, |x, _| {
+        let v = if x < 100 { 110 } else { 240 };
+        image::Rgba([v, v, v, 255])
+    });
+    let mut a = b.clone();
+    // Fully covered black core over the mid-grey half: 30 px.
+    for y in 40..46u32 {
+        for x in 20..25u32 {
+            a.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+        }
+    }
+    // A 30%-coverage veil over the light half: 0.7 * 240 = 168, 1200 px.
+    for y in 35..55u32 {
+        for x in 120..180u32 {
+            a.put_pixel(x, y, image::Rgba([168, 168, 168, 255]));
+        }
+    }
+    let text = Element {
+        id: "label".into(),
+        bbox: Some(Region {
+            x: 10,
+            y: 30,
+            w: 180,
+            h: 30,
+        }),
+        text: Some("label".into()),
+        fg_color: Some(Rgb::new(0, 0, 0)),
+        ..Default::default()
+    };
+    let c = Case {
+        a: Frame::from_rgba(a, FrameSource::synthetic_now()),
+        b: Frame::from_rgba(b, FrameSource::synthetic_now()),
+        snap: ElementSnapshot {
+            elements: vec![hero(Region { x: 0, y: 0, w, h }), text],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    let v = c.reading();
+    assert_eq!(v.sampled_px, 30, "only the fully covered core: {v:?}");
+}
+
+/// The producer's REPORT of what it hid (`text_hidden_ids`). A text element
+/// not in it is Unknown "not among the elements the producer reports it
+/// hid"; one in it is measured, and the still-painted inference — which
+/// exists only to guess the hide — is skipped.
+#[test]
+fn a_reported_hide_list_decides_which_text_is_measured() {
+    let scrim = case("scrim");
+    let eval = |ids: Option<&[String]>, b: &Frame| {
+        evaluate_assertion(
+            &Assertion::TextOverImageContrast {
+                min_ratio: Some(4.5),
+                percentile: None,
+            },
+            &EvalContext {
+                snapshot: Some(&scrim.snap),
+                frame: Some(&scrim.a),
+                text_hidden_frame: Some(b),
+                text_hidden_ids: ids,
+                ..Default::default()
+            },
+        )
+    };
+    let listed = vec!["heading".to_string()];
+    let other = vec!["caption".to_string()];
+    assert_eq!(
+        eval(Some(&listed), &scrim.b).outcome,
+        AssertionOutcome::Passed
+    );
+    let r = eval(Some(&other), &scrim.b);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("not among"),
+        "{:?}",
+        r.detail
+    );
+    let r = eval(Some(&[]), &scrim.b);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+
+    // The analyzer value follows the same list.
+    let v = analyzers::run(
+        Analyzer::Image,
+        &AnalyzeInput {
+            frame: Some(&scrim.a),
+            snapshot: Some(&scrim.snap),
+            text_hidden_frame: Some(&scrim.b),
+            text_hidden_ids: Some(&other),
+            ..Default::default()
+        },
+    )
+    .image_values
+    .unwrap();
+    let tc = v.images[0].text_contrast.as_ref().unwrap();
+    assert_eq!(tc.status(), ObservationStatus::Unknown);
+}

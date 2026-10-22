@@ -313,6 +313,70 @@ def main() -> None:
         "fg": [255, 255, 255],
     }
 
+    # Round 6 (review of 89b8daa5).
+
+    # heavy_m / heavy_w: a 71-character regular line, then "M" (stroke 5) or
+    # "W" (stroke 4) on a TIGHT 255 patch, in a full-width box. Counted at the
+    # regular line's band density (~0.2) the hidden ink is under 5% of the
+    # samples and p5 passes; every hidden pixel counted as ink, it is not.
+    def heavy_case(name: str, word: str, sw: int, seed: int) -> None:
+        width = 1280
+        page_b = Image.new("RGB", (width, H), PAGE)
+        hero = Image.new("RGB", (width, HERO[3]))
+        rng = random.Random(seed)
+        hp = hero.load()
+        for y in range(HERO[3]):
+            for x in range(width):
+                v = 55.0 + 22.0 * (math.sin(x / 23) + math.cos(y / 17) + math.sin((x + y) / 31)) / 3
+                n = rng.uniform(-6, 6)
+                hp[x, y] = tuple(max(0, min(255, round(v + n + t))) for t in (-8.0, 0.0, 10.0))
+        page_b.paste(hero, (HERO[0], HERO[1]))
+        probe = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+        prefix = "free delivery on every order placed this week only, today and tomorrow "
+        assert len(prefix) == 71
+        pl, pt, pr, pb = probe.textbbox(TEXT_AT, prefix, font=FONT)
+        at = (pr + 4, TEXT_AT[1])
+        wl, wt, wr, wb = probe.textbbox(at, word, font=FONT, stroke_width=sw)
+        ImageDraw.Draw(page_b).rectangle([wl - 1, wt - 1, wr + 1, wb + 1], fill=(255, 255, 255))
+        page_a = page_b.copy()
+        da = ImageDraw.Draw(page_a)
+        da.text(TEXT_AT, prefix, font=FONT, fill=(255, 255, 255))
+        da.text(at, word, font=FONT, fill=(255, 255, 255), stroke_width=sw,
+                stroke_fill=(255, 255, 255))
+        page_a.save(HERE / f"{name}_a.png", optimize=True)
+        page_b.save(HERE / f"{name}_b.png", optimize=True)
+        top, bottom = min(pt, wt), max(pb, wb)
+        cases[name] = {
+            "frame": f"{name}_a.png",
+            "text_hidden": f"{name}_b.png",
+            "image": {"x": 0, "y": HERO[1], "w": width, "h": HERO[3]},
+            "text": {"x": 0, "y": top - 6, "w": width, "h": bottom - top + 12},
+            "fg": [255, 255, 255],
+        }
+
+    heavy_case("heavy_m", "M", 5, 27)
+    heavy_case("heavy_w", "W", 4, 28)
+
+    # panel: a textured panel behind the first letters that reaches 8 px past
+    # the text box on the left, and moves 5 px between the captures. It
+    # touches only the ring's first row on that side -- too few tiles for the
+    # ring share. Must be Unknown.
+    rng = random.Random(29)
+    px0, py0, px1, py1 = box["x"] - 8, box["y"], box["x"] + 60, box["y"] + box["h"]
+    panel = Image.new("RGB", (px1 - px0 + 5, py1 - py0))
+    pp = panel.load()
+    for y in range(panel.height):
+        for x in range(panel.width):
+            v = 70 + 50 * (math.sin(x / 3.1) * math.cos(y / 2.7)) + rng.uniform(-8, 8)
+            pp[x, y] = (max(0, min(255, round(v))), max(0, min(255, round(v * 0.8))), 40)
+    panel_b = tex_page.copy()
+    panel_b.paste(panel.crop((0, 0, px1 - px0, py1 - py0)), (px0, py0))
+    write_case("panel", panel_b, (255, 255, 255), box, cases)
+    panel_moved = tex_page.copy()
+    panel_moved.paste(panel.crop((5, 0, px1 - px0 + 5, py1 - py0)), (px0, py0))
+    panel_moved.save(HERE / "panel_b_moved.png", optimize=True)
+    cases["panel"]["text_hidden_moved"] = "panel_b_moved.png"
+
     manifest = {
         "generator": "generate.py",
         "page": {"w": W, "h": H, "scale_factor": 1.0},
