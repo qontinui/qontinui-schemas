@@ -31,10 +31,11 @@
 //!
 //! That global check cannot see a layer displaced under PART of the image (a
 //! parallax layer moving a few px under the text). So each text element is
-//! also checked LOCALLY ([`Registration::local`]): the ring of tiles around
-//! its box must not show content that a small shift of frame B lines up.
-//! Untracked text that only frame A carries matches B under no shift, so it
-//! is still tolerated.
+//! also checked LOCALLY ([`Registration::local`]): a differing, textured
+//! tile in the ring around its box is DISPLACED image unless its difference
+//! reads as alpha-blended text — every differing pixel moved toward one
+//! colour — which untracked text that only frame A carries always does and
+//! moved texture, at any offset, does not.
 //!
 //! # Where the glyphs are
 //!
@@ -77,7 +78,9 @@
 //! with a noisy one, every blind pixel is. The undetectable pixels' ink is
 //! estimated at the mask's density in the DENSEST column band about one line
 //! height wide (where the glyphs are — never averaged over a block box's
-//! blank run, which would dilute it), times their count, and
+//! blank run, which would dilute it), times their count; in a band too blind
+//! to qualify (a hidden word may be heavier than any visible one) every
+//! undetectable pixel counts as ink. And
 //! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the percentile
 //! with that many samples added at the blind pixels' own contrasts. A check
 //! passes only on that value, fails on the measured one, and is Unknown in
@@ -191,8 +194,13 @@ pub const MIN_FLAT_TILES: usize = 4;
 /// registration check reads ([`Registration::local`]).
 pub const LOCAL_RING_TILES: i64 = 2;
 
-/// Largest displacement, in CSS px, the local check tries.
+/// Largest displacement, in CSS px, the local check's shift test tries on a
+/// text-like tile.
 pub const LOCAL_MAX_SHIFT_CSS: f64 = 3.0;
+
+/// Share of a ring tile's differing pixels that must have moved toward one
+/// colour for the tile to read as untracked text rather than moved image.
+pub const LOCAL_TEXT_LIKE_SHARE: f64 = 0.9;
 
 /// Share of the ring's tiles that must show displaced content for the local
 /// check to refuse.
@@ -625,28 +633,76 @@ impl Registration {
         self.holes[((y - iy) * iw + (x - ix)) as usize]
     }
 
-    /// The LOCAL registration check for one text element: the tiles in a
-    /// ring [`LOCAL_RING_TILES`] tiles wide around its widened box, inside
-    /// the image, must not show content DISPLACED between the frames. A
-    /// differing textured tile is displaced when shifting frame B by up to
-    /// [`LOCAL_MAX_SHIFT_CSS`] CSS px halves its difference: a parallax layer
-    /// or a scroll-linked transform moved, while text that only frame A
-    /// carries (an untracked tagline) matches B under no shift. Refused when
-    /// at least [`LOCAL_DISPLACED_TILE_SHARE`] of the ring's tiles (and at
-    /// least one) are displaced. The global check cannot see this: a layer
-    /// under part of the hero is under half its tiles.
-    pub fn local(&self, a: &Frame, b: &Frame, text_box: Region) -> Result<(), LocateError> {
+    /// The ring [`LOCAL_RING_TILES`] tiles wide around `text_box`'s widened
+    /// box, clipped to the image rect, as half-open buffer bounds.
+    fn ring(&self, a: &Frame, text_box: Region) -> Option<(i64, i64, i64, i64)> {
         let s = a.source.scale_factor;
-        let ts = self.tile as i64;
-        let Some(r) = a.css_region_to_pixels(text_box) else {
-            return Ok(());
-        };
-        let margin = (REGISTRATION_MARGIN_CSS * s).ceil() as i64 + LOCAL_RING_TILES * ts;
+        let r = a.css_region_to_pixels(text_box)?;
+        let margin =
+            (REGISTRATION_MARGIN_CSS * s).ceil() as i64 + LOCAL_RING_TILES * self.tile as i64;
         let (ix, iy, iw, ih) = self.rect;
         let x0 = (r.x as i64 - margin).max(ix as i64);
         let y0 = (r.y as i64 - margin).max(iy as i64);
         let x1 = (r.right() + margin).min((ix + iw) as i64);
         let y1 = (r.bottom() + margin).min((iy + ih) as i64);
+        (x0 < x1 && y0 < y1).then_some((x0, y0, x1, y1))
+    }
+
+    /// The share of the IMAGE's frame-B pixels in the ring around
+    /// `text_box` (outside every widened text box) within
+    /// [`GLYPH_DIFF_MIN`] of `colour`: how often the image itself is
+    /// glyph-coloured near this text. Read outside the text so an unhidden
+    /// twin's own glyph cores cannot inflate it. `0.0` when the ring holds no
+    /// image pixel.
+    pub fn glyph_coloured_share_around(
+        &self,
+        a: &Frame,
+        b: &Frame,
+        text_box: Region,
+        colour: Rgb,
+    ) -> f64 {
+        let Some((x0, y0, x1, y1)) = self.ring(a, text_box) else {
+            return 0.0;
+        };
+        let near = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
+        let (mut n, mut k) = (0usize, 0usize);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let (x, y) = (x as u32, y as u32);
+                if self.hole(x, y) {
+                    continue;
+                }
+                n += 1;
+                k += (dist2(rgb_at(b, x, y), colour) <= near) as usize;
+            }
+        }
+        k as f64 / n.max(1) as f64
+    }
+
+    /// The LOCAL registration check for one text element: the tiles in a
+    /// ring [`LOCAL_RING_TILES`] tiles wide around its widened box, inside
+    /// the image, must not show content DISPLACED between the frames.
+    ///
+    /// A differing, textured ring tile is displaced unless its difference
+    /// reads as TEXT that only frame A carries (an untracked tagline, a
+    /// credit). Text is alpha-blended over the image, so every one of its
+    /// differing pixels moved toward ONE colour, its own: at least
+    /// [`LOCAL_TEXT_LIKE_SHARE`] of the tile's differing pixels must lie
+    /// closer in A than in B to the colour of the tile's most-changed
+    /// quarter. Moved texture — a parallax layer at any offset, a rotation, a
+    /// rescale — goes both ways (a median 52–71% per tile under 1–6 px parallax
+    /// on a textured layer; untracked 12–18 px text, any colour, 100%).
+    /// A text-like tile is still displaced when shifting frame B by up to
+    /// [`LOCAL_MAX_SHIFT_CSS`] CSS px halves its difference. Refused when at
+    /// least [`LOCAL_DISPLACED_TILE_SHARE`] of the ring's tiles (and at least
+    /// one) are displaced. The global check cannot see this: a layer under
+    /// part of the hero is under half its tiles.
+    pub fn local(&self, a: &Frame, b: &Frame, text_box: Region) -> Result<(), LocateError> {
+        let s = a.source.scale_factor;
+        let ts = self.tile as i64;
+        let Some((x0, y0, x1, y1)) = self.ring(a, text_box) else {
+            return Ok(());
+        };
         let reach = (LOCAL_MAX_SHIFT_CSS * s).ceil().max(1.0) as i64;
         let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
         let (fw, fh) = (a.width as i64, a.height as i64);
@@ -656,7 +712,8 @@ impl Registration {
             let mut tx = x0;
             while tx < x1 {
                 let mut px: Vec<(u32, u32)> = Vec::new();
-                let (mut lo, mut hi, mut differing) = (u8::MAX, u8::MIN, 0usize);
+                let mut diffs: Vec<(Rgb, Rgb, f64)> = Vec::new();
+                let (mut lo, mut hi) = (u8::MAX, u8::MIN);
                 for y in ty..(ty + ts).min(y1) {
                     for x in tx..(tx + ts).min(x1) {
                         let (x, y) = (x as u32, y as u32);
@@ -668,8 +725,9 @@ impl Registration {
                         let l = luma(pb);
                         lo = lo.min(l);
                         hi = hi.max(l);
-                        if dist2(pa, pb) > min2 && !self.halo(pa, pb) {
-                            differing += 1;
+                        let d = dist2(pa, pb);
+                        if d > min2 && !self.halo(pa, pb) {
+                            diffs.push((pa, pb, d));
                         }
                     }
                 }
@@ -678,9 +736,13 @@ impl Registration {
                     continue;
                 }
                 tiles += 1;
-                if differing as f64 <= TILE_DIFFERS_SHARE * px.len() as f64
+                if diffs.len() as f64 <= TILE_DIFFERS_SHARE * px.len() as f64
                     || hi.saturating_sub(lo) < TEXTURE_LUMA_RANGE
                 {
+                    continue;
+                }
+                if !text_like(&mut diffs) {
+                    displaced += 1;
                     continue;
                 }
                 let base = px
@@ -717,8 +779,8 @@ impl Registration {
                 format!(
                     "the text-hidden frame is not registered with the frame around this text: \
                      {displaced} of the {tiles} {REGISTRATION_TILE_CSS}-CSS-px tile(s) around it \
-                     ({:.1}%) show the image displaced by up to {LOCAL_MAX_SHIFT_CSS} CSS px \
-                     between the captures (a parallax layer or a scroll-linked transform)",
+                     ({:.1}%) show the image displaced between the captures (a parallax layer, \
+                     a scroll-linked transform), not text that only the frame carries",
                     displaced as f64 * 100.0 / tiles.max(1) as f64
                 ),
             ));
@@ -730,6 +792,28 @@ impl Registration {
     fn halo(&self, pa: Rgb, pb: Rgb) -> bool {
         !self.colours.is_empty() && self.colours.iter().all(|c| !toward(pa, pb, *c))
     }
+}
+
+/// Whether a tile's differing pixels `(A, B, squared distance)` read as
+/// alpha-blended text: at least [`LOCAL_TEXT_LIKE_SHARE`] of them moved
+/// toward the colour of the most-changed quarter (per-channel median of A).
+fn text_like(diffs: &mut [(Rgb, Rgb, f64)]) -> bool {
+    if diffs.is_empty() {
+        return true;
+    }
+    diffs.sort_by(|p, q| q.2.total_cmp(&p.2));
+    let core = &diffs[..diffs.len().div_ceil(4)];
+    let median = |f: fn(&Rgb) -> u8| {
+        let mut v: Vec<u8> = core.iter().map(|(pa, _, _)| f(pa)).collect();
+        v.sort_unstable();
+        v[v.len() / 2]
+    };
+    let c = Rgb::new(median(|c| c.r), median(|c| c.g), median(|c| c.b));
+    let toward_c = diffs
+        .iter()
+        .filter(|(pa, pb, _)| toward(*pa, *pb, c))
+        .count();
+    toward_c as f64 >= LOCAL_TEXT_LIKE_SHARE * diffs.len() as f64
 }
 
 /// Whether frames `a` and `b` are REGISTERED over `image` (module docs: the
@@ -990,32 +1074,13 @@ pub fn measure(
             })
         })
         .count();
-    // The rate the IMAGE itself explains: how often a pixel of the box away
-    // from every glyph is glyph-coloured in B (a mottle, a near-white sky).
-    // A neighbourhood of n such pixels holds one by chance with probability
-    // 1 - (1 - q)^n; only the excess over that is a still-painted glyph.
-    let (bx0, by0, bw, bh) = box_px;
-    let mut near_glyph = vec![false; bw as usize * bh as usize];
-    for (x, y, _) in &mask {
-        for dy in -reach..=reach {
-            for dx in -reach..=reach {
-                let (nx, ny) = (*x as i64 + dx - bx0 as i64, *y as i64 + dy - by0 as i64);
-                if nx >= 0 && ny >= 0 && nx < bw as i64 && ny < bh as i64 {
-                    near_glyph[ny as usize * bw as usize + nx as usize] = true;
-                }
-            }
-        }
-    }
-    let (mut off, mut off_glyph_coloured) = (0usize, 0usize);
-    for y in by0..by0 + bh {
-        for x in bx0..bx0 + bw {
-            if !near_glyph[((y - by0) * bw + (x - bx0)) as usize] {
-                off += 1;
-                off_glyph_coloured += (dist2(rgb_at(b, x, y), glyph_colour) <= near) as usize;
-            }
-        }
-    }
-    let q = off_glyph_coloured as f64 / off.max(1) as f64;
+    // The rate the IMAGE itself explains: how often a pixel of the image
+    // AROUND this text (outside every widened text box) is glyph-coloured in
+    // B (a mottle, a near-white sky). Read outside the text, so an unhidden
+    // twin's own glyph cores cannot inflate it. A neighbourhood of n such
+    // pixels holds one by chance with probability 1 - (1 - q)^n; only the
+    // excess over that is a still-painted glyph.
+    let q = reg.glyph_coloured_share_around(a, b, text_box, glyph_colour);
     let chance = 1.0 - (1.0 - q).powi(((2 * reach + 1) * (2 * reach + 1)) as i32);
     let observed = still as f64 / mask.len() as f64;
     if observed - chance > STILL_PAINTED_SHARE * (1.0 - chance) {
@@ -1047,6 +1112,7 @@ pub fn measure(
     let (mut band_mask, mut band_open) = (vec![0usize; bands], vec![0usize; bands]);
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
+    let mut band_hidden = vec![0usize; bands];
     let mut faint = 0usize;
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
@@ -1068,21 +1134,31 @@ pub fn measure(
                     // With a noise-free capture a glyph on any background
                     // but the glyph colour itself differs, and was seen.
                     hidden.push(r());
+                    band_hidden[j] += 1;
                 }
             } else {
                 band_open[j] += 1;
             }
         }
     }
-    // The densest band that shows glyphs over enough open (non-blind) image.
-    // Over-counting is the safe direction: no band qualifying counts every
-    // undetectable pixel as ink.
-    let density = (0..bands)
-        .filter(|j| band_mask[*j] > 0 && band_open[*j] * 4 >= band as usize * oh as usize)
+    // The densest band that shows glyphs over enough open (non-blind) image
+    // sets the density for the hidden pixels of every band that qualifies.
+    // A band that does NOT qualify is mostly blind — the hidden word may be
+    // heavier than any visible one — so its hidden pixels are all counted as
+    // ink, as they are when no band qualifies. Over-counting is the safe
+    // direction.
+    let qualifies = |j: usize| band_mask[j] > 0 && band_open[j] * 4 >= band as usize * oh as usize;
+    let densest = (0..bands)
+        .filter(|j| qualifies(*j))
         .map(|j| band_mask[j] as f64 / band_open[j] as f64)
-        .fold(None, |m: Option<f64>, d| Some(m.map_or(d, |m| m.max(d))))
-        .unwrap_or(1.0);
-    let estimate = ((density * hidden.len() as f64).ceil() as usize).min(hidden.len());
+        .fold(None, |m: Option<f64>, d| Some(m.map_or(d, |m| m.max(d))));
+    let estimate = (0..bands)
+        .map(|j| match densest {
+            Some(d) if qualifies(j) => (d * band_hidden[j] as f64).ceil() as usize,
+            _ => band_hidden[j],
+        })
+        .sum::<usize>()
+        .min(hidden.len());
     ratios.sort_by(f64::total_cmp);
     hidden.sort_by(f64::total_cmp);
     let mut with_hidden = ratios.clone();

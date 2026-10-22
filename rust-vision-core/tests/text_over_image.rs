@@ -846,14 +846,27 @@ fn a_clipped_highlight_under_the_last_word_never_passes_in_a_full_width_box() {
 #[test]
 fn a_parallax_layer_under_the_text_is_unknown() {
     let c = case("parallax");
-    let moved = alt_twin("parallax", "text_hidden_parallax");
-    let r = c.assert_with(Some(&moved), Some(4.5), None);
-    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
-    assert!(
-        r.detail.as_deref().unwrap().contains("displaced"),
-        "{:?}",
-        r.detail
-    );
+    // 2 px, and 4 and 6 px: beyond the shift search, caught because moved
+    // texture does not change toward one colour the way text does.
+    for key in [
+        "text_hidden_parallax",
+        "text_hidden_parallax4",
+        "text_hidden_parallax6",
+    ] {
+        let moved = alt_twin("parallax", key);
+        let r = c.assert_with(Some(&moved), Some(4.5), None);
+        assert_eq!(
+            r.outcome,
+            AssertionOutcome::Unknown,
+            "{key}: {:?}",
+            r.detail
+        );
+        assert!(
+            r.detail.as_deref().unwrap().contains("displaced"),
+            "{key}: {:?}",
+            r.detail
+        );
+    }
     let control = c.assert_aa();
     assert_ne!(
         control.outcome,
@@ -901,4 +914,51 @@ fn a_single_differing_flat_tile_does_not_unregister_the_frames() {
     }
     let r = c.assert_aa();
     assert_eq!(r.outcome, control, "{:?}", r.detail);
+}
+
+// ---------------------------------------------------------------- round 5
+
+/// An UNTRACKED tagline just under the heading, inside its local ring, is
+/// text that only frame A carries: every differing pixel moved toward its
+/// colour, so it is tolerated, and the heading's verdict is the one the page
+/// has without it.
+#[test]
+fn an_untracked_tagline_inside_the_ring_is_tolerated() {
+    let control = case("parallax").assert_aa().outcome;
+    let r = case("tagline").assert_aa();
+    assert_eq!(r.outcome, control, "{:?}", r.detail);
+    assert_ne!(r.outcome, AssertionOutcome::Unknown);
+}
+
+/// A re-rasterised UNHIDDEN twin on a plain dark card. Its glyph cores lie in
+/// the box and are glyph-coloured; estimating the image's own glyph-coloured
+/// rate from inside the box counted them and measured glyph against glyph (a
+/// false FAIL). Read from the ring around the text, the rate is 0: Unknown.
+#[test]
+fn an_unhidden_twin_on_a_plain_card_is_unknown() {
+    let card = case("card");
+    let r = card.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let b = alt_twin("card", "text_hidden_rerastered");
+    let r = card.assert_with(Some(&b), Some(4.5), None);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("still paints"),
+        "{:?}",
+        r.detail
+    );
+}
+
+/// A long regular line, then a HEAVY word wholly on a clipped 255 patch, in
+/// a full-width box: the hidden word is denser than any visible band. At the
+/// regular line's densest band density its ink is 4% of the samples (p5
+/// passes); the bands over the patch are too blind to qualify, so their
+/// hidden pixels all count as ink (8%). Must never pass.
+#[test]
+fn a_heavy_word_on_a_clipped_patch_never_passes() {
+    let c = case("heavy");
+    let r = c.assert_aa();
+    assert_ne!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let v = c.reading();
+    assert!(v.percentile_ratio_with_hidden < 4.5, "{v:?}");
 }
