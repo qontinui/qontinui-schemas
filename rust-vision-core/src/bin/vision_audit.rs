@@ -86,8 +86,8 @@ const USAGE: &str = "\
 vision-audit — runner-less vision analyzer / assertion gate for CI
 
 USAGE:
-    vision-audit analyze  --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file>]] [--analyzer <a>] [--fail-on <level>]
-    vision-audit assert   --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file>]] --assertions <file> [--baseline-dir <dir>]
+    vision-audit analyze  --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file> [--text-hidden-ids <file>]]] [--analyzer <a>] [--fail-on <level>]
+    vision-audit assert   --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file> [--text-hidden-ids <file>]]] --assertions <file> [--baseline-dir <dir>]
     vision-audit baseline --snapshot <file> --name <name> --baseline-dir <dir>
 
 FRAME:
@@ -105,6 +105,9 @@ FRAME:
                     image are where the two frames differ; text_over_image_contrast
                     answers unknown (needs_multi_frame_input) without it, and the
                     image analyzer's textContrast value too. Echoed as frameTextHidden.
+    --text-hidden-ids  Optional, only with --frame-text-hidden: a JSON array of the text
+                    element ids the producer reports it hid. A text element over an
+                    image that is not listed answers unknown (not reported hidden).
 
 ANALYZE:
     --analyzer   layout | typography | color | elements | image | all   (default: all)
@@ -353,6 +356,35 @@ fn load_text_hidden_flag(
     }
 }
 
+/// `--text-hidden-ids`: a JSON array of the text element ids the producer
+/// reports it hid in the `--frame-text-hidden` capture. Refused without that
+/// frame. Absent, the hide is inferred from the pixels.
+fn load_text_hidden_ids_flag(
+    flags: &HashMap<String, String>,
+    text_hidden: Option<&Frame>,
+) -> Result<Option<Vec<String>>, CliError> {
+    match (flags.get("text-hidden-ids"), text_hidden) {
+        (None, _) => Ok(None),
+        (Some(_), None) => Err(CliError::usage(
+            "--text-hidden-ids names what the --frame-text-hidden capture hid, and no \
+             --frame-text-hidden was given",
+        )),
+        (Some(path), Some(_)) => {
+            let bytes = std::fs::read(path)
+                .map_err(|e| CliError::io(format!("cannot read text-hidden ids {path}: {e}")))?;
+            parse_text_hidden_ids(&bytes)
+                .map(Some)
+                .map_err(CliError::io)
+        }
+    }
+}
+
+/// Parse a `--text-hidden-ids` file: a JSON array of strings.
+pub fn parse_text_hidden_ids(bytes: &[u8]) -> Result<Vec<String>, String> {
+    serde_json::from_slice(bytes)
+        .map_err(|e| format!("text-hidden ids must be a JSON array of element ids: {e}"))
+}
+
 /// What a report says about the frame it analyzed: `null` on the wire when
 /// there was none, so a reader can tell "no pixels were read" from silence.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -448,6 +480,7 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
             "frame",
             "scale-factor",
             "frame-text-hidden",
+            "text-hidden-ids",
             "analyzer",
             "fail-on",
         ],
@@ -462,6 +495,7 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
     // given, `--scale-factor` must come with it — see `load_frame_flags`.
     let frame = load_frame_flags(&flags)?;
     let text_hidden = load_text_hidden_flag(&flags, frame.as_ref())?;
+    let hidden_ids = load_text_hidden_ids_flag(&flags, text_hidden.as_ref())?;
     let analyzers_to_run =
         parse_analyzer(flags.get("analyzer").map(String::as_str)).map_err(CliError::usage)?;
     let fail_on =
@@ -471,6 +505,7 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
         &snapshot,
         frame.as_ref(),
         text_hidden.as_ref(),
+        hidden_ids.as_deref(),
         &analyzers_to_run,
     );
     let exit = analyze_exit_code(&report, fail_on);
@@ -546,15 +581,17 @@ pub fn analyze(
     frame: Option<&Frame>,
     which: &[Analyzer],
 ) -> AnalyzeReport {
-    analyze_frames(snapshot, frame, None, which)
+    analyze_frames(snapshot, frame, None, None, which)
 }
 
-/// [`analyze`] with the frame's text-hidden twin (`--frame-text-hidden`),
-/// which only the image analyzer reads.
+/// [`analyze`] with the frame's text-hidden twin (`--frame-text-hidden`) and
+/// the ids the producer reports it hid (`--text-hidden-ids`), which only the
+/// image analyzer reads.
 pub fn analyze_frames(
     snapshot: &ElementSnapshot,
     frame: Option<&Frame>,
     text_hidden: Option<&Frame>,
+    hidden_ids: Option<&[String]>,
     which: &[Analyzer],
 ) -> AnalyzeReport {
     let input = AnalyzeInput {
@@ -562,6 +599,7 @@ pub fn analyze_frames(
         snapshot: Some(snapshot),
         prior_frame: None,
         text_hidden_frame: text_hidden,
+        text_hidden_ids: hidden_ids,
     };
     let mut findings = HashMap::new();
     let mut verdicts = HashMap::new();
@@ -733,6 +771,7 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
             "frame",
             "scale-factor",
             "frame-text-hidden",
+            "text-hidden-ids",
             "assertions",
             "baseline-dir",
         ],
@@ -747,6 +786,7 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
     // `analyze`.
     let frame = load_frame_flags(&flags)?;
     let text_hidden = load_text_hidden_flag(&flags, frame.as_ref())?;
+    let hidden_ids = load_text_hidden_ids_flag(&flags, text_hidden.as_ref())?;
     let assertions = load_assertions(Path::new(require(&flags, "assertions")?))?;
     let baselines = match flags.get("baseline-dir") {
         Some(dir) => load_baselines(Path::new(dir))?,
@@ -757,6 +797,7 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
         &snapshot,
         frame.as_ref(),
         text_hidden.as_ref(),
+        hidden_ids.as_deref(),
         &assertions,
         &baselines,
     );
@@ -835,7 +876,7 @@ pub fn assert_all(
     assertions: &[Assertion],
     baselines: &HashMap<String, BaselineEntry>,
 ) -> AssertReport {
-    assert_all_frames(snapshot, frame, None, assertions, baselines)
+    assert_all_frames(snapshot, frame, None, None, assertions, baselines)
 }
 
 /// [`assert_all`] with the frame's text-hidden twin (`--frame-text-hidden`),
@@ -844,6 +885,7 @@ pub fn assert_all_frames(
     snapshot: &ElementSnapshot,
     frame: Option<&Frame>,
     text_hidden: Option<&Frame>,
+    hidden_ids: Option<&[String]>,
     assertions: &[Assertion],
     baselines: &HashMap<String, BaselineEntry>,
 ) -> AssertReport {
@@ -851,6 +893,7 @@ pub fn assert_all_frames(
         snapshot: Some(snapshot),
         frame,
         text_hidden_frame: text_hidden,
+        text_hidden_ids: hidden_ids,
         ocr_blocks: None, // runner-side only
         baselines: Some(baselines),
         timeline: None, // a timeline arrives through the runner's /vision/assert only
@@ -2174,7 +2217,8 @@ mod tests {
 
     #[test]
     fn the_usage_names_the_text_hidden_flag() {
-        assert!(USAGE.contains("[--frame-text-hidden <file>]"));
+        assert!(USAGE.contains("[--frame-text-hidden <file>"));
+        assert!(USAGE.contains("[--text-hidden-ids <file>]"));
     }
 
     #[test]
@@ -2217,6 +2261,7 @@ mod tests {
             &load_snapshot(&snap).unwrap(),
             Some(&load_frame(&a, 1.0).unwrap()),
             Some(&load_frame(&b, 1.0).unwrap()),
+            None,
             &parse_assertions(br#"[{"type":"text_over_image_contrast","min_ratio":4.5}]"#).unwrap(),
             &HashMap::new(),
         );
@@ -2226,6 +2271,37 @@ mod tests {
             wire["frameTextHidden"],
             serde_json::json!({"width": 320, "height": 180, "scaleFactor": 1.0})
         );
+    }
+
+    /// `--text-hidden-ids`: refused without `--frame-text-hidden`; a list that
+    /// names the heading lets the scrim pass, one that does not leaves it
+    /// unknown (exit 2).
+    #[test]
+    fn assert_reads_the_text_hidden_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        let (snap, a, b) = text_over_image_inputs(dir.path(), "scrim");
+        let ids = dir.path().join("ids.json");
+        let mut no_twin = text_over_image_args("assert", &snap, &a, None, dir.path());
+        std::fs::write(&ids, br#"["heading"]"#).unwrap();
+        no_twin.extend([s("--text-hidden-ids"), ids.display().to_string()]);
+        assert!(
+            matches!(run(&no_twin), Err(CliError::Usage(m)) if m.contains("--frame-text-hidden"))
+        );
+        for (list, want) in [
+            (&br#"["heading"]"#[..], EXIT_OK),
+            (&br#"["other"]"#[..], EXIT_GATE_FAILED),
+        ] {
+            std::fs::write(&ids, list).unwrap();
+            let mut args = text_over_image_args("assert", &snap, &a, Some(&b), dir.path());
+            args.extend([s("--text-hidden-ids"), ids.display().to_string()]);
+            assert_eq!(
+                run(&args).unwrap(),
+                want,
+                "{}",
+                String::from_utf8_lossy(list)
+            );
+        }
+        assert!(parse_text_hidden_ids(br#"{"ids":[]}"#).is_err());
     }
 
     /// The no-gating rule: `analyze --analyzer all --fail-on critical` exits
@@ -2248,7 +2324,7 @@ mod tests {
             );
             let without = analyze_exit_code(&analyze(&snap, Some(&frame), &all), critical);
             for t in [&twin, &wrong] {
-                let report = analyze_frames(&snap, Some(&frame), Some(t), &all);
+                let report = analyze_frames(&snap, Some(&frame), Some(t), None, &all);
                 assert_eq!(analyze_exit_code(&report, critical), without, "{case}");
                 assert!(report.verdicts["image"].conclusive());
                 assert!(report.findings["image"]
@@ -2270,6 +2346,7 @@ mod tests {
             &load_snapshot(&snap).unwrap(),
             Some(&load_frame(&a, 1.0).unwrap()),
             Some(&load_frame(&b, 1.0).unwrap()),
+            None,
             &[Analyzer::Image],
         );
         let wire = serde_json::to_value(&report).unwrap();

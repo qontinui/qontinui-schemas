@@ -56,6 +56,7 @@ fn run(
             snapshot: snap,
             prior_frame: prior,
             text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     )
 }

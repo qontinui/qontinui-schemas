@@ -75,16 +75,37 @@
 //! it is treated as undetectable. With a noise-free capture only a blind
 //! pixel EXACTLY the glyph colour can hide a glyph (on any other background
 //! the glyph's core differs, and was seen), so only those are undetectable;
-//! with a noisy one, every blind pixel is. The undetectable pixels' ink is
-//! estimated at the mask's density in the DENSEST column band about one line
-//! height wide (where the glyphs are — never averaged over a block box's
-//! blank run, which would dilute it), times their count; in a band too blind
-//! to qualify (a hidden word may be heavier than any visible one) every
-//! undetectable pixel counts as ink. And
-//! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the percentile
-//! with that many samples added at the blind pixels' own contrasts. A check
-//! passes only on that value, fails on the measured one, and is Unknown in
-//! between: the hidden ink may or may not be there.
+//! with a noisy one, every blind pixel is. EVERY undetectable pixel counts
+//! as ink: no visible band bounds the density of a hidden word, which may be
+//! heavier than any visible one (a density taken from the visible line passed
+//! a heavy glyph on a tight patch at p5 7.55 where the truth was 1.00; on 2571
+//! text windows of 14 real photos counting every pixel cost 1 correct pass in
+//! 881). [`TextOverImageContrast::percentile_ratio_with_hidden`] is the
+//! percentile with those pixels added at their own contrasts. A check passes
+//! only on that value, fails on the measured one, and is Unknown in between:
+//! the hidden ink may or may not be there.
+//!
+//! A mask pixel is SAMPLED only where the glyph covers it at least
+//! [`MIN_GLYPH_COVERAGE`] (α = (A−B)·(c−B)/|c−B|² under alpha blending):
+//! a low-coverage edge clears the difference threshold more readily over a
+//! background far from the glyph colour, which weighted the sample toward
+//! high contrast. Faint pixels are sampled whatever their coverage.
+//!
+//! # Evidence of the hide, and the limits without it
+//!
+//! Whether frame B hid a given text element is otherwise INFERRED from the
+//! pixels. A producer that can say what it hid passes the ids as
+//! [`crate::analyzers::AnalyzeInput::text_hidden_ids`] (CLI
+//! `--text-hidden-ids`): a text element not in the list is then Unknown
+//! ([`not_reported_hidden`]), and one in it skips the still-painted inference.
+//! Without the list, two known limits remain:
+//!
+//! - glyph-coloured background CONFINED under the text with a dark ring
+//!   around it reads "still painted" (Unknown) instead of a failure: the
+//!   image's own rate is read from the ring, which shows none;
+//! - an UNHIDDEN re-rasterised twin over a near-white hero reads as a
+//!   failure: the ring is glyph-coloured, so the chance rate explains the
+//!   neighbours and the inference cannot fire.
 //!
 //! When the box shows glyphs and fewer than the floor of them reach the
 //! image, the text is not over the image (a label whose line box overhangs a
@@ -195,8 +216,9 @@ pub const MIN_FLAT_TILES: usize = 4;
 pub const LOCAL_RING_TILES: i64 = 2;
 
 /// Largest displacement, in CSS px, the local check's shift test tries on a
-/// text-like tile.
-pub const LOCAL_MAX_SHIFT_CSS: f64 = 3.0;
+/// text-like tile (a parallax or a sticky panel moves further than a
+/// sub-pixel re-layout).
+pub const LOCAL_MAX_SHIFT_CSS: f64 = 12.0;
 
 /// Share of a ring tile's differing pixels that must have moved toward one
 /// colour for the tile to read as untracked text rather than moved image.
@@ -205,6 +227,11 @@ pub const LOCAL_TEXT_LIKE_SHARE: f64 = 0.9;
 /// Share of the ring's tiles that must show displaced content for the local
 /// check to refuse.
 pub const LOCAL_DISPLACED_TILE_SHARE: f64 = 0.1;
+
+/// Smallest estimated glyph coverage ([`coverage`]) of a mask pixel that is
+/// sampled. Faint pixels (on a background within [`GLYPH_DIFF_MIN`] of the
+/// glyph colour) are sampled whatever their coverage.
+pub const MIN_GLYPH_COVERAGE: f64 = 0.5;
 
 /// RGB distance within which a core glyph pixel agrees with the measured
 /// glyph colour.
@@ -497,6 +524,21 @@ fn dist2(a: Rgb, b: Rgb) -> f64 {
     dr * dr + dg * dg + db * db
 }
 
+/// The glyph's estimated coverage of a pixel, α = (A−B)·(c−B) / |c−B|²: the
+/// share of the way from B to the glyph colour `c` that A moved, under alpha
+/// blending. `0.0` where B is the glyph colour itself.
+fn coverage(pa: Rgb, pb: Rgb, c: Rgb) -> f64 {
+    let d = |p: u8, q: u8| p as f64 - q as f64;
+    let (ar, ag, ab) = (d(pa.r, pb.r), d(pa.g, pb.g), d(pa.b, pb.b));
+    let (cr, cg, cb) = (d(c.r, pb.r), d(c.g, pb.g), d(c.b, pb.b));
+    let n = cr * cr + cg * cg + cb * cb;
+    if n == 0.0 {
+        0.0
+    } else {
+        (ar * cr + ag * cg + ab * cb) / n
+    }
+}
+
 /// Whether a pixel moved toward `colour` between frame B and frame A: a
 /// glyph (or its alpha-blended edge) painted over B, not a halo.
 fn toward(pa: Rgb, pb: Rgb, colour: Rgb) -> bool {
@@ -692,10 +734,14 @@ impl Registration {
     /// quarter. Moved texture — a parallax layer at any offset, a rotation, a
     /// rescale — goes both ways (a median 52–71% per tile under 1–6 px parallax
     /// on a textured layer; untracked 12–18 px text, any colour, 100%).
-    /// A text-like tile is still displaced when shifting frame B by up to
-    /// [`LOCAL_MAX_SHIFT_CSS`] CSS px halves its difference. Refused when at
+    /// A text-like tile — few differing pixels can look text-like by chance —
+    /// is still displaced when one shift of frame B by up to
+    /// [`LOCAL_MAX_SHIFT_CSS`] CSS px lines up more than half of its
+    /// differing pixels: moved image does, text only frame A carries does not. Refused when at
     /// least [`LOCAL_DISPLACED_TILE_SHARE`] of the ring's tiles (and at least
-    /// one) are displaced. The global check cannot see this: a layer under
+    /// one) are displaced, or when ANY tile of the ring's first row — within
+    /// one tile of the widened text box — is: a panel moving just under the
+    /// text shows only there. The global check cannot see this: a layer under
     /// part of the hero is under half its tiles.
     pub fn local(&self, a: &Frame, b: &Frame, text_box: Region) -> Result<(), LocateError> {
         let s = a.source.scale_factor;
@@ -703,6 +749,19 @@ impl Registration {
         let Some((x0, y0, x1, y1)) = self.ring(a, text_box) else {
             return Ok(());
         };
+        // The first row of tiles around the hole: within one tile of the
+        // widened text box. A layer moving just under the text shows there
+        // first, and one displaced tile there is enough.
+        let first_row = a.css_region_to_pixels(text_box).map(|r| {
+            let m = (REGISTRATION_MARGIN_CSS * s).ceil() as i64 + ts;
+            (
+                r.x as i64 - m,
+                r.y as i64 - m,
+                r.right() + m,
+                r.bottom() + m,
+            )
+        });
+        let mut adjacent_displaced = 0usize;
         let reach = (LOCAL_MAX_SHIFT_CSS * s).ceil().max(1.0) as i64;
         let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
         let (fw, fh) = (a.width as i64, a.height as i64);
@@ -731,6 +790,9 @@ impl Registration {
                         }
                     }
                 }
+                let adjacent = first_row.is_some_and(|(fx0, fy0, fx1, fy1)| {
+                    tx < fx1 && tx + ts > fx0 && ty < fy1 && ty + ts > fy0
+                });
                 tx += ts;
                 if px.len() * 4 < (ts * ts) as usize {
                     continue;
@@ -743,17 +805,24 @@ impl Registration {
                 }
                 if !text_like(&mut diffs) {
                     displaced += 1;
+                    adjacent_displaced += adjacent as usize;
                     continue;
                 }
-                let base = px
+                // The shift test reads only the DIFFERING pixels: whether one
+                // displacement of frame B lines up most of them. Static image
+                // elsewhere in the tile does not vote.
+                let moved: Vec<(u32, u32)> = px
                     .iter()
+                    .copied()
                     .filter(|(x, y)| dist2(rgb_at(a, *x, *y), rgb_at(b, *x, *y)) > min2)
-                    .count();
+                    .collect();
+                let base = moved.len();
                 let best = (-reach..=reach)
                     .flat_map(|dy| (-reach..=reach).map(move |dx| (dx, dy)))
                     .filter(|d| *d != (0, 0))
                     .map(|(dx, dy)| {
-                        px.iter()
+                        moved
+                            .iter()
                             .filter(|(x, y)| {
                                 let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
                                 nx < 0
@@ -769,11 +838,14 @@ impl Registration {
                     .unwrap_or(base);
                 if best * 2 < base {
                     displaced += 1;
+                    adjacent_displaced += adjacent as usize;
                 }
             }
             ty += ts;
         }
-        if displaced > 0 && displaced as f64 >= LOCAL_DISPLACED_TILE_SHARE * tiles as f64 {
+        if adjacent_displaced > 0
+            || (displaced > 0 && displaced as f64 >= LOCAL_DISPLACED_TILE_SHARE * tiles as f64)
+        {
             return Err((
                 UnknownCode::InputMissing,
                 format!(
@@ -997,6 +1069,7 @@ pub fn measure(
     pair: &TextOverImage<'_>,
     percentile: f64,
     reg: &Registration,
+    hide_reported: bool,
 ) -> Result<Option<TextOverImageContrast>, LocateError> {
     let id = pair.text.id.as_str();
     let s = a.source.scale_factor;
@@ -1083,7 +1156,9 @@ pub fn measure(
     let q = reg.glyph_coloured_share_around(a, b, text_box, glyph_colour);
     let chance = 1.0 - (1.0 - q).powi(((2 * reach + 1) * (2 * reach + 1)) as i32);
     let observed = still as f64 / mask.len() as f64;
-    if observed - chance > STILL_PAINTED_SHARE * (1.0 - chance) {
+    // A producer that REPORTED hiding this element is evidence of the hide,
+    // and the heuristic below — which exists only to infer it — is skipped.
+    if !hide_reported && observed - chance > STILL_PAINTED_SHARE * (1.0 - chance) {
         return Err(unknown(format!(
             "frame B still paints text '{id}': {still} of its {} glyph-mask pixel(s) have a \
              glyph-coloured pixel beside them in frame B (the image alone explains {:.1}%), so \
@@ -1105,26 +1180,21 @@ pub fn measure(
     let lg = luminance(glyph_colour);
     let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
     let trusted = reg.faint_trusted();
-    // Column bands about one line height wide: the hidden ink's density is
-    // taken where the glyphs are, not averaged over a block box's blank run.
-    let band = box_px.3.max(1);
-    let bands = ow.div_ceil(band) as usize;
-    let (mut band_mask, mut band_open) = (vec![0usize; bands], vec![0usize; bands]);
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
-    let mut band_hidden = vec![0usize; bands];
     let mut faint = 0usize;
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
             let is_blind = dist2(pb, glyph_colour) <= near;
-            let j = ((x - ox0) / band) as usize;
             let r = || contrast(lg, luminance(pb));
             if is_mask.contains(&(x, y)) {
-                ratios.push(r());
-                if !is_blind {
-                    band_mask[j] += 1;
-                    band_open[j] += 1;
+                // Only pixels the glyph covers at least half: a low-coverage
+                // edge clears the difference threshold more readily over a
+                // background far from the glyph colour, which would weight
+                // the sample toward high contrast.
+                if coverage(pa, pb, glyph_colour) >= MIN_GLYPH_COVERAGE {
+                    ratios.push(r());
                 }
             } else if is_blind {
                 if trusted && pa != pb && toward(pa, pb, glyph_colour) {
@@ -1134,36 +1204,30 @@ pub fn measure(
                     // With a noise-free capture a glyph on any background
                     // but the glyph colour itself differs, and was seen.
                     hidden.push(r());
-                    band_hidden[j] += 1;
                 }
-            } else {
-                band_open[j] += 1;
             }
         }
     }
-    // The densest band that shows glyphs over enough open (non-blind) image
-    // sets the density for the hidden pixels of every band that qualifies.
-    // A band that does NOT qualify is mostly blind — the hidden word may be
-    // heavier than any visible one — so its hidden pixels are all counted as
-    // ink, as they are when no band qualifies. Over-counting is the safe
-    // direction.
-    let qualifies = |j: usize| band_mask[j] > 0 && band_open[j] * 4 >= band as usize * oh as usize;
-    let densest = (0..bands)
-        .filter(|j| qualifies(*j))
-        .map(|j| band_mask[j] as f64 / band_open[j] as f64)
-        .fold(None, |m: Option<f64>, d| Some(m.map_or(d, |m| m.max(d))));
-    let estimate = (0..bands)
-        .map(|j| match densest {
-            Some(d) if qualifies(j) => (d * band_hidden[j] as f64).ceil() as usize,
-            _ => band_hidden[j],
-        })
-        .sum::<usize>()
-        .min(hidden.len());
+    if ratios.len() < floor {
+        return Err(unknown(format!(
+            "fewer than {floor} pixel(s) of text '{id}' over '{}' are covered at least {:.0}% by \
+             its glyphs ({} are), so no contrast was measured",
+            pair.image.id,
+            MIN_GLYPH_COVERAGE * 100.0,
+            ratios.len()
+        )));
+    }
+    // Every undetectable pixel counts as ink: no visible band bounds the
+    // density of a hidden word, which may be heavier than any visible one.
+    // Over-counting is the safe direction (measured: 1 correct pass in 881
+    // real text windows lost, the false pass closed).
+    let estimate = hidden.len();
     ratios.sort_by(f64::total_cmp);
     hidden.sort_by(f64::total_cmp);
     let mut with_hidden = ratios.clone();
     for i in 0..estimate {
-        // Spread across the blind pixels' own contrasts (quantiles).
+        // Spread across the undetectable pixels' own contrasts (all of them
+        // while `estimate` is their count).
         with_hidden.push(hidden[(i * hidden.len()) / estimate]);
     }
     with_hidden.sort_by(f64::total_cmp);
@@ -1187,6 +1251,18 @@ pub fn measure(
         },
         confidence: (in_frame * colour_conf).clamp(0.0, 1.0),
     }))
+}
+
+/// The Unknown for a text element the producer did not report hiding, when
+/// it reported a list ([`crate::analyzers::AnalyzeInput::text_hidden_ids`]).
+pub fn not_reported_hidden(id: &str) -> LocateError {
+    (
+        UnknownCode::InputMissing,
+        format!(
+            "text '{id}' is not among the elements the producer reports it hid in the \
+             text-hidden frame, so frame B may still paint it, and no contrast was measured"
+        ),
+    )
 }
 
 /// The Unknown for a mask too sparse to be glyphs.

@@ -734,6 +734,10 @@ pub struct EvalContext<'a> {
     /// `Unknown{needs_multi_frame_input}`. Plan
     /// 2026-10-13-image-generation-and-visual-judgment, Phase 16.
     pub text_hidden_frame: Option<&'a Frame>,
+    /// The ids of the text elements the producer reports it hid in
+    /// [`Self::text_hidden_frame`]; see
+    /// [`crate::analyzers::AnalyzeInput::text_hidden_ids`].
+    pub text_hidden_ids: Option<&'a [String]>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
     /// from `vision/extract` output before evaluating.
