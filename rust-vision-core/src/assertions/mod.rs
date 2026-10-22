@@ -283,7 +283,7 @@ pub enum Assertion {
 
     // ---- Text over images (plan 2026-10-13-image-generation-and-visual-
     // judgment, Phase 16) -------------------------------------------------
-    /// Every text element laid over a readable image reaches `min_ratio`
+    /// Every leaf text element laid over a rendered image reaches `min_ratio`
     /// WCAG contrast at its `percentile`-th percentile (default
     /// [`crate::analyzers::image::text_contrast::DEFAULT_PERCENTILE`], 5),
     /// measured on real pixels: the glyphs are where the frame and its
@@ -294,8 +294,12 @@ pub enum Assertion {
     /// `Unknown{needs_multi_frame_input}` without the text-hidden frame;
     /// `Unknown{input_missing}` when it cannot be paired with the frame
     /// (another size or scale factor), when `min_ratio` is undeclared, or
-    /// when no text lies over a readable image. A failure stands even when
-    /// another text element could not be measured; a pass needs them all.
+    /// when no text lies over a rendered image. A text element is unmeasured
+    /// (Unknown) when the two frames are not registered over its image, or
+    /// when its glyph mask is empty or too sparse — the text was not hidden in
+    /// frame B, or is invisible, and the two cannot be told apart. A failure
+    /// stands even when another text element could not be measured; a pass
+    /// needs them all.
     /// See [`crate::analyzers::image::text_contrast`] for the measurement.
     TextOverImageContrast {
         #[serde(default)]
@@ -502,8 +506,8 @@ pub struct AssertionResult {
     /// winning margin for `salience_order`), except `text_over_image_contrast`,
     /// which reads no crop: its confidence is the reading's own
     /// ([`crate::analyzers::image::TextOverImageContrast::confidence`] — the
-    /// share of the text's box in the frame, the measured glyph colour's
-    /// agreement, and a cap on the whole-box fallback). A verdict that rests on the
+    /// share of the text's box in the frame, and the measured glyph colour's
+    /// agreement). A verdict that rests on the
     /// slot's placeholder MARKER alone, and [`Assertion::ImageFocalVisible`]
     /// (media facts, no pixels), are deductions and state `None`.
     ///

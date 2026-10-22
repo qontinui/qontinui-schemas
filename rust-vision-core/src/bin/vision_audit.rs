@@ -2276,7 +2276,7 @@ mod tests {
         let tc = &wire["imageValues"]["images"][0]["textContrast"];
         assert_eq!(tc["status"], "measured", "{tc}");
         assert_eq!(tc["value"][0]["element"], "heading");
-        assert_eq!(tc["value"][0]["method"], "glyph_mask");
+        assert_eq!(tc["value"][0]["glyphColourSource"], "declared");
         assert!(tc["value"][0]["percentileRatio"].as_f64().unwrap() > 4.5);
     }
 }
