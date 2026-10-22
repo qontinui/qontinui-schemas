@@ -274,9 +274,13 @@ pub enum Assertion {
     /// when no text lies over a rendered image. A text element is unmeasured
     /// (Unknown) when the two frames are not registered over its image, or
     /// when its glyph mask is empty or too sparse — the text was not hidden in
-    /// frame B, or is invisible, and the two cannot be told apart. A failure
-    /// stands even when another text element could not be measured; a pass
-    /// needs them all.
+    /// frame B, or is invisible, and the two cannot be told apart — or when
+    /// frame B still paints its glyphs. A failure is decided on the glyph
+    /// pixels found; a pass needs the percentile WITH the glyphs the mask
+    /// cannot see (over image pixels matching the glyph colour), and is
+    /// Unknown when only the first clears `min_ratio`. A failure stands even
+    /// when another text element could not be measured; a pass needs them
+    /// all.
     /// See [`crate::analyzers::image::text_contrast`] for the measurement.
     TextOverImageContrast {
         #[serde(default)]

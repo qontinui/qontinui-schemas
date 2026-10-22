@@ -36,7 +36,7 @@ import math
 import pathlib
 import random
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = pathlib.Path(__file__).resolve().parent
 W, H = 320, 180
@@ -85,16 +85,27 @@ def line_box(text_at: tuple[int, int]) -> dict:
     return {"x": l - 2, "y": t - 6, "w": (r - l) + 4, "h": (b - t) + 12}
 
 
+def glow(page: Image.Image, blur: float, alpha: int) -> Image.Image:
+    """``page`` darkened by a blurred black ``text-shadow`` glow of TEXT."""
+    layer = Image.new("L", page.size, 0)
+    ImageDraw.Draw(layer).text(TEXT_AT, TEXT, font=FONT, fill=alpha)
+    layer = layer.filter(ImageFilter.GaussianBlur(blur))
+    return Image.composite(Image.new("RGB", page.size, (0, 0, 0)), page, layer)
+
+
 def write_case(name: str, page_b: Image.Image, fg: tuple[int, int, int], text_box: dict,
-               cases: dict) -> None:
-    page_a = page_b.copy()
+               cases: dict, image: tuple[int, int, int, int] = HERO, shadow=None,
+               extra=None) -> None:
+    page_a = page_b.copy() if shadow is None else glow(page_b, *shadow)
     ImageDraw.Draw(page_a).text(TEXT_AT, TEXT, font=FONT, fill=fg)
+    if extra is not None:
+        extra(page_a)
     page_a.save(HERE / f"{name}_a.png", optimize=True)
     page_b.save(HERE / f"{name}_b.png", optimize=True)
     cases[name] = {
         "frame": f"{name}_a.png",
         "text_hidden": f"{name}_b.png",
-        "image": {"x": HERO[0], "y": HERO[1], "w": HERO[2], "h": HERO[3]},
+        "image": {"x": image[0], "y": image[1], "w": image[2], "h": image[3]},
         "text": text_box,
         "fg": list(fg),
     }
@@ -124,6 +135,58 @@ def main() -> None:
     wide = {"x": HERO[0], "y": box["y"], "w": HERO[2], "h": box["h"]}
     assert box["x"] + box["w"] < 0.6 * W, "the glyphs must stay over the dark part"
     write_case("wide_heading", page_with(split), (255, 255, 255), wide, cases)
+
+    # Round 3 (review of 278a7ae6). Appended after the cases above so their
+    # bytes do not move.
+
+    # sky: white text whose second word sits on a near-white (253 +/- 1)
+    # region of the hero -- glyph pixels the A/B difference can barely see.
+    # Must NOT pass.
+    sky = photo(random.Random(19), base=55.0, amp=22.0)
+    px = sky.load()
+    rng = random.Random(20)
+    for y in range(sky.height):
+        for x in range(110, sky.width):
+            v = 253 + rng.choice((-1, 0, 0, 1))
+            px[x, y] = (v, v, v)
+    write_case("sky", page_with(sky), (255, 255, 255), box, cases)
+
+    # glow_mid / glow_light: white text with a dark blurred text-shadow glow
+    # (blur 10, alpha 150), which the hide removes along with the glyphs. On a
+    # mid-tone hero the glyphs pass; on a light one they fail -- judged on the
+    # glyph pixels only, never Unknown for the halo.
+    mid = photo(random.Random(21), base=95.0, amp=18.0)
+    write_case("glow_mid", page_with(mid), (255, 255, 255), box, cases, shadow=(10, 150))
+    write_case("glow_light", page_with(light), (255, 255, 255), box, cases, shadow=(10, 150))
+
+    # credit: a heading over a hero with an UNTRACKED 12 px photo credit in
+    # its corner (in frame A only, absent from the snapshot). The frames are
+    # still registered: the credit is a compact cluster of tiles.
+    def credit(page: Image.Image) -> None:
+        f = ImageFont.load_default(size=12)
+        ImageDraw.Draw(page).text((210, 140), "Photo: J. Doe", font=f, fill=(255, 255, 255))
+
+    write_case("credit", page_with(dark), (255, 255, 255), box, cases, extra=credit)
+
+    # rerastered: the scrim case with a frame B that did NOT hide the text and
+    # re-rasterised its glyphs a quarter pixel to the right (a
+    # non-deterministic raster of an unhidden twin).
+    scrim_b = Image.open(HERE / "scrim_b.png").convert("RGB")
+    big = scrim_b.resize((W * 4, H * 4), Image.NEAREST)
+    ImageDraw.Draw(big).text(
+        (TEXT_AT[0] * 4 + 1, TEXT_AT[1] * 4), TEXT, font=ImageFont.load_default(size=112),
+        fill=(250, 250, 250),
+    )
+    rerastered = scrim_b.copy()
+    tb = (box["x"], box["y"], box["x"] + box["w"], box["y"] + box["h"])
+    rerastered.paste(big.resize((W, H), Image.BOX).crop(tb), tb[:2])
+    rerastered.save(HERE / "scrim_b_rerastered.png", optimize=True)
+    cases["scrim"]["text_hidden_rerastered"] = "scrim_b_rerastered.png"
+
+    # glow_strong: a heavy glow (blur 16, alpha 255) on the light hero, whose
+    # halo reaches ~16 px past the line box. Over a banner-sized image box
+    # every tile away from the text lies in it.
+    write_case("glow_strong", page_with(light), (255, 255, 255), box, cases, shadow=(16, 255))
 
     manifest = {
         "generator": "generate.py",

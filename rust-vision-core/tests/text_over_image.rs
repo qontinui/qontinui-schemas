@@ -656,4 +656,164 @@ fn only_leaf_text_elements_are_measured() {
     let r = scrim.assert_aa();
     assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
     assert_eq!(scrim.reading().element, "heading");
+    // The wrapper is disclosed: text it paints beside its child is not measured.
+    assert!(
+        r.detail
+            .as_deref()
+            .unwrap()
+            .contains("1 wrapper text element(s)"),
+        "{:?}",
+        r.detail
+    );
+}
+
+// ---------------------------------------------------------------- round 3
+
+/// A case's frame B, swapped for another file named in the manifest.
+fn alt_twin(name: &str, key: &str) -> Frame {
+    let m = manifest();
+    frame(m["cases"][name][key].as_str().unwrap())
+}
+
+/// White text whose second word sits on a near-white (253 ± 1) region: the
+/// A/B difference there is under GLYPH_DIFF_MIN, so the mask cannot see
+/// those glyphs — and they are the invisible ones. Found as FAINT pixels
+/// from frame B, they make it fail; it must never pass.
+#[test]
+fn glyphs_the_mask_cannot_see_never_pass() {
+    let sky = case("sky");
+    let r = sky.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    let v = sky.reading();
+    assert!(v.faint_px > 0, "{v:?}");
+    assert!(v.percentile_ratio < 1.5, "{v:?}");
+}
+
+/// The same scene from a capture with sub-threshold noise: faint pixels are
+/// not trusted, the invisible ink is ESTIMATED, and the answer is Unknown
+/// naming it — never a pass.
+#[test]
+fn with_a_noisy_capture_invisible_glyphs_are_unknown_not_a_pass() {
+    let mut sky = case("sky");
+    for (i, p) in sky.b.buffer.pixels_mut().enumerate() {
+        if i % 50 == 0 {
+            p.0[0] = p.0[0].saturating_sub(1).max(1);
+        }
+    }
+    let r = sky.assert_aa();
+    assert_ne!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let v = sky.reading();
+    assert_eq!(v.faint_px, 0, "faint pixels must not be trusted: {v:?}");
+    assert!(v.hidden_px_estimate > 0, "{v:?}");
+    assert!(v.percentile_ratio_with_hidden < 4.5, "{v:?}");
+}
+
+/// A wide heading whose box runs over a glyph-free near-white region: the
+/// mask cannot rule out ink there, so a reading that passes on the glyphs it
+/// sees is Unknown, not a pass.
+#[test]
+fn a_box_over_a_glyph_free_white_region_is_unknown_not_a_pass() {
+    let mut wide = case("wide_heading");
+    let t = wide.snap.elements[1].bbox.unwrap();
+    for y in t.y as u32..(t.y as u32 + t.h) {
+        for x in 240..300u32 {
+            for f in [&mut wide.a, &mut wide.b] {
+                f.buffer.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+            }
+        }
+    }
+    let r = wide.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail
+            .as_deref()
+            .unwrap()
+            .contains("matches its glyph colour"),
+        "{:?}",
+        r.detail
+    );
+    let v = wide.reading();
+    assert!(
+        v.percentile_ratio >= 4.5 && v.hidden_px_estimate > 0,
+        "{v:?}"
+    );
+}
+
+/// A dark `text-shadow` glow under white text: the hide removes it, so every
+/// halo pixel differs. The halo moved AWAY from the glyph colour, so it is
+/// neither in the mask nor counted against registration: the text is judged
+/// on its glyph pixels — a pass on a mid-tone hero, a failure on a light one,
+/// never Unknown for the glow.
+#[test]
+fn a_glow_text_shadow_is_judged_on_the_glyph_pixels() {
+    let mid = case("glow_mid");
+    let r = mid.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let light = case("glow_light");
+    let r = light.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    // The glyph pixels sampled are about as many as without the glow.
+    let plain = case("scrim").reading().sampled_px as f64;
+    let glowing = mid.reading().sampled_px as f64;
+    assert!((glowing / plain - 1.0).abs() < 0.25, "{glowing} vs {plain}");
+
+    // A banner-sized image just around the text: under the heavy glow every
+    // tile of it away from the text lies in the halo, so registration passes
+    // (and the light case FAILS on its glyphs) only because a pixel
+    // that moved AWAY from the text colour is a removed glow, not
+    // misregistration.
+    for name in ["glow_strong", "glow_mid"] {
+        let mut banner = case(name);
+        let t = banner.snap.elements[1].bbox.unwrap();
+        banner.snap.elements[0].bbox = Some(Region {
+            x: t.x - 20,
+            y: t.y - 20,
+            w: t.w + 40,
+            h: t.h + 40,
+        });
+        let r = banner.assert_aa();
+        let want = if name == "glow_mid" {
+            AssertionOutcome::Passed
+        } else {
+            AssertionOutcome::Failed
+        };
+        assert_eq!(r.outcome, want, "{name}: {:?}", r.detail);
+    }
+}
+
+/// The differing pixels moved AWAY from the declared colour (it is not what
+/// paints): Unknown, saying so — not "not hidden".
+#[test]
+fn a_declared_colour_nothing_moved_toward_is_unknown_saying_so() {
+    let mut scrim = case("scrim");
+    scrim.snap.elements[1].fg_color = Some(Rgb::new(20, 20, 20));
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    let d = r.detail.as_deref().unwrap();
+    assert!(d.contains("moved toward its glyph colour"), "{d}");
+}
+
+/// Untracked text over the image (a 12 px photo credit absent from the
+/// snapshot) is a compact cluster of tiles, not misregistration.
+#[test]
+fn an_untracked_credit_line_does_not_unregister_the_frames() {
+    let c = case("credit");
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+}
+
+/// An unhidden twin whose glyphs were re-rasterised a quarter pixel over: its
+/// edges differ, but frame B still paints the glyphs. Unknown, not a
+/// full-confidence failure.
+#[test]
+fn a_twin_that_still_paints_the_glyphs_is_unknown() {
+    let scrim = case("scrim");
+    let b = alt_twin("scrim", "text_hidden_rerastered");
+    let r = scrim.assert_with(Some(&b), Some(4.5), None);
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("still paints"),
+        "{:?}",
+        r.detail
+    );
 }
