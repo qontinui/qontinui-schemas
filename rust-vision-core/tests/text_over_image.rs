@@ -16,7 +16,7 @@ use std::path::PathBuf;
 
 use qontinui_vision_core::analyzers::color::wcag_contrast;
 use qontinui_vision_core::analyzers::image::{
-    text_contrast, GlyphColourSource, SampleMethod, TextOverImageContrast,
+    text_contrast, GlyphColourSource, TextOverImageContrast,
 };
 use qontinui_vision_core::observation::ObservationStatus;
 use qontinui_vision_core::{
@@ -146,10 +146,10 @@ impl Case {
         let r = self.analyze(Some(&self.b));
         let values = r.image_values.expect("a framed image run carries values");
         let hero = values.images.iter().find(|i| i.element == "hero").unwrap();
-        let v = hero
-            .text_contrast
+        let tc = hero.text_contrast.as_ref().expect("this crate states one");
+        let v = tc
             .value()
-            .unwrap_or_else(|| panic!("no measured text contrast: {:?}", hero.text_contrast));
+            .unwrap_or_else(|| panic!("no measured text contrast: {tc:?}"));
         assert_eq!(v.len(), 1, "{v:?}");
         v[0].clone()
     }
@@ -182,8 +182,6 @@ fn a_low_contrast_overlay_fails_and_a_dark_scrim_passes() {
     assert_eq!(conf(&rs), 1.0);
 
     let (vl, vs) = (low.reading(), scrim.reading());
-    assert_eq!(vl.method, SampleMethod::GlyphMask);
-    assert_eq!(vs.method, SampleMethod::GlyphMask);
     assert!(
         vl.percentile_ratio < 1.5,
         "low contrast p5 {}",
@@ -238,7 +236,6 @@ fn a_wide_heading_is_measured_under_its_glyphs_not_its_box() {
     let r = wide.assert_aa();
     assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
     let v = wide.reading();
-    assert_eq!(v.method, SampleMethod::GlyphMask);
     let area = (v.region.w * v.region.h) as u64;
     assert!(
         v.sampled_px * 5 < area,
@@ -277,7 +274,7 @@ fn without_the_text_hidden_frame_the_answer_is_needs_multi_frame_input() {
     let a = held.analyze(None);
     assert_eq!(a.verdict, AnalyzerVerdict::Checked, "{:?}", a.verdict);
     let v = a.image_values.unwrap();
-    let tc = &v.images[0].text_contrast;
+    let tc = v.images[0].text_contrast.as_ref().unwrap();
     assert_eq!(tc.status(), ObservationStatus::Unknown);
     assert_eq!(
         tc.unknown_info().unwrap().code,
@@ -313,7 +310,7 @@ fn frames_of_another_size_or_scale_are_not_paired() {
         assert!(a.verdict.reason().unwrap().contains("text-hidden frame"));
         let v = a.image_values.unwrap();
         assert_eq!(
-            v.images[0].text_contrast.status(),
+            v.images[0].text_contrast.as_ref().unwrap().status(),
             ObservationStatus::Unknown
         );
     }
@@ -332,30 +329,62 @@ fn an_undeclared_threshold_or_a_bad_percentile_is_unknown() {
     }
 }
 
-/// The Phase 15 rules for the IMAGE: text over an image that paints nothing
-/// or cannot be attributed is skipped (and said so), and with nothing left
-/// the answer is Unknown, never a vacuous pass.
+/// The Phase 15 rules for the IMAGE, as they apply to text over it: an image
+/// that paints nothing (`hidden`) is skipped and said so, and with nothing
+/// left the answer is Unknown, never a vacuous pass. An image reported
+/// OCCLUDED, or `visible: false` with no reason, is still MEASURED: frame B is
+/// read under the glyphs and the image's crop never is.
 #[test]
-fn text_over_an_unrendered_or_unreadable_image_is_skipped() {
-    for (visible, reason) in [
-        (Some(false), None),
-        (Some(false), Some(VisibilityReason::Occluded)),
-        (Some(false), Some(VisibilityReason::Hidden)),
-    ] {
+fn text_over_an_unrendered_image_is_skipped_and_over_an_occluded_one_measured() {
+    let mut held = case("held");
+    held.snap.elements[0].visible = Some(false);
+    held.snap.elements[0].visibility_reason = Some(VisibilityReason::Hidden);
+    let r = held.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    let d = r.detail.as_deref().unwrap();
+    assert!(d.contains("no text lies over a rendered image"), "{d}");
+    assert!(
+        d.contains("unrendered image(s) with text over them skipped"),
+        "{d}"
+    );
+
+    for reason in [None, Some(VisibilityReason::Occluded)] {
         let mut held = case("held");
-        held.snap.elements[0].visible = visible;
+        held.snap.elements[0].visible = Some(false);
         held.snap.elements[0].visibility_reason = reason.clone();
         let r = held.assert_aa();
         assert_eq!(
             r.outcome,
-            AssertionOutcome::Unknown,
+            AssertionOutcome::Passed,
             "{reason:?}: {:?}",
             r.detail
         );
-        let d = r.detail.as_deref().unwrap();
-        assert!(d.contains("no text lies over a readable image"), "{d}");
-        assert!(d.contains("skipped"), "{d}");
     }
+}
+
+/// The usual `<img>` hero: the image sits under a sibling `absolute inset-0`
+/// scrim, so the SDK reports it occluded by that scrim. The scrim fixture,
+/// with that snapshot, must still PASS — and the light overlay still FAIL.
+#[test]
+fn a_hero_occluded_by_its_scrim_is_measured() {
+    fn occluded(mut c: Case) -> Case {
+        let hero_box = c.snap.elements[0].bbox;
+        c.snap.elements[0].visible = Some(false);
+        c.snap.elements[0].visibility_reason = Some(VisibilityReason::Occluded);
+        c.snap.elements[0].occluded_by = Some("scrim-layer".into());
+        c.snap.elements.push(Element {
+            id: "scrim-layer".into(),
+            bbox: hero_box,
+            ..Default::default()
+        });
+        c
+    }
+    let scrim = occluded(case("scrim"));
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    assert!(scrim.reading().percentile_ratio > 10.0);
+    let low = occluded(case("low_contrast"));
+    assert_eq!(low.assert_aa().outcome, AssertionOutcome::Failed);
 }
 
 /// A text box that only TOUCHES an image — its glyph-free line padding over
@@ -381,7 +410,7 @@ fn a_box_that_touches_an_image_with_no_glyph_over_it_is_not_over_it() {
     let a = held.analyze(Some(&held.b));
     let v = a.image_values.unwrap();
     assert_eq!(
-        v.images[0].text_contrast.status(),
+        v.images[0].text_contrast.as_ref().unwrap().status(),
         ObservationStatus::Absent
     );
 }
@@ -395,7 +424,7 @@ fn an_image_with_no_text_over_it_reads_absent() {
     for b in [None, Some(&held.b)] {
         let v = held.analyze(b).image_values.unwrap();
         assert_eq!(
-            v.images[0].text_contrast.status(),
+            v.images[0].text_contrast.as_ref().unwrap().status(),
             ObservationStatus::Absent
         );
     }
@@ -403,7 +432,7 @@ fn an_image_with_no_text_over_it_reads_absent() {
     held.snap.elements[0].bbox = None;
     let v = held.analyze(Some(&held.b)).image_values.unwrap();
     assert_eq!(
-        v.images[0].text_contrast.status(),
+        v.images[0].text_contrast.as_ref().unwrap().status(),
         ObservationStatus::Unknown
     );
 }
@@ -431,28 +460,24 @@ fn the_glyph_colour_is_measured_when_fg_color_is_absent() {
 }
 
 /// A twin in which the text was NOT hidden (frame B identical to A) shows
-/// no glyph mask: the whole box is sampled, at no more than the fallback's
-/// confidence, and the detail says so. Without `fg_color` there is no
-/// colour to measure, and the answer is Unknown.
+/// no glyph mask. That is UNKNOWN, never a failure: "not hidden" and "text
+/// invisible against the image" read the same, and sampling the box of text
+/// that is still painted reads its own glyphs at ~1:1. The scrim case, which
+/// passes at ~18:1 when hidden, must not fail here.
 #[test]
-fn an_unhidden_twin_falls_back_to_the_box_at_lower_confidence() {
-    let scrim = case("scrim");
-    let r = scrim.assert_with(Some(&scrim.a), Some(4.5), None);
-    assert!(conf(&r) <= text_contrast::BBOX_FALLBACK_CONFIDENCE, "{r:?}");
-    assert!(
-        r.detail.as_deref().unwrap().contains("fallback"),
-        "{:?}",
-        r.detail
-    );
-
-    let bare = case("scrim").without_fg();
-    let r = bare.assert_with(Some(&bare.a), Some(4.5), None);
-    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
-    assert_eq!(r.code, Some(UnknownCode::InputMissing));
+fn an_unhidden_twin_is_unknown_not_a_failure() {
+    for c in [case("scrim"), case("scrim").without_fg(), case("held")] {
+        let r = c.assert_with(Some(&c.a), Some(4.5), None);
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        assert_eq!(r.code, Some(UnknownCode::InputMissing));
+        assert!(r.confidence.is_none());
+        let d = r.detail.as_deref().unwrap();
+        assert!(d.contains("was not hidden"), "{d}");
+    }
 }
 
 /// A failure is evidence whatever else could not be measured; a pass needs
-/// every text over a readable image measured.
+/// every text over a rendered image measured.
 #[test]
 fn a_failure_stands_beside_an_unmeasured_text_and_a_pass_does_not() {
     // A second text element over the hero, with no colour of its own and no
@@ -501,4 +526,134 @@ fn the_image_analyzer_never_gates_on_text_contrast() {
         assert!(r.conclusive, "{:?}", r.verdict);
         assert!(r.findings.iter().all(|f| f.severity == Severity::Info));
     }
+}
+
+// ---------------------------------------------------------------- registration
+
+fn with_twin(c: &Case, b: image::RgbaImage) -> Frame {
+    assert_eq!(b.dimensions(), c.a.buffer.dimensions());
+    Frame::from_rgba(b, FrameSource::synthetic_now())
+}
+
+/// Frame B must be the same layout as frame A, not merely the same size: one
+/// shifted by a pixel, zoomed, or captured from another page turns the image's
+/// own texture into a "glyph mask". Each is Unknown with the measured share,
+/// never a verdict.
+#[test]
+fn an_unregistered_twin_is_unknown_with_the_measured_share() {
+    let wide = case("wide_heading");
+    // Shifted right by one pixel (column 0 repeated).
+    let shifted = image::RgbaImage::from_fn(320, 180, |x, y| {
+        *wide.b.buffer.get_pixel(x.saturating_sub(1), y)
+    });
+    // Zoomed 2% about the centre.
+    let held = case("held");
+    let big = image::imageops::resize(
+        &held.b.buffer,
+        327,
+        184,
+        image::imageops::FilterType::Triangle,
+    );
+    let zoomed = image::imageops::crop_imm(&big, 3, 2, 320, 180).to_image();
+    // Another page's text-hidden capture entirely.
+    let other = case("low_contrast");
+    for (c, b) in [
+        (&wide, with_twin(&wide, shifted)),
+        (&held, with_twin(&held, zoomed)),
+        (&other, case("held").b),
+    ] {
+        let r = c.assert_with(Some(&b), Some(4.5), None);
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        assert_eq!(r.code, Some(UnknownCode::InputMissing));
+        let d = r.detail.as_deref().unwrap();
+        assert!(d.contains("not registered") && d.contains('%'), "{d}");
+
+        let v = c.analyze(Some(&b)).image_values.unwrap();
+        let tc = v.images[0].text_contrast.as_ref().unwrap();
+        assert_eq!(tc.status(), ObservationStatus::Unknown);
+        assert!(tc.unknown_info().unwrap().detail.contains("not registered"));
+    }
+}
+
+// ---------------------------------------------------------------- leaves and labels
+
+/// A short label in a full-width block box covers a fraction of a percent of
+/// it ("Hi" at 20 px in a 1280x28 box: about 0.3%). The mask floor is in CSS
+/// px², not a share of the box, so it is measured.
+#[test]
+fn a_short_label_in_a_wide_box_is_measured() {
+    let (w, h) = (1280u32, 120u32);
+    let b = image::RgbaImage::from_fn(w, h, |x, y| {
+        let v = (40 + (x * 7 + y * 13) % 30) as u8;
+        image::Rgba([v, v, v.saturating_add(8), 255])
+    });
+    let mut a = b.clone();
+    // "Hi": an H (two stems and a bar) and an i (stem and dot), white.
+    let strokes = [
+        (20, 46, 3, 15),
+        (29, 46, 3, 15),
+        (23, 52, 6, 3),
+        (36, 50, 3, 11),
+        (36, 46, 3, 2),
+    ];
+    for (x0, y0, sw, sh) in strokes {
+        for y in y0..y0 + sh {
+            for x in x0..x0 + sw {
+                a.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+            }
+        }
+    }
+    let label = Element {
+        id: "label".into(),
+        bbox: Some(Region {
+            x: 0,
+            y: 40,
+            w,
+            h: 28,
+        }),
+        text: Some("Hi".into()),
+        fg_color: Some(Rgb::new(255, 255, 255)),
+        ..Default::default()
+    };
+    let c = Case {
+        a: Frame::from_rgba(a, FrameSource::synthetic_now()),
+        b: Frame::from_rgba(b, FrameSource::synthetic_now()),
+        snap: ElementSnapshot {
+            elements: vec![hero(Region { x: 0, y: 0, w, h }), label],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    let v = c.reading();
+    assert!(
+        v.sampled_px * 200 < (w * 28) as u64,
+        "{} glyph px",
+        v.sampled_px
+    );
+}
+
+/// A wrapper whose innerText includes a child's (a link around a heading) is
+/// not measured against its own colour: only the LEAF is. Here the wrapper
+/// declares a dark colour that would fail on the dark scrim.
+#[test]
+fn only_leaf_text_elements_are_measured() {
+    let mut scrim = case("scrim");
+    let t = scrim.snap.elements[1].bbox.unwrap();
+    scrim.snap.elements.push(Element {
+        id: "link".into(),
+        bbox: Some(Region {
+            x: t.x - 4,
+            y: t.y - 4,
+            w: t.w + 8,
+            h: t.h + 8,
+        }),
+        text: scrim.snap.elements[1].text.clone(),
+        fg_color: Some(Rgb::new(20, 20, 20)),
+        children_ids: vec!["heading".into()],
+        ..Default::default()
+    });
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    assert_eq!(scrim.reading().element, "heading");
 }
