@@ -11,7 +11,7 @@
 //! covered by `tests/text_over_image.rs`, which needs the new
 //! `EvalContext::text_hidden_frame` and so cannot serve as the arming test.
 
-use qontinui_vision_core::assertions::{evaluate, Assertion, AssertionOutcome, EvalContext};
+use qontinui_vision_core::assertions::{Assertion, AssertionOutcome, EvalContext};
 use qontinui_vision_core::{Element, ElementMedia, ElementSnapshot, Frame, FrameSource};
 use qontinui_vision_core::{MediaKind, ObjectFit, Region, Rgb};
 
@@ -57,7 +57,7 @@ fn a_wire_text_over_image_contrast_is_evaluated_and_needs_the_text_hidden_frame(
         image::RgbaImage::from_pixel(200, 100, image::Rgba([40, 44, 52, 255])),
         FrameSource::synthetic_now(),
     );
-    let r = evaluate(
+    let r = qontinui_vision_core::assertions::evaluate(
         &assertion,
         &EvalContext {
             snapshot: Some(&snapshot),
