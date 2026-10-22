@@ -55,6 +55,7 @@ fn run(
             frame,
             snapshot: snap,
             prior_frame: prior,
+            text_hidden_frame: None,
         },
     )
 }
@@ -327,6 +328,66 @@ fn image_every_non_checked_arm_carries_a_code() {
         "reached the degraded arm by the wrong route: {:?}",
         r.verdict
     );
+
+    // Own degraded arm #4 (Phase 16): every image located, but a text-hidden
+    // frame was supplied that cannot be paired with the frame (another size).
+    let mut m = bare("img");
+    m.bbox = Some(region(10, 10, 60, 30));
+    m.media = Some(ElementMedia {
+        object_fit: Some(qontinui_vision_core::ObjectFit::Fill),
+        ..ElementMedia::new(MediaKind::Img)
+    });
+    let s = snapshot(vec![m]);
+    let r = run(Analyzer::Image, Some(&f), Some(&s), None);
+    assert_eq!(r.verdict, AnalyzerVerdict::Checked, "the fixture's control");
+    let other = frame(100, 60);
+    let r = analyzers::run(
+        Analyzer::Image,
+        &AnalyzeInput {
+            frame: Some(&f),
+            snapshot: Some(&s),
+            text_hidden_frame: Some(&other),
+            ..Default::default()
+        },
+    );
+    assert_arm(
+        "image/text-hidden-unpaired",
+        &r,
+        Arm::Degraded,
+        UnknownCode::InputMissing,
+    );
+    assert!(
+        r.verdict.reason().unwrap().contains("text-hidden frame"),
+        "reached the degraded arm by the wrong route: {:?}",
+        r.verdict
+    );
+}
+
+/// The assertion half of the multi-frame code (Phase 16): without the
+/// text-hidden twin, `text_over_image_contrast` answers
+/// `needs_multi_frame_input`, in memory and on the wire, and the code is in
+/// the closed vocabulary.
+#[test]
+fn text_over_image_contrast_without_its_twin_needs_multi_frame_input() {
+    assert!(UnknownCode::ALL.contains(&UnknownCode::NeedsMultiFrameInput));
+    let f = frame(20, 20);
+    let s = snapshot(vec![bare("a")]);
+    let r = qontinui_vision_core::evaluate_assertion(
+        &qontinui_vision_core::Assertion::TextOverImageContrast {
+            min_ratio: Some(4.5),
+            percentile: None,
+        },
+        &qontinui_vision_core::EvalContext {
+            snapshot: Some(&s),
+            frame: Some(&f),
+            ..Default::default()
+        },
+    );
+    assert_eq!(r.code, Some(UnknownCode::NeedsMultiFrameInput));
+    let wire = serde_json::to_value(&r).unwrap();
+    assert_eq!(wire["outcome"], json!("unknown"));
+    assert_eq!(wire["code"], json!("needs_multi_frame_input"));
+    assert_eq!(wire["assertion"]["type"], json!("text_over_image_contrast"));
 }
 
 // ---------------------------------------------------------------- wire

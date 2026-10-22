@@ -1,0 +1,95 @@
+{
+  "generator": "generate.py",
+  "page": {
+    "w": 320,
+    "h": 180,
+    "scale_factor": 1.0
+  },
+  "text": "Summer sale",
+  "cases": {
+    "held": {
+      "frame": "held_a.png",
+      "text_hidden": "held_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "low_contrast": {
+      "frame": "low_contrast_a.png",
+      "text_hidden": "low_contrast_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        250,
+        250,
+        250
+      ]
+    },
+    "scrim": {
+      "frame": "scrim_a.png",
+      "text_hidden": "scrim_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        250,
+        250,
+        250
+      ]
+    },
+    "wide_heading": {
+      "frame": "wide_heading_a.png",
+      "text_hidden": "wide_heading_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 62,
+        "w": 320,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    }
+  }
+}
