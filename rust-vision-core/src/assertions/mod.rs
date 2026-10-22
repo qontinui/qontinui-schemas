@@ -3003,4 +3003,72 @@ mod tests {
         );
         assert!(!res.passed, "6px box for a 16px font must still fail");
     }
+
+    /// ARMING TEST for `text_over_image_contrast` (plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16): a WIRE
+    /// assertion — as the CLI's assertions file and the runner's
+    /// `vision/assert` body carry it — handed to [`evaluate`]. Written against
+    /// the API the crate had before the phase (no new type, field or variant
+    /// is named), so with the change reverted it compiles and goes RED at run
+    /// time (the wire type is unknown). The measurement itself is covered by
+    /// `tests/text_over_image.rs`.
+    #[test]
+    fn arming_a_wire_text_over_image_contrast_is_evaluated() {
+        use crate::element_media::{ElementMedia, MediaKind, ObjectFit};
+        use crate::frame::FrameSource;
+        let assertion: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "text_over_image_contrast",
+            "min_ratio": 4.5,
+        }))
+        .expect("the wire assertion parses");
+        let snapshot = ElementSnapshot {
+            elements: vec![
+                Element {
+                    id: "hero".into(),
+                    bbox: Some(Region {
+                        x: 0,
+                        y: 0,
+                        w: 200,
+                        h: 100,
+                    }),
+                    media: Some(ElementMedia {
+                        object_fit: Some(ObjectFit::Fill),
+                        ..ElementMedia::new(MediaKind::Img)
+                    }),
+                    ..Default::default()
+                },
+                Element {
+                    id: "heading".into(),
+                    bbox: Some(Region {
+                        x: 20,
+                        y: 30,
+                        w: 120,
+                        h: 30,
+                    }),
+                    text: Some("Summer sale".into()),
+                    fg_color: Some(Rgb::new(255, 255, 255)),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let frame = Frame::from_rgba(
+            ::image::RgbaImage::from_pixel(200, 100, ::image::Rgba([40, 44, 52, 255])),
+            FrameSource::synthetic_now(),
+        );
+        let r = evaluate(
+            &assertion,
+            &EvalContext {
+                snapshot: Some(&snapshot),
+                frame: Some(&frame),
+                ..Default::default()
+            },
+        );
+        // Not a pass: without the text-hidden capture nothing is measured, and
+        // the typed code names the input to supply.
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        let wire = serde_json::to_value(&r).unwrap();
+        assert_eq!(wire["code"], "needs_multi_frame_input", "{wire}");
+        assert_eq!(wire["assertion"]["type"], "text_over_image_contrast");
+    }
 }
