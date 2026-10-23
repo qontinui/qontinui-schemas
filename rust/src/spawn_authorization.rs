@@ -354,7 +354,7 @@ mod tests {
     #[test]
     fn the_embedded_contract_parses_and_validates() {
         let c = contract();
-        assert_eq!(c.kind_seeds.len(), 10, "the ten coord spawn kinds");
+        assert_eq!(c.kind_seeds.len(), 11, "the eleven coord spawn kinds");
         assert_eq!(c.spawn_paths.len(), 3);
         assert_eq!(c.dispositions, vec!["block", "degrade", "warn_proceed"]);
     }
@@ -434,12 +434,41 @@ mod tests {
         assert_eq!(k.spawn_path, "standing_continuation");
     }
 
+    /// The stalled-train responder is its OWN kind, not a passenger on the
+    /// class row.
+    ///
+    /// coord consults it under its own key (`next_step::dispatch_admission_stall_fix`,
+    /// `preflight_vetoing(.., "admission_stall_fix_dispatch", ..)`), exactly as
+    /// it consults the PR and red-main fixers under theirs, so that an operator
+    /// deselecting one fixer does not silence the other two. Without a seed
+    /// that key resolved NO row and the consult fell through to the
+    /// `standing_continuation` class row alone — whose only off-switch stops
+    /// every standing spawn at once. Seeded, the responder has a per-path
+    /// off-switch of its own and stays under the standing class.
+    #[test]
+    fn admission_stall_fix_dispatch_is_seeded_as_its_own_standing_kind() {
+        let c = contract();
+        let k = c
+            .kind_seeds
+            .iter()
+            .find(|k| k.agent_name == "admission_stall_fix_dispatch")
+            .expect("admission_stall_fix_dispatch is seeded");
+        assert_eq!(k.spawn_path, "standing_continuation");
+        assert!(
+            c.seeded_keys().contains(&(
+                "admission_stall_fix_dispatch".to_string(),
+                "standing_continuation".to_string()
+            )),
+            "the seeder must WRITE the (kind, path) key coord's consult reads"
+        );
+    }
+
     /// Every seeded key is unique and every kind's path is a declared path.
     #[test]
     fn seeded_keys_are_well_formed() {
         let c = contract();
         let keys = c.seeded_keys();
-        assert_eq!(keys.len(), 10 + 2, "10 kinds + 2 seeded classes");
+        assert_eq!(keys.len(), 11 + 2, "11 kinds + 2 seeded classes");
         for (_, path) in &keys {
             assert!(c.spawn_paths.contains(path), "unknown path {path}");
         }

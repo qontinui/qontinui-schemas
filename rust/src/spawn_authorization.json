@@ -45,6 +45,11 @@
       "purpose": "Spawn a fixer for a repo whose main branch is red."
     },
     {
+      "agent_name": "admission_stall_fix_dispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Spawn one bounded `/merge-train-steward --respond-to-alert <id> --once` pass for a tenant whose merge train has dispatchable work and is admitting none of it."
+    },
+    {
       "agent_name": "merge_shepherd",
       "spawn_path": "standing_continuation",
       "purpose": "Unlandable-PR shepherd escalation (Tiers 1-3)."
