@@ -373,6 +373,14 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_metrics_object_is_allowed_for_a_count_only_run() {
+        let mut e = entry();
+        e["metrics"] = json!({});
+        let got = validate_run_outcomes(Some(&json!([e]))).unwrap().unwrap();
+        assert_eq!(got[0].metrics, json!({}));
+    }
+
+    #[test]
     fn a_valid_entry_round_trips_to_the_wire_shape() {
         let got = validate_run_outcomes(Some(&json!([entry()])))
             .unwrap()
