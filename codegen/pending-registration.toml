@@ -110,3 +110,87 @@ type = "UnmeasuredDimension"
 runner_pr = "qontinui/qontinui-runner#1890"
 added = 2026-10-13
 schemas_pr = "qontinui/qontinui-schemas#202"
+
+[[pending]]
+type = "CriterionVerification"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "EarsPattern"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "ExternalRef"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "InterfaceMappingFrontmatter"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "MappingRow"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "RequestFrontmatter"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "RequirementFrontmatter"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "SourceCitation"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "SourceCitationKind"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "SpecAcceptanceCriterion"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "SpecFrontmatter"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "SpecLanguage"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "StoryFrontmatter"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
+
+[[pending]]
+type = "TemplateRef"
+runner_pr = "qontinui/qontinui-runner#2360"
+added = 2026-10-23
+schemas_pr = "qontinui/qontinui-schemas#261"
