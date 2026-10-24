@@ -27,12 +27,17 @@
 //! that was not looked at could change it. So every result carries a
 //! [`JourneySearchFrontier`] naming what was not looked at inside the part of
 //! the graph the query searched: the open frontier entries, grouped by
-//! reason, and the departures whose destination was never observed
-//! (`to_node_unobserved`). The caller (the runner) builds the
-//! `Observation<T>` envelope from those facts: a negative over an unsettled
-//! frontier ([`JourneySearchFrontier::is_settled`] false) is `unknown`
-//! (`frontier_open` / `to_node_unobserved`), never `absent`. This crate does
-//! not depend on `qontinui-vision-core` (which owns the envelope and pulls
+//! reason, the departures whose destination was never observed, and the
+//! departures the navigation edge set left out (filtered, withdrawn,
+//! rejected, `settle_timeout` / `error` to another node). The caller (the
+//! runner) builds the `Observation<T>` envelope from those facts:
+//! [`JourneySearchFrontier::unmeasured`]`(&coverage)` goes into
+//! `provenance.coverage.unmeasured`, and it ALSO names an empty ledger
+//! (`no_observations`) and a ledger that is not `writing` — so the shared
+//! `Observation::absent` constructor refuses every negative it must not
+//! settle, and the answer is `unknown` with
+//! [`JourneySearchFrontier::unsettled_because`]'s code. This crate does not
+//! depend on `qontinui-vision-core` (which owns the envelope and pulls
 //! `image`), so the wrapping is the caller's.
 //!
 //! Every result also repeats the [`JourneyCoverage`] the graph was built over
@@ -152,9 +157,11 @@ pub struct JourneyGraphNode {
 /// Departures from one node that the NAVIGATION edge set (affordance +
 /// `changed`) leaves out, yet that may still lead somewhere — so a negative
 /// answer over a component containing the node stays `unknown`, never
-/// `absent`. Only `affordance`-triggered rows are counted (a back button or a
-/// typed URL is not a way the app offers), and a `no_change` row never is:
-/// that exclusion is a genuine negative. Each counter is its own
+/// `absent`. The navigation counters count only `affordance`-triggered rows
+/// (a typed URL is not a way the app offers); excluded back-button (`pop`)
+/// rows have their own counter, [`Self::excluded_back_arrivals`]. A filtered
+/// or withdrawn `no_change` row is never counted: that exclusion is a genuine
+/// negative (a REJECTED row counts whatever its outcome). Each counter is its own
 /// `coverage.unmeasured` dimension — see [`JourneySearchFrontier::unmeasured`]
 /// for the dimension names and codes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -178,8 +185,18 @@ pub struct JourneyUnmeasuredDepartures {
     /// configuration moved. Dimension `errored_departures`.
     pub errored: u64,
     /// Frontier rows at this node that failed `validate()` — treated as OPEN
-    /// entries the read cannot list. Dimension `rejected_frontier`.
+    /// entries the read cannot list. A row whose `nodeKey` column disagrees
+    /// with its `node` is counted at BOTH keys (the column's, and the valid
+    /// node's), since either may be the true one. Dimension
+    /// `rejected_frontier`.
     pub rejected_frontier: u64,
+    /// `pop` (browser back) rows from this node that were filtered, withdrawn
+    /// (outcome not `no_change`) or rejected (any outcome). Not a navigation
+    /// departure, so a question about one component ignores it; the
+    /// graph-wide questions it can change — `dead_ends`' `backOnly`,
+    /// `requires_prior_knowledge`, the whole frontier — count it. Dimension
+    /// `excluded_back_arrivals`.
+    pub excluded_back_arrivals: u64,
 }
 
 impl JourneyUnmeasuredDepartures {
@@ -188,7 +205,17 @@ impl JourneyUnmeasuredDepartures {
         *self == Self::default()
     }
 
+    /// The counters a NAVIGATION question reads: everything but
+    /// `excludedBackArrivals`.
+    fn for_navigation(&self) -> Self {
+        Self {
+            excluded_back_arrivals: 0,
+            ..*self
+        }
+    }
+
     fn add(&mut self, o: &Self) {
+        self.excluded_back_arrivals += o.excluded_back_arrivals;
         self.filtered_out += o.filtered_out;
         self.withdrawn += o.withdrawn;
         self.rejected += o.rejected;
@@ -392,7 +419,12 @@ impl JourneyGraph {
         }
         for key in keys {
             let Some(node) = self.node(key) else { continue };
-            if node.is_fully_explored() {
+            let unmeasured = if graph_wide {
+                node.unmeasured_departures
+            } else {
+                node.unmeasured_departures.for_navigation()
+            };
+            if node.frontier.is_empty() && node.unobserved_departures == 0 && unmeasured.is_zero() {
                 continue;
             }
             let mut open_by_reason: BTreeMap<String, Vec<FrontierEntry>> = BTreeMap::new();
@@ -408,14 +440,12 @@ impl JourneyGraph {
                 summary.open_entries += 1;
             }
             summary.unobserved_departures += node.unobserved_departures;
-            summary
-                .unmeasured_departures
-                .add(&node.unmeasured_departures);
+            summary.unmeasured_departures.add(&unmeasured);
             summary.nodes.push(JourneySearchFrontierNode {
                 node_key: node.key.clone(),
                 open_by_reason,
                 unobserved_departures: node.unobserved_departures,
-                unmeasured_departures: node.unmeasured_departures,
+                unmeasured_departures: unmeasured,
             });
         }
         summary.nodes.sort_by(|a, b| a.node_key.cmp(&b.node_key));
@@ -443,7 +473,7 @@ impl JourneyGraphNode {
     fn is_fully_explored(&self) -> bool {
         self.frontier.is_empty()
             && self.unobserved_departures == 0
-            && self.unmeasured_departures.is_zero()
+            && self.unmeasured_departures.for_navigation().is_zero()
     }
 }
 
@@ -543,10 +573,16 @@ pub fn build_graph(
     // folded into `off_graph`) once the node set is known.
     let mut excluded: BTreeMap<String, JourneyUnmeasuredDepartures> = BTreeMap::new();
     let mut unplaced_rejected_rows = 0u64;
-    let is_affordance = |e: &JourneyEdgeObservation| {
-        e.trigger.navigation_trigger == NavigationTriggerKind::Affordance
-    };
+    // Count one excluded row: an affordance row by its cause (`bump`), a pop
+    // row as an excluded back arrival, any other trigger not at all. A
+    // filtered or withdrawn `no_change` row is a genuine negative and is
+    // skipped by the callers; a rejected row counts whatever its outcome.
     let mut place = |e: &JourneyEdgeObservation, bump: fn(&mut JourneyUnmeasuredDepartures)| {
+        let bump: fn(&mut JourneyUnmeasuredDepartures) = match e.trigger.navigation_trigger {
+            NavigationTriggerKind::Affordance => bump,
+            NavigationTriggerKind::Pop => |d| d.excluded_back_arrivals += 1,
+            _ => return,
+        };
         if e.from_node.validate().is_ok() {
             bump(excluded.entry(e.from_node.key()).or_default());
         } else {
@@ -557,7 +593,7 @@ pub fn build_graph(
     for edge in edges {
         if edge.invalidated_at.is_some() {
             edges_invalidated += 1;
-            if is_affordance(edge) && edge.outcome != EdgeOutcome::NoChange {
+            if edge.outcome != EdgeOutcome::NoChange {
                 place(edge, |d| d.withdrawn += 1);
             }
             continue;
@@ -568,9 +604,7 @@ pub fn build_graph(
                 row: edge.id.clone(),
                 reason: err.to_string(),
             });
-            if is_affordance(edge) {
-                place(edge, |d| d.rejected += 1);
-            }
+            place(edge, |d| d.rejected += 1);
             continue;
         }
         let observed_at = match DateTime::parse_from_rfc3339(&edge.observed_at) {
@@ -581,15 +615,13 @@ pub fn build_graph(
                     row: edge.id.clone(),
                     reason: format!("observedAt {:?} is not RFC 3339: {err}", edge.observed_at),
                 });
-                if is_affordance(edge) {
-                    place(edge, |d| d.rejected += 1);
-                }
+                place(edge, |d| d.rejected += 1);
                 continue;
             }
         };
         if !filter.keeps(edge, observed_at) {
             edges_filtered_out += 1;
-            if is_affordance(edge) && edge.outcome != EdgeOutcome::NoChange {
+            if edge.outcome != EdgeOutcome::NoChange {
                 place(edge, |d| d.filtered_out += 1);
             }
             continue;
@@ -650,14 +682,20 @@ pub fn build_graph(
                 row: format!("{} {}", entry.node_key, entry.affordance_fingerprint),
                 reason: err.to_string(),
             });
-            // Not listable, but not explored either: an OPEN entry, placed at
-            // its node's key when the node is valid (the key column is
-            // derived from it), else at the row's own key.
-            let at = match entry.node.validate() {
-                Ok(()) => entry.node.key(),
-                Err(_) => entry.node_key.clone(),
-            };
-            excluded.entry(at).or_default().rejected_frontier += 1;
+            // Not listable, but not explored either: an OPEN entry. Counted
+            // at the row's own key column ALWAYS, and also at its node's key
+            // when the node is valid and that key differs — either may be the
+            // node the affordance really belongs to.
+            excluded
+                .entry(entry.node_key.clone())
+                .or_default()
+                .rejected_frontier += 1;
+            if entry.node.validate().is_ok() {
+                let node_key = entry.node.key();
+                if node_key != entry.node_key {
+                    excluded.entry(node_key).or_default().rejected_frontier += 1;
+                }
+            }
             continue;
         }
         let text = serde_json::to_string(entry).expect("FrontierEntry serializes");
@@ -844,79 +882,93 @@ impl JourneySearchFrontier {
         }
     }
 
-    /// True iff nothing in the searched part was left unexplored: no open
-    /// frontier entry, no departure with an unobserved destination, no
-    /// unmeasured departure and no unplaced rejected row. Only then may a
-    /// negative answer be reported as `absent`.
-    pub fn is_settled(&self) -> bool {
-        self.unmeasured().is_empty()
+    /// True iff a negative answer over the searched part may be reported
+    /// `absent`: the ledger is `writing`, the graph was built over at least
+    /// one edge, and nothing in the searched part was left unexplored (no open
+    /// or rejected frontier entry, no unobserved or unmeasured departure, no
+    /// unplaced rejected row). Exactly `self.unmeasured(coverage).is_empty()`.
+    pub fn is_settled(&self, coverage: &JourneyCoverage) -> bool {
+        self.unmeasured(coverage).is_empty()
     }
 
-    /// What the searched part did not look at, as the envelope's
+    /// What the answer did not look at, as the envelope's
     /// `provenance.coverage.unmeasured` entries:
     /// `(dimension, count, UnknownCode wire string)`, only for non-zero
     /// counts, in this order:
     ///
     /// | dimension | counts | code |
     /// |---|---|---|
+    /// | `ledger` | 1 (the ledger) when `coverage.ledger` is not `writing` | `ledger_schema_absent` / `ledger_write_failing` |
+    /// | `no_observations` | 1 (the ledger) when `coverage.edgesObserved == 0` | `no_observations` |
     /// | `frontier` | `openEntries` | `frontier_open` |
     /// | `rejected_frontier` | invalid frontier rows, treated as open | `frontier_open` |
     /// | `unobserved_departures` | `to_node_unobserved` departures | `to_node_unobserved` |
     /// | `settle_timeout_departures` | `settle_timeout` affordance edges to another node | `no_event_before_timeout` |
-    /// | `rejected_departures` | contract-violating affordance rows | `producer_failed` |
+    /// | `rejected_departures` | contract-violating affordance rows (any outcome) | `producer_failed` |
     /// | `unplaced_rejected_rows` | rejected/withdrawn rows with an invalid `fromNode` | `producer_failed` |
     /// | `errored_departures` | `error` affordance edges to another node | `input_missing` |
     /// | `filtered_departures` | affordance rows the filter excluded | `input_missing` |
     /// | `withdrawn_departures` | withdrawn affordance rows | `input_missing` |
+    /// | `excluded_back_arrivals` | filtered / withdrawn / rejected `pop` rows (graph-wide questions only) | `input_missing` |
     ///
     /// Empty iff [`Self::is_settled`]. Putting these in `coverage.unmeasured`
     /// is what makes the shared `Observation::absent` constructor REFUSE a
-    /// negative over an unexplored part, so the rule is enforced once, by the
-    /// envelope.
-    pub fn unmeasured(&self) -> Vec<(&'static str, u64, &'static str)> {
+    /// negative over an empty or non-writing ledger or an unexplored part, so
+    /// the rule is enforced once, by the envelope.
+    pub fn unmeasured(&self, coverage: &JourneyCoverage) -> Vec<(&'static str, u64, &'static str)> {
+        let mut out = Vec::new();
+        if let Some(code) = coverage.ledger_unknown_code() {
+            out.push(("ledger", 1, code));
+        }
+        if coverage.edges_observed == 0 {
+            out.push(("no_observations", 1, "no_observations"));
+        }
         let d = &self.unmeasured_departures;
-        [
-            ("frontier", self.open_entries, "frontier_open"),
-            ("rejected_frontier", d.rejected_frontier, "frontier_open"),
-            (
-                "unobserved_departures",
-                self.unobserved_departures,
-                "to_node_unobserved",
-            ),
-            (
-                "settle_timeout_departures",
-                d.settle_timeout,
-                "no_event_before_timeout",
-            ),
-            ("rejected_departures", d.rejected, "producer_failed"),
-            (
-                "unplaced_rejected_rows",
-                self.unplaced_rejected_rows,
-                "producer_failed",
-            ),
-            ("errored_departures", d.errored, "input_missing"),
-            ("filtered_departures", d.filtered_out, "input_missing"),
-            ("withdrawn_departures", d.withdrawn, "input_missing"),
-        ]
-        .into_iter()
-        .filter(|(_, n, _)| *n > 0)
-        .collect()
+        out.extend(
+            [
+                ("frontier", self.open_entries, "frontier_open"),
+                ("rejected_frontier", d.rejected_frontier, "frontier_open"),
+                (
+                    "unobserved_departures",
+                    self.unobserved_departures,
+                    "to_node_unobserved",
+                ),
+                (
+                    "settle_timeout_departures",
+                    d.settle_timeout,
+                    "no_event_before_timeout",
+                ),
+                ("rejected_departures", d.rejected, "producer_failed"),
+                (
+                    "unplaced_rejected_rows",
+                    self.unplaced_rejected_rows,
+                    "producer_failed",
+                ),
+                ("errored_departures", d.errored, "input_missing"),
+                ("filtered_departures", d.filtered_out, "input_missing"),
+                ("withdrawn_departures", d.withdrawn, "input_missing"),
+                (
+                    "excluded_back_arrivals",
+                    d.excluded_back_arrivals,
+                    "input_missing",
+                ),
+            ]
+            .into_iter()
+            .filter(|(_, n, _)| *n > 0),
+        );
+        out
     }
 
     /// Why a NEGATIVE answer over this searched part cannot be settled, as an
     /// `UnknownCode` wire string, or `None` when it may be reported
-    /// `absent`. Precedence, first match wins:
-    ///
-    /// 1. the ledger is not `writing` — `ledger_schema_absent` /
-    ///    `ledger_write_failing` ([`JourneyCoverage::ledger_unknown_code`]);
-    /// 2. the graph was built over NO edge (`coverage.edgesObserved == 0`),
-    ///    whatever the subject — `no_observations`;
-    /// 3. the subject of the question (the start node; for `steps_to`, either
-    ///    endpoint; for one node's frontier, that node) was never observed —
-    ///    `no_observations`;
-    /// 4. otherwise the code of the FIRST entry of [`Self::unmeasured`]
-    ///    (`frontier_open`, `to_node_unobserved`, `no_event_before_timeout`,
-    ///    `producer_failed`, `input_missing`).
+    /// `absent`. It is the code of the first [`Self::unmeasured`] entry, with
+    /// one addition: when the SUBJECT of the question (the start node; for
+    /// `steps_to`, either endpoint; for one node's frontier, that node) was
+    /// never observed, `no_observations` comes right after the ledger's code.
+    /// So the precedence is: ledger state; `no_observations` (no edge at all,
+    /// or the subject unseen); `frontier_open`; `to_node_unobserved`;
+    /// `no_event_before_timeout`; `producer_failed`; `input_missing`.
+    /// `None` iff `subject_observed && self.is_settled(coverage)`.
     ///
     /// A POSITIVE answer (a path found, a node listed) is `measured` whatever
     /// this says; the caller still reports the coverage beside it.
@@ -928,10 +980,10 @@ impl JourneySearchFrontier {
         if let Some(code) = coverage.ledger_unknown_code() {
             return Some(code);
         }
-        if coverage.edges_observed == 0 || !subject_observed {
+        if !subject_observed {
             return Some("no_observations");
         }
-        self.unmeasured().first().map(|(_, _, code)| *code)
+        self.unmeasured(coverage).first().map(|(_, _, code)| *code)
     }
 }
 
@@ -1132,10 +1184,13 @@ pub fn steps_to(graph: &JourneyGraph, from_key: &str, to_key: &str) -> JourneySt
 pub struct JourneyDeadEnd {
     /// The node.
     pub node_key: String,
-    /// True when the only observed way out is the browser's back button (a
+    /// `true` when the only observed way out is the browser's back button (a
     /// `pop` edge that changed the configuration to a different node) — a
-    /// journey finding, not an exit.
-    pub back_only: bool,
+    /// journey finding, not an exit. `false` when no such edge was observed
+    /// and none was excluded. `null` = unknown: no kept pop exit was seen,
+    /// but a `pop` row from this node was filtered, withdrawn or rejected
+    /// (`unmeasuredDepartures.excludedBackArrivals`).
+    pub back_only: Option<bool>,
 }
 
 /// A node with no observed affordance exit that was NOT fully looked at, so
@@ -1206,7 +1261,13 @@ pub fn dead_ends(graph: &JourneyGraph) -> JourneyDeadEnds {
         if node.is_fully_explored() {
             dead.push(JourneyDeadEnd {
                 node_key: node.key.clone(),
-                back_only: pop_exits.contains(key),
+                back_only: if pop_exits.contains(key) {
+                    Some(true)
+                } else if node.unmeasured_departures.excluded_back_arrivals > 0 {
+                    None
+                } else {
+                    Some(false)
+                },
             });
         } else {
             let mut open_by_reason: BTreeMap<String, u64> = BTreeMap::new();
