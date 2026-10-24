@@ -69,8 +69,10 @@
 //! `ChangeTimeline`, which this crate cannot name (it does not depend on
 //! vision-core, which pulls `image`), and the ONLY value a producer may write
 //! there is `ChangeTimeline::for_ledger()` — the redacted projection that
-//! drops every SDK prose `summary`, the page-changed URL and every network
-//! pathname, and keeps only allow-listed `provenance.source` keys. Re-serializing
+//! drops every SDK prose `summary`, every element id (reduced to its count),
+//! every element fingerprint (`shiftedFingerprints`, animation
+//! `targetElement`), the page-changed URL and every network pathname, and
+//! keeps only allow-listed `provenance.source` keys. Re-serializing
 //! through that typed mirror drops any key it does not model, so the column
 //! has no open value/text slot. Readers select the column explicitly and
 //! parse it as `ChangeTimeline`; `qontinui_vision_core::edge_timing` reduces
