@@ -679,12 +679,24 @@ impl<T> Observation<T> {
         (self.state, self.provenance)
     }
 
-    /// The source attribution, mutably — for a projection that must drop
-    /// keys before storing (`ChangeTimeline::for_ledger`). Crate-private and
-    /// limited to `source`, which no invariant reads: coverage stays out of
-    /// reach, so the absent-over-full-coverage rule cannot be broken here.
-    pub(crate) fn source_mut(&mut self) -> &mut Option<Map<String, Value>> {
-        &mut self.provenance.source
+    /// Redact this observation for STORAGE (`ChangeTimeline::for_ledger`):
+    /// keep only the `provenance.source` keys in `keep_source`, empty
+    /// `provenance.cache.keyInputs`, and replace an unknown's free-text
+    /// `detail` with its code's wire value (the envelope's `detail` is a
+    /// required string, so it cannot be null; the code is a bounded, closed
+    /// vocabulary and the reason a reader branches on anyway). Crate-private,
+    /// and it never touches `coverage` or the state's status, so the
+    /// absent-over-full-coverage rule cannot be broken here.
+    pub(crate) fn redact_for_ledger(&mut self, keep_source: &[&str]) {
+        if let Some(source) = &mut self.provenance.source {
+            source.retain(|k, _| keep_source.contains(&k.as_str()));
+        }
+        if let Some(cache) = &mut self.provenance.cache {
+            cache.key_inputs.clear();
+        }
+        if let ObservationState::Unknown(u) = &mut self.state {
+            u.detail = u.code.as_str().to_string();
+        }
     }
 
     /// Transform a measured value, keeping status and provenance. Cannot

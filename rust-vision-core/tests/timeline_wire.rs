@@ -468,3 +468,44 @@ fn the_ledger_projection_keeps_element_counts_and_drops_element_identities() {
         assert_eq!((x.outcome, x.code), (y.outcome, y.code), "{a:?}");
     }
 }
+
+/// The ledger projection keeps every unknown's CODE and drops its free-text
+/// detail and any cache key inputs.
+#[test]
+fn the_ledger_projection_drops_unknown_details_and_cache_key_inputs() {
+    let mut seen_unknown = 0;
+    for (name, _, original) in timelines() {
+        let stored = original.for_ledger();
+        let v = serde_json::to_value(&stored.summary).unwrap();
+        let o = serde_json::to_value(&original.summary).unwrap();
+        for (field, obs) in v.as_object().unwrap() {
+            if field == "expectedStates" {
+                continue;
+            }
+            if obs["status"] == "unknown" {
+                seen_unknown += 1;
+                let code = obs["unknown"]["code"].as_str().unwrap();
+                assert_eq!(obs["unknown"]["detail"], code, "{name}.{field}");
+                assert_eq!(
+                    o[field]["unknown"]["code"], code,
+                    "{name}.{field}: code kept"
+                );
+            }
+            if let Some(keys) = obs["provenance"]["cache"]["keyInputs"].as_array() {
+                assert!(keys.is_empty(), "{name}.{field}");
+            }
+        }
+    }
+    assert!(
+        seen_unknown > 0,
+        "the captures carry unknown fields (probe is not vacuous)"
+    );
+
+    // A stated cache with key inputs: they are dropped.
+    let mut v: Value = serde_json::to_value(scenario("rich")).unwrap();
+    v["summary"]["settleMs"]["provenance"]["cache"] =
+        serde_json::json!({ "hit": true, "storedAt": null, "keyInputs": ["user@example.com"] });
+    let t: ChangeTimeline = serde_json::from_value(v).unwrap();
+    let text = serde_json::to_string(&t.for_ledger()).unwrap();
+    assert!(!text.contains("user@example.com"), "{text}");
+}
