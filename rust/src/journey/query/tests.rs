@@ -2424,3 +2424,266 @@ fn rr14_2_a_kept_pop_settle_timeout_self_loop_makes_back_only_unknown() {
     let z = d.dead_ends.iter().find(|x| x.node_key == key("z")).unwrap();
     assert_eq!(z.back_only, Some(false));
 }
+
+// --- Invariant: every trusted excluded row is counted or changes nothing ------
+//
+// For every trusted row in an enumeration of triggers x outcomes x from x to,
+// filtered or withdrawn over two base graphs: either keeping the row would
+// change no answer (dead_ends listing and back_only, requires_prior_knowledge,
+// reachable_from and its steps, the whole frontier), or the answer computed
+// WITHOUT it is unsettled. An excluded row that would change an answer
+// while the answer reads settled is a false negative.
+
+#[derive(Debug, Clone, PartialEq)]
+enum DeadEndClass {
+    Dead(Option<bool>),
+    Unexplored,
+    Absent,
+}
+
+fn dead_end_class(d: &JourneyDeadEnds, k: &str) -> DeadEndClass {
+    if let Some(x) = d.dead_ends.iter().find(|x| x.node_key == k) {
+        return DeadEndClass::Dead(x.back_only);
+    }
+    if d.unexplored.iter().any(|x| x.node_key == k) {
+        return DeadEndClass::Unexplored;
+    }
+    DeadEndClass::Absent
+}
+
+fn excluded_row_violations(base: &[E], probe: E, label: &str, out: &mut Vec<String>) {
+    let names = ["s", "a", "b", "n", "m"];
+    let mut ledger = edges(base);
+    ledger.push(probe.build());
+    let last = ledger.len() - 1;
+    let kept = build_graph(&ledger, &[], &writing(), &no_filter());
+    let mut filtered = ledger.clone();
+    filtered[last].app_version = Some("2.0.0".into());
+    let f = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let mut withdrawn = ledger.clone();
+    withdrawn[last].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    for (exc, how) in [
+        (build_graph(&filtered, &[], &writing(), &f), "filtered"),
+        (
+            build_graph(&withdrawn, &[], &writing(), &no_filter()),
+            "withdrawn",
+        ),
+    ] {
+        let tag = format!("{label} [{how}]");
+        // dead_ends
+        let (dk, dx) = (dead_ends(&kept), dead_ends(&exc));
+        let wide_settled = dx.frontier.is_settled(&dx.coverage, true);
+        for n in names {
+            let k = key(n);
+            match (dead_end_class(&dx, &k), dead_end_class(&dk, &k)) {
+                (DeadEndClass::Dead(bx), DeadEndClass::Dead(bk)) => {
+                    if bx.is_some() && bx != bk {
+                        out.push(format!("{tag}: back_only {n}: excluded {bx:?} kept {bk:?}"));
+                    }
+                }
+                (DeadEndClass::Dead(_), DeadEndClass::Absent) => {
+                    out.push(format!("{tag}: excluded lists {n} dead, kept has an exit"))
+                }
+                (DeadEndClass::Absent, DeadEndClass::Dead(_)) if wide_settled => out.push(format!(
+                    "{tag}: kept lists {n} dead, excluded silent and settled"
+                )),
+                _ => {}
+            }
+        }
+        // requires_prior_knowledge
+        let (pk, px) = (
+            requires_prior_knowledge(&kept),
+            requires_prior_knowledge(&exc),
+        );
+        let psettled = px.frontier.is_settled(&px.coverage, true);
+        for n in names {
+            let k = key(n);
+            let in_k = pk.nodes.iter().any(|x| x.node_key == k);
+            let uns_k = pk.unsettled.iter().any(|x| x.node_key == k);
+            let in_x = px.nodes.iter().any(|x| x.node_key == k);
+            let uns_x = px.unsettled.iter().any(|x| x.node_key == k);
+            if in_x && !in_k && !uns_k {
+                out.push(format!(
+                    "{tag}: prior {n}: excluded settled, kept disqualified"
+                ));
+            }
+            if in_k && !in_x && !uns_x && psettled {
+                out.push(format!(
+                    "{tag}: prior {n}: kept lists, excluded silent and settled"
+                ));
+            }
+        }
+        // reachable_from and steps
+        for s in names {
+            let (rk, rx) = (
+                reachable_from(&kept, &key(s)),
+                reachable_from(&exc, &key(s)),
+            );
+            if !rx.from_observed || !rx.frontier.is_settled(&rx.coverage, true) {
+                continue;
+            }
+            let ks: Vec<_> = rk
+                .reachable
+                .iter()
+                .map(|r| (r.node_key.clone(), r.steps))
+                .collect();
+            let xs: Vec<_> = rx
+                .reachable
+                .iter()
+                .map(|r| (r.node_key.clone(), r.steps))
+                .collect();
+            if ks != xs {
+                out.push(format!(
+                    "{tag}: reachable_from {s}: excluded settled {xs:?} kept {ks:?}"
+                ));
+            }
+        }
+        // the whole frontier
+        let (fk, fx) = (frontier_of(&kept, None), frontier_of(&exc, None));
+        if !fk.frontier.is_settled(&fk.coverage, true) && fx.frontier.is_settled(&fx.coverage, true)
+        {
+            out.push(format!(
+                "{tag}: whole frontier kept unsettled, excluded settled"
+            ));
+        }
+    }
+}
+
+fn excluded_row_enumeration_violations() -> (usize, Vec<String>) {
+    use EdgeOutcome as O;
+    use NavigationTriggerKind as T;
+    let bases: [fn() -> Vec<E>; 2] = [
+        || vec![e("1", "s", "a").kind(T::Push), e("2", "a", "b")],
+        || {
+            vec![
+                e("1", "s", "a").kind(T::Push),
+                e("2", "a", "b"),
+                e("3", "b", "a").kind(T::Pop),
+                e("4", "s", "s").kind(T::Initial),
+            ]
+        },
+    ];
+    let triggers = [
+        T::Affordance,
+        T::Pop,
+        T::Initial,
+        T::Push,
+        T::Replace,
+        T::Hash,
+    ];
+    let outcomes = [
+        O::Changed,
+        O::NoChange,
+        O::Error,
+        O::SettleTimeout,
+        O::ToNodeUnobserved,
+    ];
+    let froms: [&'static str; 4] = ["s", "a", "b", "n"];
+    let tos: [&'static str; 6] = ["s", "a", "b", "n", "m", "SELF"];
+    let mut out = Vec::new();
+    let mut rows = 0;
+    for base in bases {
+        for t in triggers {
+            for o in outcomes {
+                for fr in froms {
+                    for to in tos {
+                        let to: &'static str = if to == "SELF" { fr } else { to };
+                        if matches!(o, O::ToNodeUnobserved | O::NoChange) && to != fr {
+                            continue;
+                        }
+                        let p = e("9", fr, to).kind(t).outcome(o);
+                        if p.build().validate().is_err() {
+                            continue; // trusted rows only
+                        }
+                        rows += 1;
+                        let label = format!("{t:?}/{o:?} {fr}->{}", p.to.unwrap_or("None"));
+                        excluded_row_violations(&base(), p, &label, &mut out);
+                    }
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    (rows, out)
+}
+
+#[test]
+fn every_trusted_excluded_row_is_counted_or_changes_nothing() {
+    let (rows, violations) = excluded_row_enumeration_violations();
+    assert!(rows > 200, "the enumeration is not vacuous: {rows} rows");
+    assert!(
+        violations.is_empty(),
+        "{} violation(s):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn rr15_an_excluded_genuine_negative_on_an_unkept_node_is_counted() {
+    // s -push-> a -click-> b; n -> n (a click or back that closed no_change
+    // or error on its own node). Kept, n is a dead end. Excluded, nothing
+    // else shows n, so the row is counted off the graph.
+    for trigger in [
+        NavigationTriggerKind::Affordance,
+        NavigationTriggerKind::Pop,
+    ] {
+        for outcome in [EdgeOutcome::NoChange, EdgeOutcome::Error] {
+            let ledger = edges(&[
+                e("1", "s", "a").kind(NavigationTriggerKind::Push),
+                e("2", "a", "b"),
+                e("3", "n", "n").kind(trigger).outcome(outcome),
+            ]);
+            let label = format!("{trigger:?}/{outcome:?}");
+            let kept = dead_ends(&build_graph(&ledger, &[], &writing(), &no_filter()));
+            assert!(
+                kept.dead_ends.iter().any(|x| x.node_key == key("n")),
+                "{label}: kept, n is a dead end"
+            );
+            let mut filtered = ledger.clone();
+            filtered[2].app_version = Some("2.0.0".into());
+            let f = JourneyFilter {
+                app_version: Some("1.0.0".into()),
+                ..JourneyFilter::default()
+            };
+            let mut withdrawn = ledger.clone();
+            withdrawn[2].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+            for (g, how) in [
+                (build_graph(&filtered, &[], &writing(), &f), "filtered"),
+                (
+                    build_graph(&withdrawn, &[], &writing(), &no_filter()),
+                    "withdrawn",
+                ),
+            ] {
+                assert!(g.node(&key("n")).is_none(), "{label} {how}");
+                let og = g.off_graph_departures;
+                let counted = match (trigger, how) {
+                    (NavigationTriggerKind::Pop, _) => og.excluded_back_arrivals,
+                    (_, "filtered") => og.filtered_out,
+                    _ => og.withdrawn,
+                };
+                assert_eq!(counted, 1, "{label} {how}: {og:?}");
+                let d = dead_ends(&g);
+                assert!(!d.frontier.is_settled(&d.coverage, true), "{label} {how}");
+            }
+            // On a KEPT node the same row is still a genuine negative.
+            let mut on_kept = ledger.clone();
+            on_kept[2] = e("3", "b", "b").kind(trigger).outcome(outcome).build();
+            on_kept[2].app_version = Some("2.0.0".into());
+            let f = JourneyFilter {
+                app_version: Some("1.0.0".into()),
+                ..JourneyFilter::default()
+            };
+            let g = build_graph(&on_kept, &[], &writing(), &f);
+            assert!(g.off_graph_departures.is_zero(), "{label}");
+            assert!(
+                g.node(&key("b")).unwrap().unmeasured_departures.is_zero(),
+                "{label}"
+            );
+        }
+    }
+}

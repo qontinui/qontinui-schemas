@@ -301,7 +301,9 @@ impl JourneyUnmeasuredDepartures {
     }
 }
 
-/// A row that is a GENUINE negative, so excluding it hides nothing: a click
+/// A row that is a GENUINE negative, so excluding it hides nothing — on a
+/// node the graph keeps (on any other node, `build_graph` still counts it,
+/// off the graph, since its kept twin would reveal the node): a click
 /// or back (`affordance` / `pop`) that closed `no_change` (nothing
 /// happened), or one that closed `error` on its own node (the failure was
 /// observed and the page stayed). A URL-trigger row (`initial` / `push` /
@@ -768,6 +770,8 @@ pub fn build_graph(
     //   callers.
     // - Each distinct row (full serialized form) is placed once.
     let mut placed: BTreeSet<String> = BTreeSet::new();
+    // Excluded genuine negatives, judged once the node set is known.
+    let mut genuine_pending: Vec<(&JourneyEdgeObservation, Excluded)> = Vec::new();
     let mut unknown_destination_arrivals = 0u64;
     let mut kept_unknown_destination_arrivals = 0u64;
     let mut doubt_to: BTreeMap<String, JourneyArrivalDoubt> = BTreeMap::new();
@@ -838,7 +842,10 @@ pub fn build_graph(
                     .or_default()
                     .insert(serde_json::to_string(edge).expect("edge row serializes"));
                 place(edge, Excluded::Untrusted);
-            } else if !genuine_negative(edge) {
+            } else if genuine_negative(edge) {
+                // Decided once the node set is known (below).
+                genuine_pending.push((edge, Excluded::Withdrawn));
+            } else {
                 place(edge, Excluded::Withdrawn);
             }
             continue;
@@ -856,7 +863,9 @@ pub fn build_graph(
         };
         if !filter.keeps(edge, observed_at) {
             edges_filtered_out += 1;
-            if !genuine_negative(edge) {
+            if genuine_negative(edge) {
+                genuine_pending.push((edge, Excluded::Filtered));
+            } else {
                 place(edge, Excluded::Filtered);
             }
             continue;
@@ -961,6 +970,27 @@ pub fn build_graph(
     // nothing about the row can be trusted, its key column included (an
     // edge with an invalid fromNode is treated the same way): it is
     // unplaced, and every negative counts it.
+    // An excluded genuine negative (a click or back that closed no_change,
+    // or error on its own node) hides nothing ONLY on a node the graph
+    // keeps: there, the node is shown and the row would not change its
+    // answers. On a node NO kept or frontier row shows, its kept twin would
+    // reveal the node itself (say, as a dead end), so it is counted — off
+    // the graph — like any other excluded departure, once per distinct row.
+    for (edge, cause) in genuine_pending {
+        if node_repr.contains_key(&edge.from_node.key()) {
+            continue;
+        }
+        if !placed.insert(serde_json::to_string(edge).expect("edge row serializes")) {
+            continue;
+        }
+        let d = excluded.entry(edge.from_node.key()).or_default();
+        match (edge.trigger.navigation_trigger, cause) {
+            (NavigationTriggerKind::Pop, _) => d.excluded_back_arrivals += 1,
+            (_, Excluded::Filtered) => d.filtered_out += 1,
+            _ => d.withdrawn += 1,
+        }
+    }
+
     let mut unplaced_rejected_frontier = 0u64;
     for (column, node_key) in rejected_frontier_rows {
         match node_key {
