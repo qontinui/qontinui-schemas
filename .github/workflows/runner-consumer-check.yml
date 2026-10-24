@@ -897,9 +897,12 @@ jobs:
   #     rust/tests/fixtures/ui_bridge_sdk/ may not be Modified, Deleted or
   #     Renamed (a new capture from a new SDK release is an Addition and
   #     always passes; the capture/ harness is not guarded);
-  #   - rust/tests/ui_bridge_sdk_wire.rs may not be Modified or Deleted — an
-  #     edit could #[ignore] the gate, lower MIN_FIXTURES or repoint the
-  #     fixture directory, and its 4 tests are far below rust-ci's floor.
+  #   - rust/tests/ui_bridge_sdk_wire.rs and its page-health sibling
+  #     rust-vision-core/tests/ui_bridge_sdk_page_health_wire.rs (which gates
+  #     the page_health/ subdirectory as Observation<PageHealthValue>) may not
+  #     be Modified or Deleted — an edit could #[ignore] the gate, lower
+  #     MIN_FIXTURES or repoint the fixture directory, and their handful of
+  #     tests are far below rust-ci's floor.
   # The label is the deliberate decision (retiring an SDK's wire, or
   # changing the gate itself), visible on the PR.
   #
@@ -931,17 +934,18 @@ jobs:
           set -euo pipefail
           fixtures='rust/tests/fixtures/ui_bridge_sdk/'
           test_file='rust/tests/ui_bridge_sdk_wire.rs'
+          page_health_test_file='rust-vision-core/tests/ui_bridge_sdk_page_health_wire.rs'
           # --diff-filter=a: every change EXCEPT an Addition. --no-renames
           # splits a rename into D + A, so its D side is caught here. -z keeps
           # any file name intact. Written to a file first so a failing
           # `git diff` fails the step under set -e.
           changed_list="$RUNNER_TEMP/wire-gate-changed"
           git diff --no-renames --name-only --diff-filter=a -z \
-            "$BASE_SHA...$HEAD_SHA" -- "$fixtures" "$test_file" > "$changed_list"
+            "$BASE_SHA...$HEAD_SHA" -- "$fixtures" "$test_file" "$page_health_test_file" > "$changed_list"
           violations=()
           while IFS= read -r -d '' path; do
             case "$path" in
-              "$test_file") violations+=("$path") ;;
+              "$test_file" | "$page_health_test_file") violations+=("$path") ;;
               "${fixtures}capture/"*) ;;
               "$fixtures"*.json) violations+=("$path") ;;
             esac
