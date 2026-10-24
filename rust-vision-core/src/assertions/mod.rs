@@ -1904,7 +1904,9 @@ fn eval_animation_settled(region: Option<Region>, ctx: &EvalContext<'_>) -> Asse
                 assertion,
                 UnknownCode::InputMissing,
                 format!(
-                    "animation(s) look still running when the {}ms recording ended ({names}),                      but the recorder dropped `animation-ended` events at its cap, so their end                      may have been lost",
+                    "animation(s) look still running when the {}ms recording ended ({names}), \
+                     but the recorder dropped `animation-ended` events at its cap, so their end \
+                     may have been lost",
                     t.recorded_ms
                 ),
             );
@@ -2006,7 +2008,8 @@ fn eval_settled_within(ms: u64, ctx: &EvalContext<'_>) -> AssertionResult {
                 assertion,
                 UnknownCode::InputMissing,
                 format!(
-                    "no `settled` event within {ms}ms was recorded, but the recorder dropped                      `settled` events at its cap, so one may have been lost"
+                    "no `settled` event within {ms}ms was recorded, but the recorder dropped \
+                     `settled` events at its cap, so one may have been lost"
                 ),
             );
         }
@@ -2073,7 +2076,8 @@ fn eval_state_entered_within(state: String, ms: u64, ctx: &EvalContext<'_>) -> A
                 assertion,
                 UnknownCode::InputMissing,
                 format!(
-                    "summary.expectedStates['{state}'] says it did not enter within {ms}ms, but                      it is degraded ({}), so an entry may have gone unmeasured",
+                    "summary.expectedStates['{state}'] says it did not enter within {ms}ms, but \
+                     it is degraded ({}), so an entry may have gone unmeasured",
                     gaps.join(", ")
                 ),
             );
@@ -2930,6 +2934,10 @@ mod tests {
         );
     }
 
+    /// DEFENSIVE: the UI Bridge SDK caps events per type but emits a single
+    /// `settled`, so it never reports `timeline-events:settled` as dropped.
+    /// The rule this pins guards a non-SDK producer (or a future SDK cap)
+    /// that could, and is harmless otherwise.
     #[test]
     fn settled_within_never_fails_over_dropped_settled_events() {
         let t = timeline(vec![], |v| {

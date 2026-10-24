@@ -14,7 +14,8 @@
 //! never read as a 12-sample median.
 //!
 //! Pure, I/O-free, deterministic: rows are ordered by `(observedAt,
-//! observationId, appVersion and timeline as serialized)`; percentiles are nearest-rank (`rank = ceil(p * n)`, so the
+//! observationId)`, ties broken by the serialized `(appVersion, timeline)`;
+//! percentiles are nearest-rank (`rank = ceil(p * n)`, so the
 //! median of an even count is the LOWER middle value) over values sorted with
 //! `f64::total_cmp`; no clock is read; no threshold is applied — whether a
 //! p90 is "slow" is the caller's call.
