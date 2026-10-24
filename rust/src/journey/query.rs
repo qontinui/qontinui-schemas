@@ -198,6 +198,13 @@ pub struct JourneyGraphNode {
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
     /// Excluded affordance / pop rows arriving here from another node.
     pub arrival_doubt: JourneyArrivalDoubt,
+    /// `true` when the node has at least one kept arrival (an edge whose
+    /// `toNode` is this node), and every one of them closed `settle_timeout`,
+    /// whatever its trigger: no `changed` or `no_change` arrival confirms the
+    /// node is a real destination rather than an intermediate render (a
+    /// spinner). Such a node is never a settled dead end, nor a settled
+    /// requires-prior-knowledge node.
+    pub unconfirmed_destination: bool,
 }
 
 /// Departures from one node that the NAVIGATION edge set (affordance +
@@ -207,7 +214,9 @@ pub struct JourneyGraphNode {
 /// (a typed URL is not a way the app offers); excluded back-button (`pop`)
 /// rows have their own counter, [`Self::excluded_back_arrivals`]. A filtered
 /// or withdrawn `no_change` row is never counted: that exclusion is a genuine
-/// negative (a REJECTED row counts whatever its outcome). Each counter is its own
+/// negative. (A REJECTED row is not counted here at all: nothing in it is
+/// trusted, so it is placed at no node — see
+/// [`JourneyGraph::unplaced_rejected_rows`].) Each counter is its own
 /// `coverage.unmeasured` dimension — see [`JourneySearchFrontier::unmeasured`]
 /// for the dimension names and codes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -247,8 +256,9 @@ pub struct JourneyUnmeasuredDepartures {
     /// exit: valid `pop` rows the filter excluded or that were withdrawn
     /// (outcome not `no_change`), and kept `pop` edges to ANOTHER node whose
     /// outcome is `error` or `settle_timeout` (the same rule as an affordance
-    /// edge's). A REJECTED pop row is not here — a rejected row's trigger
-    /// cannot be trusted, so it counts as `rejected`. Not a navigation
+    /// edge's). A REJECTED pop row is not here — nothing in a rejected row
+    /// is trusted, so it counts in `JourneyGraph::unplaced_rejected_rows`.
+    /// Not a navigation
     /// departure, so a question about one component ignores it; the
     /// graph-wide questions it can change — `dead_ends`' `backOnly`,
     /// `requires_prior_knowledge`, the whole frontier — count it. Dimension
@@ -446,10 +456,12 @@ pub struct JourneyGraph {
     pub nodes: Vec<JourneyGraphNode>,
     /// Aggregated edges, sorted by `(fromKey, toKey, trigger, outcome)`.
     pub edges: Vec<JourneyGraphEdge>,
-    /// Rows left out as contract violations, sorted.
+    /// Rows left out as contract violations, live or withdrawn (a withdrawn one
+    /// is also counted in `coverage.edgesInvalidated`), sorted.
     pub rejected: Vec<JourneyRejectedRow>,
-    /// Unmeasured departures (filtered, withdrawn, rejected, rejected
-    /// frontier, excluded back arrivals) placed at a node key that is NOT in
+    /// Unmeasured departures (filtered, withdrawn, rejected frontier with a
+    /// valid node, excluded back and URL arrivals) placed at a node key that
+    /// is NOT in
     /// `nodes`. No component query can reach such a node, but a graph-wide
     /// question (`dead_ends`, `requires_prior_knowledge`, the whole frontier)
     /// counts them.
@@ -769,7 +781,14 @@ pub fn build_graph(
             edges_invalidated += 1;
             // A withdrawn row is judged like a live one: failing validate()
             // OR carrying an unparseable observedAt makes it untrusted.
-            if trusted_edge_row(edge).is_err() {
+            if let Err(reason) = trusted_edge_row(edge) {
+                // Listed like a live rejected row, so the bookkeeping shows
+                // why it is counted in unplaced_rejected_rows.
+                rejected.insert(JourneyRejectedRow {
+                    kind: JourneyRejectedRowKind::Edge,
+                    row: edge.id.clone(),
+                    reason,
+                });
                 place(edge, Excluded::Untrusted);
             } else if edge.outcome != EdgeOutcome::NoChange {
                 place(edge, Excluded::Withdrawn);
@@ -931,6 +950,7 @@ pub fn build_graph(
                 unobserved_departures: unobserved.get(&key).copied().unwrap_or(0),
                 unmeasured_departures: excluded.remove(&key).unwrap_or_default(),
                 arrival_doubt: doubt_to.get(&key).copied().unwrap_or_default(),
+                unconfirmed_destination: false,
                 key,
                 node,
                 frontier,
@@ -962,6 +982,16 @@ pub fn build_graph(
     // navigation (affordance) or from the kept back exits (pop), never a
     // negative.
     let mut nodes = nodes;
+    // Unconfirmed destinations: every kept arrival closed settle_timeout.
+    // to_key -> "every arrival so far closed settle_timeout".
+    let mut settle_only: BTreeMap<&str, bool> = BTreeMap::new();
+    for e in &graph_edges {
+        let slot = settle_only.entry(e.to_key.as_str()).or_insert(true);
+        *slot &= e.outcome == EdgeOutcome::SettleTimeout;
+    }
+    for n in &mut nodes {
+        n.unconfirmed_destination = settle_only.get(n.key.as_str()).copied().unwrap_or(false);
+    }
     for e in &graph_edges {
         if e.from_key == e.to_key {
             continue;
@@ -1129,7 +1159,7 @@ impl JourneySearchFrontier {
     /// | `unplaced_rejected_frontier` | invalid frontier rows placeable at no node | `frontier_open` |
     /// | `unobserved_departures` | `to_node_unobserved` departures | `to_node_unobserved` |
     /// | `settle_timeout_departures` | `settle_timeout` affordance edges to another node | `no_event_before_timeout` |
-    /// | `unplaced_rejected_rows` | untrusted edge rows with an invalid `fromNode` | `producer_failed` |
+    /// | `unplaced_rejected_rows` | every untrusted (rejected) edge row, live or withdrawn | `producer_failed` |
     /// | `errored_departures` | `error` affordance edges to another node | `input_missing` |
     /// | `filtered_departures` | affordance rows the filter excluded | `input_missing` |
     /// | `withdrawn_departures` | withdrawn affordance rows | `input_missing` |
@@ -1432,8 +1462,9 @@ pub struct JourneyDeadEnd {
     /// was kept, but a `pop` row from this node was filtered or withdrawn, or
     /// a kept `pop` edge to another node ended `error` / `settle_timeout`
     /// (`unmeasuredDepartures.excludedBackArrivals > 0`). `false` otherwise.
-    /// (A rejected `pop`-claiming row is untrusted and counts as `rejected`,
-    /// which makes the node `unexplored`, never a dead end.)
+    /// (A rejected `pop`-claiming row is untrusted and counts in
+    /// `JourneyGraph::unplaced_rejected_rows`, which lists no node as a dead
+    /// end at all.)
     pub back_only: Option<bool>,
 }
 
@@ -1450,9 +1481,14 @@ pub struct JourneyUnexploredNode {
     /// Departures from it whose destination was never observed.
     pub unobserved_departures: u64,
     /// Departures from it the navigation edge set left out (filtered,
-    /// withdrawn, rejected, `settle_timeout` / `error` to another node,
-    /// rejected frontier rows).
+    /// withdrawn, `settle_timeout` / `error` to another node, rejected
+    /// frontier rows with a valid node).
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
+    /// `true` when every observed arrival at the node closed
+    /// `settle_timeout` — no `changed` or `no_change` arrival confirms it is
+    /// a real destination rather than an intermediate render
+    /// ([`JourneyGraphNode::unconfirmed_destination`]).
+    pub unconfirmed_destination: bool,
     /// `true` when the node itself was fully explored but the GRAPH cannot
     /// support a dead-end verdict: an unplaced untrusted row (edge or
     /// frontier) may belong to it, or the ledger is not `writing`.
@@ -1520,7 +1556,7 @@ pub fn dead_ends(graph: &JourneyGraph) -> JourneyDeadEnds {
         if has_exit {
             continue;
         }
-        if node.is_fully_explored() && !graph_unsettled {
+        if node.is_fully_explored() && !graph_unsettled && !node.unconfirmed_destination {
             dead.push(JourneyDeadEnd {
                 node_key: node.key.clone(),
                 back_only: if pop_exits.contains(key) {
@@ -1543,7 +1579,8 @@ pub fn dead_ends(graph: &JourneyGraph) -> JourneyDeadEnds {
                 open_by_reason,
                 unobserved_departures: node.unobserved_departures,
                 unmeasured_departures: node.unmeasured_departures,
-                unsettled_by_graph: node.is_fully_explored(),
+                unconfirmed_destination: node.unconfirmed_destination,
+                unsettled_by_graph: node.is_fully_explored() && graph_unsettled,
             });
         }
     }
@@ -1658,6 +1695,10 @@ pub struct JourneyPriorKnowledgeUnsettledNode {
     /// ones placed at a node, and unplaced rejected ones, each row once. An
     /// affordance nobody activated anywhere may be the link into this node.
     pub open_frontier_entries: u64,
+    /// Every observed arrival at this node closed `settle_timeout`
+    /// ([`JourneyGraphNode::unconfirmed_destination`]): it may be an
+    /// intermediate render, not a page a URL leads to.
+    pub unconfirmed_destination: bool,
 }
 
 /// The answer of [`requires_prior_knowledge`].
@@ -1704,7 +1745,8 @@ pub struct JourneyPriorKnowledge {
 /// with an unknown destination
 /// ([`JourneyGraph::unknown_destination_arrivals`]), no open frontier entry
 /// anywhere (listable, rejected or unplaced — an affordance nobody activated
-/// may be the link into it), and a `writing` ledger. Otherwise it goes in
+/// may be the link into it), a `writing` ledger, and a confirmed destination
+/// (not every arrival closed `settle_timeout`). Otherwise it goes in
 /// `unsettled`, with those causes — the frontier decides between "requires
 /// prior knowledge" and "unknown", as the plan's Phase 5 reads it.
 pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
@@ -1749,7 +1791,9 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
             .map(|(k, n)| (k.to_string(), n))
             .collect();
         let arrival_doubt = graph.node(to).map(|n| n.arrival_doubt).unwrap_or_default();
-        if arrival_doubt.is_zero()
+        let unconfirmed_destination = graph.node(to).is_some_and(|n| n.unconfirmed_destination);
+        if !unconfirmed_destination
+            && arrival_doubt.is_zero()
             && graph.unplaced_rejected_rows == 0
             && graph.unknown_destination_arrivals == 0
             && !ledger_not_writing
@@ -1768,6 +1812,7 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
                 unknown_destination_arrivals: graph.unknown_destination_arrivals,
                 ledger_not_writing,
                 open_frontier_entries,
+                unconfirmed_destination,
             });
         }
     }
