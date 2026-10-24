@@ -457,9 +457,19 @@ fn url_origin(url: &str) -> Option<String> {
     if !valid_scheme {
         return None;
     }
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    // The authority ends at the first path, query or fragment delimiter —
+    // `\` included, which browsers read as `/` in a special URL.
+    let authority = rest.split(['/', '?', '#', '\\']).next().unwrap_or("");
     // A userinfo part (`user:pass@host`) is credentials, never kept.
     let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    // Keep only the leading run of characters valid in a host and port
+    // (letters, digits, `-._~%`, `:` for the port, `[]` for an IPv6
+    // literal): anything else is not part of an origin, and what follows it
+    // may be user input.
+    let end = host
+        .find(|c: char| !(c.is_ascii_alphanumeric() || "-._~%:[]".contains(c)))
+        .unwrap_or(host.len());
+    let host = &host[..end];
     if host.is_empty() {
         return None;
     }
@@ -643,6 +653,36 @@ mod tests {
             url_origin("git+ssh://host/x").as_deref(),
             Some("git+ssh://host")
         );
+        // Review probes: `\` ends the authority, and so does any character
+        // not valid in a host; neither path nor userinfo text survives.
+        for (u, want) in [
+            (
+                "https://api.example.com\\search\\alice",
+                Some("https://api.example.com"),
+            ),
+            (
+                "https://api.example.com\\users\\alice@corp.com",
+                Some("https://api.example.com"),
+            ),
+            (
+                "https://api.example.com;alice/x",
+                Some("https://api.example.com"),
+            ),
+            (
+                "https://alice:pw@api.example.com/x",
+                Some("https://api.example.com"),
+            ),
+            (
+                "https://api.example.com:8443/x",
+                Some("https://api.example.com:8443"),
+            ),
+            ("http://[::1]:3000/u/alice", Some("http://[::1]:3000")),
+            ("https:\\\\api.example.com\\x", None),
+            (" https://api.example.com/x", None),
+        ] {
+            assert_eq!(url_origin(u).as_deref(), want, "{u}");
+            assert!(!url_origin(u).unwrap_or_default().contains("alice"), "{u}");
+        }
         assert_eq!(url_origin("https://"), None);
     }
 
