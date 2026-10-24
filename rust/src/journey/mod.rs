@@ -147,6 +147,17 @@ pub enum JourneyContractError {
         /// What is wrong with the trigger.
         reason: &'static str,
     },
+    /// A trigger recorded at an ACTION choke point (anything but
+    /// [`ChokePoint::Navigation`]) claims a `navigationTrigger` other than
+    /// `affordance`. Every action choke point activates an affordance, so
+    /// such a row would hide a click as a typed URL or a back button.
+    #[error("chokePoint is {choke_point} but navigationTrigger is {navigation_trigger}; an action choke point activates an affordance")]
+    ActionChokePointNotAffordance {
+        /// The choke point's wire string.
+        choke_point: &'static str,
+        /// The claimed trigger's wire string.
+        navigation_trigger: &'static str,
+    },
     /// A frontier row's `nodeKey` is not `node.key()`.
     #[error("nodeKey {node_key:?} does not match node.key() {expected:?}")]
     NodeKeyMismatch {
@@ -431,13 +442,20 @@ pub struct JourneyTrigger {
 }
 
 impl JourneyTrigger {
-    /// Check the invariant the type cannot express: a
-    /// [`ChokePoint::Navigation`] trigger names no affordance — no
+    /// Check the invariants the type cannot express, in both directions:
+    /// a [`ChokePoint::Navigation`] trigger names no affordance — no
     /// `targetFingerprint`, `targetRole` or `declaredEffect`, and a
-    /// `navigationTrigger` other than `affordance`.
+    /// `navigationTrigger` other than `affordance`; and every OTHER choke
+    /// point (an action) has `navigationTrigger == affordance`.
     /// [`JourneyEdgeObservation::validate`] calls this.
     pub fn validate(&self) -> Result<(), JourneyContractError> {
         if self.choke_point != ChokePoint::Navigation {
+            if self.navigation_trigger != NavigationTriggerKind::Affordance {
+                return Err(JourneyContractError::ActionChokePointNotAffordance {
+                    choke_point: self.choke_point.as_str(),
+                    navigation_trigger: self.navigation_trigger.as_str(),
+                });
+            }
             return Ok(());
         }
         if self.target_fingerprint.is_some() {
