@@ -26,8 +26,10 @@
 //! way out, no affordance arrival) is only a negative ANSWER when nothing
 //! that was not looked at could change it. Where a LISTED item rests on such
 //! a negative (a dead end; a node that requires prior knowledge), the query
-//! lists only the items nothing left out could change, and puts the rest in
-//! a separate list with the causes (`unexplored`, `unsettled`). So every result carries a
+//! lists only the items nothing left out could change — no open or rejected
+//! frontier entry, no excluded or untrusted row, a `writing` ledger — and
+//! puts the rest in a separate list with the causes (`unexplored`,
+//! `unsettled`). So every result carries a
 //! [`JourneySearchFrontier`] naming what was not looked at inside the part of
 //! the graph the query searched: the open frontier entries, grouped by
 //! reason, the departures whose destination was never observed, and the
@@ -1192,8 +1194,10 @@ impl JourneySearchFrontier {
     /// A POSITIVE answer (a path found, a node reached) is `measured` whatever
     /// this says; the caller still reports the coverage beside it. A listed
     /// dead end or prior-knowledge node is already settled per item by its
-    /// query (the doubtful ones are in `unexplored` / `unsettled`); this code
-    /// is for the NEGATIVE about the rest — "no other node is one".
+    /// query — every doubt the graph knows of, the open frontier and the
+    /// ledger state included, moves an item to `unexplored` / `unsettled` —
+    /// and this code is for the NEGATIVE about the rest: "no other node is
+    /// one".
     pub fn unsettled_because(
         &self,
         coverage: &JourneyCoverage,
@@ -1627,6 +1631,13 @@ pub struct JourneyPriorKnowledgeUnsettledNode {
     /// [`JourneyGraph::unknown_destination_arrivals`] — any of them may
     /// arrive here.
     pub unknown_destination_arrivals: u64,
+    /// The ledger is not `writing`: a click into this node may simply have
+    /// failed to be recorded.
+    pub ledger_not_writing: bool,
+    /// Open frontier entries across the WHOLE graph — listable ones, rejected
+    /// ones placed at a node, and unplaced rejected ones, each row once. An
+    /// affordance nobody activated anywhere may be the link into this node.
+    pub open_frontier_entries: u64,
 }
 
 /// The answer of [`requires_prior_knowledge`].
@@ -1634,16 +1645,18 @@ pub struct JourneyPriorKnowledgeUnsettledNode {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct JourneyPriorKnowledge {
-    /// Nodes that require prior knowledge, settled: they qualify, and no row
-    /// the graph left out could reach them by a click or a back button.
+    /// Nodes that require prior knowledge, settled: they qualify, nothing
+    /// the graph left out could reach them by a click or a back button, no
+    /// affordance anywhere is still unexplored, and the ledger is `writing`.
     /// Sorted by key.
     pub nodes: Vec<JourneyPriorKnowledgeNode>,
     /// Nodes that qualify on their kept arrivals but cannot be settled, with
-    /// the counts of what could still reach them. Sorted by key.
+    /// the causes that could still reach them. Sorted by key.
     pub unsettled: Vec<JourneyPriorKnowledgeUnsettledNode>,
-    /// What the whole graph did not look at. An open frontier entry could be
-    /// the affordance that leads to one of `nodes`, and the absence of a
-    /// listed node is unknown unless this is settled.
+    /// What the whole graph did not look at. A listed node never rests on an
+    /// open frontier (any open entry moves every candidate to `unsettled`);
+    /// this block is what the NEGATIVE about the rest — "no other node
+    /// requires prior knowledge" — is unknown over unless it is settled.
     pub frontier: JourneySearchFrontier,
     /// The graph's filter.
     pub filter_echo: JourneyFilter,
@@ -1664,13 +1677,16 @@ pub struct JourneyPriorKnowledge {
 /// replace | hash` edge counts as an arrival whatever its from-node (a reload
 /// is `initial` from the node itself).
 ///
-/// A qualifying node is listed in `nodes` only when no row the graph left
-/// out could be such a disqualifying arrival: no filtered or withdrawn
-/// affordance / pop row into it ([`JourneyGraphNode::arrival_doubt`]), no
-/// untrusted edge row anywhere ([`JourneyGraph::untrusted_edge_rows`]) and
-/// no affordance / pop row with an unknown destination
-/// ([`JourneyGraph::unknown_destination_arrivals`]). Otherwise it goes in
-/// `unsettled`, with those counts.
+/// A qualifying node is listed in `nodes` only when nothing could still be
+/// such a disqualifying arrival: no filtered or withdrawn affordance / pop
+/// row into it ([`JourneyGraphNode::arrival_doubt`]), no untrusted edge row
+/// anywhere ([`JourneyGraph::untrusted_edge_rows`]), no affordance / pop row
+/// with an unknown destination
+/// ([`JourneyGraph::unknown_destination_arrivals`]), no open frontier entry
+/// anywhere (listable, rejected or unplaced — an affordance nobody activated
+/// may be the link into it), and a `writing` ledger. Otherwise it goes in
+/// `unsettled`, with those causes — the frontier decides between "requires
+/// prior knowledge" and "unknown", as the plan's Phase 5 reads it.
 pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
     // to_key -> arrival kind -> count
     let mut arrivals: BTreeMap<&str, BTreeMap<&'static str, u64>> = BTreeMap::new();
@@ -1695,6 +1711,13 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
             }
         }
     }
+    let ledger_not_writing = graph.coverage.ledger.state != LedgerState::Writing;
+    // Graph-wide, each row once: the whole-graph frontier already sums a
+    // doubly placed rejected row once.
+    let whole = graph.search_frontier(graph.all_keys(), true);
+    let open_frontier_entries = whole.open_entries
+        + whole.unmeasured_departures.rejected_frontier
+        + whole.unplaced_rejected_frontier;
     let mut nodes = Vec::new();
     let mut unsettled = Vec::new();
     for (to, by_kind) in arrivals {
@@ -1709,6 +1732,8 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
         if arrival_doubt.is_zero()
             && graph.untrusted_edge_rows == 0
             && graph.unknown_destination_arrivals == 0
+            && !ledger_not_writing
+            && open_frontier_entries == 0
         {
             nodes.push(JourneyPriorKnowledgeNode {
                 node_key: to.to_string(),
@@ -1721,13 +1746,15 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
                 arrival_doubt,
                 untrusted_edge_rows: graph.untrusted_edge_rows,
                 unknown_destination_arrivals: graph.unknown_destination_arrivals,
+                ledger_not_writing,
+                open_frontier_entries,
             });
         }
     }
     JourneyPriorKnowledge {
         nodes,
         unsettled,
-        frontier: graph.search_frontier(graph.all_keys(), true),
+        frontier: whole,
         filter_echo: graph.filter_echo.clone(),
         coverage: graph.coverage.clone(),
     }
