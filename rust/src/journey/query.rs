@@ -232,9 +232,11 @@ pub struct JourneyUnmeasuredDepartures {
     /// Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`
     /// and whose outcome is not `no_change`. Dimension `withdrawn_departures`.
     pub withdrawn: u64,
-    /// `settle_timeout` edges to a DIFFERENT node: not a navigation step (the
-    /// destination may be an intermediate render) but not a negative either.
-    /// Dimension `settle_timeout_departures`.
+    /// Affordance edges that closed `settle_timeout` — to a DIFFERENT node
+    /// (the destination may be an intermediate render), or to the SAME node
+    /// (the destination may not have rendered before the snapshot). Not a
+    /// navigation step, but not a negative either. Dimension
+    /// `settle_timeout_departures`.
     pub settle_timeout: u64,
     /// `error` edges to a DIFFERENT node: the action errored yet the
     /// configuration moved. Dimension `errored_departures`.
@@ -295,6 +297,18 @@ impl JourneyUnmeasuredDepartures {
     }
 }
 
+/// A row that is a GENUINE negative, so excluding it hides nothing: a
+/// `no_change` row (nothing happened), or an `error` self-loop (the failure
+/// was observed and the page stayed). Every other excluded row may still
+/// lead somewhere and is counted.
+fn genuine_negative(e: &JourneyEdgeObservation) -> bool {
+    match (&e.to_node, e.outcome) {
+        (_, EdgeOutcome::NoChange) => true,
+        (Some(to), EdgeOutcome::Error) => to.key() == e.from_node.key(),
+        _ => false,
+    }
+}
+
 /// Why an edge row is out of the graph — how `build_graph` counts it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Excluded {
@@ -307,9 +321,12 @@ enum Excluded {
 }
 
 /// Trusted affordance or `pop` rows, excluded from the graph, that ARRIVE at
-/// a node from a different node (outcome not `no_change`). Any of them may be
-/// a way in that the user did not need a URL for, so
-/// [`requires_prior_knowledge`] cannot list the node as settled.
+/// a node from a different node with outcome `changed`. Any of them may be a
+/// way in that the user did not need a URL for, so
+/// [`requires_prior_knowledge`] cannot list the node as settled. An excluded
+/// row that closed `error` or `settle_timeout` (or has no `toNode`) is not
+/// here: its recorded destination may be an intermediate state, so it routes
+/// to the graph-wide [`JourneyGraph::unknown_destination_arrivals`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -415,8 +432,9 @@ pub struct JourneyCoverage {
     pub edges_invalidated: u64,
     /// Valid, live edge rows the filter excluded.
     pub edges_filtered_out: u64,
-    /// Edge and frontier rows rejected as contract violations (listed in
-    /// [`JourneyGraph::rejected`]).
+    /// ENTRIES in [`JourneyGraph::rejected`] — one per `(kind, row,
+    /// reason)`. The sum of their `rows` gives the number of distinct
+    /// rejected rows (by full content).
     pub rows_rejected: u64,
     /// Open frontier entries across the graph.
     pub frontier_open: u64,
@@ -500,9 +518,10 @@ pub struct JourneyGraph {
     /// their node JSON share one entry there but are both counted.)
     pub rejected_frontier_double_placed: u64,
     /// Affordance or `pop` rows whose real destination is unknown: kept or
-    /// trusted-excluded ones with no `toNode` (`to_node_unobserved`), and
-    /// kept or trusted-excluded ones that closed `settle_timeout` or `error`
-    /// to a DIFFERENT node (that node may be an intermediate state). Each
+    /// trusted-excluded ones with no `toNode` (`to_node_unobserved`), ones
+    /// that closed `settle_timeout` or `error` to a DIFFERENT node (that node
+    /// may be an intermediate state), and ones that closed `settle_timeout`
+    /// on the SAME node (the destination may not have rendered yet). Each
     /// may arrive at any node, so `requires_prior_knowledge` lists no node as
     /// settled while this is non-zero.
     pub unknown_destination_arrivals: u64,
@@ -760,11 +779,15 @@ pub fn build_graph(
                 // INTO its destination (requires_prior_knowledge reads this).
                 match &e.to_node {
                     None => unknown_destination_arrivals += 1,
-                    // Closed settle_timeout or error elsewhere: the recorded
-                    // node may be an intermediate state, the real one unknown.
+                    // Closed settle_timeout or error elsewhere, or
+                    // settle_timeout on the same node: the recorded node may
+                    // be an intermediate state, the real one unknown.
                     Some(to)
-                        if matches!(e.outcome, EdgeOutcome::SettleTimeout | EdgeOutcome::Error)
-                            && to.key() != e.from_node.key() =>
+                        if (matches!(
+                            e.outcome,
+                            EdgeOutcome::SettleTimeout | EdgeOutcome::Error
+                        ) && to.key() != e.from_node.key())
+                            || e.outcome == EdgeOutcome::SettleTimeout =>
                     {
                         unknown_destination_arrivals += 1
                     }
@@ -801,7 +824,7 @@ pub fn build_graph(
                     .or_default()
                     .insert(serde_json::to_string(edge).expect("edge row serializes"));
                 place(edge, Excluded::Untrusted);
-            } else if edge.outcome != EdgeOutcome::NoChange {
+            } else if !genuine_negative(edge) {
                 place(edge, Excluded::Withdrawn);
             }
             continue;
@@ -819,7 +842,7 @@ pub fn build_graph(
         };
         if !filter.keeps(edge, observed_at) {
             edges_filtered_out += 1;
-            if edge.outcome != EdgeOutcome::NoChange {
+            if !genuine_negative(edge) {
                 place(edge, Excluded::Filtered);
             }
             continue;
@@ -991,9 +1014,9 @@ pub fn build_graph(
         )
         .collect();
 
-    // settle_timeout / error edges to a DIFFERENT node: excluded from
-    // navigation (affordance) or from the kept back exits (pop), never a
-    // negative.
+    // settle_timeout / error edges to a DIFFERENT node, and settle_timeout
+    // self-loops: excluded from navigation (affordance) or from the kept
+    // back exits (pop), never a negative.
     let mut nodes = nodes;
     // Unconfirmed destinations: no kept arrival closed changed or no_change.
     // to_key -> "no arrival so far closed changed or no_change". Only those
@@ -1008,7 +1031,26 @@ pub fn build_graph(
         n.unconfirmed_destination = settle_only.get(n.key.as_str()).copied().unwrap_or(false);
     }
     for e in &graph_edges {
+        let click_or_back = matches!(
+            e.trigger.navigation_trigger,
+            NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
+        );
         if e.from_key == e.to_key {
+            // A click or back that closed settle_timeout with the snapshot
+            // still showing the same node: its destination may simply not
+            // have rendered yet. Unmeasured, not a negative. (An `error`
+            // self-loop observed the failure, and `no_change` observed that
+            // nothing happened: both are genuine negatives.)
+            if click_or_back && e.outcome == EdgeOutcome::SettleTimeout {
+                if let Ok(i) = nodes.binary_search_by(|n| n.key.cmp(&e.from_key)) {
+                    let d = &mut nodes[i].unmeasured_departures;
+                    match e.trigger.navigation_trigger {
+                        NavigationTriggerKind::Pop => d.excluded_back_arrivals += e.observations,
+                        _ => d.settle_timeout += e.observations,
+                    }
+                }
+                kept_unknown_destination_arrivals += e.observations;
+            }
             continue;
         }
         let Ok(i) = nodes.binary_search_by(|n| n.key.cmp(&e.from_key)) else {
@@ -1759,9 +1801,11 @@ pub struct JourneyPriorKnowledge {
 /// The rule, exactly: a node QUALIFIES when it has at least one kept
 /// `initial | push | replace | hash` arrival and NO kept arrival by an
 /// affordance or pop edge from a different observed node. That
-/// disqualifying edge counts whatever its outcome (an errored click that
-/// still landed there is still a way in; back-navigation means the user had
-/// been there by some other way). An `affordance` or `pop` edge from a node
+/// disqualifying edge counts whatever its outcome (back-navigation means
+/// the user had been there by some other way; an `error` or `settle_timeout`
+/// arrival is conservatively a way in too, and its unknown real destination
+/// is also counted graph-wide in
+/// [`JourneyGraph::unknown_destination_arrivals`]). An `affordance` or `pop` edge from a node
 /// to itself neither qualifies nor disqualifies it; an `initial | push |
 /// replace | hash` edge counts as an arrival whatever its from-node (a reload
 /// is `initial` from the node itself).

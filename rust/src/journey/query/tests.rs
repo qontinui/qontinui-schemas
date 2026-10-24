@@ -589,7 +589,7 @@ fn prior_knowledge_needs_url_only_arrivals() {
         e("2", "a", "c").kind(NavigationTriggerKind::Push),    // c: URL only
         e("3", "c", "c").kind(NavigationTriggerKind::Initial), // c: reload
         e("4", "a", "d").kind(NavigationTriggerKind::Hash),    // d: URL + click
-        e("5", "b", "d").outcome(EdgeOutcome::Error),          // (errored click still lands)
+        e("5", "b", "d").outcome(EdgeOutcome::Error),          // d: errored click (disqualifies)
         e("6", "a", "f").kind(NavigationTriggerKind::Replace), // f: URL + back
         e("7", "b", "f").kind(NavigationTriggerKind::Pop),
     ]);
@@ -928,12 +928,27 @@ fn c1d_a_settle_timeout_to_another_node_is_unmeasured_not_a_step() {
     // ...and not a negative.
     assert_c_unknown_via(&g, "settle_timeout_departures", "no_event_before_timeout");
 
-    // A settle_timeout that stayed on the node is not a departure at all.
+    // A settle_timeout that stayed on the node is unmeasured too (its
+    // destination may not have rendered yet): b is not a dead end.
     let ledger = a_b_c(e("2", "b", "b").outcome(EdgeOutcome::SettleTimeout));
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
-    assert!(g.node(&key("b")).unwrap().unmeasured_departures.is_zero());
+    assert_eq!(
+        g.node(&key("b"))
+            .unwrap()
+            .unmeasured_departures
+            .settle_timeout,
+        1
+    );
     let d = dead_ends(&g);
-    assert!(d.dead_ends.iter().any(|x| x.node_key == key("b")));
+    assert!(d.dead_ends.iter().all(|x| x.node_key != key("b")));
+    // An `error` self-loop observed the failure: b is a dead end.
+    let ledger = a_b_c(e("2", "b", "b").outcome(EdgeOutcome::Error));
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(g.node(&key("b")).unwrap().unmeasured_departures.is_zero());
+    assert!(dead_ends(&g)
+        .dead_ends
+        .iter()
+        .any(|x| x.node_key == key("b")));
 }
 
 // --- W1: an empty ledger is no_observations for every question --------------
@@ -1977,13 +1992,19 @@ fn rr9_1_a_settle_timeout_click_elsewhere_has_an_unknown_destination() {
     assert!(g.node(&key("b")).unwrap().arrival_doubt.is_zero());
     assert!(requires_prior_knowledge(&g).nodes.is_empty());
 
-    // A settle_timeout that stayed on its node is no arrival anywhere.
+    // A settle_timeout that stayed on its node has an unknown destination
+    // too (it may not have rendered yet); an `error` self-loop does not.
     let ledger = edges(&[
         e("1", "a", "z"),
         e("2", "z", "b").kind(NavigationTriggerKind::Push),
         e("3", "a", "a").outcome(EdgeOutcome::SettleTimeout),
     ]);
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    assert!(requires_prior_knowledge(&g).nodes.is_empty());
+    let mut err = ledger;
+    err[2].outcome = EdgeOutcome::Error;
+    let g = build_graph(&err, &[], &writing(), &no_filter());
     assert_eq!(g.unknown_destination_arrivals, 0);
     assert_eq!(requires_prior_knowledge(&g).nodes.len(), 1);
 }
@@ -2226,4 +2247,90 @@ fn rr12_6_rejected_entries_and_unplaced_rows_count_the_same_rows() {
         .map(|r| r.rows)
         .sum();
     assert_eq!(edge_rows, g.unplaced_rejected_rows);
+}
+
+#[test]
+fn rr13_a_settle_timeout_self_loop_is_unmeasured_and_an_error_self_loop_is_not() {
+    // a -> z click; z's only departure is a click that did not settle with
+    // the snapshot still showing z. c is reached by push.
+    let ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "a").kind(NavigationTriggerKind::Initial),
+        e("3", "z", "z").outcome(EdgeOutcome::SettleTimeout),
+        e("4", "a", "c").kind(NavigationTriggerKind::Push),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("z"))
+            .unwrap()
+            .unmeasured_departures
+            .settle_timeout,
+        1
+    );
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    let d = dead_ends(&g);
+    assert!(
+        d.dead_ends.iter().all(|x| x.node_key != key("z")),
+        "{:?}",
+        d.dead_ends
+    );
+    assert!(d.unexplored.iter().any(|x| x.node_key == key("z")));
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    assert!(p
+        .unsettled
+        .iter()
+        .any(|n| n.node_key == key("c") && n.unknown_destination_arrivals == 1));
+
+    // The same self-loop, filtered out: still unmeasured.
+    let mut filtered = ledger.clone();
+    filtered[2].app_version = Some("2.0.0".into());
+    let f = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let g = build_graph(&filtered, &[], &writing(), &f);
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    assert_eq!(
+        g.node(&key("z"))
+            .unwrap()
+            .unmeasured_departures
+            .filtered_out,
+        1
+    );
+
+    // An `error` self-loop observed the failure: a genuine negative, kept or
+    // filtered. z is a dead end and c is listed.
+    let mut err = ledger.clone();
+    err[2].outcome = EdgeOutcome::Error;
+    for (g, label) in [
+        (build_graph(&err, &[], &writing(), &no_filter()), "kept"),
+        (
+            {
+                let mut e2 = err.clone();
+                e2[2].app_version = Some("2.0.0".into());
+                build_graph(&e2, &[], &writing(), &f)
+            },
+            "filtered",
+        ),
+    ] {
+        assert!(
+            g.node(&key("z")).unwrap().unmeasured_departures.is_zero(),
+            "{label}"
+        );
+        assert_eq!(g.unknown_destination_arrivals, 0, "{label}");
+        assert!(
+            dead_ends(&g)
+                .dead_ends
+                .iter()
+                .any(|x| x.node_key == key("z")),
+            "{label}"
+        );
+        let listed: Vec<String> = requires_prior_knowledge(&g)
+            .nodes
+            .into_iter()
+            .map(|n| n.node_key)
+            .collect();
+        assert!(listed.contains(&key("c")), "{label}: {listed:?}");
+    }
 }
