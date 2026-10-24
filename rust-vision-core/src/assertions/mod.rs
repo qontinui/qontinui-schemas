@@ -1891,6 +1891,24 @@ fn eval_animation_settled(region: Option<Region>, ctx: &EvalContext<'_>) -> Asse
 
     if !names.is_empty() {
         let names = names.into_iter().collect::<Vec<_>>().join(", ");
+        // A running verdict rests on an `animation-ended` that never came. If
+        // the recorder dropped `animation-ended` events at its cap, that end
+        // may have been dropped: unknown, not a fail. (A dropped
+        // `animation-started`, or no `getAnimations`, can only HIDE a running
+        // animation, so neither can make this verdict wrong.)
+        if t.summary
+            .unmeasured_dimensions()
+            .any(|d| d == "timeline-events:animation-ended")
+        {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "animation(s) look still running when the {}ms recording ended ({names}),                      but the recorder dropped `animation-ended` events at its cap, so their end                      may have been lost",
+                    t.recorded_ms
+                ),
+            );
+        }
         if region.is_some() {
             return AssertionResult::unknown(
                 assertion,
@@ -1980,6 +1998,18 @@ fn eval_settled_within(ms: u64, ctx: &EvalContext<'_>) -> AssertionResult {
         Some((code, _)) => code == UnknownCode::NoEventBeforeTimeout,
     };
     if did_not_occur && !t.settled && t.recorded_ms >= bound {
+        if t.summary
+            .unmeasured_dimensions()
+            .any(|d| d == "timeline-events:settled")
+        {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "no `settled` event within {ms}ms was recorded, but the recorder dropped                      `settled` events at its cap, so one may have been lost"
+                ),
+            );
+        }
         return AssertionResult::fail(
             assertion,
             format!(
@@ -2012,13 +2042,42 @@ fn eval_state_entered_within(state: String, ms: u64, ctx: &EvalContext<'_>) -> A
     };
     let bound = ms as f64;
 
-    // 1. The SDK's own answer, when the caller asked for this state.
+    // 1. The SDK's own answer, when the caller asked for this state. A
+    // DEGRADED answer (its coverage names an unmeasured dimension) still
+    // passes on a measured entry inside the bound, but never fails: whatever
+    // went unmeasured could hold the entry that would make it pass.
     if let Some(entry) = t
         .summary
         .expected_states
         .iter()
         .find(|e| e.state_id == state)
     {
+        let gaps: Vec<&str> = entry
+            .outcome
+            .provenance()
+            .coverage
+            .unmeasured
+            .iter()
+            .map(|u| u.dimension.as_str())
+            .collect();
+        let would_fail = match entry.outcome.state() {
+            ObservationState::Measured(ExpectedStateOutcome::EnteredAtMs(at)) => *at > bound,
+            ObservationState::Measured(
+                ExpectedStateOutcome::NotEnteredWithinMs(w)
+                | ExpectedStateOutcome::ActiveThroughoutWithinMs(w),
+            ) => *w >= bound,
+            _ => false,
+        };
+        if would_fail && !gaps.is_empty() {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "summary.expectedStates['{state}'] says it did not enter within {ms}ms, but                      it is degraded ({}), so an entry may have gone unmeasured",
+                    gaps.join(", ")
+                ),
+            );
+        }
         match entry.outcome.state() {
             ObservationState::Measured(ExpectedStateOutcome::EnteredAtMs(at)) => {
                 return if *at <= bound {
@@ -2840,6 +2899,79 @@ mod tests {
         let res = eval_timeline(&t, &settled_anim());
         assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
         assert!(res.detail.unwrap().contains("pulse"));
+    }
+
+    /// Review probe t1: the recorder dropped `animation-ended` events at its
+    /// cap, so a start with no recorded end is not evidence of a running
+    /// animation.
+    #[test]
+    fn animation_settled_is_unknown_when_animation_ended_events_were_dropped() {
+        let t = timeline(vec![anim("animation-started", 10, "fade")], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = degraded(
+                serde_json::json!([{ "name": "fade", "isInfinite": false }]),
+                "timeline-events:animation-ended",
+            );
+        });
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+        assert!(res.detail.unwrap().contains("animation-ended"));
+        // A gap elsewhere (no getAnimations) cannot make a recorded
+        // start-without-end wrong: still a fail.
+        let t = timeline(vec![anim("animation-started", 10, "fade")], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = degraded(
+                serde_json::json!([{ "name": "fade", "isInfinite": false }]),
+                "animations-running-before-action(count-unknowable)",
+            );
+        });
+        assert_eq!(
+            eval_timeline(&t, &settled_anim()).outcome,
+            AssertionOutcome::Failed
+        );
+    }
+
+    #[test]
+    fn settled_within_never_fails_over_dropped_settled_events() {
+        let t = timeline(vec![], |v| {
+            v["summary"]["settleMs"] = serde_json::json!({
+                "status": "unknown",
+                "unknown": { "code": "no_event_before_timeout", "detail": "t" },
+                "provenance": prov(serde_json::json!([
+                    { "dimension": "timeline-events:settled", "count": 1, "code": "input_missing" }
+                ]))
+            });
+            v["settled"] = serde_json::json!(false);
+            v["recordedMs"] = serde_json::json!(8000);
+        });
+        let res = eval_timeline(&t, &Assertion::SettledWithin { ms: 500 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    }
+
+    #[test]
+    fn state_entered_within_never_fails_on_a_degraded_expected_state() {
+        for outcome in [
+            serde_json::json!({ "notEnteredWithinMs": 2000 }),
+            serde_json::json!({ "activeThroughoutWithinMs": 2000 }),
+            serde_json::json!({ "enteredAtMs": 1500 }),
+        ] {
+            let t = with_expected(degraded(outcome.clone(), "timeline-events:state-entered"));
+            let res = eval_timeline(&t, &entered_within(1000));
+            assert_eq!(res.outcome, AssertionOutcome::Unknown, "{outcome}: {res:?}");
+            // Not degraded: the same answer is a fail.
+            let t = with_expected(measured(outcome.clone()));
+            assert_eq!(
+                eval_timeline(&t, &entered_within(1000)).outcome,
+                AssertionOutcome::Failed,
+                "{outcome}"
+            );
+        }
+        // A degraded answer inside the bound still passes.
+        let t = with_expected(degraded(serde_json::json!({ "enteredAtMs": 85 }), "x"));
+        assert_eq!(
+            eval_timeline(&t, &entered_within(1000)).outcome,
+            AssertionOutcome::Passed
+        );
     }
 
     #[test]

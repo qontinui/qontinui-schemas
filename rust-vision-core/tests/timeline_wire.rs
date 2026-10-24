@@ -285,7 +285,7 @@ fn the_ledger_projection_keeps_every_answer_and_drops_user_text() {
                 TimelineEvent::PageChanged { url, .. } => assert_eq!(url, &None),
                 TimelineEvent::NetworkRequestStarted { url, .. }
                 | TimelineEvent::NetworkRequestFinished { url, .. } => {
-                    assert_eq!(url, "http://localhost:3000", "{name}")
+                    assert_eq!(url.as_deref(), Some("http://localhost:3000"), "{name}")
                 }
                 _ => {}
             }

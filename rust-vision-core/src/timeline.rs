@@ -226,8 +226,10 @@ pub enum TimelineEvent {
         request_id: Option<String>,
         /// HTTP method.
         method: String,
-        /// Origin + pathname — never the query or fragment.
-        url: String,
+        /// Origin + pathname — never the query or fragment. Always a string
+        /// from the SDK; `null` only in [`ChangeTimeline::for_ledger`]'s
+        /// projection, when the URL had no valid `scheme://host` origin.
+        url: Option<String>,
         /// The request URL carried a query string (not reported).
         has_query: bool,
     },
@@ -239,8 +241,10 @@ pub enum TimelineEvent {
         request_id: Option<String>,
         /// HTTP method.
         method: String,
-        /// Origin + pathname — never the query or fragment.
-        url: String,
+        /// Origin + pathname — never the query or fragment. Always a string
+        /// from the SDK; `null` only in [`ChangeTimeline::for_ledger`]'s
+        /// projection, when the URL had no valid `scheme://host` origin.
+        url: Option<String>,
         /// The request URL carried a query string (not reported).
         has_query: bool,
         /// HTTP status, or `null` when no response arrived.
@@ -440,14 +444,23 @@ fn retain_ledger_source<T>(o: &mut Observation<T>) {
     }
 }
 
-/// `scheme://host[:port]` of a URL, or `None` when it has no `scheme://`
-/// authority — the network events keep their origin, never their path.
+/// `scheme://host[:port]` of a URL, or `None` when it does not START with a
+/// valid scheme (`[A-Za-z][A-Za-z0-9+.-]*`, RFC 3986) followed by `://` and
+/// a non-empty authority — the network events keep their origin, never their
+/// path. A relative path that merely contains `://` further on
+/// (`/search/a@b.c/https://x`) is not a URL with an origin.
 fn url_origin(url: &str) -> Option<String> {
     let (scheme, rest) = url.split_once("://")?;
+    let mut chars = scheme.chars();
+    let valid_scheme = chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'));
+    if !valid_scheme {
+        return None;
+    }
     let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
     // A userinfo part (`user:pass@host`) is credentials, never kept.
     let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
-    if scheme.is_empty() || host.is_empty() {
+    if host.is_empty() {
         return None;
     }
     Some(format!("{scheme}://{host}"))
@@ -461,7 +474,7 @@ impl ChangeTimeline {
 
     /// The projection a consumer STORES — the journey ledger's `timeline`
     /// column holds exactly this, and nothing else. It keeps every offset,
-    /// count, score, declared state id, animation name and every summary
+    /// count, score, state id, animation name and every summary
     /// [`Observation`] (status, value, coverage, unknown code and detail), so
     /// every timeline assertion and [`crate::edge_timing`] answer the same
     /// over it as over the original. It drops what can carry user input:
@@ -477,9 +490,17 @@ impl ChangeTimeline {
     /// - `page-changed` `url` becomes `null` (a URL path or query can embed
     ///   user input; the journey node already names the page);
     /// - `network-request-*` `url` becomes its origin (`scheme://host`), or
-    ///   `""` when it has none — never a pathname;
+    ///   `null` when it does not start with a valid scheme and authority —
+    ///   never a pathname;
     /// - each summary field's `provenance.source` keeps only
     ///   [`LEDGER_SOURCE_KEYS`].
+    ///
+    /// State ids are KEPT, and that is structural, not an oversight: a
+    /// `state-entered` / `state-exited` `stateId` is an id the app declared
+    /// in code, and an `expectedStates[].stateId` is whatever the CALLER
+    /// asked about in `expectStates` — kept verbatim even when the app never
+    /// declared it (its outcome then reads `unknown{input_missing}`). Neither
+    /// is page content or user input.
     ///
     /// Idempotent. Serializing the result through this typed mirror carries
     /// no key it does not model, so a stored row has no open value slot.
@@ -491,7 +512,7 @@ impl ChangeTimeline {
                 TimelineEvent::PageChanged { url, .. } => *url = None,
                 TimelineEvent::NetworkRequestStarted { url, .. }
                 | TimelineEvent::NetworkRequestFinished { url, .. } => {
-                    *url = url_origin(url).unwrap_or_default();
+                    *url = url.as_deref().and_then(url_origin);
                 }
                 TimelineEvent::ElementsAppeared { element_ids, .. }
                 | TimelineEvent::ElementsDisappeared { element_ids, .. }
@@ -614,6 +635,14 @@ mod tests {
             Some("https://api.example.com")
         );
         assert_eq!(url_origin("/relative/path"), None);
+        // Review probe t2: a relative path containing `://` further on has
+        // no origin, and its text never leaks.
+        assert_eq!(url_origin("/search/alice@example.com/https://x"), None);
+        assert_eq!(url_origin("1http://x"), None);
+        assert_eq!(
+            url_origin("git+ssh://host/x").as_deref(),
+            Some("git+ssh://host")
+        );
         assert_eq!(url_origin("https://"), None);
     }
 

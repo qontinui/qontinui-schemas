@@ -14,7 +14,7 @@
 //! never read as a 12-sample median.
 //!
 //! Pure, I/O-free, deterministic: rows are ordered by `(observedAt,
-//! observationId)`; percentiles are nearest-rank (`rank = ceil(p * n)`, so the
+//! observationId, appVersion and timeline as serialized)`; percentiles are nearest-rank (`rank = ceil(p * n)`, so the
 //! median of an even count is the LOWER middle value) over values sorted with
 //! `f64::total_cmp`; no clock is read; no threshold is applied — whether a
 //! p90 is "slow" is the caller's call.
@@ -126,7 +126,8 @@ pub struct EdgeTiming {
     /// `summary.longTaskTotalMs`.
     pub long_task_total_ms: MetricDistribution,
     /// Every observation's raw values, ordered by `(observedAt,
-    /// observationId)`.
+    /// observationId)`, ties broken by the serialized `(appVersion,
+    /// timeline)`.
     pub observations: Vec<EdgeTimingRow>,
 }
 
@@ -201,12 +202,24 @@ fn rfc3339(t: DateTime<Utc>) -> String {
 ///
 /// Order-independent: the same samples in any order give an equal answer.
 pub fn edge_timing(samples: &[EdgeTimingSample]) -> EdgeTiming {
-    let mut sorted: Vec<&EdgeTimingSample> = samples.iter().collect();
-    sorted.sort_by(|a, b| {
+    // Ordered by (observedAt, observationId), then — so that two samples
+    // sharing an id still order the same way in any input order — by the
+    // serialized timeline.
+    let mut sorted: Vec<(&EdgeTimingSample, String)> = samples
+        .iter()
+        .map(|s| {
+            let text = serde_json::to_string(&(&s.app_version, &s.timeline))
+                .expect("a timeline serializes");
+            (s, text)
+        })
+        .collect();
+    sorted.sort_by(|(a, ta), (b, tb)| {
         a.observed_at
             .cmp(&b.observed_at)
             .then_with(|| a.observation_id.cmp(&b.observation_id))
+            .then_with(|| ta.cmp(tb))
     });
+    let sorted: Vec<&EdgeTimingSample> = sorted.into_iter().map(|(s, _)| s).collect();
 
     let rows: Vec<EdgeTimingRow> = sorted
         .iter()
@@ -421,5 +434,24 @@ mod tests {
         assert_eq!(nearest_rank(&v, 0.5), 5.0);
         assert_eq!(nearest_rank(&v, 0.9), 9.0);
         assert_eq!(nearest_rank(&[7.0], 0.9), 7.0);
+    }
+
+    /// Two samples sharing an id AND a timestamp still order the same way in
+    /// any input order.
+    #[test]
+    fn duplicate_ids_order_deterministically() {
+        let a = sample(
+            "dup",
+            1,
+            Some(timeline(measured(json!(10)), measured(json!(100)))),
+        );
+        let b = sample(
+            "dup",
+            1,
+            Some(timeline(measured(json!(20)), measured(json!(200)))),
+        );
+        let x = serde_json::to_string(&edge_timing(&[a.clone(), b.clone()])).unwrap();
+        let y = serde_json::to_string(&edge_timing(&[b, a])).unwrap();
+        assert_eq!(x, y);
     }
 }
