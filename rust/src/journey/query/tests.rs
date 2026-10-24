@@ -865,8 +865,16 @@ fn c1c_a_rejected_edge_is_unmeasured_and_an_unplaceable_one_counts_everywhere() 
     let mut ledger = a_b_c(e("2", "b", "c").at("not a time"));
     ledger.extend(edges(&[e("3", "z", "c").kind(NavigationTriggerKind::Push)]));
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
-    assert_eq!(g.node(&key("b")).unwrap().unmeasured_departures.rejected, 1);
-    assert_c_unknown_via(&g, "rejected_departures", "producer_failed");
+    // Nothing in a rejected row is trusted, its fromNode included: it is
+    // placed at no node, and every negative counts it.
+    assert!(g.node(&key("b")).unwrap().unmeasured_departures.is_zero());
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    let s = steps_to(&g, &key("a"), &key("c"));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, true),
+        [("unplaced_rejected_rows", 1, "producer_failed")]
+    );
+    assert!(dead_ends(&g).dead_ends.is_empty());
 
     // A rejected row whose fromNode itself is invalid cannot be placed, so
     // every negative counts it.
@@ -1205,13 +1213,14 @@ fn rr5_c1_a_rejected_row_counts_whatever_its_claimed_trigger() {
     assert!(bad.validate().is_err());
     ledger.push(bad);
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
-    assert_eq!(g.node(&key("a")).unwrap().unmeasured_departures.rejected, 1);
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    assert!(g.node(&key("a")).unwrap().unmeasured_departures.is_zero());
     let s = steps_to(&g, &key("a"), &key("c"));
     assert_eq!(s.steps, None);
     assert!(!s.frontier.is_settled(&s.coverage, true));
     assert_eq!(
         s.frontier.unmeasured(&s.coverage, true),
-        [("rejected_departures", 1, "producer_failed")]
+        [("unplaced_rejected_rows", 1, "producer_failed")]
     );
 }
 
@@ -1525,8 +1534,12 @@ fn rr6_p4_l3_a_withdrawn_row_with_a_bad_timestamp_is_untrusted() {
         live.node(&key("a")).unwrap().unmeasured_departures,
         wd.node(&key("a")).unwrap().unmeasured_departures,
     );
-    assert_eq!(l.rejected, 1);
-    assert_eq!(w, l, "withdrawn is judged like live");
+    assert!(l.is_zero() && w.is_zero(), "placed at no node");
+    assert_eq!(live.unplaced_rejected_rows, 1);
+    assert_eq!(
+        wd.unplaced_rejected_rows, 1,
+        "withdrawn is judged like live"
+    );
 }
 
 #[test]
@@ -1593,7 +1606,7 @@ fn rr6_p7_f4_an_action_choke_point_claiming_a_url_trigger_is_rejected() {
     let s = steps_to(&g, &key("a"), &key("c"));
     assert!(!s.frontier.is_settled(&s.coverage, true));
     assert!(s.frontier.unmeasured(&s.coverage, true).contains(&(
-        "rejected_departures",
+        "unplaced_rejected_rows",
         1,
         "producer_failed"
     )));
@@ -1624,11 +1637,8 @@ fn rr6_l5_a_withdrawn_row_claiming_push_that_fails_validate_is_rejected() {
     assert!(bad.validate().is_err());
     ledger.push(bad);
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
-    let a = g.node(&key("a")).unwrap().unmeasured_departures;
-    assert_eq!(
-        (a.rejected, a.excluded_url_arrivals, a.withdrawn),
-        (1, 0, 0)
-    );
+    assert!(g.node(&key("a")).unwrap().unmeasured_departures.is_zero());
+    assert_eq!(g.unplaced_rejected_rows, 1);
     let s = steps_to(&g, &key("a"), &key("c"));
     assert!(!s.frontier.is_settled(&s.coverage, true));
 }
@@ -1668,15 +1678,7 @@ fn rr7_q1_an_id_collision_places_both_rows_in_any_order() {
         serde_json::to_string(&g2).unwrap(),
         "order-dependent graph"
     );
-    assert_eq!(
-        g1.node(&key("a")).unwrap().unmeasured_departures.rejected,
-        1
-    );
-    assert_eq!(
-        g1.node(&key("q")).unwrap().unmeasured_departures.rejected,
-        1
-    );
-    assert_eq!(g1.untrusted_edge_rows, 2);
+    assert_eq!(g1.unplaced_rejected_rows, 2);
     // The rejected LIST keeps its (kind, row, reason) identity: one entry.
     assert_eq!(g1.coverage.rows_rejected, 1);
 }
@@ -1709,8 +1711,7 @@ fn rr7_l2_an_identical_duplicate_rejected_edge_row_is_placed_once() {
     bad.trigger.navigation_trigger = NavigationTriggerKind::Push;
     l.extend([bad.clone(), bad]);
     let g = build_graph(&l, &[], &writing(), &no_filter());
-    assert_eq!(g.node(&key("a")).unwrap().unmeasured_departures.rejected, 1);
-    assert_eq!(g.untrusted_edge_rows, 1);
+    assert_eq!(g.unplaced_rejected_rows, 1);
 }
 
 #[test]
@@ -1764,7 +1765,7 @@ fn rr7_q3_prior_knowledge_does_not_list_a_node_with_a_doubtful_click_arrival() {
     ledger.push(bad);
     let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
     assert!(p.nodes.is_empty());
-    assert_eq!(p.unsettled[0].untrusted_edge_rows, 1);
+    assert_eq!(p.unsettled[0].unplaced_rejected_rows, 1);
     // Control: with neither, b is listed.
     ledger.pop();
     let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
@@ -1928,4 +1929,45 @@ fn rr8_m2_rejected_frontier_rows_differing_only_in_node_json_are_both_placed() {
     // One entry in the (kind, row, reason) list, two placements.
     assert_eq!(g.coverage.rows_rejected, 1);
     assert_eq!(g.unplaced_rejected_frontier, 2);
+}
+
+// --- Re-review of 8d48006d ------------------------------------------------------
+
+#[test]
+fn rr9_1_a_settle_timeout_click_elsewhere_has_an_unknown_destination() {
+    // a -> q closed settle_timeout: q may be an intermediate render, and the
+    // click's real destination could be b.
+    let ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+        e("3", "a", "q").outcome(EdgeOutcome::SettleTimeout),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    let b = p.unsettled.iter().find(|n| n.node_key == key("b")).unwrap();
+    assert_eq!(b.unknown_destination_arrivals, 1);
+
+    // The same row, filtered out: still an unknown destination.
+    let mut ledger = ledger;
+    ledger[2].app_version = Some("2.0.0".into());
+    let f = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let g = build_graph(&ledger, &[], &writing(), &f);
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    assert!(g.node(&key("b")).unwrap().arrival_doubt.is_zero());
+    assert!(requires_prior_knowledge(&g).nodes.is_empty());
+
+    // A settle_timeout that stayed on its node is no arrival anywhere.
+    let ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+        e("3", "a", "a").outcome(EdgeOutcome::SettleTimeout),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unknown_destination_arrivals, 0);
+    assert_eq!(requires_prior_knowledge(&g).nodes.len(), 1);
 }
