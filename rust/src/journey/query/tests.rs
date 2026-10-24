@@ -186,7 +186,7 @@ fn target_behind_a_frontier_open_node_exposes_that_frontier() {
     assert_eq!(s.steps, None);
     assert!(s.path.is_empty());
     assert!(
-        !s.frontier.is_settled(&s.coverage),
+        !s.frontier.is_settled(&s.coverage, true),
         "a negative over an open frontier is unknown"
     );
     assert_eq!(s.frontier.open_entries, 2);
@@ -205,7 +205,7 @@ fn target_behind_a_frontier_open_node_exposes_that_frontier() {
     assert_eq!(s.frontier.by_reason["effect_write"], 0);
     // The envelope inputs the runner builds `unknown` from — not `absent`.
     assert_eq!(
-        s.frontier.unmeasured(&s.coverage),
+        s.frontier.unmeasured(&s.coverage, true),
         [("frontier", 2, "frontier_open")]
     );
     assert_eq!(
@@ -217,7 +217,7 @@ fn target_behind_a_frontier_open_node_exposes_that_frontier() {
     // reachable_from tells the same story.
     let r = reachable_from(&g, &key("a"));
     assert_eq!(r.steps_to(&key("c")), None);
-    assert!(!r.frontier.is_settled(&r.coverage));
+    assert!(!r.frontier.is_settled(&r.coverage, true));
 
     // Closing B's frontier by exploring it — the explored affordance led to
     // C — flips the answer to a measured path.
@@ -235,14 +235,14 @@ fn target_behind_a_frontier_open_node_exposes_that_frontier() {
         .map(|e| (e.from_key.as_str(), e.to_key.as_str()))
         .collect();
     assert_eq!(hops, [("fx#a", "fx#b"), ("fx#b", "fx#c")]);
-    assert!(s.frontier.is_settled(&s.coverage));
+    assert!(s.frontier.is_settled(&s.coverage, true));
 
     // Closing it with NO edge to C settles the negative: now it is absent.
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
     let s = steps_to(&g, &key("a"), &key("c"));
     assert_eq!(s.steps, None);
-    assert!(s.frontier.is_settled(&s.coverage));
-    assert!(s.frontier.unmeasured(&s.coverage).is_empty());
+    assert!(s.frontier.is_settled(&s.coverage, true));
+    assert!(s.frontier.unmeasured(&s.coverage, true).is_empty());
     assert_eq!(s.frontier.unsettled_because(&s.coverage, true), None);
 }
 
@@ -265,11 +265,11 @@ fn an_unobserved_departure_keeps_a_negative_unknown() {
 
     let s = steps_to(&g, &key("a"), &key("c"));
     assert_eq!(s.steps, None);
-    assert!(!s.frontier.is_settled(&s.coverage));
+    assert!(!s.frontier.is_settled(&s.coverage, true));
     assert_eq!(s.frontier.unobserved_departures, 1);
     assert_eq!(s.frontier.nodes[0].node_key, key("b"));
     assert_eq!(
-        s.frontier.unmeasured(&s.coverage),
+        s.frontier.unmeasured(&s.coverage, true),
         [("unobserved_departures", 1, "to_node_unobserved")]
     );
     assert_eq!(
@@ -534,9 +534,9 @@ fn only_affordance_changed_edges_are_steps() {
     );
     // An error / settle_timeout edge to another node is not a step, but it
     // is not a negative either: "d is not reachable" stays unknown.
-    assert!(!r.frontier.is_settled(&r.coverage));
+    assert!(!r.frontier.is_settled(&r.coverage, true));
     assert_eq!(
-        r.frontier.unmeasured(&r.coverage),
+        r.frontier.unmeasured(&r.coverage, true),
         [
             ("settle_timeout_departures", 1, "no_event_before_timeout"),
             ("errored_departures", 1, "input_missing"),
@@ -602,7 +602,7 @@ fn prior_knowledge_needs_url_only_arrivals() {
     );
     // The errored b -> d click is an unmeasured departure from b.
     assert_eq!(
-        p.frontier.unmeasured(&p.coverage),
+        p.frontier.unmeasured(&p.coverage, true),
         [("errored_departures", 1, "input_missing")]
     );
 }
@@ -691,7 +691,7 @@ fn ledger_state_propagates_into_every_query_response() {
         // the ledger outranks every other cause.
         let s = steps_to(&g, &key("b"), &key("a"));
         assert_eq!(
-            s.frontier.is_settled(&s.coverage),
+            s.frontier.is_settled(&s.coverage, true),
             state == LedgerState::Writing
         );
         let expected = match state {
@@ -723,6 +723,9 @@ fn every_returned_unknown_code_is_a_registry_code() {
         "no_observations",
         "frontier_open",
         "to_node_unobserved",
+        "no_event_before_timeout",
+        "producer_failed",
+        "input_missing",
     ] {
         let registry = format!("UB-OBS-{}", code.to_ascii_uppercase().replace('_', "-"));
         assert!(
@@ -747,10 +750,10 @@ fn assert_c_unknown_via(g: &JourneyGraph, dimension: &str, code: &str) {
     let s = steps_to(g, &key("a"), &key("c"));
     assert_eq!(s.steps, None);
     assert!(
-        !s.frontier.is_settled(&s.coverage),
+        !s.frontier.is_settled(&s.coverage, true),
         "{dimension}: must not settle"
     );
-    let dims = s.frontier.unmeasured(&s.coverage);
+    let dims = s.frontier.unmeasured(&s.coverage, true);
     assert!(
         dims.iter()
             .any(|(d, n, c)| *d == dimension && *n == 1 && *c == code),
@@ -774,7 +777,7 @@ fn assert_c_unknown_via(g: &JourneyGraph, dimension: &str, code: &str) {
     );
     let r = reachable_from(g, &key("a"));
     assert!(
-        !r.frontier.is_settled(&r.coverage),
+        !r.frontier.is_settled(&r.coverage, true),
         "{dimension}: reachable_from"
     );
     let d = dead_ends(g);
@@ -876,7 +879,7 @@ fn c1c_a_rejected_edge_is_unmeasured_and_an_unplaceable_one_counts_everywhere() 
     assert_eq!(s.steps, Some(1), "a positive answer still stands");
     let s = steps_to(&g, &key("b"), &key("a"));
     assert_eq!(
-        s.frontier.unmeasured(&s.coverage),
+        s.frontier.unmeasured(&s.coverage, true),
         [("unplaced_rejected_rows", 1, "producer_failed")]
     );
     assert_eq!(
@@ -1069,7 +1072,7 @@ fn rr2_an_excluded_pop_row_keeps_prior_knowledge_unknown() {
     // The filtered back-arrival could disqualify n: the listing is not settled.
     assert_eq!(g.off_graph_departures.excluded_back_arrivals, 1);
     assert_eq!(
-        p.frontier.unmeasured(&p.coverage),
+        p.frontier.unmeasured(&p.coverage, true),
         [("excluded_back_arrivals", 1, "input_missing")]
     );
     assert_eq!(
@@ -1078,7 +1081,7 @@ fn rr2_an_excluded_pop_row_keeps_prior_knowledge_unknown() {
     );
     // A NAVIGATION question ignores it: a pop is not a navigation step.
     let r = reachable_from(&g, &key("z"));
-    assert!(r.frontier.is_settled(&r.coverage), "{:?}", r.frontier);
+    assert!(r.frontier.is_settled(&r.coverage, true), "{:?}", r.frontier);
 }
 
 #[test]
@@ -1107,7 +1110,7 @@ fn rr2_an_excluded_pop_exit_makes_back_only_unknown() {
         b.back_only, None,
         "not false: the back exit was not looked at"
     );
-    assert!(d.frontier.unmeasured(&d.coverage).contains(&(
+    assert!(d.frontier.unmeasured(&d.coverage, true).contains(&(
         "excluded_back_arrivals",
         1,
         "input_missing"
@@ -1125,9 +1128,9 @@ fn rr2_an_excluded_pop_exit_makes_back_only_unknown() {
 fn rr3_an_empty_or_non_writing_ledger_never_settles() {
     let empty = build_graph(&[], &[], &writing(), &no_filter());
     let s = steps_to(&empty, &key("a"), &key("b"));
-    assert!(!s.frontier.is_settled(&s.coverage));
+    assert!(!s.frontier.is_settled(&s.coverage, true));
     assert_eq!(
-        s.frontier.unmeasured(&s.coverage),
+        s.frontier.unmeasured(&s.coverage, true),
         [("no_observations", 1, "no_observations")]
     );
     for (state, code) in [
@@ -1138,13 +1141,16 @@ fn rr3_an_empty_or_non_writing_ledger_never_settles() {
         let ledger = edges(&[e("1", "a", "b")]);
         let g = build_graph(&ledger, &[], &ledger_in(state), &no_filter());
         let s = steps_to(&g, &key("b"), &key("a"));
-        assert!(!s.frontier.is_settled(&s.coverage), "{code}");
-        assert_eq!(s.frontier.unmeasured(&s.coverage), [("ledger", 1, code)]);
+        assert!(!s.frontier.is_settled(&s.coverage, true), "{code}");
+        assert_eq!(
+            s.frontier.unmeasured(&s.coverage, true),
+            [("ledger", 1, code)]
+        );
         assert_eq!(s.frontier.unsettled_because(&s.coverage, true), Some(code));
         let g = build_graph(&[], &[], &ledger_in(state), &no_filter());
         let d = dead_ends(&g);
         assert_eq!(
-            d.frontier.unmeasured(&d.coverage),
+            d.frontier.unmeasured(&d.coverage, true),
             [
                 ("ledger", 1, code),
                 ("no_observations", 1, "no_observations")
@@ -1176,13 +1182,212 @@ fn rr4_off_graph_departures_reach_graph_wide_questions_only() {
     ] {
         assert_eq!(f.off_graph_departures.filtered_out, 1, "{name}");
         assert_eq!(
-            f.unmeasured(&cov),
+            f.unmeasured(&cov, true),
             [("filtered_departures", 1, "input_missing")],
             "{name}"
         );
     }
     // A component question about a and b cannot reach x.
     let r = reachable_from(&g, &key("a"));
-    assert!(r.frontier.is_settled(&r.coverage));
+    assert!(r.frontier.is_settled(&r.coverage, true));
     assert!(r.frontier.off_graph_departures.is_zero());
+}
+
+// --- Re-review of d84ab7eb ----------------------------------------------------
+
+#[test]
+fn rr5_c1_a_rejected_row_counts_whatever_its_claimed_trigger() {
+    // a -> b, d -> c, and a rejected row a -> c claiming `push` while naming
+    // an affordance fingerprint (NavigationNamesAffordance). Its trigger
+    // cannot be trusted: it may be the click that reaches c.
+    let mut ledger = edges(&[e("1", "a", "b"), e("2", "d", "c")]);
+    let mut bad = e("3", "a", "c").kind(NavigationTriggerKind::Push).build();
+    bad.trigger.target_fingerprint = Some("fp-a-c".into());
+    assert!(bad.validate().is_err());
+    ledger.push(bad);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.node(&key("a")).unwrap().unmeasured_departures.rejected, 1);
+    let s = steps_to(&g, &key("a"), &key("c"));
+    assert_eq!(s.steps, None);
+    assert!(!s.frontier.is_settled(&s.coverage, true));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, true),
+        [("rejected_departures", 1, "producer_failed")]
+    );
+}
+
+#[test]
+fn rr5_w1_an_excluded_back_arrival_does_not_unsettle_a_component_question() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a").kind(NavigationTriggerKind::Pop),
+    ]);
+    ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("b"))
+            .unwrap()
+            .unmeasured_departures
+            .excluded_back_arrivals,
+        1
+    );
+    let r = reachable_from(&g, &key("a"));
+    assert!(r.frontier.is_settled(&r.coverage, true), "{:?}", r.frontier);
+    assert_eq!(r.frontier.unsettled_because(&r.coverage, true), None);
+}
+
+#[test]
+fn rr5_w2_an_unsettled_pop_exit_makes_back_only_unknown() {
+    for outcome in [EdgeOutcome::Error, EdgeOutcome::SettleTimeout] {
+        let ledger = edges(&[
+            e("1", "a", "b"),
+            e("2", "b", "a")
+                .kind(NavigationTriggerKind::Pop)
+                .outcome(outcome),
+        ]);
+        let g = build_graph(&ledger, &[], &writing(), &no_filter());
+        assert_eq!(
+            g.node(&key("b"))
+                .unwrap()
+                .unmeasured_departures
+                .excluded_back_arrivals,
+            1,
+            "{outcome:?}"
+        );
+        let d = dead_ends(&g);
+        let b = d
+            .dead_ends
+            .iter()
+            .find(|x| x.node_key == key("b"))
+            .expect("b is a dead end");
+        assert_eq!(b.back_only, None, "{outcome:?}");
+        assert!(d.frontier.unmeasured(&d.coverage, true).contains(&(
+            "excluded_back_arrivals",
+            1,
+            "input_missing"
+        )));
+    }
+    // An unsettled pop that stayed on the node is no exit at all.
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "b")
+            .kind(NavigationTriggerKind::Pop)
+            .outcome(EdgeOutcome::Error),
+    ]);
+    let d = dead_ends(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    let b = d.dead_ends.iter().find(|x| x.node_key == key("b")).unwrap();
+    assert_eq!(b.back_only, Some(false));
+}
+
+#[test]
+fn rr5_w3_a_doubly_placed_rejected_frontier_row_sums_once() {
+    let ledger = edges(&[e("1", "a", "c")]);
+    let mut bad = frontier("b", "fp-x", FrontierReason::NotYetActivated);
+    bad.node_key = key("c");
+    let mut bad2 = frontier("a", "fp-y", FrontierReason::NotYetActivated);
+    bad2.node_key = key("zz");
+    let g = build_graph(&ledger, &[bad, bad2], &writing(), &no_filter());
+    assert_eq!(g.rejected_frontier_double_placed, 2);
+    // Placed at both keys per node...
+    assert_eq!(
+        g.node(&key("c"))
+            .unwrap()
+            .unmeasured_departures
+            .rejected_frontier,
+        1
+    );
+    assert_eq!(
+        g.node(&key("a"))
+            .unwrap()
+            .unmeasured_departures
+            .rejected_frontier,
+        1
+    );
+    // ...summed once graph-wide.
+    let f = frontier_of(&g, None);
+    assert_eq!(
+        f.frontier.unmeasured_departures.rejected_frontier,
+        g.coverage.rows_rejected
+    );
+    assert_eq!(
+        dead_ends(&g)
+            .frontier
+            .unmeasured_departures
+            .rejected_frontier,
+        2
+    );
+}
+
+#[test]
+fn rr5_s1_an_unplaced_rejected_pop_row_counts_everywhere() {
+    // Its trigger cannot be trusted, so a pop-claiming unplaceable row is a
+    // possible click anywhere: component questions count it too.
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "c").kind(NavigationTriggerKind::Pop),
+    ]);
+    ledger[1].from_node.state_ids = vec!["x,y".into()];
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    let s = steps_to(&g, &key("b"), &key("a"));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, true),
+        [("unplaced_rejected_rows", 1, "producer_failed")]
+    );
+}
+
+#[test]
+fn rr5_s2_the_gate_names_an_unobserved_subject() {
+    let ledger = edges(&[e("1", "a", "b")]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    let s = steps_to(&g, &key("b"), &key("zz"));
+    let subject = s.from_observed && s.to_observed;
+    assert!(!subject);
+    assert!(!s.frontier.is_settled(&s.coverage, subject));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, subject),
+        [("subject_unobserved", 1, "no_observations")]
+    );
+    // unsettled_because(c, s) is None exactly when is_settled(c, s).
+    for subject in [true, false] {
+        for g in [
+            build_graph(&ledger, &[], &writing(), &no_filter()),
+            build_graph(&[], &[], &writing(), &no_filter()),
+            build_graph(
+                &ledger,
+                &[],
+                &ledger_in(LedgerState::WriteFailing),
+                &no_filter(),
+            ),
+            build_graph(
+                &ledger,
+                &[frontier("b", "f", FrontierReason::NotYetActivated)],
+                &writing(),
+                &no_filter(),
+            ),
+        ] {
+            let s = steps_to(&g, &key("b"), &key("a"));
+            assert_eq!(
+                s.frontier.unsettled_because(&s.coverage, subject).is_none(),
+                s.frontier.is_settled(&s.coverage, subject)
+            );
+        }
+    }
+}
+
+#[test]
+fn rr5_s5_a_withdrawn_no_change_row_is_a_genuine_negative() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "b").outcome(EdgeOutcome::NoChange),
+    ]);
+    ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(g.node(&key("b")).unwrap().unmeasured_departures.is_zero());
+    let s = steps_to(&g, &key("b"), &key("a"));
+    assert!(s.frontier.is_settled(&s.coverage, true), "{:?}", s.frontier);
+    assert!(dead_ends(&g)
+        .dead_ends
+        .iter()
+        .any(|x| x.node_key == key("b")));
 }
