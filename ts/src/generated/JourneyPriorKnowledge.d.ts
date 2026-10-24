@@ -28,20 +28,22 @@ export interface JourneyPriorKnowledge {
    */
   filterEcho: JourneyFilter;
   /**
-   * What the whole graph did not look at. An open frontier entry could be
-   * the affordance that leads to one of `nodes`, and the absence of a
-   * listed node is unknown unless this is settled.
+   * What the whole graph did not look at. A listed node never rests on an
+   * open frontier (any open entry moves every candidate to `unsettled`);
+   * this block is what the NEGATIVE about the rest — "no other node
+   * requires prior knowledge" — is unknown over unless it is settled.
    */
   frontier: JourneySearchFrontier;
   /**
-   * Nodes that require prior knowledge, settled: they qualify, and no row
-   * the graph left out could reach them by a click or a back button.
+   * Nodes that require prior knowledge, settled: they qualify, nothing
+   * the graph left out could reach them by a click or a back button, no
+   * affordance anywhere is still unexplored, and the ledger is `writing`.
    * Sorted by key.
    */
   nodes: JourneyPriorKnowledgeNode[];
   /**
    * Nodes that qualify on their kept arrivals but cannot be settled, with
-   * the counts of what could still reach them. Sorted by key.
+   * the causes that could still reach them. Sorted by key.
    */
   unsettled: JourneyPriorKnowledgeUnsettledNode[];
 }
@@ -78,9 +80,20 @@ export interface JourneyPriorKnowledgeUnsettledNode {
     [k: string]: number;
   };
   /**
+   * The ledger is not `writing`: a click into this node may simply have
+   * failed to be recorded.
+   */
+  ledgerNotWriting: boolean;
+  /**
    * The node.
    */
   nodeKey: string;
+  /**
+   * Open frontier entries across the WHOLE graph — listable ones, rejected
+   * ones placed at a node, and unplaced rejected ones, each row once. An
+   * affordance nobody activated anywhere may be the link into this node.
+   */
+  openFrontierEntries: number;
   /**
    * [`JourneyGraph::unknown_destination_arrivals`] — any of them may
    * arrive here.
