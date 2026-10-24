@@ -294,5 +294,15 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
         serde_json::from_value(family.raw["handVerified"]["requiresPriorKnowledge"].clone())
             .unwrap();
     assert_eq!(got, want);
-    assert!(p.frontier.is_settled());
+    // No frontier is given; the only unexplored departures are the family's
+    // own error / settle_timeout edges to another node.
+    assert_eq!(p.frontier.open_entries, 0);
+    assert!(
+        p.frontier
+            .unmeasured()
+            .iter()
+            .all(|(d, _, _)| matches!(*d, "errored_departures" | "settle_timeout_departures")),
+        "{:?}",
+        p.frontier.unmeasured()
+    );
 }
