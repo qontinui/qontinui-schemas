@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.9.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.8.0...rust-v4.9.0) (2026-10-24)
+
+
+### Features
+
+* spec_model — typed spec-artifact frontmatter and the EARS vocabulary ([162dd0a](https://github.com/qontinui/qontinui-schemas/commit/162dd0a9df655e483799876c62eb4aed70106b23))
+
 ## [4.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.7.0...rust-v4.8.0) (2026-10-22)
 
 
