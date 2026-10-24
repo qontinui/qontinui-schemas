@@ -87,7 +87,8 @@ export interface EdgeTiming {
   newestObservedAt?: string | null;
   /**
    * Every observation's raw values, ordered by `(observedAt,
-   * observationId)`.
+   * observationId)`, ties broken by the serialized `(appVersion,
+   * timeline)`.
    */
   observations: EdgeTimingRow[];
   /**

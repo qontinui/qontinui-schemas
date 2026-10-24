@@ -256,6 +256,7 @@ from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.journey_arrival_doubt import JourneyArrivalDoubt
 from .per_type.journey_coverage import JourneyCoverage
 from .per_type.journey_dead_ends import JourneyDeadEnds
 from .per_type.journey_edge_observation import JourneyEdgeObservation
@@ -868,6 +869,7 @@ __all__ = [
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "JourneyArrivalDoubt",
     "JourneyCoverage",
     "JourneyDeadEnds",
     "JourneyEdgeObservation",

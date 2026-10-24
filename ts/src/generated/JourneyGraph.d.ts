@@ -6,6 +6,7 @@
  */
 
 import type { FrontierEntry } from "./FrontierEntry";
+import type { JourneyArrivalDoubt } from "./JourneyArrivalDoubt";
 import type { JourneyCoverage } from "./JourneyCoverage";
 import type { JourneyFilter } from "./JourneyFilter";
 import type { JourneyGraphEdge } from "./JourneyGraphEdge";
@@ -51,9 +52,18 @@ export interface JourneyGraph {
    * column and their valid node's own key disagree). Per-node counts
    * include both placements; graph-wide totals subtract this, so a
    * graph-wide `rejectedFrontier` plus `unplacedRejectedFrontier` is the
-   * number of DISTINCT rejected frontier rows in `rejected`.
+   * number of DISTINCT rejected frontier rows by full content. (`rejected`
+   * lists rows by `(kind, row, reason)`, so two rows differing only in
+   * their node JSON share one entry there but are both counted.)
    */
   rejectedFrontierDoublePlaced: number;
+  /**
+   * Affordance or `pop` rows — kept `to_node_unobserved` ones, and trusted
+   * excluded ones with no `toNode` — whose destination is unknown. Each
+   * may arrive at any node, so `requires_prior_knowledge` lists no node as
+   * settled while this is non-zero.
+   */
+  unknownDestinationArrivals: number;
   /**
    * Distinct rejected frontier rows whose node is invalid AND whose
    * `nodeKey` column names no observed node, so they cannot be placed at
@@ -70,11 +80,21 @@ export interface JourneyGraph {
    * alike (dimension `unplaced_rejected_rows`).
    */
   unplacedRejectedRows: number;
+  /**
+   * Distinct untrusted edge rows (placed or unplaced). Each may be a click
+   * from and to anywhere, so `requires_prior_knowledge` lists no node as
+   * settled while this is non-zero.
+   */
+  untrustedEdgeRows: number;
 }
 /**
  * One observed vertex.
  */
 export interface JourneyGraphNode {
+  /**
+   * Excluded affordance / pop rows arriving here from another node.
+   */
+  arrivalDoubt: JourneyArrivalDoubt;
   /**
    * Open frontier entries seen at this node, sorted by
    * `affordanceFingerprint`.

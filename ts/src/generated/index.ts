@@ -254,6 +254,7 @@ export type { JobItem } from './JobItem';
 export type { JobListResponse } from './JobListResponse';
 export type { JobStatus } from './JobStatus';
 export type { JobSummary } from './JobSummary';
+export type { JourneyArrivalDoubt } from './JourneyArrivalDoubt';
 export type { JourneyCoverage } from './JourneyCoverage';
 export type { JourneyDeadEnds } from './JourneyDeadEnds';
 export type { JourneyEdgeObservation } from './JourneyEdgeObservation';

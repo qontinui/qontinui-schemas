@@ -231,9 +231,11 @@ export type TimelineEvent =
       summary: string;
       type: "network-request-started";
       /**
-       * Origin + pathname — never the query or fragment.
+       * Origin + pathname — never the query or fragment. Always a string
+       * from the SDK; `null` only in [`ChangeTimeline::for_ledger`]'s
+       * projection, when the URL had no valid `scheme://host` origin.
        */
-      url: string;
+      url?: string | null;
       [k: string]: unknown;
     }
   | {
@@ -273,9 +275,11 @@ export type TimelineEvent =
       summary: string;
       type: "network-request-finished";
       /**
-       * Origin + pathname — never the query or fragment.
+       * Origin + pathname — never the query or fragment. Always a string
+       * from the SDK; `null` only in [`ChangeTimeline::for_ledger`]'s
+       * projection, when the URL had no valid `scheme://host` origin.
        */
-      url: string;
+      url?: string | null;
       [k: string]: unknown;
     }
   | {
