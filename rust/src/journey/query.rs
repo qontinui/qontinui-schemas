@@ -118,7 +118,15 @@ pub struct JourneyFilter {
 }
 
 impl JourneyFilter {
-    fn keeps(&self, edge: &JourneyEdgeObservation, observed_at: DateTime<Utc>) -> bool {
+    /// Whether this filter keeps `edge`, observed at `observed_at` (the
+    /// row's `observedAt`, parsed — [`trusted_edge_row`] returns it):
+    /// `observedAt >= since`, `appVersion` equal to the filter's (a row that
+    /// reported no version never matches a set one), and `runKind` equal to
+    /// the filter's. Exactly the test [`build_graph`] applies, so a caller
+    /// reading the same rows for another purpose (the runner's edge-timing
+    /// route) narrows them identically. It does NOT check trust or
+    /// withdrawal: apply [`trusted_edge_row`] and `invalidatedAt` first.
+    pub fn keeps(&self, edge: &JourneyEdgeObservation, observed_at: DateTime<Utc>) -> bool {
         if self.since.is_some_and(|since| observed_at < since) {
             return false;
         }
@@ -132,6 +140,22 @@ impl JourneyFilter {
         }
         true
     }
+}
+
+/// Whether a ledger edge row can be trusted, and its parsed `observedAt`.
+///
+/// A row is UNTRUSTED when it fails [`JourneyEdgeObservation::validate`] or
+/// its `observedAt` is not RFC 3339; the `Err` is the reason, worded exactly
+/// as [`JourneyRejectedRow::reason`]. This is the one trust rule
+/// [`build_graph`] applies to live and withdrawn rows alike, public so that a
+/// caller reading the same rows (the runner's edge-timing route) treats them
+/// identically. Withdrawal (`invalidatedAt`) and the request's filter
+/// ([`JourneyFilter::keeps`]) are separate checks.
+pub fn trusted_edge_row(edge: &JourneyEdgeObservation) -> Result<DateTime<Utc>, String> {
+    edge.validate().map_err(|e| e.to_string())?;
+    DateTime::parse_from_rfc3339(&edge.observed_at)
+        .map(|t| t.with_timezone(&Utc))
+        .map_err(|err| format!("observedAt {:?} is not RFC 3339: {err}", edge.observed_at))
 }
 
 // ---------------------------------------------------------------------------
@@ -733,30 +757,20 @@ pub fn build_graph(
             edges_invalidated += 1;
             // A withdrawn row is judged like a live one: failing validate()
             // OR carrying an unparseable observedAt makes it untrusted.
-            if edge.validate().is_err() || DateTime::parse_from_rfc3339(&edge.observed_at).is_err()
-            {
+            if trusted_edge_row(edge).is_err() {
                 place(edge, Excluded::Untrusted);
             } else if edge.outcome != EdgeOutcome::NoChange {
                 place(edge, Excluded::Withdrawn);
             }
             continue;
         }
-        if let Err(err) = edge.validate() {
-            rejected.insert(JourneyRejectedRow {
-                kind: JourneyRejectedRowKind::Edge,
-                row: edge.id.clone(),
-                reason: err.to_string(),
-            });
-            place(edge, Excluded::Untrusted);
-            continue;
-        }
-        let observed_at = match DateTime::parse_from_rfc3339(&edge.observed_at) {
-            Ok(t) => t.with_timezone(&Utc),
-            Err(err) => {
+        let observed_at = match trusted_edge_row(edge) {
+            Ok(t) => t,
+            Err(reason) => {
                 rejected.insert(JourneyRejectedRow {
                     kind: JourneyRejectedRowKind::Edge,
                     row: edge.id.clone(),
-                    reason: format!("observedAt {:?} is not RFC 3339: {err}", edge.observed_at),
+                    reason,
                 });
                 place(edge, Excluded::Untrusted);
                 continue;
