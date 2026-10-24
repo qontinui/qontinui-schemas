@@ -111,10 +111,14 @@ pub enum JourneyContractError {
         /// The outcome the observation carried.
         outcome: EdgeOutcome,
     },
-    /// A [`JourneyNode`] is not in the canonical form [`JourneyNode::new`]
-    /// produces (state ids unsorted or duplicated, or `modelled` disagreeing
-    /// with its derivation). Two non-canonical nodes for one configuration
-    /// would split a graph vertex in two.
+    /// A [`JourneyNode`] breaks the node contract: it is not in the
+    /// canonical form [`JourneyNode::new`] produces (state ids unsorted or
+    /// duplicated, or `modelled` disagreeing with its derivation), its
+    /// [`JourneyNode::key`] would not be injective (a `specId` containing `#`
+    /// or starting `unmodelled:`, a state id containing `,`), or its
+    /// `pageLabel` contains `/` (the tripwire for a URL path leaking in).
+    /// Two non-canonical nodes for one configuration would split a graph
+    /// vertex in two; a non-injective key would merge two.
     #[error("{which} is not canonical: {reason}")]
     NonCanonicalNode {
         /// Which node: `"fromNode"`, `"toNode"` or `"node"`.

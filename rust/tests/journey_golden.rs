@@ -199,7 +199,7 @@ fn rust_answers_equal_multistate_on_every_fixture() {
         for start in family.nodes() {
             let r = reachable_from(&g, &family.key(&start));
             assert!(r.from_observed);
-            assert!(r.frontier.is_settled(&r.coverage));
+            assert!(r.frontier.is_settled(&r.coverage, true));
 
             // get_reachable_states
             let got: Vec<String> = r
@@ -299,10 +299,10 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
     assert_eq!(p.frontier.open_entries, 0);
     assert!(
         p.frontier
-            .unmeasured(&p.coverage)
+            .unmeasured(&p.coverage, true)
             .iter()
             .all(|(d, _, _)| matches!(*d, "errored_departures" | "settle_timeout_departures")),
         "{:?}",
-        p.frontier.unmeasured(&p.coverage)
+        p.frontier.unmeasured(&p.coverage, true)
     );
 }
