@@ -7,8 +7,12 @@
 //! under whatever filter it applies), parses each row's `timeline` column as
 //! a [`ChangeTimeline`] (the [`ChangeTimeline::for_ledger`] projection it
 //! stored), and hands them to [`edge_timing`] as [`EdgeTimingSample`]s. The
-//! answer carries every per-observation value (as the [`Observation`] the SDK
-//! produced, so an `unknown` stays an `unknown`), the sample size, and per
+//! answer carries every per-observation value as the [`Observation`] the SDK
+//! produced, LEDGER-PROJECTED (`for_ledger()` is applied again, idempotently):
+//! status, value, coverage and unknown code are kept, an unknown's free-text
+//! detail is replaced by its code, `provenance.source` keeps only the
+//! allow-listed keys and `provenance.cache.keyInputs` is emptied — so an
+//! `unknown` stays an `unknown`. Beside them: the sample size, and per
 //! metric `min` / `median` / `p90` / `max` over the MEASURED values only, with
 //! the absent and unknown counts beside them — so `n = 12, measured = 3` can
 //! never read as a 12-sample median.
@@ -46,8 +50,10 @@ pub struct EdgeTimingSample {
     pub timeline: Option<ChangeTimeline>,
 }
 
-/// One observation's values, exactly as its timeline summary stated them.
-/// `null` (for every metric) = the row has no timeline.
+/// One observation's values as its timeline summary stated them,
+/// ledger-projected (status, value, coverage and unknown code kept; unknown
+/// detail replaced by its code; source and cache keys redacted). `null` (for
+/// every metric) = the row has no timeline.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EdgeTimingRow {
