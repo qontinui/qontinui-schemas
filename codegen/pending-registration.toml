@@ -178,3 +178,112 @@ type = "TemplateRef"
 runner_pr = "qontinui/qontinui-runner#2360"
 added = 2026-10-23
 schemas_pr = "qontinui/qontinui-schemas#261"
+
+# The journey query and interaction-timeline types (schemas#264), awaiting runner#2387.
+[[pending]]
+type = "ChangeTimeline"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "DetectedAnimation"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "EdgeTiming"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyArrivalDoubt"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyCoverage"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyDeadEnds"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyEdgeTimingAnswer"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyFilter"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyFrontier"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyGraph"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyGraphEdge"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyPriorKnowledge"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyReachable"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneySearchFrontier"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneySearchFrontierNode"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneySteps"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "JourneyUnmeasuredDepartures"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
+
+[[pending]]
+type = "MetricDistribution"
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-24
+schemas_pr = "qontinui/qontinui-schemas#264"
