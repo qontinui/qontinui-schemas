@@ -1803,3 +1803,28 @@ fn rr7_q5_determinism_many_seeds_mixed() {
         assert_eq!(render_everything(&l, &f), base, "seed {seed}");
     }
 }
+
+// --- Public row-trust and filter helpers ----------------------------------------
+
+#[test]
+fn trusted_edge_row_and_keeps_are_the_graphs_own_rules() {
+    let ok = e("1", "a", "b").build();
+    assert!(trusted_edge_row(&ok).is_ok());
+    let bad_time = e("2", "a", "b").at("garbage").build();
+    let err = trusted_edge_row(&bad_time).unwrap_err();
+    assert!(err.contains("RFC 3339"), "{err}");
+    let mut bad_trigger = e("3", "a", "b").build();
+    bad_trigger.trigger.navigation_trigger = NavigationTriggerKind::Push;
+    let err = trusted_edge_row(&bad_trigger).unwrap_err();
+    // The reason is worded exactly as the graph's rejected list words it.
+    let g = build_graph(&[bad_trigger], &[], &writing(), &no_filter());
+    assert_eq!(g.rejected[0].reason, err);
+
+    let at = trusted_edge_row(&ok).unwrap();
+    let f = JourneyFilter {
+        app_version: Some("2.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    assert!(!f.keeps(&ok, at));
+    assert!(no_filter().keeps(&ok, at));
+}

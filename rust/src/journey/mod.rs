@@ -87,11 +87,12 @@ mod query;
 
 pub use query::{
     build_graph, dead_ends, frontier, reachable_from, requires_prior_knowledge, steps_to,
-    JourneyArrivalDoubt, JourneyCoverage, JourneyDeadEnd, JourneyDeadEnds, JourneyFilter,
-    JourneyFrontier, JourneyGraph, JourneyGraphEdge, JourneyGraphNode, JourneyPriorKnowledge,
-    JourneyPriorKnowledgeNode, JourneyPriorKnowledgeUnsettledNode, JourneyReachable,
-    JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind, JourneySearchFrontier,
-    JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode, JourneyUnmeasuredDepartures,
+    trusted_edge_row, JourneyArrivalDoubt, JourneyCoverage, JourneyDeadEnd, JourneyDeadEnds,
+    JourneyFilter, JourneyFrontier, JourneyGraph, JourneyGraphEdge, JourneyGraphNode,
+    JourneyPriorKnowledge, JourneyPriorKnowledgeNode, JourneyPriorKnowledgeUnsettledNode,
+    JourneyReachable, JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind,
+    JourneySearchFrontier, JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode,
+    JourneyUnmeasuredDepartures,
 };
 
 /// A violation of the edge-observation contract that the Rust type system
