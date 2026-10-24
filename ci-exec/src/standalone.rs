@@ -16,7 +16,8 @@
 //! - no model invoker, so a `model = true` step runs refused with
 //!   `host_has_no_broker`;
 //! - no sibling read door ([`NoSiblingDoor`]), so every sibling is read on
-//!   the public path.
+//!   the public path with no credential: the GitHub token above is used for
+//!   the dispatched repo only, never for a sibling's API reads.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

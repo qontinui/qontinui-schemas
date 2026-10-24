@@ -411,5 +411,10 @@ pub struct Host {
     /// with no invoker — refuses model access with `host_has_no_broker`; the
     /// steps still run.
     pub model: Option<Arc<dyn ModelInvoker>>,
+    /// The dispatch-scoped read door asked once per declared sibling. A host
+    /// with no door installs one answering `NotOffered` (see
+    /// `standalone::NoSiblingDoor`). A sibling the door does not grant is read
+    /// on the public path with NO credential: the host's own GitHub token is
+    /// used only for reads of the dispatched repo, never for a sibling.
     pub sibling_reads: Arc<dyn SiblingReadAccess>,
 }

@@ -120,6 +120,11 @@ const SIBLING_FETCH_TIMEOUT: Duration = Duration::from_secs(600);
 const GIT_LOCAL_TIMEOUT: Duration = Duration::from_secs(120);
 /// Per-request GitHub API budget.
 const API_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// How long the sibling read door may take to answer one ask. The door is a
+/// network call on the host's side; an unbounded wait would stall the whole
+/// dispatch on a wedged coord. A timeout is an UNKNOWN answer, never a refusal.
+const DOOR_TIMEOUT: Duration = Duration::from_secs(15);
 /// Pagination bound on the reverse declaration search. An unbounded scan of
 /// open PRs is a denial-of-service surface; 20 pages of 100 is far past any
 /// real repo.
@@ -696,10 +701,10 @@ struct ApiAnswer {
 /// One provision's GitHub door: the host's access (token source, ETag cache,
 /// budget meter), one HTTP client, and the token to read with.
 ///
-/// Two of these exist per granted sibling: the HOST one (the host's token, the
+/// Two of these exist per sibling: the HOST one (the host's token, the
 /// host's books) for reads of the dispatched repo itself, and the SIBLING one,
-/// which carries the door's minted token and keeps OUT of the host's books
-/// (`host_books: false`). A private PR-list body must never land in an ETag
+/// which keeps OUT of the host's books (`host_books: false`) and carries the
+/// door's minted token when the sibling was granted and NO token otherwise. A private PR-list body must never land in an ETag
 /// cache that unauthenticated reads replay from, and the minted token spends
 /// the installation's budget, not the host token's.
 #[derive(Clone, Copy)]
@@ -1089,7 +1094,8 @@ async fn no_declaration(
 ///
 /// `host_api` reads the DISPATCHED repo (its PR's labels) with the host's
 /// token; `sibling_api` reads the SIBLING (its open PRs, one PR's detail) —
-/// with the door's minted token when the sibling was granted.
+/// with the door's minted token when the sibling was granted, and with no
+/// credential when it was not.
 #[allow(clippy::too_many_arguments)]
 async fn resolve_one(
     io: &SiblingIo<'_>,
@@ -1239,6 +1245,42 @@ async fn materialise(
 
 // ─────────────────────────── the read door (D3, D4) ───────────────────────────
 
+/// The longest door-supplied string a log line or error may carry.
+const DOOR_TEXT_MAX_CHARS: usize = 200;
+
+/// A door-supplied string made safe to print: control characters (newlines
+/// that would forge a log line, escapes that would drive a terminal) become
+/// `?`, and the length is capped.
+fn clean_door_text(raw: &str) -> String {
+    let mut out: String = raw
+        .chars()
+        .take(DOOR_TEXT_MAX_CHARS)
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect();
+    if raw.chars().count() > DOOR_TEXT_MAX_CHARS {
+        out.push('…');
+    }
+    out
+}
+
+/// Ask the door once, bounded by `limit`. A door that does not answer in time
+/// is UNKNOWN (`door timed out`), which then takes the public path and says so
+/// — never a hang, and never a refusal. Dropping the returned future (a
+/// cancelled provision) drops the ask.
+async fn ask_door(
+    reads: &dyn SiblingReadAccess,
+    dispatch_id: &str,
+    repo: &str,
+    limit: Duration,
+) -> SiblingReadAnswer {
+    match tokio::time::timeout(limit, reads.read_token(dispatch_id, repo)).await {
+        Ok(answer) => answer,
+        Err(_elapsed) => SiblingReadAnswer::Unknown {
+            reason: "door timed out".to_string(),
+        },
+    }
+}
+
 /// The door's answer with the token taken out: what log lines and error
 /// messages may name.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1251,14 +1293,44 @@ enum DoorNote {
 
 impl DoorNote {
     /// Split an answer into its loggable half and the token, if any.
+    ///
+    /// Every string the door supplied is sanitised first ([`clean_door_text`]),
+    /// because it reaches log lines and error messages. A `Granted` answer
+    /// carrying an EMPTY token is UNKNOWN: an empty `Authorization` secret
+    /// would be sent as a grant that grants nothing, and the sibling would be
+    /// read as if the door had vouched for it.
     fn from_door_answer(answer: SiblingReadAnswer) -> (Self, Option<ReadToken>) {
         match answer {
-            SiblingReadAnswer::Granted(token, expires_at) => {
-                (Self::Granted { expires_at }, Some(token))
-            }
-            SiblingReadAnswer::NoGrant { code } => (Self::NoGrant { code }, None),
-            SiblingReadAnswer::NotOffered { reason } => (Self::NotOffered { reason }, None),
-            SiblingReadAnswer::Unknown { reason } => (Self::Unknown { reason }, None),
+            SiblingReadAnswer::Granted(token, _) if token.secret().trim().is_empty() => (
+                Self::Unknown {
+                    reason: "door granted an empty token".to_string(),
+                },
+                None,
+            ),
+            SiblingReadAnswer::Granted(token, expires_at) => (
+                Self::Granted {
+                    expires_at: clean_door_text(&expires_at),
+                },
+                Some(token),
+            ),
+            SiblingReadAnswer::NoGrant { code } => (
+                Self::NoGrant {
+                    code: clean_door_text(&code),
+                },
+                None,
+            ),
+            SiblingReadAnswer::NotOffered { reason } => (
+                Self::NotOffered {
+                    reason: clean_door_text(&reason),
+                },
+                None,
+            ),
+            SiblingReadAnswer::Unknown { reason } => (
+                Self::Unknown {
+                    reason: clean_door_text(&reason),
+                },
+                None,
+            ),
         }
     }
 
@@ -1296,7 +1368,7 @@ impl DoorNote {
             ),
             Self::Unknown { reason } => format!(
                 "{err}. The read door's answer was UNKNOWN ({reason}) — not a refusal, so \
-                 this sibling was read on the public path without a grant. {fix}, and the \
+                 this sibling was read on the public path with no credential. {fix}, and the \
                  door must answer"
             ),
             // Not a public-path failure; reported as it came.
@@ -1479,6 +1551,21 @@ pub(crate) async fn provision_at(
         }
     }
 
+    // The dispatch root also holds the per-dispatch git home and global config
+    // ([`crate::sibling_git`]); a sibling materialised under either name would
+    // be wiped or overwritten by them (or would overwrite them).
+    for s in siblings {
+        let name = s.dir_name();
+        if name == crate::sibling_git::ISOLATED_HOME_DIR
+            || name == crate::sibling_git::GLOBAL_CONFIG_FILE
+        {
+            return Err(format!(
+                "sibling '{}' would be materialised over the dispatch's reserved name {name:?}",
+                s.repo
+            ));
+        }
+    }
+
     let token = github.token().await;
     if token.is_none() && pr_number.is_some() {
         // Unauthenticated GitHub reads work for public repos but are limited
@@ -1509,8 +1596,9 @@ pub(crate) async fn provision_at(
     let mut resolved_all = Vec::with_capacity(siblings.len());
     for sibling in siblings {
         // D3: ask first, once, before any read of this sibling.
-        let (door, minted) =
-            DoorNote::from_door_answer(reads.read_token(dispatch_id, &sibling.repo).await);
+        let (door, minted) = DoorNote::from_door_answer(
+            ask_door(reads, dispatch_id, &sibling.repo, DOOR_TIMEOUT).await,
+        );
         let line = door.log_line(&sibling.repo);
         info!("ci_node: {line}");
         log(line);
@@ -1537,7 +1625,15 @@ pub(crate) async fn provision_at(
                     host_books: false,
                     ..host_api
                 },
-                None => host_api,
+                // A sibling the door did NOT grant is read with NO credential
+                // and outside the host's books: the owner's token may reach
+                // private repos the door just declined to vouch for, and
+                // sending it here would be the very path D5 closes for git.
+                None => Api {
+                    token: None,
+                    host_books: false,
+                    ..host_api
+                },
             };
             let io = SiblingIo {
                 process,

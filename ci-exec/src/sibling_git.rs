@@ -959,9 +959,14 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         let auths = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let record = auths.clone();
+        // Every request the endpoint answered: without it, a git that never
+        // reached the endpoint would leave `auths` empty and pass vacuously.
+        let requests = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = requests.clone();
         tokio::spawn(async move {
             while let Ok((mut conn, _)) = listener.accept().await {
                 let record = record.clone();
+                let counted = counted.clone();
                 tokio::spawn(async move {
                     let mut buf = Vec::new();
                     let mut chunk = [0u8; 4096];
@@ -971,6 +976,7 @@ mod tests {
                             Ok(n) => buf.extend_from_slice(&chunk[..n]),
                         }
                     }
+                    counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let head = String::from_utf8_lossy(&buf).into_owned();
                     for line in head.lines() {
                         if line.to_ascii_lowercase().starts_with("authorization:") {
@@ -1012,6 +1018,11 @@ mod tests {
             .await
             .unwrap();
         assert!(!out.status.success(), "{out:?}");
+        assert!(
+            requests.load(std::sync::atomic::Ordering::SeqCst) >= 1,
+            "git never reached the endpoint, so the absence of an Authorization header proves \
+             nothing: {out:?}"
+        );
         let seen = auths.lock().unwrap().clone();
         assert!(
             seen.is_empty(),

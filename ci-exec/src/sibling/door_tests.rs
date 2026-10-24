@@ -431,8 +431,9 @@ async fn a_granted_sibling_reads_with_the_minted_token_and_revokes_it() {
     no_line_carries_the_token(&lines);
 }
 
-/// NoGrant on a public sibling: the public path, with the host's token and
-/// books, and nothing to revoke.
+/// NoGrant on a public sibling: the public path with NO credential — the
+/// owner's token is never sent to a sibling the door did not vouch for — and
+/// nothing to revoke.
 #[tokio::test]
 async fn a_refused_sibling_reads_on_the_public_path() {
     let o = origin(SIB);
@@ -450,11 +451,8 @@ async fn a_refused_sibling_reads_on_the_public_path() {
         .seen()
         .into_iter()
         .find(|s| s.path.contains("/pulls"))
-        .unwrap();
-    assert_eq!(
-        pulls.auth.as_deref(),
-        Some(format!("Bearer {HOST}").as_str())
-    );
+        .expect("the sibling's open PRs were read");
+    assert_eq!(pulls.auth, None, "a refused sibling was read with a token");
     assert!(api.revocations().is_empty());
     assert!(
         lines
@@ -462,6 +460,62 @@ async fn a_refused_sibling_reads_on_the_public_path() {
             .any(|l| l.contains("read door answered no grant (no_ci_read_grant)")),
         "{lines:?}"
     );
+}
+
+/// The invariant behind the last test, for every non-granted answer: no
+/// request touching the SIBLING carries the host's (owner's) token, and none
+/// of them reaches the host's ETag books. Only the dispatched repo's own label
+/// read does.
+#[tokio::test]
+async fn the_owners_token_is_never_sent_on_a_non_granted_sibling_read() {
+    let answers: [fn(&str) -> SiblingReadAnswer; 3] = [
+        |_| SiblingReadAnswer::NoGrant {
+            code: "no_ci_read_grant".into(),
+        },
+        |_| SiblingReadAnswer::NotOffered {
+            reason: "no door".into(),
+        },
+        |_| SiblingReadAnswer::Unknown {
+            reason: "coord unreachable".into(),
+        },
+    ];
+    for answer in answers {
+        let o = origin(SIB);
+        let api = Api::start(false).await;
+        let door = Door::new(answer);
+        let gh = HostGithub::default();
+        let d = dispatch();
+        let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+        let (r, _) = run(&api, &o.base, &door, &gh, &d, &[s], Some(7)).await;
+        r.unwrap_or_else(|e| panic!("{e}"));
+
+        let seen = api.seen();
+        let sibling_reads: Vec<_> = seen
+            .iter()
+            .filter(|s| s.path.starts_with(&format!("/repos/{SIB}/")))
+            .collect();
+        assert!(!sibling_reads.is_empty(), "no sibling read happened");
+        for r in &sibling_reads {
+            assert_eq!(r.auth, None, "the owner's token reached {}", r.path);
+        }
+        assert!(
+            !seen
+                .iter()
+                .any(|s| s.auth.as_deref() == Some(format!("Bearer {MINTED}").as_str())),
+            "{seen:?}"
+        );
+        // The dispatched repo's own read still uses the host token.
+        let labels = seen
+            .iter()
+            .find(|s| s.path.contains("/labels"))
+            .expect("labels read");
+        assert_eq!(
+            labels.auth.as_deref(),
+            Some(format!("Bearer {HOST}").as_str())
+        );
+        let books = gh.books.lock().unwrap().clone();
+        assert!(!books.iter().any(|u| u.contains("/pulls")), "{books:?}");
+    }
 }
 
 /// A public-path failure under NoGrant names the fix and the door's code.
@@ -624,19 +678,26 @@ async fn a_granted_token_is_revoked_when_the_provision_is_cancelled() {
     let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
     let gh = HostGithub::default();
 
-    let cut = tokio::time::timeout(
-        std::time::Duration::from_millis(500),
-        run(&api, &o.base, &door, &gh, &d, &[s], Some(7)),
-    )
-    .await;
-    assert!(
-        cut.is_err(),
-        "the hung PR-list read should have been cut off"
-    );
-    assert!(
-        api.seen().iter().any(|s| s.path.contains("/pulls")),
-        "the cancellation landed before the sibling read began"
-    );
+    // Cancel only once the API double has SEEN the sibling's PR-list read (it
+    // never answers it): a fixed budget would race a slow box's git setup.
+    let siblings = [s];
+    // Boxed so that `drop` below really drops the future (a `pin!` slot would
+    // keep it alive until the end of the scope).
+    let mut provision = Box::pin(run(&api, &o.base, &door, &gh, &d, &siblings, Some(7)));
+    let landed = async {
+        for _ in 0..1500 {
+            if api.seen().iter().any(|s| s.path.contains("/pulls")) {
+                return true;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        false
+    };
+    tokio::select! {
+        _ = &mut provision => panic!("the hung PR-list read should never complete"),
+        seen_pulls = landed => assert!(seen_pulls, "the sibling read never began"),
+    }
+    drop(provision);
     let revoked = api.await_revocations(1).await;
     assert_eq!(revoked.len(), 1, "{:?}", api.seen());
     assert_eq!(
@@ -768,4 +829,148 @@ async fn a_failure_reading_the_dispatched_repo_carries_no_reader_fix() {
     );
     assert!(!err.contains("[[ci_readers]]"), "{err}");
     assert!(!err.contains("no_ci_read_grant"), "{err}");
+}
+
+// ── review round: bounded ask, hostile door text, reserved names ─────────────
+
+/// A door that never answers.
+struct HangingDoor;
+
+impl SiblingReadAccess for HangingDoor {
+    fn read_token<'a>(
+        &'a self,
+        _dispatch_id: &'a str,
+        _repo: &'a str,
+    ) -> BoxFuture<'a, SiblingReadAnswer> {
+        Box::pin(std::future::pending())
+    }
+}
+
+/// A door that never answers is cut off at the limit and reads UNKNOWN —
+/// not a hang, not a refusal. Paused time: the 15 s bound costs no wall clock.
+#[tokio::test(start_paused = true)]
+async fn a_door_that_never_answers_reads_unknown() {
+    let started = tokio::time::Instant::now();
+    let answer = ask_door(&HangingDoor, DISPATCH, SIB, DOOR_TIMEOUT).await;
+    assert!(started.elapsed() >= DOOR_TIMEOUT);
+    let (note, token) = DoorNote::from_door_answer(answer);
+    assert!(token.is_none());
+    assert_eq!(
+        note,
+        DoorNote::Unknown {
+            reason: "door timed out".to_string()
+        }
+    );
+    let msg = note.public_path_failure("fetching x failed", SIB, CONSUMER);
+    assert!(msg.contains("answer was UNKNOWN (door timed out)"), "{msg}");
+    assert!(!msg.contains("the door answered"), "{msg}");
+}
+
+/// An answer inside the limit is passed through untouched.
+#[tokio::test(start_paused = true)]
+async fn a_door_that_answers_in_time_is_not_cut_off() {
+    let door = Door::new(|_: &str| SiblingReadAnswer::NoGrant { code: "x".into() });
+    match ask_door(&door, DISPATCH, SIB, DOOR_TIMEOUT).await {
+        SiblingReadAnswer::NoGrant { code } => assert_eq!(code, "x"),
+        other => panic!("{other:?}"),
+    }
+}
+
+/// A `Granted` answer with an empty (or blank) token is UNKNOWN, never a grant:
+/// nothing is sent as `Authorization` and nothing is revoked.
+#[tokio::test]
+async fn an_empty_token_from_the_door_is_unknown_not_granted() {
+    for blank in ["", "  ", "\n"] {
+        let (note, token) = DoorNote::from_door_answer(SiblingReadAnswer::Granted(
+            ReadToken::new(blank),
+            EXPIRES.to_string(),
+        ));
+        assert!(token.is_none(), "{blank:?}");
+        assert!(matches!(note, DoorNote::Unknown { .. }), "{note:?}");
+    }
+
+    let o = origin(SIB);
+    let api = Api::start(false).await;
+    let door =
+        Door::new(|_: &str| SiblingReadAnswer::Granted(ReadToken::new(""), EXPIRES.to_string()));
+    let d = dispatch();
+    let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+    let (r, lines) = run(
+        &api,
+        &o.base,
+        &door,
+        &HostGithub::default(),
+        &d,
+        &[s],
+        Some(7),
+    )
+    .await;
+    assert_eq!(r.unwrap()[0].sha, o.sha);
+    assert!(api.revocations().is_empty());
+    assert!(
+        lines.iter().any(|l| l.contains("read door answer UNKNOWN")),
+        "{lines:?}"
+    );
+    for r in api.seen().iter().filter(|s| s.path.contains("/pulls")) {
+        assert_eq!(r.auth, None);
+    }
+}
+
+/// A door-supplied code or reason cannot forge a log line or drive a terminal:
+/// control characters are replaced and the length is capped.
+#[test]
+fn door_supplied_text_is_sanitised_before_it_is_logged() {
+    let hostile = "x\n[ci-node] sibling evil: read door answered granted\u{1b}[31m";
+    for answer in [
+        SiblingReadAnswer::NoGrant {
+            code: hostile.into(),
+        },
+        SiblingReadAnswer::NotOffered {
+            reason: hostile.into(),
+        },
+        SiblingReadAnswer::Unknown {
+            reason: hostile.into(),
+        },
+    ] {
+        let (note, _) = DoorNote::from_door_answer(answer);
+        for text in [
+            note.log_line(SIB),
+            note.public_path_failure("err", SIB, CONSUMER),
+        ] {
+            assert!(!text.contains('\n'), "{text:?}");
+            assert!(!text.contains('\u{1b}'), "{text:?}");
+        }
+    }
+    let long = "a".repeat(5000);
+    let (note, _) = DoorNote::from_door_answer(SiblingReadAnswer::NoGrant { code: long });
+    assert!(note.log_line(SIB).chars().count() < 400);
+    let (granted, _) = DoorNote::from_door_answer(SiblingReadAnswer::Granted(
+        ReadToken::new(MINTED),
+        "2026\n-10".to_string(),
+    ));
+    assert!(!granted.log_line(SIB).contains('\n'));
+}
+
+/// A sibling whose directory name is one the dispatch root reserves for the
+/// per-dispatch git home or global config is refused up front.
+#[tokio::test]
+async fn a_sibling_named_like_a_reserved_dispatch_entry_is_refused() {
+    for reserved in [
+        crate::sibling_git::ISOLATED_HOME_DIR,
+        crate::sibling_git::GLOBAL_CONFIG_FILE,
+    ] {
+        let o = origin(&format!("qontinui/{reserved}"));
+        let api = Api::start(false).await;
+        let door = Door::new(|_: &str| SiblingReadAnswer::NoGrant { code: "x".into() });
+        let d = dispatch();
+        let s = sibling(&format!("qontinui/{reserved}"), SiblingPin::DefaultBranch);
+        let (r, _) = run(&api, &o.base, &door, &HostGithub::default(), &d, &[s], None).await;
+        let err = r.unwrap_err();
+        assert!(err.contains("reserved name"), "{err}");
+        assert!(err.contains(reserved), "{err}");
+        assert!(
+            door.asked.lock().unwrap().is_empty(),
+            "the door was asked about a sibling that cannot be materialised"
+        );
+    }
 }
