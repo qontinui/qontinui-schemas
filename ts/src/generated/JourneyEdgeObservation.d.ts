@@ -17,8 +17,9 @@ import type { JourneyTrigger } from "./JourneyTrigger";
  * [`EdgeOutcome::ToNodeUnobserved`]; `no_change` joins nodes with equal
  * keys (a `changed` edge may also join equal keys).
  *
- * The ledger's `timeline` column is deliberately unrepresented until
- * Phase 4; readers select explicit columns rather than `*`.
+ * The ledger's `timeline` column is not a field here: it holds a
+ * `qontinui-vision-core` `ChangeTimeline::for_ledger()` projection (see the
+ * module's PRIVACY note); readers select explicit columns rather than `*`.
  */
 export interface JourneyEdgeObservation {
   /**

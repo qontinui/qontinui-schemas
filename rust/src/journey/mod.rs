@@ -57,15 +57,38 @@
 //!   unslugged path leaking in; a slugged path (`/search/secret` →
 //!   `search-secret`) passes it.
 //!
-//! PRIVACY: the ledger's `timeline` column is deliberately NOT represented
-//! here. Phase 4 of the plan owns it and must add it as a closed
-//! (`deny_unknown_fields`) type with no value/text slot — never as an open
-//! `serde_json::Value`, which would make a typed value representable again.
+//! ## Queries
+//!
+//! [`build_graph`] derives the graph from ledger rows, and [`reachable_from`],
+//! [`steps_to`], [`dead_ends`] and [`requires_prior_knowledge`] read it. All
+//! are pure, I/O-free and deterministic — see the `query` module.
+//!
+//! PRIVACY: the ledger's `timeline` column is NOT a field of
+//! [`JourneyEdgeObservation`]. Its type is `qontinui-vision-core`'s
+//! `ChangeTimeline`, which this crate cannot name (it does not depend on
+//! vision-core, which pulls `image`), and the ONLY value a producer may write
+//! there is `ChangeTimeline::for_ledger()` — the redacted projection that
+//! drops every SDK prose `summary`, the page-changed URL and every network
+//! pathname, and keeps only allow-listed `provenance.source` keys. Re-serializing
+//! through that typed mirror drops any key it does not model, so the column
+//! has no open value/text slot. Readers select the column explicitly and
+//! parse it as `ChangeTimeline`; `qontinui_vision_core::edge_timing` reduces
+//! one edge's timelines to a distribution.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::ir::IrEffect;
+
+mod query;
+
+pub use query::{
+    build_graph, dead_ends, reachable_from, requires_prior_knowledge, steps_to, JourneyCoverage,
+    JourneyDeadEnd, JourneyDeadEnds, JourneyFilter, JourneyGraph, JourneyGraphEdge,
+    JourneyGraphNode, JourneyPriorKnowledge, JourneyPriorKnowledgeNode, JourneyReachable,
+    JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind, JourneySearchFrontier,
+    JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode,
+};
 
 /// A violation of the edge-observation contract that the Rust type system
 /// alone cannot rule out.
@@ -501,8 +524,9 @@ impl EdgeOutcome {
 /// [`EdgeOutcome::ToNodeUnobserved`]; `no_change` joins nodes with equal
 /// keys (a `changed` edge may also join equal keys).
 ///
-/// The ledger's `timeline` column is deliberately unrepresented until
-/// Phase 4; readers select explicit columns rather than `*`.
+/// The ledger's `timeline` column is not a field here: it holds a
+/// `qontinui-vision-core` `ChangeTimeline::for_ledger()` projection (see the
+/// module's PRIVACY note); readers select explicit columns rather than `*`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -537,7 +561,7 @@ pub struct JourneyEdgeObservation {
     /// How the edge closed.
     pub outcome: EdgeOutcome,
     // PRIVACY: the `timeline` column is not represented here — see the
-    // module doc. Phase 4 adds it as a closed type with no value slot.
+    // module doc. It holds vision-core's `ChangeTimeline::for_ledger()`.
     /// When the row was withdrawn (ISO 8601); `None` = live.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidated_at: Option<String>,
@@ -622,6 +646,19 @@ pub enum FrontierReason {
 }
 
 impl FrontierReason {
+    /// Every member, in declaration order — the closed set the
+    /// `journey_frontier.reason` CHECK lists. Query results report a count
+    /// for each, zeros included, so a reason with no open entry reads as a
+    /// measured zero rather than a missing key.
+    pub const ALL: [FrontierReason; 6] = [
+        Self::NotYetActivated,
+        Self::EffectUndeclared,
+        Self::EffectWrite,
+        Self::EffectDestructive,
+        Self::BudgetExhausted,
+        Self::ActivationFailed,
+    ];
+
     /// The wire string.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -1189,6 +1226,17 @@ mod tests {
                 (ActivationFailed, "activation_failed"),
             ],
             FrontierReason::as_str,
+        );
+        assert_eq!(
+            FrontierReason::ALL.map(FrontierReason::as_str),
+            [
+                "not_yet_activated",
+                "effect_undeclared",
+                "effect_write",
+                "effect_destructive",
+                "budget_exhausted",
+                "activation_failed",
+            ]
         );
     }
 
