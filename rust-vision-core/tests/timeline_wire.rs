@@ -332,3 +332,139 @@ fn the_ledger_projection_keeps_every_answer_and_drops_user_text() {
     let rich = serde_json::to_string(&scenario("rich")).unwrap();
     assert!(rich.contains("/api/save") && rich.contains("/fixture/saved"));
 }
+
+/// Every element id, shifted-element fingerprint and animation target the
+/// SDK captured, as strings.
+fn element_identities(t: &ChangeTimeline) -> Vec<String> {
+    let mut out = Vec::new();
+    for ev in &t.events {
+        match ev {
+            TimelineEvent::ElementsAppeared { element_ids, .. }
+            | TimelineEvent::ElementsDisappeared { element_ids, .. }
+            | TimelineEvent::ElementsModified { element_ids, .. } => {
+                out.extend(element_ids.iter().cloned())
+            }
+            TimelineEvent::LayoutShift {
+                shifted_fingerprints,
+                ..
+            } => out.extend(shifted_fingerprints.iter().cloned()),
+            TimelineEvent::AnimationStarted { animation, .. }
+            | TimelineEvent::AnimationEnded { animation, .. } => {
+                out.extend(animation.target_element.iter().cloned())
+            }
+            _ => {}
+        }
+    }
+    if let Some(list) = t.summary.animations_unsettled_at_end.value() {
+        out.extend(list.iter().filter_map(|a| a.target_element.clone()));
+    }
+    out.retain(|s| !s.is_empty());
+    out
+}
+
+/// An SDK auto-registered element id is a slug of the element's text
+/// (`react/useAutoRegister.ts`), and an element fingerprint hashes its
+/// accessible name (`core/element-fingerprint.ts`) — both can carry what a
+/// user typed or what the page said about them. The stored projection keeps
+/// the counts and none of the identities.
+#[test]
+fn the_ledger_projection_keeps_element_counts_and_drops_element_identities() {
+    // Every identity in the SDK captures is gone from the stored form.
+    let mut seen = 0;
+    for (name, _, original) in timelines() {
+        let ids = element_identities(&original);
+        seen += ids.len();
+        let stored = original.for_ledger();
+        assert!(element_identities(&stored).is_empty(), "{name}");
+        let text = serde_json::to_string(&stored).unwrap();
+        for id in &ids {
+            // As a JSON string value: a bare substring would also match a
+            // declared state id such as `saved-toast` for the id `save`.
+            let quoted = serde_json::to_string(id).unwrap();
+            assert!(
+                !text.contains(&quoted),
+                "{name}: stored timeline carries {quoted}"
+            );
+        }
+        // Counts survive.
+        for (o, s) in original.events.iter().zip(&stored.events) {
+            match (o, s) {
+                (
+                    TimelineEvent::ElementsAppeared { count: a, .. },
+                    TimelineEvent::ElementsAppeared { count: b, .. },
+                )
+                | (
+                    TimelineEvent::ElementsDisappeared { count: a, .. },
+                    TimelineEvent::ElementsDisappeared { count: b, .. },
+                )
+                | (
+                    TimelineEvent::ElementsModified { count: a, .. },
+                    TimelineEvent::ElementsModified { count: b, .. },
+                ) => assert_eq!(a, b, "{name}"),
+                (
+                    TimelineEvent::LayoutShift {
+                        shifted_fingerprints,
+                        ..
+                    },
+                    TimelineEvent::LayoutShift {
+                        shifted_element_count,
+                        ..
+                    },
+                ) => assert_eq!(
+                    *shifted_element_count,
+                    Some(shifted_fingerprints.len() as u64),
+                    "{name}"
+                ),
+                _ => {}
+            }
+        }
+    }
+    assert!(
+        seen > 0,
+        "the captures carry element identities (probe is not vacuous)"
+    );
+
+    // A fixture element registered under a semantic, text-derived id, as the
+    // SDK's auto-registration names one, plus that element's fingerprint as
+    // a shift source and an animation target.
+    let mut v: Value = serde_json::to_value(scenario("rich")).unwrap();
+    let events = v["events"].as_array_mut().unwrap();
+    events.push(serde_json::json!({
+        "type": "elements-appeared", "offsetMs": 900, "summary": "1 element(s) appeared",
+        "elementIds": ["button-send-invoice-to-jane-doe-example-com"], "count": 1
+    }));
+    events.push(serde_json::json!({
+        "type": "layout-shift", "offsetMs": 910, "summary": "s", "value": 0.05,
+        "hadRecentInput": false, "shiftedFingerprints": ["fp-jane-doe-invoice"],
+        "unattributedSourceCount": 0
+    }));
+    events.push(serde_json::json!({
+        "type": "animation-started", "offsetMs": 920, "summary": "s",
+        "animation": { "name": "toast-in", "targetElement": "fp-jane-doe-toast", "isInfinite": false }
+    }));
+    let t: ChangeTimeline = serde_json::from_value(v).unwrap();
+    assert!(serde_json::to_string(&t).unwrap().contains("jane-doe"));
+    let stored = t.for_ledger();
+    let text = serde_json::to_string(&stored).unwrap();
+    assert!(!text.contains("jane"), "{text}");
+    assert_eq!(stored.for_ledger(), stored, "idempotent");
+    match &stored.events[stored.events.len() - 2] {
+        TimelineEvent::LayoutShift {
+            shifted_element_count,
+            ..
+        } => assert_eq!(*shifted_element_count, Some(1)),
+        other => panic!("{other:?}"),
+    }
+    // And the answers over it are the original's.
+    for a in [
+        Assertion::AnimationSettled { region: None },
+        Assertion::SettledWithin { ms: 5000 },
+        Assertion::StateEnteredWithin {
+            state: "saved-toast".into(),
+            ms: 400,
+        },
+    ] {
+        let (x, y) = (eval(&t, a.clone()), eval(&stored, a.clone()));
+        assert_eq!((x.outcome, x.code), (y.outcome, y.code), "{a:?}");
+    }
+}

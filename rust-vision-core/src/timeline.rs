@@ -188,6 +188,12 @@ pub enum TimelineEvent {
         /// Shift sources whose node was gone (or not an element) when the
         /// entry was read.
         unattributed_source_count: u64,
+        /// How many shifted elements `shiftedFingerprints` named. NOT sent by
+        /// the SDK: [`ChangeTimeline::for_ledger`] sets it when it empties
+        /// `shiftedFingerprints`, so a stored timeline keeps the count and
+        /// not the hashes. Absent on the wire from the SDK.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shifted_element_count: Option<u64>,
     },
     /// A CSS animation or transition started.
     AnimationStarted {
@@ -455,12 +461,18 @@ impl ChangeTimeline {
 
     /// The projection a consumer STORES — the journey ledger's `timeline`
     /// column holds exactly this, and nothing else. It keeps every offset,
-    /// count, score, fingerprint, element id, declared state id, animation
-    /// name and every summary [`Observation`] (status, value, coverage,
-    /// unknown code and detail), so every timeline assertion and
-    /// [`crate::edge_timing`] answer the same over it as over the original.
-    /// It drops what can carry user input:
+    /// count, score, declared state id, animation name and every summary
+    /// [`Observation`] (status, value, coverage, unknown code and detail), so
+    /// every timeline assertion and [`crate::edge_timing`] answer the same
+    /// over it as over the original. It drops what can carry user input:
     ///
+    /// - every `elements-*` event's `elementIds` becomes `[]` (its `count`
+    ///   stays): an SDK auto-registered id is a slug of the element's text;
+    /// - every `layout-shift` `shiftedFingerprints` becomes `[]`, with the
+    ///   number it held in `shiftedElementCount`, and every animation's
+    ///   `targetElement` (events and `summary.animationsUnsettledAtEnd`)
+    ///   becomes absent: an element fingerprint hashes the element's
+    ///   accessible name, which is brute-forceable;
     /// - every event's `summary` prose becomes its `type` tag;
     /// - `page-changed` `url` becomes `null` (a URL path or query can embed
     ///   user input; the journey node already names the page);
@@ -480,6 +492,21 @@ impl ChangeTimeline {
                 TimelineEvent::NetworkRequestStarted { url, .. }
                 | TimelineEvent::NetworkRequestFinished { url, .. } => {
                     *url = url_origin(url).unwrap_or_default();
+                }
+                TimelineEvent::ElementsAppeared { element_ids, .. }
+                | TimelineEvent::ElementsDisappeared { element_ids, .. }
+                | TimelineEvent::ElementsModified { element_ids, .. } => element_ids.clear(),
+                TimelineEvent::LayoutShift {
+                    shifted_fingerprints,
+                    shifted_element_count,
+                    ..
+                } => {
+                    shifted_element_count.get_or_insert(shifted_fingerprints.len() as u64);
+                    shifted_fingerprints.clear();
+                }
+                TimelineEvent::AnimationStarted { animation, .. }
+                | TimelineEvent::AnimationEnded { animation, .. } => {
+                    animation.target_element = None;
                 }
                 _ => {}
             }
@@ -508,6 +535,14 @@ impl ChangeTimeline {
         retain_ledger_source(&mut s.layout_shift_count);
         retain_ledger_source(&mut s.layout_shift_after_first_response_ms);
         retain_ledger_source(&mut s.animations_unsettled_at_end);
+        s.animations_unsettled_at_end = s.animations_unsettled_at_end.clone().map(|list| {
+            list.into_iter()
+                .map(|a| DetectedAnimation {
+                    target_element: None,
+                    ..a
+                })
+                .collect()
+        });
         retain_ledger_source(&mut s.long_task_total_ms);
         for e in &mut s.expected_states {
             retain_ledger_source(&mut e.outcome);
