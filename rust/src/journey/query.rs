@@ -199,10 +199,11 @@ pub struct JourneyGraphNode {
     /// Excluded affordance / pop rows arriving here from another node.
     pub arrival_doubt: JourneyArrivalDoubt,
     /// `true` when the node has at least one kept arrival (an edge whose
-    /// `toNode` is this node), and every one of them closed `settle_timeout`,
-    /// whatever its trigger: no `changed` or `no_change` arrival confirms the
-    /// node is a real destination rather than an intermediate render (a
-    /// spinner). Such a node is never a settled dead end, nor a settled
+    /// `toNode` is this node), and NONE of them closed `changed` or
+    /// `no_change`, whatever its trigger. Only those two outcomes confirm the
+    /// node is a real destination: a `settle_timeout` or `error` arrival's
+    /// observed node may be an intermediate state (a spinner, an error
+    /// render). Such a node is never a settled dead end, nor a settled
     /// requires-prior-knowledge node.
     pub unconfirmed_destination: bool,
 }
@@ -982,12 +983,13 @@ pub fn build_graph(
     // navigation (affordance) or from the kept back exits (pop), never a
     // negative.
     let mut nodes = nodes;
-    // Unconfirmed destinations: every kept arrival closed settle_timeout.
-    // to_key -> "every arrival so far closed settle_timeout".
+    // Unconfirmed destinations: no kept arrival closed changed or no_change.
+    // to_key -> "no arrival so far closed changed or no_change". Only those
+    // two outcomes confirm a destination; settle_timeout and error do not.
     let mut settle_only: BTreeMap<&str, bool> = BTreeMap::new();
     for e in &graph_edges {
         let slot = settle_only.entry(e.to_key.as_str()).or_insert(true);
-        *slot &= e.outcome == EdgeOutcome::SettleTimeout;
+        *slot &= !matches!(e.outcome, EdgeOutcome::Changed | EdgeOutcome::NoChange);
     }
     for n in &mut nodes {
         n.unconfirmed_destination = settle_only.get(n.key.as_str()).copied().unwrap_or(false);
@@ -1484,9 +1486,9 @@ pub struct JourneyUnexploredNode {
     /// withdrawn, `settle_timeout` / `error` to another node, rejected
     /// frontier rows with a valid node).
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
-    /// `true` when every observed arrival at the node closed
-    /// `settle_timeout` — no `changed` or `no_change` arrival confirms it is
-    /// a real destination rather than an intermediate render
+    /// `true` when no observed arrival at the node closed `changed` or
+    /// `no_change` (they were all `settle_timeout` / `error`), so nothing
+    /// confirms it is a real destination rather than an intermediate state
     /// ([`JourneyGraphNode::unconfirmed_destination`]).
     pub unconfirmed_destination: bool,
     /// `true` when the node itself was fully explored but the GRAPH cannot
@@ -1695,9 +1697,9 @@ pub struct JourneyPriorKnowledgeUnsettledNode {
     /// ones placed at a node, and unplaced rejected ones, each row once. An
     /// affordance nobody activated anywhere may be the link into this node.
     pub open_frontier_entries: u64,
-    /// Every observed arrival at this node closed `settle_timeout`
+    /// No observed arrival at this node closed `changed` or `no_change`
     /// ([`JourneyGraphNode::unconfirmed_destination`]): it may be an
-    /// intermediate render, not a page a URL leads to.
+    /// intermediate state, not a page a URL leads to.
     pub unconfirmed_destination: bool,
 }
 
@@ -1746,7 +1748,7 @@ pub struct JourneyPriorKnowledge {
 /// ([`JourneyGraph::unknown_destination_arrivals`]), no open frontier entry
 /// anywhere (listable, rejected or unplaced — an affordance nobody activated
 /// may be the link into it), a `writing` ledger, and a confirmed destination
-/// (not every arrival closed `settle_timeout`). Otherwise it goes in
+/// (some arrival closed `changed` or `no_change`). Otherwise it goes in
 /// `unsettled`, with those causes — the frontier decides between "requires
 /// prior knowledge" and "unknown", as the plan's Phase 5 reads it.
 pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
