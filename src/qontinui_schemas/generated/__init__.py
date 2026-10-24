@@ -69,6 +69,7 @@ from .per_type.canonical_step import CanonicalStep
 from .per_type.canvas_panel import CanvasPanel
 from .per_type.catch_up_policy import CatchUpPolicy
 from .per_type.category import Category
+from .per_type.change_timeline import ChangeTimeline
 from .per_type.check_issue_detail import CheckIssueDetail
 from .per_type.check_type import CheckType
 from .per_type.code_execution_step import CodeExecutionStep
@@ -114,6 +115,7 @@ from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
 from .per_type.decomposer_config import DecomposerConfig
+from .per_type.detected_animation import DetectedAnimation
 from .per_type.dev_seed_finding_payload import DevSeedFindingPayload
 from .per_type.device_branch_summary import DeviceBranchSummary
 from .per_type.diagnose_phase_config import DiagnosePhaseConfig
@@ -133,6 +135,7 @@ from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
 from .per_type.ears_pattern import EarsPattern
+from .per_type.edge_timing import EdgeTiming
 from .per_type.effect_check_step import EffectCheckStep
 from .per_type.element_action_request import ElementActionRequest
 from .per_type.element_bbox import ElementBbox
@@ -253,10 +256,23 @@ from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.journey_coverage import JourneyCoverage
+from .per_type.journey_dead_ends import JourneyDeadEnds
 from .per_type.journey_edge_observation import JourneyEdgeObservation
+from .per_type.journey_edge_timing_answer import JourneyEdgeTimingAnswer
+from .per_type.journey_filter import JourneyFilter
+from .per_type.journey_frontier import JourneyFrontier
+from .per_type.journey_graph import JourneyGraph
+from .per_type.journey_graph_edge import JourneyGraphEdge
 from .per_type.journey_ledger_health import JourneyLedgerHealth
 from .per_type.journey_node import JourneyNode
+from .per_type.journey_prior_knowledge import JourneyPriorKnowledge
+from .per_type.journey_reachable import JourneyReachable
+from .per_type.journey_search_frontier import JourneySearchFrontier
+from .per_type.journey_search_frontier_node import JourneySearchFrontierNode
+from .per_type.journey_steps import JourneySteps
 from .per_type.journey_trigger import JourneyTrigger
+from .per_type.journey_unmeasured_departures import JourneyUnmeasuredDepartures
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.legacy_assertion import LegacyAssertion
@@ -293,6 +309,7 @@ from .per_type.memory_summary import MemorySummary
 from .per_type.memory_upsert_request import MemoryUpsertRequest
 from .per_type.memory_upsert_response import MemoryUpsertResponse
 from .per_type.memory_with_history import MemoryWithHistory
+from .per_type.metric_distribution import MetricDistribution
 from .per_type.miss_reason import MissReason
 from .per_type.model_cost_breakdown import ModelCostBreakdown
 from .per_type.model_override_config import ModelOverrideConfig
@@ -664,6 +681,7 @@ __all__ = [
     "CanvasPanel",
     "CatchUpPolicy",
     "Category",
+    "ChangeTimeline",
     "CheckIssueDetail",
     "CheckType",
     "CodeExecutionStep",
@@ -709,6 +727,7 @@ __all__ = [
     "DagCancelStep",
     "DagLoopStep",
     "DecomposerConfig",
+    "DetectedAnimation",
     "DevSeedFindingPayload",
     "DeviceBranchSummary",
     "DiagnosePhaseConfig",
@@ -728,6 +747,7 @@ __all__ = [
     "DomainKnowledge",
     "DomainVerificationResult",
     "EarsPattern",
+    "EdgeTiming",
     "EffectCheckStep",
     "ElementActionRequest",
     "ElementBbox",
@@ -848,10 +868,23 @@ __all__ = [
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "JourneyCoverage",
+    "JourneyDeadEnds",
     "JourneyEdgeObservation",
+    "JourneyEdgeTimingAnswer",
+    "JourneyFilter",
+    "JourneyFrontier",
+    "JourneyGraph",
+    "JourneyGraphEdge",
     "JourneyLedgerHealth",
     "JourneyNode",
+    "JourneyPriorKnowledge",
+    "JourneyReachable",
+    "JourneySearchFrontier",
+    "JourneySearchFrontierNode",
+    "JourneySteps",
     "JourneyTrigger",
+    "JourneyUnmeasuredDepartures",
     "LLMCostSummary",
     "LLMMetrics",
     "LegacyAssertion",
@@ -888,6 +921,7 @@ __all__ = [
     "MemoryUpsertRequest",
     "MemoryUpsertResponse",
     "MemoryWithHistory",
+    "MetricDistribution",
     "MissReason",
     "ModelCostBreakdown",
     "ModelOverrideConfig",
