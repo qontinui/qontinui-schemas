@@ -60,7 +60,8 @@
 //! ## Queries
 //!
 //! [`build_graph`] derives the graph from ledger rows, and [`reachable_from`],
-//! [`steps_to`], [`dead_ends`] and [`requires_prior_knowledge`] read it. All
+//! [`steps_to`], [`dead_ends`], [`requires_prior_knowledge`] and [`frontier`]
+//! read it. All
 //! are pure, I/O-free and deterministic — see the `query` module.
 //!
 //! PRIVACY: the ledger's `timeline` column is NOT a field of
@@ -83,11 +84,12 @@ use crate::ir::IrEffect;
 mod query;
 
 pub use query::{
-    build_graph, dead_ends, reachable_from, requires_prior_knowledge, steps_to, JourneyCoverage,
-    JourneyDeadEnd, JourneyDeadEnds, JourneyFilter, JourneyGraph, JourneyGraphEdge,
-    JourneyGraphNode, JourneyPriorKnowledge, JourneyPriorKnowledgeNode, JourneyReachable,
-    JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind, JourneySearchFrontier,
-    JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode,
+    build_graph, dead_ends, frontier, reachable_from, requires_prior_knowledge, steps_to,
+    JourneyCoverage, JourneyDeadEnd, JourneyDeadEnds, JourneyFilter, JourneyFrontier, JourneyGraph,
+    JourneyGraphEdge, JourneyGraphNode, JourneyPriorKnowledge, JourneyPriorKnowledgeNode,
+    JourneyReachable, JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind,
+    JourneySearchFrontier, JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode,
+    JourneyUnmeasuredDepartures,
 };
 
 /// A violation of the edge-observation contract that the Rust type system
