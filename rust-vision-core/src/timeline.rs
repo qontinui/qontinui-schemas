@@ -439,15 +439,15 @@ pub const LEDGER_SOURCE_KEYS: [&str; 8] = [
 ];
 
 fn retain_ledger_source<T>(o: &mut Observation<T>) {
-    if let Some(source) = o.source_mut() {
-        source.retain(|k, _| LEDGER_SOURCE_KEYS.contains(&k.as_str()));
-    }
+    o.redact_for_ledger(&LEDGER_SOURCE_KEYS);
 }
 
 /// `scheme://host[:port]` of a URL, or `None` when it does not START with a
 /// valid scheme (`[A-Za-z][A-Za-z0-9+.-]*`, RFC 3986) followed by `://` and
-/// a non-empty authority — the network events keep their origin, never their
-/// path. A relative path that merely contains `://` further on
+/// a host — the network events keep their origin, never their path. The
+/// host is an IPv6 literal or a run of `[A-Za-z0-9-._~]` (no `%`: an encoded
+/// `/` or `@` would carry a path in); the port is digits only. Anything else
+/// ends the origin there. A relative path that merely contains `://` further on
 /// (`/search/a@b.c/https://x`) is not a URL with an origin.
 fn url_origin(url: &str) -> Option<String> {
     let (scheme, rest) = url.split_once("://")?;
@@ -461,19 +461,40 @@ fn url_origin(url: &str) -> Option<String> {
     // `\` included, which browsers read as `/` in a special URL.
     let authority = rest.split(['/', '?', '#', '\\']).next().unwrap_or("");
     // A userinfo part (`user:pass@host`) is credentials, never kept.
-    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
-    // Keep only the leading run of characters valid in a host and port
-    // (letters, digits, `-._~%`, `:` for the port, `[]` for an IPv6
-    // literal): anything else is not part of an origin, and what follows it
-    // may be user input.
-    let end = host
-        .find(|c: char| !(c.is_ascii_alphanumeric() || "-._~%:[]".contains(c)))
-        .unwrap_or(host.len());
-    let host = &host[..end];
-    if host.is_empty() {
+    let authority = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    // The host: an IPv6 literal `[hex:...]`, or the leading run of
+    // registered-name characters (letters, digits, `-._~`). `%` is NOT kept —
+    // a percent-encoded `/` or `@` would carry a path or an address in.
+    let host_len = if authority.starts_with('[') {
+        match authority.find(']') {
+            Some(close)
+                if authority[1..close]
+                    .chars()
+                    .all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.') =>
+            {
+                close + 1
+            }
+            _ => return None,
+        }
+    } else {
+        authority
+            .find(|c: char| !(c.is_ascii_alphanumeric() || "-._~".contains(c)))
+            .unwrap_or(authority.len())
+    };
+    let (host, rest) = authority.split_at(host_len);
+    if host.is_empty() || host == "[]" {
         return None;
     }
-    Some(format!("{scheme}://{host}"))
+    // A port is `:` and digits only; anything else ends the origin at the
+    // host.
+    let port = rest
+        .strip_prefix(':')
+        .map(|p| &p[..p.find(|c: char| !c.is_ascii_digit()).unwrap_or(p.len())])
+        .filter(|p| !p.is_empty());
+    Some(match port {
+        Some(port) => format!("{scheme}://{host}:{port}"),
+        None => format!("{scheme}://{host}"),
+    })
 }
 
 impl ChangeTimeline {
@@ -485,7 +506,7 @@ impl ChangeTimeline {
     /// The projection a consumer STORES — the journey ledger's `timeline`
     /// column holds exactly this, and nothing else. It keeps every offset,
     /// count, score, state id, animation name and every summary
-    /// [`Observation`] (status, value, coverage, unknown code and detail), so
+    /// [`Observation`] (status, value, coverage and unknown code), so
     /// every timeline assertion and [`crate::edge_timing`] answer the same
     /// over it as over the original. It drops what can carry user input:
     ///
@@ -503,7 +524,10 @@ impl ChangeTimeline {
     ///   `null` when it does not start with a valid scheme and authority —
     ///   never a pathname;
     /// - each summary field's `provenance.source` keeps only
-    ///   [`LEDGER_SOURCE_KEYS`].
+    ///   [`LEDGER_SOURCE_KEYS`], its `provenance.cache.keyInputs` (when a
+    ///   cache is stated) becomes `[]`, and an unknown's free-text `detail`
+    ///   becomes its code's wire value (the code is kept; the SDK's prose is
+    ///   not bounded, and may quote a URL or a state id).
     ///
     /// State ids are KEPT, and that is structural, not an oversight: a
     /// `state-entered` / `state-exited` `stateId` is an id the app declared
@@ -679,6 +703,17 @@ mod tests {
             ("http://[::1]:3000/u/alice", Some("http://[::1]:3000")),
             ("https:\\\\api.example.com\\x", None),
             (" https://api.example.com/x", None),
+            (
+                "https://api.example.com%2Fusers%2Falice%40corp.com",
+                Some("https://api.example.com"),
+            ),
+            ("https://host:alice", Some("https://host")),
+            (
+                "https://api.example.com:alice/x",
+                Some("https://api.example.com"),
+            ),
+            ("https://%61lice/x", None),
+            ("https://[::1/x", None),
         ] {
             assert_eq!(url_origin(u).as_deref(), want, "{u}");
             assert!(!url_origin(u).unwrap_or_default().contains("alice"), "{u}");

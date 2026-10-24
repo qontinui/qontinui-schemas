@@ -2000,6 +2000,23 @@ fn eval_settled_within(ms: u64, ctx: &EvalContext<'_>) -> AssertionResult {
         Some((code, _)) => code == UnknownCode::NoEventBeforeTimeout,
     };
     if did_not_occur && !t.settled && t.recorded_ms >= bound {
+        // The SDK stops watching for `settled` at settleTimeout, but records
+        // on to `withinMs` when the caller asked for `expectStates`. Then the
+        // recording outlasts the window `settled` was watched in, and a
+        // settle after settleTimeout would not have been seen: not a fail.
+        // Without `expectStates`, the recording IS the settle window.
+        if !t.summary.expected_states.is_empty() {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "the UI did not settle within the settle window, but the {}ms recording was \
+                     extended past it for `expectStates`, and `settled` is not watched after \
+                     settleTimeout, so whether it settled within {ms}ms is not known",
+                    t.recorded_ms
+                ),
+            );
+        }
         if t.summary
             .unmeasured_dimensions()
             .any(|d| d == "timeline-events:settled")
@@ -2932,6 +2949,33 @@ mod tests {
             eval_timeline(&t, &settled_anim()).outcome,
             AssertionOutcome::Failed
         );
+    }
+
+    /// Review probe 3: with `expectStates` the SDK records past settleTimeout
+    /// without watching for `settled`, so "did not settle within 5000ms" over
+    /// an 8000ms recording is unknown. Without `expectStates` it is a fail.
+    #[test]
+    fn settled_within_is_unknown_when_the_recording_outlasted_the_settle_window() {
+        let never = |with_states: bool| {
+            timeline(vec![state_ev("state-entered", 7000, "saved")], move |v| {
+                v["summary"]["settleMs"] = unknown("no_event_before_timeout");
+                v["settled"] = serde_json::json!(false);
+                v["recordedMs"] = serde_json::json!(8000);
+                if with_states {
+                    v["summary"]["expectedStates"] = serde_json::json!([{
+                        "stateId": "saved",
+                        "outcome": measured(serde_json::json!({ "enteredAtMs": 7000 }))
+                    }]);
+                }
+            })
+        };
+        let res = eval_timeline(&never(true), &Assertion::SettledWithin { ms: 5000 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+        assert!(res.detail.unwrap().contains("expectStates"));
+        // Control: no expectStates, the recording is the settle window.
+        let res = eval_timeline(&never(false), &Assertion::SettledWithin { ms: 5000 });
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
     }
 
     /// DEFENSIVE: the UI Bridge SDK caps events per type but emits a single
