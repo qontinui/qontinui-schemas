@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.0...ts-v2.4.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **ci-exec:** bump zip to 9 for RUSTSEC-2026-0367..0369 ([3ac862b](https://github.com/qontinui/qontinui-schemas/commit/3ac862bcb2ed38860445a4befbd30185096d6ef0))
+* restore run-outcomes capture and ts 2.4.0 reverted by 3ac862bc ([0d2fd65](https://github.com/qontinui/qontinui-schemas/commit/0d2fd65ed1f2b7e71b7276901b0266270c167aa9))
+
+## [2.4.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.1...ts-v2.4.0) (2026-10-19)
+
+
+### Features
+
+* add ScheduledTaskType::Script (command, working_directory, timeout_seconds) ([20c02a8](https://github.com/qontinui/qontinui-schemas/commit/20c02a87d257a34fbff761c8f8f82f3a2c9fa44a))
+* **ts:** ImageSlotSpec bindings, exported from the package entry ([c415a43](https://github.com/qontinui/qontinui-schemas/commit/c415a432156823d0b31c5b976e4ef9014576aae9))
+
+
+### Bug Fixes
+
+* **vision-core:** absent requires considered &gt; 0; bindings documented as types, not validators ([37f3530](https://github.com/qontinui/qontinui-schemas/commit/37f3530606a895adfa463295405b50c270aaf9e2))
+
 ## [2.3.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.0...ts-v2.3.1) (2026-10-13)
 
 

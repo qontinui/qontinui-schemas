@@ -111,6 +111,7 @@ from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
 from .per_type.criterion_override import CriterionOverride
 from .per_type.criterion_type import CriterionType
+from .per_type.criterion_verification import CriterionVerification
 from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
@@ -133,6 +134,7 @@ from .per_type.display_node import DisplayNode
 from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
+from .per_type.ears_pattern import EarsPattern
 from .per_type.effect_check_step import EffectCheckStep
 from .per_type.element_action_request import ElementActionRequest
 from .per_type.element_bbox import ElementBbox
@@ -177,6 +179,7 @@ from .per_type.exit_check_result import ExitCheckResult
 from .per_type.exit_strategy import ExitStrategy
 from .per_type.export_result import ExportResult
 from .per_type.extend_iterations_request import ExtendIterationsRequest
+from .per_type.external_ref import ExternalRef
 from .per_type.field_diff import FieldDiff
 from .per_type.file_change import FileChange
 from .per_type.filter_narrowing import FilterNarrowing
@@ -223,10 +226,12 @@ from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
+from .per_type.image_slot_spec import ImageSlotSpec
 from .per_type.implement_fixes_config import ImplementFixesConfig
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
+from .per_type.interface_mapping_frontmatter import InterfaceMappingFrontmatter
 from .per_type.ir_assertion import IrAssertion
 from .per_type.ir_assertion_target import IrAssertionTarget
 from .per_type.ir_cross_ref import IrCrossRef
@@ -267,6 +272,7 @@ from .per_type.legacy_transition import LegacyTransition
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.loop_instance_status import LoopInstanceStatus
 from .per_type.loop_phase import LoopPhase
+from .per_type.mapping_row import MappingRow
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
@@ -366,6 +372,8 @@ from .per_type.register_app_request import RegisterAppRequest
 from .per_type.relationship import Relationship
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
 from .per_type.repository_watch import RepositoryWatch
+from .per_type.request_frontmatter import RequestFrontmatter
+from .per_type.requirement_frontmatter import RequirementFrontmatter
 from .per_type.resolved_initial_states import ResolvedInitialStates
 from .per_type.resolved_initial_states_result import ResolvedInitialStatesResult
 from .per_type.resource_limits import ResourceLimits
@@ -416,6 +424,9 @@ from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.session_failure import SessionFailure
 from .per_type.session_lite import SessionLite
 from .per_type.session_source import SessionSource
+from .per_type.source_citation import SourceCitation
+from .per_type.source_citation_kind import SourceCitationKind
+from .per_type.spec_acceptance_criterion import SpecAcceptanceCriterion
 from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
@@ -423,6 +434,8 @@ from .per_type.spec_check_result import SpecCheckResult
 from .per_type.spec_check_step import SpecCheckStep
 from .per_type.spec_check_step_config import SpecCheckStepConfig
 from .per_type.spec_check_summary import SpecCheckSummary
+from .per_type.spec_frontmatter import SpecFrontmatter
+from .per_type.spec_language import SpecLanguage
 from .per_type.spec_provenance import SpecProvenance
 from .per_type.spec_section import SpecSection
 from .per_type.spec_target import SpecTarget
@@ -458,6 +471,7 @@ from .per_type.state_node_data import StateNodeData
 from .per_type.states_response import StatesResponse
 from .per_type.stdio_config import StdioConfig
 from .per_type.step_execution_config import StepExecutionConfig
+from .per_type.story_frontmatter import StoryFrontmatter
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
 from .per_type.structured_signal import StructuredSignal
@@ -486,6 +500,7 @@ from .per_type.task_run_session import TaskRunSession
 from .per_type.task_run_status import TaskRunStatus
 from .per_type.task_run_update import TaskRunUpdate
 from .per_type.task_type import TaskType
+from .per_type.template_ref import TemplateRef
 from .per_type.terminal_exit_event import TerminalExitEvent
 from .per_type.terminal_info import TerminalInfo
 from .per_type.terminal_output_event import TerminalOutputEvent
@@ -694,6 +709,7 @@ __all__ = [
     "CreateTaskRunRequest",
     "CriterionOverride",
     "CriterionType",
+    "CriterionVerification",
     "DagApprovalStep",
     "DagCancelStep",
     "DagLoopStep",
@@ -716,6 +732,7 @@ __all__ = [
     "DomainAssignment",
     "DomainKnowledge",
     "DomainVerificationResult",
+    "EarsPattern",
     "EffectCheckStep",
     "ElementActionRequest",
     "ElementBbox",
@@ -760,6 +777,7 @@ __all__ = [
     "ExitStrategy",
     "ExportResult",
     "ExtendIterationsRequest",
+    "ExternalRef",
     "FieldDiff",
     "FileChange",
     "FilterNarrowing",
@@ -806,10 +824,12 @@ __all__ = [
     "HttpConfig",
     "HttpMethod",
     "IdleCondition",
+    "ImageSlotSpec",
     "ImplementFixesConfig",
     "IndividualCheckResult",
     "InitialStateRef",
     "InitialStatesSource",
+    "InterfaceMappingFrontmatter",
     "IrAssertion",
     "IrAssertionTarget",
     "IrCrossRef",
@@ -850,6 +870,7 @@ __all__ = [
     "LogSourceSelection",
     "LoopInstanceStatus",
     "LoopPhase",
+    "MappingRow",
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
@@ -949,6 +970,8 @@ __all__ = [
     "Relationship",
     "RepositoryInactiveCondition",
     "RepositoryWatch",
+    "RequestFrontmatter",
+    "RequirementFrontmatter",
     "ResolvedInitialStates",
     "ResolvedInitialStatesResult",
     "ResourceLimits",
@@ -999,6 +1022,9 @@ __all__ = [
     "SessionFailure",
     "SessionLite",
     "SessionSource",
+    "SourceCitation",
+    "SourceCitationKind",
+    "SpecAcceptanceCriterion",
     "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
@@ -1006,6 +1032,8 @@ __all__ = [
     "SpecCheckStep",
     "SpecCheckStepConfig",
     "SpecCheckSummary",
+    "SpecFrontmatter",
+    "SpecLanguage",
     "SpecProvenance",
     "SpecSection",
     "SpecTarget",
@@ -1041,6 +1069,7 @@ __all__ = [
     "StatesResponse",
     "StdioConfig",
     "StepExecutionConfig",
+    "StoryFrontmatter",
     "StructuredFinding",
     "StructuredOverride",
     "StructuredSignal",
@@ -1069,6 +1098,7 @@ __all__ = [
     "TaskRunStatus",
     "TaskRunUpdate",
     "TaskType",
+    "TemplateRef",
     "TerminalExitEvent",
     "TerminalInfo",
     "TerminalOutputEvent",

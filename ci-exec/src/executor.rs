@@ -311,6 +311,7 @@ pub async fn run_dispatch(
                     steps: &steps_summary,
                     reason,
                     test_results: None,
+                    run_outcomes: None,
                     canonical: None,
                     model: &ModelSection::NotEvaluated,
                     model_ledger: None,
@@ -362,6 +363,7 @@ pub async fn run_dispatch(
                     steps: &steps_summary,
                     reason,
                     test_results: None,
+                    run_outcomes: None,
                     canonical: None,
                     model: &ModelSection::NotEvaluated,
                     model_ledger: None,
@@ -395,6 +397,7 @@ pub async fn run_dispatch(
                 steps: &steps_summary,
                 reason: Some("job_os_mismatch"),
                 test_results: None,
+                run_outcomes: None,
                 canonical: None,
                 model: &section_before_checks(Some(job)),
                 model_ledger: None,
@@ -480,6 +483,7 @@ pub async fn run_dispatch(
                 steps: &steps_summary,
                 reason: canonical_outcome.reason(),
                 test_results: None,
+                run_outcomes: None,
                 canonical: Some(&canonical_outcome),
                 model: &section_before_checks(Some(job)),
                 model_ledger: None,
@@ -538,6 +542,7 @@ pub async fn run_dispatch(
                     steps: &steps_summary,
                     reason: None,
                     test_results: None,
+                    run_outcomes: None,
                     canonical: Some(&canonical_outcome),
                     model: &section_before_checks(Some(job)),
                     model_ledger: None,
@@ -554,12 +559,28 @@ pub async fn run_dispatch(
         .join(".ci-target")
         .join(crate::local_repo_name(&payload.repo));
 
+    let dispatch_root = crate::checkout::ci_dispatch_root(&root, &payload.dispatch_id);
+
+    // ── The run-outcomes channel (created empty, before the first step) ──
+    //
+    // Outside the worktree, inside the dispatch's cleanup unit. A creation
+    // failure is logged and nothing is exported: the outcome channel is
+    // evidence about the run, never a reason to change its verdict.
+    let outcomes_path = crate::outcomes::prepare(&dispatch_root);
+    if let Err(e) = &outcomes_path {
+        sink.push(&format!(
+            "[ci-node] run outcomes: could not create the output file ({e}); ${} is not exported",
+            crate::outcomes::RUN_OUTCOMES_ENV
+        ));
+    }
+
     let dispatch_env = DispatchEnv::build(
         build_jobs,
         test_threads,
         &ci_target_dir,
         &tool_dirs,
         &service_env,
+        outcomes_path.as_deref().ok(),
     );
 
     // ── Model access (after provisioning, before the first step) ──
@@ -575,7 +596,6 @@ pub async fn run_dispatch(
         sink.clone(),
     )
     .await;
-    let dispatch_root = crate::checkout::ci_dispatch_root(&root, &payload.dispatch_id);
 
     // Per-dispatch containment (held across all steps; dropping it at
     // dispatch end reaps any stray build processes).
@@ -662,6 +682,11 @@ pub async fn run_dispatch(
     // still have written a partial one worth ingesting.
     let capture = crate::junit::capture(&worktree, &ci_target_dir, &job.steps);
     sink.push(&capture.log_line());
+    // The run outcomes live inside the same cleanup unit, so they are captured
+    // here too, and for the same reason unconditionally: a red run's numbers
+    // are a real observation (coord itself refuses a `cancelled` run's).
+    let outcomes = crate::outcomes::capture(outcomes_path.as_deref().map_err(String::as_str));
+    sink.push(&outcomes.log_line());
 
     let reported = report::report(
         reporter,
@@ -671,6 +696,7 @@ pub async fn run_dispatch(
             steps: &steps_summary,
             reason: None,
             test_results: capture.artifact(),
+            run_outcomes: outcomes.entries(),
             canonical: Some(&canonical_outcome),
             model: &model_section,
             model_ledger: model_ledger.as_ref(),
@@ -701,6 +727,7 @@ async fn refuse_before_checkout(
             steps: steps_summary,
             reason: Some(reason),
             test_results: None,
+            run_outcomes: None,
             canonical: None,
             model: &ModelSection::NotEvaluated,
             model_ledger: None,
@@ -961,6 +988,7 @@ impl DispatchEnv {
         ci_target_dir: &Path,
         tool_dirs: &[PathBuf],
         service_env: &[(String, String)],
+        run_outcomes_path: Option<&Path>,
     ) -> Self {
         let mut exports = vec![
             // The build-phase cap.
@@ -998,6 +1026,16 @@ impl DispatchEnv {
         // ever hold a wrong value. The manifest rejects these keys outright
         // with a pointer to the `[[services]]` entry that provides them.
         exports.extend(service_env.iter().cloned());
+        // The run-outcomes output file, when the executor could create it.
+        // Executor-owned (the manifest refuses the key): it is created empty
+        // per dispatch outside the worktree, so a manifest could only point it
+        // at a committed file.
+        if let Some(path) = run_outcomes_path {
+            exports.push((
+                crate::outcomes::RUN_OUTCOMES_ENV.to_string(),
+                path.to_string_lossy().to_string(),
+            ));
+        }
         Self { exports }
     }
 }
@@ -1186,7 +1224,7 @@ mod tests {
     /// agent in the test phase too.
     #[test]
     fn executor_exports_both_phases_of_cap() {
-        let env = DispatchEnv::build(3, 7, Path::new("/ci-target"), &[], &[]);
+        let env = DispatchEnv::build(3, 7, Path::new("/ci-target"), &[], &[], None);
         assert_eq!(exports(&env, "CARGO_BUILD_JOBS").as_deref(), Some("3"));
         assert_eq!(exports(&env, "RUST_TEST_THREADS").as_deref(), Some("7"));
         assert_eq!(exports(&env, "NEXTEST_TEST_THREADS").as_deref(), Some("7"));
@@ -1194,6 +1232,20 @@ mod tests {
         assert!(exports(&env, "CARGO_TARGET_DIR").is_some());
         // Nothing provisioned ⇒ the child inherits PATH untouched.
         assert!(exports(&env, "PATH").is_none());
+    }
+
+    /// The run-outcomes path is exported only when the executor created the
+    /// file; a creation failure exports nothing rather than a dangling path.
+    #[test]
+    fn run_outcomes_path_is_exported_only_when_created() {
+        let bare = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[], None);
+        assert!(exports(&bare, crate::outcomes::RUN_OUTCOMES_ENV).is_none());
+        let p = Path::new("/root/.ci-worktrees/d-1/.ci-outputs/run_outcomes.jsonl");
+        let env = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[], Some(p));
+        assert_eq!(
+            exports(&env, crate::outcomes::RUN_OUTCOMES_ENV).as_deref(),
+            Some(p.to_string_lossy().as_ref())
+        );
     }
 
     /// A provisioned tool goes on the FRONT of PATH, and the host's own PATH
@@ -1207,6 +1259,7 @@ mod tests {
             Path::new("/ci-target"),
             std::slice::from_ref(&dir),
             &[],
+            None,
         );
         let path = exports(&env, "PATH").expect("PATH must be exported when a tool is provisioned");
         let mut entries = std::env::split_paths(&path);
@@ -1223,7 +1276,7 @@ mod tests {
     /// outright — this asserts the second half of that belt-and-braces.)
     #[test]
     fn executor_exports_are_applied_last() {
-        let env = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[]);
+        let env = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[], None);
         let step_env = vec![("CARGO_BUILD_JOBS".to_string(), "64".to_string())];
         let mut envs = step_env.clone();
         envs.extend(env.exports.iter().cloned());
@@ -1301,7 +1354,7 @@ mod tests {
                 database: "d".to_string(),
             },
         );
-        let env = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &service_env);
+        let env = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &service_env, None);
         assert_eq!(
             exports(&env, "REDIS_URL").as_deref(),
             Some("redis://127.0.0.1:6399")
@@ -1309,7 +1362,7 @@ mod tests {
         assert_eq!(exports(&env, "REDIS_PORT").as_deref(), Some("6399"));
         // Nothing declared ⇒ nothing exported: a manifest without services
         // must not gain a connection variable pointing nowhere.
-        let bare = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[]);
+        let bare = DispatchEnv::build(1, 2, Path::new("/ci-target"), &[], &[], None);
         assert!(exports(&bare, "REDIS_URL").is_none());
         assert!(exports(&bare, "DATABASE_URL").is_none());
     }
@@ -1437,10 +1490,14 @@ mod tests {
     /// `(summary.model as JSON, the ledger as JSON)` per verdict filed.
     type Models = Arc<std::sync::Mutex<Vec<(serde_json::Value, Option<serde_json::Value>)>>>;
 
+    /// The `run_outcomes` each verdict carried, as wire JSON (`None` = none).
+    type Outcomes = Arc<std::sync::Mutex<Vec<Option<serde_json::Value>>>>;
+
     struct Recording {
         lines: Arc<std::sync::Mutex<Vec<String>>>,
         filed: Filed,
         models: Models,
+        outcomes: Outcomes,
     }
 
     struct Lines(Arc<std::sync::Mutex<Vec<String>>>);
@@ -1474,6 +1531,11 @@ mod tests {
                         .model_ledger
                         .map(|l| serde_json::to_value(l).unwrap()),
                 ));
+                self.outcomes.lock().unwrap().push(
+                    verdict
+                        .run_outcomes
+                        .map(|e| serde_json::to_value(e).unwrap()),
+                );
             })
         }
     }
@@ -1538,10 +1600,12 @@ mod tests {
         let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
         let filed = Arc::new(std::sync::Mutex::new(Vec::new()));
         let models = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let outcomes = Arc::new(std::sync::Mutex::new(Vec::new()));
         let reporter = Box::new(Recording {
             lines: lines.clone(),
             filed: filed.clone(),
             models: models.clone(),
+            outcomes: outcomes.clone(),
         });
         let payload = DispatchPayload {
             dispatch_id: dispatch_id.to_string(),
@@ -1575,6 +1639,7 @@ mod tests {
                 lines,
                 filed,
                 models,
+                outcomes,
             },
         )
     }
@@ -1630,6 +1695,104 @@ command = ["git", "--version"]
         assert!(
             !crate::checkout::ci_dispatch_root(&root, "e2e-1").exists(),
             "the dispatch root must be cleaned up"
+        );
+    }
+
+    /// A job whose steps write no run outcomes files a verdict carrying none,
+    /// and says so on the dispatch log — the channel exists on every dispatch
+    /// but sends nothing it was not given.
+    #[tokio::test]
+    async fn a_job_that_writes_no_outcomes_sends_none_and_says_so() {
+        let (_tmp, root, head) = repo_with(TWO_JOBS);
+        let (conclusion, rec) = run(&root, &head, Some("green")).await;
+        assert_eq!(conclusion, Conclusion::Success);
+        assert_eq!(rec.outcomes.lock().unwrap().clone(), vec![None]);
+        assert!(
+            rec.lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("[ci-node] run outcomes: none")),
+            "{:#?}",
+            rec.lines.lock().unwrap()
+        );
+    }
+
+    /// The arming test for the outcome channel, entered where the population
+    /// enters — `run_dispatch`: a step appends an entry to
+    /// `$QONTINUI_CI_RUN_OUTCOMES`, the verdict carries it, the file lived
+    /// inside the cleanup unit, and cleanup still ran. A second, invalid entry
+    /// sends nothing and leaves the verdict green. Runs on both lanes: the
+    /// step copies a committed file to the exported path with the platform's
+    /// own shell (`sh -c cp` / `cmd /V:ON /C copy`, delayed expansion because
+    /// `%` is a banned argv character).
+    #[tokio::test]
+    async fn a_step_appended_outcome_reaches_the_verdict_before_cleanup() {
+        fn copy_step(file: &str) -> String {
+            if cfg!(windows) {
+                format!(
+                    "[\"cmd\", \"/V:ON\", \"/C\", \"copy /Y {file} !QONTINUI_CI_RUN_OUTCOMES!\"]"
+                )
+            } else {
+                format!("[\"sh\", \"-c\", \"cp {file} $QONTINUI_CI_RUN_OUTCOMES\"]")
+            }
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("root");
+        let repo = root.join("demo");
+        std::fs::create_dir_all(repo.join(".qontinui")).unwrap();
+        std::fs::write(
+            repo.join("ok.jsonl"),
+            "{\"source\":\"reference-eval\",\"subject\":\"oracle\",\"task\":\"s1\",\"metrics\":{\"recall\":98.5},\"executed_case_count\":12}\n",
+        )
+        .unwrap();
+        std::fs::write(repo.join("bad.jsonl"), "{\"repo\":\"forged\"}\n").unwrap();
+        std::fs::write(
+            repo.join(".qontinui").join("ci.toml"),
+            format!(
+                "version = 2\n\
+                 [[jobs]]\nname = \"ok\"\n[[jobs.steps]]\nname = \"emit\"\ncommand = {}\n\
+                 [[jobs]]\nname = \"bad\"\n[[jobs.steps]]\nname = \"emit\"\ncommand = {}\n",
+                copy_step("ok.jsonl"),
+                copy_step("bad.jsonl")
+            ),
+        )
+        .unwrap();
+        git(&repo, &["init", "-q", "-b", "main"]);
+        git(&repo, &["add", "."]);
+        git(&repo, &["commit", "-q", "-m", "init"]);
+        let head = git(&repo, &["rev-parse", "HEAD"]);
+
+        let (c, rec) = run(&root, &head, Some("ok")).await;
+        assert_eq!(c, Conclusion::Success, "{:#?}", rec.lines.lock().unwrap());
+        let sent = rec.outcomes.lock().unwrap().clone();
+        assert_eq!(
+            sent,
+            vec![Some(serde_json::json!([{
+                "source": "reference-eval", "subject": "oracle", "task": "s1",
+                "metrics": {"recall": 98.5}, "executed_case_count": 12
+            }]))]
+        );
+        assert!(
+            !crate::checkout::ci_dispatch_root(&root, "e2e-1").exists(),
+            "the outcome file is inside the cleanup unit and goes with it"
+        );
+
+        let (c, rec) = run(&root, &head, Some("bad")).await;
+        assert_eq!(
+            c,
+            Conclusion::Success,
+            "an invalid outcome never changes the verdict"
+        );
+        assert_eq!(rec.outcomes.lock().unwrap().clone(), vec![None]);
+        assert!(
+            rec.lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("run_outcome_attribution_in_body")),
+            "{:#?}",
+            rec.lines.lock().unwrap()
         );
     }
 

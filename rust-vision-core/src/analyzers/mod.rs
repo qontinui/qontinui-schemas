@@ -2,11 +2,13 @@
 //! Phase 6 vision analyzers — declarative geometry + appearance queries
 //! over a captured frame + [`crate::ElementSnapshot`].
 //!
-//! Five analyzers ([`Analyzer::Layout`], [`Analyzer::Typography`],
-//! [`Analyzer::Color`], [`Analyzer::Dynamic`], [`Analyzer::Elements`])
-//! map roughly to the Python qontinui library's
-//! `vision/environment/analyzers/*.py` modules — same surface, pure Rust,
-//! no Python interpreter on the runtime path.
+//! Six analyzers ([`Analyzer::Layout`], [`Analyzer::Typography`],
+//! [`Analyzer::Color`], [`Analyzer::Dynamic`], [`Analyzer::Elements`],
+//! [`Analyzer::Image`]). The first five map roughly to the Python qontinui
+//! library's `vision/environment/analyzers/*.py` modules — same surface,
+//! pure Rust, no Python interpreter on the runtime path. [`Analyzer::Image`]
+//! measures per-image pixel VALUES ([`image::ImageValues`]) and never gates:
+//! see its module docs.
 //!
 //! Each analyzer's `run()` returns an [`AnalyzerResult`]: the findings it
 //! produced, the [`SnapshotCoverage`] it had to work with, and an
@@ -37,10 +39,11 @@ use crate::observation::UnknownCode;
 pub mod color;
 pub mod dynamic;
 pub mod elements;
+pub mod image;
 pub mod layout;
 pub mod typography;
 
-/// The five canonical analyzers. Wire-name (snake_case) matches the
+/// The six canonical analyzers. Wire-name (snake_case) matches the
 /// `/vision/analyze` request's `analyzer` field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,6 +53,9 @@ pub enum Analyzer {
     Color,
     Dynamic,
     Elements,
+    /// Per-image pixel values (plan 2026-10-13-image-generation-and-visual-judgment,
+    /// Phase 15). Info findings only; see [`image`].
+    Image,
 }
 
 impl Analyzer {
@@ -60,6 +66,7 @@ impl Analyzer {
             Self::Color => "color",
             Self::Dynamic => "dynamic",
             Self::Elements => "elements",
+            Self::Image => "image",
         }
     }
 }
@@ -87,11 +94,11 @@ pub struct Finding {
     /// Which analyzer produced this observation.
     ///
     /// Stamped by [`run`] — the dispatcher — for every finding the run
-    /// produced, rather than at each `Finding::new` site inside the five
+    /// produced, rather than at each `Finding::new` site inside the six
     /// analyzers. Attribution that each analyzer had to remember is
-    /// attribution a sixth analyzer will forget, and the moment a caller
-    /// merges five analyzers' findings into one list (which is exactly what
-    /// a five-analyzer audit does) an unattributed finding is unreadable.
+    /// attribution a seventh analyzer will forget, and the moment a caller
+    /// merges six analyzers' findings into one list (which is exactly what
+    /// a six-analyzer audit does) an unattributed finding is unreadable.
     ///
     /// `None` means the finding was produced OUTSIDE the dispatcher — a
     /// direct `layout::run(..)` call, or a value built by hand or read from
@@ -133,9 +140,11 @@ pub struct Finding {
     /// than this field — every `Finding` this crate emits states one.
     ///
     /// `Some(c)` is in `0.0..=1.0` and its MEANING is the producing site's
-    /// to document; there is no crate-wide scale. Today exactly one site
-    /// sets it: [`color`]'s pixel-sampled contrast arm (see
-    /// [`color::sample_dominant_two_scored`]).
+    /// to document; there is no crate-wide scale. Two analyzers set it:
+    /// [`color`]'s pixel-sampled contrast arm (see
+    /// [`color::sample_dominant_two_scored`]), and [`image`]'s findings that
+    /// rest on pixels read from the frame (the share of the image's box that
+    /// was in the frame and not painted over — [`image::Crop::confidence`]).
     #[serde(default)]
     pub confidence: Option<f64>,
 }
@@ -336,6 +345,17 @@ pub struct AnalyzerResult {
     /// What the analyzer observed. Read this only through `verdict` — see
     /// the type doc.
     pub findings: Vec<Finding>,
+    /// The per-image and page-level VALUES [`Analyzer::Image`] measured,
+    /// each an [`crate::Observation`] with provenance.
+    ///
+    /// A `Finding` carries no value, and the image analyzer's job is values,
+    /// so they ride here rather than being squeezed into finding prose.
+    /// `None` for every other analyzer, and for an image run that was
+    /// `Blocked` (no frame, so nothing was read); omitted from the wire then.
+    /// Every site that projects an `AnalyzerResult` field by field must
+    /// forward it, or the values are computed and silently dropped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_values: Option<image::ImageValues>,
 }
 
 impl AnalyzerResult {
@@ -351,7 +371,14 @@ impl AnalyzerResult {
             verdict,
             coverage,
             findings,
+            image_values: None,
         }
+    }
+
+    /// Attach the image analyzer's values.
+    pub fn with_image_values(mut self, values: image::ImageValues) -> Self {
+        self.image_values = Some(values);
+        self
     }
 
     /// Preconditions met; the findings describe the page.
@@ -417,11 +444,16 @@ struct AnalyzerResultWire {
     coverage: Option<SnapshotCoverage>,
     #[serde(default)]
     findings: Vec<Finding>,
+    #[serde(default)]
+    image_values: Option<image::ImageValues>,
 }
 
 impl From<AnalyzerResultWire> for AnalyzerResult {
     fn from(w: AnalyzerResultWire) -> Self {
-        Self::new(w.verdict, w.coverage, w.findings)
+        Self {
+            image_values: w.image_values,
+            ..Self::new(w.verdict, w.coverage, w.findings)
+        }
     }
 }
 
@@ -454,21 +486,28 @@ pub struct AnalyzeInput<'a> {
 /// `skipped` findings of a [`AnalyzerVerdict::Blocked`] run: **a refusal to
 /// answer is still an observation, and it needs its provenance more than a
 /// clean result does** — it is the one a reader is most likely to be holding
-/// out of context, merged into a five-analyzer report, wondering which
+/// out of context, merged into a six-analyzer report, wondering which
 /// analyzer declined and why.
 ///
 /// Stamping here rather than at each `Finding::new` site is deliberate: a
-/// duty spread over five call sites is a duty a sixth analyzer will forget,
+/// duty spread over six call sites is a duty a seventh analyzer will forget,
 /// and the failure is silent.
 pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
-    /// The blocked-on-missing-input result, built once so all five arms
-    /// spell it identically.
+    /// The blocked-on-missing-input result, built once so every arm spells
+    /// it identically.
     fn missing_input(detail: &str, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult {
+        missing_input_at(detail, snapshot, Severity::Warning)
+    }
+    fn missing_input_at(
+        detail: &str,
+        snapshot: Option<&ElementSnapshot>,
+        severity: Severity,
+    ) -> AnalyzerResult {
         AnalyzerResult::blocked(
             UnknownCode::InputMissing,
             detail.to_string(),
             snapshot.map(SnapshotCoverage::of),
-            vec![Finding::new("skipped", Severity::Warning, detail)],
+            vec![Finding::new("skipped", severity, detail)],
         )
     }
 
@@ -498,6 +537,19 @@ pub fn run(analyzer: Analyzer, input: &AnalyzeInput<'_>) -> AnalyzerResult {
         Analyzer::Elements => match input.snapshot {
             Some(s) => elements::run(s),
             None => missing_input("elements analyzer requires an ElementSnapshot", None),
+        },
+        // The frame is the image analyzer's ONE blocking input. Its `skipped`
+        // finding is Info, not the Warning the other arms carry: this
+        // analyzer emits Info only, so it can never trip `--fail-on` through
+        // a finding (the Blocked verdict itself is what a gate reads). A
+        // missing snapshot is not a block — see `image::run`.
+        Analyzer::Image => match input.frame {
+            Some(f) => image::run(f, input.snapshot),
+            None => missing_input_at(
+                "image analyzer requires a Frame: every value it measures is read from pixels",
+                input.snapshot,
+                Severity::Info,
+            ),
         },
     };
 

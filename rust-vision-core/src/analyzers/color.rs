@@ -124,10 +124,11 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
             // Warning/Critical and never counted toward density — the
             // two-mode histogram is unreliable for sparse text.
             //
-            // This is the crate's one ESTIMATED analyzer observation, so it
-            // is the one that carries a confidence. Everything else here is
-            // exact arithmetic over declared values and states so by
-            // leaving `confidence` at `None`.
+            // This is this analyzer's one ESTIMATED observation, so it is the
+            // one here that carries a confidence (the `image` analyzer's
+            // pixel-read findings are the crate's other estimates).
+            // Everything else here is exact arithmetic over declared values
+            // and states so by leaving `confidence` at `None`.
             let share = sampled_confidence
                 .expect("`declared` is derived from this Option, so the sampled arm always scores");
             findings.push(

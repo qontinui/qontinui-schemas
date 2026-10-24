@@ -5,7 +5,10 @@
 //! assertion API. It runs the SAME library code the runner's `/vision/*` HTTP
 //! endpoints call, but as a plain binary with no qontinui-runner process — so a
 //! CI job can gate a build on layout/typography/color/element findings or on a
-//! declarative assertion suite without standing up the full stack.
+//! declarative assertion suite without standing up the full stack. The `image`
+//! analyzer rides along under `all` and reports VALUES (`imageValues`); it
+//! emits Info findings only and blocks only without a frame, so it never
+//! trips `--fail-on` on its own findings.
 //!
 //! Machine-readable JSON goes to **stdout**; a human-readable summary goes to
 //! **stderr**. Exit codes are the contract CI keys off:
@@ -33,6 +36,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use qontinui_vision_core::analyzers::image::ImageValues;
 use qontinui_vision_core::analyzers::{
     self, AnalyzeInput, Analyzer, AnalyzerVerdict, Finding, Severity,
 };
@@ -82,7 +86,7 @@ USAGE:
 
 FRAME:
     --frame         PNG/JPEG/WebP screenshot captured in lockstep with the snapshot.
-                    Optional: without it the pixel analyzers (color) report
+                    Optional: without it the pixel analyzers (color, image) report
                     themselves BLOCKED and the geometric ones run unchanged.
     --scale-factor  The frame's device pixel ratio: frame pixels per CSS pixel
                     (1 for a DPR-1 capture, 2 for Retina, 2.625 for many phones).
@@ -91,9 +95,11 @@ FRAME:
                     through this value; the report echoes it as frame.scaleFactor.
 
 ANALYZE:
-    --analyzer   layout | typography | color | elements | all   (default: all)
+    --analyzer   layout | typography | color | elements | image | all   (default: all)
     --fail-on    warning | critical                             (default: never fail on findings)
     Exit 2 if any finding is at/above --fail-on; otherwise 0.
+    `image` reports per-image values under `imageValues` and Info findings only;
+    with a frame it never blocks (an image-free page is DEGRADED, which is green).
 
 ASSERT:
     --assertions JSON array of assertion objects ({\"type\":\"no_overlap\", ...}).
@@ -383,18 +389,20 @@ fn parse_analyzer(value: Option<&str>) -> Result<Vec<Analyzer>, String> {
             Analyzer::Typography,
             Analyzer::Color,
             Analyzer::Elements,
+            Analyzer::Image,
         ]),
         "layout" => Ok(vec![Analyzer::Layout]),
         "typography" => Ok(vec![Analyzer::Typography]),
         "color" => Ok(vec![Analyzer::Color]),
         "elements" => Ok(vec![Analyzer::Elements]),
+        "image" => Ok(vec![Analyzer::Image]),
         // `dynamic` needs a prior frame the bin doesn't take; surface that.
         "dynamic" => Err(
             "the 'dynamic' analyzer needs two frames and is not supported by vision-audit"
                 .to_string(),
         ),
         other => Err(format!(
-            "--analyzer must be one of layout|typography|color|elements|all, got {other:?}"
+            "--analyzer must be one of layout|typography|color|elements|image|all, got {other:?}"
         )),
     }
 }
@@ -409,10 +417,10 @@ fn run_analyze(args: &[String]) -> Result<u8, CliError> {
         &["snapshot", "frame", "scale-factor", "analyzer", "fail-on"],
     )?;
     let snapshot = load_snapshot(Path::new(require(&flags, "snapshot")?))?;
-    // `--frame` is OPTIONAL. Three of the five analyzers — layout,
+    // `--frame` is OPTIONAL. Three of the six analyzers — layout,
     // typography, elements — are pure geometry over the snapshot and never
-    // read a pixel, and `analyzers::run` already degrades color/dynamic to an
-    // explicit "skipped" finding without one. Requiring it made the geometric
+    // read a pixel, and `analyzers::run` already degrades color/dynamic/image
+    // to an explicit "skipped" finding without one. Requiring it made the geometric
     // checks unavailable to exactly the callers that need them most: a CI job
     // or a headless probe holding a snapshot and no screenshot. When it IS
     // given, `--scale-factor` must come with it — see `load_frame_flags`.
@@ -473,6 +481,14 @@ pub struct AnalyzeReport {
     /// consumer cannot read `null` as an id.
     #[serde(skip_serializing_if = "Option::is_none")]
     snapshot_id: Option<String>,
+    /// The `image` analyzer's per-image and page values, forwarded verbatim
+    /// from [`analyzers::AnalyzerResult::image_values`]. Omitted when the
+    /// image analyzer did not run or measured nothing (blocked: no frame).
+    /// Forwarding it here is load-bearing: a report that projected the
+    /// result field by field without it would compute the values and drop
+    /// them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    image_values: Option<ImageValues>,
     /// OCR/VLM are runner-side only; flagged so CI knows OCR checks did not run.
     notes: Vec<String>,
 }
@@ -496,8 +512,12 @@ pub fn analyze(
     let mut counts: HashMap<String, usize> = HashMap::new();
     let mut total = 0usize;
     let mut conclusive = true;
+    let mut image_values = None;
     for &a in which {
-        let result = analyzers::run(a, &input);
+        let mut result = analyzers::run(a, &input);
+        if let Some(v) = result.image_values.take() {
+            image_values = Some(v);
+        }
         for f in &result.findings {
             total += 1;
             *counts
@@ -521,6 +541,7 @@ pub fn analyze(
         counts,
         frame: FrameEcho::of(frame),
         snapshot_id: snapshot.snapshot_id.clone(),
+        image_values,
         notes: vec!["ocr_unavailable: OCR/VLM run runner-side only; \
                      contains_text falls back to snapshot text"
             .to_string()],
@@ -653,11 +674,13 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
         ],
     )?;
     let snapshot = load_snapshot(Path::new(require(&flags, "snapshot")?))?;
-    // Optional here for a stronger reason than in `analyze`: NO assertion in
-    // the DSL reads `ctx.frame`. Every one evaluates from the snapshot, the
-    // OCR blocks or the baseline registry, so a required `--frame` was a hard
-    // precondition for a value the evaluator never consulted. Given, it is
-    // paired with `--scale-factor` exactly as in `analyze`.
+    // Optional, as in `analyze`: only the L1 image assertions read
+    // `ctx.frame` (image_palette_within, no_near_duplicate_images, …), and
+    // without one they answer `unknown{input_missing}` rather than pass. Every
+    // other assertion evaluates from the snapshot, the OCR blocks or the
+    // baseline registry, so a required `--frame` would gate values they never
+    // consult. Given, it is paired with `--scale-factor` exactly as in
+    // `analyze`.
     let frame = load_frame_flags(&flags)?;
     let assertions = load_assertions(Path::new(require(&flags, "assertions")?))?;
     let baselines = match flags.get("baseline-dir") {
@@ -1762,8 +1785,8 @@ mod tests {
 
     #[test]
     fn assertions_evaluate_with_no_frame() {
-        // Stronger than the analyze case: no assertion in the DSL reads
-        // `ctx.frame` at all, so a required frame gated a value nothing used.
+        // Only the L1 image assertions read `ctx.frame`; the rest evaluate
+        // without one, so a required frame would gate values they never use.
         let bl = HashMap::new();
         let r = assert_all(
             &snap_with_overlap(),
@@ -1772,5 +1795,228 @@ mod tests {
             &bl,
         );
         assert!(r.all_passed);
+    }
+
+    // ---- the image analyzer ----
+
+    #[test]
+    fn all_includes_the_image_analyzer_and_image_parses_alone() {
+        assert!(parse_analyzer(None).unwrap().contains(&Analyzer::Image));
+        assert_eq!(
+            parse_analyzer(Some("image")).unwrap(),
+            vec![Analyzer::Image]
+        );
+        assert!(USAGE.contains("| image |"));
+        assert!(parse_analyzer(Some("bogus"))
+            .unwrap_err()
+            .contains("|image|"));
+    }
+
+    /// The style gate runs `--analyzer all --fail-on critical`. Adding
+    /// `image` to `all` must not make any route newly exit 2: on a page with
+    /// no images, and on the frame-bearing run the gate does, the exit code is
+    /// the one the run had without it.
+    #[test]
+    fn adding_image_to_all_newly_fails_no_style_gate_run() {
+        let without: Vec<Analyzer> = parse_analyzer(Some("all"))
+            .unwrap()
+            .into_iter()
+            .filter(|a| *a != Analyzer::Image)
+            .collect();
+        let all = parse_analyzer(Some("all")).unwrap();
+        let critical = parse_fail_on(Some("critical")).unwrap();
+        for snap in [snap_with_overlap(), image_page_snapshot()] {
+            let frame = image_page_frame();
+            let a = analyze(&snap, Some(&frame), &all);
+            let b = analyze(&snap, Some(&frame), &without);
+            assert_eq!(
+                analyze_exit_code(&a, critical),
+                analyze_exit_code(&b, critical)
+            );
+            assert!(
+                a.verdicts["image"].conclusive(),
+                "{:?}",
+                a.verdicts["image"]
+            );
+            assert!(a.findings["image"]
+                .iter()
+                .all(|f| f.severity == Severity::Info));
+        }
+    }
+
+    fn image_page_frame() -> Frame {
+        let mut buf = image::RgbaImage::from_pixel(240, 120, image::Rgba([250, 250, 250, 255]));
+        for y in 20..80 {
+            for x in 120..200 {
+                let v = ((x * 7 + y * 13) % 200) as u8;
+                buf.put_pixel(x, y, image::Rgba([v, 255 - v, 90, 255]));
+            }
+        }
+        Frame::from_rgba(buf, FrameSource::synthetic_now())
+    }
+
+    fn image_page_snapshot() -> ElementSnapshot {
+        ElementSnapshot {
+            elements: vec![Element {
+                id: "hero".into(),
+                bbox: Some(Region {
+                    x: 120,
+                    y: 20,
+                    w: 80,
+                    h: 60,
+                }),
+                // `fill` paints the whole box, so the box's pixels are the
+                // image's (a fit that may letterbox, unplaced, is unreadable).
+                media: Some(qontinui_vision_core::ElementMedia {
+                    object_fit: Some(qontinui_vision_core::ObjectFit::Fill),
+                    ..qontinui_vision_core::ElementMedia::new(qontinui_vision_core::MediaKind::Img)
+                }),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    /// `AnalyzeReport` projects each `AnalyzerResult` field by field, so it
+    /// must forward the image values or they are computed and dropped.
+    #[test]
+    fn the_analyze_report_forwards_image_values() {
+        let report = analyze(
+            &image_page_snapshot(),
+            Some(&image_page_frame()),
+            &[Analyzer::Image],
+        );
+        let wire = serde_json::to_value(&report).unwrap();
+        let img = &wire["imageValues"]["images"][0];
+        assert_eq!(img["element"], "hero");
+        assert_eq!(img["sharpness"]["status"], "measured");
+        assert!(wire["imageValues"]["page"]["colourfulness"]["value"].is_number());
+        // No image run, no key.
+        let layout_only = analyze(&image_page_snapshot(), None, &[Analyzer::Layout]);
+        assert!(serde_json::to_value(&layout_only)
+            .unwrap()
+            .get("imageValues")
+            .is_none());
+    }
+
+    /// Without a frame the image analyzer BLOCKS, exactly like `color`: no
+    /// pixels were read, and a gate must hear that rather than a pass.
+    #[test]
+    fn without_a_frame_the_image_analyzer_blocks_the_gate_like_color() {
+        let report = analyze(&image_page_snapshot(), None, &[Analyzer::Image]);
+        assert!(report.verdicts["image"].is_blocked());
+        assert_eq!(
+            analyze_exit_code(&report, parse_fail_on(Some("critical")).unwrap()),
+            EXIT_GATE_FAILED
+        );
+        assert!(serde_json::to_value(&report)
+            .unwrap()
+            .get("imageValues")
+            .is_none());
+    }
+
+    #[test]
+    fn an_image_assertion_reads_the_frame_through_assert_all() {
+        let a = Assertion::NoPlaceholderImages { element: None };
+        let snap = image_page_snapshot();
+        let framed = assert_all(
+            &snap,
+            Some(&image_page_frame()),
+            std::slice::from_ref(&a),
+            &HashMap::new(),
+        );
+        assert!(framed.all_passed, "{:?}", framed.results[0].detail);
+        assert!(framed.results[0].confidence.is_some());
+        let frameless = assert_all(&snap, None, &[a], &HashMap::new());
+        assert_eq!(frameless.unknown, 1);
+    }
+
+    // ---- arming tests (plan 2026-10-13 Phase 15) ----
+    //
+    // Written against the PRE-Phase-15 API on purpose: they name the image
+    // analyzer and the image assertions only by their WIRE names, so the
+    // arming record's revert run compiles them against the base and they go
+    // RED there on an assertion, not on a build failure.
+
+    /// A textured frame with one image row, in wire JSON.
+    fn arming_page() -> (ElementSnapshot, Frame) {
+        let snap: ElementSnapshot = serde_json::from_value(serde_json::json!({"elements": [
+            {"id": "hero", "bbox": {"x": 120, "y": 20, "w": 80, "h": 60},
+             "media": {"kind": "img", "object_fit": "fill"}}
+        ]}))
+        .unwrap();
+        let buf = image::RgbaImage::from_fn(240, 120, |x, y| {
+            if (120..200).contains(&x) && (20..80).contains(&y) {
+                let v = ((x * 7 + y * 13) % 200) as u8;
+                image::Rgba([v, 255 - v, 90, 255])
+            } else {
+                image::Rgba([250, 250, 250, 255])
+            }
+        });
+        (snap, Frame::from_rgba(buf, FrameSource::synthetic_now()))
+    }
+
+    /// `vision-audit analyze --analyzer image` through the CLI's own
+    /// dispatcher, from files on disk as CI runs it.
+    #[test]
+    fn the_cli_accepts_the_image_analyzer() {
+        let dir = tempfile::tempdir().unwrap();
+        let (snap, frame) = arming_page();
+        let snap_path = dir.path().join("snapshot.json");
+        let frame_path = dir.path().join("frame.png");
+        std::fs::write(&snap_path, serde_json::to_vec(&snap).unwrap()).unwrap();
+        frame.buffer.save(&frame_path).unwrap();
+        let args: Vec<String> = [
+            "analyze",
+            "--snapshot",
+            snap_path.to_str().unwrap(),
+            "--frame",
+            frame_path.to_str().unwrap(),
+            "--scale-factor",
+            "1",
+            "--analyzer",
+            "image",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert!(
+            matches!(run(&args), Ok(code) if code == EXIT_OK),
+            "`--analyzer image` must be accepted"
+        );
+    }
+
+    #[test]
+    fn analyze_delivers_image_values_on_its_report() {
+        let image: Analyzer =
+            serde_json::from_str("\"image\"").expect("vision-core has an `image` analyzer");
+        let (snap, frame) = arming_page();
+        let report = analyze(&snap, Some(&frame), &[image]);
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire["imageValues"]["images"][0]["element"], "hero");
+        assert_eq!(
+            wire["imageValues"]["images"][0]["sharpness"]["status"],
+            "measured"
+        );
+    }
+
+    #[test]
+    fn assert_all_fails_a_flat_slot_sized_raster_as_a_placeholder() {
+        let a: Assertion =
+            serde_json::from_value(serde_json::json!({"type": "no_placeholder_images"}))
+                .expect("`no_placeholder_images` is an assertion");
+        let snap: ElementSnapshot = serde_json::from_value(serde_json::json!({"elements": [
+            {"id": "slot", "bbox": {"x": 10, "y": 10, "w": 400, "h": 300},
+             "media": {"kind": "img", "object_fit": "fill",
+                       "natural_px": {"w": 400.0, "h": 300.0},
+                       "rendered_px": {"w": 400.0, "h": 300.0}}}
+        ]}))
+        .unwrap();
+        let frame = Frame::from_rgba(
+            image::RgbaImage::from_pixel(420, 320, image::Rgba([229, 231, 235, 255])),
+            FrameSource::synthetic_now(),
+        );
+        let r = assert_all(&snap, Some(&frame), &[a], &HashMap::new());
+        assert_eq!(r.failed, 1, "{:?}", r.results[0].detail);
     }
 }

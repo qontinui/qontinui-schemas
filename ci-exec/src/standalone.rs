@@ -115,6 +115,15 @@ pub const REPO_LOCAL_GIT_ENV: &[&str] = &[
     "GIT_COMMON_DIR",
 ];
 
+/// The names on git's `--local-env-vars` list that [`REPO_LOCAL_GIT_ENV`]
+/// deliberately does NOT scrub: they carry command-scope config (`git -c k=v`,
+/// and the `GIT_CONFIG_COUNT` overlay with its numbered `GIT_CONFIG_KEY_<n>` /
+/// `GIT_CONFIG_VALUE_<n>` pairs, which are not on git's list at all), not a
+/// repository location, and git's own submodule boundary keeps exactly these
+/// two. The same exemption the runner
+/// makes (its `git_posture::COMMAND_SCOPE_GIT_CONFIG_ENV`).
+pub const COMMAND_SCOPE_GIT_CONFIG_ENV: &[&str] = &["GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"];
+
 /// Is `program` git? Matched on the final path component, case-insensitively
 /// and with an optional `.exe`, splitting on BOTH separators so a Windows git
 /// path is recognised wherever this runs.
@@ -306,6 +315,85 @@ mod tests {
             }
         }
         assert_eq!(PlainSpawn.std_command("cargo").get_envs().count(), 0);
+    }
+
+    /// The scrub removes repository LOCATIONS only: a git child inherits the
+    /// launcher's command-scope config (an env-injected `safe.directory` or
+    /// credential helper), so neither the async nor the sync builder records a
+    /// removal of [`COMMAND_SCOPE_GIT_CONFIG_ENV`] or of the numbered
+    /// `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>` pairs.
+    #[test]
+    fn a_git_childs_command_scope_config_is_not_scrubbed() {
+        let async_cmd = PlainSpawn.command("git");
+        let sync_cmd = PlainSpawn.std_command("git");
+        for cmd in [async_cmd.as_std(), &sync_cmd] {
+            let removed: Vec<String> = cmd
+                .get_envs()
+                .filter(|(_, v)| v.is_none())
+                .map(|(k, _)| k.to_string_lossy().into_owned())
+                .collect();
+            assert!(
+                !removed.is_empty(),
+                "the git child records no removal at all, so this test proves nothing"
+            );
+            for name in &removed {
+                assert!(
+                    !COMMAND_SCOPE_GIT_CONFIG_ENV.contains(&name.as_str())
+                        && !name.starts_with("GIT_CONFIG_KEY_")
+                        && !name.starts_with("GIT_CONFIG_VALUE_"),
+                    "{name} is command-scope config, not repo-local, and must be inherited: {removed:?}"
+                );
+            }
+        }
+    }
+
+    /// The list is git's, not a hand-picked subset: every name the installed
+    /// git reports as repository-local is on [`REPO_LOCAL_GIT_ENV`], except the
+    /// [`COMMAND_SCOPE_GIT_CONFIG_ENV`] exemption, which must itself be on
+    /// git's list so it cannot exempt a name git never reported. A git that
+    /// grows the list fails here instead of silently reopening the hole.
+    /// Skipped only when no `git` can be spawned at all.
+    #[test]
+    fn repo_local_git_env_covers_gits_own_list() {
+        let Ok(out) = std::process::Command::new("git")
+            .args(["rev-parse", "--local-env-vars"])
+            .output()
+        else {
+            eprintln!("git is not installed; skipping");
+            return;
+        };
+        assert!(out.status.success(), "{out:?}");
+        let names: Vec<String> = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(str::to_string)
+            .collect();
+        assert!(
+            names.iter().any(|n| n == "GIT_DIR"),
+            "git's list must at least name GIT_DIR, or this test proves nothing: {names:?}"
+        );
+        for exempt in COMMAND_SCOPE_GIT_CONFIG_ENV {
+            assert!(
+                names.iter().any(|n| n == exempt),
+                "exemption {exempt} is not on git's list: {names:?}"
+            );
+            assert!(
+                !REPO_LOCAL_GIT_ENV.contains(exempt),
+                "{exempt} is both exempt and scrubbed"
+            );
+        }
+        let missing: Vec<&String> = names
+            .iter()
+            .filter(|n| {
+                !REPO_LOCAL_GIT_ENV.contains(&n.as_str())
+                    && !COMMAND_SCOPE_GIT_CONFIG_ENV.contains(&n.as_str())
+            })
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "REPO_LOCAL_GIT_ENV is missing git's {missing:?}"
+        );
     }
 
     /// The standalone host never authorises convergence and has no canonical

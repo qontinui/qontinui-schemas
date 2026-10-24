@@ -1,0 +1,39 @@
+{
+  "generator": "rust-vision-core/tests/fixtures/image_corpus/generate.py",
+  "reference": {
+    "imagehash": "4.3.2",
+    "pillow": "13.0.0",
+    "numpy": "2.5.4",
+    "python": "3.13.5"
+  },
+  "hashes": {
+    "base.png": {
+      "phash": "f8c70738e90732e9",
+      "dhash": "0003bc63931d4c12"
+    },
+    "blur.png": {
+      "phash": "f8c70738e90732e9",
+      "dhash": "00011c43931dcc13"
+    },
+    "duplicate.png": {
+      "phash": "f8c70738e90732e9",
+      "dhash": "00211c63939d4c13"
+    },
+    "other.png": {
+      "phash": "d0aafaaa2f2a94aa",
+      "dhash": "9998996666989998"
+    },
+    "recolour.png": {
+      "phash": "b8cf0738e90732e9",
+      "dhash": "10a11c42931ccc1b"
+    },
+    "rings.png": {
+      "phash": "c204e93b07f93bc9",
+      "dhash": "cde4b4a4cd1933c2"
+    },
+    "stripes.png": {
+      "phash": "aaffaaff55005500",
+      "dhash": "54d5a92a5255a5aa"
+    }
+  }
+}

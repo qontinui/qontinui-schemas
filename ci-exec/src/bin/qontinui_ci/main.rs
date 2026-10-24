@@ -667,6 +667,26 @@ impl Reporter for Terminal {
                 ),
                 None => out!("  no test report captured"),
             }
+            // No coord to forward to: the entries are shown, never sent.
+            match verdict.run_outcomes {
+                Some(entries) => {
+                    out!(
+                        "  run outcomes captured ({} entr{}; not forwarded, no coord)",
+                        entries.len(),
+                        if entries.len() == 1 { "y" } else { "ies" }
+                    );
+                    for e in entries {
+                        out!(
+                            "    {} / {} / {}  executed={}",
+                            e.source,
+                            e.subject,
+                            e.task,
+                            e.executed_case_count
+                        );
+                    }
+                }
+                None => out!("  no run outcomes captured"),
+            }
         })
     }
 }

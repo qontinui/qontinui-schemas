@@ -70,6 +70,11 @@ pub mod apps;
 /// a host's verdicts). No I/O. See
 /// `2026-10-06-builds-are-admitted-per-invocation-against-measured-host-memory.md`.
 pub mod build_admission;
+/// Build census — the PURE core that classifies who owns a build, rolls
+/// builds up per owner class, and attributes a stalled host's capacity to a
+/// class on positive evidence only. No I/O. See
+/// `2026-10-21-every-build-on-a-box-has-an-owner-a-cost-and-a-bound.md`.
+pub mod build_census;
 pub mod canonical_hash;
 /// Per-CLI AI-session handling — the [`cli_session::CliProfile`] manifest (one
 /// record of session-behaviour facts per AI CLI), the
@@ -131,6 +136,15 @@ pub mod glossary;
 /// non-technical helper to answer (SpotCheck / Compare / WalkThrough / Describe
 /// / Sort). See `2026-06-29-helper-task-queue-non-programmer-dev.md`.
 pub mod helper_task;
+/// Host-derived cargo sizing — the ONE formula for `CARGO_BUILD_JOBS`, test
+/// threads, a host's share across N concurrent builds, and the suggested
+/// concurrent-build count. Moved from the runner's `ci_node::host_sizing` so the
+/// runner, the supervisor and the bash wrappers (via a golden table) agree.
+/// Pure arithmetic; only `host_sizing::probe` reads the host, behind the
+/// `host-probe` feature. Not a schema type — nothing here is exported to TS or
+/// Python. See
+/// `2026-10-02-cargo-jobs-supervisor-build-pool-and-physical-disk-floors-follow-the-machine.md`.
+pub mod host_sizing;
 /// Image-slot specs — [`image_slot::ImageSlotSpec`], the declared contract of
 /// one image placement (job, audience, contexts, geometry, style, content,
 /// text and alt policy, check thresholds, and the asset bound to it). See
@@ -169,6 +183,9 @@ pub mod rag;
 /// The next-action contract: [`refusal::Refusal`], one envelope for every
 /// operator-facing refusal, whose `next_action` is typed and never absent.
 pub mod refusal;
+/// The `run_outcomes` wire contract of coord's CI result door and its one
+/// validator, shared by coord and the CI executor.
+pub mod run_outcomes;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
@@ -179,6 +196,10 @@ pub mod sdk_features;
 pub mod spawn_authorization;
 pub mod spec_api_events;
 pub mod spec_check;
+/// Spec model — the typed YAML frontmatter of a specification artifact
+/// (request, requirement, interface mapping, story) and the EARS vocabulary.
+/// `parse` / `render` need the `spec-yaml` feature.
+pub mod spec_model;
 pub mod state_machine;
 pub mod targets;
 pub mod task_run;

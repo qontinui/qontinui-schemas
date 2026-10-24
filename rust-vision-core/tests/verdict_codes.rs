@@ -11,8 +11,8 @@
 //! and asserts the code, in memory and on the wire.
 
 use qontinui_vision_core::{
-    analyzers, AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Element, ElementSnapshot,
-    Frame, FrameSource, Region, Rgb, UnknownCode,
+    analyzers, AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Element, ElementMedia,
+    ElementSnapshot, Frame, FrameSource, MediaKind, Region, Rgb, UnknownCode,
 };
 use serde_json::json;
 
@@ -275,6 +275,57 @@ fn elements_every_non_checked_arm_carries_a_code() {
         &r,
         Arm::Degraded,
         UnknownCode::InputMissing,
+    );
+}
+
+#[test]
+fn image_every_non_checked_arm_carries_a_code() {
+    let f = frame(200, 60);
+
+    // Dispatcher: no frame — the image analyzer's ONLY blocked arm.
+    let s = snapshot(vec![bare("a")]);
+    let r = run(Analyzer::Image, None, Some(&s), None);
+    assert_arm(
+        "image/no-frame",
+        &r,
+        Arm::Blocked,
+        UnknownCode::InputMissing,
+    );
+
+    // Own degraded arm #1: a frame and no snapshot at all.
+    let r = run(Analyzer::Image, Some(&f), None, None);
+    assert_arm(
+        "image/no-snapshot",
+        &r,
+        Arm::Degraded,
+        UnknownCode::InputMissing,
+    );
+
+    // Own degraded arm #2: no element carries media.
+    let r = run(Analyzer::Image, Some(&f), Some(&s), None);
+    assert_arm(
+        "image/no-media",
+        &r,
+        Arm::Degraded,
+        UnknownCode::InputMissing,
+    );
+
+    // Own degraded arm #3: a media element that cannot be located on the
+    // frame (no bbox).
+    let mut m = bare("img");
+    m.media = Some(ElementMedia::new(MediaKind::Img));
+    let s = snapshot(vec![m]);
+    let r = run(Analyzer::Image, Some(&f), Some(&s), None);
+    assert_arm(
+        "image/unlocated",
+        &r,
+        Arm::Degraded,
+        UnknownCode::InputMissing,
+    );
+    assert!(
+        r.verdict.reason().unwrap().contains("could not be read"),
+        "reached the degraded arm by the wrong route: {:?}",
+        r.verdict
     );
 }
 

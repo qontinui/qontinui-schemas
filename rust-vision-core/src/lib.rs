@@ -18,6 +18,7 @@ pub mod assertions;
 pub mod cache;
 pub mod contract;
 pub mod coverage;
+pub mod element_media;
 pub mod element_snapshot;
 pub mod encode;
 pub mod error;
@@ -35,9 +36,13 @@ pub use assertions::{
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use coverage::SnapshotCoverage;
+pub use element_media::{
+    src_digest_of, ElementMedia, MediaAlt, MediaDecoding, MediaFetchPriority, MediaKind,
+    MediaLoadState, MediaLoading, MediaSize, ObjectFit,
+};
 pub use element_snapshot::{
     display_snapshot_id, intersection, region_contains, regions_overlap, Element, ElementSnapshot,
-    Rgb,
+    Rgb, VisibilityReason,
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};

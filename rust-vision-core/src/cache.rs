@@ -199,7 +199,9 @@ pub fn sha256_of(data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn hex_encode(bytes: &[u8; 32]) -> String {
+/// Lowercase hex of a SHA-256 digest. Shared with
+/// [`crate::element_media::src_digest_of`], so the crate spells a digest one way.
+pub(crate) fn hex_encode(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
     for b in bytes {
         s.push_str(&format!("{b:02x}"));

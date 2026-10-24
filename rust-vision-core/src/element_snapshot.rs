@@ -20,6 +20,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::element_media::ElementMedia;
 use crate::frame::Region;
 
 /// Snapshot of one rendered page worth of elements, ready to feed
@@ -177,6 +178,14 @@ pub struct Element {
     /// Visible text content (innerText / accessibilityLabel equivalent).
     /// `None` when the element has no text or the snapshot source didn't
     /// populate it.
+    ///
+    /// **For a media element (`media` is `Some`) this is painted text only,
+    /// NEVER its text alternative.** An `<img>`'s `alt`, an `aria-label`, an
+    /// SVG's `<title>`, a canvas's or video's fallback content and a native
+    /// image's `accessibilityLabel` are not drawn on screen; they belong in
+    /// [`ElementMedia::alt`]. Projected here, they make an image read as a
+    /// visible label: the elements analyzer counts it as text, and the color
+    /// analyzer gates contrast on a string nobody can see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// ARIA role / native-platform equivalent. e.g., `"button"`, `"link"`.
@@ -285,6 +294,30 @@ pub struct Element {
     /// naming the widget.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occluded_by: Option<String>,
+    /// WHY the producer reports `visible: false`, in the UI Bridge SDK's
+    /// vocabulary (`registry.ts` `computeVisibilityVerdict`): `hidden`
+    /// (`display: none`, `visibility: hidden`, `opacity: 0`), `no-layout` (a
+    /// zero-size box), `off-screen` (outside the viewport), `occluded` (every
+    /// hit-test sample landed on another element).
+    ///
+    /// The distinction is load-bearing for anything reading pixels: `hidden`
+    /// and `no-layout` paint nothing, but an `occluded` element may be fully
+    /// painted under a TRANSPARENT overlay (a stretched link, an inset-0
+    /// scrim) — the hit-test cannot tell — and an `off-screen` one is simply
+    /// not in the capture. Collapsing them into one `false` is what made an
+    /// image under a scrim indistinguishable from a hidden one.
+    ///
+    /// `None` = the producer did not say (an older producer, or a visible
+    /// element). An unrecognised reason is carried verbatim
+    /// ([`VisibilityReason::Other`]) rather than rejecting the snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility_reason: Option<VisibilityReason>,
+    /// Share (0–100) of the producer's hit-test samples that another element
+    /// owned — the SDK's `occludedPct`. Present on a PARTIALLY covered element
+    /// (still `visible: true`) as well as a fully covered one. `None` = not
+    /// measured, never 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occluded_pct: Option<f32>,
 
     // ---- Horizontal text overflow ----------------------------------------
     /// Width of the element's laid-out content in CSS pixels — the DOM's
@@ -303,12 +336,74 @@ pub struct Element {
     /// is measurement rather than declaration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_overflow: Option<String>,
+
+    // ---- Media -------------------------------------------------------------
+    /// What this element is as an image, picture, SVG, video, canvas,
+    /// `[role=img]` element or CSS background image, and what the producer
+    /// measured about it. `Some` exactly when the element is a media element.
+    ///
+    /// `None` means the element is not media, or the producer measured no
+    /// media facts for it — which includes every snapshot persisted before
+    /// this field existed. Image checks therefore answer Unknown for an
+    /// element without it rather than passing. See [`ElementMedia`] for how a
+    /// converter unwraps the UI Bridge SDK's media observation into it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<ElementMedia>,
+}
+
+/// [`Element::visibility_reason`]: why an element is reported not visible.
+/// Wire form is the SDK's kebab-case string.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum VisibilityReason {
+    /// `display: none`, `visibility: hidden` or `opacity: 0`: paints nothing.
+    Hidden,
+    /// A zero-size box: paints nothing.
+    NoLayout,
+    /// Outside the viewport at capture: not in the frame.
+    OffScreen,
+    /// Every hit-test sample landed on another element. The element may
+    /// still be fully painted, under a transparent overlay.
+    Occluded,
+    /// A reason this crate does not know, carried verbatim.
+    Other(String),
+}
+
+impl VisibilityReason {
+    /// True for the reasons under which the element paints NOTHING.
+    pub fn paints_nothing(&self) -> bool {
+        matches!(self, Self::Hidden | Self::NoLayout)
+    }
+}
+
+impl From<String> for VisibilityReason {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "hidden" => Self::Hidden,
+            "no-layout" => Self::NoLayout,
+            "off-screen" => Self::OffScreen,
+            "occluded" => Self::Occluded,
+            _ => Self::Other(s),
+        }
+    }
+}
+
+impl From<VisibilityReason> for String {
+    fn from(r: VisibilityReason) -> Self {
+        match r {
+            VisibilityReason::Hidden => "hidden".into(),
+            VisibilityReason::NoLayout => "no-layout".into(),
+            VisibilityReason::OffScreen => "off-screen".into(),
+            VisibilityReason::Occluded => "occluded".into(),
+            VisibilityReason::Other(s) => s,
+        }
+    }
 }
 
 /// Linear-light RGB color (no alpha). Used for both `fg_color` and
 /// `bg_color`; assertions/analyzers convert to the appropriate space
 /// (Lab/sRGB) on demand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Rgb {
     pub r: u8,
@@ -717,5 +812,36 @@ mod tests {
     #[test]
     fn luminance_white_one() {
         assert!((Rgb::new(255, 255, 255).relative_luminance() - 1.0).abs() < 1e-6);
+    }
+}
+
+#[cfg(test)]
+mod visibility_reason_tests {
+    use super::*;
+
+    #[test]
+    fn the_sdk_vocabulary_round_trips_and_an_unknown_reason_is_kept() {
+        for (wire, r) in [
+            ("hidden", VisibilityReason::Hidden),
+            ("no-layout", VisibilityReason::NoLayout),
+            ("off-screen", VisibilityReason::OffScreen),
+            ("occluded", VisibilityReason::Occluded),
+            ("clipped", VisibilityReason::Other("clipped".into())),
+        ] {
+            let el: Element = serde_json::from_value(serde_json::json!({
+                "id": "x", "visible": false, "visibility_reason": wire, "occluded_pct": 100.0
+            }))
+            .unwrap();
+            assert_eq!(el.visibility_reason.as_ref(), Some(&r));
+            assert_eq!(
+                serde_json::to_value(&el).unwrap()["visibility_reason"],
+                wire
+            );
+        }
+        // Absent in, absent out: older snapshots are unchanged.
+        let el: Element = serde_json::from_str(r#"{"id":"x"}"#).unwrap();
+        assert!(el.visibility_reason.is_none() && el.occluded_pct.is_none());
+        let wire = serde_json::to_string(&el).unwrap();
+        assert!(!wire.contains("visibility_reason") && !wire.contains("occluded_pct"));
     }
 }
