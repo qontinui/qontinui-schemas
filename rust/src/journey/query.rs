@@ -215,8 +215,9 @@ pub struct JourneyGraphNode {
 /// `absent`. The navigation counters count only `affordance`-triggered rows
 /// (a typed URL is not a way the app offers); excluded back-button (`pop`)
 /// rows have their own counter, [`Self::excluded_back_arrivals`]. A filtered
-/// or withdrawn `no_change` row is never counted: that exclusion is a genuine
-/// negative. (A REJECTED row is not counted here at all: nothing in it is
+/// or withdrawn click or back that closed `no_change`, or `error` on its own
+/// node, is never counted: that exclusion is a genuine negative (a URL-trigger
+/// row never is one). (A REJECTED row is not counted here at all: nothing in it is
 /// trusted, so it is placed at no node — see
 /// [`JourneyGraph::unplaced_rejected_rows`].) Each counter is its own
 /// `coverage.unmeasured` dimension — see [`JourneySearchFrontier::unmeasured`]
@@ -226,11 +227,13 @@ pub struct JourneyGraphNode {
 #[schemars(deny_unknown_fields)]
 pub struct JourneyUnmeasuredDepartures {
     /// Live, valid affordance rows the request's filter (`since` /
-    /// `appVersion` / `runKind`) excluded, outcome not `no_change`. Dimension
+    /// `appVersion` / `runKind`) excluded, unless they are a genuine negative
+    /// (`no_change`, or `error` on their own node). Dimension
     /// `filtered_departures`.
     pub filtered_out: u64,
-    /// Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`
-    /// and whose outcome is not `no_change`. Dimension `withdrawn_departures`.
+    /// Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`,
+    /// unless they are a genuine negative (`no_change`, or `error` on their
+    /// own node). Dimension `withdrawn_departures`.
     pub withdrawn: u64,
     /// Affordance edges that closed `settle_timeout` — to a DIFFERENT node
     /// (the destination may be an intermediate render), or to the SAME node
@@ -248,8 +251,8 @@ pub struct JourneyUnmeasuredDepartures {
     /// `rejected_frontier`.
     pub rejected_frontier: u64,
     /// Valid URL-trigger rows (`initial` / `push` / `replace` / `hash`) from
-    /// this node that the filter excluded or that were withdrawn, outcome not
-    /// `no_change`. A typed URL is not a navigation departure, so a question
+    /// this node that the filter excluded or that were withdrawn, WHATEVER
+    /// their outcome (a URL row is an arrival, never a genuine negative). A typed URL is not a navigation departure, so a question
     /// about one component ignores it; but it is an ARRIVAL that decides
     /// `requires_prior_knowledge`, and it may reveal a node no kept row
     /// shows, so the graph-wide questions (`requires_prior_knowledge`,
@@ -258,9 +261,10 @@ pub struct JourneyUnmeasuredDepartures {
     pub excluded_url_arrivals: u64,
     /// Back-button (`pop`) rows from this node that are not a kept, changed
     /// exit: valid `pop` rows the filter excluded or that were withdrawn
-    /// (outcome not `no_change`), and kept `pop` edges to ANOTHER node whose
-    /// outcome is `error` or `settle_timeout` (the same rule as an affordance
-    /// edge's). A REJECTED pop row is not here — nothing in a rejected row
+    /// (unless a genuine negative: `no_change`, or `error` on its own node),
+    /// kept `pop` edges to ANOTHER node whose outcome is `error` or
+    /// `settle_timeout`, and kept `pop` self-loops that closed
+    /// `settle_timeout` (the same rules as an affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
     /// is trusted, so it counts in `JourneyGraph::unplaced_rejected_rows`.
     /// Not a navigation
     /// departure, so a question about one component ignores it; the
@@ -297,16 +301,25 @@ impl JourneyUnmeasuredDepartures {
     }
 }
 
-/// A row that is a GENUINE negative, so excluding it hides nothing: a
-/// `no_change` row (nothing happened), or an `error` self-loop (the failure
-/// was observed and the page stayed). Every other excluded row may still
+/// A row that is a GENUINE negative, so excluding it hides nothing: a click
+/// or back (`affordance` / `pop`) that closed `no_change` (nothing
+/// happened), or one that closed `error` on its own node (the failure was
+/// observed and the page stayed). A URL-trigger row (`initial` / `push` /
+/// `replace` / `hash`) is never one, whatever its outcome: it is an ARRIVAL
+/// at its node (a reload is `initial` from the node itself), and arrivals
+/// decide `requires_prior_knowledge`. Every other excluded row may still
 /// lead somewhere and is counted.
 fn genuine_negative(e: &JourneyEdgeObservation) -> bool {
-    match (&e.to_node, e.outcome) {
-        (_, EdgeOutcome::NoChange) => true,
-        (Some(to), EdgeOutcome::Error) => to.key() == e.from_node.key(),
-        _ => false,
-    }
+    let click_or_back = matches!(
+        e.trigger.navigation_trigger,
+        NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
+    );
+    click_or_back
+        && match (&e.to_node, e.outcome) {
+            (_, EdgeOutcome::NoChange) => true,
+            (Some(to), EdgeOutcome::Error) => to.key() == e.from_node.key(),
+            _ => false,
+        }
 }
 
 /// Why an edge row is out of the graph — how `build_graph` counts it.
@@ -750,7 +763,8 @@ pub fn build_graph(
     //   excluded back arrival, a URL-trigger row (initial / push / replace /
     //   hash) as an excluded URL arrival. An affordance or pop row is also an
     //   excluded ARRIVAL at its destination (`doubt_to`), or at an unknown
-    //   one. A `no_change` row is a genuine negative and is skipped by the
+    //   one. A genuine negative (`genuine_negative`: a click or back that
+    //   closed `no_change`, or `error` on its own node) is skipped by the
     //   callers.
     // - Each distinct row (full serialized form) is placed once.
     let mut placed: BTreeSet<String> = BTreeSet::new();
@@ -1223,7 +1237,7 @@ impl JourneySearchFrontier {
     /// | `rejected_frontier` | invalid frontier rows, treated as open | `frontier_open` |
     /// | `unplaced_rejected_frontier` | invalid frontier rows placeable at no node | `frontier_open` |
     /// | `unobserved_departures` | `to_node_unobserved` departures | `to_node_unobserved` |
-    /// | `settle_timeout_departures` | `settle_timeout` affordance edges to another node | `no_event_before_timeout` |
+    /// | `settle_timeout_departures` | `settle_timeout` affordance edges, to another node or a self-loop | `no_event_before_timeout` |
     /// | `unplaced_rejected_rows` | every untrusted (rejected) edge row, live or withdrawn | `producer_failed` |
     /// | `errored_departures` | `error` affordance edges to another node | `input_missing` |
     /// | `filtered_departures` | affordance rows the filter excluded | `input_missing` |
@@ -1524,8 +1538,9 @@ pub struct JourneyDeadEnd {
     /// `true` when a kept `pop` edge with outcome `changed` leaves this node
     /// for a different node — the only way out is the browser's back button,
     /// a journey finding rather than an exit. `null` = unknown: no such edge
-    /// was kept, but a `pop` row from this node was filtered or withdrawn, or
-    /// a kept `pop` edge to another node ended `error` / `settle_timeout`
+    /// was kept, but a `pop` row from this node was filtered or withdrawn, a
+    /// kept `pop` edge to another node ended `error` / `settle_timeout`, or a
+    /// kept `pop` self-loop ended `settle_timeout`
     /// (`unmeasuredDepartures.excludedBackArrivals > 0`). `false` otherwise.
     /// (A rejected `pop`-claiming row is untrusted and counts in
     /// `JourneyGraph::unplaced_rejected_rows`, which lists no node as a dead
@@ -1546,8 +1561,8 @@ pub struct JourneyUnexploredNode {
     /// Departures from it whose destination was never observed.
     pub unobserved_departures: u64,
     /// Departures from it the navigation edge set left out (filtered,
-    /// withdrawn, `settle_timeout` / `error` to another node, rejected
-    /// frontier rows with a valid node).
+    /// withdrawn, `settle_timeout` / `error` to another node, `settle_timeout`
+    /// self-loops, rejected frontier rows with a valid node).
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
     /// `true` when no observed arrival at the node closed `changed` or
     /// `no_change` (they were all `settle_timeout` / `error`), so nothing
