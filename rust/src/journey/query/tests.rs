@@ -2479,10 +2479,8 @@ fn excluded_row_violations(base: &[E], probe: E, label: &str, out: &mut Vec<Stri
         for n in names {
             let k = key(n);
             match (dead_end_class(&dx, &k), dead_end_class(&dk, &k)) {
-                (DeadEndClass::Dead(bx), DeadEndClass::Dead(bk)) => {
-                    if bx.is_some() && bx != bk {
-                        out.push(format!("{tag}: back_only {n}: excluded {bx:?} kept {bk:?}"));
-                    }
+                (DeadEndClass::Dead(bx), DeadEndClass::Dead(bk)) if bx.is_some() && bx != bk => {
+                    out.push(format!("{tag}: back_only {n}: excluded {bx:?} kept {bk:?}"));
                 }
                 (DeadEndClass::Dead(_), DeadEndClass::Absent) => {
                     out.push(format!("{tag}: excluded lists {n} dead, kept has an exit"))
