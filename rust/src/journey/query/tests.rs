@@ -1828,3 +1828,104 @@ fn trusted_edge_row_and_keeps_are_the_graphs_own_rules() {
     assert!(!f.keeps(&ok, at));
     assert!(no_filter().keeps(&ok, at));
 }
+
+// --- Re-review of 9ec35528 (probes a..d, kept as tests) ------------------------
+
+fn z_push_b() -> Vec<JourneyEdgeObservation> {
+    // z -> b by push is the only arrival at b.
+    edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+    ])
+}
+
+#[test]
+fn rr8_a_prior_knowledge_never_settles_over_a_non_writing_ledger() {
+    let g = build_graph(
+        &z_push_b(),
+        &[],
+        &ledger_in(LedgerState::WriteFailing),
+        &no_filter(),
+    );
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    let b = p.unsettled.iter().find(|n| n.node_key == key("b")).unwrap();
+    assert!(b.ledger_not_writing);
+    assert_eq!(b.open_frontier_entries, 0);
+    // Control: writing, b is listed.
+    let p = requires_prior_knowledge(&build_graph(&z_push_b(), &[], &writing(), &no_filter()));
+    assert_eq!(p.nodes.len(), 1);
+}
+
+#[test]
+fn rr8_b_prior_knowledge_never_settles_beside_an_open_frontier() {
+    // a has an unexplored link; clicking it may lead to b.
+    let fr = [frontier(
+        "a",
+        "fp-unclicked",
+        FrontierReason::NotYetActivated,
+    )];
+    let p = requires_prior_knowledge(&build_graph(&z_push_b(), &fr, &writing(), &no_filter()));
+    assert!(p.nodes.is_empty());
+    let b = p.unsettled.iter().find(|n| n.node_key == key("b")).unwrap();
+    assert_eq!(b.open_frontier_entries, 1);
+    assert!(!b.ledger_not_writing);
+}
+
+#[test]
+fn rr8_c_a_rejected_frontier_row_unsettles_prior_knowledge() {
+    // Unplaced (invalid node).
+    let mut bad = frontier("a", "fp-x", FrontierReason::NotYetActivated);
+    bad.node.page_label = Some("x/y".into());
+    let p = requires_prior_knowledge(&build_graph(&z_push_b(), &[bad], &writing(), &no_filter()));
+    assert!(p.nodes.is_empty());
+    assert_eq!(p.unsettled[0].open_frontier_entries, 1);
+    // Placed at a node, and doubly placed: still counted once.
+    let mut bad = frontier("a", "fp-y", FrontierReason::NotYetActivated);
+    bad.node_key = key("z");
+    let p = requires_prior_knowledge(&build_graph(&z_push_b(), &[bad], &writing(), &no_filter()));
+    assert!(p.nodes.is_empty());
+    assert_eq!(p.unsettled[0].open_frontier_entries, 1);
+}
+
+#[test]
+fn rr8_d_m7_a_filtered_click_with_no_destination_is_an_unknown_destination_arrival() {
+    let mut ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+        e("3", "a", "b"),
+        e("4", "q", "?").outcome(EdgeOutcome::ToNodeUnobserved),
+        e("5", "q", "b").kind(NavigationTriggerKind::Pop),
+    ]);
+    for row in &mut ledger[2..] {
+        row.app_version = Some("2.0.0".into());
+    }
+    let f = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let g = build_graph(&ledger, &[], &writing(), &f);
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty());
+    let b = p.unsettled.iter().find(|n| n.node_key == key("b")).unwrap();
+    assert_eq!(b.arrival_doubt.filtered, 2);
+    assert_eq!(b.unknown_destination_arrivals, 1);
+}
+
+#[test]
+fn rr8_m2_rejected_frontier_rows_differing_only_in_node_json_are_both_placed() {
+    let ledger = edges(&[e("1", "a", "d")]);
+    let mut r1 = frontier("d", "fp", FrontierReason::NotYetActivated);
+    r1.node.page_label = Some("x/y".into());
+    let mut r2 = r1.clone();
+    r2.node.page_label = Some("p/q".into());
+    assert_eq!(
+        r1.validate().unwrap_err().to_string(),
+        r2.validate().unwrap_err().to_string()
+    );
+    let g = build_graph(&ledger, &[r1, r2], &writing(), &no_filter());
+    // One entry in the (kind, row, reason) list, two placements.
+    assert_eq!(g.coverage.rows_rejected, 1);
+    assert_eq!(g.unplaced_rejected_frontier, 2);
+}
