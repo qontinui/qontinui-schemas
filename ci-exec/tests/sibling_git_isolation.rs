@@ -150,6 +150,7 @@ async fn an_enclosing_repos_insteadof_never_resolves_a_dispatched_sibling() {
         job: None,
         check_name: String::new(),
         coord_http_url: String::new(),
+        model_access: None,
     };
     let lines = Arc::new(Mutex::new(Vec::new()));
     let node = standalone_node(ci_root, "isolation-test".to_string());
