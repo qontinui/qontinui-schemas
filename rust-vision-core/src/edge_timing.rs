@@ -225,7 +225,11 @@ pub fn edge_timing(samples: &[EdgeTimingSample]) -> EdgeTiming {
     let rows: Vec<EdgeTimingRow> = sorted
         .iter()
         .map(|s| {
-            let sum = s.timeline.as_ref().map(|t| &t.summary);
+            // The ledger stores for_ledger() already; applying it again is
+            // idempotent, and a caller that passes a raw SDK timeline still
+            // emits nothing the ledger would not hold.
+            let stored = s.timeline.as_ref().map(ChangeTimeline::for_ledger);
+            let sum = stored.as_ref().map(|t| &t.summary);
             EdgeTimingRow {
                 observation_id: s.observation_id.clone(),
                 observed_at: rfc3339(s.observed_at),
@@ -435,6 +439,17 @@ mod tests {
         assert_eq!(nearest_rank(&v, 0.5), 5.0);
         assert_eq!(nearest_rank(&v, 0.9), 9.0);
         assert_eq!(nearest_rank(&[7.0], 0.9), 7.0);
+    }
+
+    /// The emitted rows carry only what the ledger would hold: a raw SDK
+    /// timeline passed in is projected with for_ledger() first.
+    #[test]
+    fn rows_are_ledger_projected() {
+        let t = edge_timing(&ledger());
+        let settle = t.observations[2].settle_ms.as_ref().unwrap();
+        let v = serde_json::to_value(settle).unwrap();
+        assert_eq!(v["unknown"]["code"], json!("no_event_before_timeout"));
+        assert_eq!(v["unknown"]["detail"], json!("no_event_before_timeout"));
     }
 
     /// Two samples sharing an id AND a timestamp still order the same way in

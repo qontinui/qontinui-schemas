@@ -446,8 +446,8 @@ fn retain_ledger_source<T>(o: &mut Observation<T>) {
 /// valid scheme (`[A-Za-z][A-Za-z0-9+.-]*`, RFC 3986) followed by `://` and
 /// a host — the network events keep their origin, never their path. The
 /// host is an IPv6 literal or a run of `[A-Za-z0-9-._~]` (no `%`: an encoded
-/// `/` or `@` would carry a path in); the port is digits only. Anything else
-/// ends the origin there. A relative path that merely contains `://` further on
+/// `/` or `@` would carry a path in); the port is 1 to 5 digits, at most
+/// 65535. Anything else ends the origin there. A relative path that merely contains `://` further on
 /// (`/search/a@b.c/https://x`) is not a URL with an origin.
 fn url_origin(url: &str) -> Option<String> {
     let (scheme, rest) = url.split_once("://")?;
@@ -490,7 +490,9 @@ fn url_origin(url: &str) -> Option<String> {
     let port = rest
         .strip_prefix(':')
         .map(|p| &p[..p.find(|c: char| !c.is_ascii_digit()).unwrap_or(p.len())])
-        .filter(|p| !p.is_empty());
+        // A TCP port: 1..=5 digits, at most 65535. Anything longer or larger
+        // is not a port (it may be a number someone typed) and is cut.
+        .filter(|p| !p.is_empty() && p.len() <= 5 && p.parse::<u32>().is_ok_and(|n| n <= 65535));
     Some(match port {
         Some(port) => format!("{scheme}://{host}:{port}"),
         None => format!("{scheme}://{host}"),
@@ -708,6 +710,11 @@ mod tests {
                 Some("https://api.example.com"),
             ),
             ("https://host:alice", Some("https://host")),
+            ("https://host:5551234567/x", Some("https://host")),
+            ("https://host:65536/x", Some("https://host")),
+            ("https://host:65535/x", Some("https://host:65535")),
+            ("https://[::1]alice:80/x", Some("https://[::1]")),
+            ("https://host;alice/x", Some("https://host")),
             (
                 "https://api.example.com:alice/x",
                 Some("https://api.example.com"),
