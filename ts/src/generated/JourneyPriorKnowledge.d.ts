@@ -95,12 +95,18 @@ export interface JourneyPriorKnowledgeUnsettledNode {
    */
   openFrontierEntries: number;
   /**
+   * No observed arrival at this node closed `changed` or `no_change`
+   * ([`JourneyGraphNode::unconfirmed_destination`]): it may be an
+   * intermediate state, not a page a URL leads to.
+   */
+  unconfirmedDestination: boolean;
+  /**
    * [`JourneyGraph::unknown_destination_arrivals`] — any of them may
    * arrive here.
    */
   unknownDestinationArrivals: number;
   /**
-   * [`JourneyGraph::untrusted_edge_rows`] — any of them may arrive here.
+   * [`JourneyGraph::unplaced_rejected_rows`] — any of them may arrive here.
    */
-  untrustedEdgeRows: number;
+  unplacedRejectedRows: number;
 }

@@ -56,7 +56,9 @@ export interface JourneyReachedNode {
    */
   nodeKey: string;
   /**
-   * Shortest number of navigation edges from the start (0 = the start).
+   * Shortest OBSERVED number of navigation edges from the start (0 = the
+   * start) — an upper bound on the true distance while the frontier is
+   * unsettled.
    */
   steps: number;
 }

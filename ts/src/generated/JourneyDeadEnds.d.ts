@@ -39,7 +39,9 @@ export interface JourneyDeadEnds {
   /**
    * Nodes with no navigation edge to a different node that still have an
    * open frontier, an unobserved departure or an unmeasured navigation
-   * departure — or that the graph as a whole cannot settle
+   * departure — or whose arrival is unconfirmed (`unconfirmedDestination`:
+   * no arrival from another node closed `changed` / `no_change`, so it may
+   * be an intermediate state), or that the graph as a whole cannot settle
    * (`unsettledByGraph`) — never dead ends. Sorted.
    */
   unexplored: JourneyUnexploredNode[];
@@ -52,11 +54,13 @@ export interface JourneyDeadEnd {
    * `true` when a kept `pop` edge with outcome `changed` leaves this node
    * for a different node — the only way out is the browser's back button,
    * a journey finding rather than an exit. `null` = unknown: no such edge
-   * was kept, but a `pop` row from this node was filtered or withdrawn, or
-   * a kept `pop` edge to another node ended `error` / `settle_timeout`
+   * was kept, but a `pop` row from this node was filtered or withdrawn, a
+   * kept `pop` edge to another node ended `error` / `settle_timeout`, or a
+   * kept `pop` self-loop ended `settle_timeout`
    * (`unmeasuredDepartures.excludedBackArrivals > 0`). `false` otherwise.
-   * (A rejected `pop`-claiming row is untrusted and counts as `rejected`,
-   * which makes the node `unexplored`, never a dead end.)
+   * (A rejected `pop`-claiming row is untrusted and counts in
+   * `JourneyGraph::unplaced_rejected_rows`, which lists no node as a dead
+   * end at all.)
    */
   backOnly?: boolean | null;
   /**
@@ -80,9 +84,16 @@ export interface JourneyUnexploredNode {
     [k: string]: number;
   };
   /**
+   * `true` when no observed arrival at the node closed `changed` or
+   * `no_change` (they were all `settle_timeout` / `error`), so nothing
+   * confirms it is a real destination rather than an intermediate state
+   * ([`JourneyGraphNode::unconfirmed_destination`]).
+   */
+  unconfirmedDestination: boolean;
+  /**
    * Departures from it the navigation edge set left out (filtered,
-   * withdrawn, rejected, `settle_timeout` / `error` to another node,
-   * rejected frontier rows).
+   * withdrawn, `settle_timeout` / `error` to another node, `settle_timeout`
+   * self-loops, rejected frontier rows with a valid node).
    */
   unmeasuredDepartures: JourneyUnmeasuredDepartures;
   /**

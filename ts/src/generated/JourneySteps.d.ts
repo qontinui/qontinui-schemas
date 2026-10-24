@@ -48,8 +48,9 @@ export interface JourneySteps {
    */
   path: JourneyGraphEdge[];
   /**
-   * Shortest number of navigation edges from start to target; `null` = no
-   * observed path (which is a negative only when `frontier` is settled and
+   * Shortest OBSERVED number of navigation edges from start to target — an
+   * upper bound on the true distance while the frontier is unsettled;
+   * `null` = no observed path (which is a negative only when `frontier` is settled and
    * both endpoints were observed).
    */
   steps?: number | null;

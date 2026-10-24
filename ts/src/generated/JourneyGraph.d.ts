@@ -36,15 +36,17 @@ export interface JourneyGraph {
    */
   nodes: JourneyGraphNode[];
   /**
-   * Unmeasured departures (filtered, withdrawn, rejected, rejected
-   * frontier, excluded back arrivals) placed at a node key that is NOT in
+   * Unmeasured departures (filtered, withdrawn, rejected frontier with a
+   * valid node, excluded back and URL arrivals) placed at a node key that
+   * is NOT in
    * `nodes`. No component query can reach such a node, but a graph-wide
    * question (`dead_ends`, `requires_prior_knowledge`, the whole frontier)
    * counts them.
    */
   offGraphDepartures: JourneyUnmeasuredDepartures;
   /**
-   * Rows left out as contract violations, sorted.
+   * Rows left out as contract violations, live or withdrawn (a withdrawn one
+   * is also counted in `coverage.edgesInvalidated`), sorted.
    */
   rejected: JourneyRejectedRow[];
   /**
@@ -58,34 +60,34 @@ export interface JourneyGraph {
    */
   rejectedFrontierDoublePlaced: number;
   /**
-   * Affordance or `pop` rows — kept `to_node_unobserved` ones, and trusted
-   * excluded ones with no `toNode` — whose destination is unknown. Each
+   * Affordance or `pop` rows whose real destination is unknown: kept or
+   * trusted-excluded ones with no `toNode` (`to_node_unobserved`), ones
+   * that closed `settle_timeout` or `error` to a DIFFERENT node (that node
+   * may be an intermediate state), and ones that closed `settle_timeout`
+   * on the SAME node (the destination may not have rendered yet). Each
    * may arrive at any node, so `requires_prior_knowledge` lists no node as
    * settled while this is non-zero.
    */
   unknownDestinationArrivals: number;
   /**
-   * Distinct rejected frontier rows whose node is invalid AND whose
-   * `nodeKey` column names no observed node, so they cannot be placed at
-   * any node: each may be an open affordance anywhere, and EVERY negative
-   * answer counts them (dimension `unplaced_rejected_frontier`).
+   * Distinct rejected frontier rows whose node fails `validate()`.
+   * Nothing in such a row is trusted, its `nodeKey` column included, so it
+   * is placed at NO node: each may be an open affordance anywhere, and
+   * EVERY negative answer counts it (dimension
+   * `unplaced_rejected_frontier`).
    */
   unplacedRejectedFrontier: number;
   /**
-   * Untrusted edge rows — live rows that failed `validate()` or carry an
-   * unparseable `observedAt`, and withdrawn rows failing either check —
-   * whose `fromNode` itself is invalid, so they cannot be placed at any
-   * node. Their trigger cannot be trusted, so each may be a click
-   * anywhere: EVERY negative answer counts them, component and graph-wide
-   * alike (dimension `unplaced_rejected_rows`).
+   * Distinct UNTRUSTED edge rows — live or withdrawn rows that fail
+   * [`trusted_edge_row`] (a failed `validate()` or an unparseable
+   * `observedAt`). Nothing in such a row is trusted, its `fromNode` and
+   * trigger included, so it is placed at NO node: it may be a click from
+   * and to anywhere, and EVERY negative answer counts it, component and
+   * graph-wide alike (dimension `unplaced_rejected_rows`). While it is
+   * non-zero, `dead_ends` lists no dead end and `requires_prior_knowledge`
+   * lists no settled node.
    */
   unplacedRejectedRows: number;
-  /**
-   * Distinct untrusted edge rows (placed or unplaced). Each may be a click
-   * from and to anywhere, so `requires_prior_knowledge` lists no node as
-   * settled while this is non-zero.
-   */
-  untrustedEdgeRows: number;
 }
 /**
  * One observed vertex.
@@ -109,6 +111,17 @@ export interface JourneyGraphNode {
    * rows disagree on non-identity detail such as `pageLabel`).
    */
   node: JourneyNode;
+  /**
+   * `true` when the node has at least one kept arrival (an edge from a
+   * DIFFERENT node whose `toNode` is this node — a self-loop is not an
+   * arrival), and NONE of them closed `changed` or
+   * `no_change`, whatever its trigger. Only those two outcomes confirm the
+   * node is a real destination: a `settle_timeout` or `error` arrival's
+   * observed node may be an intermediate state (a spinner, an error
+   * render). Such a node is never a settled dead end, nor a settled
+   * requires-prior-knowledge node.
+   */
+  unconfirmedDestination: boolean;
   /**
    * Departures from this node the navigation edge set leaves out but that
    * may still lead somewhere (see [`JourneyUnmeasuredDepartures`]).
@@ -139,4 +152,14 @@ export interface JourneyRejectedRow {
    * frontier row.
    */
   row: string;
+  /**
+   * How many DISTINCT rows (by full serialized content) this entry stands
+   * for. Two rows that share `(kind, row, reason)` but differ anywhere
+   * else — a live and a withdrawn copy, or two fromNodes under one id —
+   * are one entry here with `rows: 2`. The same full-row identity is the
+   * one `JourneyGraph::unplaced_rejected_rows` and
+   * `unplaced_rejected_frontier` count by, so for edges the `rows` of the
+   * edge entries sum to `unplaced_rejected_rows`.
+   */
+  rows: number;
 }

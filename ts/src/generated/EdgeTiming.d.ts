@@ -106,8 +106,10 @@ export interface EdgeTiming {
   [k: string]: unknown;
 }
 /**
- * One observation's values, exactly as its timeline summary stated them.
- * `null` (for every metric) = the row has no timeline.
+ * One observation's values as its timeline summary stated them,
+ * ledger-projected (status, value, coverage and unknown code kept; unknown
+ * detail replaced by its code; source and cache keys redacted). `null` (for
+ * every metric) = the row has no timeline.
  */
 export interface EdgeTimingRow {
   /**

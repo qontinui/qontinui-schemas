@@ -12,8 +12,11 @@
  * `absent`. The navigation counters count only `affordance`-triggered rows
  * (a typed URL is not a way the app offers); excluded back-button (`pop`)
  * rows have their own counter, [`Self::excluded_back_arrivals`]. A filtered
- * or withdrawn `no_change` row is never counted: that exclusion is a genuine
- * negative (a REJECTED row counts whatever its outcome). Each counter is its own
+ * or withdrawn click or back that closed `no_change`, or `error` on its own
+ * node, is never counted: that exclusion is a genuine negative (a URL-trigger
+ * row never is one). (A REJECTED row is not counted here at all: nothing in it is
+ * trusted, so it is placed at no node — see
+ * [`JourneyGraph::unplaced_rejected_rows`].) Each counter is its own
  * `coverage.unmeasured` dimension — see [`JourneySearchFrontier::unmeasured`]
  * for the dimension names and codes.
  */
@@ -26,10 +29,12 @@ export interface JourneyUnmeasuredDepartures {
   /**
    * Back-button (`pop`) rows from this node that are not a kept, changed
    * exit: valid `pop` rows the filter excluded or that were withdrawn
-   * (outcome not `no_change`), and kept `pop` edges to ANOTHER node whose
-   * outcome is `error` or `settle_timeout` (the same rule as an affordance
-   * edge's). A REJECTED pop row is not here — a rejected row's trigger
-   * cannot be trusted, so it counts as `rejected`. Not a navigation
+   * (unless a genuine negative: `no_change`, or `error` on its own node),
+   * kept `pop` edges to ANOTHER node whose outcome is `error` or
+   * `settle_timeout`, and kept `pop` self-loops that closed
+   * `settle_timeout` (the same rules as an affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
+   * is trusted, so it counts in `JourneyGraph::unplaced_rejected_rows`.
+   * Not a navigation
    * departure, so a question about one component ignores it; the
    * graph-wide questions it can change — `dead_ends`' `backOnly`,
    * `requires_prior_knowledge`, the whole frontier — count it. Dimension
@@ -38,8 +43,8 @@ export interface JourneyUnmeasuredDepartures {
   excludedBackArrivals: number;
   /**
    * Valid URL-trigger rows (`initial` / `push` / `replace` / `hash`) from
-   * this node that the filter excluded or that were withdrawn, outcome not
-   * `no_change`. A typed URL is not a navigation departure, so a question
+   * this node that the filter excluded or that were withdrawn, WHATEVER
+   * their outcome (a URL row is an arrival, never a genuine negative). A typed URL is not a navigation departure, so a question
    * about one component ignores it; but it is an ARRIVAL that decides
    * `requires_prior_knowledge`, and it may reveal a node no kept row
    * shows, so the graph-wide questions (`requires_prior_knowledge`,
@@ -49,18 +54,11 @@ export interface JourneyUnmeasuredDepartures {
   excludedUrlArrivals: number;
   /**
    * Live, valid affordance rows the request's filter (`since` /
-   * `appVersion` / `runKind`) excluded, outcome not `no_change`. Dimension
+   * `appVersion` / `runKind`) excluded, unless they are a genuine negative
+   * (`no_change`, or `error` on their own node). Dimension
    * `filtered_departures`.
    */
   filteredOut: number;
-  /**
-   * Rows that failed the contract (`validate()` or an unparseable
-   * `observedAt`) — counted whatever their trigger AND outcome, since none
-   * of the row's claims can be trusted (a row claiming `push` may really
-   * be a click). A withdrawn row that also fails `validate()` counts here
-   * too. Dimension `rejected_departures`.
-   */
-  rejected: number;
   /**
    * Frontier rows at this node that failed `validate()` — treated as OPEN
    * entries the read cannot list. A row whose `nodeKey` column disagrees
@@ -70,14 +68,17 @@ export interface JourneyUnmeasuredDepartures {
    */
   rejectedFrontier: number;
   /**
-   * `settle_timeout` edges to a DIFFERENT node: not a navigation step (the
-   * destination may be an intermediate render) but not a negative either.
-   * Dimension `settle_timeout_departures`.
+   * Affordance edges that closed `settle_timeout` — to a DIFFERENT node
+   * (the destination may be an intermediate render), or to the SAME node
+   * (the destination may not have rendered before the snapshot). Not a
+   * navigation step, but not a negative either. Dimension
+   * `settle_timeout_departures`.
    */
   settleTimeout: number;
   /**
-   * Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`
-   * and whose outcome is not `no_change`. Dimension `withdrawn_departures`.
+   * Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`,
+   * unless they are a genuine negative (`no_change`, or `error` on their
+   * own node). Dimension `withdrawn_departures`.
    */
   withdrawn: number;
 }

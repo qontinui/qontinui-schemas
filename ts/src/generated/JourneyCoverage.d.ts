@@ -79,8 +79,9 @@ export interface JourneyCoverage {
    */
   oldestEdgeAt?: string | null;
   /**
-   * Edge and frontier rows rejected as contract violations (listed in
-   * [`JourneyGraph::rejected`]).
+   * ENTRIES in [`JourneyGraph::rejected`] — one per `(kind, row,
+   * reason)`. The sum of their `rows` gives the number of distinct
+   * rejected rows (by full content).
    */
   rowsRejected: number;
   /**
