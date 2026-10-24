@@ -285,6 +285,7 @@ fn an_unobserved_departure_keeps_a_negative_unknown() {
             open_by_reason: BTreeMap::new(),
             unobserved_departures: 1,
             unmeasured_departures: JourneyUnmeasuredDepartures::default(),
+            unconfirmed_destination: false,
             unsettled_by_graph: false,
         }]
     );
@@ -1970,4 +1971,100 @@ fn rr9_1_a_settle_timeout_click_elsewhere_has_an_unknown_destination() {
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
     assert_eq!(g.unknown_destination_arrivals, 0);
     assert_eq!(requires_prior_knowledge(&g).nodes.len(), 1);
+}
+
+// --- Re-review of 6ac846f5 (probes a..d, kept as tests) ------------------------
+
+#[test]
+fn rr10_a_a_settle_timeout_only_destination_is_never_a_settled_dead_end() {
+    // a <-> b explored; a -> q closed settle_timeout (q may be a spinner).
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").outcome(EdgeOutcome::SettleTimeout),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(g.node(&key("q")).unwrap().unconfirmed_destination);
+    assert!(!g.node(&key("b")).unwrap().unconfirmed_destination);
+    let d = dead_ends(&g);
+    assert!(
+        d.dead_ends.iter().all(|x| x.node_key != key("q")),
+        "{:?}",
+        d.dead_ends
+    );
+    let q = d
+        .unexplored
+        .iter()
+        .find(|x| x.node_key == key("q"))
+        .unwrap();
+    assert!(q.unconfirmed_destination);
+    assert!(!q.unsettled_by_graph);
+
+    // A confirming arrival (changed) makes q a real destination again.
+    let mut ledger = ledger;
+    ledger.extend(edges(&[e("4", "b", "q")]));
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(!g.node(&key("q")).unwrap().unconfirmed_destination);
+    assert!(dead_ends(&g)
+        .dead_ends
+        .iter()
+        .any(|x| x.node_key == key("q")));
+}
+
+#[test]
+fn rr10_b_a_settle_timeout_only_destination_never_settles_prior_knowledge() {
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q")
+            .kind(NavigationTriggerKind::Push)
+            .outcome(EdgeOutcome::SettleTimeout),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    let q = p.unsettled.iter().find(|n| n.node_key == key("q")).unwrap();
+    assert!(q.unconfirmed_destination);
+    // Control: the push closed `changed`, q is listed.
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").kind(NavigationTriggerKind::Push),
+    ]);
+    let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert_eq!(p.nodes.len(), 1);
+}
+
+#[test]
+fn rr10_c_a_withdrawn_untrusted_row_is_listed_as_rejected() {
+    let mut ledger = edges(&[e("1", "a", "b"), e("2", "b", "a")]);
+    let mut bad = e("3", "a", "c").at("not a time").build();
+    bad.invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    ledger.push(bad);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    assert_eq!(g.coverage.edges_invalidated, 1);
+    assert_eq!(g.coverage.rows_rejected, 1);
+    assert_eq!(g.rejected[0].row, "3");
+    assert!(g.rejected[0].reason.contains("RFC 3339"));
+}
+
+#[test]
+fn rr10_d_order_independence_with_untrusted_and_settle_timeout() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").outcome(EdgeOutcome::SettleTimeout),
+        e("4", "q", "a")
+            .kind(NavigationTriggerKind::Pop)
+            .outcome(EdgeOutcome::SettleTimeout),
+        e("5", "z", "c").at("bad"),
+        e("5", "y", "c").at("bad"),
+    ]);
+    let f = vec![frontier("a", "fp-x", FrontierReason::NotYetActivated)];
+    let base = render_everything(&ledger, &f);
+    for seed in 1..60u64 {
+        shuffle(&mut ledger, seed);
+        assert_eq!(render_everything(&ledger, &f), base, "seed {seed}");
+    }
 }
