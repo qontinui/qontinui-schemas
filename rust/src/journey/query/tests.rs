@@ -2068,3 +2068,41 @@ fn rr10_d_order_independence_with_untrusted_and_settle_timeout() {
         assert_eq!(render_everything(&ledger, &f), base, "seed {seed}");
     }
 }
+
+#[test]
+fn rr11_an_error_only_destination_is_unconfirmed() {
+    // a <-> b explored; a -> q by click closed `error`: q's observed node may
+    // be an error render, not a real destination.
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").outcome(EdgeOutcome::Error),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(g.node(&key("q")).unwrap().unconfirmed_destination);
+    let d = dead_ends(&g);
+    assert!(
+        d.dead_ends.iter().all(|x| x.node_key != key("q")),
+        "{:?}",
+        d.dead_ends
+    );
+    assert!(d
+        .unexplored
+        .iter()
+        .any(|x| x.node_key == key("q") && x.unconfirmed_destination));
+
+    // The same through a URL arrival that closed `error`.
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q")
+            .kind(NavigationTriggerKind::Push)
+            .outcome(EdgeOutcome::Error),
+    ]);
+    let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    assert!(p
+        .unsettled
+        .iter()
+        .any(|n| n.node_key == key("q") && n.unconfirmed_destination));
+}
