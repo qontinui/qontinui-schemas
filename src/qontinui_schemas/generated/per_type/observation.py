@@ -72,6 +72,13 @@ class UnknownCode(StrEnum):
     model_reply_unparseable = 'model_reply_unparseable'
     needs_multi_frame_input = 'needs_multi_frame_input'
     stale_input = 'stale_input'
+    frontier_open = 'frontier_open'
+    ledger_schema_absent = 'ledger_schema_absent'
+    ledger_write_failing = 'ledger_write_failing'
+    no_observations = 'no_observations'
+    to_node_unobserved = 'to_node_unobserved'
+    performance_observer_unsupported = 'performance_observer_unsupported'
+    no_event_before_timeout = 'no_event_before_timeout'
 
 
 class UnknownInfo(BaseModel):

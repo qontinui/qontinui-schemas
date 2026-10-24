@@ -23,4 +23,11 @@ export type UnknownCode =
   | "below_confidence_floor"
   | "model_reply_unparseable"
   | "needs_multi_frame_input"
-  | "stale_input";
+  | "stale_input"
+  | "frontier_open"
+  | "ledger_schema_absent"
+  | "ledger_write_failing"
+  | "no_observations"
+  | "to_node_unobserved"
+  | "performance_observer_unsupported"
+  | "no_event_before_timeout";

@@ -91,18 +91,32 @@ pub enum UiBridgeErrorCode {
     UbObsBelowConfidenceFloor,
     /// `UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD`
     UbObsCapabilityUnavailableInBuild,
+    /// `UB-OBS-FRONTIER-OPEN`
+    UbObsFrontierOpen,
     /// `UB-OBS-INPUT-MISSING`
     UbObsInputMissing,
+    /// `UB-OBS-LEDGER-SCHEMA-ABSENT`
+    UbObsLedgerSchemaAbsent,
+    /// `UB-OBS-LEDGER-WRITE-FAILING`
+    UbObsLedgerWriteFailing,
     /// `UB-OBS-MODEL-REPLY-UNPARSEABLE`
     UbObsModelReplyUnparseable,
     /// `UB-OBS-NEEDS-MULTI-FRAME-INPUT`
     UbObsNeedsMultiFrameInput,
+    /// `UB-OBS-NO-EVENT-BEFORE-TIMEOUT`
+    UbObsNoEventBeforeTimeout,
+    /// `UB-OBS-NO-OBSERVATIONS`
+    UbObsNoObservations,
+    /// `UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED`
+    UbObsPerformanceObserverUnsupported,
     /// `UB-OBS-PRODUCER-FAILED`
     UbObsProducerFailed,
     /// `UB-OBS-PRODUCER-NOT-RUN`
     UbObsProducerNotRun,
     /// `UB-OBS-STALE-INPUT`
     UbObsStaleInput,
+    /// `UB-OBS-TO-NODE-UNOBSERVED`
+    UbObsToNodeUnobserved,
     /// `UB-PAGE-LOAD-ERROR`
     UbPageLoadError,
     /// `UB-PARSE-ERROR`
@@ -164,12 +178,19 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbObsAppUnreachable => "UB-OBS-APP-UNREACHABLE",
             UiBridgeErrorCode::UbObsBelowConfidenceFloor => "UB-OBS-BELOW-CONFIDENCE-FLOOR",
             UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild => "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD",
+            UiBridgeErrorCode::UbObsFrontierOpen => "UB-OBS-FRONTIER-OPEN",
             UiBridgeErrorCode::UbObsInputMissing => "UB-OBS-INPUT-MISSING",
+            UiBridgeErrorCode::UbObsLedgerSchemaAbsent => "UB-OBS-LEDGER-SCHEMA-ABSENT",
+            UiBridgeErrorCode::UbObsLedgerWriteFailing => "UB-OBS-LEDGER-WRITE-FAILING",
             UiBridgeErrorCode::UbObsModelReplyUnparseable => "UB-OBS-MODEL-REPLY-UNPARSEABLE",
             UiBridgeErrorCode::UbObsNeedsMultiFrameInput => "UB-OBS-NEEDS-MULTI-FRAME-INPUT",
+            UiBridgeErrorCode::UbObsNoEventBeforeTimeout => "UB-OBS-NO-EVENT-BEFORE-TIMEOUT",
+            UiBridgeErrorCode::UbObsNoObservations => "UB-OBS-NO-OBSERVATIONS",
+            UiBridgeErrorCode::UbObsPerformanceObserverUnsupported => "UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED",
             UiBridgeErrorCode::UbObsProducerFailed => "UB-OBS-PRODUCER-FAILED",
             UiBridgeErrorCode::UbObsProducerNotRun => "UB-OBS-PRODUCER-NOT-RUN",
             UiBridgeErrorCode::UbObsStaleInput => "UB-OBS-STALE-INPUT",
+            UiBridgeErrorCode::UbObsToNodeUnobserved => "UB-OBS-TO-NODE-UNOBSERVED",
             UiBridgeErrorCode::UbPageLoadError => "UB-PAGE-LOAD-ERROR",
             UiBridgeErrorCode::UbParseError => "UB-PARSE-ERROR",
             UiBridgeErrorCode::UbStaleElement => "UB-STALE-ELEMENT",
@@ -221,12 +242,19 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbObsAppUnreachable,
             UiBridgeErrorCode::UbObsBelowConfidenceFloor,
             UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild,
+            UiBridgeErrorCode::UbObsFrontierOpen,
             UiBridgeErrorCode::UbObsInputMissing,
+            UiBridgeErrorCode::UbObsLedgerSchemaAbsent,
+            UiBridgeErrorCode::UbObsLedgerWriteFailing,
             UiBridgeErrorCode::UbObsModelReplyUnparseable,
             UiBridgeErrorCode::UbObsNeedsMultiFrameInput,
+            UiBridgeErrorCode::UbObsNoEventBeforeTimeout,
+            UiBridgeErrorCode::UbObsNoObservations,
+            UiBridgeErrorCode::UbObsPerformanceObserverUnsupported,
             UiBridgeErrorCode::UbObsProducerFailed,
             UiBridgeErrorCode::UbObsProducerNotRun,
             UiBridgeErrorCode::UbObsStaleInput,
+            UiBridgeErrorCode::UbObsToNodeUnobserved,
             UiBridgeErrorCode::UbPageLoadError,
             UiBridgeErrorCode::UbParseError,
             UiBridgeErrorCode::UbStaleElement,
@@ -299,12 +327,19 @@ impl FromStr for UiBridgeErrorCode {
             "UB-OBS-APP-UNREACHABLE" => Ok(UiBridgeErrorCode::UbObsAppUnreachable),
             "UB-OBS-BELOW-CONFIDENCE-FLOOR" => Ok(UiBridgeErrorCode::UbObsBelowConfidenceFloor),
             "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD" => Ok(UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild),
+            "UB-OBS-FRONTIER-OPEN" => Ok(UiBridgeErrorCode::UbObsFrontierOpen),
             "UB-OBS-INPUT-MISSING" => Ok(UiBridgeErrorCode::UbObsInputMissing),
+            "UB-OBS-LEDGER-SCHEMA-ABSENT" => Ok(UiBridgeErrorCode::UbObsLedgerSchemaAbsent),
+            "UB-OBS-LEDGER-WRITE-FAILING" => Ok(UiBridgeErrorCode::UbObsLedgerWriteFailing),
             "UB-OBS-MODEL-REPLY-UNPARSEABLE" => Ok(UiBridgeErrorCode::UbObsModelReplyUnparseable),
             "UB-OBS-NEEDS-MULTI-FRAME-INPUT" => Ok(UiBridgeErrorCode::UbObsNeedsMultiFrameInput),
+            "UB-OBS-NO-EVENT-BEFORE-TIMEOUT" => Ok(UiBridgeErrorCode::UbObsNoEventBeforeTimeout),
+            "UB-OBS-NO-OBSERVATIONS" => Ok(UiBridgeErrorCode::UbObsNoObservations),
+            "UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED" => Ok(UiBridgeErrorCode::UbObsPerformanceObserverUnsupported),
             "UB-OBS-PRODUCER-FAILED" => Ok(UiBridgeErrorCode::UbObsProducerFailed),
             "UB-OBS-PRODUCER-NOT-RUN" => Ok(UiBridgeErrorCode::UbObsProducerNotRun),
             "UB-OBS-STALE-INPUT" => Ok(UiBridgeErrorCode::UbObsStaleInput),
+            "UB-OBS-TO-NODE-UNOBSERVED" => Ok(UiBridgeErrorCode::UbObsToNodeUnobserved),
             "UB-PAGE-LOAD-ERROR" => Ok(UiBridgeErrorCode::UbPageLoadError),
             "UB-PARSE-ERROR" => Ok(UiBridgeErrorCode::UbParseError),
             "UB-STALE-ELEMENT" => Ok(UiBridgeErrorCode::UbStaleElement),

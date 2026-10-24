@@ -767,6 +767,7 @@ pub fn assert_all(
         frame,
         ocr_blocks: None, // runner-side only
         baselines: Some(baselines),
+        timeline: None, // a timeline arrives through the runner's /vision/assert only
     };
     let results: Vec<AssertionResult> = assertions
         .iter()

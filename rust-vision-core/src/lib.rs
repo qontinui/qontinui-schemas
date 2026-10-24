@@ -18,6 +18,7 @@ pub mod assertions;
 pub mod cache;
 pub mod contract;
 pub mod coverage;
+pub mod edge_timing;
 pub mod element_media;
 pub mod element_snapshot;
 pub mod encode;
@@ -27,6 +28,7 @@ pub mod observation;
 pub mod pipeline;
 pub mod stage;
 pub mod strip;
+pub mod timeline;
 
 pub use analyzers::{AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Finding, Severity};
 pub use assertions::{
@@ -36,6 +38,9 @@ pub use assertions::{
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use coverage::SnapshotCoverage;
+pub use edge_timing::{
+    edge_timing, EdgeTiming, EdgeTimingRow, EdgeTimingSample, MetricDistribution,
+};
 pub use element_media::{
     src_digest_of, ElementMedia, MediaAlt, MediaDecoding, MediaFetchPriority, MediaKind,
     MediaLoadState, MediaLoading, MediaSize, ObjectFit,
@@ -52,3 +57,8 @@ pub use observation::{
 };
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};
+pub use timeline::{
+    AnimationEndReason, ChangeTimeline, DetectedAnimation, ExpectedStateOutcome,
+    ExpectedStateResult, TimelineEvent, TimelineEventBase, TimelineSource, TimelineSummary,
+    LEDGER_SOURCE_KEYS,
+};
