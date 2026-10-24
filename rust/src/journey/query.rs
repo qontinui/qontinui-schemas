@@ -24,7 +24,10 @@
 //!
 //! These functions return FACTS, not verdicts. A negative fact (no path, no
 //! way out, no affordance arrival) is only a negative ANSWER when nothing
-//! that was not looked at could change it. So every result carries a
+//! that was not looked at could change it. Where a LISTED item rests on such
+//! a negative (a dead end; a node that requires prior knowledge), the query
+//! lists only the items nothing left out could change, and puts the rest in
+//! a separate list with the causes (`unexplored`, `unsettled`). So every result carries a
 //! [`JourneySearchFrontier`] naming what was not looked at inside the part of
 //! the graph the query searched: the open frontier entries, grouped by
 //! reason, the departures whose destination was never observed, and the
@@ -154,6 +157,8 @@ pub struct JourneyGraphNode {
     /// Departures from this node the navigation edge set leaves out but that
     /// may still lead somewhere (see [`JourneyUnmeasuredDepartures`]).
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
+    /// Excluded affordance / pop rows arriving here from another node.
+    pub arrival_doubt: JourneyArrivalDoubt,
 }
 
 /// Departures from one node that the NAVIGATION edge set (affordance +
@@ -243,6 +248,38 @@ impl JourneyUnmeasuredDepartures {
         self.settle_timeout += o.settle_timeout;
         self.errored += o.errored;
         self.rejected_frontier += o.rejected_frontier;
+    }
+}
+
+/// Why an edge row is out of the graph — how `build_graph` counts it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Excluded {
+    /// The request's filter excluded a valid, live row.
+    Filtered,
+    /// A valid row was withdrawn.
+    Withdrawn,
+    /// The row failed the contract; nothing it says can be trusted.
+    Untrusted,
+}
+
+/// Trusted affordance or `pop` rows, excluded from the graph, that ARRIVE at
+/// a node from a different node (outcome not `no_change`). Any of them may be
+/// a way in that the user did not need a URL for, so
+/// [`requires_prior_knowledge`] cannot list the node as settled.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct JourneyArrivalDoubt {
+    /// Arrivals the request's filter excluded.
+    pub filtered: u64,
+    /// Withdrawn arrivals.
+    pub withdrawn: u64,
+}
+
+impl JourneyArrivalDoubt {
+    /// True when both counters are zero.
+    pub fn is_zero(&self) -> bool {
+        *self == Self::default()
     }
 }
 
@@ -401,8 +438,19 @@ pub struct JourneyGraph {
     /// column and their valid node's own key disagree). Per-node counts
     /// include both placements; graph-wide totals subtract this, so a
     /// graph-wide `rejectedFrontier` plus `unplacedRejectedFrontier` is the
-    /// number of DISTINCT rejected frontier rows in `rejected`.
+    /// number of DISTINCT rejected frontier rows by full content. (`rejected`
+    /// lists rows by `(kind, row, reason)`, so two rows differing only in
+    /// their node JSON share one entry there but are both counted.)
     pub rejected_frontier_double_placed: u64,
+    /// Distinct untrusted edge rows (placed or unplaced). Each may be a click
+    /// from and to anywhere, so `requires_prior_knowledge` lists no node as
+    /// settled while this is non-zero.
+    pub untrusted_edge_rows: u64,
+    /// Affordance or `pop` rows — kept `to_node_unobserved` ones, and trusted
+    /// excluded ones with no `toNode` — whose destination is unknown. Each
+    /// may arrive at any node, so `requires_prior_knowledge` lists no node as
+    /// settled while this is non-zero.
+    pub unknown_destination_arrivals: u64,
     /// What the graph was built over.
     pub coverage: JourneyCoverage,
 }
@@ -615,37 +663,70 @@ pub fn build_graph(
     let mut excluded: BTreeMap<String, JourneyUnmeasuredDepartures> = BTreeMap::new();
     let mut unplaced_rejected_rows = 0u64;
     let mut rejected_frontier_double_placed = 0u64;
-    // How one excluded edge row is counted.
+    // How one excluded edge row is counted (`Excluded` says why it is out).
     //
-    // - A row that FAILED `validate()` (`trusted == false`): none of its
-    //   claims can be trusted, its trigger included, so it counts as
-    //   `rejected` whatever its trigger or outcome — at its fromNode when
-    //   that is valid, else as an unplaced row every negative counts.
-    // - A row that passed `validate()` (filtered, or withdrawn): its trigger
-    //   decides. An affordance row counts by its cause (`bump`), a pop row
-    //   as an excluded back arrival, a URL-trigger row (initial / push /
-    //   replace / hash) as an excluded URL arrival. A `no_change` row is a
-    //   genuine negative and is skipped by the callers.
-    let mut place =
-        |e: &JourneyEdgeObservation, trusted: bool, bump: fn(&mut JourneyUnmeasuredDepartures)| {
-            let bump: fn(&mut JourneyUnmeasuredDepartures) = if !trusted {
+    // - An UNTRUSTED row (failed `validate()` or an unparseable
+    //   `observedAt`, live or withdrawn): none of its claims can be trusted,
+    //   its trigger included, so it counts as `rejected` whatever its
+    //   trigger or outcome — at its fromNode when that is valid, else as an
+    //   unplaced row every negative counts.
+    // - A trusted row (filtered, or withdrawn): its trigger decides. An
+    //   affordance row counts as `filteredOut` / `withdrawn`, a pop row as an
+    //   excluded back arrival, a URL-trigger row (initial / push / replace /
+    //   hash) as an excluded URL arrival. An affordance or pop row is also an
+    //   excluded ARRIVAL at its destination (`doubt_to`), or at an unknown
+    //   one. A `no_change` row is a genuine negative and is skipped by the
+    //   callers.
+    // - Each distinct row (full serialized form) is placed once.
+    let mut placed: BTreeSet<String> = BTreeSet::new();
+    let mut untrusted_edge_rows = 0u64;
+    let mut unknown_destination_arrivals = 0u64;
+    let mut kept_unknown_destination_arrivals = 0u64;
+    let mut doubt_to: BTreeMap<String, JourneyArrivalDoubt> = BTreeMap::new();
+    let mut place = |e: &JourneyEdgeObservation, cause: Excluded| {
+        // One placement per DISTINCT row, by its full serialized form: two
+        // rows that differ anywhere (say, sharing an id but not a fromNode)
+        // are both placed, and the result is independent of input order.
+        if !placed.insert(serde_json::to_string(e).expect("edge row serializes")) {
+            return;
+        }
+        let trigger = e.trigger.navigation_trigger;
+        let bump: fn(&mut JourneyUnmeasuredDepartures) = match (cause, trigger) {
+            (Excluded::Untrusted, _) => {
+                untrusted_edge_rows += 1;
                 |d| d.rejected += 1
-            } else {
-                match e.trigger.navigation_trigger {
-                    NavigationTriggerKind::Affordance => bump,
-                    NavigationTriggerKind::Pop => |d| d.excluded_back_arrivals += 1,
-                    NavigationTriggerKind::Initial
-                    | NavigationTriggerKind::Push
-                    | NavigationTriggerKind::Replace
-                    | NavigationTriggerKind::Hash => |d| d.excluded_url_arrivals += 1,
+            }
+            (_, NavigationTriggerKind::Initial)
+            | (_, NavigationTriggerKind::Push)
+            | (_, NavigationTriggerKind::Replace)
+            | (_, NavigationTriggerKind::Hash) => |d| d.excluded_url_arrivals += 1,
+            (cause, NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop) => {
+                // A trusted excluded click or back arrival: it may be the way
+                // INTO its destination (requires_prior_knowledge reads this).
+                match &e.to_node {
+                    None => unknown_destination_arrivals += 1,
+                    Some(to) if to.key() != e.from_node.key() => {
+                        let d = doubt_to.entry(to.key()).or_default();
+                        match cause {
+                            Excluded::Filtered => d.filtered += 1,
+                            _ => d.withdrawn += 1,
+                        }
+                    }
+                    Some(_) => {}
                 }
-            };
-            if e.from_node.validate().is_ok() {
-                bump(excluded.entry(e.from_node.key()).or_default());
-            } else {
-                unplaced_rejected_rows += 1;
+                match (cause, trigger) {
+                    (_, NavigationTriggerKind::Pop) => |d| d.excluded_back_arrivals += 1,
+                    (Excluded::Filtered, _) => |d| d.filtered_out += 1,
+                    _ => |d| d.withdrawn += 1,
+                }
             }
         };
+        if e.from_node.validate().is_ok() {
+            bump(excluded.entry(e.from_node.key()).or_default());
+        } else {
+            unplaced_rejected_rows += 1;
+        }
+    };
 
     for edge in edges {
         if edge.invalidated_at.is_some() {
@@ -654,41 +735,37 @@ pub fn build_graph(
             // OR carrying an unparseable observedAt makes it untrusted.
             if edge.validate().is_err() || DateTime::parse_from_rfc3339(&edge.observed_at).is_err()
             {
-                place(edge, false, |_| {});
+                place(edge, Excluded::Untrusted);
             } else if edge.outcome != EdgeOutcome::NoChange {
-                place(edge, true, |d| d.withdrawn += 1);
+                place(edge, Excluded::Withdrawn);
             }
             continue;
         }
         if let Err(err) = edge.validate() {
-            // Counted once per DISTINCT rejected row, so the counters agree
-            // with `rows_rejected`.
-            if rejected.insert(JourneyRejectedRow {
+            rejected.insert(JourneyRejectedRow {
                 kind: JourneyRejectedRowKind::Edge,
                 row: edge.id.clone(),
                 reason: err.to_string(),
-            }) {
-                place(edge, false, |_| {});
-            }
+            });
+            place(edge, Excluded::Untrusted);
             continue;
         }
         let observed_at = match DateTime::parse_from_rfc3339(&edge.observed_at) {
             Ok(t) => t.with_timezone(&Utc),
             Err(err) => {
-                if rejected.insert(JourneyRejectedRow {
+                rejected.insert(JourneyRejectedRow {
                     kind: JourneyRejectedRowKind::Edge,
                     row: edge.id.clone(),
                     reason: format!("observedAt {:?} is not RFC 3339: {err}", edge.observed_at),
-                }) {
-                    place(edge, false, |_| {});
-                }
+                });
+                place(edge, Excluded::Untrusted);
                 continue;
             }
         };
         if !filter.keeps(edge, observed_at) {
             edges_filtered_out += 1;
             if edge.outcome != EdgeOutcome::NoChange {
-                place(edge, true, |d| d.filtered_out += 1);
+                place(edge, Excluded::Filtered);
             }
             continue;
         }
@@ -713,6 +790,12 @@ pub fn build_graph(
             None => {
                 edges_to_node_unobserved += 1;
                 *unobserved.entry(from_key).or_default() += 1;
+                if matches!(
+                    edge.trigger.navigation_trigger,
+                    NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
+                ) {
+                    kept_unknown_destination_arrivals += 1;
+                }
             }
             Some(to) => {
                 let to_key = to.key();
@@ -744,14 +827,18 @@ pub fn build_graph(
     // Distinct rejected frontier rows: (nodeKey column, the node's key when
     // the node is valid). Placed once the node set is known.
     let mut rejected_frontier_rows: Vec<(String, Option<String>)> = Vec::new();
+    let mut placed_frontier: BTreeSet<String> = BTreeSet::new();
     for entry in frontier {
         if let Err(err) = entry.validate() {
-            let distinct = rejected.insert(JourneyRejectedRow {
+            rejected.insert(JourneyRejectedRow {
                 kind: JourneyRejectedRowKind::Frontier,
                 row: format!("{} {}", entry.node_key, entry.affordance_fingerprint),
                 reason: err.to_string(),
             });
-            if distinct {
+            // One placement per DISTINCT row, by its full serialized form.
+            if placed_frontier
+                .insert(serde_json::to_string(entry).expect("FrontierEntry serializes"))
+            {
                 let node_key = entry.node.validate().is_ok().then(|| entry.node.key());
                 rejected_frontier_rows.push((entry.node_key.clone(), node_key));
             }
@@ -773,16 +860,16 @@ pub fn build_graph(
     }
 
     // A rejected frontier row is not listable, but not explored either: an
-    // OPEN entry. It is counted at its `nodeKey` column ALWAYS, and also at
-    // its node's key when that node is valid and the key differs — either may
-    // be the node the affordance really belongs to. A row whose node is
-    // INVALID and whose key column names no observed node cannot be placed
-    // at all: it is unplaced, and every negative counts it.
+    // OPEN entry. When its node is VALID it is counted at its `nodeKey`
+    // column and also at the node's key when that differs — either may be
+    // the node the affordance really belongs to. When its node is INVALID,
+    // nothing about the row can be trusted, its key column included (an
+    // edge with an invalid fromNode is treated the same way): it is
+    // unplaced, and every negative counts it.
     let mut unplaced_rejected_frontier = 0u64;
     for (column, node_key) in rejected_frontier_rows {
         match node_key {
-            None if !node_repr.contains_key(&column) => unplaced_rejected_frontier += 1,
-            None => excluded.entry(column).or_default().rejected_frontier += 1,
+            None => unplaced_rejected_frontier += 1,
             Some(k) => {
                 if k != column {
                     excluded.entry(column).or_default().rejected_frontier += 1;
@@ -817,6 +904,7 @@ pub fn build_graph(
             JourneyGraphNode {
                 unobserved_departures: unobserved.get(&key).copied().unwrap_or(0),
                 unmeasured_departures: excluded.remove(&key).unwrap_or_default(),
+                arrival_doubt: doubt_to.get(&key).copied().unwrap_or_default(),
                 key,
                 node,
                 frontier,
@@ -899,6 +987,9 @@ pub fn build_graph(
         unplaced_rejected_rows,
         unplaced_rejected_frontier,
         rejected_frontier_double_placed,
+        untrusted_edge_rows,
+        unknown_destination_arrivals: unknown_destination_arrivals
+            + kept_unknown_destination_arrivals,
         coverage,
     }
 }
@@ -1084,8 +1175,11 @@ impl JourneySearchFrontier {
     /// `producer_failed`; `input_missing` — and
     /// `unsettled_because(c, s).is_none() == is_settled(c, s)`.
     ///
-    /// A POSITIVE answer (a path found, a node listed) is `measured` whatever
-    /// this says; the caller still reports the coverage beside it.
+    /// A POSITIVE answer (a path found, a node reached) is `measured` whatever
+    /// this says; the caller still reports the coverage beside it. A listed
+    /// dead end or prior-knowledge node is already settled per item by its
+    /// query (the doubtful ones are in `unexplored` / `unsettled`); this code
+    /// is for the NEGATIVE about the rest — "no other node is one".
     pub fn unsettled_because(
         &self,
         coverage: &JourneyCoverage,
@@ -1501,15 +1595,41 @@ pub struct JourneyPriorKnowledgeNode {
     pub arrivals: BTreeMap<String, u64>,
 }
 
+/// A node that qualifies on its KEPT arrivals, but that some row the graph
+/// left out could still reach by a click or a back button — so whether it
+/// requires prior knowledge is unknown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct JourneyPriorKnowledgeUnsettledNode {
+    /// The node.
+    pub node_key: String,
+    /// Its kept URL-trigger arrivals, as in [`JourneyPriorKnowledgeNode`].
+    pub arrivals: BTreeMap<String, u64>,
+    /// Excluded (filtered / withdrawn) affordance or pop arrivals into it.
+    pub arrival_doubt: JourneyArrivalDoubt,
+    /// [`JourneyGraph::untrusted_edge_rows`] — any of them may arrive here.
+    pub untrusted_edge_rows: u64,
+    /// [`JourneyGraph::unknown_destination_arrivals`] — any of them may
+    /// arrive here.
+    pub unknown_destination_arrivals: u64,
+}
+
 /// The answer of [`requires_prior_knowledge`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct JourneyPriorKnowledge {
-    /// Matching nodes, sorted by key.
+    /// Nodes that require prior knowledge, settled: they qualify, and no row
+    /// the graph left out could reach them by a click or a back button.
+    /// Sorted by key.
     pub nodes: Vec<JourneyPriorKnowledgeNode>,
-    /// What the whole graph did not look at: any open frontier entry could be
-    /// the affordance that leads to one of `nodes`.
+    /// Nodes that qualify on their kept arrivals but cannot be settled, with
+    /// the counts of what could still reach them. Sorted by key.
+    pub unsettled: Vec<JourneyPriorKnowledgeUnsettledNode>,
+    /// What the whole graph did not look at. An open frontier entry could be
+    /// the affordance that leads to one of `nodes`, and the absence of a
+    /// listed node is unknown unless this is settled.
     pub frontier: JourneySearchFrontier,
     /// The graph's filter.
     pub filter_echo: JourneyFilter,
@@ -1520,15 +1640,23 @@ pub struct JourneyPriorKnowledge {
 /// Nodes whose ONLY observed arrivals are `initial | push | replace | hash` —
 /// a user must already know the URL.
 ///
-/// The rule, exactly: a node qualifies when it has at least one observed
-/// `initial | push | replace | hash` arrival and NO arrival by an affordance
-/// or pop edge from a different observed node. That disqualifying edge counts
-/// whatever its outcome (an errored click that still landed there is still a
-/// way in; back-navigation means the user had been there by some other way).
-/// An `affordance` or `pop` edge from a node to itself neither qualifies nor
-/// disqualifies it; an `initial | push | replace | hash` edge
-/// counts as an arrival whatever its from-node (a reload is `initial` from
-/// the node itself).
+/// The rule, exactly: a node QUALIFIES when it has at least one kept
+/// `initial | push | replace | hash` arrival and NO kept arrival by an
+/// affordance or pop edge from a different observed node. That
+/// disqualifying edge counts whatever its outcome (an errored click that
+/// still landed there is still a way in; back-navigation means the user had
+/// been there by some other way). An `affordance` or `pop` edge from a node
+/// to itself neither qualifies nor disqualifies it; an `initial | push |
+/// replace | hash` edge counts as an arrival whatever its from-node (a reload
+/// is `initial` from the node itself).
+///
+/// A qualifying node is listed in `nodes` only when no row the graph left
+/// out could be such a disqualifying arrival: no filtered or withdrawn
+/// affordance / pop row into it ([`JourneyGraphNode::arrival_doubt`]), no
+/// untrusted edge row anywhere ([`JourneyGraph::untrusted_edge_rows`]) and
+/// no affordance / pop row with an unknown destination
+/// ([`JourneyGraph::unknown_destination_arrivals`]). Otherwise it goes in
+/// `unsettled`, with those counts.
 pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
     // to_key -> arrival kind -> count
     let mut arrivals: BTreeMap<&str, BTreeMap<&'static str, u64>> = BTreeMap::new();
@@ -1553,19 +1681,38 @@ pub fn requires_prior_knowledge(graph: &JourneyGraph) -> JourneyPriorKnowledge {
             }
         }
     }
-    let nodes = arrivals
-        .into_iter()
-        .filter(|(to, _)| !disqualified.contains(to))
-        .map(|(to, by_kind)| JourneyPriorKnowledgeNode {
-            node_key: to.to_string(),
-            arrivals: by_kind
-                .into_iter()
-                .map(|(k, n)| (k.to_string(), n))
-                .collect(),
-        })
-        .collect();
+    let mut nodes = Vec::new();
+    let mut unsettled = Vec::new();
+    for (to, by_kind) in arrivals {
+        if disqualified.contains(to) {
+            continue;
+        }
+        let arrivals: BTreeMap<String, u64> = by_kind
+            .into_iter()
+            .map(|(k, n)| (k.to_string(), n))
+            .collect();
+        let arrival_doubt = graph.node(to).map(|n| n.arrival_doubt).unwrap_or_default();
+        if arrival_doubt.is_zero()
+            && graph.untrusted_edge_rows == 0
+            && graph.unknown_destination_arrivals == 0
+        {
+            nodes.push(JourneyPriorKnowledgeNode {
+                node_key: to.to_string(),
+                arrivals,
+            });
+        } else {
+            unsettled.push(JourneyPriorKnowledgeUnsettledNode {
+                node_key: to.to_string(),
+                arrivals,
+                arrival_doubt,
+                untrusted_edge_rows: graph.untrusted_edge_rows,
+                unknown_destination_arrivals: graph.unknown_destination_arrivals,
+            });
+        }
+    }
     JourneyPriorKnowledge {
         nodes,
+        unsettled,
         frontier: graph.search_frontier(graph.all_keys(), true),
         filter_echo: graph.filter_echo.clone(),
         coverage: graph.coverage.clone(),

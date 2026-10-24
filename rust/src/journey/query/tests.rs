@@ -1063,14 +1063,12 @@ fn rr2_an_excluded_pop_row_keeps_prior_knowledge_unknown() {
     ));
     let g = build_graph(&ledger, &[], &writing(), &agent_actions_only());
     let p = requires_prior_knowledge(&g);
-    assert_eq!(
-        p.nodes
-            .iter()
-            .map(|n| n.node_key.as_str())
-            .collect::<Vec<_>>(),
-        [key("n")]
-    );
-    // The filtered back-arrival could disqualify n: the listing is not settled.
+    // The filtered back-arrival into n could disqualify it: n is unsettled,
+    // not listed.
+    assert!(p.nodes.is_empty());
+    assert_eq!(p.unsettled.len(), 1);
+    assert_eq!(p.unsettled[0].node_key, key("n"));
+    assert_eq!(p.unsettled[0].arrival_doubt.filtered, 1);
     assert_eq!(g.off_graph_departures.excluded_back_arrivals, 1);
     assert_eq!(
         p.frontier.unmeasured(&p.coverage, true),
@@ -1421,18 +1419,14 @@ fn rr6_p1_an_unplaceable_rejected_frontier_row_counts_everywhere() {
     assert!(dead_ends(&g).dead_ends.is_empty());
 
     // The same invalid node under a key column that DOES name an observed
-    // node is placed there, not unplaced.
+    // node is STILL unplaced: with an invalid node, the row's key column
+    // cannot be trusted either.
     let mut bad = frontier("b", "fp-open", FrontierReason::NotYetActivated);
     bad.node.modelled = false;
+    assert_eq!(bad.node_key, key("b"));
     let g = build_graph(&ledger, &[bad], &writing(), &no_filter());
-    assert_eq!(g.unplaced_rejected_frontier, 0);
-    assert_eq!(
-        g.node(&key("b"))
-            .unwrap()
-            .unmeasured_departures
-            .rejected_frontier,
-        1
-    );
+    assert_eq!(g.unplaced_rejected_frontier, 1);
+    assert!(g.node(&key("b")).unwrap().unmeasured_departures.is_zero());
 }
 
 #[test]
@@ -1637,4 +1631,175 @@ fn rr6_l5_a_withdrawn_row_claiming_push_that_fails_validate_is_rejected() {
     );
     let s = steps_to(&g, &key("a"), &key("c"));
     assert!(!s.frontier.is_settled(&s.coverage, true));
+}
+
+// --- Re-review of 9bd3a8c2 (probes q1..q5, kept as tests) ----------------------
+
+/// Two live rows with the SAME id and the SAME rejection reason, from
+/// different valid nodes a and q.
+fn id_collision() -> (
+    Vec<JourneyEdgeObservation>,
+    JourneyEdgeObservation,
+    JourneyEdgeObservation,
+) {
+    let base = edges(&[e("1", "a", "b"), e("2", "q", "r")]);
+    let mut x_a = e("x", "a", "c").build();
+    x_a.trigger.navigation_trigger = NavigationTriggerKind::Push; // element_action + push
+    let mut x_q = e("x", "q", "c").build();
+    x_q.trigger.navigation_trigger = NavigationTriggerKind::Push;
+    assert_eq!(
+        x_a.validate().unwrap_err().to_string(),
+        x_q.validate().unwrap_err().to_string()
+    );
+    (base, x_a, x_q)
+}
+
+#[test]
+fn rr7_q1_an_id_collision_places_both_rows_in_any_order() {
+    let (base, x_a, x_q) = id_collision();
+    let mut l1 = base.clone();
+    l1.extend([x_a.clone(), x_q.clone()]);
+    let mut l2 = base;
+    l2.extend([x_q, x_a]);
+    let g1 = build_graph(&l1, &[], &writing(), &no_filter());
+    let g2 = build_graph(&l2, &[], &writing(), &no_filter());
+    assert_eq!(
+        serde_json::to_string(&g1).unwrap(),
+        serde_json::to_string(&g2).unwrap(),
+        "order-dependent graph"
+    );
+    assert_eq!(
+        g1.node(&key("a")).unwrap().unmeasured_departures.rejected,
+        1
+    );
+    assert_eq!(
+        g1.node(&key("q")).unwrap().unmeasured_departures.rejected,
+        1
+    );
+    assert_eq!(g1.untrusted_edge_rows, 2);
+    // The rejected LIST keeps its (kind, row, reason) identity: one entry.
+    assert_eq!(g1.coverage.rows_rejected, 1);
+}
+
+#[test]
+fn rr7_q1b_an_id_collision_never_settles_the_second_node() {
+    for flip in [false, true] {
+        let (mut l, x_a, x_q) = id_collision();
+        if flip {
+            l.extend([x_q, x_a]);
+        } else {
+            l.extend([x_a, x_q]);
+        }
+        let g = build_graph(&l, &[], &writing(), &no_filter());
+        for from in ["a", "q"] {
+            let s = steps_to(&g, &key(from), &key(if from == "a" { "r" } else { "b" }));
+            assert!(
+                !s.frontier.is_settled(&s.coverage, true),
+                "flip={flip} from={from}: {:?}",
+                s.frontier.unmeasured(&s.coverage, true)
+            );
+        }
+    }
+}
+
+#[test]
+fn rr7_l2_an_identical_duplicate_rejected_edge_row_is_placed_once() {
+    let mut l = edges(&[e("1", "a", "b")]);
+    let mut bad = e("x", "a", "c").build();
+    bad.trigger.navigation_trigger = NavigationTriggerKind::Push;
+    l.extend([bad.clone(), bad]);
+    let g = build_graph(&l, &[], &writing(), &no_filter());
+    assert_eq!(g.node(&key("a")).unwrap().unmeasured_departures.rejected, 1);
+    assert_eq!(g.untrusted_edge_rows, 1);
+}
+
+#[test]
+fn rr7_q2_a_frontier_row_with_an_invalid_node_is_always_unplaced() {
+    // a -> d (d has no exit), a -> x. A rejected frontier row whose node is
+    // d with a leaked pageLabel (invalid); its key column names x.
+    let ledger = edges(&[e("1", "a", "d"), e("2", "a", "x")]);
+    let mut bad = frontier("d", "fp-open", FrontierReason::NotYetActivated);
+    bad.node.page_label = Some("search/sentinel".into());
+    assert!(bad.node.validate().is_err());
+    assert_eq!(bad.node.key(), key("d"));
+    bad.node_key = key("x");
+    let g = build_graph(&ledger, &[bad], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_frontier, 1);
+    assert!(g.node(&key("x")).unwrap().unmeasured_departures.is_zero());
+    let r = reachable_from(&g, &key("d"));
+    assert!(!r.frontier.is_settled(&r.coverage, true));
+    let de = dead_ends(&g);
+    assert!(de.dead_ends.is_empty(), "{:?}", de.dead_ends);
+}
+
+#[test]
+fn rr7_q3_prior_knowledge_does_not_list_a_node_with_a_doubtful_click_arrival() {
+    // z -> b by push (kept); a -> b by click, WITHDRAWN (valid).
+    let mut ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+        e("3", "a", "b"),
+    ]);
+    ledger[2].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.iter().all(|n| n.node_key != key("b")));
+    let b = p.unsettled.iter().find(|n| n.node_key == key("b")).unwrap();
+    assert_eq!(b.arrival_doubt.withdrawn, 1);
+    assert_eq!(b.arrivals["push"], 1);
+
+    // An untrusted row anywhere, or a click with an unknown destination,
+    // unsettles every candidate.
+    let mut ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "b").kind(NavigationTriggerKind::Push),
+        e("3", "a", "?").outcome(EdgeOutcome::ToNodeUnobserved),
+    ]);
+    let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert!(p.nodes.is_empty());
+    assert_eq!(p.unsettled[0].unknown_destination_arrivals, 1);
+    ledger.pop();
+    let mut bad = e("9", "q", "r").build();
+    bad.trigger.navigation_trigger = NavigationTriggerKind::Push;
+    ledger.push(bad);
+    let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert!(p.nodes.is_empty());
+    assert_eq!(p.unsettled[0].untrusted_edge_rows, 1);
+    // Control: with neither, b is listed.
+    ledger.pop();
+    let p = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert_eq!(p.nodes.len(), 1);
+    assert!(p.unsettled.is_empty());
+}
+
+#[test]
+fn rr7_q5_determinism_many_seeds_mixed() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "c").kind(NavigationTriggerKind::Push),
+        e("3", "c", "a").kind(NavigationTriggerKind::Pop),
+        e("4", "c", "d").outcome(EdgeOutcome::SettleTimeout),
+        e("5", "d", "d").outcome(EdgeOutcome::NoChange),
+        e("6", "a", "e").at("bad"),
+        e("7", "e", "f").kind(NavigationTriggerKind::Hash),
+    ]);
+    ledger[1].invalidated_at = Some("2026-10-03T00:00:00Z".into());
+    ledger[6].from_node.modelled = false;
+    let (_, x_a, x_q) = id_collision();
+    ledger.extend([x_a, x_q]);
+    let mut fr1 = frontier("d", "fp1", FrontierReason::EffectWrite);
+    fr1.node.page_label = Some("x/y".into());
+    let fr = vec![
+        fr1.clone(),
+        fr1,
+        frontier("a", "fp2", FrontierReason::BudgetExhausted),
+    ];
+    let base = render_everything(&ledger, &fr);
+    for seed in 1..200u64 {
+        let mut l = ledger.clone();
+        let mut f = fr.clone();
+        shuffle(&mut l, seed);
+        shuffle(&mut f, seed * 13 + 3);
+        assert_eq!(render_everything(&l, &f), base, "seed {seed}");
+    }
 }
