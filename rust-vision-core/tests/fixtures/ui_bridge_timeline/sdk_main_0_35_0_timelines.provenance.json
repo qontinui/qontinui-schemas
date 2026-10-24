@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_main_0_35_0_timelines.json",
+  "sha256": "75b87f8855ab0954cd314c5922db4f8786a41b59610a32b44168f7db6636f27b",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.35.0 (packages/ui-bridge/package.json at the commit below)",
+  "sdk_commit": "qontinui/ui-bridge d84bfa6ffe679fd36d25e747e43086cc6ff196a0 (origin/main, 2026-10-20; contains the Phase 4 timeline of qontinui/ui-bridge#258)",
+  "source": "ChangeTracker.executeWithDiff(...).timeline -- the `timeline` field POST /ai/execute-with-diff returns -- run under the capture harness in capture/ against jsdom with a mocked PerformanceObserver, a mocked network tracker and a mocked declared-state registry. Four scenarios, keyed by name: rich (every TimelineEvent type; enteredAtMs / notEnteredWithinMs / activeThroughoutWithinMs / unknown{input_missing} expected states; a degraded animationsUnsettledAtEnd), noPerformanceObserver (unknown{performance_observer_unsupported}), neverSettles (settleMs unknown{no_event_before_timeout}; an absent field), staticPage (firstResponseMs unknown{no_event_before_timeout}).",
+  "capture_command": "cp rust-vision-core/tests/fixtures/ui_bridge_timeline/capture/timeline-fixture.capture.test.ts <ui-bridge>/packages/ui-bridge/src/ai/ && cd <ui-bridge>/packages/ui-bridge && TIMELINE_FIXTURE_OUT=<abs path>.json npx vitest run src/ai/timeline-fixture.capture.test.ts",
+  "captured_at": "2026-10-20",
+  "trim": "None. Each timeline is a JSON round-trip of the SDK object (exactly what goes over HTTP), written verbatim; timestamps and fingerprints are whatever that run produced.",
+  "node": "v24.19.0, vitest 4.1.5"
+}

@@ -114,16 +114,39 @@ pub enum UnknownCode {
     BelowConfidenceFloor,
     /// A model reply could not be parsed or validated.
     ModelReplyUnparseable,
-    /// The question needs more than one frame (e.g. `animation_settled`).
+    /// The question needs more than one captured frame, and only one (or
+    /// none) was supplied.
     NeedsMultiFrameInput,
     /// The input is known to be stale.
     StaleInput,
+    /// A negative journey answer ("not reachable", "no way out") was asked
+    /// over a part of the graph with open frontier entries — affordances
+    /// seen and never activated — so it cannot be settled yet.
+    FrontierOpen,
+    /// The store the answer is read from does not exist in this database
+    /// (e.g. an embedded DB that predates the journey tables).
+    LedgerSchemaAbsent,
+    /// The store exists but writes to it are failing, so it stopped growing
+    /// and an answer over it would describe a stale graph as a finished one.
+    LedgerWriteFailing,
+    /// The store holds no observation the question could be answered from
+    /// (an empty ledger, or a node it has never seen).
+    NoObservations,
+    /// An action's destination was never observed: a second action arrived
+    /// before any snapshot closed the first.
+    ToNodeUnobserved,
+    /// The page's runtime does not support the `PerformanceObserver` entry
+    /// type the measurement needs.
+    PerformanceObserverUnsupported,
+    /// The awaited event did not occur before the timeout, so whether it
+    /// would have occurred is unknown.
+    NoEventBeforeTimeout,
 }
 
 impl UnknownCode {
     /// Every member, in declaration order. The closed set, so a test can
     /// pin it against the wire contract rather than against itself.
-    pub const ALL: [UnknownCode; 9] = [
+    pub const ALL: [UnknownCode; 16] = [
         Self::AppUnreachable,
         Self::CapabilityUnavailableInBuild,
         Self::ProducerFailed,
@@ -133,6 +156,13 @@ impl UnknownCode {
         Self::ModelReplyUnparseable,
         Self::NeedsMultiFrameInput,
         Self::StaleInput,
+        Self::FrontierOpen,
+        Self::LedgerSchemaAbsent,
+        Self::LedgerWriteFailing,
+        Self::NoObservations,
+        Self::ToNodeUnobserved,
+        Self::PerformanceObserverUnsupported,
+        Self::NoEventBeforeTimeout,
     ];
 
     /// The snake_case wire value.
@@ -147,6 +177,13 @@ impl UnknownCode {
             Self::ModelReplyUnparseable => "model_reply_unparseable",
             Self::NeedsMultiFrameInput => "needs_multi_frame_input",
             Self::StaleInput => "stale_input",
+            Self::FrontierOpen => "frontier_open",
+            Self::LedgerSchemaAbsent => "ledger_schema_absent",
+            Self::LedgerWriteFailing => "ledger_write_failing",
+            Self::NoObservations => "no_observations",
+            Self::ToNodeUnobserved => "to_node_unobserved",
+            Self::PerformanceObserverUnsupported => "performance_observer_unsupported",
+            Self::NoEventBeforeTimeout => "no_event_before_timeout",
         }
     }
 
@@ -642,6 +679,14 @@ impl<T> Observation<T> {
         (self.state, self.provenance)
     }
 
+    /// The source attribution, mutably — for a projection that must drop
+    /// keys before storing (`ChangeTimeline::for_ledger`). Crate-private and
+    /// limited to `source`, which no invariant reads: coverage stays out of
+    /// reach, so the absent-over-full-coverage rule cannot be broken here.
+    pub(crate) fn source_mut(&mut self) -> &mut Option<Map<String, Value>> {
+        &mut self.provenance.source
+    }
+
     /// Transform a measured value, keeping status and provenance. Cannot
     /// break the absent-over-full-coverage invariant: coverage is untouched.
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Observation<U> {
@@ -840,6 +885,13 @@ mod tests {
                 json!("model_reply_unparseable"),
                 json!("needs_multi_frame_input"),
                 json!("stale_input"),
+                json!("frontier_open"),
+                json!("ledger_schema_absent"),
+                json!("ledger_write_failing"),
+                json!("no_observations"),
+                json!("to_node_unobserved"),
+                json!("performance_observer_unsupported"),
+                json!("no_event_before_timeout"),
             ]
         );
         for c in UnknownCode::ALL {
@@ -856,6 +908,10 @@ mod tests {
         assert_eq!(
             UnknownCode::InputMissing.diagnostic_code(),
             "UB-OBS-INPUT-MISSING"
+        );
+        assert_eq!(
+            UnknownCode::PerformanceObserverUnsupported.diagnostic_code(),
+            "UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED"
         );
     }
 
