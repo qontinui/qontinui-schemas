@@ -595,8 +595,22 @@ fn prior_knowledge_needs_url_only_arrivals() {
     ]);
     let g = build_graph(&ledger, &[], &writing(), &no_filter());
     let p = requires_prior_knowledge(&g);
+    // c qualifies; but the errored b -> d click's real destination is
+    // unknown (it may have been c), so c is unsettled, not listed.
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    assert_eq!(p.unsettled.len(), 1);
+    assert_eq!(p.unsettled[0].node_key, key("c"));
     assert_eq!(
-        p.nodes,
+        p.unsettled[0].arrivals,
+        BTreeMap::from([("initial".to_string(), 1), ("push".to_string(), 1)])
+    );
+    assert_eq!(p.unsettled[0].unknown_destination_arrivals, 1);
+    // The same click closing `changed`: c is listed (d stays disqualified).
+    let mut landed = ledger.clone();
+    landed[4].outcome = EdgeOutcome::Changed;
+    let p2 = requires_prior_knowledge(&build_graph(&landed, &[], &writing(), &no_filter()));
+    assert_eq!(
+        p2.nodes,
         vec![JourneyPriorKnowledgeNode {
             node_key: key("c"),
             arrivals: BTreeMap::from([("initial".to_string(), 1), ("push".to_string(), 1)]),
@@ -1930,6 +1944,7 @@ fn rr8_m2_rejected_frontier_rows_differing_only_in_node_json_are_both_placed() {
     // One entry in the (kind, row, reason) list, two placements.
     assert_eq!(g.coverage.rows_rejected, 1);
     assert_eq!(g.unplaced_rejected_frontier, 2);
+    assert_eq!(g.rejected[0].rows, 2);
 }
 
 // --- Re-review of 8d48006d ------------------------------------------------------
@@ -2105,4 +2120,110 @@ fn rr11_an_error_only_destination_is_unconfirmed() {
         .unsettled
         .iter()
         .any(|n| n.node_key == key("q") && n.unconfirmed_destination));
+}
+
+// --- Re-review of 032a25e4 (probes p1..p3, kept as tests) ----------------------
+
+fn with_click_into_q(outcome: EdgeOutcome) -> Vec<JourneyEdgeObservation> {
+    // a <-> b explored; a -> q click closed `outcome`; y reached only by an
+    // initial load.
+    edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").outcome(outcome),
+        e("4", "b", "y").kind(NavigationTriggerKind::Initial),
+        e("5", "y", "a"),
+    ])
+}
+
+#[test]
+fn rr12_1_an_error_click_elsewhere_has_an_unknown_destination() {
+    for outcome in [EdgeOutcome::Error, EdgeOutcome::SettleTimeout] {
+        let g = build_graph(&with_click_into_q(outcome), &[], &writing(), &no_filter());
+        assert_eq!(g.unknown_destination_arrivals, 1, "{outcome:?}");
+        let p = requires_prior_knowledge(&g);
+        assert!(p.nodes.is_empty(), "{outcome:?}: {:?}", p.nodes);
+        let y = p.unsettled.iter().find(|n| n.node_key == key("y")).unwrap();
+        assert_eq!(y.unknown_destination_arrivals, 1, "{outcome:?}");
+    }
+    // The excluded path: the same error click, filtered out.
+    let mut ledger = with_click_into_q(EdgeOutcome::Error);
+    ledger[2].app_version = Some("2.0.0".into());
+    let f = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let g = build_graph(&ledger, &[], &writing(), &f);
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    // Control: the click closed `changed`, y is listed.
+    let p = requires_prior_knowledge(&build_graph(
+        &with_click_into_q(EdgeOutcome::Changed),
+        &[],
+        &writing(),
+        &no_filter(),
+    ));
+    assert_eq!(p.nodes.len(), 1);
+    assert_eq!(p.nodes[0].node_key, key("y"));
+}
+
+#[test]
+fn rr12_3_a_self_loop_is_not_an_arrival() {
+    // z is a start node whose only edge is an erroring self-loop: no exit,
+    // no arrival, so it is a dead end by the usual rules.
+    let ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "z", "z").outcome(EdgeOutcome::Error),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert!(!g.node(&key("z")).unwrap().unconfirmed_destination);
+    let d = dead_ends(&g);
+    assert!(
+        d.dead_ends.iter().any(|x| x.node_key == key("z")),
+        "{:?}",
+        d
+    );
+}
+
+#[test]
+fn rr12_3_determinism_with_error_and_self_loops() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a"),
+        e("3", "a", "q").outcome(EdgeOutcome::Error),
+        e("3", "a", "q").outcome(EdgeOutcome::Changed),
+        e("6", "a", "q").outcome(EdgeOutcome::SettleTimeout),
+        e("7", "q", "q").outcome(EdgeOutcome::NoChange),
+        e("4", "b", "y")
+            .kind(NavigationTriggerKind::Initial)
+            .outcome(EdgeOutcome::Error),
+        e("5", "y", "a").at("bad"),
+    ]);
+    let base = render_everything(&ledger, &[]);
+    for seed in 1..200u64 {
+        shuffle(&mut ledger, seed);
+        assert_eq!(render_everything(&ledger, &[]), base, "seed {seed}");
+    }
+}
+
+#[test]
+fn rr12_6_rejected_entries_and_unplaced_rows_count_the_same_rows() {
+    // A live and a withdrawn copy of one untrusted row: same (kind, id,
+    // reason), different full rows.
+    let mut ledger = edges(&[e("1", "a", "b")]);
+    let live = e("x", "a", "c").at("not a time").build();
+    let mut withdrawn = live.clone();
+    withdrawn.invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    ledger.extend([live.clone(), withdrawn, live]); // the live copy twice
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.rejected.len(), 1);
+    assert_eq!(g.rejected[0].rows, 2, "an identical duplicate is one row");
+    assert_eq!(g.unplaced_rejected_rows, 2);
+    let edge_rows: u64 = g
+        .rejected
+        .iter()
+        .filter(|r| r.kind == JourneyRejectedRowKind::Edge)
+        .map(|r| r.rows)
+        .sum();
+    assert_eq!(edge_rows, g.unplaced_rejected_rows);
 }

@@ -285,15 +285,34 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
     assert_eq!(family.raw["source"], "hand-verified");
     let g = family.graph();
     let p = requires_prior_knowledge(&g);
+    // The hand-verified vector is the QUALIFY rule (which nodes are reached
+    // only by URL). Whether each qualifying node is then SETTLED is a
+    // separate layer: the family carries an errored click to another node,
+    // whose real destination is unknown, so every candidate is `unsettled`
+    // with that cause. Compare the qualifying set across both lists.
     let got: BTreeMap<String, BTreeMap<String, u64>> = p
         .nodes
         .iter()
         .map(|n| (family.name_of(&n.node_key), n.arrivals.clone()))
+        .chain(
+            p.unsettled
+                .iter()
+                .map(|n| (family.name_of(&n.node_key), n.arrivals.clone())),
+        )
         .collect();
     let want: BTreeMap<String, BTreeMap<String, u64>> =
         serde_json::from_value(family.raw["handVerified"]["requiresPriorKnowledge"].clone())
             .unwrap();
     assert_eq!(got, want);
+    assert!(
+        g.unknown_destination_arrivals > 0,
+        "the family's errored click"
+    );
+    assert!(p.nodes.is_empty());
+    assert!(p
+        .unsettled
+        .iter()
+        .all(|n| n.unknown_destination_arrivals == g.unknown_destination_arrivals));
     // No frontier is given; the only unexplored departures are the family's
     // own error / settle_timeout edges to another node.
     assert_eq!(p.frontier.open_entries, 0);

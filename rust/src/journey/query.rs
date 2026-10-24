@@ -198,8 +198,9 @@ pub struct JourneyGraphNode {
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
     /// Excluded affordance / pop rows arriving here from another node.
     pub arrival_doubt: JourneyArrivalDoubt,
-    /// `true` when the node has at least one kept arrival (an edge whose
-    /// `toNode` is this node), and NONE of them closed `changed` or
+    /// `true` when the node has at least one kept arrival (an edge from a
+    /// DIFFERENT node whose `toNode` is this node — a self-loop is not an
+    /// arrival), and NONE of them closed `changed` or
     /// `no_change`, whatever its trigger. Only those two outcomes confirm the
     /// node is a real destination: a `settle_timeout` or `error` arrival's
     /// observed node may be an intermediate state (a spinner, an error
@@ -383,6 +384,14 @@ pub struct JourneyRejectedRow {
     /// The contract violation, as `JourneyContractError` renders it (or the
     /// timestamp parse failure).
     pub reason: String,
+    /// How many DISTINCT rows (by full serialized content) this entry stands
+    /// for. Two rows that share `(kind, row, reason)` but differ anywhere
+    /// else — a live and a withdrawn copy, or two fromNodes under one id —
+    /// are one entry here with `rows: 2`. The same full-row identity is the
+    /// one `JourneyGraph::unplaced_rejected_rows` and
+    /// `unplaced_rejected_frontier` count by, so for edges the `rows` of the
+    /// edge entries sum to `unplaced_rejected_rows`.
+    pub rows: u64,
 }
 
 /// What a graph was built over — the resolution and freshness of every answer
@@ -492,8 +501,8 @@ pub struct JourneyGraph {
     pub rejected_frontier_double_placed: u64,
     /// Affordance or `pop` rows whose real destination is unknown: kept or
     /// trusted-excluded ones with no `toNode` (`to_node_unobserved`), and
-    /// kept or trusted-excluded ones that closed `settle_timeout` to a
-    /// DIFFERENT node (that node may be an intermediate render). Each
+    /// kept or trusted-excluded ones that closed `settle_timeout` or `error`
+    /// to a DIFFERENT node (that node may be an intermediate state). Each
     /// may arrive at any node, so `requires_prior_knowledge` lists no node as
     /// settled while this is non-zero.
     pub unknown_destination_arrivals: u64,
@@ -689,7 +698,9 @@ pub fn build_graph(
     ledger: &JourneyLedgerHealth,
     filter: &JourneyFilter,
 ) -> JourneyGraph {
-    let mut rejected: BTreeSet<JourneyRejectedRow> = BTreeSet::new();
+    // (kind, row, reason) -> the distinct full rows behind it.
+    let mut rejected: BTreeMap<(JourneyRejectedRowKind, String, String), BTreeSet<String>> =
+        BTreeMap::new();
     let mut node_repr: BTreeMap<String, Option<JourneyNode>> = BTreeMap::new();
     let mut unobserved: BTreeMap<String, u64> = BTreeMap::new();
     let mut agg: BTreeMap<EdgeKey, EdgeAgg> = BTreeMap::new();
@@ -749,10 +760,10 @@ pub fn build_graph(
                 // INTO its destination (requires_prior_knowledge reads this).
                 match &e.to_node {
                     None => unknown_destination_arrivals += 1,
-                    // Closed settle_timeout elsewhere: the recorded node may
-                    // be an intermediate render, the real one unknown.
+                    // Closed settle_timeout or error elsewhere: the recorded
+                    // node may be an intermediate state, the real one unknown.
                     Some(to)
-                        if e.outcome == EdgeOutcome::SettleTimeout
+                        if matches!(e.outcome, EdgeOutcome::SettleTimeout | EdgeOutcome::Error)
                             && to.key() != e.from_node.key() =>
                     {
                         unknown_destination_arrivals += 1
@@ -785,11 +796,10 @@ pub fn build_graph(
             if let Err(reason) = trusted_edge_row(edge) {
                 // Listed like a live rejected row, so the bookkeeping shows
                 // why it is counted in unplaced_rejected_rows.
-                rejected.insert(JourneyRejectedRow {
-                    kind: JourneyRejectedRowKind::Edge,
-                    row: edge.id.clone(),
-                    reason,
-                });
+                rejected
+                    .entry((JourneyRejectedRowKind::Edge, edge.id.clone(), reason))
+                    .or_default()
+                    .insert(serde_json::to_string(edge).expect("edge row serializes"));
                 place(edge, Excluded::Untrusted);
             } else if edge.outcome != EdgeOutcome::NoChange {
                 place(edge, Excluded::Withdrawn);
@@ -799,11 +809,10 @@ pub fn build_graph(
         let observed_at = match trusted_edge_row(edge) {
             Ok(t) => t,
             Err(reason) => {
-                rejected.insert(JourneyRejectedRow {
-                    kind: JourneyRejectedRowKind::Edge,
-                    row: edge.id.clone(),
-                    reason,
-                });
+                rejected
+                    .entry((JourneyRejectedRowKind::Edge, edge.id.clone(), reason))
+                    .or_default()
+                    .insert(serde_json::to_string(edge).expect("edge row serializes"));
                 place(edge, Excluded::Untrusted);
                 continue;
             }
@@ -876,11 +885,14 @@ pub fn build_graph(
     let mut placed_frontier: BTreeSet<String> = BTreeSet::new();
     for entry in frontier {
         if let Err(err) = entry.validate() {
-            rejected.insert(JourneyRejectedRow {
-                kind: JourneyRejectedRowKind::Frontier,
-                row: format!("{} {}", entry.node_key, entry.affordance_fingerprint),
-                reason: err.to_string(),
-            });
+            rejected
+                .entry((
+                    JourneyRejectedRowKind::Frontier,
+                    format!("{} {}", entry.node_key, entry.affordance_fingerprint),
+                    err.to_string(),
+                ))
+                .or_default()
+                .insert(serde_json::to_string(entry).expect("FrontierEntry serializes"));
             // One placement per DISTINCT row, by its full serialized form.
             if placed_frontier
                 .insert(serde_json::to_string(entry).expect("FrontierEntry serializes"))
@@ -987,7 +999,8 @@ pub fn build_graph(
     // to_key -> "no arrival so far closed changed or no_change". Only those
     // two outcomes confirm a destination; settle_timeout and error do not.
     let mut settle_only: BTreeMap<&str, bool> = BTreeMap::new();
-    for e in &graph_edges {
+    // A self-loop is not an arrival.
+    for e in graph_edges.iter().filter(|e| e.from_key != e.to_key) {
         let slot = settle_only.entry(e.to_key.as_str()).or_insert(true);
         *slot &= !matches!(e.outcome, EdgeOutcome::Changed | EdgeOutcome::NoChange);
     }
@@ -1012,9 +1025,9 @@ pub fn build_graph(
             }
             _ => {}
         }
-        // A click or back closed settle_timeout elsewhere: its real
+        // A click or back closed settle_timeout or error elsewhere: its real
         // destination is unknown (requires_prior_knowledge reads this).
-        if e.outcome == EdgeOutcome::SettleTimeout
+        if matches!(e.outcome, EdgeOutcome::SettleTimeout | EdgeOutcome::Error)
             && matches!(
                 e.trigger.navigation_trigger,
                 NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
@@ -1050,7 +1063,15 @@ pub fn build_graph(
         filter_echo: filter.clone(),
         nodes,
         edges: graph_edges,
-        rejected: rejected.into_iter().collect(),
+        rejected: rejected
+            .into_iter()
+            .map(|((kind, row, reason), rows)| JourneyRejectedRow {
+                kind,
+                row,
+                reason,
+                rows: rows.len() as u64,
+            })
+            .collect(),
         off_graph_departures,
         unplaced_rejected_rows,
         unplaced_rejected_frontier,
@@ -1508,7 +1529,9 @@ pub struct JourneyDeadEnds {
     pub dead_ends: Vec<JourneyDeadEnd>,
     /// Nodes with no navigation edge to a different node that still have an
     /// open frontier, an unobserved departure or an unmeasured navigation
-    /// departure — or that the graph as a whole cannot settle
+    /// departure — or whose arrival is unconfirmed (`unconfirmedDestination`:
+    /// no arrival from another node closed `changed` / `no_change`, so it may
+    /// be an intermediate state), or that the graph as a whole cannot settle
     /// (`unsettledByGraph`) — never dead ends. Sorted.
     pub unexplored: Vec<JourneyUnexploredNode>,
     /// What the whole graph did not look at.
@@ -1524,9 +1547,12 @@ pub struct JourneyDeadEnds {
 /// A node with an open frontier, a departure whose destination was never
 /// observed, or a navigation departure the edge set left out
 /// ([`JourneyUnmeasuredDepartures`] other than `excludedBackArrivals`) is
-/// `unexplored`, never a dead end. So is EVERY node without an exit while
-/// the graph has an unplaced untrusted row (edge or frontier) or the ledger
-/// is not `writing` (`unsettledByGraph: true`). A dead end's `backOnly` is
+/// `unexplored`, never a dead end. So is a node whose arrivals are all
+/// unconfirmed (`unconfirmedDestination: true` — none from another node
+/// closed `changed` / `no_change`; it may be a spinner or an error render),
+/// and EVERY node without an exit while the graph has an unplaced untrusted
+/// row (edge or frontier) or the ledger is not `writing`
+/// (`unsettledByGraph: true`). A dead end's `backOnly` is
 /// `true` with a kept, changed `pop` exit to another node, `null` when it has
 /// none but an excluded or unsettled one (`excludedBackArrivals > 0`), else
 /// `false`.
