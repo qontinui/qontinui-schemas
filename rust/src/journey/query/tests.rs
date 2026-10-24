@@ -1,5 +1,5 @@
 use super::*;
-use crate::journey::ChokePoint;
+use crate::journey::{ChokePoint, JourneyContractError};
 use chrono::TimeZone;
 use serde_json::json;
 
@@ -285,6 +285,7 @@ fn an_unobserved_departure_keeps_a_negative_unknown() {
             open_by_reason: BTreeMap::new(),
             unobserved_departures: 1,
             unmeasured_departures: JourneyUnmeasuredDepartures::default(),
+            unsettled_by_graph: false,
         }]
     );
     assert!(d.dead_ends.iter().all(|x| x.node_key != key("b")));
@@ -1390,4 +1391,250 @@ fn rr5_s5_a_withdrawn_no_change_row_is_a_genuine_negative() {
         .dead_ends
         .iter()
         .any(|x| x.node_key == key("b")));
+}
+
+// --- Re-review of 8cf1f2fc (the reviewer's probes p1..p7, kept as tests) ------
+
+#[test]
+fn rr6_p1_an_unplaceable_rejected_frontier_row_counts_everywhere() {
+    // a -> b. An open affordance at b, whose frontier row carries a
+    // non-canonical node keyed by what that invalid node renders — a key
+    // that names no observed node.
+    let ledger = edges(&[e("1", "a", "b")]);
+    let mut bad = frontier("b", "fp-open", FrontierReason::NotYetActivated);
+    bad.node.modelled = false;
+    bad.node_key = bad.node.key();
+    assert!(bad.validate().is_err());
+    assert!(bad.node.validate().is_err());
+    let g = build_graph(&ledger, &[bad], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_frontier, 1);
+    assert!(g.off_graph_departures.is_zero());
+    let s = steps_to(&g, &key("b"), &key("a"));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, true),
+        [("unplaced_rejected_frontier", 1, "frontier_open")]
+    );
+    let r = reachable_from(&g, &key("b"));
+    assert!(!r.frontier.is_settled(&r.coverage, true));
+    let f = frontier_of(&g, Some(&key("b")));
+    assert!(!f.frontier.is_settled(&f.coverage, f.node_observed));
+    assert!(dead_ends(&g).dead_ends.is_empty());
+
+    // The same invalid node under a key column that DOES name an observed
+    // node is placed there, not unplaced.
+    let mut bad = frontier("b", "fp-open", FrontierReason::NotYetActivated);
+    bad.node.modelled = false;
+    let g = build_graph(&ledger, &[bad], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_frontier, 0);
+    assert_eq!(
+        g.node(&key("b"))
+            .unwrap()
+            .unmeasured_departures
+            .rejected_frontier,
+        1
+    );
+}
+
+#[test]
+fn rr6_p2_no_dead_end_beside_an_unplaced_row_or_a_non_writing_ledger() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a").kind(NavigationTriggerKind::Pop),
+    ]);
+    ledger[1].from_node.modelled = false; // b's back exit, unplaceable
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    let d = dead_ends(&g);
+    assert!(d.dead_ends.is_empty(), "{:?}", d.dead_ends);
+    let b = d
+        .unexplored
+        .iter()
+        .find(|x| x.node_key == key("b"))
+        .unwrap();
+    assert!(b.unsettled_by_graph);
+
+    // A non-writing ledger: same.
+    let ledger = edges(&[e("1", "a", "b")]);
+    let g = build_graph(
+        &ledger,
+        &[],
+        &ledger_in(LedgerState::WriteFailing),
+        &no_filter(),
+    );
+    let d = dead_ends(&g);
+    assert!(d.dead_ends.is_empty());
+    assert!(d
+        .unexplored
+        .iter()
+        .any(|x| x.node_key == key("b") && x.unsettled_by_graph));
+    // Writing: b is a dead end, and not "unsettled by graph".
+    let d = dead_ends(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert_eq!(d.dead_ends.len(), 1);
+    assert!(d.unexplored.is_empty());
+}
+
+#[test]
+fn rr6_p3_an_excluded_url_arrival_keeps_prior_knowledge_unknown() {
+    // y -> a by click (v1). z -> y by push (v2) is the ONLY arrival at y.
+    let mut ledger = edges(&[
+        e("1", "y", "a"),
+        e("2", "z", "y").kind(NavigationTriggerKind::Push),
+    ]);
+    ledger[1].app_version = Some("2.0.0".into());
+    let unfiltered = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+    assert_eq!(
+        unfiltered.nodes.len(),
+        1,
+        "y needs prior knowledge, unfiltered"
+    );
+    let filter = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    let g = build_graph(&ledger, &[], &writing(), &filter);
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty());
+    assert_eq!(
+        p.frontier.unmeasured(&p.coverage, true),
+        [("excluded_url_arrivals", 1, "input_missing")]
+    );
+    let f = frontier_of(&g, None);
+    assert!(!f.frontier.is_settled(&f.coverage, true));
+    // A navigation question ignores it.
+    let r = reachable_from(&g, &key("y"));
+    assert!(r.frontier.is_settled(&r.coverage, true));
+
+    // A withdrawn push: same.
+    let mut ledger_w = ledger.clone();
+    ledger_w[1].app_version = Some("1.0.0".into());
+    ledger_w[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let pw = requires_prior_knowledge(&build_graph(&ledger_w, &[], &writing(), &no_filter()));
+    assert!(pw.nodes.is_empty());
+    assert_eq!(
+        pw.frontier.unmeasured(&pw.coverage, true),
+        [("excluded_url_arrivals", 1, "input_missing")]
+    );
+}
+
+#[test]
+fn rr6_p4_l3_a_withdrawn_row_with_a_bad_timestamp_is_untrusted() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "a", "c")
+            .kind(NavigationTriggerKind::Push)
+            .at("garbage"),
+    ]);
+    let live = build_graph(&ledger, &[], &writing(), &no_filter());
+    ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let wd = build_graph(&ledger, &[], &writing(), &no_filter());
+    let (l, w) = (
+        live.node(&key("a")).unwrap().unmeasured_departures,
+        wd.node(&key("a")).unwrap().unmeasured_departures,
+    );
+    assert_eq!(l.rejected, 1);
+    assert_eq!(w, l, "withdrawn is judged like live");
+}
+
+#[test]
+fn rr6_p5_l2_duplicate_rejected_frontier_rows_count_once() {
+    let ledger = edges(&[e("1", "a", "c")]);
+    let mut bad = frontier("a", "fp-x", FrontierReason::NotYetActivated);
+    bad.node_key = key("zz");
+    let g = build_graph(&ledger, &[bad.clone(), bad], &writing(), &no_filter());
+    assert_eq!(g.coverage.rows_rejected, 1);
+    let f = frontier_of(&g, None);
+    assert_eq!(
+        f.frontier.unmeasured_departures.rejected_frontier + f.frontier.unplaced_rejected_frontier,
+        g.coverage.rows_rejected
+    );
+}
+
+#[test]
+fn rr6_p6_determinism_with_the_new_counters() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "a")
+            .kind(NavigationTriggerKind::Pop)
+            .outcome(EdgeOutcome::Error),
+        e("3", "a", "c").kind(NavigationTriggerKind::Push),
+        e("4", "b", "c"),
+        e("5", "c", "d").kind(NavigationTriggerKind::Replace),
+    ]);
+    ledger[2].trigger.target_fingerprint = Some("x".into()); // rejected
+    ledger[3].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    ledger[3].from_node.modelled = false; // withdrawn + invalid -> unplaced
+    ledger[4].invalidated_at = Some("2026-10-02T00:00:00Z".into()); // url arrival
+    let mut b1 = frontier("b", "fp-x", FrontierReason::NotYetActivated);
+    b1.node_key = key("c");
+    let mut b2 = frontier("b", "fp-z", FrontierReason::NotYetActivated);
+    b2.node.modelled = false;
+    b2.node_key = b2.node.key(); // unplaced
+    let fr = vec![
+        b1,
+        b2,
+        frontier("a", "fp-y", FrontierReason::NotYetActivated),
+    ];
+    let base = render_everything(&ledger, &fr);
+    for seed in 1..40u64 {
+        let mut l = ledger.clone();
+        let mut f = fr.clone();
+        shuffle(&mut l, seed);
+        shuffle(&mut f, seed * 7 + 1);
+        assert_eq!(render_everything(&l, &f), base, "seed {seed}");
+    }
+}
+
+#[test]
+fn rr6_p7_f4_an_action_choke_point_claiming_a_url_trigger_is_rejected() {
+    let mut ledger = edges(&[e("1", "a", "b"), e("2", "b", "c")]);
+    // chokePoint stays element_action, fingerprint kept: a click posing as
+    // a typed URL.
+    ledger[1].trigger.navigation_trigger = NavigationTriggerKind::Push;
+    assert!(matches!(
+        ledger[1].validate(),
+        Err(JourneyContractError::ActionChokePointNotAffordance { .. })
+    ));
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.coverage.rows_rejected, 1);
+    let s = steps_to(&g, &key("a"), &key("c"));
+    assert!(!s.frontier.is_settled(&s.coverage, true));
+    assert!(s.frontier.unmeasured(&s.coverage, true).contains(&(
+        "rejected_departures",
+        1,
+        "producer_failed"
+    )));
+}
+
+#[test]
+fn rr6_l5_an_unplaced_row_claiming_push_counts_everywhere() {
+    let mut ledger = edges(&[
+        e("1", "a", "b"),
+        e("2", "b", "c").kind(NavigationTriggerKind::Push),
+    ]);
+    ledger[1].from_node.state_ids = vec!["x,y".into()];
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(g.unplaced_rejected_rows, 1);
+    let s = steps_to(&g, &key("b"), &key("a"));
+    assert_eq!(
+        s.frontier.unmeasured(&s.coverage, true),
+        [("unplaced_rejected_rows", 1, "producer_failed")]
+    );
+}
+
+#[test]
+fn rr6_l5_a_withdrawn_row_claiming_push_that_fails_validate_is_rejected() {
+    let mut ledger = edges(&[e("1", "a", "b")]);
+    let mut bad = e("2", "a", "c").kind(NavigationTriggerKind::Push).build();
+    bad.trigger.target_fingerprint = Some("fp-a-c".into());
+    bad.invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    assert!(bad.validate().is_err());
+    ledger.push(bad);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    let a = g.node(&key("a")).unwrap().unmeasured_departures;
+    assert_eq!(
+        (a.rejected, a.excluded_url_arrivals, a.withdrawn),
+        (1, 0, 0)
+    );
+    let s = steps_to(&g, &key("a"), &key("c"));
+    assert!(!s.frontier.is_settled(&s.coverage, true));
 }
