@@ -2334,3 +2334,93 @@ fn rr13_a_settle_timeout_self_loop_is_unmeasured_and_an_error_self_loop_is_not()
         assert!(listed.contains(&key("c")), "{label}: {listed:?}");
     }
 }
+
+#[test]
+fn rr14_1_an_excluded_url_self_loop_is_never_a_genuine_negative() {
+    // z -> a click, a -> b push, z -> z reload (`initial`). Kept, the reload
+    // is a URL arrival at z, so z qualifies for prior knowledge.
+    for outcome in [EdgeOutcome::Error, EdgeOutcome::NoChange] {
+        let ledger = edges(&[
+            e("1", "z", "a"),
+            e("2", "a", "b").kind(NavigationTriggerKind::Push),
+            e("3", "z", "z")
+                .kind(NavigationTriggerKind::Initial)
+                .outcome(outcome),
+        ]);
+        let kept = requires_prior_knowledge(&build_graph(&ledger, &[], &writing(), &no_filter()));
+        assert!(
+            kept.nodes.iter().any(|n| n.node_key == key("z")),
+            "{outcome:?}: kept, z qualifies"
+        );
+        // Filtered and withdrawn: the reload is an excluded URL arrival, so
+        // the graph-wide "no other node requires prior knowledge" is unsettled.
+        let mut filtered = ledger.clone();
+        filtered[2].app_version = Some("2.0.0".into());
+        let f = JourneyFilter {
+            app_version: Some("1.0.0".into()),
+            ..JourneyFilter::default()
+        };
+        let mut withdrawn = ledger.clone();
+        withdrawn[2].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+        for (g, label) in [
+            (build_graph(&filtered, &[], &writing(), &f), "filtered"),
+            (
+                build_graph(&withdrawn, &[], &writing(), &no_filter()),
+                "withdrawn",
+            ),
+        ] {
+            assert_eq!(
+                g.node(&key("z"))
+                    .unwrap()
+                    .unmeasured_departures
+                    .excluded_url_arrivals,
+                1,
+                "{outcome:?} {label}"
+            );
+            let p = requires_prior_knowledge(&g);
+            assert!(
+                !p.frontier.is_settled(&p.coverage, true),
+                "{outcome:?} {label}"
+            );
+            assert!(
+                p.frontier.unmeasured(&p.coverage, true).contains(&(
+                    "excluded_url_arrivals",
+                    1,
+                    "input_missing"
+                )),
+                "{outcome:?} {label}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rr14_2_a_kept_pop_settle_timeout_self_loop_makes_back_only_unknown() {
+    let ledger = edges(&[
+        e("1", "a", "z"),
+        e("2", "z", "z")
+            .kind(NavigationTriggerKind::Pop)
+            .outcome(EdgeOutcome::SettleTimeout),
+    ]);
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("z"))
+            .unwrap()
+            .unmeasured_departures
+            .excluded_back_arrivals,
+        1
+    );
+    let d = dead_ends(&g);
+    let z = d
+        .dead_ends
+        .iter()
+        .find(|x| x.node_key == key("z"))
+        .expect("z is a dead end");
+    assert_eq!(z.back_only, None);
+    // Control: an error pop self-loop is a genuine negative, back_only false.
+    let mut err = ledger;
+    err[1].outcome = EdgeOutcome::Error;
+    let d = dead_ends(&build_graph(&err, &[], &writing(), &no_filter()));
+    let z = d.dead_ends.iter().find(|x| x.node_key == key("z")).unwrap();
+    assert_eq!(z.back_only, Some(false));
+}
