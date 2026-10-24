@@ -52,10 +52,11 @@ export interface JourneyEdgeTimingAnswer {
    */
   ledger: JourneyLedgerHealth;
   /**
-   * Observations of this edge left out as contract violations (a row that
-   * fails `validate()` or whose `observedAt` is not RFC 3339) — the same
-   * rows the graph routes list as `rejected`; never samples, never
-   * "filtered out".
+   * Untrusted rows ANYWHERE in the read (a row that fails `validate()` or
+   * whose `observedAt` is not RFC 3339) — the rows the graph routes list
+   * as `rejected`. Their node keys cannot be trusted, so none is matched
+   * to this edge, and any of them may be one of its observations; never
+   * samples, never "filtered out".
    */
   rowsRejected: number;
   /**
