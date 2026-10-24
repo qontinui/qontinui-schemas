@@ -57,6 +57,8 @@ fn a_dpr2_caption_is_sampled_where_it_rendered() {
         frame: Some(&frame),
         snapshot: Some(&snap),
         prior_frame: None,
+        text_hidden_frame: None,
+        text_hidden_ids: None,
     };
     let result = analyzers::run(Analyzer::Color, &input);
 

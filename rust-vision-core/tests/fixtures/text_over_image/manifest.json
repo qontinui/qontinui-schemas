@@ -1,0 +1,395 @@
+{
+  "generator": "generate.py",
+  "page": {
+    "w": 320,
+    "h": 180,
+    "scale_factor": 1.0
+  },
+  "text": "Summer sale",
+  "cases": {
+    "held": {
+      "frame": "held_a.png",
+      "text_hidden": "held_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "low_contrast": {
+      "frame": "low_contrast_a.png",
+      "text_hidden": "low_contrast_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        250,
+        250,
+        250
+      ]
+    },
+    "scrim": {
+      "frame": "scrim_a.png",
+      "text_hidden": "scrim_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        250,
+        250,
+        250
+      ],
+      "text_hidden_rerastered": "scrim_b_rerastered.png"
+    },
+    "wide_heading": {
+      "frame": "wide_heading_a.png",
+      "text_hidden": "wide_heading_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 62,
+        "w": 320,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "sky": {
+      "frame": "sky_a.png",
+      "text_hidden": "sky_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_mid": {
+      "frame": "glow_mid_a.png",
+      "text_hidden": "glow_mid_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_light": {
+      "frame": "glow_light_a.png",
+      "text_hidden": "glow_light_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "credit": {
+      "frame": "credit_a.png",
+      "text_hidden": "credit_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "glow_strong": {
+      "frame": "glow_strong_a.png",
+      "text_hidden": "glow_strong_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "clipped": {
+      "frame": "clipped_a.png",
+      "text_hidden": "clipped_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 960,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 62,
+        "w": 960,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "parallax": {
+      "frame": "parallax_a.png",
+      "text_hidden": "parallax_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_parallax": "parallax_b_moved.png",
+      "text_hidden_parallax4": "parallax_b_moved4.png",
+      "text_hidden_parallax6": "parallax_b_moved6.png"
+    },
+    "mottled": {
+      "frame": "mottled_a.png",
+      "text_hidden": "mottled_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "tagline": {
+      "frame": "tagline_a.png",
+      "text_hidden": "tagline_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "card": {
+      "frame": "card_a.png",
+      "text_hidden": "card_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_rerastered": "card_b_rerastered.png"
+    },
+    "heavy": {
+      "frame": "heavy_a.png",
+      "text_hidden": "heavy_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 58,
+        "w": 1280,
+        "h": 41
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "heavy_m": {
+      "frame": "heavy_m_a.png",
+      "text_hidden": "heavy_m_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 58,
+        "w": 1280,
+        "h": 41
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "heavy_w": {
+      "frame": "heavy_w_a.png",
+      "text_hidden": "heavy_w_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 1280,
+        "h": 150
+      },
+      "text": {
+        "x": 0,
+        "y": 59,
+        "w": 1280,
+        "h": 40
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ]
+    },
+    "panel": {
+      "frame": "panel_a.png",
+      "text_hidden": "panel_b.png",
+      "image": {
+        "x": 0,
+        "y": 10,
+        "w": 320,
+        "h": 150
+      },
+      "text": {
+        "x": 22,
+        "y": 62,
+        "w": 166,
+        "h": 32
+      },
+      "fg": [
+        255,
+        255,
+        255
+      ],
+      "text_hidden_moved": "panel_b_moved.png"
+    }
+  }
+}

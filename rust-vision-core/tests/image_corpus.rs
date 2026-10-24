@@ -86,6 +86,8 @@ fn run_image(frame: Option<&Frame>, snap: Option<&ElementSnapshot>) -> AnalyzerR
             frame,
             snapshot: snap,
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     )
 }
@@ -370,6 +372,8 @@ fn image_values_survive_the_wire() {
             frame: None,
             snapshot: Some(&snap),
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     assert!(serde_json::to_value(&layout)

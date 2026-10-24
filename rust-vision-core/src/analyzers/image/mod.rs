@@ -8,7 +8,9 @@
 //! busyness (also under any text laid over the image), pHash and dHash, the
 //! placeholder signals, the legibility of its edge and stroke pixels against
 //! what surrounds it, the part of the natural image left visible under
-//! object-fit, and spectral-residual saliency. For the page it measures
+//! object-fit, spectral-residual saliency, and — given the frame's
+//! text-hidden twin — the WCAG contrast of each text element laid over it
+//! ([`text_contrast`], Phase 16). For the page it measures
 //! colourfulness, clutter and empty space. Every value is an
 //! [`Observation`] with provenance, carried on
 //! [`super::AnalyzerResult::image_values`].
@@ -60,6 +62,9 @@
 //! gap, so the analyzer degrades and page-wide checks answer unknown.
 
 pub mod pixels;
+pub mod text_contrast;
+
+pub use text_contrast::{GlyphColourSource, TextOverImageContrast};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -148,6 +153,24 @@ pub struct ImageElementValues {
     pub visible_region: Observation<NaturalRegion>,
     /// Mean spectral-residual saliency over the crop (0..=1, page maximum 1).
     pub saliency: Observation<f64>,
+    /// The WCAG contrast of each text element laid over the image, measured
+    /// on real pixels from the frame and its text-hidden twin
+    /// ([`super::AnalyzeInput::text_hidden_frame`]) at the
+    /// [`text_contrast::DEFAULT_PERCENTILE`]: see [`text_contrast`].
+    ///
+    /// `absent` when no text lies over the image; `unknown` with
+    /// `needs_multi_frame_input` when text does and no text-hidden frame was
+    /// supplied, and with `input_missing` when the one supplied cannot be
+    /// paired or registered with the frame, or the image is unrendered or
+    /// has no box. Computed from the image's BOX, not its crop, so a
+    /// CSS-background hero and an occluded `<img>` under a scrim are measured
+    /// too: the glyphs' background is read from the text-hidden frame,
+    /// whatever painted it.
+    ///
+    /// `None` only on a payload written before Phase 16; this crate always
+    /// states one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_contrast: Option<Observation<Vec<TextOverImageContrast>>>,
 }
 
 /// Page-level values over the whole frame.
@@ -1344,9 +1367,37 @@ enum Located {
     Unlocated(String),
 }
 
+/// The text-hidden frame as [`measure`] reads it: not supplied, or supplied
+/// and either paired with the frame or refused with the reason.
+type TextHidden<'a> = Option<Result<&'a Frame, LocateError>>;
+
+/// What [`measure`] needs for the text-over-image value, built once per run.
+struct TextCtx<'a> {
+    hidden: TextHidden<'a>,
+    ids: Option<&'a [String]>,
+    index: Option<text_contrast::TextIndex<'a>>,
+}
+
 /// Run the image analyzer. The dispatcher has already answered `Blocked`
 /// when there is no frame; `snapshot` may still be absent.
-pub fn run(frame: &Frame, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult {
+///
+/// `text_hidden` is the frame's text-hidden twin (Phase 16), read only for
+/// [`ImageElementValues::text_contrast`]. Its absence changes no verdict: the
+/// value is then `unknown{needs_multi_frame_input}` where text lies over an
+/// image. One that cannot be paired with the frame
+/// ([`text_contrast::pair_frames`]) is an input the caller asked to be read
+/// and that was not, so the run is `Degraded{input_missing}` — green.
+pub fn run(
+    frame: &Frame,
+    snapshot: Option<&ElementSnapshot>,
+    text_hidden: Option<&Frame>,
+    text_hidden_ids: Option<&[String]>,
+) -> AnalyzerResult {
+    let text_hidden = TextCtx {
+        hidden: text_hidden.map(|b| text_contrast::pair_frames(frame, b).map(|()| b)),
+        ids: text_hidden_ids,
+        index: snapshot.map(text_contrast::TextIndex::of),
+    };
     let stamp = Stamp {
         observed_at: frame.source.captured_at,
         evaluated_at: Utc::now(),
@@ -1383,8 +1434,15 @@ pub fn run(frame: &Frame, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult 
     let mut findings = Vec::new();
     let mut unlocated = Vec::new();
     for (el, media) in &media_elements {
-        let (values, located, hashes) =
-            measure(frame, snapshot, el, media, &stamp, saliency.as_ref());
+        let (values, located, hashes) = measure(
+            frame,
+            snapshot,
+            el,
+            media,
+            &stamp,
+            saliency.as_ref(),
+            &text_hidden,
+        );
         match located {
             Located::Crop(crop) => {
                 // A flat crop's pHash is degenerate whatever its kind, so it
@@ -1528,12 +1586,22 @@ pub fn run(frame: &Frame, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult 
         page,
         near_duplicates,
     };
+    // A text-hidden frame that was supplied and cannot be paired is named on
+    // whatever degradation the run reports, or degrades it on its own.
+    let unpaired = match &text_hidden.hidden {
+        Some(Err((_, why))) => format!(
+            " The text-hidden frame was not read, so no text-over-image contrast was measured: \
+             {why}"
+        ),
+        _ => String::new(),
+    };
     let result = if media_elements.is_empty() {
         AnalyzerResult::degraded(
             UnknownCode::InputMissing,
             format!(
                 "no element carries media (0/{}), so no per-image value was measured; only the \
-                 page-level values were. Green by design: an image-free page is not a failure.",
+                 page-level values were. Green by design: an image-free page is not a failure.\
+                 {unpaired}",
                 coverage.elements
             ),
             Some(coverage),
@@ -1544,11 +1612,18 @@ pub fn run(frame: &Frame, snapshot: Option<&ElementSnapshot>) -> AnalyzerResult 
             UnknownCode::InputMissing,
             format!(
                 "{}/{} media element(s) could not be read from the frame, so their pixel values \
-                 are unknown: {}",
+                 are unknown: {}.{unpaired}",
                 unlocated.len(),
                 media_elements.len(),
                 unlocated.join("; ")
             ),
+            Some(coverage),
+            findings,
+        )
+    } else if !unpaired.is_empty() {
+        AnalyzerResult::degraded(
+            UnknownCode::InputMissing,
+            unpaired.trim_start().to_string(),
             Some(coverage),
             findings,
         )
@@ -1598,8 +1673,11 @@ fn measure(
     media: &ElementMedia,
     stamp: &Stamp,
     saliency: Option<&(Vec<Vec<f64>>, f64)>,
+    text_hidden: &TextCtx<'_>,
 ) -> (ImageElementValues, Located, Option<(u64, u64)>) {
     let id = el.id.as_str();
+    // From the image's box, not its crop: see `ImageElementValues::text_contrast`.
+    let text_contrast = Some(text_contrast_value(frame, text_hidden, snapshot, el, stamp));
     let effective_resolution = stamp.of_result(
         effective_resolution(media, frame.source.scale_factor),
         "effective_resolution",
@@ -1632,6 +1710,7 @@ fn measure(
                     edge_contrast: stamp.unknown(e.clone(), "edge_contrast", Some(id)),
                     visible_region,
                     saliency: stamp.unknown(e, "saliency", Some(id)),
+                    text_contrast,
                 },
                 located,
                 None,
@@ -1785,10 +1864,170 @@ fn measure(
             edge_contrast,
             visible_region,
             saliency,
+            text_contrast,
         },
         Located::Crop(crop),
         hash_pair,
     )
+}
+
+/// [`ImageElementValues::text_contrast`] for one image: every text element
+/// laid over it, measured at [`text_contrast::DEFAULT_PERCENTILE`].
+///
+/// Coverage counts the text elements over the image: one whose glyphs turn
+/// out not to reach it ([`text_contrast::measure`]'s `None`) was measured in
+/// full and is simply not in the list; one reported not visible, or one that
+/// could not be measured, is unmeasured. Confidence is the lowest of the
+/// listed readings.
+fn text_contrast_value(
+    frame: &Frame,
+    text: &TextCtx<'_>,
+    snapshot: &ElementSnapshot,
+    el: &Element,
+    stamp: &Stamp,
+) -> Observation<Vec<TextOverImageContrast>> {
+    const DIM: &str = "text_contrast";
+    let id = Some(el.id.as_str());
+    // Without a box nothing can be over the image, and nothing was looked at:
+    // that is not an absence.
+    if el.bbox.is_none() {
+        return stamp.unknown(
+            (
+                UnknownCode::InputMissing,
+                format!(
+                    "element '{}' carries no bbox, so which text lies over it is unknown",
+                    el.id
+                ),
+            ),
+            DIM,
+            id,
+        );
+    }
+    let built;
+    let index = match &text.index {
+        Some(i) => i,
+        None => {
+            built = text_contrast::TextIndex::of(snapshot);
+            &built
+        }
+    };
+    let over = text_contrast::texts_over(snapshot, el, index);
+    let (pairs, hidden_texts) = (over.pairs, over.unreadable_texts);
+    let considered = (pairs.len() + hidden_texts) as u64;
+    if considered == 0 {
+        return Observation::absent(stamp.provenance(ObservationCoverage::full(1), id))
+            .expect("one image considered in full is a legal absence");
+    }
+    // Only an image that paints NOTHING is refused: an occluded or otherwise
+    // unreadable one is measured, because frame B is read under the glyphs
+    // and the image's crop never is.
+    if let Some(why) = unrendered(snapshot, el) {
+        return stamp.unknown((UnknownCode::InputMissing, why), DIM, id);
+    }
+    let b = match &text.hidden {
+        _ if pairs.is_empty() => {
+            return stamp.unknown(
+                (
+                    UnknownCode::InputMissing,
+                    format!(
+                        "the {hidden_texts} text element(s) over '{}' are reported not visible, \
+                         so no glyph over it can be attributed to the frame",
+                        el.id
+                    ),
+                ),
+                DIM,
+                id,
+            )
+        }
+        None => {
+            return stamp.unknown(
+                (
+                    UnknownCode::NeedsMultiFrameInput,
+                    format!(
+                        "{} text element(s) lie over '{}', and their glyphs are found only by \
+                         comparing the frame with a text-hidden capture of it, which was not \
+                         supplied",
+                        pairs.len(),
+                        el.id
+                    ),
+                ),
+                DIM,
+                id,
+            )
+        }
+        Some(Err(e)) => return stamp.unknown(e.clone(), DIM, id),
+        Some(Ok(b)) => *b,
+    };
+    let reg = match text_contrast::registered(frame, b, snapshot, el) {
+        Ok(r) => r,
+        Err(e) => return stamp.unknown(e, DIM, id),
+    };
+    let mut values = Vec::new();
+    let mut not_over = 0u64;
+    let mut failed = Vec::new();
+    for p in &pairs {
+        let reported = match text.ids {
+            None => false,
+            Some(ids) if ids.contains(&p.text.id) => true,
+            Some(_) => {
+                failed.push(text_contrast::not_reported_hidden(&p.text.id));
+                continue;
+            }
+        };
+        match text_contrast::measure(
+            frame,
+            b,
+            p,
+            text_contrast::DEFAULT_PERCENTILE,
+            &reg,
+            reported,
+        ) {
+            Ok(Some(v)) => values.push(v),
+            Ok(None) => not_over += 1,
+            Err(e) => failed.push(e),
+        }
+    }
+    let mut unmeasured = Vec::new();
+    if hidden_texts > 0 {
+        unmeasured.push(UnmeasuredDimension::new(
+            "text_visibility",
+            hidden_texts as u64,
+            UnknownCode::InputMissing,
+        ));
+    }
+    if !failed.is_empty() {
+        unmeasured.push(UnmeasuredDimension::new(
+            DIM,
+            failed.len() as u64,
+            UnknownCode::InputMissing,
+        ));
+    }
+    let coverage = ObservationCoverage {
+        considered,
+        measured: values.len() as u64 + not_over,
+        unmeasured,
+    };
+    if values.is_empty() {
+        return match failed.into_iter().next() {
+            Some((code, detail)) => {
+                Observation::unknown(code, detail, stamp.provenance(coverage, id))
+            }
+            None => match Observation::absent(stamp.provenance(coverage.clone(), id)) {
+                Ok(o) => o,
+                // Unmeasured text with nothing listed: not an absence.
+                Err(_) => Observation::unknown(
+                    UnknownCode::InputMissing,
+                    format!(
+                        "no text element over '{}' could be measured or ruled out",
+                        el.id
+                    ),
+                    stamp.provenance(coverage, id),
+                ),
+            },
+        };
+    }
+    let conf = values.iter().map(|v| v.confidence).fold(1.0, f64::min);
+    stamp.measured_over(values, id, Some(conf), coverage)
 }
 
 /// Busyness of the part of the image under each text element laid over it.

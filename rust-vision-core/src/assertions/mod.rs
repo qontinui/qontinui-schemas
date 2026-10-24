@@ -258,6 +258,37 @@ pub enum Assertion {
         #[serde(default)]
         max_blockiness: Option<f64>,
     },
+
+    // ---- Text over images (plan 2026-10-13-image-generation-and-visual-
+    // judgment, Phase 16) -------------------------------------------------
+    /// Every leaf text element laid over a rendered image reaches `min_ratio`
+    /// WCAG contrast at its `percentile`-th percentile (default
+    /// [`crate::analyzers::image::text_contrast::DEFAULT_PERCENTILE`], 5),
+    /// measured on real pixels: the glyphs are where the frame and its
+    /// text-hidden twin ([`EvalContext::text_hidden_frame`]) differ, and the
+    /// twin is sampled under them. The minimum is reported beside the
+    /// percentile; `percentile: 0` gates on the minimum itself.
+    ///
+    /// `Unknown{needs_multi_frame_input}` without the text-hidden frame;
+    /// `Unknown{input_missing}` when it cannot be paired with the frame
+    /// (another size or scale factor), when `min_ratio` is undeclared, or
+    /// when no text lies over a rendered image. A text element is unmeasured
+    /// (Unknown) when the two frames are not registered over its image, or
+    /// when its glyph mask is empty or too sparse — the text was not hidden in
+    /// frame B, or is invisible, and the two cannot be told apart — or when
+    /// frame B still paints its glyphs. A failure is decided on the glyph
+    /// pixels found; a pass needs the percentile WITH the glyphs the mask
+    /// cannot see (over image pixels matching the glyph colour), and is
+    /// Unknown when only the first clears `min_ratio`. A failure stands even
+    /// when another text element could not be measured; a pass needs them
+    /// all.
+    /// See [`crate::analyzers::image::text_contrast`] for the measurement.
+    TextOverImageContrast {
+        #[serde(default)]
+        min_ratio: Option<f64>,
+        #[serde(default)]
+        percentile: Option<f64>,
+    },
 }
 
 fn default_wcag_aa() -> WcagLevel {
@@ -446,14 +477,19 @@ pub struct AssertionResult {
     /// ([`Assertion::ImagePaletteWithin`], [`Assertion::NoNearDuplicateImages`],
     /// [`Assertion::NoPlaceholderImages`], [`Assertion::TransparentImageLegible`],
     /// [`Assertion::SalienceOrder`], [`Assertion::ImageSharpnessAtLeast`],
-    /// [`Assertion::ImageBlockinessWithin`]) are the ONLY evaluators that read
-    /// [`EvalContext::frame`], and a pixel read from a composited frame is an
-    /// estimate of the image under it. Each sets this field from
-    /// [`crate::analyzers::image::Crop::confidence`] — the share of the
-    /// image's box that was inside the frame and not painted over — scaled
+    /// [`Assertion::ImageBlockinessWithin`], [`Assertion::TextOverImageContrast`])
+    /// are the ONLY evaluators that read [`EvalContext::frame`] (and the last
+    /// also [`EvalContext::text_hidden_frame`]), and a pixel read from a
+    /// composited frame is an estimate of the image under it. Each sets this
+    /// field from [`crate::analyzers::image::Crop::confidence`] — the share of
+    /// the image's box that was inside the frame and not painted over — scaled
     /// where its own doc says so (the ring of surround pixels for
     /// `transparent_image_legible`; the saliency map's peakedness and the
-    /// winning margin for `salience_order`). A verdict that rests on the
+    /// winning margin for `salience_order`), except `text_over_image_contrast`,
+    /// which reads no crop: its confidence is the reading's own
+    /// ([`crate::analyzers::image::TextOverImageContrast::confidence`] — the
+    /// share of the text's box in the frame, and the measured glyph colour's
+    /// agreement). A verdict that rests on the
     /// slot's placeholder MARKER alone, and [`Assertion::ImageFocalVisible`]
     /// (media facts, no pixels), are deductions and state `None`.
     ///
@@ -669,6 +705,17 @@ pub struct EvalContext<'a> {
     /// Any other evaluator that starts reading it is producing an ESTIMATE
     /// and owes one too — see that field.
     pub frame: Option<&'a Frame>,
+    /// The text-hidden twin of [`Self::frame`]: the same page, captured with
+    /// its text made transparent. Read only by
+    /// [`Assertion::TextOverImageContrast`] (in `assertions/image.rs`, with
+    /// the other pixel readers); absent, that assertion answers
+    /// `Unknown{needs_multi_frame_input}`. Plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16.
+    pub text_hidden_frame: Option<&'a Frame>,
+    /// The ids of the text elements the producer reports it hid in
+    /// [`Self::text_hidden_frame`]; see
+    /// [`crate::analyzers::AnalyzeInput::text_hidden_ids`].
+    pub text_hidden_ids: Option<&'a [String]>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
     /// from `vision/extract` output before evaluating.
@@ -761,7 +808,8 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
         | Assertion::TransparentImageLegible { .. }
         | Assertion::SalienceOrder { .. }
         | Assertion::ImageSharpnessAtLeast { .. }
-        | Assertion::ImageBlockinessWithin { .. } => image::evaluate(a, ctx),
+        | Assertion::ImageBlockinessWithin { .. }
+        | Assertion::TextOverImageContrast { .. } => image::evaluate(a, ctx),
     }
 }
 
@@ -2955,5 +3003,73 @@ mod tests {
             &ctx,
         );
         assert!(!res.passed, "6px box for a 16px font must still fail");
+    }
+
+    /// ARMING TEST for `text_over_image_contrast` (plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16): a WIRE
+    /// assertion — as the CLI's assertions file and the runner's
+    /// `vision/assert` body carry it — handed to [`evaluate`]. Written against
+    /// the API the crate had before the phase (no new type, field or variant
+    /// is named), so with the change reverted it compiles and goes RED at run
+    /// time (the wire type is unknown). The measurement itself is covered by
+    /// `tests/text_over_image.rs`.
+    #[test]
+    fn arming_a_wire_text_over_image_contrast_is_evaluated() {
+        use crate::element_media::{ElementMedia, MediaKind, ObjectFit};
+        use crate::frame::FrameSource;
+        let assertion: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "text_over_image_contrast",
+            "min_ratio": 4.5,
+        }))
+        .expect("the wire assertion parses");
+        let snapshot = ElementSnapshot {
+            elements: vec![
+                Element {
+                    id: "hero".into(),
+                    bbox: Some(Region {
+                        x: 0,
+                        y: 0,
+                        w: 200,
+                        h: 100,
+                    }),
+                    media: Some(ElementMedia {
+                        object_fit: Some(ObjectFit::Fill),
+                        ..ElementMedia::new(MediaKind::Img)
+                    }),
+                    ..Default::default()
+                },
+                Element {
+                    id: "heading".into(),
+                    bbox: Some(Region {
+                        x: 20,
+                        y: 30,
+                        w: 120,
+                        h: 30,
+                    }),
+                    text: Some("Summer sale".into()),
+                    fg_color: Some(Rgb::new(255, 255, 255)),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let frame = Frame::from_rgba(
+            ::image::RgbaImage::from_pixel(200, 100, ::image::Rgba([40, 44, 52, 255])),
+            FrameSource::synthetic_now(),
+        );
+        let r = evaluate(
+            &assertion,
+            &EvalContext {
+                snapshot: Some(&snapshot),
+                frame: Some(&frame),
+                ..Default::default()
+            },
+        );
+        // Not a pass: without the text-hidden capture nothing is measured, and
+        // the typed code names the input to supply.
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        let wire = serde_json::to_value(&r).unwrap();
+        assert_eq!(wire["code"], "needs_multi_frame_input", "{wire}");
+        assert_eq!(wire["assertion"]["type"], "text_over_image_contrast");
     }
 }
