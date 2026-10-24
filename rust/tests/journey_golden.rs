@@ -313,6 +313,15 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
         .unsettled
         .iter()
         .all(|n| n.unknown_destination_arrivals == g.unknown_destination_arrivals));
+    // ...and nothing else unsettles them.
+    for n in &p.unsettled {
+        let name = family.name_of(&n.node_key);
+        assert!(n.arrival_doubt.is_zero(), "{name}");
+        assert_eq!(n.unplaced_rejected_rows, 0, "{name}");
+        assert!(!n.ledger_not_writing, "{name}");
+        assert_eq!(n.open_frontier_entries, 0, "{name}");
+        assert!(!n.unconfirmed_destination, "{name}");
+    }
     // No frontier is given; the only unexplored departures are the family's
     // own error / settle_timeout edges to another node.
     assert_eq!(p.frontier.open_entries, 0);
