@@ -864,10 +864,33 @@ mod tests {
             &["config", "--get-all", "credential.helper"],
         )
         .await;
-        // Exactly one value — our empty reset — and nothing after it.
+        let listed = String::from_utf8_lossy(&helpers.stdout).into_owned();
+        // `--get-all` prints one line per value: `credential.helper =` (the
+        // reset) prints as an empty line.
+        let values: Vec<&str> = listed
+            .strip_suffix('\n')
+            .unwrap_or(&listed)
+            .split('\n')
+            .collect();
+        // Everywhere: the enclosing repo's `store` never appears, and the LAST
+        // value is our empty reset — git clears every helper listed before an
+        // empty one, so whatever precedes it is dead.
+        assert!(
+            !values.contains(&"store"),
+            "an enclosing repo's helper reached the sibling: {helpers:?}"
+        );
         assert_eq!(
-            String::from_utf8_lossy(&helpers.stdout),
-            "\n",
+            values.last(),
+            Some(&""),
+            "the empty helper reset is not the last value: {helpers:?}"
+        );
+        // Off Windows the system config is not read at all, so the reset is
+        // the ONLY value. On Windows D5's named fallback keeps the system
+        // config (Git for Windows' own `manager` helper is listed ahead of the
+        // reset, which clears it).
+        #[cfg(not(windows))]
+        assert_eq!(
+            listed, "\n",
             "an enclosing repo's helper reached the sibling: {helpers:?}"
         );
         let url = git_under(
