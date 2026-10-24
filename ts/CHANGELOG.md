@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.1...ts-v2.5.0) (2026-10-24)
+
+
+### Features
+
+* generated bindings for the spec_model types ([7bab6d4](https://github.com/qontinui/qontinui-schemas/commit/7bab6d418bb3eee3b96fa41fd342338fe09c48f6))
+
 ## [2.4.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.0...ts-v2.4.1) (2026-10-22)
 
 

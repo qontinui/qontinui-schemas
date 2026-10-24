@@ -1,6 +1,6 @@
 {
-  "rust": "4.8.0",
-  "rust-runner-client": "0.2.13",
-  "ts": "2.4.1",
-  "ci-exec": "0.1.1"
+  "rust": "4.9.0",
+  "rust-runner-client": "0.2.14",
+  "ts": "2.5.0",
+  "ci-exec": "0.1.2"
 }
