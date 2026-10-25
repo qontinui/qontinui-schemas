@@ -189,6 +189,11 @@ pub mod run_outcomes;
 pub mod runner;
 pub mod scheduler;
 pub mod sdk_features;
+/// Session run-record vocabulary — the ONE declaration of the session work
+/// types, initiators, end reasons, end sources and bind origins, plus the
+/// classifier version coord stores beside every work-type verdict. Carried as
+/// embedded DATA, like `spawn_authorization`.
+pub mod session_work_type;
 /// Agent-spawn authorization — the ONE declaration of the spawn
 /// configuration surface (spawn paths, dispositions, the fan-out default and
 /// its ceiling, the coord seed tables). Carried as embedded DATA rather than
