@@ -86,6 +86,13 @@ pub struct SessionWorkTypeContract {
 /// The value both mandatory fallback lists must contain.
 pub const UNKNOWN: &str = "unknown";
 
+/// Does `v` match `^[a-z][a-z0-9_]*$`, the shape every wire value must have?
+fn is_wire_shaped(v: &str) -> bool {
+    let mut chars = v.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
 impl SessionWorkTypeContract {
     /// Parse [`CONTRACT_JSON`]. Prefer [`contract`], which parses once per
     /// process and validates.
@@ -172,6 +179,13 @@ impl SessionWorkTypeContract {
             for v in values {
                 if v.trim().is_empty() {
                     return Err(format!("{label} contains a blank entry"));
+                }
+                if !is_wire_shaped(v) {
+                    return Err(format!(
+                        "{label} entry `{v}` is not a wire value — it must match \
+                         ^[a-z][a-z0-9_]*$ (a padded or mixed-case value would key \
+                         a row no lookup can find)"
+                    ));
                 }
                 if !seen.insert(v.as_str()) {
                     return Err(format!("{label} declares `{v}` twice"));
@@ -336,9 +350,11 @@ mod tests {
 
     // ── Assert the assertions: each invariant must be able to FAIL ──────────
     //
-    // Every rejection below feeds HAND-BUILT JSON through the same
-    // `parse_and_validate` door, and `the_minimal_fixture_validates` proves
-    // the fixture is otherwise valid — so each red is the injected fault.
+    // Each rejection below starts from a HAND-BUILT fixture that
+    // `the_minimal_fixture_validates` proves is otherwise valid — so each red
+    // is the injected fault. Most feed the broken JSON through
+    // `parse_and_validate`; the duplicate sweep mutates the parsed struct and
+    // calls `validate` directly.
 
     fn fixture(work_types: &str, initiators: &str) -> String {
         format!(
@@ -461,6 +477,85 @@ mod tests {
         let broken = CONTRACT_JSON.replacen(anchor, "\"label\": \"x\", \"name\": \"vet_imp\",", 1);
         assert_ne!(broken, CONTRACT_JSON);
         assert!(serde_json::from_str::<SessionWorkTypeContract>(&broken).is_err());
+    }
+
+    #[test]
+    fn an_unknown_top_level_field_is_refused() {
+        // A pure addition beside `classifier_version`, so only the
+        // contract-level `deny_unknown_fields` can make the parse fail.
+        let json = fixture(WT_OK, INIT_OK).replace(
+            "\"classifier_version\": 1,",
+            "\"classifier_version\": 1, \"extra\": 1,",
+        );
+        assert_ne!(json, fixture(WT_OK, INIT_OK), "the fixture must be altered");
+        let err = SessionWorkTypeContract::parse_and_validate(&json).unwrap_err();
+        assert!(err.contains("unknown field"), "{err}");
+    }
+
+    #[test]
+    fn validate_rejects_a_blank_comment() {
+        let json =
+            fixture(WT_OK, INIT_OK).replace("\"$comment\": \"fixture\"", "\"$comment\": \" \"");
+        assert_ne!(json, fixture(WT_OK, INIT_OK), "the fixture must be altered");
+        let err = SessionWorkTypeContract::parse_and_validate(&json).unwrap_err();
+        assert!(err.contains("$comment"), "{err}");
+    }
+
+    #[test]
+    fn validate_rejects_a_value_that_is_not_wire_shaped() {
+        // Padded and mixed-case values are non-blank and distinct from their
+        // clean twins, so the blank and duplicate checks both wave them through.
+        for bad in [" vet_imp", "vet_imp ", "Vet_Imp", "vet-imp", "1vet"] {
+            let wt = format!(
+                r#"[{{"name": "{bad}", "description": "d"}}, {{"name": "unknown", "description": "d"}}]"#
+            );
+            let err =
+                SessionWorkTypeContract::parse_and_validate(&fixture(&wt, INIT_OK)).unwrap_err();
+            assert!(err.contains("not a wire value"), "{bad:?}: {err}");
+        }
+        let err = SessionWorkTypeContract::parse_and_validate(&fixture(
+            WT_OK,
+            r#"["Operator", "unknown"]"#,
+        ))
+        .unwrap_err();
+        assert!(
+            err.contains("initiators") && err.contains("not a wire value"),
+            "{err}"
+        );
+        for field in ["end_reasons", "end_sources", "bind_origins"] {
+            let mut c = SessionWorkTypeContract::parse_and_validate(&fixture(WT_OK, INIT_OK))
+                .expect("fixture valid");
+            let list = match field {
+                "end_reasons" => &mut c.end_reasons,
+                "end_sources" => &mut c.end_sources,
+                _ => &mut c.bind_origins,
+            };
+            list.push("Padded ".to_string());
+            let err = c.validate().unwrap_err();
+            assert!(
+                err.contains(field) && err.contains("not a wire value"),
+                "{field}: {err}"
+            );
+        }
+    }
+
+    /// The three work types D2 derives from a spawn KIND must name a kind
+    /// spawn_authorization actually declares — a renamed kind would otherwise
+    /// leave its runs classifiable to nothing.
+    #[test]
+    fn spawn_kind_work_types_name_declared_spawn_kinds() {
+        let kinds = &crate::spawn_authorization::contract().kind_seeds;
+        for wt in [
+            "condition_autodispatch",
+            "operator_page_remediation",
+            "onboarding_audit",
+        ] {
+            assert!(is_work_type(wt), "`{wt}` must be a declared work type");
+            assert!(
+                kinds.iter().any(|k| k.agent_name == wt),
+                "work type `{wt}` names no spawn_authorization kind_seeds agent_name"
+            );
+        }
     }
 
     #[test]
