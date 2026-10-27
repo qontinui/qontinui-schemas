@@ -17,6 +17,7 @@
 //! | [`HostIdentity`] | where CI state lives on this host, and what to call the host |
 //! | [`CanonicalConvergence`] | the `[canonical]` gate's measuring and acting halves |
 //! | [`ModelInvoker`] | how one model call is made for a `model = true` step (optional: a host with none refuses model access) |
+//! | [`SiblingReadAccess`] | the dispatch-scoped door that may mint a read token for a private sibling |
 //!
 //! Every trait is object-safe, so a host is assembled at runtime from
 //! `Arc<dyn …>` parts and the crate never grows a generic parameter per trait.
@@ -356,6 +357,47 @@ pub trait ModelInvoker: Send + Sync {
     }
 }
 
+/// What a host's sibling read door answered for one `(dispatch, sibling)`.
+///
+/// Four answers, because "absent" and "unanswered" are different answers and
+/// only the first is a NO (plan
+/// `2026-10-13-local-lane-ci-reads-a-private-sibling-through-a-dispatch-scoped-door`,
+/// D3): a sibling the door could not answer for is read on the public path,
+/// and if that fails the error says the door's answer was UNKNOWN — never
+/// "no grant".
+#[derive(Debug)]
+pub enum SiblingReadAnswer {
+    /// A minted read token for exactly this sibling, and its expiry as the door
+    /// reported it (an RFC 3339 string; logged, never parsed).
+    Granted(crate::sibling_git::ReadToken, String),
+    /// The door answered and refused, with its typed code
+    /// (`no_ci_read_grant`, `fork_pr`, `dispatch_not_live`, …).
+    NoGrant { code: String },
+    /// This host has no such door (a standalone `qontinui-ci` run).
+    NotOffered { reason: String },
+    /// The door could not be asked or did not answer usably (unreachable,
+    /// 5xx, `grant_unestablished`, a missing credential).
+    Unknown { reason: String },
+}
+
+/// The dispatch-scoped sibling read door.
+///
+/// The executor asks it ONCE per declared sibling per dispatch, before any
+/// read of that sibling. On a coord-dispatched node the host implements it as
+/// `POST /coord/ci/dispatches/:dispatch_id/sibling-read-token` with body
+/// `{repo}`, answering `{token, expires_at, repository, permissions}`; ci-exec
+/// has no coord transport of its own, so the call is the host's. The executor
+/// revokes a granted token itself once that sibling is provisioned.
+pub trait SiblingReadAccess: Send + Sync {
+    /// Ask for a read token for `repo` (`owner/name`) on behalf of
+    /// `dispatch_id`.
+    fn read_token<'a>(
+        &'a self,
+        dispatch_id: &'a str,
+        repo: &'a str,
+    ) -> BoxFuture<'a, SiblingReadAnswer>;
+}
+
 /// One implementation of each host trait.
 #[derive(Clone)]
 pub struct Host {
@@ -369,4 +411,10 @@ pub struct Host {
     /// with no invoker — refuses model access with `host_has_no_broker`; the
     /// steps still run.
     pub model: Option<Arc<dyn ModelInvoker>>,
+    /// The dispatch-scoped read door asked once per declared sibling. A host
+    /// with no door installs one answering `NotOffered` (see
+    /// `standalone::NoSiblingDoor`). A sibling the door does not grant is read
+    /// on the public path with NO credential: the host's own GitHub token is
+    /// used only for reads of the dispatched repo, never for a sibling.
+    pub sibling_reads: Arc<dyn SiblingReadAccess>,
 }

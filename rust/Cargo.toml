@@ -31,6 +31,10 @@ base64 = "0.22"
 # Optional: only `host_sizing::probe` reads the live host. Enable with the
 # `host-probe` feature; the pure sizing arithmetic needs nothing.
 sysinfo = { version = "0.32", default-features = false, features = ["system"], optional = true }
+# Optional: only `spec_model::{parse, render}` read and write YAML frontmatter.
+# Enable with the `spec-yaml` feature; the spec types themselves need nothing,
+# so a consumer that only uses them adds nothing to its lockfile.
+serde_yaml_ng = { version = "0.10", optional = true }
 
 [features]
 default = []
@@ -38,6 +42,9 @@ default = []
 # Consumers that size builds against the live host (runner, supervisor)
 # enable this; the rest of the crate never touches the host.
 host-probe = ["dep:sysinfo"]
+# `spec_model::{parse, render}` — the spec artifact body as YAML frontmatter
+# plus prose. Consumers that read or write whole spec bodies enable this.
+spec-yaml = ["dep:serde_yaml_ng"]
 
 [dev-dependencies]
 # tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.

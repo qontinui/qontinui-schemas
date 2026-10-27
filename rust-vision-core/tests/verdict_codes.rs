@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Every `Blocked` and `Degraded` verdict carries a typed [`UnknownCode`].
 //!
 //! PER ANALYZER, not aggregate (plan `489ed69e` lesson 6): an aggregate

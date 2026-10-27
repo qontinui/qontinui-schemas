@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Layout analyzer — overlaps, misalignments, off-screen elements, missing
 //! gutters, etc. Pure geometry over [`ElementSnapshot`]; no pixels.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A degenerate snapshot must not audit clean.
 //!
 //! These tests pin the defect this crate's analyzer verdict exists to close:

@@ -16,6 +16,7 @@
 //! | [`executor`] | one job end-to-end: checkout → manifest → canonical gate → provisioning → steps → report → cleanup |
 //! | [`checkout`] | the dispatch-scoped worktree and its cleanup |
 //! | [`sibling`] | sibling-repo resolution and materialisation |
+//! | [`sibling_git`] | the isolated git environment a sibling's git runs under |
 //! | [`tools`] | the closed tool registry and its version-keyed cache |
 //! | [`services`] | the closed container-service registry and its lifecycle |
 //! | [`junit`] | capturing a run's test report before cleanup removes it |
@@ -53,6 +54,7 @@ pub mod services;
 #[cfg(feature = "import")]
 pub mod shell;
 pub mod sibling;
+pub mod sibling_git;
 pub mod standalone;
 pub mod tools;
 
