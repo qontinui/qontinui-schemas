@@ -38,25 +38,6 @@
 # CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
 # the daily pending-registration-audit workflow reds until the row is deleted.
 
-# The cli_session types (schemas#212, 86710c89), awaiting runner#1990.
-[[pending]]
-type = "CapabilityState"
-runner_pr = "qontinui/qontinui-runner#1990"
-added = 2026-10-13
-schemas_pr = "qontinui/qontinui-schemas#212"
-
-[[pending]]
-type = "CliProfile"
-runner_pr = "qontinui/qontinui-runner#1990"
-added = 2026-10-13
-schemas_pr = "qontinui/qontinui-schemas#212"
-
-[[pending]]
-type = "SessionFailure"
-runner_pr = "qontinui/qontinui-runner#1990"
-added = 2026-10-13
-schemas_pr = "qontinui/qontinui-schemas#212"
-
 [[pending]]
 type = "CacheProvenance"
 runner_pr = "qontinui/qontinui-runner#1890"
