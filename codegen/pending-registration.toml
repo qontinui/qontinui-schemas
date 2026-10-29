@@ -38,58 +38,61 @@
 # CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
 # the daily pending-registration-audit workflow reds until the row is deleted.
 
+# The Observation-envelope types (schemas#202), awaiting runner#2387, which
+# registers all nine. Re-pointed 2026-10-29 from runner#1890, which is DIRTY
+# and idle since 2026-10-24.
 [[pending]]
 type = "CacheProvenance"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "Observation"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "ObservationCoverage"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "ObservationStatus"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "Producer"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "Provenance"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "UnknownCode"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "UnknownInfo"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
 type = "UnmeasuredDimension"
-runner_pr = "qontinui/qontinui-runner#1890"
-added = 2026-10-13
+runner_pr = "qontinui/qontinui-runner#2387"
+added = 2026-10-29
 schemas_pr = "qontinui/qontinui-schemas#202"
 
 [[pending]]
