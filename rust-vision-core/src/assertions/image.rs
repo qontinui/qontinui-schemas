@@ -810,10 +810,13 @@ fn blockiness_within(
 /// (`needs_multi_frame_input`); the frame present; the two paired (one size,
 /// one scale factor); a snapshot. Then, per image with text over it, the two
 /// frames must be registered over it ([`tc::registered`]); its text is
-/// unmeasured otherwise. Text over an unrendered image, or reported not
-/// visible itself, is skipped and disclosed; text over an OCCLUDED image is
-/// measured (frame B is read under the glyphs, never the image's crop); text
-/// whose box touches an image while its glyphs do not is not text over it.
+/// unmeasured otherwise. Text over an unrendered image is skipped and
+/// disclosed; text reported not visible ITSELF (occluded, off-screen) is
+/// unmeasured, so it never lets a pass through; text over an OCCLUDED image
+/// is measured (frame B is read under the glyphs, never the image's crop);
+/// text whose box touches an image while its glyphs do not is not text over
+/// it. A failure found on measured text stands beside unmeasured text; a pass
+/// needs every text over a rendered image measured.
 fn text_over_image(
     a: Assertion,
     min_ratio: Option<f64>,
@@ -873,6 +876,20 @@ fn text_over_image(
             Err((_, why)) => unmeasured.push(why),
         }
     }
+    // Text over the image that may paint but cannot be attributed to the
+    // frame (occluded, off-screen, an unknown reason): unmeasured, so it
+    // blocks a pass as any other unmeasured text does. Text that paints
+    // nothing never reaches this count (`paints_text` drops it first).
+    if page.skipped_texts > 0 {
+        unmeasured.push(format!(
+            "{} text element(s) over an image are reported not visible (occluded, off-screen, or \
+             for a reason this crate does not read), so whether the frame shows their glyphs is \
+             unknown",
+            page.skipped_texts
+        ));
+    }
+    // Each entry names one text, except the one above, which names many.
+    let unmeasured_n = unmeasured.len() + page.skipped_texts.saturating_sub(1);
     let mut note = page.note();
     if not_over > 0 {
         note.push_str(&format!(
@@ -903,10 +920,7 @@ fn text_over_image(
         let also = if unmeasured.is_empty() {
             String::new()
         } else {
-            format!(
-                " ({} other text element(s) could not be measured)",
-                unmeasured.len()
-            )
+            format!(" ({unmeasured_n} other text element(s) could not be measured)")
         };
         return AssertionResult::fail(
             a,
@@ -924,9 +938,8 @@ fn text_over_image(
             a,
             UnknownCode::InputMissing,
             format!(
-                "{} text element(s) over an image could not be measured, so the page was not \
-                 fully examined: {}{note}",
-                unmeasured.len(),
+                "{unmeasured_n} text element(s) over an image could not be measured, so the page \
+                 was not fully examined: {}{note}",
                 unmeasured.join("; ")
             ),
         );
