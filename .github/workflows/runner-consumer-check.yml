@@ -110,6 +110,53 @@ on:
     # must re-red the PR, or the gate can be satisfied and then quietly
     # un-satisfied.
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # PUSH TO MAIN — a verdict for schemas `main` itself, not for a PR.
+  #
+  # Two readers need it, and before this trigger both read nothing:
+  #   1. A red main must be VISIBLE as a consumer break. Without a push run
+  #      this workflow wrote no `main` baseline, so a schemas `main` that no
+  #      longer compiled consumer `main` surfaced only through check-drift.
+  #      Now it is this workflow's own red on `main`, which coord counts in
+  #      `main_ci_status` (`coord.ci_baselines` is fed ONLY by push runs).
+  #   2. coord's stale-base arm (c) — qontinui-coord#3557, OPEN as of
+  #      2026-10-30, plan 2026-10-30-a-red-pr-whose-failing-checks-are-green-
+  #      at-main-tip-is-never-freshened — will freshen a red PR ONCE when every
+  #      failing check is green on the default branch's most recent PUSH run
+  #      of the same name.
+  #      qontinui-schemas#235/#240/#257 were red on exactly `consumer-check
+  #      (qontinui-runner, …)` and `consumer-gate`, which had no push run on
+  #      `main` at all, so the arm could never see them green there.
+  #
+  # NO `paths:` FILTER here either, for a reason of its own: this gate's
+  # input is OUTSIDE this repo. Consumer `main` moves independently, so every
+  # push to schemas `main` is a fresh measurement of "does consumer main
+  # compile against schemas main", whatever files the push touched. And on
+  # push the in-job `gate` step below NEVER takes its cheap exit: a green
+  # posted without compiling would be a vacuous green ON MAIN, which coord
+  # reads as evidence.
+  #
+  # Costs, accepted and stated so nobody rediscovers them:
+  #   - One full consumer compile per push to `main`.
+  #   - This is now a `main` baseline, and `consumer-gate` is a REQUIRED
+  #     context, so a consumer `main` that fails against schemas `main` makes
+  #     coord read schemas `main` as RED — including a consumer break that is
+  #     not schemas' fault.
+  #   - A SANCTIONED break reads red too. When a schemas PR lands with a
+  #     declared adaptation (leg 2 green), coord lands that adaptation AFTER
+  #     it, so this push run compiles consumer `main` before the adaptation is
+  #     there and fails. Leg 2 cannot run on a push — there is no PR to read a
+  #     declaration from — so schemas `main` stays red from the land until a
+  #     later PUSH verdict compiles. Nothing makes that happen by itself: a
+  #     compile failure is a GENUINE failure to coord's red-main lane, whose
+  #     re-run of one is behind `auto_fix_red_main_flaky` (default OFF) and
+  #     fires at most once per episode, almost always before the adaptation
+  #     has landed. So it clears when someone runs
+  #     `gh run rerun <this run> --failed` AFTER the adaptation lands (a re-run
+  #     keeps `event: push`), or when the next land goes through coord's
+  #     main-red waiver lane. A `workflow_dispatch` does NOT clear it: coord
+  #     never writes or prunes a baseline from a non-push run.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 # Only a NEW HEAD SHA (`synchronize`) cancels a run in flight. A label event
@@ -133,7 +180,16 @@ on:
 # the same head. That red is honest, not manufactured, and it is short-lived.
 # `synchronize` still cancels: the superseded run's
 # contexts land on a SHA that is no longer the head. `workflow_dispatch` has no
-# `action`, so it never cancels either.
+# `action`, so it never cancels either — and neither does `push`, whose group is
+# `runner-consumer-check-refs/heads/main`, shared with no PR (a PR's
+# `github.ref` is `refs/pull/<n>/merge`) but shared with a `workflow_dispatch`
+# on `main`: a queued dispatch can replace a queued push run, which then ends
+# `cancelled` (coord skips a cancelled run, so the baseline is not harmed, but
+# the newest push verdict can then be an older sha's). Pushes to main QUEUE rather than cancel,
+# so each run that starts finishes and leaves a real verdict on its sha: a
+# cancelled run is NO VERDICT, and on `main` that would be a baseline that says
+# nothing. A burst of pushes still collapses to one pending run, so the newest
+# main sha is always measured.
 # Plan: 2026-09-13-schemas-major-release-wedges-consumers, Phase 1.
 concurrency:
   group: runner-consumer-check-${{ github.ref }}
@@ -187,7 +243,7 @@ jobs:
             needs_dist_stub: "false"
             heavy: "false"
     steps:
-      - name: Checkout qontinui-schemas (PR head)
+      - name: Checkout qontinui-schemas (PR head, or the pushed sha)
         uses: actions/checkout@v5
         with:
           path: qontinui-schemas
@@ -230,6 +286,14 @@ jobs:
               if printf '%s\n' "$changed" | grep -qE '^(rust/|rust-vision-core/|code-graph/|rust-runner-client/|Cargo\.toml$|Cargo\.lock$|\.github/workflows/runner-consumer-check\.yml$)'; then
                 run_gate=true
               fi
+              ;;
+            push)
+              # A push to main ALWAYS runs fully — no path predicate. This
+              # verdict is read as "green/red on main" (coord's main baseline
+              # and stale-base arm (c)), and the gate's input is consumer
+              # `main`, which moves without any schemas path changing. A
+              # cheap exit here would be a vacuous green on main.
+              run_gate=true
               ;;
             *)
               # workflow_dispatch is an explicit ask — always run fully.
@@ -377,7 +441,7 @@ jobs:
           set -euo pipefail
 
           if [ -z "${PR_NUMBER:-}" ]; then
-            echo "No PR number (workflow_dispatch run) — leg 2 cannot resolve a declaration."
+            echo "No PR number (${{ github.event_name }} run) — leg 2 cannot resolve a declaration."
             echo "found=false" >> "$GITHUB_OUTPUT"
             echo "reason=not-a-pull-request" >> "$GITHUB_OUTPUT"
             exit 0
@@ -756,6 +820,8 @@ jobs:
           DECLARED_RED: ${{ steps.declare.outputs.red_contexts }}
           DECLARED_PENDING: ${{ steps.declare.outputs.pending_contexts }}
           LEG2: ${{ steps.leg2.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEMAS_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -776,6 +842,31 @@ jobs:
           if [ "$LEG1" != "success" ] && [ "$LEG1" != "failure" ]; then
             echo "::error::VACUOUS GATE: run_gate=true but leg 1 did not execute (outcome=${LEG1:-<none>})."
             echo "Refusing to report a green that proves nothing."
+            exit 1
+          fi
+
+          # NOT A PULL REQUEST (push to main, or workflow_dispatch): leg 1's
+          # verdict IS the verdict. There is no PR to declare an adaptation on,
+          # so leg 2 has nothing to resolve, and the PR-oriented remedy below
+          # (label THIS PR) would be advice to nobody.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            if [ "$LEG1" = "success" ]; then
+              echo "PASS: ${CONSUMER} main (${MAIN_SHA}) compiles against qontinui-schemas @ ${SCHEMAS_SHA} (${EVENT_NAME})."
+              exit 0
+            fi
+            echo "::error::${CONSUMER} main (${MAIN_SHA}) does NOT compile against qontinui-schemas @ ${SCHEMAS_SHA} (${EVENT_NAME})."
+            echo ""
+            echo "This is a CONSUMER BREAK on this schemas commit, not a PR's problem. One of:"
+            echo "  * a breaking schemas change landed and its declared adaptation has not landed YET"
+            echo "    (expected, transient: coord lands the adaptation after the schemas PR);"
+            echo "  * a breaking schemas change landed with no adaptation;"
+            echo "  * ${CONSUMER} main stopped compiling on its own."
+            echo "Read the leg 1 log for the first error and fix whichever side owns it."
+            if [ "$EVENT_NAME" = "push" ]; then
+              echo "coord reads THIS run as schemas main's baseline. Once the consumer side is fixed, re-run this"
+              echo "run's failed jobs (gh run rerun ${{ github.run_id }} --failed), which keeps event=push and"
+              echo "writes a fresh baseline. A workflow_dispatch does NOT clear it: coord ignores non-push runs."
+            fi
             exit 1
           fi
 
@@ -1032,9 +1123,35 @@ jobs:
       - name: Aggregate consumer verdicts
         env:
           RESULT: ${{ needs.consumer-check.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEMAS_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          echo "consumer-check aggregate result: $RESULT"
+          echo "consumer-check aggregate result: $RESULT (event: $EVENT_NAME)"
+          # Off a pull request (push to main, workflow_dispatch) wire-gate-guard
+          # is skipped (it diffs a PR against its base), and consumer-check's
+          # result is leg 1's verdict alone: green iff every consumer's main
+          # compiles against this schemas sha. `skipped` is NOT green here (a
+          # dispatch used to read it so): consumer-check carries no `if:`, so a
+          # skipped result off a PR means nothing was compiled.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            case "$RESULT" in
+              success)
+                echo "Every consumer's main compiles against qontinui-schemas @ ${SCHEMAS_SHA}."
+                exit 0
+                ;;
+              cancelled)
+                echo "::error::NO VERDICT: consumer-check was cancelled. This is not evidence a consumer is broken; re-run this workflow."
+                exit 1
+                ;;
+              *)
+                echo "::error::At least one consumer's main does NOT compile against qontinui-schemas @ ${SCHEMAS_SHA} — a consumer break on ${REF_NAME}."
+                echo "Open the per-consumer consumer-check job above for the first compile error."
+                exit 1
+                ;;
+            esac
+          fi
           case "$RESULT" in
             success|skipped)
               echo "All consumers either compile against this PR at main, or have a verified declared adaptation."
