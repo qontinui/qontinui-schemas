@@ -280,8 +280,9 @@ pub enum ScheduledTaskType {
         capture_on_focus_change: bool,
     },
     /// Run an ad-hoc Claude agent prompt without pre-registering it in the
-    /// Prompt Library. Reuses the runner's existing `POST /prompts/run`
-    /// ad-hoc surface — no separate Claude CLI plumbing required.
+    /// Prompt Library. The runner launches it as one headless `claude`
+    /// session through its own spawn seam; the recorded outcome is that
+    /// session's exit status (success iff exit code 0).
     RemoteAgent {
         /// The prompt content to send to the Claude session.
         prompt: String,
@@ -298,6 +299,24 @@ pub enum ScheduledTaskType {
         /// (typically `claude-sonnet-4-6`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         model: Option<String>,
+        /// Optional reasoning-effort level for the spawned session: one of
+        /// `low`, `medium`, `high`, `xhigh` or `max`. `None` leaves the level
+        /// to the runner. A plain string rather than an enum, so a stored
+        /// task carrying a level this crate does not list still loads; the
+        /// consumer validates it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
+        /// Optional ultracode switch (standing dynamic-workflow orchestration)
+        /// for the spawned session. `Some(true)` turns it on, `Some(false)`
+        /// keeps it off, and `None` leaves the choice to the runner.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ultracode: Option<bool>,
+        /// Optional kebab-case name of a spawn-effort profile (e.g.
+        /// `research`, `implementation`) that the runner resolves to an
+        /// effort level and an ultracode setting. `None` leaves the choice
+        /// to the runner.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort_profile: Option<String>,
         /// Optional MCP connection references resolved at dispatch time
         /// against the runner's existing MCP config. Empty = inherit
         /// whatever the runner currently has configured.
