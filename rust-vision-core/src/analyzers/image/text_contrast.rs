@@ -82,9 +82,10 @@
 //! with a noisy one, every blind pixel is. EVERY undetectable pixel counts
 //! as ink: no visible band bounds the density of a hidden word, which may be
 //! heavier than any visible one (a density taken from the visible line passed
-//! a heavy glyph on a tight patch at p5 7.55 where the truth was 1.00; on 2606
-//! text windows of 14 real photos the shipped rule read 4 of 886 true passes
-//! as Unknown and 3 as conservative failures, and passed nothing falsely).
+//! a heavy glyph on a tight patch, the `heavy_m` / `heavy_w` fixtures). The
+//! cost — a few true passes read as Unknown — was measured during review on a
+//! private corpus of real photos, which this repository does not carry; see
+//! PR qontinui/qontinui-schemas#257.
 //! [`TextOverImageContrast::percentile_ratio_with_hidden`] is the
 //! percentile with those pixels added at their own contrasts. A check passes
 //! only on that value, fails on the measured one, and is Unknown in between:
@@ -117,7 +118,9 @@
 //!
 //! When the box shows glyphs and fewer than the floor of them reach the
 //! image, the text is not over the image (a label whose line box overhangs a
-//! thumbnail), and is not measured.
+//! thumbnail), and is not measured — unless the image under the box is blind
+//! enough to hide the floor's worth (a box straddling the image's edge whose
+//! glyphs over it sit on their own colour): that is Unknown.
 //!
 //! Only LEAF text elements are measured ([`TextIndex`]): a wrapper whose
 //! innerText includes a child's is measured through the child, against the
@@ -251,6 +254,29 @@ pub const MIN_GLYPH_COVERAGE_ABS: f64 = 0.15;
 /// glyph colour.
 pub const GLYPH_COLOUR_TOLERANCE: f64 = 24.0;
 
+/// Largest scale factor (device pixel ratio) a frame pair is measured at.
+/// The work grows with its square and more (the local check's shift search
+/// tries `(2·⌈12·s⌉+1)²` offsets), and no display ships one above 4; a larger
+/// value is a mistyped input, refused as Unknown rather than clamped.
+pub const MAX_SCALE_FACTOR: f64 = 8.0;
+
+/// A frame's scale factor, refused unless it is finite, positive and at most
+/// [`MAX_SCALE_FACTOR`].
+pub fn usable_scale(s: f64) -> Result<f64, LocateError> {
+    if s.is_finite() && s > 0.0 && s <= MAX_SCALE_FACTOR {
+        Ok(s)
+    } else {
+        Err((
+            UnknownCode::InputMissing,
+            format!(
+                "the frame's scale factor {s} is outside 0 < s <= {MAX_SCALE_FACTOR}: no display \
+                 captures at that ratio, and the glyph search would not finish, so no contrast \
+                 was measured"
+            ),
+        ))
+    }
+}
+
 /// Where the glyph colour came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -327,6 +353,7 @@ pub fn pair_frames(a: &Frame, b: &Frame) -> Result<(), LocateError> {
             ),
         ));
     }
+    usable_scale(sa)?;
     Ok(())
 }
 
@@ -404,10 +431,12 @@ pub struct Over<'a> {
     pub wrappers: usize,
 }
 
-/// The LEAF text elements laid over `image` ([`TextIndex`]). A text box that
-/// contains the image whole is a container (a section, a card, a caption
-/// wrapper), not an overlay, as the image analyzer's busyness-under-text
-/// reads it.
+/// The LEAF text elements laid over `image` ([`TextIndex`]). A WRAPPER box
+/// that contains the image whole is a container (a section, a card, a
+/// caption wrapper), not an overlay, and is skipped. A LEAF box that contains
+/// it is not skipped on its box: an inset-0 overlay whose text node is its
+/// own has exactly the image's box, and its glyphs lie over the image. The
+/// glyph test decides ([`measure`]'s `None` when they do not reach it).
 ///
 /// The image itself is gated by the caller on [`unrendered`] only: an
 /// OCCLUDED image (the usual `<img>` hero under an inset-0 scrim or text
@@ -427,14 +456,13 @@ pub fn texts_over<'a>(
             continue;
         }
         let Some(tb) = t.bbox else { continue };
-        if region_contains(tb, img) {
-            continue;
-        }
         let Some(css) = intersection(tb, img) else {
             continue;
         };
         if !index.is_leaf(&t.id) {
-            over.wrappers += 1;
+            if !region_contains(tb, img) {
+                over.wrappers += 1;
+            }
             continue;
         }
         if unreadable(snapshot, t).is_some() {
@@ -810,7 +838,7 @@ impl Registration {
                     tx < fx1 && tx + ts > fx0 && ty < fy1 && ty + ts > fy0
                 });
                 tx += ts;
-                if px.len() * 4 < (ts * ts) as usize {
+                if px.len() as u64 * 4 < ts as u64 * ts as u64 {
                     continue;
                 }
                 tiles += 1;
@@ -836,26 +864,33 @@ impl Registration {
                     .filter(|(x, y)| dist2(rgb_at(a, *x, *y), rgb_at(b, *x, *y)) > min2)
                     .collect();
                 let base = moved.len();
-                let best = (-reach..=reach)
+                // Displaced when SOME shift leaves fewer than half of them
+                // unmatched. A shift's count stops as soon as it reaches half,
+                // and the search at the first shift that lines up: the same
+                // answer as the minimum over every shift, without reading
+                // every pixel at every offset.
+                let lines_up = (-reach..=reach)
                     .flat_map(|dy| (-reach..=reach).map(move |dx| (dx, dy)))
                     .filter(|d| *d != (0, 0))
-                    .map(|(dx, dy)| {
-                        moved
-                            .iter()
-                            .filter(|(x, y)| {
-                                let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
-                                nx < 0
-                                    || ny < 0
-                                    || nx >= fw
-                                    || ny >= fh
-                                    || dist2(rgb_at(a, *x, *y), rgb_at(b, nx as u32, ny as u32))
-                                        > min2
-                            })
-                            .count()
-                    })
-                    .min()
-                    .unwrap_or(base);
-                if best * 2 < base {
+                    .any(|(dx, dy)| {
+                        let mut misses = 0usize;
+                        for (x, y) in &moved {
+                            let (nx, ny) = (*x as i64 + dx, *y as i64 + dy);
+                            let miss = nx < 0
+                                || ny < 0
+                                || nx >= fw
+                                || ny >= fh
+                                || dist2(rgb_at(a, *x, *y), rgb_at(b, nx as u32, ny as u32)) > min2;
+                            if miss {
+                                misses += 1;
+                                if misses * 2 >= base {
+                                    return false;
+                                }
+                            }
+                        }
+                        misses * 2 < base
+                    });
+                if lines_up {
                     displaced += 1;
                     if adjacent {
                         adjacent_displaced += 1;
@@ -934,7 +969,7 @@ pub fn registered(
     image: &Element,
 ) -> Result<Registration, LocateError> {
     let id = &image.id;
-    let s = a.source.scale_factor;
+    let s = usable_scale(a.source.scale_factor)?;
     let img = image.bbox.ok_or_else(|| {
         (
             UnknownCode::InputMissing,
@@ -960,6 +995,9 @@ pub fn registered(
             continue;
         }
         let Some(tb) = t.bbox else { continue };
+        // A box containing the whole image leaves no image to register if cut
+        // as a hole. Its glyphs read here as untracked text instead: tolerated
+        // when compact, refused (Unknown) when they spread — never a pass.
         if region_contains(tb, img) || intersection(tb, img).is_none() {
             continue;
         }
@@ -1022,7 +1060,7 @@ pub fn registered(
                 }
             }
             considered_all += considered;
-            if considered * 4 >= (ts * ts) as usize {
+            if considered as u64 * 4 >= ts as u64 * ts as u64 {
                 let differs = differing as f64 > TILE_DIFFERS_SHARE * considered as f64;
                 if hi.saturating_sub(lo) >= TEXTURE_LUMA_RANGE {
                     te += 1;
@@ -1094,9 +1132,12 @@ fn measured_glyph_colour(a: &Frame, mask: &[(u32, u32, f64)]) -> (Rgb, f64) {
 /// image (`reg`, from [`registered`]). See the module docs.
 ///
 /// `Ok(None)` when the text's box shows glyphs and fewer than the glyph floor
-/// of them reach the image: not text over it. `Err` (Unknown) when the box
-/// shows no usable mask, when the differing pixels moved away from the glyph
-/// colour, or when frame B still paints the glyphs.
+/// of them reach the image, and the image under the box is not blind enough
+/// to hide that many: not text over it. `Err` (Unknown) when the box shows no
+/// usable mask, when the differing pixels moved away from the glyph colour,
+/// when frame B still paints the glyphs, when the scale factor is unusable
+/// ([`usable_scale`]), or when the image under the box could hide the glyphs
+/// the mask did not find there.
 pub fn measure(
     a: &Frame,
     b: &Frame,
@@ -1106,7 +1147,7 @@ pub fn measure(
     hide_reported: bool,
 ) -> Result<Option<TextOverImageContrast>, LocateError> {
     let id = pair.text.id.as_str();
-    let s = a.source.scale_factor;
+    let s = usable_scale(a.source.scale_factor)?;
     let unknown = |detail: String| (UnknownCode::InputMissing, detail);
     let over_frame = |what: &str| {
         unknown(format!(
@@ -1204,16 +1245,59 @@ pub fn measure(
 
     let (ox0, oy0, ow, oh) = over_px;
     let over = |x: u32, y: u32| x >= ox0 && x < ox0 + ow && y >= oy0 && y < oy0 + oh;
-    if mask.iter().filter(|(x, y, _)| over(*x, *y)).count() < floor {
-        return Ok(None);
+    let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
+    let trusted = reg.faint_trusted();
+    let mask_over = mask.iter().filter(|(x, y, _)| over(*x, *y)).count();
+    if mask_over < floor {
+        // Few mask pixels over the image is "not over it" only if the image
+        // under the box could have SHOWN glyphs. Its BLIND pixels (module
+        // docs) cannot: a FAINT one is a glyph pixel the mask missed, and an
+        // undetectable one may hide one. Counted the way the sampling below
+        // classifies them, stopping once the floor is reached.
+        let (mut faint, mut undetectable) = (0usize, 0usize);
+        'scan: for y in oy0..oy0 + oh {
+            for x in ox0..ox0 + ow {
+                if is_mask.contains(&(x, y)) {
+                    continue;
+                }
+                let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
+                if dist2(pb, glyph_colour) > near {
+                    continue;
+                }
+                if trusted && pa != pb && toward(pa, pb, glyph_colour) {
+                    faint += 1;
+                } else if !trusted || pb == glyph_colour {
+                    undetectable += 1;
+                }
+                if mask_over + faint >= floor {
+                    break 'scan;
+                }
+            }
+        }
+        if mask_over + faint < floor {
+            if mask_over + faint + undetectable < floor {
+                return Ok(None);
+            }
+            return Err(unknown(format!(
+                "only {mask_over} glyph-mask pixel(s) of text '{id}' reach '{}' (under the {floor} \
+                 needed), but {undetectable} pixel(s) of the image under its box are within \
+                 {GLYPH_DIFF_MIN} of its glyph colour rgb({},{},{}), where the mask cannot see \
+                 a glyph: whether its glyphs reach the image is unknown, so no contrast was \
+                 measured",
+                pair.image.id,
+                glyph_colour.r,
+                glyph_colour.g,
+                glyph_colour.b
+            )));
+        }
+        // Enough FAINT glyph pixels reach the image: it is text over it, and
+        // is measured below like any other.
     }
     // The image displaced under THIS text (a parallax layer) is invisible to
     // the global check; the ring around the text is read here.
     reg.local(a, b, text_box)?;
 
     let lg = luminance(glyph_colour);
-    let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
-    let trusted = reg.faint_trusted();
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
     let mut faint = 0usize;
@@ -1259,8 +1343,9 @@ pub fn measure(
     }
     // Every undetectable pixel counts as ink: no visible band bounds the
     // density of a hidden word, which may be heavier than any visible one.
-    // Over-counting is the safe direction (measured: 1 correct pass in 881
-    // real text windows lost, the false pass closed).
+    // Over-counting is the safe direction: it can turn a true pass into an
+    // Unknown, never a failure into a pass (the module docs, "Glyphs the mask
+    // cannot see").
     let estimate = hidden.len();
     ratios.sort_by(f64::total_cmp);
     hidden.sort_by(f64::total_cmp);
@@ -1377,6 +1462,23 @@ mod tests {
             (Rgb::new(128, 128, 128), Rgb::new(128, 128, 128)),
         ] {
             assert_eq!(contrast(luminance(a), luminance(b)), wcag_contrast(a, b));
+        }
+    }
+
+    #[test]
+    fn a_scale_factor_is_usable_only_in_0_to_the_cap() {
+        for bad in [
+            0.0,
+            -1.0,
+            MAX_SCALE_FACTOR + 0.01,
+            5000.0,
+            f64::NAN,
+            f64::INFINITY,
+        ] {
+            assert!(usable_scale(bad).is_err(), "{bad}");
+        }
+        for ok in [0.5, 1.0, 2.0, MAX_SCALE_FACTOR] {
+            assert_eq!(usable_scale(ok).unwrap(), ok);
         }
     }
 

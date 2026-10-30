@@ -1172,3 +1172,267 @@ fn a_hairline_face_whose_ink_peaks_under_half_coverage_is_measured() {
     let v = c.reading();
     assert!(v.sampled_px >= 60, "{v:?}");
 }
+
+// ---------------------------------------------------------------- review of #257
+
+/// A frame pair built in the test: `bg(x, y)` is frame B; frame A is frame B
+/// with each `(x0, y0, w, h)` stroke painted `ink`.
+fn painted(
+    (w, h): (u32, u32),
+    bg: impl Fn(u32, u32) -> u8,
+    strokes: &[(u32, u32, u32, u32)],
+    ink: u8,
+) -> (Frame, Frame) {
+    let b = image::RgbaImage::from_fn(w, h, |x, y| {
+        let v = bg(x, y);
+        image::Rgba([v, v, v, 255])
+    });
+    let mut a = b.clone();
+    for &(x0, y0, sw, sh) in strokes {
+        for y in y0..y0 + sh {
+            for x in x0..x0 + sw {
+                a.put_pixel(x, y, image::Rgba([ink, ink, ink, 255]));
+            }
+        }
+    }
+    (
+        Frame::from_rgba(a, FrameSource::synthetic_now()),
+        Frame::from_rgba(b, FrameSource::synthetic_now()),
+    )
+}
+
+/// A white-text element with the given id and box.
+fn white_text(id: &str, bbox: Region) -> Element {
+    Element {
+        id: id.into(),
+        bbox: Some(bbox),
+        text: Some(id.into()),
+        fg_color: Some(Rgb::new(255, 255, 255)),
+        ..Default::default()
+    }
+}
+
+/// Vertical stems 3 px wide, `n` of them every 10 px from `x0`.
+fn stems(x0: u32, y0: u32, n: u32, h: u32) -> Vec<(u32, u32, u32, u32)> {
+    (0..n).map(|i| (x0 + 10 * i, y0, 3, h)).collect()
+}
+
+/// The image analyzer's `text_contrast` value for the hero.
+fn hero_value(
+    c: &Case,
+) -> qontinui_vision_core::observation::Observation<Vec<TextOverImageContrast>> {
+    let v = c.analyze(Some(&c.b)).image_values.unwrap();
+    let hero = v.images.iter().find(|i| i.element == "hero").unwrap();
+    hero.text_contrast.clone().unwrap()
+}
+
+/// A second text over the hero that may paint but is reported not visible
+/// itself (occluded, off-screen, an uninterpreted reason, `visible: false`
+/// with no reason) is unmeasured: beside a passing heading the answer is
+/// Unknown naming it, never Passed; beside a failing one the failure stands.
+/// Text that paints NOTHING (`hidden`) is not over the image at all, and the
+/// pass stands.
+#[test]
+fn text_reported_not_visible_over_the_image_blocks_a_pass() {
+    let badge = |reason: Option<VisibilityReason>| Element {
+        id: "badge".into(),
+        bbox: Some(Region {
+            x: 200,
+            y: 120,
+            w: 100,
+            h: 30,
+        }),
+        text: Some("New".into()),
+        fg_color: Some(Rgb::new(250, 250, 250)),
+        visible: Some(false),
+        visibility_reason: reason,
+        ..Default::default()
+    };
+    for reason in [
+        Some(VisibilityReason::Occluded),
+        Some(VisibilityReason::OffScreen),
+        Some(VisibilityReason::Other("clipped".into())),
+        None,
+    ] {
+        let mut scrim = case("scrim");
+        scrim.snap.elements.push(badge(reason.clone()));
+        let r = scrim.assert_aa();
+        assert_eq!(
+            r.outcome,
+            AssertionOutcome::Unknown,
+            "{reason:?}: {:?}",
+            r.detail
+        );
+        let d = r.detail.as_deref().unwrap();
+        assert!(
+            d.contains("1 text element(s) over an image could not be measured")
+                && d.contains("reported not visible"),
+            "{reason:?}: {d}"
+        );
+        // The analyzer half already counted it unmeasured.
+        let v = hero_value(&scrim);
+        assert!(
+            !v.provenance().coverage.unmeasured.is_empty(),
+            "{reason:?}: {v:?}"
+        );
+
+        let mut low = case("low_contrast");
+        low.snap.elements.push(badge(reason.clone()));
+        let r = low.assert_aa();
+        assert_eq!(
+            r.outcome,
+            AssertionOutcome::Failed,
+            "{reason:?}: {:?}",
+            r.detail
+        );
+        assert!(
+            r.detail
+                .as_deref()
+                .unwrap()
+                .contains("1 other text element(s) could not be measured"),
+            "{reason:?}: {:?}",
+            r.detail
+        );
+    }
+    let mut scrim = case("scrim");
+    scrim
+        .snap
+        .elements
+        .push(badge(Some(VisibilityReason::Hidden)));
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+}
+
+/// A text box straddling the image's top edge: its glyphs differ over the
+/// page above, and over the image they sit on their own colour (white on a
+/// blown-out 255 region), where no difference shows. Too few MASK pixels
+/// reach the image, but the image under the box could hide every glyph: that
+/// is Unknown, not "not over it" — so a passing heading beside it does not
+/// make the page pass, and the analyzer does not read the straddler as
+/// measured.
+#[test]
+fn a_box_straddling_the_image_edge_over_its_own_colour_is_unknown() {
+    let (w, h) = (200u32, 100u32);
+    // The page (y < 50) is dark; the image (y >= 50) is white on the left,
+    // dark on the right.
+    let bg = |x: u32, y: u32| if y >= 50 && x < 100 { 255 } else { 40 };
+    let mut strokes = stems(15, 42, 6, 17); // the straddler, rows 42..59
+    strokes.extend(stems(125, 64, 5, 16)); // the heading, over the dark part
+    let (a, b) = painted((w, h), bg, &strokes, 255);
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![
+                hero(Region {
+                    x: 0,
+                    y: 50,
+                    w,
+                    h: 50,
+                }),
+                white_text(
+                    "straddler",
+                    Region {
+                        x: 10,
+                        y: 40,
+                        w: 80,
+                        h: 20,
+                    },
+                ),
+                white_text(
+                    "heading",
+                    Region {
+                        x: 120,
+                        y: 60,
+                        w: 60,
+                        h: 24,
+                    },
+                ),
+            ],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    let d = r.detail.as_deref().unwrap();
+    assert!(
+        d.contains("straddler") && d.contains("whether its glyphs reach the image is unknown"),
+        "{d}"
+    );
+
+    let v = hero_value(&c);
+    let values = v.value().expect("the heading is measured");
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].element, "heading");
+    assert!(
+        !v.provenance().coverage.unmeasured.is_empty(),
+        "the straddler is unmeasured, not ruled out: {v:?}"
+    );
+}
+
+/// An inset-0 overlay whose text node is its own: a LEAF text element whose
+/// box IS the image's. It was skipped as a container; its glyphs lie over the
+/// image, and here they are white on a light part of it (about 1.25:1). It is
+/// measured, and the page fails rather than passing on the heading beside it.
+#[test]
+fn a_leaf_overlay_whose_box_is_the_image_is_measured() {
+    let (w, h) = (200u32, 100u32);
+    let bg = |x: u32, _: u32| if x < 100 { 40 } else { 230 };
+    let mut strokes = stems(15, 23, 4, 14); // the heading, over the dark half
+    strokes.extend(stems(130, 70, 6, 20)); // the overlay's own glyphs
+    let (a, b) = painted((w, h), bg, &strokes, 255);
+    let image = Region { x: 0, y: 0, w, h };
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![
+                hero(image),
+                white_text(
+                    "heading",
+                    Region {
+                        x: 10,
+                        y: 20,
+                        w: 80,
+                        h: 20,
+                    },
+                ),
+                white_text("overlay", image),
+            ],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("text 'overlay'"),
+        "{:?}",
+        r.detail
+    );
+}
+
+/// A scale factor past `MAX_SCALE_FACTOR` is Unknown naming it, on the
+/// assertion and on the analyzer: the shift search grows with its square and
+/// the tile arithmetic overflowed past 4096. It must return, not hang.
+#[test]
+fn a_scale_factor_past_the_cap_is_unknown() {
+    let mut held = case("held");
+    for f in [&mut held.a, &mut held.b] {
+        f.source.scale_factor = 5000.0;
+    }
+    let r = held.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert_eq!(r.code, Some(UnknownCode::InputMissing));
+    assert!(
+        r.detail.as_deref().unwrap().contains("scale factor 5000"),
+        "{:?}",
+        r.detail
+    );
+    let v = hero_value(&held);
+    assert_eq!(v.status(), ObservationStatus::Unknown, "{v:?}");
+    assert!(v
+        .unknown_info()
+        .unwrap()
+        .detail
+        .contains("scale factor 5000"));
+}
