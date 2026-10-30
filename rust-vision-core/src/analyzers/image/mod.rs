@@ -1676,7 +1676,8 @@ fn measure(
     text_hidden: &TextCtx<'_>,
 ) -> (ImageElementValues, Located, Option<(u64, u64)>) {
     let id = el.id.as_str();
-    // From the image's box, not its crop: see `ImageElementValues::text_contrast`.
+    // From the image's box, not its crop: see
+    // `ImageElementValues::text_contrast`.
     let text_contrast = Some(text_contrast_value(frame, text_hidden, snapshot, el, stamp));
     let effective_resolution = stamp.of_result(
         effective_resolution(media, frame.source.scale_factor),
@@ -1875,10 +1876,14 @@ fn measure(
 /// laid over it, measured at [`text_contrast::DEFAULT_PERCENTILE`].
 ///
 /// Coverage counts the text elements over the image: one whose glyphs turn
-/// out not to reach it ([`text_contrast::measure`]'s `None`) was measured in
-/// full and is simply not in the list; one reported not visible, or one that
-/// could not be measured, is unmeasured. Confidence is the lowest of the
-/// listed readings.
+/// out not to reach it ([`text_contrast::measure`]'s `None`), and one whose
+/// box is too small to hold a legible glyph
+/// ([`text_contrast::Over::too_small`]), was measured in full and is simply
+/// not in the list; one reported not visible, or one that could not be
+/// measured, is unmeasured; and so is every painted text element of the page
+/// with no box (dimension `text_box`): whether it lies over this image is
+/// unknown, so the image's text is never claimed absent past it. Confidence
+/// is the lowest of the listed readings.
 fn text_contrast_value(
     frame: &Frame,
     text: &TextCtx<'_>,
@@ -1912,12 +1917,36 @@ fn text_contrast_value(
         }
     };
     let over = text_contrast::texts_over(snapshot, el, index);
-    let (pairs, hidden_texts) = (over.pairs, over.unreadable_texts);
-    let considered = (pairs.len() + hidden_texts) as u64;
-    if considered == 0 {
-        return Observation::absent(stamp.provenance(ObservationCoverage::full(1), id))
-            .expect("one image considered in full is a legal absence");
+    let (pairs, hidden_texts, too_small) = (over.pairs, over.unreadable_texts, over.too_small);
+    // Painted text with no box may lie over this image: not an absence.
+    let boxless = index.boxless_texts();
+    let boxless_dim = (boxless > 0)
+        .then(|| UnmeasuredDimension::new("text_box", boxless as u64, UnknownCode::InputMissing));
+    if pairs.is_empty() && hidden_texts == 0 {
+        if let Some(d) = boxless_dim {
+            return Observation::unknown(
+                UnknownCode::InputMissing,
+                format!(
+                    "{boxless} painted text element(s) carry no box, so whether any lies over \
+                     '{}' is unknown",
+                    el.id
+                ),
+                stamp.provenance(
+                    ObservationCoverage {
+                        considered: (boxless + too_small) as u64,
+                        measured: too_small as u64,
+                        unmeasured: vec![d],
+                    },
+                    id,
+                ),
+            );
+        }
+        return Observation::absent(
+            stamp.provenance(ObservationCoverage::full((too_small as u64).max(1)), id),
+        )
+        .expect("one image considered in full is a legal absence");
     }
+    let considered = (pairs.len() + hidden_texts + too_small + boxless) as u64;
     // Only an image that paints NOTHING is refused: an occluded or otherwise
     // unreadable one is measured, because frame B is read under the glyphs
     // and the image's crop never is.
@@ -1958,7 +1987,7 @@ fn text_contrast_value(
         Some(Err(e)) => return stamp.unknown(e.clone(), DIM, id),
         Some(Ok(b)) => *b,
     };
-    let reg = match text_contrast::registered(frame, b, snapshot, el) {
+    let reg = match text_contrast::registered(frame, b, el, index) {
         Ok(r) => r,
         Err(e) => return stamp.unknown(e, DIM, id),
     };
@@ -1987,7 +2016,7 @@ fn text_contrast_value(
             Err(e) => failed.push(e),
         }
     }
-    let mut unmeasured = Vec::new();
+    let mut unmeasured: Vec<UnmeasuredDimension> = boxless_dim.into_iter().collect();
     if hidden_texts > 0 {
         unmeasured.push(UnmeasuredDimension::new(
             "text_visibility",
@@ -2004,7 +2033,7 @@ fn text_contrast_value(
     }
     let coverage = ObservationCoverage {
         considered,
-        measured: values.len() as u64 + not_over,
+        measured: values.len() as u64 + not_over + too_small as u64,
         unmeasured,
     };
     if values.is_empty() {
