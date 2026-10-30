@@ -162,10 +162,10 @@ pub struct ImageElementValues {
     /// `needs_multi_frame_input` when text does and no text-hidden frame was
     /// supplied, and with `input_missing` when the one supplied cannot be
     /// paired or registered with the frame, or the image is unrendered or
-    /// has no box. Computed from the image's BOX, not its crop, so a
-    /// CSS-background hero and an occluded `<img>` under a scrim are measured
-    /// too: the glyphs' background is read from the text-hidden frame,
-    /// whatever painted it.
+    /// has no box. Computed from the image's BOX, not its crop, so text over
+    /// a CSS-background hero — its children's, and its own text node's — and
+    /// over an occluded `<img>` under a scrim is measured too: the glyphs'
+    /// background is read from the text-hidden frame, whatever painted it.
     ///
     /// `None` only on a payload written before Phase 16; this crate always
     /// states one.
