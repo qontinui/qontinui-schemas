@@ -91,6 +91,21 @@ export type ScheduledTaskType =
        */
       allowed_tools?: string[];
       /**
+       * Optional reasoning-effort level for the spawned session: one of
+       * `low`, `medium`, `high`, `xhigh` or `max`. `None` leaves the level
+       * to the runner. A plain string rather than an enum, so a stored
+       * task carrying a level this crate does not list still loads; the
+       * consumer validates it.
+       */
+      effort?: string | null;
+      /**
+       * Optional kebab-case name of a spawn-effort profile (e.g.
+       * `research`, `implementation`) that the runner resolves to an
+       * effort level and an ultracode setting. `None` leaves the choice
+       * to the runner.
+       */
+      effort_profile?: string | null;
+      /**
        * Hard cap on Claude turns per run (safety bound). `None` =
        * runner's default cap (typically 50).
        */
@@ -116,6 +131,12 @@ export type ScheduledTaskType =
        * (typically 600s = 10 min).
        */
       timeout_seconds?: number | null;
+      /**
+       * Optional ultracode switch (standing dynamic-workflow orchestration)
+       * for the spawned session. `Some(true)` turns it on, `Some(false)`
+       * keeps it off, and `None` leaves the choice to the runner.
+       */
+      ultracode?: boolean | null;
       /**
        * Working directory for the spawned session. `None` means the
        * runner's project root. Stored as a string (not `PathBuf`) to keep

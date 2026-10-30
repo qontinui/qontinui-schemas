@@ -80,7 +80,7 @@ fn schedule_expression_condition_roundtrips() {
 }
 
 // ============================================================================
-// Scheduler — ScheduledTaskType (all five variants, internally tagged with
+// Scheduler — ScheduledTaskType (all seven variants, internally tagged with
 // `task_type`)
 // ============================================================================
 
@@ -189,6 +189,127 @@ fn scheduled_task_type_script_roundtrips() {
         }
         _ => panic!("wrong variant"),
     }
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_roundtrips() {
+    let t = ScheduledTaskType::RemoteAgent {
+        prompt: "run /research-plan nightly".to_string(),
+        working_directory: Some("/repo".to_string()),
+        allowed_tools: vec!["Bash".to_string(), "Read".to_string()],
+        model: Some("claude-opus-5-5".to_string()),
+        effort: Some("max".to_string()),
+        ultracode: Some(true),
+        effort_profile: Some("research".to_string()),
+        mcp_connections: vec![McpConnectionRef {
+            name: "coord".to_string(),
+            url: Some("http://127.0.0.1:9876/coord-mcp".to_string()),
+        }],
+        max_turns: Some(20),
+        timeout_seconds: Some(900),
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["task_type"], "RemoteAgent");
+    assert_eq!(v["prompt"], "run /research-plan nightly");
+    assert_eq!(v["model"], "claude-opus-5-5");
+    assert_eq!(v["effort"], "max");
+    assert_eq!(v["ultracode"], true);
+    assert_eq!(v["effort_profile"], "research");
+    assert_eq!(v["mcp_connections"][0]["name"], "coord");
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    match back {
+        ScheduledTaskType::RemoteAgent {
+            effort,
+            ultracode,
+            effort_profile,
+            ..
+        } => {
+            assert_eq!(effort.as_deref(), Some("max"));
+            assert_eq!(ultracode, Some(true));
+            assert_eq!(effort_profile.as_deref(), Some("research"));
+        }
+        _ => panic!("wrong variant"),
+    }
+
+    // `prompt` is required.
+    assert!(serde_json::from_str::<ScheduledTaskType>(r#"{"task_type":"RemoteAgent"}"#).is_err());
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_without_effort_fields_is_byte_identical() {
+    // A task stored before `effort`, `ultracode` and `effort_profile` existed,
+    // spelled in this crate's own serialization order. It must load with all
+    // three as None and write back byte for byte, so no stored task changes
+    // shape.
+    let stored = concat!(
+        r#"{"task_type":"RemoteAgent","prompt":"p","working_directory":"/repo","#,
+        r#""allowed_tools":["Bash"],"model":"claude-opus-5-5","#,
+        r#""mcp_connections":[{"name":"coord"}],"max_turns":20,"timeout_seconds":900}"#,
+    );
+    let t: ScheduledTaskType = serde_json::from_str(stored).unwrap();
+    match &t {
+        ScheduledTaskType::RemoteAgent {
+            effort,
+            ultracode,
+            effort_profile,
+            ..
+        } => {
+            assert!(effort.is_none());
+            assert!(ultracode.is_none());
+            assert!(effort_profile.is_none());
+        }
+        _ => panic!("wrong variant"),
+    }
+    assert_eq!(serde_json::to_string(&t).unwrap(), stored);
+
+    // The minimal task, only the required `prompt`, round-trips the same way:
+    // a None field is left off the wire, never written as `null`.
+    let min = r#"{"task_type":"RemoteAgent","prompt":"p"}"#;
+    let t: ScheduledTaskType = serde_json::from_str(min).unwrap();
+    assert_eq!(serde_json::to_string(&t).unwrap(), min);
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_keeps_explicit_effort_values() {
+    // `Some(false)` is an explicit "off", distinct from "not set": it reaches
+    // the wire, where None is omitted.
+    let t = ScheduledTaskType::RemoteAgent {
+        prompt: "p".to_string(),
+        working_directory: None,
+        allowed_tools: vec![],
+        model: None,
+        effort: None,
+        ultracode: Some(false),
+        effort_profile: None,
+        mcp_connections: vec![],
+        max_turns: None,
+        timeout_seconds: None,
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    assert_eq!(
+        json,
+        r#"{"task_type":"RemoteAgent","prompt":"p","ultracode":false}"#
+    );
+    match serde_json::from_str::<ScheduledTaskType>(&json).unwrap() {
+        ScheduledTaskType::RemoteAgent { ultracode, .. } => {
+            assert_eq!(ultracode, Some(false));
+        }
+        _ => panic!("wrong variant"),
+    }
+
+    // `effort` is a plain string, so a level this crate does not list still
+    // loads and writes back unchanged. Validating it is the consumer's job.
+    let unlisted = r#"{"task_type":"RemoteAgent","prompt":"p","effort":"turbo"}"#;
+    let t: ScheduledTaskType = serde_json::from_str(unlisted).unwrap();
+    match &t {
+        ScheduledTaskType::RemoteAgent { effort, .. } => {
+            assert_eq!(effort.as_deref(), Some("turbo"));
+        }
+        _ => panic!("wrong variant"),
+    }
+    assert_eq!(serde_json::to_string(&t).unwrap(), unlisted);
 }
 
 // ============================================================================
@@ -334,13 +455,15 @@ fn scheduled_task_minimal_elides_none_fields() {
     };
     let json = serde_json::to_string(&task).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
+    // `ScheduledTask` serializes camelCase, so these are the wire spellings. A
+    // snake_case name here would be absent whatever the serde attributes say.
     for absent_field in [
         "description",
-        "success_criteria",
-        "last_run",
-        "next_run",
+        "successCriteria",
+        "lastRun",
+        "nextRun",
         "conditions",
-        "condition_status",
+        "conditionStatus",
     ] {
         assert!(
             v.get(absent_field).is_none(),

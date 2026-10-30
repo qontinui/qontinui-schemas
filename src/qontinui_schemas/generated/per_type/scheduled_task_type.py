@@ -151,14 +151,27 @@ class McpConnectionRef(BaseModel):
 class ScheduledTaskType6(BaseModel):
     """
     Run an ad-hoc Claude agent prompt without pre-registering it in the
-    Prompt Library. Reuses the runner's existing `POST /prompts/run`
-    ad-hoc surface — no separate Claude CLI plumbing required.
+    Prompt Library. The runner launches it as one headless `claude`
+    session through its own spawn seam; the recorded outcome is that
+    session's exit status (success iff exit code 0).
     """
 
     allowed_tools: Annotated[
         list[str] | None,
         Field(
             description='Allowed tool names (e.g. `["Bash", "Read", "Write", "Edit"]`).\nEmpty = use the runner\'s default tool allow-list.'
+        ),
+    ] = None
+    effort: Annotated[
+        str | None,
+        Field(
+            description='Optional reasoning-effort level for the spawned session: one of\n`low`, `medium`, `high`, `xhigh` or `max`. `None` leaves the level\nto the runner. A plain string rather than an enum, so a stored\ntask carrying a level this crate does not list still loads; the\nconsumer validates it.'
+        ),
+    ] = None
+    effort_profile: Annotated[
+        str | None,
+        Field(
+            description='Optional kebab-case name of a spawn-effort profile (e.g.\n`research`, `implementation`) that the runner resolves to an\neffort level and an ultracode setting. `None` leaves the choice\nto the runner.'
         ),
     ] = None
     max_turns: Annotated[
@@ -189,6 +202,12 @@ class ScheduledTaskType6(BaseModel):
         Field(
             description='Wall-clock timeout in seconds. `None` = runner default\n(typically 600s = 10 min).',
             ge=0,
+        ),
+    ] = None
+    ultracode: Annotated[
+        bool | None,
+        Field(
+            description='Optional ultracode switch (standing dynamic-workflow orchestration)\nfor the spawned session. `Some(true)` turns it on, `Some(false)`\nkeeps it off, and `None` leaves the choice to the runner.'
         ),
     ] = None
     working_directory: Annotated[
