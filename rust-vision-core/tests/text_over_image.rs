@@ -1436,3 +1436,47 @@ fn a_scale_factor_past_the_cap_is_unknown() {
         .detail
         .contains("scale factor 5000"));
 }
+
+/// Partly covered ink on a background just past the mask's threshold: white
+/// at 57% coverage over 248 grey reads 252, a difference of 6.9 (under
+/// GLYPH_DIFF_MIN), while 248 lies 12.1 from white (past it). Such a pixel
+/// was neither masked nor blind, so the light half of the word was never
+/// sampled and the heading passed on its dark half. A glyph at the sampling
+/// floor's coverage is missed on any background within GLYPH_DIFF_MIN over
+/// that coverage, so those are blind too: FAINT here, and the text fails.
+#[test]
+fn partly_covered_ink_just_past_the_threshold_is_not_ignored() {
+    let (w, h) = (200u32, 100u32);
+    let bg = |x: u32, _: u32| if x < 100 { 40 } else { 248 };
+    let (mut a, b) = painted((w, h), bg, &stems(15, 25, 4, 20), 255);
+    for (x0, y0, sw, sh) in stems(115, 25, 8, 20) {
+        for y in y0..y0 + sh {
+            for x in x0..x0 + sw {
+                a.buffer.put_pixel(x, y, image::Rgba([252, 252, 252, 255]));
+            }
+        }
+    }
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![
+                hero(Region { x: 0, y: 0, w, h }),
+                white_text(
+                    "heading",
+                    Region {
+                        x: 10,
+                        y: 20,
+                        w: 180,
+                        h: 30,
+                    },
+                ),
+            ],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    let v = c.reading();
+    assert!(v.faint_px >= 480, "{v:?}");
+}

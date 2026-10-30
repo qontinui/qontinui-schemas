@@ -71,8 +71,12 @@
 //! Where the image under a glyph is within [`GLYPH_DIFF_MIN`] of the glyph
 //! colour (blown-out sky, snow, a white studio backdrop under white text;
 //! crushed shadows under black), A and B differ by less than the mask's
-//! threshold, and those are exactly the invisible glyph pixels. They are
-//! found from frame B alone: the BLIND pixels of the overlap. A blind pixel
+//! threshold, and those are exactly the invisible glyph pixels. A glyph that
+//! covers a pixel only partly moves it less: at the sampling floor's coverage
+//! `m` ([`MIN_GLYPH_COVERAGE_SHARE`] below), the mask misses it on any
+//! background within `GLYPH_DIFF_MIN / m` of the glyph colour. Those pixels
+//! are found from frame B alone: the BLIND pixels of the overlap, within
+//! `GLYPH_DIFF_MIN / m` of the glyph colour. A blind pixel
 //! that differs at all and moved toward the glyph colour is a FAINT glyph
 //! pixel and is sampled like any other — when the registration check found
 //! the capture free of sub-threshold noise ([`FAINT_NOISE_MAX`]); otherwise
@@ -313,9 +317,9 @@ pub struct TextOverImageContrast {
     /// How many frame-B pixels were sampled (glyph pixels over the image),
     /// faint ones included.
     pub sampled_px: u64,
-    /// Of [`Self::sampled_px`], the FAINT glyph pixels: on a background
-    /// within [`GLYPH_DIFF_MIN`] of the glyph colour, found by any
-    /// difference at all.
+    /// Of [`Self::sampled_px`], the FAINT glyph pixels: on a BLIND
+    /// background (within `GLYPH_DIFF_MIN` over the sampling floor's coverage
+    /// of the glyph colour; module docs), found by any difference at all.
     pub faint_px: u64,
     /// The estimated glyph pixels on such a background that no difference
     /// shows (module docs).
@@ -1248,6 +1252,18 @@ pub fn measure(
     let is_mask: HashSet<(u32, u32)> = mask.iter().map(|(x, y, _)| (*x, *y)).collect();
     let trusted = reg.faint_trusted();
     let mask_over = mask.iter().filter(|(x, y, _)| over(*x, *y)).count();
+    let peak = mask
+        .iter()
+        .filter(|(x, y, _)| over(*x, *y))
+        .map(|(x, y, _)| coverage(rgb_at(a, *x, *y), rgb_at(b, *x, *y), glyph_colour))
+        .fold(0.0_f64, f64::max);
+    let min_coverage = (MIN_GLYPH_COVERAGE_SHARE * peak).max(MIN_GLYPH_COVERAGE_ABS);
+    // BLIND: a glyph covering a pixel at `min_coverage` moves it by
+    // `min_coverage` times the background's distance from the glyph colour,
+    // which stays at or under GLYPH_DIFF_MIN (so the mask misses a pixel the
+    // sampling would keep) wherever that distance is at most
+    // GLYPH_DIFF_MIN / min_coverage.
+    let blind = (GLYPH_DIFF_MIN / min_coverage).powi(2);
     if mask_over < floor {
         // Few mask pixels over the image is "not over it" only if the image
         // under the box could have SHOWN glyphs. Its BLIND pixels (module
@@ -1261,7 +1277,7 @@ pub fn measure(
                     continue;
                 }
                 let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
-                if dist2(pb, glyph_colour) > near {
+                if dist2(pb, glyph_colour) > blind {
                     continue;
                 }
                 if trusted && pa != pb && toward(pa, pb, glyph_colour) {
@@ -1281,10 +1297,11 @@ pub fn measure(
             return Err(unknown(format!(
                 "only {mask_over} glyph-mask pixel(s) of text '{id}' reach '{}' (under the {floor} \
                  needed), but {undetectable} pixel(s) of the image under its box are within \
-                 {GLYPH_DIFF_MIN} of its glyph colour rgb({},{},{}), where the mask cannot see \
-                 a glyph: whether its glyphs reach the image is unknown, so no contrast was \
+                 {:.1} of its glyph colour rgb({},{},{}), where the mask cannot see a glyph: \
+                 whether its glyphs reach the image is unknown, so no contrast was \
                  measured",
                 pair.image.id,
+                blind.sqrt(),
                 glyph_colour.r,
                 glyph_colour.g,
                 glyph_colour.b
@@ -1301,16 +1318,10 @@ pub fn measure(
     let mut ratios: Vec<f64> = Vec::new();
     let mut hidden: Vec<f64> = Vec::new();
     let mut faint = 0usize;
-    let peak = mask
-        .iter()
-        .filter(|(x, y, _)| over(*x, *y))
-        .map(|(x, y, _)| coverage(rgb_at(a, *x, *y), rgb_at(b, *x, *y), glyph_colour))
-        .fold(0.0_f64, f64::max);
-    let min_coverage = (MIN_GLYPH_COVERAGE_SHARE * peak).max(MIN_GLYPH_COVERAGE_ABS);
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
-            let is_blind = dist2(pb, glyph_colour) <= near;
+            let is_blind = dist2(pb, glyph_colour) <= blind;
             let r = || contrast(lg, luminance(pb));
             if is_mask.contains(&(x, y)) {
                 // Only pixels the glyph covers at least half as well as its
