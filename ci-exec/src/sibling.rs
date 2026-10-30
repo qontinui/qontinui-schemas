@@ -78,6 +78,10 @@
 //! * "Absent" and "unanswered" are different answers and only the first is a
 //!   NO. A rate-limited or unreachable probe is UNKNOWN and hard-fails; a
 //!   404 on a PR that WAS declared is a semantic red about the declaration.
+//! * A sibling is never read with the host's GitHub token. It is read with the
+//!   read door's minted token when the door granted it, and with no credential
+//!   otherwise (60 requests/hour per IP). The host's token reads the dispatched
+//!   PR's labels and nothing else.
 //! * Resolution is keyed on a pull request, never on the pushed ref. The
 //!   CI-node lane dispatches `refs/heads/merge-candidate/<proposal_id>`, and
 //!   coord pushes the SAME candidate ref into every repo of a multi-repo
@@ -704,9 +708,10 @@ struct ApiAnswer {
 /// Two of these exist per sibling: the HOST one (the host's token, the
 /// host's books) for reads of the dispatched repo itself, and the SIBLING one,
 /// which keeps OUT of the host's books (`host_books: false`) and carries the
-/// door's minted token when the sibling was granted and NO token otherwise. A private PR-list body must never land in an ETag
-/// cache that unauthenticated reads replay from, and the minted token spends
-/// the installation's budget, not the host token's.
+/// door's minted token when the sibling was granted and NO token otherwise. A
+/// private PR-list body must never land in an ETag cache that unauthenticated
+/// reads replay from, and the minted token spends the installation's budget,
+/// not the host token's.
 #[derive(Clone, Copy)]
 struct Api<'a> {
     github: &'a dyn GithubAccess,
@@ -716,17 +721,44 @@ struct Api<'a> {
     host_books: bool,
 }
 
+impl Api<'_> {
+    /// What to do about a `403`/`429` on a read through this door. Only the HOST
+    /// door with no token is fixed by setting one. `expect_ok` cannot tell a
+    /// rate limit from a missing permission, so a token's arm names both.
+    fn rate_limit_remedy(&self) -> &'static str {
+        match (self.host_books, self.token) {
+            (true, None) => {
+                "Set GITHUB_TOKEN/GH_TOKEN or authenticate `gh` on this device to raise the limit."
+            }
+            (true, Some(_)) => {
+                "This read used the host's token, so it spends that token's budget; a 403 can \
+                 also mean the token lacks permission for this read."
+            }
+            (false, Some(_)) => {
+                "This read used the door's minted token, so it spends the installation's budget; \
+                 a 403 can also mean that token lacks permission for this read."
+            }
+            (false, None) => {
+                "This sibling was read with no credential (60 requests/hour per IP). The host's \
+                 own token is never used for a sibling, so setting one does not raise this \
+                 limit; on a host offering the read door, a [[ci_readers]] grant in the sibling \
+                 reads it with the door's token instead."
+            }
+        }
+    }
+}
+
 /// The ONE door every GitHub read in this module goes through, so that metering
 /// and conditional requests are properties of the module rather than something
 /// each call site has to remember.
 ///
 /// Conditional: each read echoes the `ETag` the host holds, and a `304` — which
 /// GitHub does NOT charge against the bucket — is answered out of the host's
-/// cache and handed back to the caller as the `200` it stands in for. Every one
-/// of these reads is a declaration probe against a sibling repo whose labels
-/// change rarely and whose PR list changes not at all between the retries of
-/// one provision, so this is the endpoint family conditional requests were
-/// meant for.
+/// cache and handed back to the caller as the `200` it stands in for. The only
+/// read in the host's books is a dispatched PR's labels, which change rarely
+/// and not at all between the retries of one provision, so this is the endpoint
+/// family conditional requests were meant for. A read outside those books takes
+/// [`api_get_unbooked`] instead.
 ///
 /// A request that never produced a response is recorded as a transport error,
 /// never as a charged call: it cost a socket, and dropping it would make a
@@ -795,8 +827,8 @@ async fn api_get(api: &Api<'_>, url: &str) -> Option<ApiAnswer> {
     Some(ApiAnswer { status, body })
 }
 
-/// A read with a minted credential: no `If-None-Match`, no cache write, no
-/// replay, no host metering — none of the host's books see it.
+/// A read outside the host's books, with the door's minted token or with no
+/// credential: no `If-None-Match`, no cache write, no replay, no host metering.
 async fn api_get_unbooked(api: &Api<'_>, url: &str) -> Option<ApiAnswer> {
     let mut req = api
         .client
@@ -834,7 +866,7 @@ fn cache_decision(status: u16, etag: Option<&str>) -> CacheDecision<'_> {
 /// Turn an answer into either its body or an UNKNOWN hard-fail. `404` is left
 /// to the caller, because whether a 404 is semantic depends on whether the
 /// thing being read was DECLARED.
-fn expect_ok(what: &str, answer: Option<ApiAnswer>) -> Result<ApiAnswer, String> {
+fn expect_ok(api: &Api<'_>, what: &str, answer: Option<ApiAnswer>) -> Result<ApiAnswer, String> {
     let Some(a) = answer else {
         return Err(format!(
             "{what}: no answer at all (network/DNS/TLS). An unanswered probe is UNKNOWN, not \
@@ -844,9 +876,9 @@ fn expect_ok(what: &str, answer: Option<ApiAnswer>) -> Result<ApiAnswer, String>
     match a.status {
         200 => Ok(a),
         403 | 429 => Err(format!(
-            "{what}: rate-limited (HTTP {}). UNKNOWN, not 'no declaration'. Set GITHUB_TOKEN/\
-             GH_TOKEN or authenticate `gh` on this device to raise the limit.",
-            a.status
+            "{what}: rate-limited (HTTP {}). UNKNOWN, not 'no declaration'. {}",
+            a.status,
+            api.rate_limit_remedy()
         )),
         404 => Ok(a),
         s => Err(format!(
@@ -862,7 +894,7 @@ async fn fetch_pr_labels(api: &Api<'_>, repo: &str, number: u64) -> Result<Vec<S
         "{}/repos/{repo}/issues/{number}/labels?per_page=100",
         api.base
     );
-    let a = expect_ok(&what, api_get(api, &url).await)?;
+    let a = expect_ok(api, &what, api_get(api, &url).await)?;
     if a.status == 404 {
         return Err(format!("{what}: HTTP 404 — no such pull request."));
     }
@@ -888,7 +920,7 @@ async fn fetch_sibling_open_prs(
             "{}/repos/{sibling_repo}/pulls?state=open&per_page=100&page={page}",
             api.base
         );
-        let a = expect_ok(&what, api_get(api, &url).await)?;
+        let a = expect_ok(api, &what, api_get(api, &url).await)?;
         if a.status == 404 {
             return Err(format!("{what}: HTTP 404 — no such repository."));
         }
@@ -932,7 +964,7 @@ async fn fetch_sibling_pr_detail(
 ) -> Result<SiblingPrDetail, String> {
     let what = format!("reading {sibling_repo}#{number}");
     let url = format!("{}/repos/{sibling_repo}/pulls/{number}", api.base);
-    let a = expect_ok(&what, api_get(api, &url).await)?;
+    let a = expect_ok(api, &what, api_get(api, &url).await)?;
     if a.status == 404 {
         return Err(format!(
             "declared adaptation {sibling_repo}#{number} is invalid: no such pull request \
@@ -1356,6 +1388,8 @@ impl DoorNote {
     /// A public-path failure, with D3's fix text. An UNKNOWN door is named as
     /// UNKNOWN and is never rendered as a refusal.
     fn public_path_failure(&self, err: &str, repo: &str, consumer: &str) -> String {
+        // A probe's message may already end its sentence.
+        let err = err.trim_end_matches('.');
         let fix = format!(
             "if {repo} is private, its default branch must declare [[ci_readers]] \
              repo = \"{consumer}\""
@@ -1566,14 +1600,23 @@ pub(crate) async fn provision_at(
         }
     }
 
-    let token = github.token().await;
-    if token.is_none() && pr_number.is_some() {
+    // The host's token reads one thing here: the dispatched PR's labels, which
+    // only a pull request with a sibling that consults a declaration reads. Any
+    // other provision has no use for it, and does not ask.
+    let reads_pr_labels =
+        pr_number.is_some() && siblings.iter().any(|s| s.pin != SiblingPin::DefaultBranch);
+    let token = if reads_pr_labels {
+        github.token().await
+    } else {
+        None
+    };
+    if reads_pr_labels && token.is_none() {
         // Unauthenticated GitHub reads work for public repos but are limited
         // to 60/hour per IP. Say so BEFORE the rate-limit hard-fail, so the
         // fix is obvious when it happens.
         warn!(
-            "ci_node: no GitHub token (GITHUB_TOKEN/GH_TOKEN or `gh auth token`) — sibling \
-             declaration probes will run unauthenticated at 60 requests/hour"
+            "ci_node: no GitHub token (GITHUB_TOKEN/GH_TOKEN or `gh auth token`) — this \
+             dispatch's PR labels will be read unauthenticated at 60 requests/hour"
         );
     }
     let client = reqwest::Client::builder()

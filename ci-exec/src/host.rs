@@ -53,16 +53,19 @@ pub trait CiSettings: Send + Sync {
     }
 }
 
-/// GitHub reads for sibling resolution: a token, and the host's metering and
-/// conditional-request cache.
+/// GitHub reads of the dispatched repo during sibling resolution: a token, and
+/// the host's metering and conditional-request cache.
 ///
 /// The cache and meter are host state on purpose. The runner keeps one
 /// process-wide ETag cache and one request-budget histogram across every
-/// subsystem that talks to GitHub, so a sibling probe must land in the same
-/// books; a one-shot CLI process has no cross-run books at all.
+/// subsystem that talks to GitHub, so a dispatched PR's label read must land in
+/// the same books; a one-shot CLI process has no cross-run books at all. A
+/// sibling's own reads stay out of all of this: they carry the read door's
+/// token or none ([`SiblingReadAccess`]).
 pub trait GithubAccess: Send + Sync {
-    /// A GitHub token, or `None` to read unauthenticated (60 requests/hour per
-    /// IP — enough for a public repo with no pull request in play).
+    /// A GitHub token for the dispatched repo, or `None` to read unauthenticated
+    /// (60 requests/hour per IP). Asked for only when a pull request's labels
+    /// will be read, and never sent on a read of a sibling.
     fn token(&self) -> BoxFuture<'_, Option<String>>;
     /// The `ETag` this host holds for `url`, if any. It is echoed as
     /// `If-None-Match` so an unchanged answer costs no request budget.

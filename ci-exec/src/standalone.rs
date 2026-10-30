@@ -30,7 +30,7 @@ use crate::host::{
 };
 
 /// How long `gh auth token` may take before the run proceeds without a token.
-/// `gh` has been observed blocked for hours on a wedged keyring; a sibling probe
+/// `gh` has been observed blocked for hours on a wedged keyring; a PR label read
 /// waiting on it forever is worse than an unauthenticated one.
 const GH_TOKEN_TIMEOUT: Duration = Duration::from_secs(10);
 

@@ -64,11 +64,16 @@ fn granted(_: &str) -> SiblingReadAnswer {
 #[derive(Default)]
 struct HostGithub {
     books: Mutex<Vec<String>>,
+    token_asks: std::sync::atomic::AtomicUsize,
+    no_token: bool,
 }
 
 impl GithubAccess for HostGithub {
     fn token(&self) -> BoxFuture<'_, Option<String>> {
-        Box::pin(async { Some(HOST.to_string()) })
+        self.token_asks
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let token = (!self.no_token).then(|| HOST.to_string());
+        Box::pin(async move { token })
     }
     fn cached_etag(&self, url: &str) -> Option<String> {
         self.books.lock().unwrap().push(url.to_string());
@@ -116,6 +121,8 @@ struct Quirks {
     hang_first_delete: bool,
     /// The dispatched PR's label read answers this status with no body.
     labels_status: Option<u16>,
+    /// The sibling's open-PR read answers this status with no body.
+    pulls_status: Option<u16>,
 }
 
 impl Api {
@@ -132,6 +139,7 @@ impl Api {
             hang_pulls,
             hang_first_delete,
             labels_status,
+            pulls_status,
         } = quirks;
         let deletes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -181,8 +189,14 @@ impl Api {
                     {
                         std::future::pending::<()>().await;
                     }
-                    let resp = if let (Some(code), true) = (labels_status, path.contains("/labels"))
-                    {
+                    let status = if path.contains("/labels") {
+                        labels_status
+                    } else if path.contains("/pulls") {
+                        pulls_status
+                    } else {
+                        None
+                    };
+                    let resp = if let Some(code) = status {
                         format!(
                             "HTTP/1.1 {code} Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                         )
@@ -829,6 +843,141 @@ async fn a_failure_reading_the_dispatched_repo_carries_no_reader_fix() {
     );
     assert!(!err.contains("[[ci_readers]]"), "{err}");
     assert!(!err.contains("no_ci_read_grant"), "{err}");
+}
+
+// ── a rate limit names the remedy that applies to the read that hit it ───────
+
+/// A sibling the door did not grant is read with no credential, so the host's
+/// token cannot raise its limit and the error must not send anyone to set one.
+#[tokio::test]
+async fn a_rate_limited_ungranted_sibling_read_does_not_ask_for_the_hosts_token() {
+    let answers: [fn(&str) -> SiblingReadAnswer; 3] = [
+        |_| SiblingReadAnswer::NoGrant {
+            code: "no_ci_read_grant".into(),
+        },
+        |_| SiblingReadAnswer::NotOffered {
+            reason: "no door".into(),
+        },
+        |_| SiblingReadAnswer::Unknown {
+            reason: "coord unreachable".into(),
+        },
+    ];
+    for answer in answers {
+        let o = origin(SIB);
+        let api = Api::start_with(Quirks {
+            pulls_status: Some(403),
+            ..Quirks::default()
+        })
+        .await;
+        let door = Door::new(answer);
+        let d = dispatch();
+        let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+        let (r, _) = run(
+            &api,
+            &o.base,
+            &door,
+            &HostGithub::default(),
+            &d,
+            &[s],
+            Some(7),
+        )
+        .await;
+        let err = r.unwrap_err();
+        assert!(err.contains("rate-limited (HTTP 403)"), "{err}");
+        assert!(err.contains("does not raise this limit"), "{err}");
+        assert!(!err.contains("Set GITHUB_TOKEN"), "{err}");
+        assert!(!err.contains(".."), "{err}");
+    }
+}
+
+/// A granted sibling's read spends the installation's budget, and the host's
+/// token is not involved.
+#[tokio::test]
+async fn a_rate_limited_granted_sibling_read_names_the_installations_budget() {
+    let o = origin(SIB);
+    let api = Api::start_with(Quirks {
+        pulls_status: Some(429),
+        ..Quirks::default()
+    })
+    .await;
+    let door = Door::new(granted);
+    let d = dispatch();
+    let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+    let (r, lines) = run(
+        &api,
+        &o.base,
+        &door,
+        &HostGithub::default(),
+        &d,
+        &[s],
+        Some(7),
+    )
+    .await;
+    let err = r.unwrap_err();
+    assert!(err.contains("rate-limited (HTTP 429)"), "{err}");
+    assert!(err.contains("installation's budget"), "{err}");
+    assert!(!err.contains("Set GITHUB_TOKEN"), "{err}");
+    no_line_carries_the_token(&lines);
+    assert_eq!(api.revocations().len(), 1);
+}
+
+/// The dispatched repo's own read IS the host token's, so setting one is the
+/// advice only when none was sent.
+#[tokio::test]
+async fn a_rate_limited_dispatched_repo_read_advises_a_token_only_when_it_had_none() {
+    for (no_token, wants_advice) in [(true, true), (false, false)] {
+        let o = origin(SIB);
+        let api = Api::start_with(Quirks {
+            labels_status: Some(403),
+            ..Quirks::default()
+        })
+        .await;
+        let door = Door::new(|_: &str| SiblingReadAnswer::NoGrant {
+            code: "no_ci_read_grant".into(),
+        });
+        let gh = HostGithub {
+            no_token,
+            ..HostGithub::default()
+        };
+        let d = dispatch();
+        let s = sibling(SIB, SiblingPin::DeclaredAdaptation);
+        let (r, _) = run(&api, &o.base, &door, &gh, &d, &[s], Some(7)).await;
+        let err = r.unwrap_err();
+        assert!(
+            err.contains(&format!("reading labels on {CONSUMER}#7")),
+            "{err}"
+        );
+        assert_eq!(err.contains("Set GITHUB_TOKEN"), wants_advice, "{err}");
+    }
+}
+
+/// The host's token reads only a dispatched PR's labels, so a provision that
+/// reads none never asks for it. `gh auth token` has been observed blocked on a
+/// wedged keyring, and no read here would use its answer.
+#[tokio::test]
+async fn the_hosts_token_is_asked_for_only_when_a_pr_label_read_will_use_it() {
+    let cases = [
+        (SiblingPin::DefaultBranch, Some(7), 0),
+        (SiblingPin::DeclaredAdaptation, None, 0),
+        (SiblingPin::DeclaredAdaptation, Some(7), 1),
+    ];
+    for (pin, pr, want) in cases {
+        let o = origin(SIB);
+        let api = Api::start(false).await;
+        let door = Door::new(|_: &str| SiblingReadAnswer::NotOffered {
+            reason: "no door".into(),
+        });
+        let gh = HostGithub::default();
+        let d = dispatch();
+        let s = sibling(SIB, pin);
+        let (r, _) = run(&api, &o.base, &door, &gh, &d, &[s], pr).await;
+        r.unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            gh.token_asks.load(std::sync::atomic::Ordering::SeqCst),
+            want,
+            "pr {pr:?}"
+        );
+    }
 }
 
 // ── review round: bounded ask, hostile door text, reserved names ─────────────
