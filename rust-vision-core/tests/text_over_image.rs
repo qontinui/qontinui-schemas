@@ -1480,3 +1480,252 @@ fn partly_covered_ink_just_past_the_threshold_is_not_ignored() {
     let v = c.reading();
     assert!(v.faint_px >= 480, "{v:?}");
 }
+
+// ---------------------------------------------------------------- review round 2
+
+fn region_at(x: i32, y: i32, w: u32, h: u32) -> Region {
+    Region { x, y, w, h }
+}
+
+/// A CSS-background hero `<div>` paints its OWN text node over its own
+/// background image. That text was never paired (media was not text, and the
+/// image was never over itself), so the page read "no text" and the analyzer
+/// Absent. It is measured over itself — and with a child heading inside it,
+/// with the child's box cut out, so the hero's own word is what decides.
+#[test]
+fn a_css_background_heros_own_text_is_measured() {
+    let (w, h) = (200u32, 100u32);
+    let bg = |x: u32, _: u32| if x < 100 { 230 } else { 40 };
+    let mut strokes = stems(20, 30, 6, 20); // "Welcome": the hero's own, on 230
+    strokes.extend(stems(120, 30, 6, 20)); // "Sale": the child heading, on 40
+    let (a, b) = painted((w, h), bg, &strokes, 255);
+    let hero_div = |text: &str, children: Vec<String>| Element {
+        id: "hero".into(),
+        bbox: Some(region_at(0, 0, w, h)),
+        text: Some(text.into()),
+        fg_color: Some(Rgb::new(255, 255, 255)),
+        media: Some(ElementMedia::new(MediaKind::CssBackground)),
+        children_ids: children,
+        ..Default::default()
+    };
+    // The hero's own text alone (the right half's glyphs are untracked).
+    let alone = Case {
+        a: a.clone(),
+        b: b.clone(),
+        snap: ElementSnapshot {
+            elements: vec![hero_div("Welcome", vec![])],
+            ..Default::default()
+        },
+    };
+    let r = alone.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("text 'hero'"),
+        "{:?}",
+        r.detail
+    );
+    let v = hero_value(&alone);
+    assert!(
+        v.value()
+            .is_some_and(|v| v.iter().any(|x| x.element == "hero")),
+        "{v:?}"
+    );
+
+    // With a child heading that passes on its own: the hero's own word fails.
+    let mut sale = white_text("sale", region_at(110, 25, 80, 30));
+    sale.text = Some("Sale".into());
+    let mixed = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![hero_div("Welcome Sale", vec!["sale".into()]), sale],
+            ..Default::default()
+        },
+    };
+    let r = mixed.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("text 'hero'"),
+        "{:?}",
+        r.detail
+    );
+}
+
+/// `<h1>Hello <span>world</span></h1>`: "Hello" is the wrapper's own text,
+/// never sampled when a wrapper was measured only through its children. It
+/// is measured, against the wrapper's colour, with the span's box cut out.
+/// Here only the wrapper's box reaches the image (the span lies beside it):
+/// the page read "no text" and the analyzer Absent; now both see "Hello"
+/// fail on the light image.
+#[test]
+fn a_wrappers_own_text_beside_its_child_is_measured() {
+    let (w, h) = (200u32, 100u32);
+    let bg = |x: u32, _: u32| if x < 100 { 230 } else { 40 };
+    let mut strokes = stems(20, 25, 5, 20); // "Hello", over the image
+    strokes.extend(stems(120, 25, 5, 20)); // "world", beside it
+    let (a, b) = painted((w, h), bg, &strokes, 255);
+    let mut h1 = white_text("h1", region_at(10, 20, 180, 30));
+    h1.text = Some("Hello world".into());
+    h1.children_ids = vec!["world".into()];
+    let mut span = white_text("world", region_at(110, 20, 80, 30));
+    span.text = Some("world".into());
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![hero(region_at(0, 0, 100, h)), h1, span],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    assert!(
+        r.detail.as_deref().unwrap().contains("text 'h1'"),
+        "{:?}",
+        r.detail
+    );
+    let v = hero_value(&c);
+    assert_eq!(v.status(), ObservationStatus::Measured, "{v:?}");
+    assert_eq!(v.value().unwrap()[0].element, "h1");
+}
+
+/// A `<button>` whose own "Buy" label sits beside a black icon inside its
+/// box: the label's box CONTAINS the icon, no glyph reaches it, and every
+/// icon pixel equals the label's black. Those are not hidden glyphs (text is
+/// laid out beside an inline icon), so the button is not text over the icon,
+/// and the page — a heading that passes over its hero — passes. A box that
+/// only straddles an image still counts every blind pixel (the straddling
+/// test above).
+#[test]
+fn a_button_label_beside_its_icon_is_not_unknown() {
+    let (w, h) = (200u32, 100u32);
+    let bg = |x: u32, y: u32| {
+        if x < 100 {
+            40 // the hero
+        } else if (110..126).contains(&x) && (40..56).contains(&y) {
+            0 // the icon
+        } else {
+            230 // the button
+        }
+    };
+    let (mut a, b) = painted((w, h), bg, &stems(15, 25, 4, 14), 255);
+    for (x0, y0, sw, sh) in stems(140, 42, 3, 12) {
+        for y in y0..y0 + sh {
+            for x in x0..x0 + sw {
+                a.buffer.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+            }
+        }
+    }
+    let mut button = white_text("buy", region_at(104, 34, 90, 28));
+    button.fg_color = Some(Rgb::new(0, 0, 0));
+    let icon = Element {
+        id: "icon".into(),
+        bbox: Some(region_at(110, 40, 16, 16)),
+        media: Some(ElementMedia::new(MediaKind::Svg)),
+        ..Default::default()
+    };
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![
+                hero(region_at(0, 0, 100, h)),
+                white_text("heading", region_at(10, 20, 80, 20)),
+                button,
+                icon,
+            ],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+}
+
+/// A rendered image with no box: whether text lies over it is unknown, as
+/// the analyzer already says, so the page cannot pass. A painted text with no
+/// box is disclosed.
+#[test]
+fn a_rendered_image_with_no_box_blocks_a_pass() {
+    let mut scrim = case("scrim");
+    scrim.snap.elements.push(Element {
+        id: "thumb".into(),
+        media: Some(ElementMedia::new(MediaKind::Img)),
+        ..Default::default()
+    });
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail
+            .as_deref()
+            .unwrap()
+            .contains("1 rendered image(s) carry no box"),
+        "{:?}",
+        r.detail
+    );
+    let mut low = case("low_contrast");
+    low.snap.elements.push(Element {
+        id: "thumb".into(),
+        media: Some(ElementMedia::new(MediaKind::Img)),
+        ..Default::default()
+    });
+    assert_eq!(low.assert_aa().outcome, AssertionOutcome::Failed);
+
+    let mut scrim = case("scrim");
+    scrim.snap.elements.push(Element {
+        id: "caption".into(),
+        text: Some("caption".into()),
+        ..Default::default()
+    });
+    let r = scrim.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    assert!(
+        r.detail
+            .as_deref()
+            .unwrap()
+            .contains("1 text element(s) carry no box"),
+        "{:?}",
+        r.detail
+    );
+}
+
+/// Neighbouring text boxes (here four nested wrappers of the heading, whose
+/// text is all the heading's) cover the whole ring the LOCAL registration
+/// check reads around the heading: no ring tile is left to compare, which
+/// confirms nothing. Unknown, as the global check answers the same thing
+/// over a whole image — never a vacuous pass.
+#[test]
+fn a_ring_covered_by_neighbouring_text_is_unknown() {
+    let (w, h) = (320u32, 180u32);
+    let (a, b) = painted((w, h), |_, _| 40, &stems(104, 73, 5, 14), 255);
+    let heading = white_text("heading", region_at(100, 70, 60, 20));
+    let wrapper = |id: &str, child: &str, bbox: Region| Element {
+        children_ids: vec![child.into()],
+        text: Some("heading".into()),
+        ..white_text(id, bbox)
+    };
+    let c = Case {
+        a,
+        b,
+        snap: ElementSnapshot {
+            elements: vec![
+                hero(region_at(0, 0, w, h)),
+                wrapper("top", "bottom", region_at(60, 30, 140, 36)),
+                wrapper("bottom", "left", region_at(60, 94, 140, 36)),
+                wrapper("left", "right", region_at(60, 66, 36, 28)),
+                wrapper("right", "heading", region_at(164, 66, 36, 28)),
+                heading,
+            ],
+            ..Default::default()
+        },
+    };
+    let r = c.assert_aa();
+    assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+    assert!(
+        r.detail
+            .as_deref()
+            .unwrap()
+            .contains("registration with the frame around it cannot be confirmed"),
+        "{:?}",
+        r.detail
+    );
+}

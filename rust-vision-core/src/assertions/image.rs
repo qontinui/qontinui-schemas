@@ -812,7 +812,8 @@ fn blockiness_within(
 /// frames must be registered over it ([`tc::registered`]); its text is
 /// unmeasured otherwise. Text over an unrendered image is skipped and
 /// disclosed; text reported not visible ITSELF (occluded, off-screen) is
-/// unmeasured, so it never lets a pass through; text over an OCCLUDED image
+/// unmeasured, so it never lets a pass through, and so is a rendered image
+/// with no box (what lies over it is unknown); text over an OCCLUDED image
 /// is measured (frame B is read under the glyphs, never the image's crop);
 /// text whose box touches an image while its glyphs do not is not text over
 /// it. A failure found on measured text stands beside unmeasured text; a pass
@@ -890,6 +891,14 @@ fn text_over_image(
     }
     // Each entry names one text, except the one above, which names many.
     let unmeasured_n = unmeasured.len() + page.skipped_texts.saturating_sub(1);
+    // A rendered image with no box cannot have text placed over it: the
+    // page is not fully examined, as the image analyzer says of it.
+    let boxless = (page.boxless_images > 0).then(|| {
+        format!(
+            "{} rendered image(s) carry no box, so whether text lies over them is unknown",
+            page.boxless_images
+        )
+    });
     let mut note = page.note();
     if not_over > 0 {
         note.push_str(&format!(
@@ -917,11 +926,15 @@ fn text_over_image(
         )
     };
     if let Some(w) = worst.filter(|w| w.percentile_ratio < min) {
-        let also = if unmeasured.is_empty() {
-            String::new()
-        } else {
-            format!(" ({unmeasured_n} other text element(s) could not be measured)")
-        };
+        let mut also = String::new();
+        if unmeasured_n > 0 {
+            also.push_str(&format!(
+                " ({unmeasured_n} other text element(s) could not be measured)"
+            ));
+        }
+        if let Some(b) = &boxless {
+            also.push_str(&format!(" ({b})"));
+        }
         return AssertionResult::fail(
             a,
             format!(
@@ -933,14 +946,19 @@ fn text_over_image(
         )
         .with_confidence(w.confidence);
     }
-    if !unmeasured.is_empty() {
+    if !unmeasured.is_empty() || boxless.is_some() {
+        let head = if unmeasured_n > 0 {
+            format!("{unmeasured_n} text element(s) over an image could not be measured")
+        } else {
+            "an image could not be placed".to_string()
+        };
+        let why: Vec<String> = unmeasured.into_iter().chain(boxless).collect();
         return AssertionResult::unknown(
             a,
             UnknownCode::InputMissing,
             format!(
-                "{unmeasured_n} text element(s) over an image could not be measured, so the page \
-                 was not fully examined: {}{note}",
-                unmeasured.join("; ")
+                "{head}, so the page was not fully examined: {}{note}",
+                why.join("; ")
             ),
         );
     }

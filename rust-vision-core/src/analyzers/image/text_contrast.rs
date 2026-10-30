@@ -126,11 +126,13 @@
 //! enough to hide the floor's worth (a box straddling the image's edge whose
 //! glyphs over it sit on their own colour): that is Unknown.
 //!
-//! Only LEAF text elements are measured ([`TextIndex`]): a wrapper whose
-//! innerText includes a child's is measured through the child, against the
-//! child's colour. Text a wrapper paints directly beside its children is not
-//! measured, and a wrapper over an image is disclosed as such
-//! ([`PagePairs::wrappers`]).
+//! Each text is measured against its OWN colour ([`TextIndex`]). A LEAF text
+//! element is measured on its box. A wrapper whose innerText is just its
+//! leaf children's (a link around a heading) is measured through them, and
+//! disclosed ([`PagePairs::wrappers`]). A wrapper that paints text of its own
+//! beside them (`<h1>Hello <span>world</span></h1>`) is measured too, with
+//! its leaf children's boxes cut out of its mask, and so is a CSS-background
+//! element's own text over its own background.
 //!
 //! # Against which colour
 //!
@@ -160,12 +162,13 @@
 //! permissive open-source licence, and the plan adds it only after a licence
 //! read admits it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
 use super::{unreadable, unrendered, Ancestry, LocateError};
+use crate::element_media::MediaKind;
 use crate::element_snapshot::{intersection, region_contains, Element, ElementSnapshot, Rgb};
 use crate::frame::{Frame, Region};
 use crate::observation::UnknownCode;
@@ -215,9 +218,10 @@ pub const FAINT_NOISE_MAX: f64 = 0.001;
 /// Share of glyph-mask pixels with a glyph-coloured frame-B pixel within
 /// one CSS px — one that ALSO differs in frame A, so a glyph-coloured speckle
 /// of the image itself does not count — above which frame B still paints the
-/// glyphs (an unhidden twin whose raster moved a sub-pixel). Measured 0% on
-/// every hidden fixture, 1.2% with half the glyphs over near-white, and 45.6%
-/// on a quarter-pixel re-raster. Read as an EXCESS over the rate the image's
+/// glyphs (an unhidden twin whose raster moved a sub-pixel). Chosen between
+/// the shares measured on the committed fixtures during review: near zero on
+/// the hidden twins, far above it on the re-rasterised ones
+/// (`text_hidden_rerastered`). Read as an EXCESS over the rate the image's
 /// own glyph-coloured pixels away from the glyphs explain (a 253 / 225 mottle
 /// explains nearly all of it), relative to the headroom left.
 pub const STILL_PAINTED_SHARE: f64 = 0.2;
@@ -260,9 +264,17 @@ pub const GLYPH_COLOUR_TOLERANCE: f64 = 24.0;
 
 /// Largest scale factor (device pixel ratio) a frame pair is measured at.
 /// The work grows with its square and more (the local check's shift search
-/// tries `(2·⌈12·s⌉+1)²` offsets), and no display ships one above 4; a larger
-/// value is a mistyped input, refused as Unknown rather than clamped.
-pub const MAX_SCALE_FACTOR: f64 = 8.0;
+/// tries `(2·⌈12·s⌉+1)²` offsets), and every threshold here was calibrated at
+/// ratios up to this one. A larger value is refused as Unknown, outside the
+/// calibrated range, rather than clamped.
+pub const MAX_SCALE_FACTOR: f64 = 4.0;
+
+/// How near, in CSS px, a BLIND pixel must lie to one of the text's own
+/// mask pixels to count as evidence of hidden glyphs when the text box
+/// CONTAINS the image (a button's label beside its icon): text is laid out
+/// beside an inline icon, not over it, so only blind pixels touching the
+/// visible glyphs can be theirs.
+pub const BLIND_ADJACENT_CSS: f64 = 2.0;
 
 /// A frame's scale factor, refused unless it is finite, positive and at most
 /// [`MAX_SCALE_FACTOR`].
@@ -273,9 +285,8 @@ pub fn usable_scale(s: f64) -> Result<f64, LocateError> {
         Err((
             UnknownCode::InputMissing,
             format!(
-                "the frame's scale factor {s} is outside 0 < s <= {MAX_SCALE_FACTOR}: no display \
-                 captures at that ratio, and the glyph search would not finish, so no contrast \
-                 was measured"
+                "the frame's scale factor {s} is outside 0 < s <= {MAX_SCALE_FACTOR}, the range \
+                 the measurement is calibrated for, so no contrast was measured"
             ),
         ))
     }
@@ -362,90 +373,163 @@ pub fn pair_frames(a: &Frame, b: &Frame) -> Result<(), LocateError> {
 }
 
 /// One text element over one image, and the CSS-px region where they overlap.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TextOverImage<'a> {
     pub text: &'a Element,
     pub image: &'a Element,
     pub css: Region,
+    /// CSS boxes cut out of the text's glyph mask: a WRAPPER's (or a
+    /// CSS-background element's) leaf text descendants, measured on their
+    /// own, so only the text the element paints itself is measured here.
+    /// Empty for a leaf.
+    pub exclude: Vec<Region>,
 }
 
 /// Whether `t` is a text element that paints: non-blank text, not itself
 /// media, not [`unrendered`].
 fn paints_text(snapshot: &ElementSnapshot, t: &Element) -> bool {
-    t.media.is_none()
-        && t.text.as_deref().is_some_and(|s| !s.trim().is_empty())
+    t.media.is_none() && has_text(t) && unrendered(snapshot, t).is_none()
+}
+
+fn has_text(t: &Element) -> bool {
+    t.text.as_deref().is_some_and(|s| !s.trim().is_empty())
+}
+
+/// Whether `t` is a CSS-background element with text, not [`unrendered`]: a
+/// hero `<div>` paints its own text over its own background image, so that
+/// text is over the image even though no other element carries it.
+fn paints_own_text_media(snapshot: &ElementSnapshot, t: &Element) -> bool {
+    t.media
+        .as_ref()
+        .is_some_and(|m| m.kind == MediaKind::CssBackground)
+        && has_text(t)
         && unrendered(snapshot, t).is_none()
+}
+
+/// `s` with every whitespace character removed: two innerTexts compared
+/// regardless of how a producer joins lines and blocks.
+fn squeezed(s: &str) -> String {
+    s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 /// Which painted text elements are LEAVES: no other painted text element
 /// descends from them (`parent_id` chain or `children_ids`, as
-/// [`super::drop_nested`] reads it). Built once per snapshot.
+/// [`super::drop_nested`] reads it); and which WRAPPERS (and CSS-background
+/// elements with text) paint text of their OWN: their text, whitespace
+/// removed, is not their leaf descendants' texts concatenated in snapshot
+/// order (`<h1>Hello <span>world</span></h1>`). Built once per snapshot.
 #[derive(Debug)]
 pub struct TextIndex<'a> {
     leaves: HashSet<&'a str>,
+    /// Elements that paint text of their own, with the boxes of their leaf
+    /// text descendants.
+    own_text: HashMap<&'a str, Vec<Region>>,
 }
 
 impl<'a> TextIndex<'a> {
     pub fn of(snapshot: &'a ElementSnapshot) -> Self {
         let ancestry = Ancestry::of(snapshot);
-        let texts: Vec<&'a str> = snapshot
+        let texts: Vec<&'a Element> = snapshot
             .elements
             .iter()
             .filter(|t| paints_text(snapshot, t))
-            .map(|t| t.id.as_str())
             .collect();
-        let ancestors: Vec<HashSet<&'a str>> =
-            texts.iter().map(|id| ancestry.ancestors(id)).collect();
+        let ancestors: Vec<HashSet<&'a str>> = texts
+            .iter()
+            .map(|t| ancestry.ancestors(t.id.as_str()))
+            .collect();
         // `w` wraps `c` when `w` is among `c`'s ancestors and not the other
         // way round (a cycle in the producer's chain is not a nesting).
-        let wrappers: HashSet<&'a str> = texts
-            .iter()
-            .enumerate()
-            .filter(|(wi, w)| {
-                texts.iter().enumerate().any(|(ci, _)| {
-                    ci != *wi && ancestors[ci].contains(*w) && !ancestors[*wi].contains(texts[ci])
-                })
+        let wraps = |w: &str, w_anc: &HashSet<&str>, ci: usize| {
+            texts[ci].id != w && ancestors[ci].contains(w) && !w_anc.contains(texts[ci].id.as_str())
+        };
+        let wrappers: HashSet<usize> = (0..texts.len())
+            .filter(|&wi| {
+                (0..texts.len()).any(|ci| wraps(texts[wi].id.as_str(), &ancestors[wi], ci))
             })
-            .map(|(_, w)| *w)
             .collect();
-        Self {
-            leaves: texts
-                .into_iter()
-                .filter(|t| !wrappers.contains(t))
-                .collect(),
+        let leaves: HashSet<&'a str> = (0..texts.len())
+            .filter(|i| !wrappers.contains(i))
+            .map(|i| texts[i].id.as_str())
+            .collect();
+        let mut own_text = HashMap::new();
+        let mut by_snapshot: Vec<usize> = wrappers.iter().copied().collect();
+        by_snapshot.sort_unstable();
+        let candidates = by_snapshot
+            .into_iter()
+            .map(|wi| (texts[wi], ancestors[wi].clone()))
+            .chain(
+                snapshot
+                    .elements
+                    .iter()
+                    .filter(|t| paints_own_text_media(snapshot, t))
+                    .map(|t| (t, ancestry.ancestors(t.id.as_str()))),
+            );
+        for (w, w_anc) in candidates {
+            let kids: Vec<&Element> = (0..texts.len())
+                .filter(|&ci| leaves.contains(texts[ci].id.as_str()))
+                .filter(|&ci| wraps(w.id.as_str(), &w_anc, ci))
+                .map(|ci| texts[ci])
+                .collect();
+            let theirs: String = kids
+                .iter()
+                .filter_map(|c| c.text.as_deref())
+                .map(squeezed)
+                .collect();
+            if squeezed(w.text.as_deref().unwrap_or_default()) != theirs {
+                own_text.insert(
+                    w.id.as_str(),
+                    kids.iter().filter_map(|c| c.bbox).collect::<Vec<_>>(),
+                );
+            }
         }
+        Self { leaves, own_text }
     }
 
     /// Whether `id` is a painted leaf text element.
     pub fn is_leaf(&self, id: &str) -> bool {
         self.leaves.contains(id)
     }
+
+    /// The leaf text descendants' boxes of an element that paints text of
+    /// its own; `None` when its text is all theirs (or it is a leaf).
+    pub fn own_text(&self, id: &str) -> Option<&[Region]> {
+        self.own_text.get(id).map(Vec::as_slice)
+    }
 }
 
 /// The text over one image ([`texts_over`]).
 #[derive(Debug, Default)]
 pub struct Over<'a> {
-    /// The leaf text elements over it, each with the overlap region.
+    /// The text elements over it that are measured, each with the overlap
+    /// region.
     pub pairs: Vec<TextOverImage<'a>>,
-    /// Leaf text elements over it that cannot themselves be attributed to
-    /// the frame ([`unreadable`]).
+    /// Text elements over it that cannot themselves be attributed to the
+    /// frame ([`unreadable`]).
     pub unreadable_texts: usize,
-    /// Wrapper text elements over it: measured through their leaf children,
-    /// so any text they paint beside those children is not measured.
+    /// Wrapper text elements over it whose text is all their leaf
+    /// children's: measured through those children.
     pub wrappers: usize,
 }
 
-/// The LEAF text elements laid over `image` ([`TextIndex`]). A WRAPPER box
-/// that contains the image whole is a container (a section, a card, a
-/// caption wrapper), not an overlay, and is skipped. A LEAF box that contains
-/// it is not skipped on its box: an inset-0 overlay whose text node is its
-/// own has exactly the image's box, and its glyphs lie over the image. The
-/// glyph test decides ([`measure`]'s `None` when they do not reach it).
+/// The text elements laid over `image` ([`TextIndex`]) that are measured:
+///
+/// - every LEAF text element whose box meets the image's. A leaf box that
+///   contains the image is not skipped on its box: an inset-0 overlay whose
+///   text node is its own has exactly the image's box. The glyph test decides
+///   ([`measure`]'s `None` when its glyphs do not reach the image).
+/// - every WRAPPER that paints text of its own ([`TextIndex::own_text`]),
+///   with its leaf descendants cut out of its mask. A wrapper whose text is
+///   all its children's is measured through them and counted
+///   ([`Over::wrappers`]) unless its box contains the image whole (a
+///   section, a card: a container, not an overlay).
+/// - a CSS-background `image` with text of its own, over itself.
 ///
 /// The image itself is gated by the caller on [`unrendered`] only: an
 /// OCCLUDED image (the usual `<img>` hero under an inset-0 scrim or text
 /// layer) is measured, because nothing here reads the image's crop — frame B
-/// shows whatever the glyphs sit on.
+/// shows whatever the glyphs sit on. An image with no box has nothing over
+/// it here; the caller counts it ([`PagePairs::boxless_images`]).
 pub fn texts_over<'a>(
     snapshot: &'a ElementSnapshot,
     image: &'a Element,
@@ -456,19 +540,28 @@ pub fn texts_over<'a>(
         return over;
     };
     for t in &snapshot.elements {
-        if t.id == image.id || !paints_text(snapshot, t) {
+        let itself = t.id == image.id;
+        if itself {
+            if !paints_own_text_media(snapshot, t) {
+                continue;
+            }
+        } else if !paints_text(snapshot, t) {
             continue;
         }
         let Some(tb) = t.bbox else { continue };
         let Some(css) = intersection(tb, img) else {
             continue;
         };
-        if !index.is_leaf(&t.id) {
-            if !region_contains(tb, img) {
+        let exclude = if index.is_leaf(&t.id) {
+            Vec::new()
+        } else if let Some(kids) = index.own_text(&t.id) {
+            kids.to_vec()
+        } else {
+            if !itself && !region_contains(tb, img) {
                 over.wrappers += 1;
             }
             continue;
-        }
+        };
         if unreadable(snapshot, t).is_some() {
             over.unreadable_texts += 1;
             continue;
@@ -477,6 +570,7 @@ pub fn texts_over<'a>(
             text: t,
             image,
             css,
+            exclude,
         });
     }
     over
@@ -491,9 +585,15 @@ pub struct PagePairs<'a> {
     /// Text elements over an image that cannot themselves be attributed to
     /// the frame.
     pub skipped_texts: usize,
-    /// Wrapper text elements over an image, measured through their children
-    /// only (see [`Over::wrappers`]).
+    /// Wrapper text elements over an image whose text is all their
+    /// children's, measured through them (see [`Over::wrappers`]).
     pub wrappers: usize,
+    /// Rendered images with no box: whether any text lies over them is
+    /// unknown.
+    pub boxless_images: usize,
+    /// Painted text elements with no box: whether they lie over an image is
+    /// unknown.
+    pub boxless_texts: usize,
 }
 
 impl PagePairs<'_> {
@@ -508,15 +608,22 @@ impl PagePairs<'_> {
         }
         if self.skipped_texts > 0 {
             note.push_str(&format!(
-                " ({} text element(s) over an image skipped: reported not visible)",
+                " ({} text element(s) over an image reported not visible)",
                 self.skipped_texts
             ));
         }
         if self.wrappers > 0 {
             note.push_str(&format!(
-                " ({} wrapper text element(s) over an image measured through their children \
-                 only: text they paint beside them is not measured)",
+                " ({} wrapper text element(s) over an image measured through their children, \
+                 whose text is all of theirs)",
                 self.wrappers
+            ));
+        }
+        if self.boxless_texts > 0 {
+            note.push_str(&format!(
+                " ({} text element(s) carry no box, so whether they lie over an image is \
+                 unknown)",
+                self.boxless_texts
             ));
         }
         note
@@ -536,13 +643,24 @@ impl PagePairs<'_> {
 /// [`texts_over`] every rendered media element of the snapshot.
 pub fn page_pairs(snapshot: &ElementSnapshot) -> PagePairs<'_> {
     let index = TextIndex::of(snapshot);
-    let mut page = PagePairs::default();
+    let mut page = PagePairs {
+        boxless_texts: snapshot
+            .elements
+            .iter()
+            .filter(|t| t.bbox.is_none() && paints_text(snapshot, t))
+            .count(),
+        ..Default::default()
+    };
     for image in snapshot.elements.iter().filter(|e| e.media.is_some()) {
         let over = texts_over(snapshot, image, &index);
         if unrendered(snapshot, image).is_some() {
             if !over.pairs.is_empty() || over.unreadable_texts > 0 {
                 page.skipped_images += 1;
             }
+            continue;
+        }
+        if image.bbox.is_none() {
+            page.boxless_images += 1;
             continue;
         }
         page.skipped_texts += over.unreadable_texts;
@@ -658,8 +776,10 @@ fn on_frame(frame: &Frame, css: Region) -> Option<((u32, u32, u32, u32), f64)> {
 /// One pass over `px`: the pixels where frames `a` and `b` differ by more
 /// than [`GLYPH_DIFF_MIN`] and that moved toward `colour` (`None`: every
 /// differing pixel), as `(x, y, squared distance)`, and how many differed
-/// at all past the threshold in any direction. `None` as soon as more than
-/// `cap` pixels are kept: the caller has no use for a mask that dense.
+/// at all past the threshold in any direction. Pixels `cut` names (another
+/// element's text, measured on its own) are passed over. `None` as soon as
+/// more than `cap` pixels are kept: the caller has no use for a mask that
+/// dense.
 #[allow(clippy::type_complexity)]
 fn diff_mask(
     a: &Frame,
@@ -667,12 +787,16 @@ fn diff_mask(
     (x0, y0, w, h): (u32, u32, u32, u32),
     colour: Option<Rgb>,
     cap: usize,
+    cut: &dyn Fn(u32, u32) -> bool,
 ) -> Option<(Vec<(u32, u32, f64)>, usize)> {
     let min2 = GLYPH_DIFF_MIN * GLYPH_DIFF_MIN;
     let mut mask = Vec::new();
     let mut raw = 0usize;
     for y in y0..y0 + h {
         for x in x0..x0 + w {
+            if cut(x, y) {
+                continue;
+            }
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
             let d = dist2(pa, pb);
             if d <= min2 {
@@ -778,8 +902,9 @@ impl Registration {
     /// [`LOCAL_TEXT_LIKE_SHARE`] of the tile's differing pixels must lie
     /// closer in A than in B to the colour of the tile's most-changed
     /// quarter. Moved texture — a parallax layer at any offset, a rotation, a
-    /// rescale — goes both ways (a median 52–71% per tile under 1–6 px parallax
-    /// on a textured layer; untracked 12–18 px text, any colour, 100%).
+    /// rescale — goes both ways, while untracked text moves one way: measured
+    /// on the committed fixtures during review (the `parallax` twins against
+    /// the `credit` and `tagline` cases).
     /// A text-like tile — few differing pixels can look text-like by chance —
     /// is still displaced when one shift of frame B by up to
     /// [`LOCAL_MAX_SHIFT_CSS`] CSS px lines up more than half of its
@@ -788,12 +913,24 @@ impl Registration {
     /// one) are displaced, or when ANY tile of the ring's first row — within
     /// one tile of the widened text box — is: a panel moving just under the
     /// text shows only there. The global check cannot see this: a layer under
-    /// part of the hero is under half its tiles.
+    /// part of the hero is under half its tiles. A ring with no tile mostly
+    /// outside the text boxes (neighbouring text covering it) confirms
+    /// nothing, and is refused too.
     pub fn local(&self, a: &Frame, b: &Frame, text_box: Region) -> Result<(), LocateError> {
         let s = a.source.scale_factor;
         let ts = self.tile as i64;
+        let unconfirmed = || {
+            (
+                UnknownCode::InputMissing,
+                format!(
+                    "no {REGISTRATION_TILE_CSS}-CSS-px tile of the image around this text lies \
+                     mostly outside every text box, so the text-hidden frame's registration with \
+                     the frame around it cannot be confirmed"
+                ),
+            )
+        };
         let Some((x0, y0, x1, y1)) = self.ring(a, text_box) else {
-            return Ok(());
+            return Err(unconfirmed());
         };
         // The first row of tiles around the hole: within one tile of the
         // widened text box. A layer moving just under the text shows there
@@ -903,6 +1040,11 @@ impl Registration {
                 }
             }
             ty += ts;
+        }
+        // Text boxes covering the whole ring leave nothing to compare: the
+        // global check refuses the same situation over the whole image.
+        if tiles == 0 {
+            return Err(unconfirmed());
         }
         if adjacent_displaced > 0
             || (displaced > 0 && displaced as f64 >= LOCAL_DISPLACED_TILE_SHARE * tiles as f64)
@@ -1166,6 +1308,27 @@ pub fn measure(
     let area = box_px.2 as usize * box_px.3 as usize;
     let floor = min_glyph_px(s);
     let cap = (MAX_GLYPH_SHARE * area as f64) as usize;
+    // A wrapper's leaf descendants, each widened for anti-aliasing: their
+    // glyphs are measured on their own, against their own colour.
+    let margin = (REGISTRATION_MARGIN_CSS * s).ceil() as i64;
+    let cuts: Vec<(i64, i64, i64, i64)> = pair
+        .exclude
+        .iter()
+        .filter_map(|r| a.css_region_to_pixels(*r))
+        .map(|r| {
+            (
+                r.x as i64 - margin,
+                r.y as i64 - margin,
+                r.right() + margin,
+                r.bottom() + margin,
+            )
+        })
+        .collect();
+    let cut = |x: u32, y: u32| {
+        let (x, y) = (x as i64, y as i64);
+        cuts.iter()
+            .any(|&(x0, y0, x1, y1)| x >= x0 && x < x1 && y >= y0 && y < y1)
+    };
     let dense = || {
         unknown(format!(
             "frames A and B differ toward the glyph colour at more than {:.0}% of text '{id}''s \
@@ -1178,7 +1341,7 @@ pub fn measure(
     let (glyph_colour, source, colour_conf) = match pair.text.fg_color {
         Some(fg) => (fg, GlyphColourSource::Declared, 1.0),
         None => {
-            let (raw, _) = diff_mask(a, b, box_px, None, area).ok_or_else(dense)?;
+            let (raw, _) = diff_mask(a, b, box_px, None, area, &cut).ok_or_else(dense)?;
             if raw.len() < floor {
                 return Err(not_hidden(id, raw.len(), floor));
             }
@@ -1186,7 +1349,7 @@ pub fn measure(
             (c, GlyphColourSource::Measured, agree)
         }
     };
-    let (mask, raw) = diff_mask(a, b, box_px, Some(glyph_colour), cap).ok_or_else(dense)?;
+    let (mask, raw) = diff_mask(a, b, box_px, Some(glyph_colour), cap, &cut).ok_or_else(dense)?;
     if !mask_usable(mask.len(), area, s) {
         if raw >= floor {
             return Err(unknown(format!(
@@ -1270,14 +1433,32 @@ pub fn measure(
         // docs) cannot: a FAINT one is a glyph pixel the mask missed, and an
         // undetectable one may hide one. Counted the way the sampling below
         // classifies them, stopping once the floor is reached.
+        //
+        // When the box CONTAINS the image (a button's label and its icon),
+        // text is laid out beside the image, not over it: only blind pixels
+        // within BLIND_ADJACENT_CSS of the text's own visible glyphs count,
+        // so a black icon under a black label is not hidden ink.
+        let contains = pair
+            .image
+            .bbox
+            .is_some_and(|ib| region_contains(text_box, ib));
+        let adj = (BLIND_ADJACENT_CSS * s).ceil() as i64;
+        let beside_glyph = |x: u32, y: u32| {
+            (-adj..=adj).any(|dy| {
+                (-adj..=adj).any(|dx| {
+                    let (nx, ny) = (x as i64 + dx, y as i64 + dy);
+                    nx >= 0 && ny >= 0 && is_mask.contains(&(nx as u32, ny as u32))
+                })
+            })
+        };
         let (mut faint, mut undetectable) = (0usize, 0usize);
         'scan: for y in oy0..oy0 + oh {
             for x in ox0..ox0 + ow {
-                if is_mask.contains(&(x, y)) {
+                if is_mask.contains(&(x, y)) || cut(x, y) {
                     continue;
                 }
                 let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
-                if dist2(pb, glyph_colour) > blind {
+                if dist2(pb, glyph_colour) > blind || (contains && !beside_glyph(x, y)) {
                     continue;
                 }
                 if trusted && pa != pb && toward(pa, pb, glyph_colour) {
@@ -1320,6 +1501,9 @@ pub fn measure(
     let mut faint = 0usize;
     for y in oy0..oy0 + oh {
         for x in ox0..ox0 + ow {
+            if cut(x, y) {
+                continue;
+            }
             let (pa, pb) = (rgb_at(a, x, y), rgb_at(b, x, y));
             let is_blind = dist2(pb, glyph_colour) <= blind;
             let r = || contrast(lg, luminance(pb));
@@ -1359,13 +1543,8 @@ pub fn measure(
     // cannot see").
     let estimate = hidden.len();
     ratios.sort_by(f64::total_cmp);
-    hidden.sort_by(f64::total_cmp);
     let mut with_hidden = ratios.clone();
-    for i in 0..estimate {
-        // Spread across the undetectable pixels' own contrasts (all of them
-        // while `estimate` is their count).
-        with_hidden.push(hidden[(i * hidden.len()) / estimate]);
-    }
+    with_hidden.extend_from_slice(&hidden);
     with_hidden.sort_by(f64::total_cmp);
     Ok(Some(TextOverImageContrast {
         element: id.to_string(),
