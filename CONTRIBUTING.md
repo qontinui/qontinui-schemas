@@ -386,8 +386,10 @@ version so a consumer's sibling pin can tell it from `main`: when that version
 is a MAJOR, this bound moves to it in the same commit (a `^N` bound cannot
 select N+1), and release-please later rewrites it to the same value. Such a
 hand-declared version must equal what release-please computes from the tagged
-manifest anchor (`fix` = one patch, `feat` = one minor, `feat!` = one major above it), never stack
-on another unreleased hand bump, and never touch `release-please-manifest.json`.
+manifest anchor over EVERY unreleased commit under the component's path, not
+just this PR's (the highest of: `fix` = one patch, `feat` = one minor, `feat!` =
+one major above the anchor), never stack on another unreleased hand bump, and
+never touch `release-please-manifest.json`.
 
 **On a qontinui-types MAJOR, give runner-client a real version too.** The
 plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its

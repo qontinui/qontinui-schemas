@@ -59,10 +59,10 @@
 //! environment variables above. A box that declares its root, or runs a binary
 //! from inside a checkout, is answered by a higher rung first, so this rung
 //! changes nothing for it (`session_repo_parent_ranks_below_every_fleet_rung`).
-//! The one resolution it DOES change is a box answered today only by
-//! `<home>/qontinui-root`, and only for a caller that passes a session
-//! repository: that caller now gets the folder holding the session's checkout,
-//! which is the more specific answer.
+//! It changes two outcomes, both only for a caller that passes a session
+//! repository: a box that resolved nothing now resolves, and a box answered
+//! only by `<home>/qontinui-root` now gets the folder holding the session's
+//! checkout, which is the more specific answer.
 //!
 //! ## When nothing resolves — one typed refusal
 //!
@@ -898,9 +898,8 @@ fn session_repo_parent(repo: &Path) -> Option<PathBuf> {
 /// fabricated answer this module refuses.
 ///
 /// **Round-trip verified.** Paths are folded lexically (never
-/// `canonicalize`, which resolves symlinks and on Windows returns a `\\?\`
-/// verbatim path, spelling the root differently from every other rung). A
-/// lexical fold of a RELATIVE `gitdir:` read through a symlinked worktree path
+/// `canonicalize`, which on Windows returns a `\\?\` verbatim path no other
+/// rung produces). A lexical fold of a RELATIVE `gitdir:` read through a symlinked worktree path
 /// can land on a different admin directory, so the admin directory must name
 /// this worktree back: its own `gitdir` file (which git writes) must fold to
 /// this worktree's `.git`. Git writes that back-link with symlinks RESOLVED, so
@@ -908,7 +907,17 @@ fn session_repo_parent(repo: &Path) -> Option<PathBuf> {
 /// `/var` -> `/private/var`, a drive letter spelled in the other case) fails the
 /// lexical comparison; only then is the IDENTITY re-checked through
 /// `canonicalize` of both sides. Canonicalisation is used for that yes/no
-/// question only — the root returned is still the lexically folded spelling.
+/// question only — the root returned is the lexical fold of what the `.git`
+/// file and `commondir` say.
+///
+/// **Spelling.** That fold starts from the path git recorded, and git records
+/// a worktree's `gitdir:` with symlinks resolved (unless
+/// `worktree.useRelativePaths` is set). So for a linked worktree the root is
+/// spelled the way git resolved it, while a session opened on the main
+/// checkout itself gets the session's own, possibly symlinked, spelling: the
+/// same folder can come back spelled two ways
+/// (`session_repo_root_is_spelled_as_git_recorded_it`). A consumer comparing
+/// roots as text across sessions or rungs must canonicalize both first.
 /// A back-link that names another worktree either way skips the rung: a
 /// symlinked spelling may cost the inference, it never yields another
 /// checkout's folder.
@@ -1505,6 +1514,52 @@ mod tests {
         .unwrap();
         let got = resolve_workspace_root(None, None, None, None, Some(&via_link), None);
         assert_eq!(got.root, None);
+    }
+
+    /// The main checkout lives under a SYMLINKED workspace spelling. Git
+    /// records a linked worktree's `gitdir:` with symlinks resolved, so a session
+    /// on the worktree gets the resolved spelling, while a session on the main
+    /// checkout through the link gets the link's spelling. Both name one folder.
+    /// Pins the spelling `main_checkout_of_worktree` documents.
+    #[cfg(unix)]
+    #[test]
+    fn session_repo_root_is_spelled_as_git_recorded_it() {
+        let (base, _g) = other_root("session_spelling");
+        let real_ws = base.join("real-ws");
+        let main = real_ws.join("my-app");
+        let admin = main.join(".git").join("worktrees").join("wt");
+        std::fs::create_dir_all(&admin).unwrap();
+        std::fs::write(admin.join("commondir"), "../..\n").unwrap();
+        let link_ws = base.join("link-ws");
+        std::os::unix::fs::symlink(&real_ws, &link_ws).unwrap();
+
+        let worktree = base.join("wt").join("my-app");
+        std::fs::create_dir_all(&worktree).unwrap();
+        // As git writes it: the admin dir through the RESOLVED workspace path.
+        std::fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", admin.display()),
+        )
+        .unwrap();
+        std::fs::write(
+            admin.join("gitdir"),
+            format!("{}\n", worktree.join(".git").display()),
+        )
+        .unwrap();
+
+        let from_worktree = resolve_workspace_root(None, None, None, None, Some(&worktree), None);
+        assert_eq!(from_worktree.kind, WorkspaceRootKind::SessionRepoParent);
+        assert_eq!(from_worktree.root.as_deref(), Some(real_ws.as_path()));
+
+        let via_link = link_ws.join("my-app");
+        let from_main = resolve_workspace_root(None, None, None, None, Some(&via_link), None);
+        assert_eq!(from_main.kind, WorkspaceRootKind::SessionRepoParent);
+        assert_eq!(from_main.root.as_deref(), Some(link_ws.as_path()));
+
+        assert_eq!(
+            std::fs::canonicalize(from_worktree.root.unwrap()).unwrap(),
+            std::fs::canonicalize(from_main.root.unwrap()).unwrap()
+        );
     }
 
     #[test]
