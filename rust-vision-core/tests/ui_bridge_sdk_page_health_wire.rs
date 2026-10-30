@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Wire-compatibility gate: recorded, GENUINE UI Bridge SDK page-health
 //! answers must deserialize into `Observation<PageHealthValue>` and lose
 //! nothing on the way in.
@@ -318,7 +319,14 @@ fn laid_out_page_is_measured_with_visible_geometry_and_a_warning() {
         "the laid-out capture covers some of the grid"
     );
     let coverage = &obs.provenance().coverage;
-    assert!(coverage.considered > 0 && coverage.measured == coverage.considered);
+    assert!(
+        coverage.considered > 0,
+        "coverage considered nothing: {coverage:?}"
+    );
+    assert_eq!(
+        coverage.measured, coverage.considered,
+        "coverage measured a different count than it considered: {coverage:?}"
+    );
     assert_eq!(coverage.measured, value.visible_count);
 }
 

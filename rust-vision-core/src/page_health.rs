@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! [`PageHealthValue`] — the `value` of a `measured` page-health
 //! [`Observation`](crate::Observation): the canonical wire type of what the
 //! UI Bridge SDK's `/control/page-health` answers (producer
@@ -34,6 +35,11 @@ use serde_json::{Map, Value};
 
 /// One finding's severity, and the report's roll-up. Spelled in capitals on
 /// the wire (`"OK" | "WARNING" | "CRITICAL"`).
+///
+/// The variant ORDER is load-bearing: the derived `Ord` ranks `Ok < Warning <
+/// Critical`, and the wire gate (`tests/ui_bridge_sdk_page_health_wire.rs`)
+/// checks that the producer's `summary` equals the `max` of the findings'
+/// severities. Never reorder these variants.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
