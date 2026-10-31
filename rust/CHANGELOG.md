@@ -1,5 +1,43 @@
 # Changelog
 
+## [5.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.8.0...rust-v5.0.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* WorkspaceRoot::require returns WorkspaceRootUnresolved; qontinui_workspace_root and resolve_workspace_root take a session_repo argument; WorkspaceRootKind gains SessionRepoParent.
+
+### Features
+
+* declare the registry snapshot age bound in the spawn contract ([3655957](https://github.com/qontinui/qontinui-schemas/commit/36559574eecc4b6b569b943a11ea0881361fc893))
+* **scheduler:** RemoteAgent carries effort, ultracode and effort_profile ([55eedce](https://github.com/qontinui/qontinui-schemas/commit/55eedceb1a60d0f348866c221338e7a162f98bc4))
+* **session-work-type:** the session run-record vocabulary contract ([b12e73f](https://github.com/qontinui/qontinui-schemas/commit/b12e73f152ab92a24d11cf4825ba1870b7c7cc53))
+* **spawn-authorization:** seed admission_stall_fix_dispatch as its own kind ([a14ee98](https://github.com/qontinui/qontinui-schemas/commit/a14ee98cda4f0af69b6262539df4f07db85ae710))
+* spec_model — typed spec-artifact frontmatter and the EARS vocabulary ([162dd0a](https://github.com/qontinui/qontinui-schemas/commit/162dd0a9df655e483799876c62eb4aed70106b23))
+* typed workspace-root refusal and the session-repository rung ([441c49d](https://github.com/qontinui/qontinui-schemas/commit/441c49d854b884c9ee2ffd7176d9838d3e2b1800))
+* **types:** journey graph queries over the edge ledger, pinned to multistate ([429d17f](https://github.com/qontinui/qontinui-schemas/commit/429d17f64f28c5aafcdc089f48d04ee70a9670fd))
+* **types:** public trusted_edge_row and JourneyFilter::keeps for the runner's edge-timing route ([31b2286](https://github.com/qontinui/qontinui-schemas/commit/31b2286e5459868abc014ab95b6f0aefbd4bb837))
+* **vision-core:** interaction timeline, timeline assertions, ledger projection and edge timing ([3d6c9bf](https://github.com/qontinui/qontinui-schemas/commit/3d6c9bfb338bb240fba1b021f59ce2b0a557c07d))
+
+
+### Bug Fixes
+
+* **paths:** a symlinked worktree spelling still resolves; pin the format against real git ([f44a1c3](https://github.com/qontinui/qontinui-schemas/commit/f44a1c35427023723e5249edf71ca1b00f2598d8))
+* **types:** a departure left out of the navigation set never settles a negative ([06f15ac](https://github.com/qontinui/qontinui-schemas/commit/06f15ac3130d6d6ba5aeabf587e1e998f2e91801))
+* **types:** a rejected row's trigger is untrusted; absent gate names an unobserved subject ([6a83a29](https://github.com/qontinui/qontinui-schemas/commit/6a83a29f0966691517bb02dcd4b547852eeb4052))
+* **types:** a settle_timeout-only destination is unconfirmed, never a settled dead end ([280b7f5](https://github.com/qontinui/qontinui-schemas/commit/280b7f5899e6c17459c5b3317a4d58083ada377d))
+* **types:** a URL-trigger row is never a genuine negative; test the pop settle_timeout self-loop ([d9d1349](https://github.com/qontinui/qontinui-schemas/commit/d9d13492bad0f0ae67e87399ec53320e9bdd18ea))
+* **types:** absent is unreachable over an empty or non-writing ledger; count back arrivals ([9edc750](https://github.com/qontinui/qontinui-schemas/commit/9edc750639a338a4f6b684a81b459a15132bbc9c))
+* **types:** an error arrival does not confirm a destination ([b2d0c4a](https://github.com/qontinui/qontinui-schemas/commit/b2d0c4a50c41ed396894b8930e0f4e93579d8e7d))
+* **types:** count an excluded negative on a node the graph drops; enumeration invariant ([a595ddd](https://github.com/qontinui/qontinui-schemas/commit/a595ddd842d077bb0a0b09c86bacb20dbed32ad7))
+* **types:** error click elsewhere has unknown destination; self-loops are not arrivals ([49f7dae](https://github.com/qontinui/qontinui-schemas/commit/49f7dae193087622c8211cb266659b8aff1d9b33))
+* **types:** nothing in a rejected row is trusted; settle_timeout elsewhere is unknown ([5af035b](https://github.com/qontinui/qontinui-schemas/commit/5af035ba5ccd53396586e592887aadd188e8187c))
+* **types:** placement keys on the full row; invalid frontier nodes are unplaced ([f064e72](https://github.com/qontinui/qontinui-schemas/commit/f064e72db13e7e0da3aec3afbafc0444e701f18e))
+* **types:** prior knowledge never settles beside an open frontier or a non-writing ledger ([7f76b2f](https://github.com/qontinui/qontinui-schemas/commit/7f76b2fc692d0fcbeb9a01e01f51c4a791f46669))
+* **types:** settle_timeout self-loop is unmeasured; an error self-loop is a genuine negative ([ecf7248](https://github.com/qontinui/qontinui-schemas/commit/ecf7248c0638e6c4660f7bdb552fdd18d478e455))
+* **types:** unplaceable frontier rows, URL arrivals and graph-wide doubt never settle a negative ([58bd297](https://github.com/qontinui/qontinui-schemas/commit/58bd2976cb5dc0175f4a73fffb88830c9438b2ee))
+* **vision-core:** the ledger projection keeps element counts, never element identities ([a7b5c4b](https://github.com/qontinui/qontinui-schemas/commit/a7b5c4b9a9dc7170d01b07bccea1455fb6384644))
+
 ## [4.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.7.0...rust-v4.8.0) (2026-10-22)
 
 

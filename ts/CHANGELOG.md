@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.5.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.1...ts-v2.5.0) (2026-10-31)
+
+
+### Features
+
+* generated bindings for the spec_model types ([7bab6d4](https://github.com/qontinui/qontinui-schemas/commit/7bab6d418bb3eee3b96fa41fd342338fe09c48f6))
+* **scheduler:** RemoteAgent carries effort, ultracode and effort_profile ([55eedce](https://github.com/qontinui/qontinui-schemas/commit/55eedceb1a60d0f348866c221338e7a162f98bc4))
+* **types:** journey graph queries over the edge ledger, pinned to multistate ([429d17f](https://github.com/qontinui/qontinui-schemas/commit/429d17f64f28c5aafcdc089f48d04ee70a9670fd))
+* **vision-core:** interaction timeline, timeline assertions, ledger projection and edge timing ([3d6c9bf](https://github.com/qontinui/qontinui-schemas/commit/3d6c9bfb338bb240fba1b021f59ce2b0a557c07d))
+
+
+### Bug Fixes
+
+* **codegen:** drop runner[#1990](https://github.com/qontinui/qontinui-schemas/issues/1990)'s expired bindings no runner main exports ([dc6c2d0](https://github.com/qontinui/qontinui-schemas/commit/dc6c2d01adecea867159c680069d696b9a7378ce))
+
 ## [2.4.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.0...ts-v2.4.1) (2026-10-22)
 
 
