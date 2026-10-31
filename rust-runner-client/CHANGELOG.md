@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.2.14](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.13...rust-runner-client-v0.2.14) (2026-10-31)
+
 ## [0.2.13](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.12...rust-runner-client-v0.2.13) (2026-10-22)
 
 
