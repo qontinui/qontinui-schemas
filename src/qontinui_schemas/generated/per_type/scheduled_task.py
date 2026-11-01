@@ -98,6 +98,54 @@ class IdleCondition(BaseModel):
     enabled: Annotated[bool, Field(description='Whether this condition is active.')]
 
 
+class ManagedBy(BaseModel):
+    """
+    Provenance of a [`ScheduledTask`] that the runner reconciles from a
+    fleet-wide declaration (plan
+    `2026-10-29-recurring-agents-declared-in-coord-reconciled-by-runner`, D5).
+
+    `(source, tenant_id, agent)` is the managed key: the runner holds at most
+    one task per key. What the reconciler compares to decide whether a task is
+    current is `digest`, never `version` — a catalog fix in coord's code moves
+    no row version, and a deleted-and-recreated agent restarts its version at 1.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    agent: Annotated[
+        str,
+        Field(
+            description="The recurring agent's name — its join key across coord's status, run\nrequests and this managed task (coord forbids renames)."
+        ),
+    ]
+    digest: Annotated[
+        str | None,
+        Field(
+            description='sha256 (64 lowercase hex) of the resolved spec coord served when this\ntask was applied. `None` = applied from a declaration that carried no\ndigest.'
+        ),
+    ] = None
+    source: Annotated[
+        str,
+        Field(
+            description='Which declaration store the task came from — [`MANAGED_SOURCE_COORD`].\nA plain string rather than an enum, so a stored task from a newer\nsource still loads; the consumer decides what it recognises.'
+        ),
+    ]
+    tenantId: Annotated[
+        str,
+        Field(
+            description='The coord tenant (UUID) whose declaration this task applies. A device\nbound to several tenants holds one managed task per tenant and agent.'
+        ),
+    ]
+    version: Annotated[
+        int,
+        Field(
+            description="The declaration's row version when applied. History and display only.",
+            ge=0,
+        ),
+    ]
+
+
 class McpConnectionRef(BaseModel):
     """
     Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
@@ -644,6 +692,12 @@ class ScheduledTask(BaseModel):
             ge=0,
         ),
     ] = 60
+    managed: Annotated[
+        ManagedBy | None,
+        Field(
+            description="Set when the task was created by the runner's reconciler from a\nfleet-wide recurring-agent declaration rather than by a user. `None` =\nan unmanaged, user-created task, which the reconciler never touches."
+        ),
+    ] = None
     modifiedAt: Annotated[
         str, Field(description='ISO 8601 timestamp of last modification.')
     ]
@@ -673,3 +727,9 @@ class ScheduledTask(BaseModel):
         ScheduledTaskType,
         Field(description='Task type and its per-type configuration.'),
     ]
+    timezone: Annotated[
+        str | None,
+        Field(
+            description='IANA time zone this task\'s schedule is interpreted in (e.g.\n`Europe/Berlin`). Takes precedence over the global\n[`SchedulerSettings::timezone`]; `None` = the scheduler\'s zone. Lets one\nfleet-wide declaration mean either "local night on every device" or a\nfixed instant.'
+        ),
+    ] = None

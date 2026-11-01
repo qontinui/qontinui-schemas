@@ -386,6 +386,14 @@ fn scheduled_task_fully_populated_roundtrips() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: Some("Europe/Berlin".to_string()),
+        managed: Some(ManagedBy {
+            source: MANAGED_SOURCE_COORD.to_string(),
+            tenant_id: "7d6c1c2e-1b7a-4e43-9a43-6f1f0f3c2a11".to_string(),
+            agent: "cleanup-steward".to_string(),
+            version: 3,
+            digest: Some("a".repeat(64)),
+        }),
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -418,6 +426,8 @@ fn scheduled_task_minimally_populated_roundtrips() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: None,
+        managed: None,
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -452,6 +462,8 @@ fn scheduled_task_minimal_elides_none_fields() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: None,
+        managed: None,
     };
     let json = serde_json::to_string(&task).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
@@ -464,6 +476,8 @@ fn scheduled_task_minimal_elides_none_fields() {
         "nextRun",
         "conditions",
         "conditionStatus",
+        "timezone",
+        "managed",
     ] {
         assert!(
             v.get(absent_field).is_none(),
