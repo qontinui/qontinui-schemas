@@ -26,13 +26,17 @@ name: release-pr-sanity
 # `2026-09-07-coord-release-please-prs-must-land-without-sha-rewrite` in
 # qontinui-dev-notes).
 #
+# It also fails the release PR when qontinui-types goes up a major and
+# runner-client's minor did not move (CONTRIBUTING.md, "On a qontinui-types
+# MAJOR, give runner-client a real version too"). See the script's header.
+#
 # Scoped to release-please's head branches by a job-level `if:` rather than a
 # trigger filter: `pull_request` has no head-branch filter, and skipping the job
 # (rather than never registering it) keeps the check name stable on every PR.
 #
 # NOT a required check, deliberately: the fix for what it detects is a manual
-# recovery, and a required red would freeze the train on a PR that must be
-# closed anyway. Its value is the message.
+# recovery or a follow-up commit, and a required red would freeze the train on a
+# PR that must be closed or rewritten anyway. Its value is the message.
 
 on:
   pull_request:
@@ -52,8 +56,18 @@ jobs:
           # `git show`; a shallow PR checkout does not carry the base.
           fetch-depth: 0
 
-      - name: Every base manifest version has a release
+      - name: Every expected release exists, and the proposed versions obey the major rule
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bash .github/scripts/release-pr-sanity.sh
+
+  # The script only runs on release PRs, so without this job (on every PR to
+  # main) nothing would exercise a change to it until a release PR was already
+  # wrong.
+  release-pr-sanity-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: The sanity script's verdicts
+        run: bash .github/scripts/release-pr-sanity-test.sh
