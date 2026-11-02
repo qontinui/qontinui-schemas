@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.13...rust-runner-client-v0.3.0) (2026-11-02)
+
+
+### Documentation
+
+* **runner-client:** say how to move from 0.2.x to 0.3.0 ([c149dc4](https://github.com/qontinui/qontinui-schemas/commit/c149dc4fb105b21a844567761c3cd6959285d6c6))
+
 ## [0.2.13](https://github.com/qontinui/qontinui-schemas/compare/rust-runner-client-v0.2.12...rust-runner-client-v0.2.13) (2026-10-22)
 
 
