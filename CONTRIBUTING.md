@@ -302,7 +302,10 @@ Two ways to get there:
   and the consumers' version bounds turned five checks red with a
   version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
   10+ coord `ci-not-green` cycles). The `release-pr-sanity` workflow now fails
-  a release PR with this recipe when a base manifest version has no tag:
+  a release PR with this recipe when a base manifest version of a package in
+  `release-please-config.json` has no tag. A manifest row with no package there
+  (`ci-exec`, written by the cargo-workspace plugin, `publish = false`) never
+  gets a tag and is skipped:
   1. find the landed release commit —
      `git log --format='%h %an %s' -3 -- release-please-manifest.json`;
   2. create the release release-please would have, for each component:
@@ -399,6 +402,7 @@ a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer in
 the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
 release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
+`release-pr-sanity` fails the release PR if runner-client's minor did not move.
 
 The footer only counts while nothing but trailers follows it to the end of the
 message; a blank line does not protect it from later prose. `git cherry-pick -x`
