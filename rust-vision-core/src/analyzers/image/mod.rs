@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The `image` analyzer: L1 pixel VALUES for every image on a page (plan
 //! 2026-10-13-image-generation-and-visual-judgment, Phase 15).
 //!

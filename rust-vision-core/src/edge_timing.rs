@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Edge timing — the latency of one journey EDGE as a distribution over its
 //! observations, never a single "the latency" (plan
 //! `2026-09-20-ui-bridge-represents-the-users-path-and-the-passage-of-time`,
