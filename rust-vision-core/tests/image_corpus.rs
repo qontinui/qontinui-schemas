@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The `image` analyzer and the L1 image assertions, against held fixtures and
 //! their mutations (plan 2026-10-13-image-generation-and-visual-judgment,
 //! Phase 15 step 4).

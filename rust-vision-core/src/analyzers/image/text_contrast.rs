@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Text over images, measured on real pixels (plan
 //! 2026-10-13-image-generation-and-visual-judgment, Phase 16).
 //!

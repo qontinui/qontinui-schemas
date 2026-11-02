@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Text over images, measured on real pixels (plan
 //! 2026-10-13-image-generation-and-visual-judgment, Phase 16): the
 //! `text_over_image_contrast` assertion and the image analyzer's per-image

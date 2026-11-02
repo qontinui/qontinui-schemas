@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Wire gate: SDK-captured interaction timelines round-trip through
 //! [`ChangeTimeline`] and the timeline assertions answer over them.
 //!

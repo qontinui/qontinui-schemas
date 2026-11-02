@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The interaction timeline — the Rust mirror of the UI Bridge SDK's
 //! `ChangeTimeline` (`@qontinui/ui-bridge` `packages/ui-bridge/src/ai/types.ts`,
 //! as landed in qontinui/ui-bridge#258; plan

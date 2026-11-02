@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Pixel math for the [`super`] image analyzer: pure functions over an RGB
 //! crop or a whole frame, no I/O, no model, no new dependency (plan
 //! 2026-10-13-image-generation-and-visual-judgment, PD9).

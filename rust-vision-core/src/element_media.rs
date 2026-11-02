@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Media facts for one snapshot element — what an image, picture, SVG, video,
 //! canvas, `[role=img]` element or CSS background image is, as the snapshot
 //! producer measured it. Carried on [`crate::Element::media`].

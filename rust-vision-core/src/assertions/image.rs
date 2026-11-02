@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The L1 image assertions (plan 2026-10-13-image-generation-and-visual-
 //! judgment, Phase 15): the first evaluators that read
 //! [`EvalContext::frame`].

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! [`UnknownCode`] and the ui-bridge diagnostic registry name the same closed
 //! set.
 //!
