@@ -400,6 +400,17 @@ the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
 release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
 
+The footer only counts while every line in its paragraph is a trailer.
+`git cherry-pick -x` appends `(cherry picked from commit …)` to that paragraph,
+and release-please then reads no `Release-As` at all, without any error. That
+happened to the 0.3.0 commit (`f6107595`) when #269 carried it over from #206,
+so release PR #262 proposed runner-client 0.2.14. To carry such a commit to a new
+branch, cherry-pick it without `-x`, or remove that line from the message. A
+`Rebased-By:` trailer added at land is harmless. The check is the release PR
+itself: it must name the version you asked for, and if it does not, land another
+commit with a clean footer. The type can stay `docs`, because a commit carrying
+this footer is listed in the changelog even though `docs` is otherwise hidden.
+
 The ergonomics of skipping the anchor: every override generates one stale
 "chore: release main" PR proposing the wrong version that you close by hand. The
 ergonomics of doing it: one tag.
