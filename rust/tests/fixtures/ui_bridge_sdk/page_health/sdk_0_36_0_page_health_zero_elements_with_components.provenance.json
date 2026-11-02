@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_0_36_0_page_health_zero_elements_with_components.json",
+  "sha256": "dd60faa835876a99230cb0f54c414b7515c11ee0e68cc32a452d10388c1684cc",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.36.0 (packages/ui-bridge/package.json at the commit below; the producer version the SDK stamps, read from __SDK_VERSION__, which vitest defines from that package.json)",
+  "sdk_commit": "qontinui/ui-bridge 76dc20818bdeb676077821485e735bbe27471659 (the npm gitHead of @qontinui/ui-bridge 0.36.0, the version qontinui-runner pins)",
+  "source": "diagnoseSnapshotPageHealth() (packages/ui-bridge/src/server/page-health.ts, producer sdk/page-health), the call the in-page /control/page-health handler makes at this SDK, run under the capture harness in capture/ over the recorded GENUINE live SDK snapshot rust/tests/fixtures/ui_bridge_sdk/runner_live_sdk_0_27_0_control_snapshot.json (sha256 4668836c4f495beab821fb328cf1e272ce577452cf61868b1aa563d1b3f8306a) with `elements` emptied and its 2 components kept. That edit is the harness's.",
+  "capture_command": "In a ui-bridge checkout detached at 76dc208 (a git archive of it works): npm ci --ignore-scripts -w packages/ui-bridge && cp <schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/capture/page-health-sdk-0-36.capture.test.ts packages/ui-bridge/src/server/ && cd packages/ui-bridge && PAGE_HEALTH_SNAPSHOT_IN=<schemas>/rust/tests/fixtures/ui_bridge_sdk/runner_live_sdk_0_27_0_control_snapshot.json PAGE_HEALTH_OUT_DIR=<out> PAGE_HEALTH_EVALUATED_AT=2026-11-02T00:00:00.000Z npx vitest run src/server/page-health-sdk-0-36.capture.test.ts",
+  "captured_at": "2026-11-02",
+  "trim": "Written verbatim as a JSON round-trip, pretty-printed with 2-space indent. evaluatedAt is PINNED; every other byte is the SDK's. A re-run reproduces this file byte-for-byte (checked 2026-11-02).",
+  "notes": "status=measured, summary=CRITICAL, coverage {considered: 0, measured: 0}. The producer's producer_not_run branch needs zero components as well as zero elements, so this input is analyzed over nothing. Recorded as the SDK's genuine answer, not endorsed: it is the one measured report over zero considered elements left at this SDK. The recorded snapshot is itself a whole-entry trim of a live page (3 of 160 elements, 2 of 6 components, per its own sidecar), so this is the producer's answer over those entries and says nothing about whether that live page was all-invisible."
+}

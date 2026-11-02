@@ -10,6 +10,10 @@
  * `{ snapshotId }`. It writes the answer's wire bytes (a JSON round-trip, i.e.
  * exactly what goes over HTTP inside the `success` envelope's `data`).
  *
+ * This harness reproduces the sdk_0_30_0_* captures at d6ff394 and fails on SDK
+ * >= 0.31.1, where the recorded snapshot below is no longer `measured`. Later
+ * captures use page-health-sdk-0-36.capture.test.ts beside it.
+ *
  * Three captures:
  *   - PAGE_HEALTH_POPULATED_OUT: over a recorded genuine SDK snapshot read from
  *     PAGE_HEALTH_SNAPSHOT_IN (a fixture under rust/tests/fixtures/ui_bridge_sdk/).

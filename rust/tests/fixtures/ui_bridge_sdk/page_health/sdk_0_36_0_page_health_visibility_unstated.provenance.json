@@ -1,0 +1,12 @@
+{
+  "fixture": "sdk_0_36_0_page_health_visibility_unstated.json",
+  "sha256": "bb2e1045e6217851d2500ad49095e29d68ca6c8675f4374b6d592dbf2d77538c",
+  "sdk_package": "@qontinui/ui-bridge",
+  "sdk_version": "0.36.0 (packages/ui-bridge/package.json at the commit below; the producer version the SDK stamps, read from __SDK_VERSION__, which vitest defines from that package.json)",
+  "sdk_commit": "qontinui/ui-bridge 76dc20818bdeb676077821485e735bbe27471659 (the npm gitHead of @qontinui/ui-bridge 0.36.0, the version qontinui-runner pins)",
+  "source": "diagnoseSnapshotPageHealth() (packages/ui-bridge/src/server/page-health.ts, producer sdk/page-health), the call the in-page /control/page-health handler makes at this SDK, run under the capture harness in capture/ over the laid-out snapshot with state.visible deleted from every element. That edit is the harness's; the core registry at this SDK always emits a boolean state.visible, and the producer's visibilityStated branch exists for a snapshot that does not.",
+  "capture_command": "In a ui-bridge checkout detached at 76dc208 (a git archive of it works): npm ci --ignore-scripts -w packages/ui-bridge && cp <schemas>/rust/tests/fixtures/ui_bridge_sdk/page_health/capture/page-health-sdk-0-36.capture.test.ts packages/ui-bridge/src/server/ && cd packages/ui-bridge && PAGE_HEALTH_SNAPSHOT_IN=<schemas>/rust/tests/fixtures/ui_bridge_sdk/runner_live_sdk_0_27_0_control_snapshot.json PAGE_HEALTH_OUT_DIR=<out> PAGE_HEALTH_EVALUATED_AT=2026-11-02T00:00:00.000Z npx vitest run src/server/page-health-sdk-0-36.capture.test.ts",
+  "captured_at": "2026-11-02",
+  "trim": "Written verbatim as a JSON round-trip, pretty-printed with 2-space indent. evaluatedAt is PINNED. Volatile bytes: observedAt and provenance.source.snapshotId come from the snapshot taken at capture, so a re-run differs in those and nowhere else (two runs compared 2026-11-02).",
+  "notes": "status=unknown, unknown.code=input_missing, and coverage {considered: 9, measured: 0, unmeasured: [{dimension: visibility, count: 9, code: input_missing}]}: an `unknown` that still says what it could not see."
+}

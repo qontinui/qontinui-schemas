@@ -14,14 +14,26 @@
 //! `2026-09-20-ui-bridge-observations-distinguish-cannot-see-from-not-present-and-carry-provenance`,
 //! Phase 3).
 //!
-//! Coverage (how many visible elements carried geometry) is NOT here: it
+//! Coverage (how many elements could be placed on screen) is NOT here: it
 //! lives in the observation's `provenance.coverage`. A report only ever
 //! exists inside a `measured` observation, and "could not look" (no
 //! `elements`, an empty registry, visible elements none of which carry
-//! geometry) is an `unknown` with a typed code. One gap remains on the SDK
-//! side at 0.30.0: elements registered but NONE visible still yields a
-//! `measured` CRITICAL report over zero considered elements — the
-//! `..._populated.json` fixture records exactly that.
+//! geometry) is an `unknown` with a typed code. Elements whose snapshot never
+//! said whether they are visible count under `coverage.unmeasured` as the
+//! `visibility` dimension, and go `unknown` when nothing is left to place.
+//!
+//! SDKs from 0.30.0 up to but not including 0.31.1 still answer `measured`
+//! CRITICAL over zero considered elements when elements are registered but
+//! NONE is visible, and deployed apps can still emit that:
+//! `sdk_0_30_0_page_health_populated.json` records it. From 0.31.1 the same
+//! input is `unknown{input_missing}`:
+//! `sdk_0_36_0_page_health_all_invisible.json` records that.
+//!
+//! One `measured` report over zero considered elements remains at 0.36.0: no
+//! elements at all while components ARE registered, which the SDK analyzes
+//! rather than treating as "nothing has registered yet".
+//! `sdk_0_36_0_page_health_zero_elements_with_components.json` records it. So
+//! read `coverage.considered` before trusting a blank-page CRITICAL.
 //!
 //! Field names are the SDK's wire names verbatim (`element_count`, not
 //! camelCase), so there is no `rename_all`. Unrecognised keys are ignored

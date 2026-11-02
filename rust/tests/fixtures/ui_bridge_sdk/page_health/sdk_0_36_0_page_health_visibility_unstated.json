@@ -1,0 +1,31 @@
+{
+  "status": "unknown",
+  "unknown": {
+    "code": "input_missing",
+    "detail": "9 of 9 element(s) carry no boolean `state.visible`, so no element can be placed on screen; spatial coverage, layout regions and visual anomalies cannot be measured"
+  },
+  "provenance": {
+    "producer": {
+      "id": "sdk/page-health",
+      "version": "0.36.0"
+    },
+    "observedAt": "2026-11-02T16:22:00.207Z",
+    "evaluatedAt": "2026-11-02T00:00:00.000Z",
+    "coverage": {
+      "considered": 9,
+      "measured": 0,
+      "unmeasured": [
+        {
+          "dimension": "visibility",
+          "count": 9,
+          "code": "input_missing"
+        }
+      ]
+    },
+    "confidence": null,
+    "cache": null,
+    "source": {
+      "snapshotId": "ubs2_9_9_ff660a064f3a1bde_3cdba23daa2c7008"
+    }
+  }
+}
