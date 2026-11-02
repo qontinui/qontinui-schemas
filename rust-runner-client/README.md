@@ -70,11 +70,10 @@ not `native-tls`, to match the rest of the qontinui ecosystem.
   Breaking changes will bump the minor version per Cargo's pre-1.0 SemVer
   rules; the CHANGELOG calls them out explicitly. Wire-format compatibility
   is the responsibility of `qontinui-types`.
-- **Runner version**: built against the `/spawn-placement/{preview,temp}`
-  surface the runner has stabilized as of `qontinui-types 0.1.x`. The
-  `qontinui-types` dependency is constrained as `^0.1`, so a runner that
-  speaks `qontinui-types 0.2.x` will not be compatible without a runner-client
-  bump.
+- **Runner version**: built against the runner's `/spawn-placement/{preview,temp}`
+  surface. The `qontinui-types` dependency is a caret requirement on one major
+  (see the top of this file), so a runner speaking a newer `qontinui-types`
+  major needs a runner-client minor built on it.
 
 ## License
 
