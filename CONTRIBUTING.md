@@ -400,9 +400,10 @@ the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
 release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
 
-The footer only counts while every line in its paragraph is a trailer.
-`git cherry-pick -x` appends `(cherry picked from commit …)` to that paragraph,
-and release-please then reads no `Release-As` at all, without any error. That
+The footer only counts while nothing but trailers follows it to the end of the
+message; a blank line does not protect it from later prose. `git cherry-pick -x`
+appends `(cherry picked from commit …)` after it, and release-please then reads
+no `Release-As` at all, without any error. That
 happened to the 0.3.0 commit (`f6107595`) when #269 carried it over from #206,
 so release PR #262 proposed runner-client 0.2.14. To carry such a commit to a new
 branch, cherry-pick it without `-x`, or remove that line from the message. A
