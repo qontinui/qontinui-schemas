@@ -1181,7 +1181,9 @@ pub enum RecurringAgentTarget {
     },
     /// An explicit list of devices.
     Devices {
-        /// Device ids (UUIDs). Must be non-empty.
+        /// Device ids (UUIDs). May be empty: coord's catalog defaults for a
+        /// one-box agent are `{"kind":"devices","devices":[]}` — the agent
+        /// targets no device until an operator picks one.
         devices: Vec<String>,
         /// Device ids (UUIDs) removed from the target.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1233,12 +1235,12 @@ impl RecurringAgentTarget {
         }
     }
 
-    /// Check every selector list is non-empty and free of blanks and
-    /// duplicates.
+    /// Check every selector list is free of blanks and duplicates, and
+    /// non-empty except `devices` (an empty device list targets nothing).
     pub fn validate(&self) -> Result<(), RecurringAgentError> {
         match self {
             Self::All { .. } | Self::DispatchRole { .. } => {}
-            Self::Devices { devices, .. } => require_name_list("target.devices", devices, false)?,
+            Self::Devices { devices, .. } => require_name_list("target.devices", devices, true)?,
             Self::Capabilities { capabilities, .. } => {
                 require_name_list("target.capabilities", capabilities, false)?
             }
@@ -1261,64 +1263,113 @@ impl RecurringAgentTarget {
     }
 }
 
-/// The type, default and bounds of one catalog parameter.
+/// The type, default and bounds of one catalog parameter — exactly the shape
+/// coord serves in each catalog entry's `params` array
+/// (`recurring_agents::param_schema_json` in qontinui-coord).
 ///
-/// Serialized tagged by `type`: `{"type":"enum","options":[…],"default":"…"}`,
-/// `{"type":"bool","default":true}`, `{"type":"int","default":24,"min":1}`,
-/// `{"type":"string","default":""}`.
+/// Tagged by `type` and FLATTENED into its [`RecurringAgentParamDef`], so one
+/// served parameter reads
+/// `{"name":"mode","description":"…","required":false,"type":"enum","values":["reap","report"],"default":"reap"}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RecurringAgentParamKind {
-    /// One of a fixed set of strings.
-    Enum {
-        /// The allowed values, in display order. Non-empty, no duplicates.
-        options: Vec<String>,
-        /// The value used when the tenant sets none. One of `options`.
-        default: String,
-    },
     /// A checkbox.
-    Bool {
+    Boolean {
         /// The value used when the tenant sets none.
         default: bool,
     },
-    /// A whole number, optionally bounded (inclusive).
-    Int {
+    /// A whole number within `minimum..=maximum`.
+    Integer {
+        /// Smallest allowed value.
+        minimum: i64,
+        /// Largest allowed value.
+        maximum: i64,
         /// The value used when the tenant sets none. Within the bounds.
         default: i64,
-        /// Smallest allowed value.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        min: Option<i64>,
-        /// Largest allowed value.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        max: Option<i64>,
     },
-    /// Free text.
-    String {
-        /// The value used when the tenant sets none.
+    /// One of a fixed set of strings.
+    Enum {
+        /// The allowed values, in display order. Non-empty, no duplicates.
+        values: Vec<String>,
+        /// The value used when the tenant sets none. One of `values`.
         default: String,
+    },
+    /// A non-empty set of integers drawn from `allowed`, rendered ascending
+    /// (e.g. the dossier-exit-check's lookback windows).
+    IntegerSet {
+        /// The values a tenant may pick from. Non-empty, no duplicates.
+        allowed: Vec<i64>,
+        /// Values that exist but this entry refuses, each with why — shown
+        /// greyed out in the form rather than hidden.
+        #[serde(default)]
+        excluded: Vec<RecurringAgentExcludedValue>,
+        /// The set used when the tenant sets none. Non-empty, drawn from
+        /// `allowed`, none of it excluded.
+        default: Vec<i64>,
+    },
+    /// A UUID, lower-cased on render. Coord serves no default (`null`).
+    Uuid {
+        /// The value used when the tenant sets none.
+        #[serde(default)]
+        default: Option<String>,
+    },
+    /// A lower-case slug matching `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`.
+    Slug {
+        /// The value used when the tenant sets none. `None` = no default.
+        #[serde(default)]
+        default: Option<String>,
     },
 }
 
-/// One parameter a catalog entry's prompt is rendered from (plan D2), e.g.
-/// cleanup-steward's `mode` enum or return-to-main's `daily_cap` int.
+impl RecurringAgentParamKind {
+    /// The value a parameter takes when the tenant sets none, as coord renders
+    /// it. `None` = no default (a required parameter must then be supplied).
+    pub fn default_value(&self) -> Option<serde_json::Value> {
+        use serde_json::Value;
+        match self {
+            Self::Boolean { default } => Some(Value::Bool(*default)),
+            Self::Integer { default, .. } => Some(Value::from(*default)),
+            Self::Enum { default, .. } => Some(Value::String(default.clone())),
+            Self::IntegerSet { default, .. } => Some(Value::from(default.clone())),
+            Self::Uuid { default } | Self::Slug { default } => default.clone().map(Value::String),
+        }
+    }
+}
+
+/// An [`RecurringAgentParamKind::IntegerSet`] value the entry refuses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
+pub struct RecurringAgentExcludedValue {
+    /// The refused value.
+    pub value: i64,
+    /// Why it is refused.
+    pub reason: String,
+}
+
+/// One parameter a catalog entry's prompt is rendered from (plan D2), e.g.
+/// cleanup-steward's `mode` enum or return-to-main's `daily_cap` integer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct RecurringAgentParamDef {
     /// The key a value is supplied under in [`RecurringAgentSpec::params`].
     pub name: String,
     /// Human-readable explanation, shown beside the form control.
     pub description: String,
-    /// Type, default and bounds.
+    /// A required parameter with no default must be supplied by the tenant
+    /// row before the entry renders at all (strategic-pulse's tenant slug).
+    #[serde(default)]
+    pub required: bool,
+    /// Type, default and bounds, flattened beside the fields above.
+    #[serde(flatten)]
     pub kind: RecurringAgentParamKind,
 }
 
 /// The parameter form of one catalog entry: the typed parameters a tenant may
-/// set instead of editing prompt text (plan D2, D10).
+/// set instead of editing prompt text (plan D2, D10). Serialized as the bare
+/// array coord serves under a catalog entry's `params` key.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[schemars(deny_unknown_fields)]
+#[serde(transparent)]
 pub struct RecurringAgentParamSchema {
     /// The parameters, in display order. Names are unique.
-    #[serde(default)]
     pub params: Vec<RecurringAgentParamDef>,
 }
 
@@ -1329,8 +1380,8 @@ impl RecurringAgentParamSchema {
     }
 
     /// Check the schema itself: names non-empty and unique, every default
-    /// satisfies its own kind, enum options non-empty and unique, int bounds
-    /// ordered.
+    /// satisfies its own kind, enum values and integer-set choices non-empty
+    /// and unique, integer bounds ordered.
     pub fn validate(&self) -> Result<(), RecurringAgentError> {
         for def in &self.params {
             require_non_empty("params[].name", &def.name)?;
@@ -1339,63 +1390,144 @@ impl RecurringAgentParamSchema {
                 problem: problem.to_string(),
             };
             match &def.kind {
-                RecurringAgentParamKind::Enum { options, default } => {
-                    if options.is_empty() {
-                        return Err(problem("enum has no options"));
+                RecurringAgentParamKind::Boolean { .. } => {}
+                RecurringAgentParamKind::Integer {
+                    minimum,
+                    maximum,
+                    default,
+                } => {
+                    if minimum > maximum {
+                        return Err(problem("minimum is greater than maximum"));
                     }
-                    require_unique_entries("enum option", options.iter().map(String::as_str))?;
-                    if !options.contains(default) {
-                        return Err(problem("default is not one of the options"));
+                    if !(minimum..=maximum).contains(&default) {
+                        return Err(problem("default is outside [minimum, maximum]"));
                     }
                 }
-                RecurringAgentParamKind::Int { default, min, max } => {
-                    if let (Some(lo), Some(hi)) = (min, max) {
-                        if lo > hi {
-                            return Err(problem("min is greater than max"));
+                RecurringAgentParamKind::Enum { values, default } => {
+                    if values.is_empty() {
+                        return Err(problem("enum has no values"));
+                    }
+                    require_unique_entries("enum value", values.iter().map(String::as_str))?;
+                    if !values.contains(default) {
+                        return Err(problem("default is not one of the values"));
+                    }
+                }
+                RecurringAgentParamKind::IntegerSet {
+                    allowed,
+                    excluded,
+                    default,
+                } => {
+                    if allowed.is_empty() {
+                        return Err(problem("integer set allows no values"));
+                    }
+                    if !all_distinct(allowed) {
+                        return Err(problem("allowed lists a value twice"));
+                    }
+                    if !all_distinct(&excluded.iter().map(|e| e.value).collect::<Vec<_>>()) {
+                        return Err(problem("excluded lists a value twice"));
+                    }
+                    if excluded.iter().any(|e| e.reason.trim().is_empty()) {
+                        return Err(problem("an excluded value has no reason"));
+                    }
+                    check_integer_set(default, allowed, excluded).map_err(|why| {
+                        RecurringAgentError::Param {
+                            name: def.name.clone(),
+                            problem: format!("default: {why}"),
                         }
-                    }
-                    if !int_in_bounds(*default, *min, *max) {
-                        return Err(problem("default is outside [min, max]"));
+                    })?;
+                }
+                RecurringAgentParamKind::Uuid { default } => {
+                    if default
+                        .as_deref()
+                        .is_some_and(|d| uuid::Uuid::parse_str(d).is_err())
+                    {
+                        return Err(problem("default is not a UUID"));
                     }
                 }
-                RecurringAgentParamKind::Bool { .. } | RecurringAgentParamKind::String { .. } => {}
+                RecurringAgentParamKind::Slug { default } => {
+                    if default.as_deref().is_some_and(|d| !is_param_slug(d)) {
+                        return Err(problem("default is not a slug"));
+                    }
+                }
             }
         }
         require_unique_entries("parameter", self.params.iter().map(|p| p.name.as_str()))
     }
 
-    /// Check tenant-supplied parameter values against this schema: every key
-    /// is a known parameter and every value has its parameter's type and lies
-    /// within its options or bounds. Absent keys inherit the default.
+    /// Check tenant-supplied parameter values against this schema, the way
+    /// coord resolves them: every key is a known parameter, every non-null
+    /// value has its parameter's type and lies within its values or bounds,
+    /// and a required parameter with no default has a value. An absent or
+    /// `null` key inherits the default.
     pub fn validate_params(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<(), RecurringAgentError> {
-        for (name, value) in params {
+        for name in params.keys() {
+            if self.get(name).is_none() {
+                return Err(RecurringAgentError::Param {
+                    name: name.clone(),
+                    problem: "unknown parameter".to_string(),
+                });
+            }
+        }
+        for def in &self.params {
             let problem = |problem: &str| RecurringAgentError::Param {
-                name: name.clone(),
+                name: def.name.clone(),
                 problem: problem.to_string(),
             };
-            let def = self.get(name).ok_or_else(|| problem("unknown parameter"))?;
+            let Some(value) = params.get(&def.name).filter(|v| !v.is_null()) else {
+                if def.required && def.kind.default_value().is_none() {
+                    return Err(problem("required parameter has no value and no default"));
+                }
+                continue;
+            };
             match &def.kind {
-                RecurringAgentParamKind::Enum { options, .. } => match value.as_str() {
-                    Some(v) if options.iter().any(|o| o == v) => {}
-                    Some(_) => return Err(problem("value is not one of the options")),
-                    None => return Err(problem("expected a string")),
-                },
-                RecurringAgentParamKind::Bool { .. } => {
+                RecurringAgentParamKind::Boolean { .. } => {
                     if !value.is_boolean() {
                         return Err(problem("expected a boolean"));
                     }
                 }
-                RecurringAgentParamKind::Int { min, max, .. } => match value.as_i64() {
-                    Some(v) if int_in_bounds(v, *min, *max) => {}
-                    Some(_) => return Err(problem("value is outside [min, max]")),
+                RecurringAgentParamKind::Integer {
+                    minimum, maximum, ..
+                } => match value.as_i64() {
+                    Some(v) if (minimum..=maximum).contains(&&v) => {}
+                    Some(_) => return Err(problem("value is outside [minimum, maximum]")),
                     None => return Err(problem("expected a whole number")),
                 },
-                RecurringAgentParamKind::String { .. } => {
-                    if !value.is_string() {
-                        return Err(problem("expected a string"));
+                RecurringAgentParamKind::Enum { values, .. } => match value.as_str() {
+                    Some(v) if values.iter().any(|o| o == v) => {}
+                    Some(_) => return Err(problem("value is not one of the values")),
+                    None => return Err(problem("expected a string")),
+                },
+                RecurringAgentParamKind::IntegerSet {
+                    allowed, excluded, ..
+                } => {
+                    let Some(items) = value.as_array() else {
+                        return Err(problem("expected an array of whole numbers"));
+                    };
+                    let mut set = Vec::with_capacity(items.len());
+                    for item in items {
+                        match item.as_i64() {
+                            Some(n) => set.push(n),
+                            None => return Err(problem("expected whole numbers")),
+                        }
+                    }
+                    check_integer_set(&set, allowed, excluded).map_err(|why| problem(&why))?;
+                }
+                RecurringAgentParamKind::Uuid { .. } => {
+                    if value
+                        .as_str()
+                        .is_none_or(|s| uuid::Uuid::parse_str(s).is_err())
+                    {
+                        return Err(problem("expected a UUID string"));
+                    }
+                }
+                RecurringAgentParamKind::Slug { .. } => {
+                    if value.as_str().is_none_or(|s| !is_param_slug(s)) {
+                        return Err(problem(
+                            "expected a slug matching ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
+                        ));
                     }
                 }
             }
@@ -1404,8 +1536,44 @@ impl RecurringAgentParamSchema {
     }
 }
 
-fn int_in_bounds(value: i64, min: Option<i64>, max: Option<i64>) -> bool {
-    min.is_none_or(|lo| value >= lo) && max.is_none_or(|hi| value <= hi)
+fn all_distinct(values: &[i64]) -> bool {
+    let mut seen = BTreeSet::new();
+    values.iter().all(|v| seen.insert(*v))
+}
+
+/// A non-empty, duplicate-free set drawn from `allowed` with nothing excluded —
+/// coord's rule for an integer-set value.
+fn check_integer_set(
+    set: &[i64],
+    allowed: &[i64],
+    excluded: &[RecurringAgentExcludedValue],
+) -> Result<(), String> {
+    if set.is_empty() {
+        return Err("the set may not be empty".to_string());
+    }
+    let mut seen = BTreeSet::new();
+    for n in set {
+        if let Some(e) = excluded.iter().find(|e| e.value == *n) {
+            return Err(format!("{n} is refused: {}", e.reason));
+        }
+        if !allowed.contains(n) {
+            return Err(format!("{n} is not one of {allowed:?}"));
+        }
+        if !seen.insert(*n) {
+            return Err(format!("{n} is listed twice"));
+        }
+    }
+    Ok(())
+}
+
+/// `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$` — coord's slug parameter grammar.
+fn is_param_slug(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    let edge = |b: &u8| b.is_ascii_lowercase() || b.is_ascii_digit();
+    (1..=63).contains(&bytes.len())
+        && bytes.first().is_some_and(edge)
+        && bytes.last().is_some_and(edge)
+        && bytes.iter().all(|b| edge(b) || *b == b'-')
 }
 
 /// One recurring agent as coord serves it: a catalog entry merged with the
@@ -2033,14 +2201,19 @@ mod tests {
 
     #[test]
     fn target_validate_refuses_empty_blank_and_duplicate_selectors() {
-        let empty = RecurringAgentTarget::Devices {
-            devices: vec![],
+        // coord's one-box catalog default (`TARGET_NONE`) is legal: it targets
+        // no device until an operator picks one.
+        let none: RecurringAgentTarget =
+            serde_json::from_value(json!({"kind": "devices", "devices": []})).unwrap();
+        assert_eq!(none.validate(), Ok(()));
+        let empty_caps = RecurringAgentTarget::Capabilities {
+            capabilities: vec![],
             exclude_devices: vec![],
         };
         assert!(matches!(
-            empty.validate(),
+            empty_caps.validate(),
             Err(RecurringAgentError::Empty {
-                field: "target.devices"
+                field: "target.capabilities"
             })
         ));
         let blank = RecurringAgentTarget::Capabilities {
@@ -2070,61 +2243,72 @@ mod tests {
 
     // ---- Parameter schema --------------------------------------------------
 
+    /// A catalog entry's `params` array exactly as coord's
+    /// `param_schema_json` serves it (shapes from coord's catalog: the
+    /// cleanup-steward's enum and integer set, return-to-main's bounded
+    /// integer and boolean, findings-steward's UUID, strategic-pulse's
+    /// required slug).
+    fn served_params() -> Value {
+        json!([
+            {"name": "mode", "description": "report or reap", "required": false,
+             "type": "enum", "values": ["reap", "report"], "default": "reap"},
+            {"name": "classes", "description": "the run set", "required": false,
+             "type": "integer_set", "allowed": [1, 2, 3, 10, 12, 14, 16],
+             "excluded": [{"value": 6, "reason": "it has its own sweep"}],
+             "default": [3, 12, 14, 16]},
+            {"name": "act", "description": "move checkouts", "required": false,
+             "type": "boolean", "default": false},
+            {"name": "daily_cap", "description": "runs per day", "required": false,
+             "type": "integer", "minimum": 1, "maximum": 24, "default": 3},
+            {"name": "tenant", "description": "tenant UUID", "required": false,
+             "type": "uuid", "default": null},
+            {"name": "tenant_slug", "description": "tenant slug", "required": true,
+             "type": "slug", "default": null}
+        ])
+    }
+
     fn param_schema() -> RecurringAgentParamSchema {
-        RecurringAgentParamSchema {
-            params: vec![
-                RecurringAgentParamDef {
-                    name: "mode".to_string(),
-                    description: "report or reap".to_string(),
-                    kind: RecurringAgentParamKind::Enum {
-                        options: vec!["report".to_string(), "reap".to_string()],
-                        default: "report".to_string(),
-                    },
-                },
-                RecurringAgentParamDef {
-                    name: "act".to_string(),
-                    description: "move checkouts".to_string(),
-                    kind: RecurringAgentParamKind::Bool { default: false },
-                },
-                RecurringAgentParamDef {
-                    name: "daily_cap".to_string(),
-                    description: "runs per day".to_string(),
-                    kind: RecurringAgentParamKind::Int {
-                        default: 3,
-                        min: Some(1),
-                        max: Some(24),
-                    },
-                },
-                RecurringAgentParamDef {
-                    name: "tenant".to_string(),
-                    description: "tenant slug".to_string(),
-                    kind: RecurringAgentParamKind::String {
-                        default: String::new(),
-                    },
-                },
-            ],
-        }
+        serde_json::from_value(served_params()).unwrap()
     }
 
     #[test]
-    fn param_schema_round_trips_with_typed_kinds() {
-        let v = round_trip(&param_schema());
+    fn param_schema_reads_and_writes_coords_served_array_byte_for_byte() {
+        let schema = param_schema();
+        assert_eq!(schema.params.len(), 6);
+        assert!(schema.get("tenant_slug").unwrap().required);
         assert_eq!(
-            v["params"][0]["kind"],
-            json!({"type": "enum", "options": ["report", "reap"], "default": "report"})
+            schema.get("classes").unwrap().kind,
+            RecurringAgentParamKind::IntegerSet {
+                allowed: vec![1, 2, 3, 10, 12, 14, 16],
+                excluded: vec![RecurringAgentExcludedValue {
+                    value: 6,
+                    reason: "it has its own sweep".to_string(),
+                }],
+                default: vec![3, 12, 14, 16],
+            }
         );
-        assert_eq!(
-            v["params"][2]["kind"],
-            json!({"type": "int", "default": 3, "min": 1, "max": 24})
-        );
-        assert_eq!(param_schema().validate(), Ok(()));
+        // coord's real shape: an excluded value need not be in `allowed`.
+        // Re-serialized, it is the served array itself — no wrapper object,
+        // no nested `kind`, `default: null` kept for uuid/slug.
+        assert_eq!(round_trip(&schema), served_params());
+        assert_eq!(schema.validate(), Ok(()));
+    }
+
+    #[test]
+    fn a_param_def_without_required_defaults_to_optional() {
+        let def: RecurringAgentParamDef = serde_json::from_value(
+            json!({"name": "act", "description": "d", "type": "boolean", "default": true}),
+        )
+        .unwrap();
+        assert!(!def.required);
+        assert_eq!(def.kind.default_value(), Some(json!(true)));
     }
 
     #[test]
     fn param_schema_validate_refuses_bad_definitions() {
         let mut bad_default = param_schema();
         bad_default.params[0].kind = RecurringAgentParamKind::Enum {
-            options: vec!["report".to_string()],
+            values: vec!["report".to_string()],
             default: "reap".to_string(),
         };
         assert!(matches!(
@@ -2133,18 +2317,56 @@ mod tests {
         ));
 
         let mut inverted = param_schema();
-        inverted.params[2].kind = RecurringAgentParamKind::Int {
+        inverted.params[3].kind = RecurringAgentParamKind::Integer {
+            minimum: 10,
+            maximum: 1,
             default: 5,
-            min: Some(10),
-            max: Some(1),
         };
         assert!(matches!(
             inverted.validate(),
             Err(RecurringAgentError::Param { .. })
         ));
 
+        for (allowed, excluded, default) in [
+            (vec![], vec![], vec![1]),
+            (vec![1, 1], vec![], vec![1]),
+            (vec![1, 2], vec![], vec![]),
+            (vec![1, 2], vec![(2, "no")], vec![2]),
+            (vec![1, 2], vec![(2, " ")], vec![1]),
+            (vec![1, 2], vec![], vec![3]),
+        ] {
+            let mut bad = param_schema();
+            bad.params[1].kind = RecurringAgentParamKind::IntegerSet {
+                allowed,
+                excluded: excluded
+                    .into_iter()
+                    .map(|(value, reason)| RecurringAgentExcludedValue {
+                        value,
+                        reason: reason.to_string(),
+                    })
+                    .collect(),
+                default,
+            };
+            assert!(
+                matches!(bad.validate(), Err(RecurringAgentError::Param { .. })),
+                "expected {:?} to be refused",
+                bad.params[1].kind
+            );
+        }
+
+        let mut bad_uuid = param_schema();
+        bad_uuid.params[4].kind = RecurringAgentParamKind::Uuid {
+            default: Some("not-a-uuid".to_string()),
+        };
+        assert!(bad_uuid.validate().is_err());
+        let mut bad_slug = param_schema();
+        bad_slug.params[5].kind = RecurringAgentParamKind::Slug {
+            default: Some("Upper_Case".to_string()),
+        };
+        assert!(bad_slug.validate().is_err());
+
         let mut dup = param_schema();
-        dup.params.push(dup.params[1].clone());
+        dup.params.push(dup.params[2].clone());
         assert!(matches!(
             dup.validate(),
             Err(RecurringAgentError::Duplicate { .. })
@@ -2152,19 +2374,34 @@ mod tests {
     }
 
     #[test]
-    fn param_values_are_checked_against_the_schema() {
+    fn param_values_are_checked_the_way_coord_resolves_them() {
         let schema = param_schema();
-        let ok = json!({"mode": "reap", "act": true, "daily_cap": 24, "tenant": "x"});
+        let ok = json!({
+            "mode": "report", "classes": [16, 3], "act": true, "daily_cap": 24,
+            "tenant": TENANT, "tenant_slug": "acme-co"
+        });
         assert_eq!(schema.validate_params(ok.as_object().unwrap()), Ok(()));
-        assert_eq!(schema.validate_params(&serde_json::Map::new()), Ok(()));
+        // null inherits the default, as coord treats it.
+        let nulls = json!({"tenant_slug": "a", "mode": null, "tenant": null});
+        assert_eq!(schema.validate_params(nulls.as_object().unwrap()), Ok(()));
         for bad in [
-            json!({"unknown": 1}),
-            json!({"mode": "delete-everything"}),
-            json!({"mode": 1}),
-            json!({"act": "yes"}),
-            json!({"daily_cap": 25}),
-            json!({"daily_cap": 2.5}),
-            json!({"tenant": false}),
+            json!({}), // tenant_slug is required with no default
+            json!({"tenant_slug": null}),
+            json!({"tenant_slug": "a", "unknown": 1}),
+            json!({"tenant_slug": "a", "mode": "delete-everything"}),
+            json!({"tenant_slug": "a", "mode": 1}),
+            json!({"tenant_slug": "a", "act": "yes"}),
+            json!({"tenant_slug": "a", "daily_cap": 25}),
+            json!({"tenant_slug": "a", "daily_cap": 2.5}),
+            json!({"tenant_slug": "a", "classes": []}),
+            json!({"tenant_slug": "a", "classes": [6]}),
+            json!({"tenant_slug": "a", "classes": [7]}),
+            json!({"tenant_slug": "a", "classes": [3, 3]}),
+            json!({"tenant_slug": "a", "classes": 3}),
+            json!({"tenant_slug": "a", "tenant": "nope"}),
+            json!({"tenant_slug": "-a"}),
+            json!({"tenant_slug": "A"}),
+            json!({"tenant_slug": "a".repeat(64)}),
         ] {
             assert!(
                 matches!(
@@ -2173,6 +2410,16 @@ mod tests {
                 ),
                 "expected {bad} to be refused"
             );
+        }
+    }
+
+    #[test]
+    fn param_slug_grammar_matches_coords() {
+        for good in ["a", "a1", "acme-co", &"a".repeat(63)] {
+            assert!(is_param_slug(good), "{good}");
+        }
+        for bad in ["", "-a", "a-", "A", "a_b", "a b", &"a".repeat(64)] {
+            assert!(!is_param_slug(bad), "{bad}");
         }
     }
 
@@ -2212,6 +2459,20 @@ mod tests {
             "target": {"kind": "all"}, "version": 1, "params": []
         }))
         .is_err());
+    }
+
+    #[test]
+    fn a_stored_catalog_row_with_coords_target_none_validates() {
+        let row: RecurringAgentSpec = serde_json::from_value(json!({
+            "name": "findings-steward",
+            "catalog_ref": "findings-steward",
+            "enabled": false,
+            "schedule": {"type": "Cron", "value": "13 3 * * *"},
+            "target": {"kind": "devices", "devices": []},
+            "version": 1
+        }))
+        .unwrap();
+        assert_eq!(row.validate_stored(), Ok(()));
     }
 
     #[test]
