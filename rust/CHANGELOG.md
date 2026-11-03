@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v5.0.0...rust-v5.0.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **scheduler:** match RecurringAgentParamSchema to coord's served shape; accept TARGET_NONE ([b654866](https://github.com/qontinui/qontinui-schemas/commit/b65486669b0c4c28410efc2fc3fc768636435e92))
+
 ## [5.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.8.0...rust-v5.0.0) (2026-11-02)
 
 
