@@ -287,6 +287,7 @@ from .per_type.legacy_transition import LegacyTransition
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.loop_instance_status import LoopInstanceStatus
 from .per_type.loop_phase import LoopPhase
+from .per_type.managed_by import ManagedBy
 from .per_type.mapping_row import MappingRow
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
@@ -379,6 +380,18 @@ from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommended_state import RecommendedState
 from .per_type.record_git_op_request import RecordGitOpRequest
+from .per_type.recurring_agent_dispatch_role import RecurringAgentDispatchRole
+from .per_type.recurring_agent_excluded_value import RecurringAgentExcludedValue
+from .per_type.recurring_agent_os import RecurringAgentOs
+from .per_type.recurring_agent_override import RecurringAgentOverride
+from .per_type.recurring_agent_param_def import RecurringAgentParamDef
+from .per_type.recurring_agent_param_kind import RecurringAgentParamKind
+from .per_type.recurring_agent_param_schema import RecurringAgentParamSchema
+from .per_type.recurring_agent_spec import RecurringAgentSpec
+from .per_type.recurring_agent_state import RecurringAgentState
+from .per_type.recurring_agent_status import RecurringAgentStatus
+from .per_type.recurring_agent_status_report import RecurringAgentStatusReport
+from .per_type.recurring_agent_target import RecurringAgentTarget
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.refusal import Refusal
 from .per_type.refusal_code import RefusalCode
@@ -900,6 +913,7 @@ __all__ = [
     "LogSourceSelection",
     "LoopInstanceStatus",
     "LoopPhase",
+    "ManagedBy",
     "MappingRow",
     "MatchAdjustment",
     "MatchLocation",
@@ -992,6 +1006,18 @@ __all__ = [
     "ReadConfigResponse",
     "RecommendedState",
     "RecordGitOpRequest",
+    "RecurringAgentDispatchRole",
+    "RecurringAgentExcludedValue",
+    "RecurringAgentOs",
+    "RecurringAgentOverride",
+    "RecurringAgentParamDef",
+    "RecurringAgentParamKind",
+    "RecurringAgentParamSchema",
+    "RecurringAgentSpec",
+    "RecurringAgentState",
+    "RecurringAgentStatus",
+    "RecurringAgentStatusReport",
+    "RecurringAgentTarget",
     "ReflectionFixOutput",
     "Refusal",
     "RefusalCode",
