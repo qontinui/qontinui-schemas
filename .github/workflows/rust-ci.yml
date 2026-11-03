@@ -119,8 +119,10 @@ jobs:
   # job. coord retries with "re-run failed jobs", which keeps a `route` that
   # succeeded, and a pool that picks jobs up and then fails them reads healthy
   # to the queue signal. So `runs-on` reads this job's labels on attempt 1
-  # only. A lane change reaches runs created after it; to free a run stuck on
-  # a dead pool, cancel it and re-run it (a re-run goes hosted).
+  # only, and this job is skipped on a re-run (it could only answer
+  # "hosted", after queueing for a hosted runner to say so). A lane change
+  # reaches runs created after it; to free a run stuck on a dead pool, cancel
+  # it and re-run it (a re-run goes hosted).
   #
   # THE COST, under `auto` only: this job needs a hosted runner itself, so it
   # waits in the same hosted queue (seconds when hosted runners are free,
@@ -136,15 +138,15 @@ jobs:
   # unless both callers granted it (qontinui-coord's candidate-ci.yml records
   # that outage). The router does not need it: this repo is public, and the
   # runs and jobs listings it reads are public resources, readable without
-  # the permission. Should the repo go private, the listing answers 403, the
-  # router reports UNKNOWN and routes to the floor.
+  # the permission. Should the repo go private and the listing be refused,
+  # the router reports UNKNOWN and routes to the floor.
   #
   # The router always exits 0 with outputs written, and `rust-ci` runs under
   # `!cancelled()` with a hosted fallback, so a route job that fails, times
   # out or is skipped leaves rust-ci on the floor (or, forced, on the pool),
   # never SKIPPED, which coord's check classification would count as passing.
   route:
-    if: ${{ github.event_name != 'pull_request' && vars.SCHEMAS_CI_LINUX_LANE == 'auto' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) }}
+    if: ${{ github.run_attempt == 1 && github.event_name != 'pull_request' && vars.SCHEMAS_CI_LINUX_LANE == 'auto' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -213,8 +215,17 @@ jobs:
     # together.
     # coord-pools: [self-hosted, Linux, X64, ram-16g] | [ubuntu-latest]
     runs-on: ${{ fromJSON((github.run_attempt == 1 && github.event_name != 'pull_request' && vars.SCHEMAS_CI_LINUX_LANE == 'self-hosted' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) && '["self-hosted","Linux","X64","ram-16g"]') || (github.run_attempt == 1 && needs.route.outputs.labels) || '["ubuntu-latest"]') }}
+    # A backstop for a hang: hosted runs take 3-7 min and a warm pool run about
+    # 4, and on a four-registration pool one stuck job would otherwise hold a
+    # quarter of it for the 360-min default.
+    timeout-minutes: 30
     steps:
+      # persist-credentials: false because no later step needs git auth, and
+      # on the pool .git/config outlives the job in a home every registration
+      # on the host shares.
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       # SELF-HOSTED ONLY (`route` put this job on the pool). What a hosted VM
       # hands every job and a persistent, shared host has to be told:
@@ -243,7 +254,7 @@ jobs:
       #      symlink to it: the clean removes the link, never the tree behind
       #      it. `/target/` in .gitignore does not match a symlink, hence the
       #      info/exclude line. Bounded: over 40 GiB used, under 60 GiB free on
-      #      its filesystem, or unreadable, it starts cold.
+      #      its filesystem, or either reading unavailable, it starts cold.
       - name: "Self-hosted: job-local HOME, rustup, compile caps and the persistent target"
         if: runner.environment == 'self-hosted'
         shell: bash
@@ -291,7 +302,8 @@ jobs:
             mkdir -p "$cache"
             used_kb=0
           fi
-          free_kb=$(df -Pk "$cache" | awk 'NR == 2 {print $4}')
+          free_kb=$(df -Pk "$cache" 2>/dev/null | awk 'NR == 2 {print $4}') || true
+          case "$free_kb" in ''|*[!0-9]*) free_kb=0 ;; esac
           if [ "$used_kb" -gt $((40 * 1048576)) ] || [ "$free_kb" -lt $((60 * 1048576)) ]; then
             echo "::notice title=persistent target reset::$((used_kb / 1048576)) GiB used, $((free_kb / 1048576)) GiB free on its filesystem: starting cold"
             chmod -R u+rwX "${cache:?}" 2>/dev/null || true
