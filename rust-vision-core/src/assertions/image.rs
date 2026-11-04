@@ -824,7 +824,11 @@ fn blockiness_within(
 /// ([`TextOverImageContrast::percentile_ratio`]); a pass needs every text
 /// over a rendered image measured and each reading's WORST case
 /// ([`TextOverImageContrast::percentile_ratio_worst_case`]) at the
-/// threshold. Between the two the check is Unknown.
+/// threshold. Between the two the check is Unknown. A snapshot whose
+/// producer says it dropped content rows (`registration.contentDropped` above
+/// zero) cannot pass: past the fail arm it is Unknown naming the count, and a
+/// failure names it beside its own reading. An absent count changes no
+/// verdict and is disclosed in the detail.
 fn text_over_image(
     a: Assertion,
     min_ratio: Option<f64>,
@@ -920,6 +924,14 @@ fn text_over_image(
         (!why.is_empty()).then(|| why.join("; "))
     };
     let mut note = page.note();
+    // What the producer left out. A count above zero is text the snapshot
+    // holds no row for, so no reading here saw it; an absent count is an
+    // older producer that could not say, which changes no verdict but is
+    // said.
+    let dropped = snap.content_dropped();
+    if dropped.is_none() {
+        note.push_str(&format!(" ({})", tc::content_dropped_unreported()));
+    }
     if not_over > 0 {
         note.push_str(&format!(
             " ({not_over} text box(es) touch an image while their glyphs do not reach it)"
@@ -964,6 +976,11 @@ fn text_over_image(
         if let Some(b) = &boxless {
             also.push_str(&format!(" ({b})"));
         }
+        // Text it DID read and found wanting is still wanting: a truncated
+        // snapshot can hide more failures, never undo this one.
+        if let Some(n) = dropped.filter(|n| *n > 0) {
+            also.push_str(&format!(" ({})", tc::content_dropped_detail(n)));
+        }
         return AssertionResult::fail(
             a,
             format!(
@@ -974,6 +991,21 @@ fn text_over_image(
             ),
         )
         .with_confidence(w.confidence);
+    }
+    // Past the fail arm, a page the producer truncated cannot pass and is
+    // not shown clean by having nothing over an image: what it dropped may
+    // be exactly the text over one.
+    if let Some(n) = dropped.filter(|n| *n > 0) {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!(
+                "{}, so the page was not fully examined ({} reading(s) taken over what it \
+                 holds){note}",
+                tc::content_dropped_detail(n),
+                readings.len()
+            ),
+        );
     }
     if !unmeasured.is_empty() || boxless.is_some() {
         let head = if unmeasured_n > 0 {

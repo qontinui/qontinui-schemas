@@ -4535,3 +4535,158 @@ fn a_missing_inner_flag_reads_as_inner() {
         .expect("over the image");
     assert_eq!(v.shared_px, v.sampled_px, "{v:?}");
 }
+
+// ------------------------------------------- what the snapshot left out
+//
+// Plan 2026-11-02-text-over-image-contrast-cannot-see-what-the-snapshot-
+// left-out, Phase 2: a producer that dropped content rows at its
+// registration cap says so in `registration.contentDropped`, and text no row
+// holds was never read. So a page that would pass is Unknown, a failure
+// stays a failure, and an absent count changes no verdict but is said.
+
+impl Case {
+    /// This case's snapshot as the SDK would put it on the wire with a
+    /// `registration` block carrying `dropped` (or none at all).
+    fn with_dropped(mut self, dropped: Option<u32>) -> Self {
+        let mut wire = serde_json::to_value(&self.snap).unwrap();
+        if let Some(n) = dropped {
+            wire["registration"] = serde_json::json!({
+                "totalRegistered": 200,
+                "everHadRegistrations": true,
+                "contentDropped": n,
+            });
+        }
+        self.snap = serde_json::from_value(wire).unwrap();
+        assert_eq!(self.snap.content_dropped(), dropped);
+        self
+    }
+
+    /// The analyzer's `textContrast` observation over the hero.
+    fn text_contrast_obs(&self) -> qontinui_vision_core::Observation<Vec<TextOverImageContrast>> {
+        let r = self.analyze(Some(&self.b));
+        let values = r.image_values.expect("a framed image run carries values");
+        let hero = values
+            .images
+            .into_iter()
+            .find(|i| i.element == "hero")
+            .unwrap();
+        hero.text_contrast.expect("this crate states one")
+    }
+}
+
+fn dropped_dim(o: &qontinui_vision_core::Observation<Vec<TextOverImageContrast>>) -> Option<u64> {
+    o.provenance()
+        .coverage
+        .unmeasured
+        .iter()
+        .find(|d| d.dimension == "content_rows")
+        .map(|d| d.count)
+}
+
+fn source_dropped(o: &qontinui_vision_core::Observation<Vec<TextOverImageContrast>>) -> Value {
+    o.provenance()
+        .source
+        .as_ref()
+        .and_then(|s| s.get("contentDropped"))
+        .cloned()
+        .unwrap_or_else(|| panic!("textContrast states contentDropped: {:?}", o.provenance()))
+}
+
+/// The arm itself: the scrim case PASSES on what it holds, and the same page
+/// whose producer dropped 3 content rows is Unknown, naming the count. The
+/// analyzer's reading stands, DEGRADED by the 3 rows it never saw.
+#[test]
+fn a_passing_page_that_dropped_content_rows_is_unknown() {
+    let r = case("scrim").with_dropped(Some(3));
+    let res = r.assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
+    assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    let detail = res.detail.as_deref().unwrap();
+    assert!(detail.contains("dropped 3 content row(s)"), "{detail}");
+
+    let o = r.text_contrast_obs();
+    assert_eq!(o.status(), ObservationStatus::Measured, "{o:?}");
+    assert_eq!(dropped_dim(&o), Some(3), "{:?}", o.provenance().coverage);
+    assert_eq!(source_dropped(&o), serde_json::json!(3));
+}
+
+/// A truncated snapshot can hide more failures, never undo the one it read:
+/// the low-contrast heading still FAILS, and the detail names the count.
+#[test]
+fn a_failing_page_that_dropped_content_rows_still_fails() {
+    let r = case("low_contrast").with_dropped(Some(3));
+    let res = r.assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Failed, "{:?}", res.detail);
+    let detail = res.detail.as_deref().unwrap();
+    assert!(detail.contains("dropped 3 content row(s)"), "{detail}");
+}
+
+/// An older producer sends no count: the verdict is the one it always was,
+/// and it says the count was unavailable. The analyzer states `null`, adds
+/// no unmeasured dimension, and its value is the same.
+#[test]
+fn an_absent_count_changes_no_verdict_and_is_said() {
+    let r = case("scrim").with_dropped(None);
+    let res = r.assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Passed, "{:?}", res.detail);
+    let detail = res.detail.as_deref().unwrap();
+    assert!(
+        detail.contains("did not report how many content rows it dropped"),
+        "{detail}"
+    );
+    let low = case("low_contrast").with_dropped(None).assert_aa();
+    assert_eq!(low.outcome, AssertionOutcome::Failed, "{:?}", low.detail);
+
+    let o = r.text_contrast_obs();
+    assert_eq!(o.status(), ObservationStatus::Measured, "{o:?}");
+    assert_eq!(dropped_dim(&o), None, "{:?}", o.provenance().coverage);
+    assert_eq!(source_dropped(&o), Value::Null);
+}
+
+/// `contentDropped: 0` is the statement "nothing was dropped": the page
+/// passes with no disclosure, and the analyzer states the zero.
+#[test]
+fn a_zero_count_passes_with_no_disclosure() {
+    let r = case("scrim").with_dropped(Some(0));
+    let res = r.assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Passed, "{:?}", res.detail);
+    let detail = res.detail.as_deref().unwrap();
+    assert!(
+        !detail.contains("content row") && !detail.contains("contentDropped"),
+        "{detail}"
+    );
+    let o = r.text_contrast_obs();
+    assert_eq!(dropped_dim(&o), None, "{:?}", o.provenance().coverage);
+    assert_eq!(source_dropped(&o), serde_json::json!(0));
+}
+
+/// An image with no listed text over it is an ABSENCE only when the
+/// snapshot dropped nothing; with dropped rows the text over it may be among
+/// them, so the analyzer answers Unknown and the assertion names the count.
+#[test]
+fn no_listed_text_over_an_image_is_not_absent_past_dropped_rows() {
+    let mut r = case("scrim");
+    r.snap.elements.retain(|e| e.id == "hero");
+    let r0 = Case {
+        a: r.a.clone(),
+        b: r.b.clone(),
+        snap: r.snap.clone(),
+    }
+    .with_dropped(Some(0));
+    assert_eq!(r0.text_contrast_obs().status(), ObservationStatus::Absent);
+
+    let r = r.with_dropped(Some(5));
+    let o = r.text_contrast_obs();
+    assert_eq!(o.status(), ObservationStatus::Unknown, "{o:?}");
+    assert_eq!(dropped_dim(&o), Some(5));
+    let res = r.assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
+    assert!(
+        res.detail
+            .as_deref()
+            .unwrap()
+            .contains("dropped 5 content row(s)"),
+        "{:?}",
+        res.detail
+    );
+}

@@ -81,7 +81,8 @@ use crate::element_snapshot::{
 };
 use crate::frame::{Frame, Region};
 use crate::observation::{
-    Observation, ObservationCoverage, Producer, Provenance, UnknownCode, UnmeasuredDimension,
+    Observation, ObservationCoverage, ObservationState, Producer, Provenance, UnknownCode,
+    UnmeasuredDimension,
 };
 
 // ---------------------------------------------------------------------------
@@ -1885,7 +1886,65 @@ fn measure(
 /// with no box (dimension `text_box`): whether it lies over this image is
 /// unknown, so the image's text is never claimed absent past it. Confidence
 /// is the lowest of the listed readings.
+///
+/// What the producer left out is counted too ([`with_dropped_rows`]): a
+/// snapshot that says it dropped content rows has text no reading saw.
 fn text_contrast_value(
+    frame: &Frame,
+    text: &TextCtx<'_>,
+    snapshot: &ElementSnapshot,
+    el: &Element,
+    stamp: &Stamp,
+) -> Observation<Vec<TextOverImageContrast>> {
+    with_dropped_rows(
+        text_contrast_over_rows(frame, text, snapshot, el, stamp),
+        snapshot.content_dropped(),
+        &el.id,
+    )
+}
+
+/// Fold the producer's `registration.contentDropped` into a `textContrast`
+/// value. Every value states it in `provenance.source.contentDropped`: the
+/// count, or `null` when the producer did not report one (an older SDK),
+/// which changes nothing else — that is UNKNOWN, not zero, and it is said
+/// rather than defaulted. A count above zero is that many text elements the
+/// snapshot holds no row for, so they join the coverage as considered and
+/// unmeasured (dimension `content_rows`): a measured value stands DEGRADED,
+/// and an absence can no longer be claimed — it becomes Unknown naming the
+/// count. Text that may lie over the image was never looked at.
+fn with_dropped_rows<T>(obs: Observation<T>, dropped: Option<u32>, image: &str) -> Observation<T> {
+    const DIM: &str = "content_rows";
+    let (state, mut prov) = obs.into_parts();
+    prov.source.get_or_insert_with(Map::new).insert(
+        "contentDropped".into(),
+        dropped.map(Value::from).unwrap_or(Value::Null),
+    );
+    let n = dropped.unwrap_or(0);
+    if n > 0 {
+        prov.coverage.considered += u64::from(n);
+        prov.coverage.unmeasured.push(UnmeasuredDimension::new(
+            DIM,
+            u64::from(n),
+            UnknownCode::InputMissing,
+        ));
+    }
+    match state {
+        ObservationState::Measured(v) => Observation::measured(v, prov),
+        ObservationState::Unknown(u) => Observation::unknown(u.code, u.detail, prov),
+        ObservationState::Absent if n > 0 => Observation::unknown(
+            UnknownCode::InputMissing,
+            format!(
+                "no listed text lies over '{image}', but {}",
+                text_contrast::content_dropped_detail(n)
+            ),
+            prov,
+        ),
+        ObservationState::Absent => Observation::absent(prov)
+            .expect("an absence's coverage is unchanged when nothing was dropped"),
+    }
+}
+
+fn text_contrast_over_rows(
     frame: &Frame,
     text: &TextCtx<'_>,
     snapshot: &ElementSnapshot,
