@@ -4636,6 +4636,14 @@ fn an_absent_count_changes_no_verdict_and_is_said() {
     );
     let low = case("low_contrast").with_dropped(None).assert_aa();
     assert_eq!(low.outcome, AssertionOutcome::Failed, "{:?}", low.detail);
+    assert!(
+        low.detail
+            .as_deref()
+            .unwrap()
+            .contains("did not report how many content rows it dropped"),
+        "{:?}",
+        low.detail
+    );
 
     let o = r.text_contrast_obs();
     assert_eq!(o.status(), ObservationStatus::Measured, "{o:?}");
@@ -4689,4 +4697,48 @@ fn no_listed_text_over_an_image_is_not_absent_past_dropped_rows() {
         "{:?}",
         res.detail
     );
+}
+
+/// A truncated snapshot with text it could not measure keeps BOTH reasons:
+/// the count it dropped, and the text over the image it could not read.
+#[test]
+fn dropped_rows_beside_unmeasured_text_names_both() {
+    let mut r = case("scrim");
+    r.snap.elements.push(Element {
+        id: "caption".into(),
+        bbox: Some(Region {
+            x: 200,
+            y: 120,
+            w: 100,
+            h: 30,
+        }),
+        text: Some("caption".into()),
+        ..Default::default()
+    });
+    let res = r.with_dropped(Some(4)).assert_aa();
+    assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
+    let d = res.detail.as_deref().unwrap();
+    assert!(d.contains("dropped 4 content row(s)"), "{d}");
+    assert!(
+        d.contains("1 text element(s) over an image could not be measured"),
+        "{d}"
+    );
+}
+
+/// A `textContrast` the analyzer could not answer stays Unknown, with its
+/// own code, and gains the rows the snapshot dropped in its coverage.
+#[test]
+fn a_producer_unknown_text_contrast_keeps_its_unknown_and_counts_dropped_rows() {
+    let r = case("held").with_dropped(Some(6));
+    let a = r.analyze(None);
+    let v = a.image_values.unwrap();
+    let hero = v.images.iter().find(|i| i.element == "hero").unwrap();
+    let tc = hero.text_contrast.as_ref().unwrap();
+    assert_eq!(tc.status(), ObservationStatus::Unknown, "{tc:?}");
+    assert_eq!(
+        tc.unknown_info().unwrap().code,
+        UnknownCode::NeedsMultiFrameInput
+    );
+    assert_eq!(dropped_dim(tc), Some(6), "{:?}", tc.provenance().coverage);
+    assert_eq!(source_dropped(tc), serde_json::json!(6));
 }

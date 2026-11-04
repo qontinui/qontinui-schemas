@@ -1912,6 +1912,11 @@ fn text_contrast_value(
 /// unmeasured (dimension `content_rows`): a measured value stands DEGRADED,
 /// and an absence can no longer be claimed — it becomes Unknown naming the
 /// count. Text that may lie over the image was never looked at.
+///
+/// The `content_rows` dimension is PER IMAGE and not additive across
+/// images: the snapshot does not say where a dropped row sits, so every
+/// image's value carries the page's whole count, and summing the dimension
+/// over a page's images counts the same rows once per image.
 fn with_dropped_rows<T>(obs: Observation<T>, dropped: Option<u32>, image: &str) -> Observation<T> {
     const DIM: &str = "content_rows";
     let (state, mut prov) = obs.into_parts();

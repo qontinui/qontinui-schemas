@@ -16,7 +16,9 @@
 //! Confidence: see [`AssertionResult::confidence`]. Each evaluator that
 //! reads pixels sets it; each one's doc says what scales it.
 
-use super::{missing_operand, require_snapshot, Assertion, AssertionResult, EvalContext};
+use super::{
+    missing_operand, require_snapshot, Assertion, AssertionOutcome, AssertionResult, EvalContext,
+};
 use crate::analyzers::image::text_contrast::{self as tc, TextOverImageContrast};
 use crate::analyzers::image::{self as img, pixels, Crop, NaturalRegion};
 use crate::element_media::{ElementMedia, MediaKind};
@@ -992,154 +994,167 @@ fn text_over_image(
         )
         .with_confidence(w.confidence);
     }
-    // Past the fail arm, a page the producer truncated cannot pass and is
-    // not shown clean by having nothing over an image: what it dropped may
-    // be exactly the text over one.
-    if let Some(n) = dropped.filter(|n| *n > 0) {
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!(
-                "{}, so the page was not fully examined ({} reading(s) taken over what it \
-                 holds){note}",
-                tc::content_dropped_detail(n),
-                readings.len()
-            ),
-        );
-    }
-    if !unmeasured.is_empty() || boxless.is_some() {
-        let head = if unmeasured_n > 0 {
-            format!("{unmeasured_n} text element(s) over an image could not be measured")
-        } else {
-            "an element could not be placed".to_string()
-        };
-        let why: Vec<String> = unmeasured.into_iter().chain(boxless).collect();
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!(
-                "{head}, so the page was not fully examined: {}{note}",
-                why.join("; ")
-            ),
-        );
-    }
-    let Some(w) = worst else {
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!("no text lies over a rendered image, so no contrast was measured{note}"),
-        );
-    };
-    // A pass needs the WORST case the pixels admit: every glyph pixel at its
-    // local peak coverage or at what it renders, and the lowest reading any
-    // choice of the pixels that may or may not be its glyphs gives — its
-    // strokes' edges and the pixels beside them (each kind whole), hidden
-    // ink, pixels another text may have painted, and on a noisy capture
-    // pixels its noise and a too-faint glyph share.
-    if let Some(h) = readings
-        .iter()
-        .filter(|r| r.percentile_ratio_worst_case < min)
-        .min_by(|x, y| {
-            x.percentile_ratio_worst_case
-                .total_cmp(&y.percentile_ratio_worst_case)
-        })
-    {
-        let mut because = Vec::new();
-        if h.hidden_px_estimate > 0 {
-            because.push(format!(
-                "about {} more glyph pixel(s) may lie where the image is too near its ink {} \
-                 for any difference to reveal them",
-                h.hidden_px_estimate,
-                tc::describe_ink(h.ink_range)
-            ));
-        }
-        if let Some(alpha) = h.glyph_alpha.filter(|a| *a < 1.0) {
-            because.push(format!(
-                "its faintest glyphs cover at most {:.0}% of a pixel, which a translucent colour, \
-                 a hairline face and a glow of its own colour joined to its strokes all explain, \
-                 and a translucent glyph paints only that share of its colour",
-                alpha * 100.0
-            ));
-        }
-        if h.faint_px > 0 {
-            because.push(format!(
-                "{} of its glyph pixel(s) are too faint for the glyph mask and are read at their \
-                 own coverage or at what they render",
-                h.faint_px
-            ));
-        }
-        if h.off_colour_px > 0 {
-            because.push(format!(
-                "{} of its glyph pixel(s) paint off the blend toward its glyph colour (ink a few \
-                 units off it, or another colour) and are read at what they render",
-                h.off_colour_px
-            ));
-        }
-        if h.halo_px > 0 {
-            because.push(format!(
-                "{} pixel(s) on its strokes' edges or beside them, where an anti-aliased edge, a \
-                 glow of its colour and a faint glyph paint alike, may or may not be its glyphs \
-                 (each kind read whole or not at all)",
-                h.halo_px
-            ));
-        }
-        if h.noise_px > 0 {
-            because.push(format!(
-                "{} pixel(s) moved toward its ink by less than the glyph mask sees, where on a \
-                 capture with sub-threshold noise a glyph too faint for the mask and the \
-                 capture's noise paint alike, may or may not be its glyphs (capture losslessly \
-                 to tell them apart)",
-                h.noise_px
-            ));
-        }
-        if let Some(ink) = h.hairline_ink {
-            because.push(format!(
-                "its strokes hold no pixel covered whole, so its measured colour may be a \
-                 hairline of rgb({},{},{}) at partial coverage, which only the best case reads",
-                ink.r, ink.g, ink.b
-            ));
-        }
-        if h.shared_px > 0 {
-            because.push(format!(
-                "{} of its glyph pixel(s) lie in the box of another text that paints there and \
-                 may be that text's ink, and the worst case allows that only some of them are \
-                 its own",
-                h.shared_px
-            ));
-        }
-        if because.is_empty() {
-            because.push(
-                "some of its glyph pixels are covered less than whole, and the worst case reads \
-                 each at its own coverage"
-                    .to_string(),
+    // Every verdict past the fail arm (unmeasured text, nothing over an
+    // image, a worst case below the threshold, a pass) is decided first, so
+    // a truncated snapshot keeps its reasons; then `truncated` turns it
+    // Unknown.
+    let verdict = (|| {
+        if !unmeasured.is_empty() || boxless.is_some() {
+            let head = if unmeasured_n > 0 {
+                format!("{unmeasured_n} text element(s) over an image could not be measured")
+            } else {
+                "an element could not be placed".to_string()
+            };
+            let why: Vec<String> = unmeasured.into_iter().chain(boxless).collect();
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!(
+                    "{head}, so the page was not fully examined: {}{note}",
+                    why.join("; ")
+                ),
             );
         }
-        return AssertionResult::unknown(
+        let Some(w) = worst else {
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!("no text lies over a rendered image, so no contrast was measured{note}"),
+            );
+        };
+        // A pass needs the WORST case the pixels admit: every glyph pixel at its
+        // local peak coverage or at what it renders, and the lowest reading any
+        // choice of the pixels that may or may not be its glyphs gives — its
+        // strokes' edges and the pixels beside them (each kind whole), hidden
+        // ink, pixels another text may have painted, and on a noisy capture
+        // pixels its noise and a too-faint glyph share.
+        if let Some(h) = readings
+            .iter()
+            .filter(|r| r.percentile_ratio_worst_case < min)
+            .min_by(|x, y| {
+                x.percentile_ratio_worst_case
+                    .total_cmp(&y.percentile_ratio_worst_case)
+            })
+        {
+            let mut because = Vec::new();
+            if h.hidden_px_estimate > 0 {
+                because.push(format!(
+                    "about {} more glyph pixel(s) may lie where the image is too near its ink {} \
+                     for any difference to reveal them",
+                    h.hidden_px_estimate,
+                    tc::describe_ink(h.ink_range)
+                ));
+            }
+            if let Some(alpha) = h.glyph_alpha.filter(|a| *a < 1.0) {
+                because.push(format!(
+                    "its faintest glyphs cover at most {:.0}% of a pixel, which a translucent colour, \
+                     a hairline face and a glow of its own colour joined to its strokes all explain, \
+                     and a translucent glyph paints only that share of its colour",
+                    alpha * 100.0
+                ));
+            }
+            if h.faint_px > 0 {
+                because.push(format!(
+                    "{} of its glyph pixel(s) are too faint for the glyph mask and are read at their \
+                     own coverage or at what they render",
+                    h.faint_px
+                ));
+            }
+            if h.off_colour_px > 0 {
+                because.push(format!(
+                    "{} of its glyph pixel(s) paint off the blend toward its glyph colour (ink a few \
+                     units off it, or another colour) and are read at what they render",
+                    h.off_colour_px
+                ));
+            }
+            if h.halo_px > 0 {
+                because.push(format!(
+                    "{} pixel(s) on its strokes' edges or beside them, where an anti-aliased edge, a \
+                     glow of its colour and a faint glyph paint alike, may or may not be its glyphs \
+                     (each kind read whole or not at all)",
+                    h.halo_px
+                ));
+            }
+            if h.noise_px > 0 {
+                because.push(format!(
+                    "{} pixel(s) moved toward its ink by less than the glyph mask sees, where on a \
+                     capture with sub-threshold noise a glyph too faint for the mask and the \
+                     capture's noise paint alike, may or may not be its glyphs (capture losslessly \
+                     to tell them apart)",
+                    h.noise_px
+                ));
+            }
+            if let Some(ink) = h.hairline_ink {
+                because.push(format!(
+                    "its strokes hold no pixel covered whole, so its measured colour may be a \
+                     hairline of rgb({},{},{}) at partial coverage, which only the best case reads",
+                    ink.r, ink.g, ink.b
+                ));
+            }
+            if h.shared_px > 0 {
+                because.push(format!(
+                    "{} of its glyph pixel(s) lie in the box of another text that paints there and \
+                     may be that text's ink, and the worst case allows that only some of them are \
+                     its own",
+                    h.shared_px
+                ));
+            }
+            if because.is_empty() {
+                because.push(
+                    "some of its glyph pixels are covered less than whole, and the worst case reads \
+                     each at its own coverage"
+                        .to_string(),
+                );
+            }
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!(
+                    "text '{}' over image '{}' reads {} in the best case, but {}; in the worst case \
+                     p{} is {:.2}:1, below {min:.2}:1, so whether it holds is unknown{note}",
+                    h.element,
+                    h.image,
+                    describe(h),
+                    because.join(", and "),
+                    h.percentile,
+                    h.percentile_ratio_worst_case
+                ),
+            );
+        }
+        let conf = readings.iter().map(|r| r.confidence).fold(1.0, f64::min);
+        AssertionResult::pass_with(
             a,
-            UnknownCode::InputMissing,
             format!(
-                "text '{}' over image '{}' reads {} in the best case, but {}; in the worst case \
-                 p{} is {:.2}:1, below {min:.2}:1, so whether it holds is unknown{note}",
-                h.element,
-                h.image,
-                describe(h),
-                because.join(", and "),
-                h.percentile,
-                h.percentile_ratio_worst_case
+                "{} text-over-image reading(s) reach {min:.2}:1; the lowest, text '{}' over '{}', \
+                 reads {}{note}",
+                readings.len(),
+                w.element,
+                w.image,
+                describe(w)
             ),
-        );
+        )
+        .with_confidence(conf)
+    })();
+    match dropped.filter(|n| *n > 0) {
+        None => verdict,
+        Some(n) => truncated(verdict, n, readings.len(), &note),
     }
-    let conf = readings.iter().map(|r| r.confidence).fold(1.0, f64::min);
-    AssertionResult::pass_with(
-        a,
-        format!(
-            "{} text-over-image reading(s) reach {min:.2}:1; the lowest, text '{}' over '{}', \
-             reads {}{note}",
-            readings.len(),
-            w.element,
-            w.image,
-            describe(w)
-        ),
-    )
-    .with_confidence(conf)
+}
+
+/// A verdict past [`text_over_image`]'s fail arm, on a snapshot whose
+/// producer dropped `n` content rows: what it dropped may be exactly the text
+/// over an image, so the page cannot pass and is not shown clean by having
+/// nothing over one. It is Unknown naming the count, and an Unknown keeps
+/// its own reasons beside it (unmeasured or unplaced text, a worst case
+/// below the threshold).
+fn truncated(verdict: AssertionResult, n: u32, readings: usize, note: &str) -> AssertionResult {
+    let head = format!(
+        "{}, so the page was not fully examined ({readings} reading(s) taken over what it holds)",
+        tc::content_dropped_detail(n)
+    );
+    let detail = match (verdict.outcome, verdict.detail.as_deref()) {
+        (AssertionOutcome::Unknown, Some(d)) => format!("{head}; besides that, {d}"),
+        _ => format!("{head}{note}"),
+    };
+    AssertionResult::unknown(verdict.assertion, UnknownCode::InputMissing, detail)
 }
