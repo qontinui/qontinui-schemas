@@ -1016,10 +1016,17 @@ fn text_over_image(
             );
         }
         let Some(w) = worst else {
+            // On a truncated snapshot only the LISTED text is known not to
+            // lie over an image; a dropped row may.
+            let which = if dropped.is_some_and(|n| n > 0) {
+                "no listed text"
+            } else {
+                "no text"
+            };
             return AssertionResult::unknown(
                 a,
                 UnknownCode::InputMissing,
-                format!("no text lies over a rendered image, so no contrast was measured{note}"),
+                format!("{which} lies over a rendered image, so no contrast was measured{note}"),
             );
         };
         // A pass needs the WORST case the pixels admit: every glyph pixel at its
@@ -1147,14 +1154,23 @@ fn text_over_image(
 /// nothing over one. It is Unknown naming the count, and an Unknown keeps
 /// its own reasons beside it (unmeasured or unplaced text, a worst case
 /// below the threshold).
+///
+/// A Failed verdict is returned unchanged: the fail arm runs before this, so
+/// none should reach it, and a failure is evidence a truncation cannot undo.
 fn truncated(verdict: AssertionResult, n: u32, readings: usize, note: &str) -> AssertionResult {
     let head = format!(
         "{}, so the page was not fully examined ({readings} reading(s) taken over what it holds)",
         tc::content_dropped_detail(n)
     );
     let detail = match (verdict.outcome, verdict.detail.as_deref()) {
+        (AssertionOutcome::Failed, _) => {
+            debug_assert!(false, "the fail arm runs before `truncated`: {verdict:?}");
+            return verdict;
+        }
         (AssertionOutcome::Unknown, Some(d)) => format!("{head}; besides that, {d}"),
-        _ => format!("{head}{note}"),
+        (AssertionOutcome::Unknown, None) | (AssertionOutcome::Passed, _) => {
+            format!("{head}{note}")
+        }
     };
     AssertionResult::unknown(verdict.assertion, UnknownCode::InputMissing, detail)
 }

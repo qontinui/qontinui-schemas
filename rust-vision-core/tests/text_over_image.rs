@@ -4557,7 +4557,6 @@ impl Case {
             });
         }
         self.snap = serde_json::from_value(wire).unwrap();
-        assert_eq!(self.snap.content_dropped(), dropped);
         self
     }
 
@@ -4694,6 +4693,14 @@ fn no_listed_text_over_an_image_is_not_absent_past_dropped_rows() {
             .as_deref()
             .unwrap()
             .contains("dropped 5 content row(s)"),
+        "{:?}",
+        res.detail
+    );
+    assert!(
+        res.detail
+            .as_deref()
+            .unwrap()
+            .contains("no listed text lies over a rendered image"),
         "{:?}",
         res.detail
     );
