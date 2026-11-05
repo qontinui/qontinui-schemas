@@ -118,11 +118,12 @@ on:
   #      longer compiled consumer `main` surfaced only through check-drift.
   #      Now it is this workflow's own red on `main`, which coord counts in
   #      `main_ci_status` (`coord.ci_baselines` is fed ONLY by push runs).
-  #   2. coord's stale-base arm (c) — qontinui-coord#3557, OPEN as of
-  #      2026-10-30, plan 2026-10-30-a-red-pr-whose-failing-checks-are-green-
-  #      at-main-tip-is-never-freshened — will freshen a red PR ONCE when every
-  #      failing check is green on the default branch's most recent PUSH run
-  #      of the same name.
+  #   2. coord's stale-base arm (c) — landed as qontinui-coord#3557
+  #      (`82116a21a` + `01953b9e1`, deployed in `28e9e789676d`), plan
+  #      2026-10-30-a-red-pr-whose-failing-checks-are-green-at-main-tip-is-
+  #      never-freshened (SHIPPED 2026-11-04) — freshens a red PR ONCE when
+  #      every failing check is green on the default branch's most recent
+  #      PUSH run of the same name.
   #      qontinui-schemas#235/#240/#257 were red on exactly `consumer-check
   #      (qontinui-runner, …)` and `consumer-gate`, which had no push run on
   #      `main` at all, so the arm could never see them green there.
