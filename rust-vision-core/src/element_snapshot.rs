@@ -100,9 +100,64 @@ pub struct ElementSnapshot {
         skip_serializing_if = "Option::is_none"
     )]
     pub snapshot_id: Option<String>,
+    /// What the PRODUCER says about how it registered the page's elements —
+    /// the SDK snapshot's `registration` block, read straight off it the way
+    /// [`Self::snapshot_id`] is. Only the facts this crate reads are kept;
+    /// the block's other keys (`totalRegistered`, `everHadRegistrations`,
+    /// `byRoute`, …) are ignored on the way in.
+    ///
+    /// `None` (absent or `null`) is valid and is the default: a hand-written
+    /// fixture, a native a11y tree, or an SDK predating the block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registration: Option<SnapshotRegistration>,
+}
+
+/// The producer's account of what it registered. Named for the SDK's
+/// `SnapshotRegistrationMetadata`, and deliberately NOT `Registration`, which
+/// in [`crate::analyzers::image::text_contrast`] means frame alignment.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnapshotRegistration {
+    /// Content elements (headings, paragraphs, labels) that qualified for a
+    /// row and were refused one because a registration cap was full. The
+    /// count is exact and describes the current page: a refused element that
+    /// later gets a row leaves it.
+    ///
+    /// `None` means the producer did not say — an SDK predating the field, or
+    /// a value that is not a count (negative, fractional, non-numeric), which
+    /// is read as unsaid rather than refusing the whole snapshot. A count
+    /// past `u32::MAX` saturates to it: it is still a count above zero. **`None` is
+    /// UNKNOWN, never zero**: a page whose producer is silent may still have
+    /// text no row holds. `Some(0)` is the statement "nothing was dropped".
+    #[serde(
+        default,
+        rename = "contentDropped",
+        deserialize_with = "lenient_count",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub content_dropped: Option<u32>,
+}
+
+/// A count, or `None` for anything that is not one — so a producer's odd
+/// value reads as "unsaid" (UNKNOWN) rather than failing the whole snapshot.
+/// A non-negative integer above `u32::MAX` saturates to `u32::MAX`.
+fn lenient_count<'de, D>(d: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = Option::<serde_json::Value>::deserialize(d)?;
+    // A count past `u32::MAX` is still a count, and a large one: saturate
+    // rather than read it as unsaid, which would let that page pass.
+    Ok(v.and_then(|v| v.as_u64())
+        .map(|n| u32::try_from(n).unwrap_or(u32::MAX)))
 }
 
 impl ElementSnapshot {
+    /// [`SnapshotRegistration::content_dropped`], flattened: `None` when the
+    /// producer sent no `registration` block or no count in it.
+    pub fn content_dropped(&self) -> Option<u32> {
+        self.registration.as_ref().and_then(|r| r.content_dropped)
+    }
+
     /// Find an element by id. O(n) — snapshots are small (typically <500
     /// elements) and assertions look up only a handful per call.
     pub fn get(&self, id: &str) -> Option<&Element> {
@@ -641,6 +696,7 @@ mod tests {
                 ..Default::default()
             }],
             snapshot_id: Some(id.to_string()),
+            ..Default::default()
         };
 
         // The wire spelling is the PRODUCER's `snapshotId` — the same key the
@@ -843,5 +899,58 @@ mod visibility_reason_tests {
         assert!(el.visibility_reason.is_none() && el.occluded_pct.is_none());
         let wire = serde_json::to_string(&el).unwrap();
         assert!(!wire.contains("visibility_reason") && !wire.contains("occluded_pct"));
+    }
+
+    // ---------------------------------------------------------------
+    // The producer's `registration` block. Only `contentDropped` is read;
+    // the SDK's other keys must not stop a snapshot from loading, and a
+    // count the producer did not state stays UNKNOWN (None), never zero.
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn registration_content_dropped_reads_off_the_sdk_snapshot() {
+        let snap: ElementSnapshot = serde_json::from_str(
+            r#"{"elements":[],"registration":{"totalRegistered":200,
+                "everHadRegistrations":true,"byRoute":{"/":{"count":200,"ids":[]}},
+                "contentDropped":37,"someFutureKey":[1,2]}}"#,
+        )
+        .unwrap();
+        assert_eq!(snap.content_dropped(), Some(37));
+        let wire = serde_json::to_string(&snap).unwrap();
+        assert!(
+            wire.contains(r#""registration":{"contentDropped":37}"#),
+            "camelCase on the way out, unread keys not carried: {wire}"
+        );
+    }
+
+    #[test]
+    fn registration_absent_null_or_uncounted_is_unknown_not_zero() {
+        for json in [
+            r#"{"elements":[]}"#,
+            r#"{"elements":[],"registration":null}"#,
+            r#"{"elements":[],"registration":{"totalRegistered":3}}"#,
+            r#"{"elements":[],"registration":{"contentDropped":null}}"#,
+            r#"{"elements":[],"registration":{"contentDropped":-1}}"#,
+            r#"{"elements":[],"registration":{"contentDropped":2.5}}"#,
+            r#"{"elements":[],"registration":{"contentDropped":"7"}}"#,
+        ] {
+            let snap: ElementSnapshot = serde_json::from_str(json)
+                .unwrap_or_else(|e| panic!("{json} must still load: {e}"));
+            assert_eq!(snap.content_dropped(), None, "{json}");
+        }
+        let zero: ElementSnapshot =
+            serde_json::from_str(r#"{"elements":[],"registration":{"contentDropped":0}}"#).unwrap();
+        assert_eq!(zero.content_dropped(), Some(0));
+        let huge: ElementSnapshot = serde_json::from_str(
+            r#"{"elements":[],"registration":{"contentDropped":99999999999}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            huge.content_dropped(),
+            Some(u32::MAX),
+            "a count past u32 saturates, never reads as unsaid"
+        );
+        let wire = serde_json::to_string(&ElementSnapshot::default()).unwrap();
+        assert!(!wire.contains("registration"), "{wire}");
     }
 }
