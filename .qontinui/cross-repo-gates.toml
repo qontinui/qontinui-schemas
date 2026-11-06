@@ -1,0 +1,18 @@
+# Cross-repo gates: this repo's workflows that measure a SIBLING repo's LIVE
+# `main` (they compile or check the consumer, not only this tree).
+#
+# Read by qontinui-coord's red-main self-heal
+# (crates/coord/src/stuck_pr_watcher/adaptation_rerun.rs) at the red run's own
+# head_sha. When one of these workflows' push run on `main` goes red and a PR
+# declared `coord:upstream-of=<consumer>#<n>` on the schemas PR it measured
+# then lands, coord re-runs the failed jobs once per landed downstream PR, so
+# `main` clears without a human `gh run rerun --failed`.
+#
+# A workflow NOT listed here never gets that same-sha re-run. Each entry is the
+# workflow's `name:`, exactly as GitHub reports it.
+#
+# A separate file from .qontinui/ci.toml on purpose: the runner's CI-node lane
+# parses ci.toml with `deny_unknown_fields`, where a new key is a hard error.
+#
+# Plan: qontinui-dev-notes/plans/2026-11-02-a-sequenced-cross-repo-break-leaves-the-upstream-main-red-until-a-human-reruns-it.md
+workflows = ["runner-consumer-check", "schema-drift"]
