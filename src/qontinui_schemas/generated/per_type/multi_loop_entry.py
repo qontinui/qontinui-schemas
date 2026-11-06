@@ -384,7 +384,7 @@ class OrchestrationLoopConfig(BaseModel):
     targetRunnerId: Annotated[
         str | None,
         Field(
-            description='Target runner ID (for supervisor restart calls). If `None`, uses\n`"primary"`.'
+            description='Target runner ID, used ONLY by the dev-supervisor rebuild path. If\n`None`, it is resolved from the supervisor `/runners` list by\n`target_runner_port`; a plain restart never uses this id.'
         ),
     ] = None
     targetRunnerPort: Annotated[
