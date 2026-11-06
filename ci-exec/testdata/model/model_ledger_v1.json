@@ -1,0 +1,169 @@
+{
+  "budget": {
+    "calls_used": 4,
+    "max_calls": 400,
+    "max_tokens": 2000,
+    "max_wall_secs": 3600,
+    "tokens_overshoot": 514,
+    "tokens_used": 2514,
+    "wall_secs_used": 41
+  },
+  "by_account": {
+    "acct-a": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "calls": 1,
+      "cost_microusd": 4200,
+      "input_tokens": 1200,
+      "ok": 1,
+      "output_tokens": 1
+    },
+    "acct-b": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 512,
+      "calls": 2,
+      "cost_microusd": 0,
+      "input_tokens": 800,
+      "ok": 1,
+      "output_tokens": 1
+    },
+    "none": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "calls": 3,
+      "cost_microusd": 0,
+      "input_tokens": 0,
+      "ok": 0,
+      "output_tokens": 0
+    }
+  },
+  "by_model": {
+    "claude-haiku-4-5": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 512,
+      "calls": 1,
+      "cost_microusd": 0,
+      "input_tokens": 800,
+      "ok": 1,
+      "output_tokens": 1
+    },
+    "claude-sonnet-4-5": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "calls": 1,
+      "cost_microusd": 4200,
+      "input_tokens": 1200,
+      "ok": 1,
+      "output_tokens": 1
+    },
+    "unknown": {
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "calls": 4,
+      "cost_microusd": 0,
+      "input_tokens": 0,
+      "ok": 0,
+      "output_tokens": 0
+    }
+  },
+  "calls": [
+    {
+      "account": "acct-a",
+      "attempts": 1,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_microusd": 4200,
+      "index": 1,
+      "input_tokens": 1200,
+      "latency_ms": 10,
+      "model_id": "claude-sonnet-4-5",
+      "outcome": "ok",
+      "output_tokens": 1,
+      "requested": "claude-sonnet",
+      "route": "subscription",
+      "step": "b2"
+    },
+    {
+      "account": "acct-b",
+      "attempts": 2,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 512,
+      "index": 2,
+      "input_tokens": 800,
+      "latency_ms": 10,
+      "model_id": "claude-haiku-4-5",
+      "outcome": "ok",
+      "output_tokens": 1,
+      "requested": "claude-haiku",
+      "route": "subscription",
+      "step": "grade"
+    },
+    {
+      "account": "acct-b",
+      "attempts": 1,
+      "index": 3,
+      "latency_ms": 30000,
+      "outcome": "provider_error",
+      "requested": "claude-sonnet",
+      "route": "subscription",
+      "step": "b2"
+    },
+    {
+      "attempts": 1,
+      "index": 4,
+      "latency_ms": 12,
+      "outcome": "all_accounts_exhausted",
+      "requested": "claude-sonnet",
+      "step": "b2"
+    },
+    {
+      "attempts": 0,
+      "index": 5,
+      "latency_ms": 0,
+      "outcome": "budget_exhausted:tokens",
+      "requested": "claude-sonnet",
+      "step": "b2"
+    },
+    {
+      "attempts": 0,
+      "index": 6,
+      "latency_ms": 0,
+      "outcome": "model_not_declared",
+      "requested": "claude-opus",
+      "step": "grade"
+    }
+  ],
+  "cost": {
+    "cost_source": "reported",
+    "coverage": {
+      "calls": 4,
+      "reported": 1,
+      "share": 0.25
+    },
+    "label": "list-price equivalent, not your bill",
+    "total_microusd": 4200
+  },
+  "isolation": "env",
+  "refusals_by_outcome": {
+    "budget_exhausted:tokens": 1,
+    "model_not_declared": 1
+  },
+  "refused_rows_dropped": 0,
+  "rows_complete": true,
+  "rows_omitted": 0,
+  "schema": "qontinui.ci.model_ledger/1",
+  "token_coverage": {
+    "calls": 4,
+    "reported": 2,
+    "share": 0.5
+  },
+  "totals": {
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 512,
+    "calls": 6,
+    "cost_microusd": 4200,
+    "input_tokens": 2000,
+    "ok": 2,
+    "output_tokens": 2
+  }
+}

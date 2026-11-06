@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Declarative output contracts. An [`OutputContract`] describes the constraints
 //! a downstream consumer (e.g. Claude's vision API) places on emitted image bytes.
 //!

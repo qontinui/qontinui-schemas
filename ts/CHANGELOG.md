@@ -1,5 +1,69 @@
 # Changelog
 
+## [2.5.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.1...ts-v2.5.0) (2026-11-02)
+
+
+### Features
+
+* generated bindings for the spec_model types ([7bab6d4](https://github.com/qontinui/qontinui-schemas/commit/7bab6d418bb3eee3b96fa41fd342338fe09c48f6))
+* **scheduler:** recurring-agent spec, target, status report; ScheduledTask managed + timezone ([8dad1d5](https://github.com/qontinui/qontinui-schemas/commit/8dad1d5cd2c82430859bcef5832bf4646e859aab))
+* **scheduler:** RemoteAgent carries effort, ultracode and effort_profile ([55eedce](https://github.com/qontinui/qontinui-schemas/commit/55eedceb1a60d0f348866c221338e7a162f98bc4))
+* **types:** journey graph queries over the edge ledger, pinned to multistate ([429d17f](https://github.com/qontinui/qontinui-schemas/commit/429d17f64f28c5aafcdc089f48d04ee70a9670fd))
+* **vision-core:** interaction timeline, timeline assertions, ledger projection and edge timing ([3d6c9bf](https://github.com/qontinui/qontinui-schemas/commit/3d6c9bfb338bb240fba1b021f59ce2b0a557c07d))
+
+
+### Bug Fixes
+
+* **codegen:** drop runner[#1990](https://github.com/qontinui/qontinui-schemas/issues/1990)'s expired bindings no runner main exports ([dc6c2d0](https://github.com/qontinui/qontinui-schemas/commit/dc6c2d01adecea867159c680069d696b9a7378ce))
+
+## [2.4.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.0...ts-v2.4.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **ci-exec:** bump zip to 9 for RUSTSEC-2026-0367..0369 ([3ac862b](https://github.com/qontinui/qontinui-schemas/commit/3ac862bcb2ed38860445a4befbd30185096d6ef0))
+* restore run-outcomes capture and ts 2.4.0 reverted by 3ac862bc ([0d2fd65](https://github.com/qontinui/qontinui-schemas/commit/0d2fd65ed1f2b7e71b7276901b0266270c167aa9))
+
+## [2.4.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.1...ts-v2.4.0) (2026-10-19)
+
+
+### Features
+
+* add ScheduledTaskType::Script (command, working_directory, timeout_seconds) ([20c02a8](https://github.com/qontinui/qontinui-schemas/commit/20c02a87d257a34fbff761c8f8f82f3a2c9fa44a))
+* **ts:** ImageSlotSpec bindings, exported from the package entry ([c415a43](https://github.com/qontinui/qontinui-schemas/commit/c415a432156823d0b31c5b976e4ef9014576aae9))
+
+
+### Bug Fixes
+
+* **vision-core:** absent requires considered &gt; 0; bindings documented as types, not validators ([37f3530](https://github.com/qontinui/qontinui-schemas/commit/37f3530606a895adfa463295405b50c270aaf9e2))
+
+## [2.3.1](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.3.0...ts-v2.3.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* address pre-PR review of the glossary v2 corrections ([e797a9b](https://github.com/qontinui/qontinui-schemas/commit/e797a9b443121d3580b7d6129b4ed961378639b7))
+* correct seven glossary terms that disagree with the services (glossary v2) ([2253e55](https://github.com/qontinui/qontinui-schemas/commit/2253e55cc8d40a90508484dc3ff65d3231616b68))
+
+## [2.3.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.2.0...ts-v2.3.0) (2026-10-13)
+
+
+### Features
+
+* **types:** generated TS/Python bindings for the cli_session types ([86710c8](https://github.com/qontinui/qontinui-schemas/commit/86710c896b0834516ae072959e92013530022b0d))
+
+## [2.2.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.1.0...ts-v2.2.0) (2026-10-06)
+
+
+### Features
+
+* **refusal:** generic HTTP-class refusal codes every producer can share ([3db4fba](https://github.com/qontinui/qontinui-schemas/commit/3db4fba446afa07774cd04991ce93cd29e5e0ae5))
+
+
+### Bug Fixes
+
+* **refusal:** carry the retry_later target doc into the generated bindings ([c1be97a](https://github.com/qontinui/qontinui-schemas/commit/c1be97a259900ff8bb56bad8840bb98e7c1d00c2))
+
 ## [2.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.0.0...ts-v2.1.0) (2026-10-02)
 
 

@@ -1,0 +1,1437 @@
+{
+  "rich": {
+    "events": [
+      {
+        "offsetMs": 0,
+        "type": "action",
+        "summary": "Action executed"
+      },
+      {
+        "offsetMs": 0,
+        "type": "state-entered",
+        "summary": "State entered: spinner",
+        "stateId": "spinner"
+      },
+      {
+        "offsetMs": 0,
+        "type": "network-request-started",
+        "summary": "POST http://localhost:3000/api/save?… started",
+        "requestId": "r1",
+        "method": "POST",
+        "url": "http://localhost:3000/api/save",
+        "hasQuery": true
+      },
+      {
+        "offsetMs": 3,
+        "type": "animation-started",
+        "summary": "Animation started: pulse",
+        "animation": {
+          "name": "pulse",
+          "isInfinite": false,
+          "targetElement": "c2cb4553f4b0d763"
+        }
+      },
+      {
+        "offsetMs": 4,
+        "type": "animation-started",
+        "summary": "Animation started: slide-in",
+        "animation": {
+          "name": "slide-in",
+          "isInfinite": false,
+          "targetElement": "87b606beaf68fdfc"
+        }
+      },
+      {
+        "offsetMs": 4,
+        "type": "long-task",
+        "summary": "Long task 64ms",
+        "durationMs": 64
+      },
+      {
+        "offsetMs": 27,
+        "type": "elements-modified",
+        "summary": "1 element(s) modified",
+        "elementIds": [
+          "save"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 36,
+        "type": "animation-ended",
+        "summary": "Animation ended: slide-in",
+        "animation": {
+          "name": "slide-in",
+          "isInfinite": false,
+          "durationMs": 200,
+          "targetElement": "87b606beaf68fdfc"
+        },
+        "endReason": "finished"
+      },
+      {
+        "offsetMs": 85,
+        "type": "network-request-finished",
+        "summary": "POST http://localhost:3000/api/save?… answered 200",
+        "requestId": "r1",
+        "method": "POST",
+        "url": "http://localhost:3000/api/save",
+        "hasQuery": true,
+        "statusCode": 200,
+        "durationMs": 80,
+        "errored": false
+      },
+      {
+        "offsetMs": 85,
+        "type": "state-exited",
+        "summary": "State exited: spinner",
+        "stateId": "spinner"
+      },
+      {
+        "offsetMs": 85,
+        "type": "state-entered",
+        "summary": "State entered: saved-toast",
+        "stateId": "saved-toast"
+      },
+      {
+        "offsetMs": 86,
+        "type": "layout-shift",
+        "summary": "Layout shift 0.1200 (1 source(s))",
+        "value": 0.12,
+        "hadRecentInput": false,
+        "shiftedFingerprints": [
+          "87b606beaf68fdfc"
+        ],
+        "unattributedSourceCount": 0
+      },
+      {
+        "offsetMs": 96,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "banner"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 96,
+        "type": "elements-disappeared",
+        "summary": "1 element(s) disappeared",
+        "elementIds": [
+          "hint"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 96,
+        "type": "page-changed",
+        "summary": "URL changed to http://localhost/fixture/saved",
+        "url": "http://localhost/fixture/saved"
+      },
+      {
+        "offsetMs": 335,
+        "type": "settled",
+        "summary": "UI settled after 200ms of stability"
+      }
+    ],
+    "recordedMs": 401,
+    "settled": true,
+    "observedSources": [
+      "snapshot-poll",
+      "layout-shift",
+      "long-task",
+      "animation-events",
+      "network",
+      "states"
+    ],
+    "summary": {
+      "firstResponseMs": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 16,
+            "measured": 16,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ],
+            "eventType": "state-entered"
+          }
+        }
+      },
+      "settleMs": {
+        "status": "measured",
+        "value": 335,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ]
+          }
+        }
+      },
+      "layoutShiftTotal": {
+        "status": "measured",
+        "value": 0.12,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftCount": {
+        "status": "measured",
+        "value": 1,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftAfterFirstResponseMs": {
+        "status": "measured",
+        "value": 86,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed",
+            "lastShiftAtMs": 86,
+            "firstResponseAtMs": 0
+          }
+        }
+      },
+      "animationsUnsettledAtEnd": {
+        "status": "measured",
+        "value": [
+          {
+            "name": "pulse",
+            "isInfinite": false,
+            "targetElement": "c2cb4553f4b0d763"
+          }
+        ],
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/animations",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": [
+              {
+                "dimension": "animations-running-before-action(count-unknowable)",
+                "count": 0,
+                "code": "input_missing"
+              }
+            ]
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ]
+          }
+        }
+      },
+      "longTaskTotalMs": {
+        "status": "measured",
+        "value": 64,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.107Z",
+          "evaluatedAt": "2026-10-20T19:39:38.107Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 401
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events",
+              "network",
+              "states"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "expectedStates": [
+        {
+          "stateId": "saved-toast",
+          "outcome": {
+            "status": "measured",
+            "value": {
+              "enteredAtMs": 85
+            },
+            "provenance": {
+              "producer": {
+                "id": "sdk/timeline/state-registry",
+                "version": "0.35.0"
+              },
+              "observedAt": "2026-10-20T19:39:38.107Z",
+              "evaluatedAt": "2026-10-20T19:39:38.107Z",
+              "coverage": {
+                "considered": 1,
+                "measured": 1,
+                "unmeasured": []
+              },
+              "confidence": null,
+              "cache": null,
+              "source": {
+                "window": {
+                  "fromMs": 0,
+                  "toMs": 401
+                },
+                "observedSources": [
+                  "snapshot-poll",
+                  "layout-shift",
+                  "long-task",
+                  "animation-events",
+                  "network",
+                  "states"
+                ],
+                "withinMs": 400
+              }
+            }
+          }
+        },
+        {
+          "stateId": "error-banner",
+          "outcome": {
+            "status": "measured",
+            "value": {
+              "notEnteredWithinMs": 400
+            },
+            "provenance": {
+              "producer": {
+                "id": "sdk/timeline/state-registry",
+                "version": "0.35.0"
+              },
+              "observedAt": "2026-10-20T19:39:38.107Z",
+              "evaluatedAt": "2026-10-20T19:39:38.107Z",
+              "coverage": {
+                "considered": 1,
+                "measured": 1,
+                "unmeasured": []
+              },
+              "confidence": null,
+              "cache": null,
+              "source": {
+                "window": {
+                  "fromMs": 0,
+                  "toMs": 401
+                },
+                "observedSources": [
+                  "snapshot-poll",
+                  "layout-shift",
+                  "long-task",
+                  "animation-events",
+                  "network",
+                  "states"
+                ],
+                "withinMs": 400
+              }
+            }
+          }
+        },
+        {
+          "stateId": "editor",
+          "outcome": {
+            "status": "measured",
+            "value": {
+              "activeThroughoutWithinMs": 400
+            },
+            "provenance": {
+              "producer": {
+                "id": "sdk/timeline/state-registry",
+                "version": "0.35.0"
+              },
+              "observedAt": "2026-10-20T19:39:38.107Z",
+              "evaluatedAt": "2026-10-20T19:39:38.107Z",
+              "coverage": {
+                "considered": 1,
+                "measured": 1,
+                "unmeasured": []
+              },
+              "confidence": null,
+              "cache": null,
+              "source": {
+                "window": {
+                  "fromMs": 0,
+                  "toMs": 401
+                },
+                "observedSources": [
+                  "snapshot-poll",
+                  "layout-shift",
+                  "long-task",
+                  "animation-events",
+                  "network",
+                  "states"
+                ],
+                "withinMs": 400
+              }
+            }
+          }
+        },
+        {
+          "stateId": "undeclared-state",
+          "outcome": {
+            "status": "unknown",
+            "unknown": {
+              "code": "input_missing",
+              "detail": "the app declares no state 'undeclared-state'"
+            },
+            "provenance": {
+              "producer": {
+                "id": "sdk/timeline/state-registry",
+                "version": "0.35.0"
+              },
+              "observedAt": "2026-10-20T19:39:38.107Z",
+              "evaluatedAt": "2026-10-20T19:39:38.107Z",
+              "coverage": {
+                "considered": 0,
+                "measured": 0,
+                "unmeasured": []
+              },
+              "confidence": null,
+              "cache": null,
+              "source": {
+                "window": {
+                  "fromMs": 0,
+                  "toMs": 401
+                },
+                "observedSources": [
+                  "snapshot-poll",
+                  "layout-shift",
+                  "long-task",
+                  "animation-events",
+                  "network",
+                  "states"
+                ],
+                "withinMs": 400
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "noPerformanceObserver": {
+    "events": [
+      {
+        "offsetMs": 0,
+        "type": "action",
+        "summary": "Action executed"
+      },
+      {
+        "offsetMs": 22,
+        "type": "settled",
+        "summary": "UI settled after 20ms of stability"
+      }
+    ],
+    "recordedMs": 23,
+    "settled": true,
+    "observedSources": [
+      "snapshot-poll",
+      "animation-events"
+    ],
+    "summary": {
+      "firstResponseMs": {
+        "status": "unknown",
+        "unknown": {
+          "code": "no_event_before_timeout",
+          "detail": "nothing responded to the action in the 23ms window"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 2,
+            "measured": 2,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "settleMs": {
+        "status": "measured",
+        "value": 22,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "layoutShiftTotal": {
+        "status": "unknown",
+        "unknown": {
+          "code": "performance_observer_unsupported",
+          "detail": "this webview's PerformanceObserver does not support the 'layout-shift' entry type"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ],
+            "supportedEntryTypes": null,
+            "supportProbe": null
+          }
+        }
+      },
+      "layoutShiftCount": {
+        "status": "unknown",
+        "unknown": {
+          "code": "performance_observer_unsupported",
+          "detail": "this webview's PerformanceObserver does not support the 'layout-shift' entry type"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ],
+            "supportedEntryTypes": null,
+            "supportProbe": null
+          }
+        }
+      },
+      "layoutShiftAfterFirstResponseMs": {
+        "status": "unknown",
+        "unknown": {
+          "code": "performance_observer_unsupported",
+          "detail": "this webview's PerformanceObserver does not support the 'layout-shift' entry type"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ],
+            "supportedEntryTypes": null,
+            "supportProbe": null
+          }
+        }
+      },
+      "animationsUnsettledAtEnd": {
+        "status": "measured",
+        "value": [],
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/animations",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": [
+              {
+                "dimension": "animations-running-before-action(count-unknowable)",
+                "count": 0,
+                "code": "input_missing"
+              }
+            ]
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "longTaskTotalMs": {
+        "status": "unknown",
+        "unknown": {
+          "code": "performance_observer_unsupported",
+          "detail": "this webview's PerformanceObserver does not support the 'longtask' entry type"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.149Z",
+          "evaluatedAt": "2026-10-20T19:39:38.149Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "animation-events"
+            ],
+            "supportedEntryTypes": null,
+            "supportProbe": null
+          }
+        }
+      },
+      "expectedStates": []
+    }
+  },
+  "neverSettles": {
+    "events": [
+      {
+        "offsetMs": 0,
+        "type": "action",
+        "summary": "Action executed"
+      },
+      {
+        "offsetMs": 10,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-1"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 24,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-2"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 36,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-3"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 50,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-4"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 61,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-5"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 77,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-6"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 93,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-7"
+        ],
+        "count": 1
+      },
+      {
+        "offsetMs": 106,
+        "type": "elements-appeared",
+        "summary": "1 element(s) appeared",
+        "elementIds": [
+          "churn-8"
+        ],
+        "count": 1
+      }
+    ],
+    "recordedMs": 121,
+    "settled": false,
+    "observedSources": [
+      "snapshot-poll",
+      "layout-shift",
+      "long-task",
+      "animation-events"
+    ],
+    "summary": {
+      "firstResponseMs": {
+        "status": "measured",
+        "value": 10,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 9,
+            "measured": 9,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "eventType": "elements-appeared"
+          }
+        }
+      },
+      "settleMs": {
+        "status": "unknown",
+        "unknown": {
+          "code": "no_event_before_timeout",
+          "detail": "the UI did not settle before settleTimeout elapsed"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "layoutShiftTotal": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftCount": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftAfterFirstResponseMs": {
+        "status": "absent",
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "animationsUnsettledAtEnd": {
+        "status": "measured",
+        "value": [],
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/animations",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": [
+              {
+                "dimension": "animations-running-before-action(count-unknowable)",
+                "count": 0,
+                "code": "input_missing"
+              }
+            ]
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "longTaskTotalMs": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.273Z",
+          "evaluatedAt": "2026-10-20T19:39:38.273Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 121
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "expectedStates": []
+    }
+  },
+  "staticPage": {
+    "events": [
+      {
+        "offsetMs": 0,
+        "type": "action",
+        "summary": "Action executed"
+      },
+      {
+        "offsetMs": 21,
+        "type": "settled",
+        "summary": "UI settled after 20ms of stability"
+      }
+    ],
+    "recordedMs": 23,
+    "settled": true,
+    "observedSources": [
+      "snapshot-poll",
+      "layout-shift",
+      "long-task",
+      "animation-events"
+    ],
+    "summary": {
+      "firstResponseMs": {
+        "status": "unknown",
+        "unknown": {
+          "code": "no_event_before_timeout",
+          "detail": "nothing responded to the action in the 23ms window"
+        },
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 2,
+            "measured": 2,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "settleMs": {
+        "status": "measured",
+        "value": 21,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/events",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "layoutShiftTotal": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftCount": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "layoutShiftAfterFirstResponseMs": {
+        "status": "absent",
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 1,
+            "measured": 1,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "animationsUnsettledAtEnd": {
+        "status": "measured",
+        "value": [],
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/animations",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": [
+              {
+                "dimension": "animations-running-before-action(count-unknowable)",
+                "count": 0,
+                "code": "input_missing"
+              }
+            ]
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ]
+          }
+        }
+      },
+      "longTaskTotalMs": {
+        "status": "measured",
+        "value": 0,
+        "provenance": {
+          "producer": {
+            "id": "sdk/timeline/performance-observer",
+            "version": "0.35.0"
+          },
+          "observedAt": "2026-10-20T19:39:38.298Z",
+          "evaluatedAt": "2026-10-20T19:39:38.298Z",
+          "coverage": {
+            "considered": 0,
+            "measured": 0,
+            "unmeasured": []
+          },
+          "confidence": null,
+          "cache": null,
+          "source": {
+            "window": {
+              "fromMs": 0,
+              "toMs": 23
+            },
+            "observedSources": [
+              "snapshot-poll",
+              "layout-shift",
+              "long-task",
+              "animation-events"
+            ],
+            "supportedEntryTypes": [
+              "layout-shift",
+              "longtask"
+            ],
+            "supportProbe": "listed"
+          }
+        }
+      },
+      "expectedStates": []
+    }
+  }
+}

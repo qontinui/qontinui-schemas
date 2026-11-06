@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! How much of a snapshot is actually MEASURABLE.
 //!
 //! An analyzer that returns no findings is saying one of two completely

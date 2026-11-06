@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Phase 6 assertion DSL — declarative "should this be true?" checks
 //! over a captured [`Frame`] + [`ElementSnapshot`].
 //!
@@ -56,6 +57,12 @@ use crate::element_snapshot::{
     display_snapshot_id, intersection, region_contains, regions_overlap, ElementSnapshot, Rgb,
 };
 use crate::frame::{Frame, Region};
+use crate::observation::{Observation, ObservationState, UnknownCode};
+use crate::timeline::{ChangeTimeline, ExpectedStateOutcome, TimelineEvent, TimelineSource};
+
+pub use crate::analyzers::image::NaturalRegion;
+
+mod image;
 
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,8 +126,12 @@ pub enum Assertion {
         axis_tolerance_px: Option<u32>,
     },
     /// Element's foreground color is within ΔE_76 of expected RGB.
-    /// (ΔE_2000 is more perceptually accurate but materially harder to
-    /// compute — ΔE_76 is the Phase 6 first-pass tradeoff.)
+    ///
+    /// Still ΔE_76, deliberately, although [`delta_e_2000`] now exists: the
+    /// two scales differ, and moving this variant to ΔE_2000 would silently
+    /// re-mean every `delta_e_max` a caller has already written. A ΔE_2000
+    /// colour check is a new variant, not a changed one —
+    /// [`Assertion::ImagePaletteWithin`] is the first.
     ColorWithin {
         element: String,
         expected: Rgb,
@@ -147,19 +158,158 @@ pub enum Assertion {
         #[serde(default)]
         region: Option<Region>,
     },
-    /// Successive captures across N frames are pixel-identical modulo
-    /// noise threshold. Caller provides the prior frames separately.
+    /// No CSS animation or transition is still running when the
+    /// interaction's timeline ended. Evaluated against
+    /// [`EvalContext::timeline`]: an `animation-started` with no matching
+    /// `animation-ended` after it, or a non-empty
+    /// `summary.animationsUnsettledAtEnd`, fails; neither passes; no timeline
+    /// is unknown.
+    ///
+    /// `region` scopes the claim. The timeline names an animation's target
+    /// by element fingerprint, not by geometry, so with a region set a
+    /// still-running animation cannot be placed inside or outside it: that
+    /// is unknown, while "nothing is running anywhere" still passes.
+    ///
+    /// (The variant once took a `settle_frames` count for a multi-frame
+    /// pixel comparison no caller ever supplied; the key is ignored if sent.)
     AnimationSettled {
         #[serde(default)]
         region: Option<Region>,
-        #[serde(default)]
-        settle_frames: Option<u32>,
     },
+    /// The UI settled within `ms` of the action: the timeline's
+    /// `summary.settleMs` is at most `ms`. A recording that covered `ms` and
+    /// never settled fails; one that stopped short of `ms` without settling
+    /// is unknown. `ms` is the caller's bound — this crate ships no default.
+    SettledWithin { ms: u64 },
+    /// The declared UI state `state` became active within `ms` of the
+    /// action. Read from the timeline's `summary.expectedStates` entry for
+    /// `state` (request it with `expectStates` + `withinMs`), else from its
+    /// `state-entered` events. A state that was already active throughout
+    /// FAILS: the action did not enter it. `ms` is the caller's bound.
+    StateEnteredWithin { state: String, ms: u64 },
     /// Element passes WCAG contrast at the named level (AA 4.5:1 or AAA 7.0:1).
     ContrastMeetsWcag {
         element: String,
         #[serde(default = "default_wcag_aa")]
         level: WcagLevel,
+    },
+
+    // ---- L1 image assertions (plan 2026-10-13-image-generation-and-visual-
+    // judgment, Phase 15) ------------------------------------------------
+    //
+    // The first evaluators that read [`EvalContext::frame`]. Each one that
+    // does sets [`AssertionResult::confidence`] (see that field). Thresholds
+    // are the CALLER's — the visual system or the slot spec — and an
+    // undeclared one answers `Unknown{input_missing}`, never a pass.
+    /// At least `min_coverage` (0..=1) of the image's pixels, as read from
+    /// the frame, lie within `max_delta_e` (CIEDE2000) of some colour in the
+    /// declared `palette` (a slot spec's `thresholds.min_palette_coverage` /
+    /// `max_palette_delta_e`).
+    ///
+    /// `palette` is a boxed slice rather than a `Vec` only to keep
+    /// [`Assertion`] (and so every `AssertionResult`) under clippy's
+    /// large-error threshold; the wire is the same JSON array.
+    ImagePaletteWithin {
+        element: String,
+        palette: Box<[Rgb]>,
+        #[serde(default)]
+        max_delta_e: Option<f64>,
+        #[serde(default)]
+        min_coverage: Option<f64>,
+    },
+    /// No two images on the page have pHashes within `max_hamming` bits of
+    /// each other.
+    ///
+    /// **Unknown on most real captures today, by design.** An image the
+    /// producer reports `visible: false` without a `visibility_reason` — every
+    /// off-screen image of a viewport-only frame, from every producer that
+    /// does not yet send the reason — cannot be told from one hidden under a
+    /// transparent overlay, so this answers Unknown rather than pass over it.
+    /// Phase 26 must not promote this check to a gate before the producers
+    /// (the style-gate `normalize.ts` and the ccfg converter) send
+    /// `visibility_reason`. Perceptual, so a re-encoded or rescaled copy is caught; a
+    /// distinct variant from Phase 8's `no_duplicate_images`, which compares
+    /// `src_digest`. Flat fills are excluded (see
+    /// [`Assertion::NoPlaceholderImages`]).
+    NoNearDuplicateImages {
+        #[serde(default)]
+        max_hamming: Option<u32>,
+    },
+    /// No image (or the named one) renders a placeholder: the slot's
+    /// placeholder marker, a low-entropy fill, or the crossed-box pattern.
+    ///
+    /// **Unknown on most real captures today, by design** — page-wide, for
+    /// the same reason as [`Assertion::NoNearDuplicateImages`]: an image
+    /// reported `visible: false` with no `visibility_reason` is unreadable,
+    /// not left out. Phase 26 must not promote this check to a gate before
+    /// the producers send `visibility_reason`.
+    NoPlaceholderImages {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// The whole `focal` region (natural-frame fractions — a slot spec's
+    /// `focal.region`, passed verbatim) survives object-fit/object-position.
+    /// Reads the snapshot's media facts, not the frame.
+    ImageFocalVisible {
+        element: String,
+        focal: NaturalRegion,
+    },
+    /// The image's edge and stroke pixels reach `min_ratio` WCAG contrast
+    /// against what surrounds them on this frame — a transparent icon that
+    /// vanishes on one theme's background fails on that theme's frame.
+    TransparentImageLegible {
+        element: String,
+        #[serde(default)]
+        min_ratio: Option<f64>,
+    },
+    /// `cta_id` is the most salient element on the frame (spectral-residual
+    /// saliency, mean over its box) among the interactive and media elements
+    /// that neither contain it nor sit inside it.
+    SalienceOrder { cta_id: String },
+    /// The image's sharpness at its rendered scale — variance of the
+    /// Laplacian over its frame crop — is at least `min_sharpness`.
+    ImageSharpnessAtLeast {
+        element: String,
+        #[serde(default)]
+        min_sharpness: Option<f64>,
+    },
+    /// The image's compression blockiness (block-edge step ÷ other step,
+    /// ~1.0 clean) is at most `max_blockiness`.
+    ImageBlockinessWithin {
+        element: String,
+        #[serde(default)]
+        max_blockiness: Option<f64>,
+    },
+
+    // ---- Text over images (plan 2026-10-13-image-generation-and-visual-
+    // judgment, Phase 16) -------------------------------------------------
+    /// Every leaf text element laid over a rendered image reaches `min_ratio`
+    /// WCAG contrast at its `percentile`-th percentile (default
+    /// [`crate::analyzers::image::text_contrast::DEFAULT_PERCENTILE`], 5),
+    /// measured on real pixels: the glyphs are where the frame and its
+    /// text-hidden twin ([`EvalContext::text_hidden_frame`]) differ, and the
+    /// twin is sampled under them. The minimum is reported beside the
+    /// percentile; `percentile: 0` gates on the minimum itself.
+    ///
+    /// `Unknown{needs_multi_frame_input}` without the text-hidden frame;
+    /// `Unknown{input_missing}` when it cannot be paired with the frame
+    /// (another size or scale factor), when `min_ratio` is undeclared, or
+    /// when no text lies over a rendered image. A text element is unmeasured
+    /// (Unknown) when the two frames are not registered over its image, or
+    /// when its glyph mask is empty or too sparse — the text was not hidden in
+    /// frame B, or is invisible, and the two cannot be told apart — or when
+    /// frame B still paints its glyphs. A failure is decided on the glyph
+    /// pixels found; a pass needs the percentile WITH the glyphs the mask
+    /// cannot see (over image pixels matching the glyph colour), and is
+    /// Unknown when only the first clears `min_ratio`. A failure stands even
+    /// when another text element could not be measured; a pass needs them
+    /// all.
+    /// See [`crate::analyzers::image::text_contrast`] for the measurement.
+    TextOverImageContrast {
+        #[serde(default)]
+        min_ratio: Option<f64>,
+        #[serde(default)]
+        percentile: Option<f64>,
     },
 }
 
@@ -276,15 +426,23 @@ impl AssertionOutcome {
 ///
 /// `passed` and `outcome` are two views of one verdict and are always
 /// consistent: `passed == outcome.passed()`. `passed` is retained as the
-/// wire-stable gate bit every existing consumer already reads (the runner's
-/// `all_passed`, `vision-audit`'s exit code); `outcome` is the finer answer.
+/// wire-stable gate bit existing consumers read (`vision-audit`'s exit code);
+/// `outcome` is the finer answer, and the runner's assert route rolls up
+/// `outcome` (failed > unknown > passed), never `passed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[serde(from = "AssertionResultWire")]
+#[serde(try_from = "AssertionResultWire")]
 pub struct AssertionResult {
     pub passed: bool,
     /// The three-way verdict. See [`AssertionOutcome`].
     pub outcome: AssertionOutcome,
+    /// WHY the assertion could not be evaluated, typed. Present iff
+    /// `outcome` is [`AssertionOutcome::Unknown`] — every unknown carries
+    /// one, and no other outcome does, so the key's presence on the wire is
+    /// itself the statement "not evaluated" and its value says why. The
+    /// deserializer refuses a payload that breaks either half.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<UnknownCode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     /// Echo of the input assertion for downstream display. Owned (cloned)
@@ -310,7 +468,8 @@ pub struct AssertionResult {
     /// the second, and that is what a payload written before this field
     /// existed means.
     ///
-    /// `Some(c)` is in `0.0..=1.0`. Today exactly one evaluator sets it:
+    /// `Some(c)` is in `0.0..=1.0`. Two families of evaluator set it: the L1
+    /// image assertions that read [`EvalContext::frame`] (below), and
     /// [`Assertion::ContainsText`]'s OCR fallback, which reports the LOWEST
     /// [`OcrBlockRef::confidence`] among the blocks whose text it actually
     /// read. Lowest, not mean: the aggregate string is only as trustworthy
@@ -336,10 +495,30 @@ pub struct AssertionResult {
     ///
     /// Note what does NOT set it, and that the two reasons are different.
     ///
-    /// Every other evaluator is exact, and there is a MECHANICAL reason to
-    /// trust that rather than a hand-maintained list: **no evaluator reads
-    /// [`EvalContext::frame`] at all**, so none of them samples a pixel.
-    /// They compare declared snapshot values ([`Assertion::ContrastMeetsWcag`],
+    /// **The frame readers.** The L1 image assertions
+    /// ([`Assertion::ImagePaletteWithin`], [`Assertion::NoNearDuplicateImages`],
+    /// [`Assertion::NoPlaceholderImages`], [`Assertion::TransparentImageLegible`],
+    /// [`Assertion::SalienceOrder`], [`Assertion::ImageSharpnessAtLeast`],
+    /// [`Assertion::ImageBlockinessWithin`], [`Assertion::TextOverImageContrast`])
+    /// are the ONLY evaluators that read [`EvalContext::frame`] (and the last
+    /// also [`EvalContext::text_hidden_frame`]), and a pixel read from a
+    /// composited frame is an estimate of the image under it. Each sets this
+    /// field from [`crate::analyzers::image::Crop::confidence`] — the share of
+    /// the image's box that was inside the frame and not painted over — scaled
+    /// where its own doc says so (the ring of surround pixels for
+    /// `transparent_image_legible`; the saliency map's peakedness and the
+    /// winning margin for `salience_order`), except `text_over_image_contrast`,
+    /// which reads no crop: its confidence is the reading's own
+    /// ([`crate::analyzers::image::TextOverImageContrast::confidence`] — the
+    /// share of the text's box in the frame, and the measured glyph colour's
+    /// agreement). A verdict that rests on the
+    /// slot's placeholder MARKER alone, and [`Assertion::ImageFocalVisible`]
+    /// (media facts, no pixels), are deductions and state `None`.
+    ///
+    /// Every OTHER evaluator is exact, and the reason is mechanical rather
+    /// than a hand-maintained list: none of them reads
+    /// [`EvalContext::frame`], so none samples a pixel. They compare declared
+    /// snapshot values ([`Assertion::ContrastMeetsWcag`],
     /// [`Assertion::ColorWithin`], [`Assertion::TypographyConsistent`]),
     /// recorded baselines ([`Assertion::NoLayoutShiftSince`]) and bboxes.
     /// `ContrastMeetsWcag` in particular returns `Unknown` when a colour is
@@ -383,6 +562,8 @@ struct AssertionResultWire {
     passed: bool,
     outcome: Option<AssertionOutcome>,
     #[serde(default)]
+    code: Option<UnknownCode>,
+    #[serde(default)]
     detail: Option<String>,
     assertion: Assertion,
     /// Absent in every payload written before the field existed, and that
@@ -391,23 +572,41 @@ struct AssertionResultWire {
     confidence: Option<f64>,
 }
 
-impl From<AssertionResultWire> for AssertionResult {
-    fn from(w: AssertionResultWire) -> Self {
+impl TryFrom<AssertionResultWire> for AssertionResult {
+    type Error = String;
+
+    fn try_from(w: AssertionResultWire) -> Result<Self, Self::Error> {
         let outcome = w.outcome.unwrap_or(if w.passed {
             AssertionOutcome::Passed
         } else {
             AssertionOutcome::Failed
         });
-        Self {
+        // `code` is present iff the outcome is `unknown`. Unlike `outcome`
+        // itself there is no legacy form to repair toward: an `unknown`
+        // written without a code does not say why, and that is the shape
+        // this field exists to make unrepresentable.
+        match (outcome, w.code) {
+            (AssertionOutcome::Unknown, None) => {
+                return Err("an `unknown` assertion result must carry a `code`".to_string())
+            }
+            (AssertionOutcome::Passed | AssertionOutcome::Failed, Some(code)) => {
+                return Err(format!(
+                    "`code` ({code}) is legal only on an `unknown` assertion result"
+                ))
+            }
+            _ => {}
+        }
+        Ok(Self {
             // The outcome is authoritative: a payload whose two fields
             // disagree is repaired toward the richer one rather than
             // carried forward inconsistent.
             passed: outcome.passed(),
             outcome,
+            code: w.code,
             detail: w.detail,
             assertion: w.assertion,
             confidence: w.confidence,
-        }
+        })
     }
 }
 
@@ -416,6 +615,7 @@ impl AssertionResult {
         Self {
             passed: outcome.passed(),
             outcome,
+            code: None,
             detail,
             assertion,
             confidence: None,
@@ -448,8 +648,14 @@ impl AssertionResult {
     /// The assertion could not be evaluated. `detail` must say WHICH input
     /// was missing — an `unknown` whose detail does not name the gap is
     /// indistinguishable from a failure to the reader it exists to inform.
-    fn unknown(assertion: Assertion, detail: impl Into<String>) -> Self {
-        Self::of(assertion, AssertionOutcome::Unknown, Some(detail.into()))
+    ///
+    /// `code` is required, and is the machine-readable half of the same
+    /// statement: an agent branches on it without parsing `detail`.
+    fn unknown(assertion: Assertion, code: UnknownCode, detail: impl Into<String>) -> Self {
+        Self {
+            code: Some(code),
+            ..Self::of(assertion, AssertionOutcome::Unknown, Some(detail.into()))
+        }
     }
 }
 
@@ -514,17 +720,35 @@ impl BaselineEntry {
 #[derive(Debug, Default)]
 pub struct EvalContext<'a> {
     pub snapshot: Option<&'a ElementSnapshot>,
-    /// **No evaluator reads this today**, and that absence is what makes
-    /// [`AssertionResult::confidence`]'s enumeration checkable by grep rather
-    /// than by hand: nothing here samples a pixel, so nothing here estimates
-    /// a colour. The first evaluator that does read it will be producing an
-    /// ESTIMATE and owes a confidence — see that field.
+    /// **Only the L1 image assertions read this** (the evaluators in
+    /// `assertions/image.rs`), which keeps [`AssertionResult::confidence`]'s
+    /// enumeration checkable by grep rather than by hand: every evaluator that
+    /// samples a pixel lives in that one file, and each states a confidence.
+    /// Any other evaluator that starts reading it is producing an ESTIMATE
+    /// and owes one too — see that field.
     pub frame: Option<&'a Frame>,
+    /// The text-hidden twin of [`Self::frame`]: the same page, captured with
+    /// its text made transparent. Read only by
+    /// [`Assertion::TextOverImageContrast`] (in `assertions/image.rs`, with
+    /// the other pixel readers); absent, that assertion answers
+    /// `Unknown{needs_multi_frame_input}`. Plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16.
+    pub text_hidden_frame: Option<&'a Frame>,
+    /// The ids of the text elements the producer reports it hid in
+    /// [`Self::text_hidden_frame`]; see
+    /// [`crate::analyzers::AnalyzeInput::text_hidden_ids`].
+    pub text_hidden_ids: Option<&'a [String]>,
     /// Map of OCR blocks keyed by region or by source-element id —
     /// callers (e.g., the runner's `vision/assert` handler) compose this
     /// from `vision/extract` output before evaluating.
     pub ocr_blocks: Option<&'a [OcrBlockRef<'a>]>,
     pub baselines: Option<&'a HashMap<String, BaselineEntry>>,
+    /// The interaction timeline the timeline assertions
+    /// ([`Assertion::AnimationSettled`], [`Assertion::SettledWithin`],
+    /// [`Assertion::StateEnteredWithin`]) are evaluated against. `None` makes
+    /// each of them `unknown{input_missing}`, naming where a timeline comes
+    /// from ([`NO_TIMELINE`]).
+    pub timeline: Option<&'a ChangeTimeline>,
 }
 
 /// Borrowed OCR block (avoids re-serializing the runner-side type).
@@ -583,27 +807,19 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
             tolerance_px,
         } => eval_layout_shift(baseline, tolerance_px, ctx),
         Assertion::NoClipping { region } => eval_no_clipping(region, ctx),
-        Assertion::AnimationSettled { .. } => {
-            // Animation settle needs N captures over time, which is runner-side
-            // orchestration this sync evaluator cannot do. Nothing anywhere
-            // supplies them today: the runner's `vision/assert` handler maps
-            // EVERY assertion straight through this function, so no multi-frame
-            // path has ever run.
-            //
-            // The Phase 6 first-pass returned a `pass_with` "skipping" note
-            // here — a green gate over an assertion that was never evaluated,
-            // for any caller, ever. That is the silent false negative
-            // `AssertionOutcome::Unknown` exists to remove: an
-            // `animation_settled` in a suite now reports that it was not
-            // checked instead of reporting that it held.
-            AssertionResult::unknown(
-                assertion.clone(),
-                "animation_settled needs successive captures that this evaluator is never given, \
-                 so nothing was measured. No runner-side multi-frame path is wired up yet; until \
-                 one is, this assertion cannot answer.",
-            )
-        }
+        Assertion::AnimationSettled { region } => eval_animation_settled(region, ctx),
+        Assertion::SettledWithin { ms } => eval_settled_within(ms, ctx),
+        Assertion::StateEnteredWithin { state, ms } => eval_state_entered_within(state, ms, ctx),
         Assertion::ContrastMeetsWcag { element, level } => eval_contrast(element, level, ctx),
+        Assertion::ImagePaletteWithin { .. }
+        | Assertion::NoNearDuplicateImages { .. }
+        | Assertion::NoPlaceholderImages { .. }
+        | Assertion::ImageFocalVisible { .. }
+        | Assertion::TransparentImageLegible { .. }
+        | Assertion::SalienceOrder { .. }
+        | Assertion::ImageSharpnessAtLeast { .. }
+        | Assertion::ImageBlockinessWithin { .. }
+        | Assertion::TextOverImageContrast { .. } => image::evaluate(a, ctx),
     }
 }
 
@@ -632,6 +848,7 @@ fn require_snapshot<'a>(
     ctx.snapshot.ok_or_else(|| {
         AssertionResult::unknown(
             assertion.clone(),
+            UnknownCode::InputMissing,
             "no ElementSnapshot supplied, so this assertion was never evaluated",
         )
     })
@@ -655,6 +872,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&elements[0], "the pair was never compared"),
             )
         }
@@ -664,6 +882,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&elements[1], "the pair was never compared"),
             )
         }
@@ -673,6 +892,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{}' carries no geometry (bbox), so overlap was never measured",
                     elements[0]
@@ -685,6 +905,7 @@ fn eval_no_overlap(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{}' carries no geometry (bbox), so overlap was never measured",
                     elements[1]
@@ -780,6 +1001,7 @@ fn eval_element_above(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(above_id, "no ordering verdict was reached"),
             )
         }
@@ -789,6 +1011,7 @@ fn eval_element_above(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(below_id, "no ordering verdict was reached"),
             )
         }
@@ -806,6 +1029,7 @@ fn eval_element_above(
                 };
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     format!(
                         "element_above[{above_id}, {below_id}]: no geometry (bbox) on {which}, \
                          so the required overlap could not be checked. Set \
@@ -856,6 +1080,7 @@ fn eval_element_above(
         };
         return AssertionResult::unknown(
             assertion,
+            UnknownCode::InputMissing,
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
                  reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
@@ -915,6 +1140,7 @@ fn eval_contains_text(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(&t.element, "its text was never read"),
                 )
             }
@@ -1031,6 +1257,7 @@ fn eval_contains_text(
 
     AssertionResult::unknown(
         assertion,
+        UnknownCode::InputMissing,
         "no snapshot text and no ocr_blocks supplied, so the text was never read",
     )
 }
@@ -1066,6 +1293,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "text fit was never checked"),
             )
         }
@@ -1084,6 +1312,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "element '{element}' carries no geometry (bbox), so text fit was never checked"
                 ),
@@ -1177,6 +1406,7 @@ fn eval_aligned(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(id, "alignment was never measured"),
                 )
             }
@@ -1235,6 +1465,7 @@ fn eval_color_within(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "its color was never read"),
             )
         }
@@ -1244,6 +1475,7 @@ fn eval_color_within(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 "the snapshot carries no `fg_color` for this element, so no color was compared",
             )
         }
@@ -1274,6 +1506,76 @@ pub fn delta_e_76(a: Rgb, b: Rgb) -> f64 {
     let da = la.1 - lb.1;
     let db = la.2 - lb.2;
     (dl * dl + da * da + db * db).sqrt()
+}
+
+/// CIEDE2000 (Sharma, Wu & Dalal 2005) between two sRGB colours, through
+/// CIELAB D65. The perceptual distance [`delta_e_76`] approximates: ΔE_2000
+/// corrects the hue rotation in the blues and the compressed chroma scale, so
+/// a just-noticeable difference is ~1 everywhere in the gamut.
+pub fn delta_e_2000(a: Rgb, b: Rgb) -> f64 {
+    delta_e_2000_lab(rgb_to_lab(a), rgb_to_lab(b))
+}
+
+/// [`delta_e_2000`] over CIELAB triples `(L*, a*, b*)` (kL = kC = kH = 1).
+pub fn delta_e_2000_lab(lab1: (f64, f64, f64), lab2: (f64, f64, f64)) -> f64 {
+    let (l1, a1, b1) = lab1;
+    let (l2, a2, b2) = lab2;
+    let pow7 = |v: f64| v.powi(7);
+    let c_bar = (a1.hypot(b1) + a2.hypot(b2)) / 2.0;
+    let g = 0.5 * (1.0 - (pow7(c_bar) / (pow7(c_bar) + pow7(25.0))).sqrt());
+    let a1p = (1.0 + g) * a1;
+    let a2p = (1.0 + g) * a2;
+    let c1p = a1p.hypot(b1);
+    let c2p = a2p.hypot(b2);
+    let hue = |b: f64, ap: f64| {
+        if b == 0.0 && ap == 0.0 {
+            0.0
+        } else {
+            b.atan2(ap).to_degrees().rem_euclid(360.0)
+        }
+    };
+    let h1p = hue(b1, a1p);
+    let h2p = hue(b2, a2p);
+    let dl = l2 - l1;
+    let dc = c2p - c1p;
+    let dh_deg = if c1p * c2p == 0.0 {
+        0.0
+    } else {
+        let d = h2p - h1p;
+        if d.abs() <= 180.0 {
+            d
+        } else if d > 180.0 {
+            d - 360.0
+        } else {
+            d + 360.0
+        }
+    };
+    let dh = 2.0 * (c1p * c2p).sqrt() * (dh_deg / 2.0).to_radians().sin();
+    let l_bar = (l1 + l2) / 2.0;
+    let c_bar_p = (c1p + c2p) / 2.0;
+    let h_bar = if c1p * c2p == 0.0 {
+        h1p + h2p
+    } else if (h1p - h2p).abs() <= 180.0 {
+        (h1p + h2p) / 2.0
+    } else if h1p + h2p < 360.0 {
+        (h1p + h2p + 360.0) / 2.0
+    } else {
+        (h1p + h2p - 360.0) / 2.0
+    };
+    let cosd = |d: f64| d.to_radians().cos();
+    let t =
+        1.0 - 0.17 * cosd(h_bar - 30.0) + 0.24 * cosd(2.0 * h_bar) + 0.32 * cosd(3.0 * h_bar + 6.0)
+            - 0.20 * cosd(4.0 * h_bar - 63.0);
+    let d_theta = 30.0 * (-((h_bar - 275.0) / 25.0).powi(2)).exp();
+    let r_c = 2.0 * (pow7(c_bar_p) / (pow7(c_bar_p) + pow7(25.0))).sqrt();
+    let s_l = 1.0 + 0.015 * (l_bar - 50.0).powi(2) / (20.0 + (l_bar - 50.0).powi(2)).sqrt();
+    let s_c = 1.0 + 0.045 * c_bar_p;
+    let s_h = 1.0 + 0.015 * c_bar_p * t;
+    let r_t = -(2.0 * d_theta).to_radians().sin() * r_c;
+    let (tl, tc, th) = (dl / s_l, dc / s_c, dh / s_h);
+    (tl * tl + tc * tc + th * th + r_t * tc * th)
+        .max(0.0)
+        .sqrt()
 }
 
 /// sRGB → Lab (D65 illuminant). Pure math, no dependencies.
@@ -1342,6 +1644,7 @@ fn eval_typography(
             None => {
                 return AssertionResult::unknown(
                     assertion,
+                    UnknownCode::InputMissing,
                     missing_operand(id, "typography was never compared"),
                 )
             }
@@ -1414,6 +1717,7 @@ fn eval_layout_shift(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 "no baselines were supplied to the evaluator, so no shift was measured",
             )
         }
@@ -1423,6 +1727,7 @@ fn eval_layout_shift(
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "baseline '{baseline}' is not registered, so no shift was measured — \
                      register it with `vision/baseline` first"
@@ -1523,6 +1828,7 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
         None => {
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 missing_operand(&element, "contrast was never computed"),
             )
         }
@@ -1537,6 +1843,7 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
             };
             return AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
                     "the snapshot carries no {which} for this element, so contrast was never \
                      computed"
@@ -1557,6 +1864,406 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
     } else {
         AssertionResult::pass_with(assertion, format!("contrast ratio {:.2}:1", ratio))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Timeline assertions — evaluated against `EvalContext::timeline`
+// ---------------------------------------------------------------------------
+//
+// No constant here bounds a timing: the only bound is the caller's `ms`.
+
+/// Where an interaction timeline comes from — the detail every timeline
+/// assertion's no-timeline `unknown{input_missing}` carries, so the reader
+/// learns which route would let it answer.
+pub const NO_TIMELINE: &str = "no interaction timeline was supplied, so nothing was measured. \
+     A timeline is recorded by the UI Bridge SDK's `POST /ai/execute-with-diff` \
+     (`ActionDiffResult.timeline`, on unless the request sends `timeline: false`) and reaches \
+     this evaluator through the runner's `POST /vision/assert` `timeline_ref` (a journey \
+     edge-observation id), or `EvalContext::timeline` directly";
+
+fn require_timeline<'a>(
+    ctx: &'a EvalContext<'_>,
+    assertion: &Assertion,
+) -> Result<&'a ChangeTimeline, AssertionResult> {
+    ctx.timeline.ok_or_else(|| {
+        AssertionResult::unknown(assertion.clone(), UnknownCode::InputMissing, NO_TIMELINE)
+    })
+}
+
+/// The status word and, for an unknown, its typed reason and detail.
+fn not_measured<T>(o: &Observation<T>) -> (&'static str, Option<(UnknownCode, &str)>) {
+    match o.state() {
+        ObservationState::Measured(_) => ("measured", None),
+        ObservationState::Absent => ("absent", None),
+        ObservationState::Unknown(u) => ("unknown", Some((u.code, u.detail.as_str()))),
+    }
+}
+
+fn eval_animation_settled(region: Option<Region>, ctx: &EvalContext<'_>) -> AssertionResult {
+    let assertion = Assertion::AnimationSettled { region };
+    let t = match require_timeline(ctx, &assertion) {
+        Ok(t) => t,
+        Err(r) => return r,
+    };
+
+    // Replay the animation events: a start with no later matching end is
+    // still running. Matched on (name, target), else on name alone (an end
+    // whose target could not be fingerprinted). Only meaningful when the
+    // recording listened for them.
+    let mut running: Vec<&crate::timeline::DetectedAnimation> = Vec::new();
+    if t.observed(TimelineSource::AnimationEvents) {
+        for ev in &t.events {
+            match ev {
+                TimelineEvent::AnimationStarted { animation, .. } => running.push(animation),
+                TimelineEvent::AnimationEnded { animation, .. } => {
+                    let at = running
+                        .iter()
+                        .position(|r| {
+                            r.name == animation.name && r.target_element == animation.target_element
+                        })
+                        .or_else(|| running.iter().position(|r| r.name == animation.name));
+                    if let Some(i) = at {
+                        running.remove(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let summary = &t.summary.animations_unsettled_at_end;
+    let mut names: std::collections::BTreeSet<&str> =
+        running.iter().map(|a| a.name.as_str()).collect();
+    if let Some(list) = summary.value() {
+        names.extend(list.iter().map(|a| a.name.as_str()));
+    }
+
+    if !names.is_empty() {
+        let names = names.into_iter().collect::<Vec<_>>().join(", ");
+        // A running verdict rests on an `animation-ended` that never came. If
+        // the recorder dropped `animation-ended` events at its cap, that end
+        // may have been dropped: unknown, not a fail. (A dropped
+        // `animation-started`, or no `getAnimations`, can only HIDE a running
+        // animation, so neither can make this verdict wrong.)
+        if t.summary
+            .unmeasured_dimensions()
+            .any(|d| d == "timeline-events:animation-ended")
+        {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "animation(s) look still running when the {}ms recording ended ({names}), \
+                     but the recorder dropped `animation-ended` events at its cap, so their end \
+                     may have been lost",
+                    t.recorded_ms
+                ),
+            );
+        }
+        if region.is_some() {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "animation(s) still running when the {}ms recording ended ({names}), but the \
+                     timeline names an animation's target by element fingerprint, not geometry, \
+                     so whether any of them is inside the region cannot be decided",
+                    t.recorded_ms
+                ),
+            );
+        }
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "animation(s) still running when the {}ms recording ended: {names}",
+                t.recorded_ms
+            ),
+        );
+    }
+
+    if let (status, Some((code, detail))) = not_measured(summary) {
+        return AssertionResult::unknown(
+            assertion,
+            code,
+            format!(
+                "no animation was seen running, but summary.animationsUnsettledAtEnd is \
+                 {status} ({detail}), so one running unseen cannot be ruled out"
+            ),
+        );
+    }
+    let mut gaps: Vec<&str> = summary
+        .provenance()
+        .coverage
+        .unmeasured
+        .iter()
+        .map(|u| u.dimension.as_str())
+        .collect();
+    gaps.extend(
+        t.summary
+            .unmeasured_dimensions()
+            .filter(|d| d.starts_with("timeline-events:animation-")),
+    );
+    if !gaps.is_empty() {
+        gaps.sort_unstable();
+        gaps.dedup();
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "no animation was seen running, but {} went unmeasured, so one running unseen \
+                 cannot be ruled out",
+                gaps.join(", ")
+            ),
+        );
+    }
+    AssertionResult::pass_with(
+        assertion,
+        format!(
+            "no animation running when the {}ms recording ended",
+            t.recorded_ms
+        ),
+    )
+}
+
+fn eval_settled_within(ms: u64, ctx: &EvalContext<'_>) -> AssertionResult {
+    let assertion = Assertion::SettledWithin { ms };
+    let t = match require_timeline(ctx, &assertion) {
+        Ok(t) => t,
+        Err(r) => return r,
+    };
+    let bound = ms as f64;
+    let settle = &t.summary.settle_ms;
+    if let Some(&at) = settle.value() {
+        return if at <= bound {
+            AssertionResult::pass_with(assertion, format!("settled at {at}ms (bound {ms}ms)"))
+        } else {
+            AssertionResult::fail(assertion, format!("settled at {at}ms, later than {ms}ms"))
+        };
+    }
+    let (status, unknown) = not_measured(settle);
+    // A settle that did not happen is a measured negative over the window the
+    // recording covered — but only for the "it did not occur" readings, never
+    // for an unknown with another cause.
+    let did_not_occur = match unknown {
+        None => true,
+        Some((code, _)) => code == UnknownCode::NoEventBeforeTimeout,
+    };
+    if did_not_occur && !t.settled && t.recorded_ms >= bound {
+        // The SDK stops watching for `settled` at settleTimeout, but records
+        // on to `withinMs` when the caller asked for `expectStates`. Then the
+        // recording outlasts the window `settled` was watched in, and a
+        // settle after settleTimeout would not have been seen: not a fail.
+        // Without `expectStates`, the recording IS the settle window.
+        if !t.summary.expected_states.is_empty() {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "the UI did not settle within the settle window, but the {}ms recording was \
+                     extended past it for `expectStates`, and `settled` is not watched after \
+                     settleTimeout, so whether it settled within {ms}ms is not known",
+                    t.recorded_ms
+                ),
+            );
+        }
+        if t.summary
+            .unmeasured_dimensions()
+            .any(|d| d == "timeline-events:settled")
+        {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "no `settled` event within {ms}ms was recorded, but the recorder dropped \
+                     `settled` events at its cap, so one may have been lost"
+                ),
+            );
+        }
+        return AssertionResult::fail(
+            assertion,
+            format!(
+                "did not settle within {ms}ms: the recording covered {}ms and no `settled` \
+                 event occurred",
+                t.recorded_ms
+            ),
+        );
+    }
+    let (code, detail) = unknown.unwrap_or((UnknownCode::NoEventBeforeTimeout, "no settle event"));
+    AssertionResult::unknown(
+        assertion,
+        code,
+        format!(
+            "summary.settleMs is {status} ({detail}) and the recording covered {}ms of the {ms}ms \
+             asked about, so whether the UI settled within {ms}ms is not known",
+            t.recorded_ms
+        ),
+    )
+}
+
+fn eval_state_entered_within(state: String, ms: u64, ctx: &EvalContext<'_>) -> AssertionResult {
+    let assertion = Assertion::StateEnteredWithin {
+        state: state.clone(),
+        ms,
+    };
+    let t = match require_timeline(ctx, &assertion) {
+        Ok(t) => t,
+        Err(r) => return r,
+    };
+    let bound = ms as f64;
+
+    // 1. The SDK's own answer, when the caller asked for this state. A
+    // DEGRADED answer (its coverage names an unmeasured dimension) still
+    // passes on a measured entry inside the bound, but never fails: whatever
+    // went unmeasured could hold the entry that would make it pass.
+    if let Some(entry) = t
+        .summary
+        .expected_states
+        .iter()
+        .find(|e| e.state_id == state)
+    {
+        let gaps: Vec<&str> = entry
+            .outcome
+            .provenance()
+            .coverage
+            .unmeasured
+            .iter()
+            .map(|u| u.dimension.as_str())
+            .collect();
+        let would_fail = match entry.outcome.state() {
+            ObservationState::Measured(ExpectedStateOutcome::EnteredAtMs(at)) => *at > bound,
+            ObservationState::Measured(
+                ExpectedStateOutcome::NotEnteredWithinMs(w)
+                | ExpectedStateOutcome::ActiveThroughoutWithinMs(w),
+            ) => *w >= bound,
+            _ => false,
+        };
+        if would_fail && !gaps.is_empty() {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "summary.expectedStates['{state}'] says it did not enter within {ms}ms, but \
+                     it is degraded ({}), so an entry may have gone unmeasured",
+                    gaps.join(", ")
+                ),
+            );
+        }
+        match entry.outcome.state() {
+            ObservationState::Measured(ExpectedStateOutcome::EnteredAtMs(at)) => {
+                return if *at <= bound {
+                    AssertionResult::pass_with(
+                        assertion,
+                        format!("'{state}' entered at {at}ms (bound {ms}ms)"),
+                    )
+                } else {
+                    AssertionResult::fail(
+                        assertion,
+                        format!("'{state}' entered at {at}ms, later than {ms}ms"),
+                    )
+                };
+            }
+            ObservationState::Measured(ExpectedStateOutcome::NotEnteredWithinMs(w))
+                if *w >= bound =>
+            {
+                return AssertionResult::fail(
+                    assertion,
+                    format!("'{state}' did not enter within the {w}ms window, which covers {ms}ms"),
+                );
+            }
+            ObservationState::Measured(ExpectedStateOutcome::ActiveThroughoutWithinMs(w))
+                if *w >= bound =>
+            {
+                return AssertionResult::fail(
+                    assertion,
+                    format!(
+                        "'{state}' was already active when the action ran and stayed active for \
+                         the whole {w}ms window, so the action did not enter it"
+                    ),
+                );
+            }
+            ObservationState::Unknown(u) => {
+                return AssertionResult::unknown(
+                    assertion,
+                    u.code,
+                    format!("summary.expectedStates['{state}'] is unknown: {}", u.detail),
+                );
+            }
+            // A window shorter than `ms`, or `absent`: the events may still
+            // settle it.
+            ObservationState::Measured(_) | ObservationState::Absent => {}
+        }
+    }
+
+    // 2. The state events.
+    if !t.observed(TimelineSource::States) {
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "the timeline did not observe the declared-state registry (no `states` source) \
+                 and answers nothing for '{state}' within {ms}ms; record it with \
+                 `expectStates: [\"{state}\"]` and `withinMs`"
+            ),
+        );
+    }
+    let mut named = false;
+    for ev in &t.events {
+        match ev {
+            TimelineEvent::StateEntered { base, state_id } if *state_id == state => {
+                named = true;
+                if base.offset_ms <= bound {
+                    return AssertionResult::pass_with(
+                        assertion,
+                        format!("'{state}' entered at {}ms (bound {ms}ms)", base.offset_ms),
+                    );
+                }
+            }
+            TimelineEvent::StateExited { state_id, .. } if *state_id == state => named = true,
+            _ => {}
+        }
+    }
+    let dropped = t
+        .summary
+        .unmeasured_dimensions()
+        .any(|d| d == "timeline-events:state-entered");
+    if dropped {
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "no `state-entered` for '{state}' within {ms}ms was recorded, but the recorder \
+                 dropped `state-entered` events at its cap, so one may have been lost"
+            ),
+        );
+    }
+    if t.recorded_ms < bound {
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::NoEventBeforeTimeout,
+            format!(
+                "'{state}' had not entered when the recording ended at {}ms, short of the {ms}ms \
+                 asked about",
+                t.recorded_ms
+            ),
+        );
+    }
+    if !named {
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "no event names '{state}' and the timeline carries no expectedStates entry for \
+                 it, so a declared state that never entered cannot be told from an undeclared \
+                 id; record it with `expectStates: [\"{state}\"]` and `withinMs`"
+            ),
+        );
+    }
+    AssertionResult::fail(
+        assertion,
+        format!(
+            "'{state}' did not enter within {ms}ms (the recording covered {}ms)",
+            t.recorded_ms
+        ),
+    )
 }
 
 #[cfg(test)]
@@ -2014,9 +2721,11 @@ mod tests {
                 tolerance_px: None,
             },
             Assertion::NoClipping { region: None },
-            Assertion::AnimationSettled {
-                region: None,
-                settle_frames: None,
+            Assertion::AnimationSettled { region: None },
+            Assertion::SettledWithin { ms: 500 },
+            Assertion::StateEnteredWithin {
+                state: "saved-toast".into(),
+                ms: 2000,
             },
             Assertion::ContrastMeetsWcag {
                 element: "a".into(),
@@ -2035,10 +2744,14 @@ mod tests {
                 "bit and outcome disagree for {a:?}: {res:?}"
             );
             match res.outcome {
-                AssertionOutcome::Passed => seen_pass = true,
+                AssertionOutcome::Passed => {
+                    seen_pass = true;
+                    assert_eq!(res.code, None, "a pass carries no unknown code: {a:?}");
+                }
                 AssertionOutcome::Failed => {
                     seen_fail = true;
                     assert!(res.detail.is_some(), "a failure must say why: {a:?}");
+                    assert_eq!(res.code, None, "a failure carries no unknown code: {a:?}");
                 }
                 AssertionOutcome::Unknown => {
                     seen_unknown = true;
@@ -2046,6 +2759,10 @@ mod tests {
                         res.detail.is_some(),
                         "an unknown whose detail does not name the missing input is \
                          indistinguishable from a failure: {a:?}"
+                    );
+                    assert!(
+                        res.code.is_some(),
+                        "an unknown must carry a typed code: {a:?}"
                     );
                 }
             }
@@ -2107,28 +2824,447 @@ mod tests {
         assert!(detail.contains("GLOBAL"), "{detail}");
     }
 
-    /// `animation_settled` used to return a `pass_with` "skipping" note. No
-    /// caller has ever supplied the successive captures it needs — the
-    /// runner's `vision/assert` maps every assertion straight through
-    /// `evaluate` — so that was an unconditional green gate over an
-    /// assertion nobody had ever evaluated.
-    #[test]
-    fn animation_settled_reports_unknown_rather_than_passing_vacuously() {
-        let snap = snap_of(vec![el("a", 0, 0, 10, 10)]);
-        let res = eval_on(
-            &snap,
-            &Assertion::AnimationSettled {
-                region: None,
-                settle_frames: Some(3),
+    // -- Timeline assertions -------------------------------------------------
+
+    fn prov(unmeasured: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "producer": { "id": "sdk/timeline/events", "version": "test" },
+            "observedAt": "2026-10-20T00:00:00Z",
+            "evaluatedAt": "2026-10-20T00:00:00Z",
+            "coverage": { "considered": 1, "measured": 1, "unmeasured": unmeasured },
+            "confidence": null,
+            "cache": null,
+            "source": null
+        })
+    }
+    fn measured(v: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({ "status": "measured", "value": v, "provenance": prov(serde_json::json!([])) })
+    }
+    fn degraded(v: serde_json::Value, dimension: &str) -> serde_json::Value {
+        serde_json::json!({
+            "status": "measured",
+            "value": v,
+            "provenance": prov(serde_json::json!([
+                { "dimension": dimension, "count": 0, "code": "input_missing" }
+            ]))
+        })
+    }
+    fn unknown(code: &str) -> serde_json::Value {
+        serde_json::json!({
+            "status": "unknown",
+            "unknown": { "code": code, "detail": "test" },
+            "provenance": prov(serde_json::json!([]))
+        })
+    }
+    fn anim(ty: &str, at: u64, name: &str) -> serde_json::Value {
+        let mut v = serde_json::json!({
+            "type": ty, "offsetMs": at, "summary": "s",
+            "animation": { "name": name, "targetElement": format!("fp-{name}"), "isInfinite": false }
+        });
+        if ty == "animation-ended" {
+            v["endReason"] = serde_json::json!("finished");
+        }
+        v
+    }
+    fn state_ev(ty: &str, at: u64, id: &str) -> serde_json::Value {
+        serde_json::json!({ "type": ty, "offsetMs": at, "summary": "s", "stateId": id })
+    }
+
+    /// A timeline with every summary field measured over full coverage, the
+    /// given extra events after the action, and `edit` applied to its JSON.
+    fn timeline(
+        events: Vec<serde_json::Value>,
+        edit: impl FnOnce(&mut serde_json::Value),
+    ) -> ChangeTimeline {
+        let mut all = vec![serde_json::json!({ "type": "action", "offsetMs": 0, "summary": "a" })];
+        all.extend(events);
+        let mut v = serde_json::json!({
+            "events": all,
+            "recordedMs": 1000,
+            "settled": true,
+            "observedSources": [
+                "snapshot-poll", "layout-shift", "long-task", "animation-events",
+                "get-animations", "states"
+            ],
+            "summary": {
+                "firstResponseMs": measured(serde_json::json!(10)),
+                "settleMs": measured(serde_json::json!(300)),
+                "layoutShiftTotal": measured(serde_json::json!(0)),
+                "layoutShiftCount": measured(serde_json::json!(0)),
+                "layoutShiftAfterFirstResponseMs": measured(serde_json::json!(0)),
+                "animationsUnsettledAtEnd": measured(serde_json::json!([])),
+                "longTaskTotalMs": measured(serde_json::json!(0)),
+                "expectedStates": []
+            }
+        });
+        edit(&mut v);
+        serde_json::from_value(v).expect("test timeline parses")
+    }
+
+    fn eval_timeline(t: &ChangeTimeline, a: &Assertion) -> AssertionResult {
+        let res = evaluate(
+            a,
+            &EvalContext {
+                timeline: Some(t),
+                ..Default::default()
             },
         );
-        assert_eq!(res.outcome, AssertionOutcome::Unknown);
-        assert!(!res.passed, "a gate that never ran must not report green");
+        assert_eq!(res.passed, res.outcome.passed());
+        assert_eq!(res.code.is_some(), res.outcome.is_unknown(), "{res:?}");
+        res
+    }
+
+    fn settled_anim() -> Assertion {
+        Assertion::AnimationSettled { region: None }
+    }
+
+    /// With no timeline every timeline assertion is unknown and names the
+    /// route that supplies one — the old `animation_settled` "needs frames"
+    /// unknown pointed at a multi-frame path that does not exist.
+    #[test]
+    fn timeline_assertions_without_a_timeline_are_unknown_and_name_the_route() {
+        let snap = snap_of(vec![el("a", 0, 0, 10, 10)]);
+        for a in [
+            settled_anim(),
+            Assertion::SettledWithin { ms: 500 },
+            Assertion::StateEnteredWithin {
+                state: "saved-toast".into(),
+                ms: 2000,
+            },
+        ] {
+            let res = eval_on(&snap, &a);
+            assert_eq!(res.outcome, AssertionOutcome::Unknown, "{a:?}");
+            assert!(!res.passed, "a gate that never ran must not report green");
+            assert_eq!(res.code, Some(UnknownCode::InputMissing));
+            let detail = res.detail.as_deref().unwrap();
+            assert!(detail.contains("POST /ai/execute-with-diff"), "{detail}");
+            assert!(detail.contains("timeline_ref"), "{detail}");
+        }
+    }
+
+    #[test]
+    fn timeline_assertions_parse_from_the_wire() {
+        let a: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "settled_within", "ms": 500
+        }))
+        .unwrap();
+        assert!(matches!(a, Assertion::SettledWithin { ms: 500 }));
+        let a: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "state_entered_within", "state": "saved-toast", "ms": 2000
+        }))
+        .unwrap();
+        assert!(matches!(a, Assertion::StateEnteredWithin { ms: 2000, .. }));
+        // A suite written for the retired frame-count dial still parses.
+        let a: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "animation_settled", "settle_frames": 3
+        }))
+        .unwrap();
+        assert!(matches!(a, Assertion::AnimationSettled { region: None }));
+    }
+
+    #[test]
+    fn animation_settled_fails_when_the_last_animation_event_is_a_start() {
+        let t = timeline(vec![anim("animation-started", 20, "pulse")], |_| {});
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+        assert!(res.detail.unwrap().contains("pulse"));
+    }
+
+    /// Review probe t1: the recorder dropped `animation-ended` events at its
+    /// cap, so a start with no recorded end is not evidence of a running
+    /// animation.
+    #[test]
+    fn animation_settled_is_unknown_when_animation_ended_events_were_dropped() {
+        let t = timeline(vec![anim("animation-started", 10, "fade")], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = degraded(
+                serde_json::json!([{ "name": "fade", "isInfinite": false }]),
+                "timeline-events:animation-ended",
+            );
+        });
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+        assert!(res.detail.unwrap().contains("animation-ended"));
+        // A gap elsewhere (no getAnimations) cannot make a recorded
+        // start-without-end wrong: still a fail.
+        let t = timeline(vec![anim("animation-started", 10, "fade")], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = degraded(
+                serde_json::json!([{ "name": "fade", "isInfinite": false }]),
+                "animations-running-before-action(count-unknowable)",
+            );
+        });
+        assert_eq!(
+            eval_timeline(&t, &settled_anim()).outcome,
+            AssertionOutcome::Failed
+        );
+    }
+
+    /// Review probe 3: with `expectStates` the SDK records past settleTimeout
+    /// without watching for `settled`, so "did not settle within 5000ms" over
+    /// an 8000ms recording is unknown. Without `expectStates` it is a fail.
+    #[test]
+    fn settled_within_is_unknown_when_the_recording_outlasted_the_settle_window() {
+        let never = |with_states: bool| {
+            timeline(vec![state_ev("state-entered", 7000, "saved")], move |v| {
+                v["summary"]["settleMs"] = unknown("no_event_before_timeout");
+                v["settled"] = serde_json::json!(false);
+                v["recordedMs"] = serde_json::json!(8000);
+                if with_states {
+                    v["summary"]["expectedStates"] = serde_json::json!([{
+                        "stateId": "saved",
+                        "outcome": measured(serde_json::json!({ "enteredAtMs": 7000 }))
+                    }]);
+                }
+            })
+        };
+        let res = eval_timeline(&never(true), &Assertion::SettledWithin { ms: 5000 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+        assert!(res.detail.unwrap().contains("expectStates"));
+        // Control: no expectStates, the recording is the settle window.
+        let res = eval_timeline(&never(false), &Assertion::SettledWithin { ms: 5000 });
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+    }
+
+    /// DEFENSIVE: the UI Bridge SDK caps events per type but emits a single
+    /// `settled`, so it never reports `timeline-events:settled` as dropped.
+    /// The rule this pins guards a non-SDK producer (or a future SDK cap)
+    /// that could, and is harmless otherwise.
+    #[test]
+    fn settled_within_never_fails_over_dropped_settled_events() {
+        let t = timeline(vec![], |v| {
+            v["summary"]["settleMs"] = serde_json::json!({
+                "status": "unknown",
+                "unknown": { "code": "no_event_before_timeout", "detail": "t" },
+                "provenance": prov(serde_json::json!([
+                    { "dimension": "timeline-events:settled", "count": 1, "code": "input_missing" }
+                ]))
+            });
+            v["settled"] = serde_json::json!(false);
+            v["recordedMs"] = serde_json::json!(8000);
+        });
+        let res = eval_timeline(&t, &Assertion::SettledWithin { ms: 500 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    }
+
+    #[test]
+    fn state_entered_within_never_fails_on_a_degraded_expected_state() {
+        for outcome in [
+            serde_json::json!({ "notEnteredWithinMs": 2000 }),
+            serde_json::json!({ "activeThroughoutWithinMs": 2000 }),
+            serde_json::json!({ "enteredAtMs": 1500 }),
+        ] {
+            let t = with_expected(degraded(outcome.clone(), "timeline-events:state-entered"));
+            let res = eval_timeline(&t, &entered_within(1000));
+            assert_eq!(res.outcome, AssertionOutcome::Unknown, "{outcome}: {res:?}");
+            // Not degraded: the same answer is a fail.
+            let t = with_expected(measured(outcome.clone()));
+            assert_eq!(
+                eval_timeline(&t, &entered_within(1000)).outcome,
+                AssertionOutcome::Failed,
+                "{outcome}"
+            );
+        }
+        // A degraded answer inside the bound still passes.
+        let t = with_expected(degraded(serde_json::json!({ "enteredAtMs": 85 }), "x"));
+        assert_eq!(
+            eval_timeline(&t, &entered_within(1000)).outcome,
+            AssertionOutcome::Passed
+        );
+    }
+
+    #[test]
+    fn animation_settled_passes_when_every_start_ended() {
+        let t = timeline(
+            vec![
+                anim("animation-started", 20, "slide-in"),
+                anim("animation-ended", 220, "slide-in"),
+            ],
+            |_| {},
+        );
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Passed, "{res:?}");
+        // And with no animation at all.
+        let res = eval_timeline(&timeline(vec![], |_| {}), &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Passed, "{res:?}");
+    }
+
+    #[test]
+    fn animation_settled_fails_on_a_running_animation_only_get_animations_saw() {
+        let t = timeline(vec![], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = measured(serde_json::json!([
+                { "name": "spinner", "isInfinite": true }
+            ]));
+        });
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+        assert!(res.detail.unwrap().contains("spinner"));
+    }
+
+    #[test]
+    fn animation_settled_is_unknown_when_the_summary_could_not_look() {
+        let t = timeline(vec![], |v| {
+            v["summary"]["animationsUnsettledAtEnd"] = unknown("input_missing");
+        });
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+
+        // Degraded coverage (no getAnimations): an animation running since
+        // before the action cannot be ruled out, so "none seen" is no pass.
+        let t = timeline(
+            vec![
+                anim("animation-started", 20, "slide-in"),
+                anim("animation-ended", 220, "slide-in"),
+            ],
+            |v| {
+                v["summary"]["animationsUnsettledAtEnd"] = degraded(
+                    serde_json::json!([]),
+                    "animations-running-before-action(count-unknowable)",
+                );
+            },
+        );
+        let res = eval_timeline(&t, &settled_anim());
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
         assert!(res
             .detail
-            .as_deref()
             .unwrap()
-            .contains("nothing was measured"));
+            .contains("animations-running-before-action"));
+    }
+
+    #[test]
+    fn animation_settled_with_a_region_cannot_place_a_running_animation() {
+        let region = Some(Region {
+            x: 0,
+            y: 0,
+            w: 10,
+            h: 10,
+        });
+        let running = timeline(vec![anim("animation-started", 20, "pulse")], |_| {});
+        let res = eval_timeline(&running, &Assertion::AnimationSettled { region });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        let quiet = timeline(vec![], |_| {});
+        let res = eval_timeline(&quiet, &Assertion::AnimationSettled { region });
+        assert_eq!(res.outcome, AssertionOutcome::Passed, "{res:?}");
+    }
+
+    #[test]
+    fn settled_within_reads_the_settle_observation() {
+        let t = timeline(vec![], |_| {});
+        let pass = eval_timeline(&t, &Assertion::SettledWithin { ms: 300 });
+        assert_eq!(pass.outcome, AssertionOutcome::Passed, "{pass:?}");
+        let fail = eval_timeline(&t, &Assertion::SettledWithin { ms: 299 });
+        assert_eq!(fail.outcome, AssertionOutcome::Failed, "{fail:?}");
+    }
+
+    #[test]
+    fn settled_within_a_never_settled_recording_fails_only_over_its_window() {
+        let never = |recorded: u64| {
+            timeline(vec![], move |v| {
+                v["summary"]["settleMs"] = unknown("no_event_before_timeout");
+                v["settled"] = serde_json::json!(false);
+                v["recordedMs"] = serde_json::json!(recorded);
+            })
+        };
+        // The recording covered the bound and nothing settled: a measured negative.
+        let res = eval_timeline(&never(8000), &Assertion::SettledWithin { ms: 500 });
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+        // It stopped short of the bound: unknown.
+        let res = eval_timeline(&never(120), &Assertion::SettledWithin { ms: 500 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::NoEventBeforeTimeout));
+        // An unknown with another cause is never turned into a verdict.
+        let other = timeline(vec![], |v| {
+            v["summary"]["settleMs"] = unknown("producer_failed");
+            v["settled"] = serde_json::json!(false);
+            v["recordedMs"] = serde_json::json!(8000);
+        });
+        let res = eval_timeline(&other, &Assertion::SettledWithin { ms: 500 });
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::ProducerFailed));
+    }
+
+    fn with_expected(outcome: serde_json::Value) -> ChangeTimeline {
+        timeline(vec![], move |v| {
+            v["summary"]["expectedStates"] =
+                serde_json::json!([{ "stateId": "saved-toast", "outcome": outcome }]);
+        })
+    }
+
+    fn entered_within(ms: u64) -> Assertion {
+        Assertion::StateEnteredWithin {
+            state: "saved-toast".into(),
+            ms,
+        }
+    }
+
+    #[test]
+    fn state_entered_within_reads_the_expected_state_observation() {
+        let t = with_expected(measured(serde_json::json!({ "enteredAtMs": 85 })));
+        assert_eq!(
+            eval_timeline(&t, &entered_within(400)).outcome,
+            AssertionOutcome::Passed
+        );
+        assert_eq!(
+            eval_timeline(&t, &entered_within(50)).outcome,
+            AssertionOutcome::Failed
+        );
+
+        let never = with_expected(measured(serde_json::json!({ "notEnteredWithinMs": 2000 })));
+        let res = eval_timeline(&never, &entered_within(2000));
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+        assert!(res.detail.unwrap().contains("2000ms window"));
+
+        let already = with_expected(measured(
+            serde_json::json!({ "activeThroughoutWithinMs": 400 }),
+        ));
+        let res = eval_timeline(&already, &entered_within(400));
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+        assert!(res.detail.unwrap().contains("already active"));
+
+        let undeclared = with_expected(unknown("input_missing"));
+        let res = eval_timeline(&undeclared, &entered_within(400));
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    }
+
+    #[test]
+    fn state_entered_within_falls_back_to_the_state_events() {
+        let t = timeline(vec![state_ev("state-entered", 120, "saved-toast")], |_| {});
+        assert_eq!(
+            eval_timeline(&t, &entered_within(200)).outcome,
+            AssertionOutcome::Passed
+        );
+        // Entered, but late: the id is known, the window covered, a fail.
+        let res = eval_timeline(&t, &entered_within(100));
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{res:?}");
+
+        // A window the recording did not cover is unknown.
+        let res = eval_timeline(&t, &entered_within(5000));
+        assert_eq!(
+            res.outcome,
+            AssertionOutcome::Passed,
+            "an entry inside any bound passes"
+        );
+        let short = timeline(vec![state_ev("state-exited", 50, "saved-toast")], |_| {});
+        let res = eval_timeline(&short, &entered_within(5000));
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert_eq!(res.code, Some(UnknownCode::NoEventBeforeTimeout));
+
+        // No event names the id: a typo and a never-entered state look alike.
+        let silent = timeline(vec![], |_| {});
+        let res = eval_timeline(&silent, &entered_within(500));
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert!(res.detail.unwrap().contains("expectStates"));
+
+        // No state registry observed at all.
+        let blind = timeline(vec![], |v| {
+            v["observedSources"] = serde_json::json!(["snapshot-poll"]);
+        });
+        let res = eval_timeline(&blind, &entered_within(500));
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{res:?}");
+        assert!(res.detail.unwrap().contains("`states` source"));
     }
 
     /// An operand the producer never registered is a gap in the snapshot,
@@ -2176,6 +3312,7 @@ mod tests {
                 "the detail must name the gap: {:?}",
                 res.detail
             );
+            assert_eq!(res.code, Some(UnknownCode::InputMissing), "{a:?}");
         }
     }
 
@@ -2189,6 +3326,59 @@ mod tests {
         );
         assert_eq!(res.outcome, AssertionOutcome::Unknown);
         assert!(!res.passed);
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
+    }
+
+    /// `code` is present iff the outcome is `unknown`, on the wire as well
+    /// as in memory: a pass or failure never serializes the key.
+    #[test]
+    fn the_code_key_is_on_the_wire_iff_unknown() {
+        let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
+        let unknown = serde_json::to_value(eval_on(&snap, &above(["a", "b"], true))).unwrap();
+        assert_eq!(unknown["code"], serde_json::json!("input_missing"));
+        let failed = serde_json::to_value(eval_on(
+            &snap,
+            &Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            },
+        ))
+        .unwrap();
+        assert_eq!(failed["outcome"], serde_json::json!("failed"));
+        assert!(
+            !failed.as_object().unwrap().contains_key("code"),
+            "{failed}"
+        );
+    }
+
+    /// An `unknown` that does not say why is refused at the deserialization
+    /// boundary, and so is a code on an outcome that reached a verdict.
+    #[test]
+    fn an_unknown_without_a_code_or_a_verdict_with_one_fails_to_deserialize() {
+        let no_code = serde_json::json!({
+            "passed": false,
+            "outcome": "unknown",
+            "detail": "no snapshot",
+            "assertion": { "type": "no_clipping" }
+        });
+        assert!(serde_json::from_value::<AssertionResult>(no_code).is_err());
+
+        let code_on_failed = serde_json::json!({
+            "passed": false,
+            "outcome": "failed",
+            "code": "input_missing",
+            "assertion": { "type": "no_clipping" }
+        });
+        assert!(serde_json::from_value::<AssertionResult>(code_on_failed).is_err());
+
+        let ok = serde_json::json!({
+            "passed": false,
+            "outcome": "unknown",
+            "code": "stale_input",
+            "assertion": { "type": "no_clipping" }
+        });
+        let res: AssertionResult = serde_json::from_value(ok).unwrap();
+        assert_eq!(res.code, Some(UnknownCode::StaleInput));
     }
 
     /// Wire shape. `passed` stays where every existing consumer reads it,
@@ -2233,6 +3423,7 @@ mod tests {
         let contradictory = serde_json::json!({
             "passed": true,
             "outcome": "unknown",
+            "code": "input_missing",
             "assertion": { "type": "no_clipping" }
         });
         let res: AssertionResult = serde_json::from_value(contradictory).unwrap();
@@ -2635,5 +3826,73 @@ mod tests {
             &ctx,
         );
         assert!(!res.passed, "6px box for a 16px font must still fail");
+    }
+
+    /// ARMING TEST for `text_over_image_contrast` (plan
+    /// 2026-10-13-image-generation-and-visual-judgment, Phase 16): a WIRE
+    /// assertion — as the CLI's assertions file and the runner's
+    /// `vision/assert` body carry it — handed to [`evaluate`]. Written against
+    /// the API the crate had before the phase (no new type, field or variant
+    /// is named), so with the change reverted it compiles and goes RED at run
+    /// time (the wire type is unknown). The measurement itself is covered by
+    /// `tests/text_over_image.rs`.
+    #[test]
+    fn arming_a_wire_text_over_image_contrast_is_evaluated() {
+        use crate::element_media::{ElementMedia, MediaKind, ObjectFit};
+        use crate::frame::FrameSource;
+        let assertion: Assertion = serde_json::from_value(serde_json::json!({
+            "type": "text_over_image_contrast",
+            "min_ratio": 4.5,
+        }))
+        .expect("the wire assertion parses");
+        let snapshot = ElementSnapshot {
+            elements: vec![
+                Element {
+                    id: "hero".into(),
+                    bbox: Some(Region {
+                        x: 0,
+                        y: 0,
+                        w: 200,
+                        h: 100,
+                    }),
+                    media: Some(ElementMedia {
+                        object_fit: Some(ObjectFit::Fill),
+                        ..ElementMedia::new(MediaKind::Img)
+                    }),
+                    ..Default::default()
+                },
+                Element {
+                    id: "heading".into(),
+                    bbox: Some(Region {
+                        x: 20,
+                        y: 30,
+                        w: 120,
+                        h: 30,
+                    }),
+                    text: Some("Summer sale".into()),
+                    fg_color: Some(Rgb::new(255, 255, 255)),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let frame = Frame::from_rgba(
+            ::image::RgbaImage::from_pixel(200, 100, ::image::Rgba([40, 44, 52, 255])),
+            FrameSource::synthetic_now(),
+        );
+        let r = evaluate(
+            &assertion,
+            &EvalContext {
+                snapshot: Some(&snapshot),
+                frame: Some(&frame),
+                ..Default::default()
+            },
+        );
+        // Not a pass: without the text-hidden capture nothing is measured, and
+        // the typed code names the input to supply.
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        let wire = serde_json::to_value(&r).unwrap();
+        assert_eq!(wire["code"], "needs_multi_frame_input", "{wire}");
+        assert_eq!(wire["assertion"]["type"], "text_over_image_contrast");
     }
 }

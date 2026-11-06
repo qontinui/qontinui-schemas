@@ -1,0 +1,200 @@
+# CI manifest for the runner-as-CI-node lane
+# (plan qontinui-dev-notes/plans/2026-08-07-runner-local-ci-parity-and-web-
+#  configuration.md, Phase 5 — manifest coverage for the repos that had none.
+#  A repo without this file cannot run on the product's local-CI lane at all.)
+#
+# PARITY IS A REVIEW-TIME INVARIANT: the steps below mirror the gate commands of
+# .github/workflows/boundary-guard.yml (`no-coord-import`) and
+# .github/workflows/ci.yml (`repo-checks`, `python-lint`) — every job except
+# `composed-typecheck`, which is disclosed in item 4 below. When either changes,
+# update this file in the SAME PR. Actions steps are referenced by NAME below,
+# never by line number — line numbers move and a stale citation makes the
+# invariant unauditable.
+#
+# Commands are argv arrays (never shell strings); env is limited to the runner's
+# allowlist (qontinui-runner/src-tauri/src/ci_node/manifest.rs::ENV_ALLOWLIST);
+# `[limits]` values are ceilings the executor caps against host-derived sizing.
+#
+# ===========================================================================
+# COVERAGE: EVERY ACTIONS GATE IS MIRRORED EXCEPT ONE, AND THE EXCEPTION IS
+# NAMED. Until `composed-typecheck` was added, the "what cannot run" section
+# every other manifest in this fleet needs was, for this repo, EMPTY — not
+# because gates were dropped, but because the Actions lane was deliberately
+# built out of gates that need no `services:` database, no docker daemon, no
+# marketplace-only Action and no sibling checkout. That constraint is still the
+# rule and is still recorded in ci.yml's header; it now has exactly one recorded
+# exception, item 4 below. Everything else here remains fully mirrored.
+#
+# Superseded note (was items 1-2 of this header, resolved by the follow-up PR
+# that added ci.yml): backend/ previously had no lint/format/type-check job
+# anywhere, and package.json declared a `"test": "vitest run"` script that no
+# workflow invoked. Both are closed. ruff/ruff-format/mypy now gate backend/ and
+# scripts/ in BOTH lanes. The `test` script was REMOVED rather than wired: it
+# could never have run (vitest was not a dependency, and neither a config nor a
+# single test file existed), and a real JS suite needs the host app's `@/*`
+# alias graph, since this package is compiled inside qontinui-web rather than
+# here. Gating a script that fails on invocation would have been worse than the
+# gap it replaced.
+#
+# STILL NOT GATED, AND WHY:
+#
+# 1. No pytest job. There are no Python tests of backend/ to run — the package
+#    is import-coupled to qontinui-web's `app.*`, which this lane cannot
+#    provision until the plan's Phase 1 (sibling path-dep provisioning) lands.
+#    The repo's own testable surface — the gate scripts — IS tested, by the
+#    stdlib `unittest` step below.
+# 2. SUPERSEDED — there IS a JS/TS gate now, on the Actions lane only.
+#    This item used to read "No JS/TS gate of any kind, for the alias-graph
+#    reason given above." The alias-graph fact has not changed: frontend/ still
+#    cannot be checked standalone, because it compiles inside qontinui-web's
+#    `@/*` graph and qontinui-web reaches back into it through `@cloud/*`. What
+#    changed is the conclusion drawn from it — ci.yml's `composed-typecheck` now
+#    checks this tree INSIDE qontinui-web rather than not at all. See item 4 for
+#    why only one of the two lanes can carry it.
+#
+# 4. ci.yml's `composed-typecheck` job — A CWD THIS LANE CANNOT EXPRESS.
+#    Its steps run `npm ci`, `npm run cloud:install`, `npm run type-check` and
+#    `npm test` inside a SIBLING checkout of qontinui-web, because that is the
+#    only place these sources resolve.
+#
+#    THE BLOCKER IS `working_dir`, NOT PROVISIONING. Stated precisely because the
+#    obvious guess is wrong and would send the next reader after the wrong fix:
+#    this lane CAN provision siblings — qontinui-web's own manifest declares two
+#    `[[siblings]]` and its `backend-install-cloud-control` step consumes one — so
+#    a `[[siblings]] repo = "qontinui/qontinui-web"` entry here would materialise
+#    the tree fine. What it could not do is RUN in it.
+#    `manifest.rs::validate_working_dir` requires `working_dir` to be
+#    repo-relative and rejects any parent (`..`) component, so
+#    `working_dir = "../qontinui-web/frontend"` is a hard validation REJECTION of
+#    the whole manifest. Note the asymmetry that makes this specific rather than
+#    general: `backend-install-cloud-control` escapes to `../../` in its ARGV,
+#    which is unrestricted — but no argv can relocate a process's cwd, and every
+#    step of this job needs its cwd in the sibling.
+#
+#    ONE UNTESTED CANDIDATE, named so this gap is not mistaken for permanent:
+#    `npm --prefix <dir> ci` / `npm --prefix <dir> run <script>` sets npm's
+#    prefix and runs lifecycle scripts from there, and `..` in argv is legal on
+#    this lane. Whether that is faithful for all four steps has NOT been
+#    verified. Verify it before either closing this gap or declaring it closed
+#    for good; do not mirror the job on the strength of the guess.
+#
+# 3. NO [[tools]] ARE DECLARED, AND THAT IS NOT THE SAME AS "NEEDS NOTHING".
+#    The runner's tool registry (ci_node/tools.rs) provisions exactly one tool,
+#    cargo-nextest, which nothing here wants. Three of the four steps below are
+#    deliberately stdlib-only and assume nothing but a Python interpreter on
+#    PATH. The fourth (`python-lint`) needs ruff and mypy, which the registry
+#    cannot provision — so it declares the pip install as its own step, exactly
+#    as the Actions job does. Declaring a tool the registry does not know is a
+#    validation ERROR, so the honest move is to mirror the install rather than
+#    fake a [[tools]] entry.
+# ===========================================================================
+
+version = 1
+
+# NO [[siblings]] — and that is a checked statement, not an omission.
+#
+# ci.yml's `composed-typecheck` DOES check out qontinui-web, and this list still
+# does not declare it: no step below can run inside that tree (header item 4), so
+# provisioning it would materialise a multi-hundred-megabyte checkout that nothing
+# reads. Declare it in the same change that closes item 4, never before.
+#
+# boundary-guard.yml checks out nothing but this repo, and pyproject.toml
+# carries NO `path =` dependency: its own comment records the deliberate design,
+# that qontinui-web is consumed by an explicit `pip install -e ../qontinui-web/
+# backend` at install time rather than as a path-dep, precisely so no absolute
+# `file://` path is baked in. package.json names
+# `"@qontinui/web": "file:../qontinui-web/frontend"` as a PEER dependency, which
+# by definition the consumer supplies — and no gated step below resolves it.
+#
+# Provisioning qontinui-web here would therefore serve no step and diverge from
+# the Actions lane. (Note the arrow runs the other way in practice:
+# qontinui-web's own manifest declares THIS repo as a `[[siblings]]` entry,
+# because its backend gates do install it.)
+
+# NO [limits] TABLE, deliberately.
+#
+# CiLimits carries `cargo_build_jobs` and `test_threads`; every step below is a
+# single short-lived Python process, so neither knob binds anything here.
+# Omitting a limit means "size me from the host", which is the right answer when
+# the manifest author has no measurement to contribute.
+
+[[steps]]
+name = "no-coord-import"
+# boundary-guard.yml "cloud-control must not import qontinui-coord source".
+# Fails the build if this open, AGPL repo ever imports the closed qontinui-coord
+# service source — a licence-boundary invariant, which is why it is worth having
+# on both lanes rather than only on GitHub's.
+#
+# THE ONE DIVERGENCE, and it is spelling only: the workflow invokes `python3`,
+# this step invokes `python`. `python3` is not a standard executable name on
+# Windows — the CPython installer ships `python.exe` and the Store alias stub
+# for `python3` opens the Microsoft Store rather than running anything — and
+# this lane's whole premise is running on users' own desktop machines. Where
+# both names exist they resolve to the same interpreter. The script needs only
+# `>=3.12`-compatible stdlib (`re`, `sys`, `pathlib`) and its docstring
+# documents running it from the repo root, which is where a step with no
+# `working_dir` runs.
+command = ["python", "scripts/check_no_coord_import.py"]
+
+[[steps]]
+name = "frontend-imports"
+# ci.yml `repo-checks` step "frontend relative imports resolve".
+# Every RELATIVE import under frontend/src must point at a file that exists in
+# this repo. `@/...` specifiers are host-resolved by the consuming app and are
+# deliberately NOT checked. This gate exists because the carve-out that created
+# this repo left ten dangling relative imports behind — nothing compiles this
+# tree standalone, so nothing reported them.
+command = ["python", "scripts/check_frontend_imports.py"]
+
+[[steps]]
+name = "gate-self-tests"
+# ci.yml `repo-checks` step "gate self-tests".
+# Each checker above must pass a known-good fixture AND trip on a
+# deliberately-broken one — the same two-control standard this manifest's own
+# validation used. stdlib `unittest`, so no install step is needed.
+#
+# `-v` is dropped relative to the Actions step: it is output verbosity only,
+# never a pass/fail difference, and the executor captures stdout regardless.
+command = ["python", "-m", "unittest", "discover", "-s", "scripts", "-p", "test_*.py"]
+
+[[steps]]
+name = "install-gate-tooling"
+# ci.yml `python-lint` step "Install gate tooling".
+# Mirrored as a real step because ci_node/tools.rs cannot provision ruff or
+# mypy — see item 3 of the header.
+#
+# THE SPECIFIER USES `~=`, NOT `>=`, AND THAT IS FORCED BY THE VALIDATOR.
+# `>` is in manifest.rs::ARGV_BANNED_CHARS (with `&`, `|`, `<`, `^`, `"`, `%`,
+# NUL and the newline pair) — banned so the Windows `cmd.exe /C` respawn used
+# for `.cmd` shims can never see a live metacharacter. A `"ruff>=0.6"` token is
+# therefore a hard validation REJECTION of the whole manifest, not a warning.
+# `~=0.6` is the equivalent that survives it: compatible-release, so `>=0.6`
+# within the 0.x series. The Actions job was written with the same spelling
+# rather than `>=` so the two lanes stay literally identical — the divergence
+# budget is better spent on `python3` vs `python`, which cannot be avoided.
+command = ["python", "-m", "pip", "install", "--upgrade", "ruff~=0.6", "mypy~=1.11"]
+
+[[steps]]
+name = "ruff-check"
+# ci.yml `python-lint` step "Run ruff (linting)".
+command = ["python", "-m", "ruff", "check", "backend/", "scripts/"]
+
+[[steps]]
+name = "ruff-format"
+# ci.yml `python-lint` step "Run ruff format (formatting)".
+command = ["python", "-m", "ruff", "format", "--check", "backend/", "scripts/"]
+
+[[steps]]
+name = "mypy"
+# ci.yml `python-lint` step "Run mypy (type checking)".
+#
+# Runs WITHOUT installing this package's runtime deps, exactly as the Actions
+# job does — verified green both with and without them, which is what lets the
+# step stay sibling-free and therefore mirrorable on this lane at all.
+#
+# Invoked as `python -m ruff` / `python -m mypy` rather than the bare console
+# scripts: pip installs those into a Scripts/ or bin/ directory whose presence
+# on PATH is not guaranteed on a user's desktop, and this lane targets exactly
+# those machines. `-m` resolves through the interpreter that just installed
+# them, which is the only spelling guaranteed to work on both.
+command = ["python", "-m", "mypy", "backend/qontinui_cloud_control", "scripts"]

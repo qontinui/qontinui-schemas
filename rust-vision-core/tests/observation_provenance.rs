@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Every observation carries its provenance, and says whether it is an
 //! estimate or a deduction.
 //!
@@ -25,8 +26,9 @@
 
 use qontinui_vision_core::{
     analyzers, assertions, evaluate_assertion, AnalyzeInput, Analyzer, AnalyzerVerdict, Assertion,
-    AssertionOutcome, AssertionResult, Element, ElementSnapshot, EvalContext, Finding, Frame,
-    FrameSource, OcrBlockRef, Region, Rgb, Severity, TextMatchKind, TextTarget, WcagLevel,
+    AssertionOutcome, AssertionResult, Element, ElementMedia, ElementSnapshot, EvalContext,
+    Finding, Frame, FrameSource, MediaKind, ObjectFit, OcrBlockRef, Region, Rgb, Severity,
+    TextMatchKind, TextTarget, WcagLevel,
 };
 
 // ---------------------------------------------------------------- fixtures
@@ -60,22 +62,23 @@ fn snapshot(elements: Vec<Element>) -> ElementSnapshot {
     }
 }
 
-const ALL: [Analyzer; 5] = [
+const ALL: [Analyzer; 6] = [
     Analyzer::Layout,
     Analyzer::Typography,
     Analyzer::Color,
     Analyzer::Dynamic,
     Analyzer::Elements,
+    Analyzer::Image,
 ];
 
 // ------------------------------------------------- 1. attribution (phase 3)
 
 /// Every finding from a real run names its analyzer. The stamp lives in the
-/// dispatcher, so this is one assertion over all five rather than five
+/// dispatcher, so this is one assertion over all six rather than six
 /// assertions each analyzer could individually have forgotten.
 #[test]
 fn every_finding_from_a_real_run_names_its_analyzer() {
-    // The fixture has to make ALL FIVE speak, or the per-analyzer guard at
+    // The fixture has to make ALL SIX speak, or the per-analyzer guard at
     // the end fails loudly rather than letting a silent zero pass for
     // coverage. Overlapping bboxes feed `layout`; five distinct font
     // families trip `typography`'s >3 drift heuristic; undeclared colours
@@ -96,6 +99,20 @@ fn every_finding_from_a_real_run_names_its_analyzer() {
     let mut tiny = el("tiny", 150);
     tiny.bbox = Some(region(150, 0, 16, 16));
     elements.push(tiny);
+    // `image` speaks on a media element over the flat frame: its crop is a
+    // low-entropy fill, which is an Info `image_placeholder` finding.
+    elements.push(Element {
+        id: "img".into(),
+        // Slot-sized (both sides >= 48 CSS px): a smaller flat image is a
+        // swatch, not a placeholder.
+        bbox: Some(region(150, 5, 50, 50)),
+        // `fill` paints the whole box, so the box's pixels are the image's.
+        media: Some(ElementMedia {
+            object_fit: Some(ObjectFit::Fill),
+            ..ElementMedia::new(MediaKind::Img)
+        }),
+        ..Default::default()
+    });
     let snap = snapshot(elements);
     let frame = solid_frame(200, 60, [0xC8, 0xC8, 0xC8, 0xff]);
     let prior = solid_frame(200, 60, [0x10, 0x10, 0x10, 0xff]);
@@ -106,6 +123,8 @@ fn every_finding_from_a_real_run_names_its_analyzer() {
             frame: Some(&frame),
             snapshot: Some(&snap),
             prior_frame: Some(&prior),
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         };
         let result = analyzers::run(a, &input);
         for f in &result.findings {
@@ -146,6 +165,8 @@ fn a_blocked_verdict_still_carries_its_provenance() {
             frame: None,
             snapshot: None,
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         };
         let result = analyzers::run(a, &input);
 
@@ -180,8 +201,9 @@ fn a_hand_built_finding_is_unattributed_rather_than_mislabelled() {
 
 // ------------------------------------------------ 2. qualification (phase 3)
 
-/// The pixel-sampled contrast arm is the one estimated analyzer input in the
-/// crate, and it is the one that carries a number.
+/// The pixel-sampled contrast arm is `color`'s one estimated input, and it is
+/// the one there that carries a number. (`image`'s pixel-read values are the
+/// crate's other estimates; `tests/image_corpus.rs` pins their confidence.)
 #[test]
 fn a_pixel_sampled_contrast_finding_carries_a_confidence() {
     // No declared colours: the analyzer must sample the frame. A flat frame
@@ -199,6 +221,8 @@ fn a_pixel_sampled_contrast_finding_carries_a_confidence() {
             frame: Some(&frame),
             snapshot: Some(&snap),
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
 
@@ -242,6 +266,8 @@ fn a_declared_contrast_finding_states_that_it_is_a_deduction() {
             frame: Some(&frame),
             snapshot: Some(&snap),
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
 
@@ -271,6 +297,8 @@ fn geometry_findings_state_that_they_are_deductions() {
             frame: None,
             snapshot: Some(&snap),
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     assert!(
@@ -286,7 +314,9 @@ fn geometry_findings_state_that_they_are_deductions() {
     }
 }
 
-/// The OCR fallback is the one estimated input in the assertion evaluator.
+/// The OCR fallback is the one estimated input among the assertions that read
+/// no frame (the L1 image assertions, which do, are pinned in
+/// `tests/image_corpus.rs`).
 /// It reports the LOWEST contributing block's confidence: the aggregate
 /// string is only as good as its worst-read fragment.
 #[test]
@@ -578,6 +608,8 @@ fn finding_round_trips_its_analyzer_and_confidence() {
             frame: None,
             snapshot: None,
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     // Sanity: the dispatcher's own blocked finding is attributed, and that
@@ -612,6 +644,8 @@ fn an_analyzer_result_round_trips_with_its_findings_attributed() {
             frame: None,
             snapshot: Some(&snap),
             prior_frame: None,
+            text_hidden_frame: None,
+            text_hidden_ids: None,
         },
     );
     let json = serde_json::to_string(&result).unwrap();

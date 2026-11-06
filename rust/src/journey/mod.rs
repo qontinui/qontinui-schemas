@@ -57,15 +57,43 @@
 //!   unslugged path leaking in; a slugged path (`/search/secret` →
 //!   `search-secret`) passes it.
 //!
-//! PRIVACY: the ledger's `timeline` column is deliberately NOT represented
-//! here. Phase 4 of the plan owns it and must add it as a closed
-//! (`deny_unknown_fields`) type with no value/text slot — never as an open
-//! `serde_json::Value`, which would make a typed value representable again.
+//! ## Queries
+//!
+//! [`build_graph`] derives the graph from ledger rows, and [`reachable_from`],
+//! [`steps_to`], [`dead_ends`], [`requires_prior_knowledge`] and [`frontier`]
+//! read it. All
+//! are pure, I/O-free and deterministic — see the `query` module.
+//!
+//! PRIVACY: the ledger's `timeline` column is NOT a field of
+//! [`JourneyEdgeObservation`]. Its type is `qontinui-vision-core`'s
+//! `ChangeTimeline`, which this crate cannot name (it does not depend on
+//! vision-core, which pulls `image`), and the ONLY value a producer may write
+//! there is `ChangeTimeline::for_ledger()` — the redacted projection that
+//! drops every SDK prose `summary`, every element id (reduced to its count),
+//! every element fingerprint (`shiftedFingerprints`, animation
+//! `targetElement`), the page-changed URL and every network pathname, and
+//! keeps only allow-listed `provenance.source` keys. Re-serializing
+//! through that typed mirror drops any key it does not model, so the column
+//! has no open value/text slot. Readers select the column explicitly and
+//! parse it as `ChangeTimeline`; `qontinui_vision_core::edge_timing` reduces
+//! one edge's timelines to a distribution.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::ir::IrEffect;
+
+mod query;
+
+pub use query::{
+    build_graph, dead_ends, frontier, reachable_from, requires_prior_knowledge, steps_to,
+    trusted_edge_row, JourneyArrivalDoubt, JourneyCoverage, JourneyDeadEnd, JourneyDeadEnds,
+    JourneyFilter, JourneyFrontier, JourneyGraph, JourneyGraphEdge, JourneyGraphNode,
+    JourneyPriorKnowledge, JourneyPriorKnowledgeNode, JourneyPriorKnowledgeUnsettledNode,
+    JourneyReachable, JourneyReachedNode, JourneyRejectedRow, JourneyRejectedRowKind,
+    JourneySearchFrontier, JourneySearchFrontierNode, JourneySteps, JourneyUnexploredNode,
+    JourneyUnmeasuredDepartures,
+};
 
 /// A violation of the edge-observation contract that the Rust type system
 /// alone cannot rule out.
@@ -84,10 +112,14 @@ pub enum JourneyContractError {
         /// The outcome the observation carried.
         outcome: EdgeOutcome,
     },
-    /// A [`JourneyNode`] is not in the canonical form [`JourneyNode::new`]
-    /// produces (state ids unsorted or duplicated, or `modelled` disagreeing
-    /// with its derivation). Two non-canonical nodes for one configuration
-    /// would split a graph vertex in two.
+    /// A [`JourneyNode`] breaks the node contract: it is not in the
+    /// canonical form [`JourneyNode::new`] produces (state ids unsorted or
+    /// duplicated, or `modelled` disagreeing with its derivation), its
+    /// [`JourneyNode::key`] would not be injective (a `specId` containing `#`
+    /// or starting `unmodelled:`, a state id containing `,`), or its
+    /// `pageLabel` contains `/` (the tripwire for a URL path leaking in).
+    /// Two non-canonical nodes for one configuration would split a graph
+    /// vertex in two; a non-injective key would merge two.
     #[error("{which} is not canonical: {reason}")]
     NonCanonicalNode {
         /// Which node: `"fromNode"`, `"toNode"` or `"node"`.
@@ -105,6 +137,27 @@ pub enum JourneyContractError {
         from_key: String,
         /// `toNode.key()`.
         to_key: String,
+    },
+    /// A `navigation` trigger names an activated affordance — a
+    /// `targetFingerprint`, `targetRole` or `declaredEffect`, or a
+    /// `navigationTrigger` of `affordance`. An
+    /// agent-driven navigation activates none, and the arrivals
+    /// `requires_prior_knowledge` reads are told apart by exactly that.
+    #[error("chokePoint is navigation but {reason}; a navigation activates no affordance")]
+    NavigationNamesAffordance {
+        /// What is wrong with the trigger.
+        reason: &'static str,
+    },
+    /// A trigger recorded at an ACTION choke point (anything but
+    /// [`ChokePoint::Navigation`]) claims a `navigationTrigger` other than
+    /// `affordance`. Every action choke point activates an affordance, so
+    /// such a row would hide a click as a typed URL or a back button.
+    #[error("chokePoint is {choke_point} but navigationTrigger is {navigation_trigger}; an action choke point activates an affordance")]
+    ActionChokePointNotAffordance {
+        /// The choke point's wire string.
+        choke_point: &'static str,
+        /// The claimed trigger's wire string.
+        navigation_trigger: &'static str,
     },
     /// A frontier row's `nodeKey` is not `node.key()`.
     #[error("nodeKey {node_key:?} does not match node.key() {expected:?}")]
@@ -317,20 +370,37 @@ impl NavigationTriggerKind {
 /// Which runner action choke point captured the edge. Every transport an
 /// agent can act through is one of these; an edge from a transport not listed
 /// here is a producer defect, not a new variant to tolerate.
+///
+/// A variant names the action's KIND. Every variant except `ElementAction` /
+/// `SdkElementAction` covers the SDK and the control transports alike: the
+/// transport is not recorded for those kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[schemars(inline)]
 #[serde(rename_all = "snake_case")]
 pub enum ChokePoint {
     /// `/ui-bridge/control/element/{id}/action`.
     ElementAction,
-    /// `/ui-bridge/control/batch-actions`, `/control/actions/batch`.
+    /// One trigger for a whole batch: the control batch routes
+    /// (`/ui-bridge/control/batch-actions`, `/control/actions/batch`), the SDK
+    /// batch routes, and compound actions (action plans, transitions,
+    /// `ai/execute`, `fill-form`).
     BatchAction,
-    /// `/control/component/{id}/action/{action_id}`.
+    /// A component action: `/control/component/{id}/action/{action_id}` and
+    /// its SDK twin.
     ComponentAction,
     /// The SDK/WebSocket element action.
     SdkElementAction,
     /// Any execute-with-diff route (runner routes and the SDK twin).
     ExecuteWithDiff,
+    /// An agent-driven navigation, SDK and control alike: `page/navigate` /
+    /// `page/navigate-to`, back/forward, refresh and hard refresh, tab
+    /// switches and `navigate_tab`, and gated-flow `view:` navigation. No
+    /// affordance was activated, so the trigger carries no `targetFingerprint`,
+    /// `targetRole` or `declaredEffect`, and its `navigationTrigger` is never
+    /// `affordance` (`push`/`replace` for a navigate, `pop` for back/forward,
+    /// `initial` for a reload). [`JourneyTrigger::validate`] enforces this.
+    /// These are the arrivals `requires_prior_knowledge` reads.
+    Navigation,
 }
 
 impl ChokePoint {
@@ -342,6 +412,7 @@ impl ChokePoint {
             Self::ComponentAction => "component_action",
             Self::SdkElementAction => "sdk_element_action",
             Self::ExecuteWithDiff => "execute_with_diff",
+            Self::Navigation => "navigation",
         }
     }
 }
@@ -369,6 +440,47 @@ pub struct JourneyTrigger {
     pub navigation_trigger: NavigationTriggerKind,
     /// Which runner choke point captured it.
     pub choke_point: ChokePoint,
+}
+
+impl JourneyTrigger {
+    /// Check the invariants the type cannot express, in both directions:
+    /// a [`ChokePoint::Navigation`] trigger names no affordance — no
+    /// `targetFingerprint`, `targetRole` or `declaredEffect`, and a
+    /// `navigationTrigger` other than `affordance`; and every OTHER choke
+    /// point (an action) has `navigationTrigger == affordance`.
+    /// [`JourneyEdgeObservation::validate`] calls this.
+    pub fn validate(&self) -> Result<(), JourneyContractError> {
+        if self.choke_point != ChokePoint::Navigation {
+            if self.navigation_trigger != NavigationTriggerKind::Affordance {
+                return Err(JourneyContractError::ActionChokePointNotAffordance {
+                    choke_point: self.choke_point.as_str(),
+                    navigation_trigger: self.navigation_trigger.as_str(),
+                });
+            }
+            return Ok(());
+        }
+        if self.target_fingerprint.is_some() {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "targetFingerprint is present",
+            });
+        }
+        if self.target_role.is_some() {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "targetRole is present",
+            });
+        }
+        if self.declared_effect.is_some() {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "declaredEffect is present",
+            });
+        }
+        if self.navigation_trigger == NavigationTriggerKind::Affordance {
+            return Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "navigationTrigger is affordance",
+            });
+        }
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -439,8 +551,9 @@ impl EdgeOutcome {
 /// [`EdgeOutcome::ToNodeUnobserved`]; `no_change` joins nodes with equal
 /// keys (a `changed` edge may also join equal keys).
 ///
-/// The ledger's `timeline` column is deliberately unrepresented until
-/// Phase 4; readers select explicit columns rather than `*`.
+/// The ledger's `timeline` column is not a field here: it holds a
+/// `qontinui-vision-core` `ChangeTimeline::for_ledger()` projection (see the
+/// module's PRIVACY note); readers select explicit columns rather than `*`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -475,7 +588,7 @@ pub struct JourneyEdgeObservation {
     /// How the edge closed.
     pub outcome: EdgeOutcome,
     // PRIVACY: the `timeline` column is not represented here — see the
-    // module doc. Phase 4 adds it as a closed type with no value slot.
+    // module doc. It holds vision-core's `ChangeTimeline::for_ledger()`.
     /// When the row was withdrawn (ISO 8601); `None` = live.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidated_at: Option<String>,
@@ -493,8 +606,9 @@ pub struct JourneyEdgeObservation {
 impl JourneyEdgeObservation {
     /// Check the contract invariants the type cannot express: `toNode` is
     /// null iff `outcome` is `to_node_unobserved`; both nodes are in
-    /// canonical form; and a `no_change` edge joins nodes with equal
-    /// [`JourneyNode::key`]s. A producer calls this before writing a row; a
+    /// canonical form; a `no_change` edge joins nodes with equal
+    /// [`JourneyNode::key`]s; and the trigger passes
+    /// [`JourneyTrigger::validate`]. A producer calls this before writing a row; a
     /// reader may call it on a row it did not write.
     pub fn validate(&self) -> Result<(), JourneyContractError> {
         let unobserved = self.outcome == EdgeOutcome::ToNodeUnobserved;
@@ -514,6 +628,7 @@ impl JourneyEdgeObservation {
             _ => {}
         }
         self.from_node.validate_as("fromNode")?;
+        self.trigger.validate()?;
         if let Some(to) = &self.to_node {
             to.validate_as("toNode")?;
             if self.outcome == EdgeOutcome::NoChange {
@@ -558,6 +673,19 @@ pub enum FrontierReason {
 }
 
 impl FrontierReason {
+    /// Every member, in declaration order — the closed set the
+    /// `journey_frontier.reason` CHECK lists. Query results report a count
+    /// for each, zeros included, so a reason with no open entry reads as a
+    /// measured zero rather than a missing key.
+    pub const ALL: [FrontierReason; 6] = [
+        Self::NotYetActivated,
+        Self::EffectUndeclared,
+        Self::EffectWrite,
+        Self::EffectDestructive,
+        Self::BudgetExhausted,
+        Self::ActivationFailed,
+    ];
+
     /// The wire string.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -952,6 +1080,93 @@ mod tests {
         ));
     }
 
+    fn navigation_trigger() -> JourneyTrigger {
+        JourneyTrigger {
+            action_type: "navigate".into(),
+            target_fingerprint: None,
+            target_role: None,
+            declared_effect: None,
+            navigation_trigger: NavigationTriggerKind::Push,
+            choke_point: ChokePoint::Navigation,
+        }
+    }
+
+    #[test]
+    fn navigation_trigger_accepts_every_non_affordance_kind() {
+        use NavigationTriggerKind::*;
+        for kind in [Push, Replace, Pop, Initial, Hash] {
+            let t = JourneyTrigger {
+                navigation_trigger: kind,
+                ..navigation_trigger()
+            };
+            assert_eq!(t.validate(), Ok(()), "{kind:?}");
+        }
+        let mut e = edge(Some(other_node()), EdgeOutcome::Changed);
+        e.trigger = navigation_trigger();
+        assert_eq!(e.validate(), Ok(()));
+    }
+
+    #[test]
+    fn navigation_trigger_rejects_a_target_fingerprint() {
+        let t = JourneyTrigger {
+            target_fingerprint: Some("fp-1".into()),
+            ..navigation_trigger()
+        };
+        let want = Err(JourneyContractError::NavigationNamesAffordance {
+            reason: "targetFingerprint is present",
+        });
+        assert_eq!(t.validate(), want);
+        let mut e = edge(Some(other_node()), EdgeOutcome::Changed);
+        e.trigger = t;
+        assert_eq!(e.validate(), want);
+    }
+
+    #[test]
+    fn navigation_trigger_rejects_a_target_role_or_declared_effect() {
+        let t = JourneyTrigger {
+            target_role: Some("link".into()),
+            ..navigation_trigger()
+        };
+        assert_eq!(
+            t.validate(),
+            Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "targetRole is present",
+            })
+        );
+        let t = JourneyTrigger {
+            declared_effect: Some(IrEffect::Read),
+            ..navigation_trigger()
+        };
+        assert_eq!(
+            t.validate(),
+            Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "declaredEffect is present",
+            })
+        );
+    }
+
+    #[test]
+    fn navigation_trigger_rejects_affordance_kind() {
+        let t = JourneyTrigger {
+            navigation_trigger: NavigationTriggerKind::Affordance,
+            ..navigation_trigger()
+        };
+        assert_eq!(
+            t.validate(),
+            Err(JourneyContractError::NavigationNamesAffordance {
+                reason: "navigationTrigger is affordance",
+            })
+        );
+    }
+
+    #[test]
+    fn non_navigation_triggers_are_unconstrained_here() {
+        // The fixture trigger is an element action with a fingerprint, role,
+        // effect and an affordance kind — all of which a navigation may not
+        // carry.
+        assert_eq!(trigger().validate(), Ok(()));
+    }
+
     // --- Enum wire strings --------------------------------------------------
 
     fn assert_wire<T>(pairs: &[(T, &str)], as_str: fn(T) -> &'static str)
@@ -991,6 +1206,7 @@ mod tests {
                 (ComponentAction, "component_action"),
                 (SdkElementAction, "sdk_element_action"),
                 (ExecuteWithDiff, "execute_with_diff"),
+                (Navigation, "navigation"),
             ],
             ChokePoint::as_str,
         );
@@ -1037,6 +1253,17 @@ mod tests {
                 (ActivationFailed, "activation_failed"),
             ],
             FrontierReason::as_str,
+        );
+        assert_eq!(
+            FrontierReason::ALL.map(FrontierReason::as_str),
+            [
+                "not_yet_activated",
+                "effect_undeclared",
+                "effect_write",
+                "effect_destructive",
+                "budget_exhausted",
+                "activation_failed",
+            ]
         );
     }
 

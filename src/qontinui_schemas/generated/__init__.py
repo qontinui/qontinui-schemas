@@ -57,15 +57,19 @@ from .per_type.batch_compute_embedding_request import BatchComputeEmbeddingReque
 from .per_type.batch_compute_embedding_response import BatchComputeEmbeddingResponse
 from .per_type.batch_embedding_result import BatchEmbeddingResult
 from .per_type.between_iterations import BetweenIterations
+from .per_type.bound_kind import BoundKind
+from .per_type.bounded_read_meta import BoundedReadMeta
 from .per_type.bounding_box import BoundingBox
 from .per_type.bridge_fingerprint import BridgeFingerprint
 from .per_type.build_phase_config import BuildPhaseConfig
 from .per_type.builtin_override_proposal import BuiltinOverrideProposal
+from .per_type.cache_provenance import CacheProvenance
 from .per_type.candidate_miss import CandidateMiss
 from .per_type.canonical_step import CanonicalStep
 from .per_type.canvas_panel import CanvasPanel
 from .per_type.catch_up_policy import CatchUpPolicy
 from .per_type.category import Category
+from .per_type.change_timeline import ChangeTimeline
 from .per_type.check_issue_detail import CheckIssueDetail
 from .per_type.check_type import CheckType
 from .per_type.code_execution_step import CodeExecutionStep
@@ -106,10 +110,12 @@ from .per_type.create_scheduled_task_request import CreateScheduledTaskRequest
 from .per_type.create_task_run_request import CreateTaskRunRequest
 from .per_type.criterion_override import CriterionOverride
 from .per_type.criterion_type import CriterionType
+from .per_type.criterion_verification import CriterionVerification
 from .per_type.dag_approval_step import DagApprovalStep
 from .per_type.dag_cancel_step import DagCancelStep
 from .per_type.dag_loop_step import DagLoopStep
 from .per_type.decomposer_config import DecomposerConfig
+from .per_type.detected_animation import DetectedAnimation
 from .per_type.dev_seed_finding_payload import DevSeedFindingPayload
 from .per_type.device_branch_summary import DeviceBranchSummary
 from .per_type.diagnose_phase_config import DiagnosePhaseConfig
@@ -128,6 +134,8 @@ from .per_type.display_node import DisplayNode
 from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
 from .per_type.domain_verification_result import DomainVerificationResult
+from .per_type.ears_pattern import EarsPattern
+from .per_type.edge_timing import EdgeTiming
 from .per_type.effect_check_step import EffectCheckStep
 from .per_type.element_action_request import ElementActionRequest
 from .per_type.element_bbox import ElementBbox
@@ -172,8 +180,10 @@ from .per_type.exit_check_result import ExitCheckResult
 from .per_type.exit_strategy import ExitStrategy
 from .per_type.export_result import ExportResult
 from .per_type.extend_iterations_request import ExtendIterationsRequest
+from .per_type.external_ref import ExternalRef
 from .per_type.field_diff import FieldDiff
 from .per_type.file_change import FileChange
+from .per_type.filter_narrowing import FilterNarrowing
 from .per_type.finding import Finding
 from .per_type.finding_action_type import FindingActionType
 from .per_type.finding_batch_create import FindingBatchCreate
@@ -190,6 +200,7 @@ from .per_type.finding_update import FindingUpdate
 from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
+from .per_type.frontier_entry import FrontierEntry
 from .per_type.full_runner_step import FullRunnerStep
 from .per_type.functional_spec import FunctionalSpec
 from .per_type.gui_element_chunk import GUIElementChunk
@@ -216,10 +227,12 @@ from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
+from .per_type.image_slot_spec import ImageSlotSpec
 from .per_type.implement_fixes_config import ImplementFixesConfig
 from .per_type.individual_check_result import IndividualCheckResult
 from .per_type.initial_state_ref import InitialStateRef
 from .per_type.initial_states_source import InitialStatesSource
+from .per_type.interface_mapping_frontmatter import InterfaceMappingFrontmatter
 from .per_type.ir_assertion import IrAssertion
 from .per_type.ir_assertion_target import IrAssertionTarget
 from .per_type.ir_cross_ref import IrCrossRef
@@ -243,6 +256,24 @@ from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
 from .per_type.job_summary import JobSummary
+from .per_type.journey_arrival_doubt import JourneyArrivalDoubt
+from .per_type.journey_coverage import JourneyCoverage
+from .per_type.journey_dead_ends import JourneyDeadEnds
+from .per_type.journey_edge_observation import JourneyEdgeObservation
+from .per_type.journey_edge_timing_answer import JourneyEdgeTimingAnswer
+from .per_type.journey_filter import JourneyFilter
+from .per_type.journey_frontier import JourneyFrontier
+from .per_type.journey_graph import JourneyGraph
+from .per_type.journey_graph_edge import JourneyGraphEdge
+from .per_type.journey_ledger_health import JourneyLedgerHealth
+from .per_type.journey_node import JourneyNode
+from .per_type.journey_prior_knowledge import JourneyPriorKnowledge
+from .per_type.journey_reachable import JourneyReachable
+from .per_type.journey_search_frontier import JourneySearchFrontier
+from .per_type.journey_search_frontier_node import JourneySearchFrontierNode
+from .per_type.journey_steps import JourneySteps
+from .per_type.journey_trigger import JourneyTrigger
+from .per_type.journey_unmeasured_departures import JourneyUnmeasuredDepartures
 from .per_type.llm_cost_summary import LLMCostSummary
 from .per_type.llm_metrics import LLMMetrics
 from .per_type.legacy_assertion import LegacyAssertion
@@ -256,6 +287,8 @@ from .per_type.legacy_transition import LegacyTransition
 from .per_type.log_source_selection import LogSourceSelection
 from .per_type.loop_instance_status import LoopInstanceStatus
 from .per_type.loop_phase import LoopPhase
+from .per_type.managed_by import ManagedBy
+from .per_type.mapping_row import MappingRow
 from .per_type.match_adjustment import MatchAdjustment
 from .per_type.match_location import MatchLocation
 from .per_type.match_method import MatchMethod
@@ -278,6 +311,7 @@ from .per_type.memory_summary import MemorySummary
 from .per_type.memory_upsert_request import MemoryUpsertRequest
 from .per_type.memory_upsert_response import MemoryUpsertResponse
 from .per_type.memory_with_history import MemoryWithHistory
+from .per_type.metric_distribution import MetricDistribution
 from .per_type.miss_reason import MissReason
 from .per_type.model_cost_breakdown import ModelCostBreakdown
 from .per_type.model_override_config import ModelOverrideConfig
@@ -296,6 +330,9 @@ from .per_type.next_task_info import NextTaskInfo
 from .per_type.node_metadata import NodeMetadata
 from .per_type.node_status import NodeStatus
 from .per_type.node_type import NodeType
+from .per_type.observation import Observation
+from .per_type.observation_coverage import ObservationCoverage
+from .per_type.observation_status import ObservationStatus
 from .per_type.ocr_engine import OcrEngine
 from .per_type.ol_config import OlConfig
 from .per_type.operation import Operation
@@ -328,11 +365,13 @@ from .per_type.process_config import ProcessConfig
 from .per_type.process_state import ProcessState
 from .per_type.process_status import ProcessStatus
 from .per_type.process_status_lite import ProcessStatusLite
+from .per_type.producer import Producer
 from .per_type.profile import Profile
 from .per_type.project_snapshot import ProjectSnapshot
 from .per_type.prompt_step import PromptStep
 from .per_type.prompt_step_phase import PromptStepPhase
 from .per_type.proposal_status import ProposalStatus
+from .per_type.provenance import Provenance
 from .per_type.provenance_mix import ProvenanceMix
 from .per_type.rag_dashboard_stats import RAGDashboardStats
 from .per_type.rag_completion_event import RagCompletionEvent
@@ -341,6 +380,18 @@ from .per_type.rag_progress_event import RagProgressEvent
 from .per_type.read_config_response import ReadConfigResponse
 from .per_type.recommended_state import RecommendedState
 from .per_type.record_git_op_request import RecordGitOpRequest
+from .per_type.recurring_agent_dispatch_role import RecurringAgentDispatchRole
+from .per_type.recurring_agent_excluded_value import RecurringAgentExcludedValue
+from .per_type.recurring_agent_os import RecurringAgentOs
+from .per_type.recurring_agent_override import RecurringAgentOverride
+from .per_type.recurring_agent_param_def import RecurringAgentParamDef
+from .per_type.recurring_agent_param_kind import RecurringAgentParamKind
+from .per_type.recurring_agent_param_schema import RecurringAgentParamSchema
+from .per_type.recurring_agent_spec import RecurringAgentSpec
+from .per_type.recurring_agent_state import RecurringAgentState
+from .per_type.recurring_agent_status import RecurringAgentStatus
+from .per_type.recurring_agent_status_report import RecurringAgentStatusReport
+from .per_type.recurring_agent_target import RecurringAgentTarget
 from .per_type.reflection_fix_output import ReflectionFixOutput
 from .per_type.refusal import Refusal
 from .per_type.refusal_code import RefusalCode
@@ -350,6 +401,8 @@ from .per_type.register_app_request import RegisterAppRequest
 from .per_type.relationship import Relationship
 from .per_type.repository_inactive_condition import RepositoryInactiveCondition
 from .per_type.repository_watch import RepositoryWatch
+from .per_type.request_frontmatter import RequestFrontmatter
+from .per_type.requirement_frontmatter import RequirementFrontmatter
 from .per_type.resolved_initial_states import ResolvedInitialStates
 from .per_type.resolved_initial_states_result import ResolvedInitialStatesResult
 from .per_type.resource_limits import ResourceLimits
@@ -402,6 +455,9 @@ from .per_type.semantic_search_request import SemanticSearchRequest
 from .per_type.semantic_search_response import SemanticSearchResponse
 from .per_type.session_lite import SessionLite
 from .per_type.session_source import SessionSource
+from .per_type.source_citation import SourceCitation
+from .per_type.source_citation_kind import SourceCitationKind
+from .per_type.spec_acceptance_criterion import SpecAcceptanceCriterion
 from .per_type.spec_api_event import SpecApiEvent
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
@@ -409,6 +465,8 @@ from .per_type.spec_check_result import SpecCheckResult
 from .per_type.spec_check_step import SpecCheckStep
 from .per_type.spec_check_step_config import SpecCheckStepConfig
 from .per_type.spec_check_summary import SpecCheckSummary
+from .per_type.spec_frontmatter import SpecFrontmatter
+from .per_type.spec_language import SpecLanguage
 from .per_type.spec_provenance import SpecProvenance
 from .per_type.spec_section import SpecSection
 from .per_type.spec_target import SpecTarget
@@ -444,6 +502,7 @@ from .per_type.state_node_data import StateNodeData
 from .per_type.states_response import StatesResponse
 from .per_type.stdio_config import StdioConfig
 from .per_type.step_execution_config import StepExecutionConfig
+from .per_type.story_frontmatter import StoryFrontmatter
 from .per_type.structured_finding import StructuredFinding
 from .per_type.structured_override import StructuredOverride
 from .per_type.structured_signal import StructuredSignal
@@ -472,6 +531,7 @@ from .per_type.task_run_session import TaskRunSession
 from .per_type.task_run_status import TaskRunStatus
 from .per_type.task_run_update import TaskRunUpdate
 from .per_type.task_type import TaskType
+from .per_type.template_ref import TemplateRef
 from .per_type.terminal_exit_event import TerminalExitEvent
 from .per_type.terminal_info import TerminalInfo
 from .per_type.terminal_output_event import TerminalOutputEvent
@@ -522,6 +582,9 @@ from .per_type.ui_bridge_step_phase import UiBridgeStepPhase
 from .per_type.ui_bridge_visual_assertion_step import UiBridgeVisualAssertionStep
 from .per_type.unified_step import UnifiedStep
 from .per_type.unified_workflow import UnifiedWorkflow
+from .per_type.unknown_code import UnknownCode
+from .per_type.unknown_info import UnknownInfo
+from .per_type.unmeasured_dimension import UnmeasuredDimension
 from .per_type.update_app_request import UpdateAppRequest
 from .per_type.update_mcp_server_input import UpdateMcpServerInput
 from .per_type.update_ol_config_request import UpdateOlConfigRequest
@@ -623,15 +686,19 @@ __all__ = [
     "BatchComputeEmbeddingResponse",
     "BatchEmbeddingResult",
     "BetweenIterations",
+    "BoundKind",
+    "BoundedReadMeta",
     "BoundingBox",
     "BridgeFingerprint",
     "BuildPhaseConfig",
     "BuiltinOverrideProposal",
+    "CacheProvenance",
     "CandidateMiss",
     "CanonicalStep",
     "CanvasPanel",
     "CatchUpPolicy",
     "Category",
+    "ChangeTimeline",
     "CheckIssueDetail",
     "CheckType",
     "CodeExecutionStep",
@@ -672,10 +739,12 @@ __all__ = [
     "CreateTaskRunRequest",
     "CriterionOverride",
     "CriterionType",
+    "CriterionVerification",
     "DagApprovalStep",
     "DagCancelStep",
     "DagLoopStep",
     "DecomposerConfig",
+    "DetectedAnimation",
     "DevSeedFindingPayload",
     "DeviceBranchSummary",
     "DiagnosePhaseConfig",
@@ -694,6 +763,8 @@ __all__ = [
     "DomainAssignment",
     "DomainKnowledge",
     "DomainVerificationResult",
+    "EarsPattern",
+    "EdgeTiming",
     "EffectCheckStep",
     "ElementActionRequest",
     "ElementBbox",
@@ -738,8 +809,10 @@ __all__ = [
     "ExitStrategy",
     "ExportResult",
     "ExtendIterationsRequest",
+    "ExternalRef",
     "FieldDiff",
     "FileChange",
+    "FilterNarrowing",
     "Finding",
     "FindingActionType",
     "FindingBatchCreate",
@@ -756,6 +829,7 @@ __all__ = [
     "FindingUserInput",
     "FindingsSummary",
     "FlowEvent",
+    "FrontierEntry",
     "FullRunnerStep",
     "FunctionalSpec",
     "GUIElementChunk",
@@ -782,10 +856,12 @@ __all__ = [
     "HttpConfig",
     "HttpMethod",
     "IdleCondition",
+    "ImageSlotSpec",
     "ImplementFixesConfig",
     "IndividualCheckResult",
     "InitialStateRef",
     "InitialStatesSource",
+    "InterfaceMappingFrontmatter",
     "IrAssertion",
     "IrAssertionTarget",
     "IrCrossRef",
@@ -809,6 +885,24 @@ __all__ = [
     "JobListResponse",
     "JobStatus",
     "JobSummary",
+    "JourneyArrivalDoubt",
+    "JourneyCoverage",
+    "JourneyDeadEnds",
+    "JourneyEdgeObservation",
+    "JourneyEdgeTimingAnswer",
+    "JourneyFilter",
+    "JourneyFrontier",
+    "JourneyGraph",
+    "JourneyGraphEdge",
+    "JourneyLedgerHealth",
+    "JourneyNode",
+    "JourneyPriorKnowledge",
+    "JourneyReachable",
+    "JourneySearchFrontier",
+    "JourneySearchFrontierNode",
+    "JourneySteps",
+    "JourneyTrigger",
+    "JourneyUnmeasuredDepartures",
     "LLMCostSummary",
     "LLMMetrics",
     "LegacyAssertion",
@@ -822,6 +916,8 @@ __all__ = [
     "LogSourceSelection",
     "LoopInstanceStatus",
     "LoopPhase",
+    "ManagedBy",
+    "MappingRow",
     "MatchAdjustment",
     "MatchLocation",
     "MatchMethod",
@@ -844,6 +940,7 @@ __all__ = [
     "MemoryUpsertRequest",
     "MemoryUpsertResponse",
     "MemoryWithHistory",
+    "MetricDistribution",
     "MissReason",
     "ModelCostBreakdown",
     "ModelOverrideConfig",
@@ -862,6 +959,9 @@ __all__ = [
     "NodeMetadata",
     "NodeStatus",
     "NodeType",
+    "Observation",
+    "ObservationCoverage",
+    "ObservationStatus",
     "OcrEngine",
     "OlConfig",
     "Operation",
@@ -894,11 +994,13 @@ __all__ = [
     "ProcessState",
     "ProcessStatus",
     "ProcessStatusLite",
+    "Producer",
     "Profile",
     "ProjectSnapshot",
     "PromptStep",
     "PromptStepPhase",
     "ProposalStatus",
+    "Provenance",
     "ProvenanceMix",
     "RAGDashboardStats",
     "RagCompletionEvent",
@@ -907,6 +1009,18 @@ __all__ = [
     "ReadConfigResponse",
     "RecommendedState",
     "RecordGitOpRequest",
+    "RecurringAgentDispatchRole",
+    "RecurringAgentExcludedValue",
+    "RecurringAgentOs",
+    "RecurringAgentOverride",
+    "RecurringAgentParamDef",
+    "RecurringAgentParamKind",
+    "RecurringAgentParamSchema",
+    "RecurringAgentSpec",
+    "RecurringAgentState",
+    "RecurringAgentStatus",
+    "RecurringAgentStatusReport",
+    "RecurringAgentTarget",
     "ReflectionFixOutput",
     "Refusal",
     "RefusalCode",
@@ -916,6 +1030,8 @@ __all__ = [
     "Relationship",
     "RepositoryInactiveCondition",
     "RepositoryWatch",
+    "RequestFrontmatter",
+    "RequirementFrontmatter",
     "ResolvedInitialStates",
     "ResolvedInitialStatesResult",
     "ResourceLimits",
@@ -968,6 +1084,9 @@ __all__ = [
     "SemanticSearchResponse",
     "SessionLite",
     "SessionSource",
+    "SourceCitation",
+    "SourceCitationKind",
+    "SpecAcceptanceCriterion",
     "SpecApiEvent",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
@@ -975,6 +1094,8 @@ __all__ = [
     "SpecCheckStep",
     "SpecCheckStepConfig",
     "SpecCheckSummary",
+    "SpecFrontmatter",
+    "SpecLanguage",
     "SpecProvenance",
     "SpecSection",
     "SpecTarget",
@@ -1010,6 +1131,7 @@ __all__ = [
     "StatesResponse",
     "StdioConfig",
     "StepExecutionConfig",
+    "StoryFrontmatter",
     "StructuredFinding",
     "StructuredOverride",
     "StructuredSignal",
@@ -1038,6 +1160,7 @@ __all__ = [
     "TaskRunStatus",
     "TaskRunUpdate",
     "TaskType",
+    "TemplateRef",
     "TerminalExitEvent",
     "TerminalInfo",
     "TerminalOutputEvent",
@@ -1088,6 +1211,9 @@ __all__ = [
     "UiBridgeVisualAssertionStep",
     "UnifiedStep",
     "UnifiedWorkflow",
+    "UnknownCode",
+    "UnknownInfo",
+    "UnmeasuredDimension",
     "UpdateAppRequest",
     "UpdateMcpServerInput",
     "UpdateOlConfigRequest",

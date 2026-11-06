@@ -13,6 +13,7 @@
   "default_fanout_bound": 15,
   "max_fanout_bound": 100,
   "default_enabled": true,
+  "max_snapshot_age_secs": 43200,
   "kind_seeds": [
     {
       "agent_name": "operator_spawn",
@@ -45,6 +46,11 @@
       "purpose": "Spawn a fixer for a repo whose main branch is red."
     },
     {
+      "agent_name": "admission_stall_fix_dispatch",
+      "spawn_path": "standing_continuation",
+      "purpose": "Spawn one bounded `/merge-train-steward --respond-to-alert <id> --once` pass for a tenant whose merge train has dispatchable work and is admitting none of it."
+    },
+    {
       "agent_name": "merge_shepherd",
       "spawn_path": "standing_continuation",
       "purpose": "Unlandable-PR shepherd escalation (Tiers 1-3)."
@@ -58,6 +64,11 @@
       "agent_name": "onboarding_audit",
       "spawn_path": "standing_continuation",
       "purpose": "Audit a newly connected repo to propose a starter merge profile."
+    },
+    {
+      "agent_name": "operator_page_remediation",
+      "spawn_path": "standing_continuation",
+      "purpose": "Dispatch the steward that owns a paged condition to make one alert-bound pass (`/merge-train-steward` or `/dev-ops-steward` `--respond-to-alert <id> --once`) before the operator page names it."
     }
   ],
   "class_seeds": [

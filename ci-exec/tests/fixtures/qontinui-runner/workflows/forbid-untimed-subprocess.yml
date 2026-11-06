@@ -1,0 +1,602 @@
+name: forbid untimed subprocess waits
+
+# Phase 1 enforcement deliverable of plan
+# `2026-08-30-runner-blocking-pool-exhaustion-and-wedge-diagnostics`.
+#
+# WHAT IT FORBIDS: a NEW `std::process::Command` waited on with no time bound —
+# `.output()`, `.status()`, `Child::wait()`, `Child::wait_with_output()` —
+# anywhere in the Rust that runs inside the runner process, unless the enclosing
+# function is listed with a written reason in
+# `scripts/untimed-subprocess-baseline.json`.
+#
+# WHY IT EXISTS: those four calls have NO timeout. A child that never exits
+# parks the calling thread forever, and when that thread came from tokio's
+# blocking pool it is never given back. tokio's default `max_blocking_threads`
+# is 512. On 2026-08-30 eight independent PERIODIC callers each leaked one
+# thread per tick until the pool was exhausted; `spawn_blocking` then stopped
+# scheduling at all, which starved the PG pool, which disabled `zombie_sweep`,
+# which made the spiral self-reinforcing until `/livez` went dark.
+#
+# That was the FOURTH independently-discovered instance of the same defect
+# shape, across two incidents four days apart. Code review did not catch it any
+# of the first three times, so review is a demonstrated-insufficient control
+# here and the class gets a machine check. A one-time grep-and-fix would have
+# left the class open for a fifth.
+#
+# THE SANCTIONED BOUNDED WRAPPERS (src-tauri/src/process_helpers.rs):
+#
+#   run_with_timeout(cmd: Command, timeout: Duration) -> io::Result<TimedOutput>
+#   output_with_timeout(cmd: Command, timeout: Duration) -> io::Result<Output>
+#   run_probe(cmd: Command, timeout: Duration, label: &str) -> ProbeOutcome
+#
+# A site routed through any of these never calls `.output()`/`.status()` at all
+# — it hands the BUILT command to the wrapper — so "is it bounded?" needs no
+# heuristic. The presence of the blocking wait IS the finding.
+#
+# WHAT IS SCANNED — DISCOVERED, NOT HARD-CODED, BUT DECLARED. Every in-repo crate
+# LINKED INTO
+# THE RUNNER BINARY, i.e. every crate that shares the runner's tokio runtime and
+# therefore its blocking pool: `src-tauri/src` plus the transitive closure of
+# the dependencies of `src-tauri/Cargo.toml`, restricted to paths inside this
+# repo. Each contributes `<crate>/src/**/*.rs` (the `.rs` suffix matched
+# case-INSENSITIVELY — `hidden.RS` compiles on the Windows dev box and used to
+# escape the Linux glob) plus every file a `#[path = "…"] mod` attribute reaches,
+# including one pointing OUTSIDE the crate tree. A `#[cfg(test)]`-gated `#[path]`
+# include is not followed, which is what keeps `wedge_diagnostics.rs`' test-only
+# pull-in of `../build.rs` — a build script, a separate process with no blocking
+# pool — out of scope.
+#
+# The DISCOVERED list is compared against `EXPECTED_SCAN_ROOTS` in the checker on
+# every run, and a difference in either direction FAILS. Discovery alone was not a
+# gate: `src-tauri/Cargo.toml` decides the scan scope and is not a guarded file,
+# so deleting one `path = "…"` line moved a whole crate tree out of coverage and
+# the job still printed `OK`, with the shrunken list going only to `--list-roots`
+# — a log nobody diffs. Changing coverage is now a deliberate two-line diff in
+# `scripts/check_untimed_subprocess.py`. That file is NOT self-edit guarded today
+# (see SELF-PROTECTION below), so the two-line diff gets ordinary PR review and
+# nothing more. Note what is NOT done: `src-tauri/Cargo.toml` is deliberately not
+# made a guarded file either. Adding an ordinary dependency
+# edits it constantly and would flag every such PR for review; the declared-roots
+# check catches the only edits to it that matter — the ones that change what this
+# gate covers.
+#
+# BOTH dependency spellings are followed — `foo = { path = "…" }` and
+# `foo = { workspace = true }`, the latter resolved through the workspace root's
+# `[workspace.dependencies]`. Following only the first meant that converting a
+# path dep to the standard workspace-inheritance idiom — a routine, safe-looking
+# refactor — silently dropped that crate out of the scan AND printed it under
+# `--list-roots`' "NOT SCANNED … they ship as their own processes", an
+# affirmatively false statement about a crate linked into the runner.
+#
+# A Cargo.toml the checker cannot PARSE is fatal. It used to become "no path
+# dependencies", so one malformed line in src-tauri/Cargo.toml shrank the scan
+# from five crate trees to one and the job still went green. A discovery failure
+# is UNKNOWN, not empty — which is also why there is no longer a regex manifest
+# reader for pre-3.11 interpreters (it could not see `workspace = true`, so it
+# under-scanned silently). This job pins Python 3.12.
+#
+# This is not cosmetic. Plan
+# `2026-08-21-runner-extract-crates-frontier-first` is actively carving modules
+# OUT of `src-tauri/src` into sibling crates (`crates/runner-stats`,
+# `crates/runner-win32` so far, per src-tauri/Cargo.toml's own comment), so a
+# hard-coded `src-tauri/src` root would let every future phase silently remove
+# code from coverage — and the ratchet would then instruct the contributor to
+# DELETE the newly-unresolvable baseline entries, permanently ungating them. An
+# extraction necessarily adds a path dependency, so the closure picks the new
+# crate up with no edit to the checker.
+#
+# Two things are deliberately out of scope, and
+# `check_untimed_subprocess.py --list-roots` prints both so the boundary is
+# inspectable rather than assumed: path deps that resolve OUTSIDE this repo
+# (`../../qontinui-schemas/*` — a different repository with its own CI, not even
+# checked out in this job), and in-repo workspace members the dependency closure
+# does not REACH (`crates/comprehension`, `crates/qontinui-app-generator`,
+# `crates/qontinui-backend-generator`). The second list is a statement about the
+# scan, not a claim about how those crates run: today they ship as their own
+# processes, so a blocking wait there cannot consume a runner blocking-pool
+# thread — but the list is only as trustworthy as the closure that computed it,
+# which is precisely what went wrong while `workspace = true` was unfollowed. If
+# one ever becomes a runner dependency the closure starts scanning it
+# automatically.
+#
+# WHY `.spawn()` IS NOT IN THE PATTERN: `.spawn()` returns immediately and parks
+# nothing. Gating it would fire on every deliberately-detached long-lived child
+# (the python sidecar, ffmpeg, rathole, claude CLI sessions, terminal spawns,
+# the managed services in process_capture) and on every hand-rolled bounded
+# `spawn` + `try_wait` poll loop — a large, legitimate, statically
+# indistinguishable population, i.e. exactly the false-positive flood that gets
+# a gate disabled. The defect is the unbounded WAIT, so the gate follows the
+# wait. That also covers the `spawn`-then-`wait` shape a bare-`spawn` rule
+# would have had to allow through anyway. `try_wait()` is absent on purpose: it
+# does not block.
+#
+# HOW std IS TOLD FROM tokio: not by regex — many files use both, and
+# `reqwest`'s `Response::status()` alone would produce hundreds of false hits.
+# The checker resolves each blocking wait's RECEIVER back to its constructor
+# (`no_window` / `cmd_no_window` / `std::process::Command::new`, and the aliased
+# spellings `use std::process::Command as C;` / `type Cmd = …;` = sync and
+# gated; the `tokio::process` equivalents = async and ignored, because an
+# awaited async wait occupies no blocking-pool thread). Anything it cannot
+# resolve to a sync origin is NOT flagged. The receiver is resolved at three
+# positions, not one: the chained spelling `git_cmd(p).output()`, a `let`
+# BINDING of a helper's result (`let mut c = pm_command("cargo"); c.output();` —
+# the only way to write it when you need to add arguments, and previously
+# invisible), and the chain's last link (`self.build_command().output()`).
+#
+# EVERY BINDING FORM IS READ, not just `let <ident>`. A pattern binds each of its
+# names to the initialiser's origin, so `if let Ok(mut child) = cmd.spawn()`,
+# `match cmd.spawn() { Ok(mut child) => … }`, `let Ok(mut child) = cmd.spawn()
+# else { … };` and `let (mut child, _t) = (cmd.spawn().unwrap(), 1u8)` all
+# resolve. All four were invisible while the binding regex demanded a bare
+# identifier — the gate saw the least idiomatic spelling and missed the four most
+# idiomatic ones — and the let-else shape is already in this tree
+# (`env_agent/collectors.rs`).
+#
+# THIS GATE IS A SYNTACTIC APPROXIMATION OF A SEMANTIC PROPERTY, so it has holes,
+# and they are written down rather than glossed. A green run means "no unbounded
+# wait of a shape this checker can see", not "no unbounded wait". The full list
+# is in the module docstring of `scripts/check_untimed_subprocess.py`; the ones
+# worth knowing before you trust a green tick:
+#
+#   * A `macro_rules!` at MODULE scope can hold an arbitrary number of unbounded
+#     waits and this gate stays green. Its body is read as text, but the finding
+#     has no enclosing `fn` to key against and is dropped. Essentially every
+#     macro in this tree is declared at module scope. (This header used to claim
+#     macro bodies were covered. They are not.)
+#   * A wait assembled from macro FRAGMENTS (`$recv.$method()`) is never seen.
+#   * UFCS is invisible: `Command::output(&mut c)` / `Child::wait(&mut child)`
+#     yield zero findings.
+#   * Nested-group `use std::{process::Command, …}` imports, and a receiver whose
+#     kind is only knowable from a struct FIELD's declared type.
+#   * A `#[cfg]`-gated kill still suppresses the wait below it (a portability arm
+#     is not a proof). A cfg predicate that is false BY CONSTRUCTION —
+#     `#[cfg(any())]` and friends — does NOT suppress: that is a kill which
+#     exists in no compilation, dressed as one that exists in some.
+#   * The program token is resolved SYNTACTICALLY AT THE WAIT SITE, so it names
+#     the spelling, not the program. `fn:git_cmd` survives editing the helper
+#     from `Command::new("git")` to `Command::new("aws")`; `dyn:prog` survives
+#     editing `let prog = "osascript"` to `"curl"`; and basename normalization
+#     collapses `./tools/git`, `C:/attacker/git.exe` and `GIT` onto `git`.
+#     7 of the 55 baselined waits carry a non-discriminating token today, and for
+#     those entries the ratchet enforces the COUNT and nothing more.
+#
+# What is skipped wholesale (`#[cfg(test)]` items, and a `wait()` that follows an
+# UNCONDITIONAL `kill()` ON THE SAME RECEIVER within 3 statements) is in the same
+# docstring.
+#
+# NOTHING IS SKIPPED BY FILE. `process_helpers.rs` used to be — it implements
+# the bounded primitives, so it necessarily contains the raw calls — but that
+# made the one file whose name reads as "sanctioned" a blind spot: a
+# `pub fn output_now(mut cmd: Command) { cmd.output() }` dropped in beside the
+# three real wrappers passed, and so did every periodic caller routed through
+# it. It is scanned like any other file now.
+#
+# It has NO baseline entry, and this header used to say its raw waits "are
+# baselined like any other exemption" — which was false, and false in the
+# direction that matters: a reader checking the claim finds nothing in the JSON
+# and concludes the file is still skipped. What actually happens is that its one
+# raw wait (`run_with_timeout`'s expiry path, `child.kill(); child.wait();`) is
+# suppressed by the kill-adjacency rule, which applies to every file equally.
+#
+# THE BASELINE IS A RATCHET. `scripts/untimed-subprocess-baseline.json`
+# enumerates the surviving sites — one-shot CLI paths, user-triggered actions,
+# startup and shutdown work, and commands whose runtime is unbounded by design
+# (a build, a Playwright run) — keyed by `<path>::<QUALIFIED fn>` with a
+# REQUIRED written reason. The key carries every enclosing `impl` / `trait` /
+# `mod` / outer `fn`, so `impl A { fn run }` and `impl B { fn run }` are
+# different sites; with a bare function name they collided, and moving a wait
+# from one to the other left the count constant and the gate green. GENERIC
+# ARGUMENTS are part of the label too (`impl Bar<u8>` vs `impl Bar<u16>`) —
+# truncating the type at the first `<` reinstated that same collision for any
+# such pair.
+#
+# Each entry records WHAT it covers, not how many: `waits` is one normalized
+# PROGRAM token per untimed wait in the function (a string-literal program as
+# its lowercased basename without `.exe`, a computed one as
+# `dyn:<identifier>`, a helper-built one as `fn:<helper>`, an unresolvable one
+# as `?`), and `reason_covers_waits` is the list the prose was authored against,
+# which must equal it. The list is compared exactly, so the baseline can only
+# shrink and cannot silently rot.
+#
+# A COUNT COULD NOT SEE A SWAP. Replacing the baselined `osascript` one-shot in
+# `window_manager::list_windows_macos` with
+# `Command::new("aws").args(["s3","ls",…]).output()` keeps the count at 1, so a
+# count ratchet stays green while an unbounded NETWORK call ships under prose
+# reading "User-triggered window enumeration via `osascript`, one pass per
+# click". The token is deliberately NOT a hash of the call text: that would go
+# red on `git status` -> `git status --porcelain`, an edit that cannot
+# invalidate any reason, and a gate that cries wolf gets disabled.
+#
+#   * a brand-new key                     -> empty reason -> rejected
+#   * a NEW wait inside an already-exempt function -> `--update-baseline`
+#     CLEARS the reason (it does not carry the old prose forward) -> rejected
+#   * a wait SWAPPED for a different program -> reason CLEARED -> rejected
+#   * a baseline DOWNGRADED to a pre-format-3 (count-only) schema and then
+#     migrated -> every reason CLEARED, because a count cannot say WHICH programs
+#     the prose covered. That arm used to ADOPT the observed programs whenever the
+#     count still matched, which made the tool's own supported migration path a
+#     way to launder a swapped program under prose written for the old one — the
+#     exact attack format 3 exists to close.
+#   * hand-editing `waits` and leaving the reason alone ->
+#     `reason_covers_waits` mismatch -> rejected
+#   * a pure REMOVAL -> reason kept; a strict improvement needs no new prose
+#
+# What it does NOT detect is a human who hand-edits BOTH lists and leaves stale
+# prose, or a swap between two waits whose program is `?`. The first is a false
+# statement standing in a reviewable diff, not a silent bypass; no static check
+# can tell apposite prose from inapposite prose. The second is enumerated in the
+# checker's own "WHAT IT DOES NOT SEE".
+# Adding an entry for a PERIODIC caller is a policy violation, not a lint fix.
+#
+# A baseline that is not the current `"format"` is REJECTED outright rather than
+# matched against — an unrecognised file would otherwise match nothing, which
+# the ratchet reads as "every site was fixed" and which would ungate all of them
+# at once. The rejection prints the migration steps.
+#
+# NOT PATH-FILTERED, deliberately — same posture as forbid-runner-schema.yml,
+# and the opposite of forbid-sibling-clone.yml. Two reasons:
+#   1. The gate's inputs are every scanned crate's Rust PLUS the checker PLUS
+#      the baseline PLUS `src-tauri/Cargo.toml` (which decides the scan scope).
+#      Enumerating that as a `paths:` filter is a list that rots — a PR that
+#      only edits the baseline JSON, or that renames a directory, or that adds a
+#      path dependency, would slip a wrongly-filtered gate. The check costs ~8s
+#      of stdlib Python over the whole Rust tree, so filtering buys nothing
+#      worth that risk.
+#   2. Because it is unfiltered it creates a check-run on EVERY pull request, so
+#      it does not carry forbid-sibling-clone's hazard — a path-filtered trigger
+#      makes no check-run on a non-matching PR, so registering one as required
+#      leaves it "Expected" forever and wedges every unrelated PR (the
+#      2026-06-26 fleet wedge). This gate is therefore *eligible* to be a
+#      required context.
+#
+# THE BASE-BRANCH FILTER WAS REMOVED to make (2) literally true. It used to read
+# `pull_request: branches: [main, develop]`, which produces NO check-run at all
+# on a stacked PR whose base is another feature branch — and this repo actively
+# uses stacked PRs (see stacked-pr-fastlane.yml). That did not endanger a
+# required-context registration (a ruleset on `main` does not gate a PR that
+# targets a feature branch), but it did mean an untimed wait introduced inside a
+# stack went ungated until the stack re-targeted `main`. At ~8s a run, closing
+# that is cheaper than reasoning about it. `push:` stays pinned to the trunk
+# branches PLUS coord's merge-candidate refs. A push run on every feature
+# branch would be pure duplication of the PR run, but a candidate ref is not a
+# feature branch: it is the rebased tip coord will land, the only run that sees
+# the PR combined with everything that landed before it. The red window that
+# opened 2026-09-02T07:56Z began exactly there: `ae52e215f` landed before this
+# gate existed, and the gate's own PR run judged a base without it, so no run
+# ever scanned the two together until main.
+#
+# It is still NOT REGISTERED as a required context today: red CI is this repo's
+# sanctioned merge-stopper and `main` carries pre-existing red, so promoting a
+# brand-new gate to required is an operator decision about ruleset 16044811, not
+# a side-effect of adding the workflow. Do not register it without making that
+# call explicitly.
+#
+# SELF-PROTECTION — ONLY THIS WORKFLOW FILE HAS IT, NOT THE CHECKER. ci-integrity.yml
+# triggers on `.github/workflows/**` and `.github/actions/**` alone, filters the
+# PR's changed files to those two prefixes, and digests each one's PARSED YAML —
+# WHOLE mappings, not a chosen list of fields, which is what makes new Actions
+# syntax captured by default. So a PR that deletes this workflow or changes its
+# steps is flagged: declared by its author and recorded, NOT sent for operator
+# review — that arm was retired in favour of declare-and-verify, and the guard's
+# own error text says "No operator is involved." But the entire verdict lives in
+# `scripts/check_untimed_subprocess.py`: BLOCKING_WAITS, the receiver resolver,
+# what suppresses a finding, the scope discovery, the baseline format check. That
+# file matches neither trigger glob, has no digest, and has no test file, so a PR
+# that neuters the gate by editing ONLY the checker gets ordinary PR review and
+# nothing more. (qontinui-runner#1253, rebased onto the trigger-derived scope
+# that replaced ci-integrity's hand-kept GATING allowlist, puts the checker in
+# ci-integrity's `paths:` trigger AND its scope-filter `case` arm — so an edit to
+# ONLY the checker now runs the guard and is scanned by it.)
+# `scripts/untimed-subprocess-baseline.json` is deliberately unguarded as well: it
+# is edited by every legitimate ratchet-tightening PR, and its integrity is
+# enforced by the required-reason / `reason_covers_waits` / exact-wait-list rules
+# inside the checker. The residual is that those rules are only as strong as the
+# unguarded checker that enforces them.
+#
+# The one guard this workflow has used to be conditional on the PR's base:
+# ci-integrity.yml triggered on `pull_request_target: branches: [main]`, so a
+# STACKED PR (base = another feature branch) got no integrity run at all — in a
+# repo that actively stacks PRs (stacked-pr-fastlane.yml) — and a later
+# re-target fires the `edited` activity type, which a default
+# `pull_request_target` trigger does not listen for. #1253 removed that base
+# filter; ci-integrity.yml's own header records why.
+
+# A RE-RUN PICKS UP *LIVE* INPUTS ONLY — AND THE TREE IS NOT ONE OF THEM.
+#
+# `ci-rerun-on-declaration.yml`'s header states the half of this that is true
+# for LABELS: a re-run replays the ORIGINAL event payload, and it works there
+# anyway because `checkout-sibling` reads the labels LIVE rather than from the
+# payload. The converse was never written down, and it is the half that wedges
+# PRs: a gate whose input is the CHECKED-OUT TREE gets the FROZEN one, because
+# `github.sha` on a `pull_request` event is the merge commit recorded when the
+# run was created. So "CI is stale, re-run it" — the fleet's habitual recovery —
+# is NOT a recovery for a tree-reading gate, and re-running one re-publishes the
+# same stale verdict as current, indefinitely.
+#
+# The step below is what makes a re-run of THIS gate mean something: it
+# re-derives the merge state against the live base before scanning. Note that
+# fetching the live `refs/pull/<n>/merge` is NOT that re-derivation either —
+# GitHub recomputes that ref lazily; the measurements are at the step itself.
+#
+# Every other tree-reading gate in this repo (ci.yml's fmt and clippy legs,
+# forbid-runner-schema.yml, the freshness gates) still has the original
+# behaviour. That is deliberate scope, not an oversight — see the plan.
+#
+# Plan: 2026-09-08-a-gating-workflows-pr-verdict-is-frozen-at-its-original-merge-commit-so-a-red-main-window-wedges-every-pr-that-ran-during-it
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      # merge-candidate refs are the tips coord LANDS: coord's candidate verdict
+      # reduces every check-run on the candidate tip, so a gate that does not
+      # run here takes no part in the land decision (plan
+      # 2026-09-12-red-main-fix-pr-opened-after-the-red-never-gets-a-probe-candidate D5).
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+
+# Serialise per ref. `cancel-in-progress: false` on purpose, matching
+# atlas-schema-check.yml and page-spec-paths.yml rather than the two
+# cancel-in-progress siblings: a cancelled run on a gating workflow presents to
+# coord as an unverified tip (the condition ci-rerun-on-declaration.yml's header
+# describes), and this gate is eligible to become a required context. An 8s job
+# is not worth manufacturing that.
+concurrency:
+  group: forbid-untimed-subprocess-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Read-only, and the ONLY thing it buys is the live `base.ref` read in the
+  # re-derivation step below. The payload's copy of that field is frozen at run
+  # creation, and on a repo that stacks PRs it goes WRONG rather than stale —
+  # see that step's own comment.
+  pull-requests: read
+
+jobs:
+  forbid-untimed-subprocess:
+    name: Forbid untimed std::process::Command waits
+    runs-on: ubuntu-latest
+    steps:
+      # `fetch-depth: 0` is REQUIRED by the re-derivation step below: a merge
+      # needs a merge base, and a depth-1 checkout has none — `git merge` would
+      # refuse on unrelated histories. Measured cost on this repo: 3472 commits,
+      # a 118 MiB pack, against a job that ran ~24 s end to end at depth 1.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          # BLOBLESS, not just deep. `fetch-depth: 0` alone would pull every
+          # blob of all 3472 commits (a 118 MiB pack) on EVERY trigger — including
+          # the `push` and `workflow_dispatch` runs that skip the step below
+          # entirely — for a job that was ~24 s. The merge needs the COMMIT GRAPH
+          # (a merge base); it does not need history's blobs. `filter: blob:none`
+          # keeps the graph and fetches blobs lazily for the trees actually
+          # materialised, which is the working tree we were already paying for.
+          filter: blob:none
+
+      # --------------------------------------------------------------------
+      # RE-DERIVE THE PR'S MERGE STATE AGAINST THE *CURRENT* BASE
+      # --------------------------------------------------------------------
+      #
+      # WHY THIS EXISTS. On a `pull_request` event `actions/checkout` checks out
+      # `github.sha`, which is the merge commit GitHub RECORDED WHEN THE RUN WAS
+      # CREATED. That SHA is a property of the RUN, so:
+      #
+      #   * GitHub never re-runs a PR check when the base branch advances, and
+      #   * `gh run rerun` REPLAYS the recorded SHA.
+      #
+      # A gate whose input is the TREE therefore has no recovery verb at all: a
+      # window in which `main` is red on this gate permanently stains every PR
+      # whose run landed inside it, and re-running re-derives the same stale
+      # verdict forever. Measured 2026-09-08 — this gate was red on `main` for
+      # 24h20m (2026-09-02T07:56:22Z → 2026-09-03T08:15:28Z, fixed by 000213954)
+      # and SIX DAYS LATER ten open PRs were still red on it, all naming one call
+      # site none of them wrote. A `gh run rerun` on PR #1302 that day logged:
+      #
+      #   HEAD is now at 24e57df Merge 75d8479b… into f4d4e769f…
+      #
+      # `f4d4e769f` was `main` from the first minute of the red window.
+      #
+      # WHY NOT JUST FETCH THE LIVE `refs/pull/<n>/merge`. Because GitHub
+      # recomputes that ref LAZILY, not on every base push — measured the same
+      # day, by the merge commit's own committer date:
+      #
+      #   PR 1302  computed 18:51:54Z, 11 s after main's push   -> fresh
+      #   PR 1309  computed 15:37:14Z, main pushed twice since   -> 6 HOURS stale
+      #   PR 1301  computed 2026-09-02T22:33:33Z, PR CONFLICTING -> 6 DAYS frozen
+      #
+      # No SHA comparison separates the benign lag from the pathological freeze
+      # without an arbitrary threshold that would make this gate flaky. Merging
+      # locally depends on no GitHub-maintained ref at all, so it has neither
+      # problem — and it turns the conflicting-PR case into a NAMED failure
+      # instead of a silent scan of a six-day-old tree.
+      #
+      # `push:` runs are untouched: there is no PR to merge on a trunk branch
+      # or on a merge-candidate ref (the tip coord will land).
+      #
+      # Plan: 2026-09-08-a-gating-workflows-pr-verdict-is-frozen-at-its-original-merge-commit-so-a-red-main-window-wedges-every-pr-that-ran-during-it
+      - name: Re-derive this PR's merge state against the current base
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PAYLOAD_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          RECORDED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          : "${PR_NUMBER:?}" "${PAYLOAD_BASE_REF:?}"
+
+          # THE BASE REF IS READ LIVE, and this is not belt-and-braces: the
+          # payload's `base.ref` is the SAME frozen-input class this whole step
+          # exists to fix. `PR_NUMBER` survives a replay because a PR number
+          # never changes; `base.ref` does change, and on this repo it changes
+          # by itself. When a stacked PR's parent merges, GitHub auto-retargets
+          # the child to `main` and (with delete-on-merge) removes the parent
+          # branch. That retarget fires `edited`, which this workflow's default
+          # `pull_request` types do NOT listen for — so no new run exists and
+          # `gh run rerun` is the only verb available. Replaying the frozen
+          # `base.ref` then either merges against a stale parent tip and prints
+          # it as if it were the PR's base (the original defect, one field over),
+          # or dies on a deleted branch.
+          # `|| true` keeps an API blip from redding this gate: an unreadable
+          # base ref degrades to the behaviour that existed before this step,
+          # whereas an unfetchable base leaves nothing to judge at all — which is
+          # why that one fails closed below and this one does not.
+          #
+          # The `= "null"` arm is not paranoia: on a 200 whose body lacks the
+          # field, `--jq` prints the four-character string `null` and exits 0,
+          # which would otherwise be fetched as `refs/heads/null`.
+          BASE_REF="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .base.ref || true)"
+          BASE_SOURCE="live"
+          if [ -z "${BASE_REF}" ] || [ "${BASE_REF}" = "null" ]; then
+            echo "::warning title=Live base ref unreadable::Falling back to the recorded payload value '${PAYLOAD_BASE_REF}'; if this PR was retargeted, the verdict below is about the OLD base."
+            BASE_REF="${PAYLOAD_BASE_REF}"
+            BASE_SOURCE="payload fallback (live read failed)"
+          elif [ "${BASE_REF}" != "${PAYLOAD_BASE_REF}" ]; then
+            echo "::notice title=PR retargeted since this run was created::${PAYLOAD_BASE_REF} -> ${BASE_REF}; judging the LIVE base."
+          fi
+
+          # `refs/pull/<n>/head` — NOT `/merge`. The head ref is always present
+          # and always current; the merge ref is the lazily-recomputed one this
+          # step exists to stop depending on.
+          #
+          # ANNOTATE THE FAILURE. Under `set -euo pipefail` a bare failed fetch
+          # aborts with git's stderr and no `::error::`, so the job goes red
+          # under the name "Forbid untimed std::process::Command waits" and
+          # reads as a gate violation — the exact "cost a day instead of a
+          # minute" confusion the provenance block below exists to prevent.
+          if ! git fetch --no-tags origin \
+                 "+refs/pull/${PR_NUMBER}/head:refs/qontinui/pr-head" \
+                 "+refs/heads/${BASE_REF}:refs/qontinui/base"; then
+            echo "::error title=Cannot re-derive the PR merge state::Could not fetch PR #${PR_NUMBER}'s head, or base branch '${BASE_REF}' (deleted, renamed, or retargeted). This is NOT an untimed-subprocess finding."
+            exit 1
+          fi
+
+          LIVE_BASE_SHA="$(git rev-parse refs/qontinui/base)"
+          LIVE_HEAD_SHA="$(git rev-parse refs/qontinui/pr-head)"
+
+          # THE PROVENANCE BLOCK. Three SHAs on three lines, so "which tree did
+          # this verdict come from?" is a one-line log read rather than an
+          # investigation. Its absence is what made the 2026-09-08 wedge cost a
+          # day instead of a minute.
+          echo "recorded merge commit : ${GITHUB_SHA}  (frozen at run creation)"
+          echo "recorded PR head      : ${RECORDED_HEAD_SHA}"
+          echo "live PR head          : ${LIVE_HEAD_SHA}"
+          echo "live base             : ${BASE_REF} @ ${LIVE_BASE_SHA}"
+
+          # THE VERDICT IS DECOUPLED FROM THE SHA THE CHECK RUN HANGS ON, and
+          # that is a deliberate trade worth stating where a reader will meet it.
+          # This step judges the LIVE head; GitHub attaches the resulting check
+          # run to the RECORDED one. So a green recorded against commit A may
+          # have been computed on commit B. Judging the PR as it now stands is
+          # what a human wants from a merge gate — but anything reading verdicts
+          # per-SHA (branch protection on a re-pushed SHA, coord's twin, later
+          # forensics) would otherwise read that green as a statement about A
+          # with nothing but a raw log line to say otherwise. Hence the job
+          # summary, which survives outside the log.
+          {
+            echo "### forbid-untimed-subprocess provenance"
+            echo "- recorded merge commit: \`${GITHUB_SHA}\` (frozen at run creation)"
+            echo "- recorded PR head: \`${RECORDED_HEAD_SHA}\`"
+            echo "- **judged head**: \`${LIVE_HEAD_SHA}\`"
+            echo "- base: \`${BASE_REF}\` @ \`${LIVE_BASE_SHA}\` (ref source: ${BASE_SOURCE})"
+            # `:-` because this step is meant to be cheap to reproduce by hand;
+            # `$GITHUB_STEP_SUMMARY` is always set on a hosted runner and is not
+            # set under `act` or a local re-run, and dying here under `set -u`
+            # before the scan would be a poor reward for reproducing it.
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          if [ "${LIVE_HEAD_SHA}" != "${RECORDED_HEAD_SHA}" ]; then
+            # Not an error: a push since this run was created fires its own
+            # `pull_request` run that supersedes this one. Judging the live head
+            # is still the right answer for the PR as it now stands, and saying
+            # so keeps the case visible rather than silent.
+            echo "::notice title=PR head moved since this run was created::Judging the LIVE head ${LIVE_HEAD_SHA}, not the recorded ${RECORDED_HEAD_SHA}."
+          fi
+
+          # Annotated for the same reason the fetch is, and newly necessary:
+          # under `filter: blob:none` this checkout performs a lazy blob fetch,
+          # so a transient origin failure now aborts a command that used to be
+          # purely local — unannotated, under this gate's name.
+          if ! git checkout --quiet --detach refs/qontinui/pr-head; then
+            echo "::error title=Cannot re-derive the PR merge state::Could not check out PR #${PR_NUMBER}'s head ${LIVE_HEAD_SHA} (a blobless clone needs a lazy fetch from origin here). This is NOT an untimed-subprocess finding."
+            exit 1
+          fi
+
+          # Merge the live base INTO the head. For a clean merge the resulting
+          # TREE equals GitHub's base-first merge, and the tree is all the
+          # scanner reads — so the direction does not matter.
+          #
+          # NEVER continue on the pre-merge tree when this fails. Scanning one
+          # tree while reporting on another is the exact defect this step fixes;
+          # reproducing it inside the fix would be worse than not having the fix.
+          # No `--quiet`: on a FAILING merge its only effect is to suppress the
+          # context you want. And do not assert a cause you did not measure — a
+          # non-zero `git merge` is not necessarily a content conflict (unrelated
+          # histories, a lazy-blob fetch failure, index or disk errors all land
+          # here), and telling someone to rebase for a problem a rebase will not
+          # fix is worse than saying you do not know.
+          if ! git -c user.name=ci -c user.email=ci@qontinui.local \
+                 merge --no-edit "${LIVE_BASE_SHA}"; then
+            # This is a FAILURE handler and must not have a failure mode of its
+            # own: under `set -e` + `pipefail` a non-zero `git diff` would kill
+            # the step before it printed the annotation, skipping it exactly when
+            # it is needed. `if VAR="$(…)"` suspends errexit for the assignment
+            # the same way `if ! cmd` does, so the annotation is guaranteed AND
+            # the status is kept — which matters, because an empty CONFLICTS
+            # from a FAILED listing is not the same fact as an empty one from a
+            # successful listing, and only the second licenses the "not a content
+            # conflict" claim below.
+            if CONFLICTS="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; then
+              CONFLICT_LIST_OK=1
+            else
+              CONFLICT_LIST_OK=0
+              CONFLICTS=""
+            fi
+            if [ -n "${CONFLICTS}" ]; then
+              echo "::error title=PR does not merge cleanly::Conflicts with ${BASE_REF} (${LIVE_BASE_SHA}) in: ${CONFLICTS}"
+              echo "There is no merge state to judge, so this gate reports nothing about it."
+              echo "Rebase ${LIVE_HEAD_SHA} onto ${BASE_REF} and push; the gate re-runs on the push."
+            elif [ "${CONFLICT_LIST_OK}" = "0" ]; then
+              echo "::error title=Cannot re-derive the PR merge state::git merge failed AND the conflict listing failed, so the cause is UNKNOWN — see the git output above. This is NOT an untimed-subprocess finding."
+            else
+              echo "::error title=Cannot re-derive the PR merge state::git merge failed for a reason other than a content conflict; see the git output above. This is NOT an untimed-subprocess finding."
+            fi
+            exit 1
+          fi
+
+          echo "scanning tree: $(git rev-parse HEAD) (PR head merged with live ${BASE_REF})"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan the runner's Rust crates for unbounded blocking subprocess waits
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The non-PR path says which tree it scanned too. The whole point of
+          # this workflow's change is "which tree did this verdict come from?",
+          # and `workflow_dispatch` is the verb an operator reaches for.
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "scanning tree: $(git rev-parse HEAD) (${GITHUB_REF}, as-is — not a PR merge state)"
+          fi
+
+          # Print the discovered scan scope first: the gate's coverage is
+          # computed from src-tauri/Cargo.toml's path dependencies, so a phase
+          # of the crate-extraction plan that changes it changes what is gated,
+          # and that must be visible in the log rather than inferred.
+          python3 scripts/check_untimed_subprocess.py --list-roots
+
+          # Pure stdlib — no `pip install` step, so this leg cannot go red on a
+          # package-index outage. The same command is what a developer runs
+          # locally before pushing (on the Windows dev box: `python
+          # scripts\check_untimed_subprocess.py`).
+          python3 scripts/check_untimed_subprocess.py --ci

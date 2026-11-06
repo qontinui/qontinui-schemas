@@ -1,0 +1,266 @@
+# CI manifest for the runner-as-CI-node lane
+# (plan qontinui-dev-notes/plans/2026-08-07-runner-local-ci-parity-and-web-
+#  configuration.md, Phase 5 — manifest coverage for the repos that had none.
+#  A repo without this file cannot run on the product's local-CI lane at all.)
+#
+# PARITY IS A REVIEW-TIME INVARIANT: the steps below mirror the gate commands of
+# .github/workflows/rust-ci.yml's `rust-ci` job. When that job's steps change,
+# update this file in the SAME PR. Actions steps are referenced by NAME below,
+# never by line number — line numbers in that file move constantly and a stale
+# citation makes the invariant unauditable.
+#
+# Commands are argv arrays (never shell strings); env is limited to the runner's
+# allowlist (qontinui-runner/src-tauri/src/ci_node/manifest.rs::ENV_ALLOWLIST).
+#
+# THIS FILE DESCRIBES THE *LANDED* EXECUTOR (qontinui-runner main). The schema it
+# is validated against is exactly `version`, `steps`, `limits` — and `limits`
+# holds exactly one key, `cargo_build_jobs`. `deny_unknown_fields` is set on all
+# three structs, so any other key is a HARD PARSE ERROR that takes this repo off
+# the lane entirely, not a soft warning. Verified by running the runner's own
+# `parse_and_validate` against this file rather than a transcription of it.
+#
+# qontinui-runner#1017 (OPEN, not merged) is what adds sibling provisioning, a
+# tool registry and host-derived sizing. Do not write this file against that PR:
+# until it lands, the manifest a dispatch actually validates against is main's.
+#
+# WHY rust-ci AND NOT SOMETHING BROADER: candidate-ci.yml — the workflow that
+# keeps coord's merge scheduler from mistaking a zero-check candidate ref for a
+# CI outage — invokes `./.github/workflows/rust-ci.yml` and NOTHING ELSE, on the
+# stated grounds that rust-ci is "self-contained and is the substantive
+# correctness gate". This manifest mirrors exactly that job, so the two lanes
+# agree on what a green candidate head means.
+#
+# ===========================================================================
+# WHAT THIS MANIFEST CANNOT EXPRESS
+#
+# Recorded rather than silently omitted — the precedent is qontinui-coord's
+# manifest header: a manifest that parses but cannot run is worse than one that
+# announces why. A reviewer comparing this file against the workflows must be
+# able to tell a deliberate gap from an oversight.
+#
+# 1. schema-drift.yml's `check-drift` job — A REQUIRED CHECK THIS LANE CANNOT
+#    HOLD, blocked four separate ways, any one of which is fatal:
+#      a. Its "Regenerate types" step sets CARGO_TARGET_DIR. A step that sets it
+#         is REJECTED at validation — not by a dedicated executor-owned list
+#         (there is no EXECUTOR_OWNED_ENV in manifest.rs), but because
+#         CARGO_TARGET_DIR is simply absent from ENV_ALLOWLIST; the rejection
+#         reads `env var "CARGO_TARGET_DIR" is not allowlisted`. The executor
+#         then sets CARGO_TARGET_DIR itself, per-repo, and its value WINS over
+#         any step env — so the variable is executor-owned in effect even though
+#         the enforcement is the plain allowlist. The override is not
+#         cosmetic there — generate_types.sh hardcodes
+#         `$PROJECT_ROOT/target/schemas.json` against the runner's *package*
+#         dir while the runner repo is a cargo workspace, so without the
+#         override the regen writes nowhere the check then reads.
+#      b. "Install Tauri Linux system deps" is `sudo apt-get install` of
+#         libwebkit2gtk-4.1-dev and friends. The landed lane provisions nothing
+#         at all — not siblings, not tools, and certainly not system packages —
+#         and it runs on users' own machines, where a sudo apt-get is not
+#         something a manifest may do even once provisioning exists.
+#      c. "Stub qontinui-runner frontend dist" is `mkdir -p` plus a `printf`
+#         REDIRECTED into a file. The argv contract has no shell, deliberately.
+#      d. "Install datamodel-code-generator" is a global `pip install` of a
+#         pinned generator. On an ephemeral Actions runner that is free; on a
+#         user's machine it mutates their interpreter permanently.
+#    The sibling half is not the blocker here either — but note it is not
+#    expressible today for a second reason: `[[siblings]]` is not in the landed
+#    schema at all (`unknown field 'siblings', expected one of 'version',
+#    'steps', 'limits'`). It becomes expressible only when runner#1017 lands.
+#      e. AND, since 2026-08-12, the sibling checkout is itself an ACTION —
+#         `qontinui/qontinui-runner/.github/actions/checkout-sibling@main`,
+#         a composite that resolves a DECLARED qontinui-runner PR through the
+#         GitHub API and materialises it SHA-pinned. The argv contract has no
+#         Action runtime, exactly as gap 3 records for commitlint. Worth
+#         stating because it changes the SHAPE of the gap rather than its size:
+#         runner#1017's `[[siblings]]` would let this lane declare a STATIC
+#         sibling to provision, and that is now strictly weaker than what this
+#         job does. A static declaration cannot express "whichever runner PR
+#         this pair declared", so even after #1017 lands, parity for this job
+#         needs a resolver on the lane and not just a provisioner.
+#
+# 2. runner-consumer-check.yml's `consumer-gate` — the required context that
+#    replaced `check-consumers` in ruleset 16104588. Not expressible and not
+#    close: it is a matrix over consumer repos, it resolves a DECLARED
+#    adaptation PR through the GitHub API at runtime, it carries step-level
+#    `continue-on-error` for a two-leg fallback the executor has no analogue
+#    for (a step here either passes or fails the dispatch), and it does the same
+#    sudo apt-get Tauri provisioning plus "Free disk space (Ubuntu)" and "Add
+#    swapfile" shell surgery on the host. A verdict aggregated across legs is a
+#    workflow-level construct; this lane runs a flat list of steps.
+#
+# 3. commitlint.yml — `wagoid/commitlint-github-action`, a marketplace Action
+#    that reads the PULL REQUEST's commits. This lane dispatches a SHA; there is
+#    no pull request in scope and no Action runtime to host.
+#
+# 4. secret-scan.yml — its gitleaks step is `curl … | tar -xz` (a pipe, banned
+#    in argv) and then scopes the scan with
+#    `--log-opts=<base.sha>..<head.sha>` taken from the pull_request event
+#    context, which this lane does not have. Note candidate-ci.yml already
+#    records that this check "is empty off a PR (would fail)".
+#
+# 5. publish.yml, publish-rust.yml, release-please.yml — tag/release lanes, not
+#    PR gates. Out of scope for a parity mirror of the GATES, and they carry
+#    registry credentials this lane must never see.
+#
+# 6. THIS LANE EMITS NO JUnit FOR THIS REPO, and that has a downstream cost
+#    worth stating rather than discovering. rust-ci.yml's test step is plain
+#    `cargo test`, and this repo has no `.config/nextest.toml` at all — so there
+#    is no junit profile to select. And `[[tools]] cargo-nextest` could not be
+#    declared even as a gesture: `tools` is not in the landed schema, so adding
+#    it is a HARD PARSE ERROR (`unknown field 'tools', expected one of
+#    'version', 'steps', 'limits'`) that would take this repo off the lane
+#    outright. Consequence: for a qontinui-schemas head validated ONLY on this
+#    lane, coord's `test_run_effects::score_for_head` finds no `test_results`
+#    row and the Tier-7 credibility-weighted-pass merge gate fails CLOSED.
+#
+#    Closing it takes THREE things, not the two originally recorded here:
+#      i.   a `.config/nextest.toml` with a JUnit profile (coord's `ci-pr` is
+#           the model — JUnit only, no coverage);
+#      ii.  rust-ci.yml's "cargo test" step switched to
+#           `cargo nextest run --workspace --profile ci-pr`, plus a
+#           taiki-e/install-action step, since nextest is not preinstalled;
+#      iii. an ingest step POSTing the JUnit to /coord/test-results/ingest —
+#           which needs the COORD_INGEST_TOKEN repo secret. **qontinui-schemas
+#           does not have that secret** (`gh secret list` shows only the two
+#           RELEASE_PLEASE_* keys once the expired crates.io token is deleted —
+#           crates publish via trusted publishing; coord has
+#           COORD_INGEST_TOKEN).
+#           Emitting JUnit that nothing ingests would leave Tier-7 exactly as
+#           closed as it is now, so (iii) is the load-bearing step and it is
+#           gated on an operator-held credential, not on code.
+#    All three touch the Actions lane, so none is smuggled in here.
+#
+# 7. NO [[tools]] ARE DECLARED — AND ON THE LANDED RUNNER THAT IS NOT A CHOICE.
+#    There is no tool registry on main at all (no ci_node/tools.rs, no `tools`
+#    key); tool provisioning is what runner#1017 adds. So this lane provisions
+#    NOTHING, and "needs nothing" is emphatically not what that means: every
+#    step below assumes a stable Rust toolchain WITH the `clippy` and `rustfmt`
+#    components already on PATH. The Actions lane gets those from
+#    `dtolnay/rust-toolchain@stable`, which is an Action, not a command. On a
+#    machine without them the fmt and clippy steps fail on a missing binary,
+#    which is a HOST problem this manifest cannot fix and must not pretend to.
+#
+# 8. NO Swatinem/rust-cache EQUIVALENT. The Actions lane restores a warm cargo
+#    cache; a cold CI node compiles the workspace from scratch, which is why the
+#    compile-bearing steps below carry the maximum per-step timeout.
+#
+# 9. rust-ci's "fleet-nouns.toml patterns agree across Rust, Python and JS"
+#    step is NOT mirrored. It passes the Rust hit matrix to the next command
+#    through FLEET_NOUNS_MATRIX_OUT, which is not in ENV_ALLOWLIST, and it needs
+#    python3 and node on PATH, which this lane cannot provision (gap 7). The
+#    Rust half — rust/tests/fleet_nouns_vocabulary.rs, including the lexical
+#    portable-subset guard — does run here, inside `rust-test`.
+# ===========================================================================
+
+version = 1
+
+# NO [[siblings]]. On the landed runner the key does not exist, so this is not
+# yet a declarable choice (see gap 1) — but it is worth recording that when
+# runner#1017 makes it declarable, the answer for THIS repo is still "none", and
+# this repo is the one place in the fleet where that is a positive statement
+# rather than an absence. Cargo.toml declares
+# members = ["rust", "rust-runner-client", "rust-vision-core", "code-graph"],
+# all four in-tree, and the workspace's only `path =` dependency is
+# rust-runner-client's `qontinui-types = { path = "../rust" }` — INTRA-repo.
+# rust-ci.yml checks out nothing but this repo, and neither does this manifest.
+#
+# schema-drift.yml's "Check out sibling qontinui-runner (declared PR, else
+# default branch)" is the one sibling checkout in this repo's CI, and it belongs
+# to a job this manifest cannot run for reasons that are not about the sibling
+# (see gap 1). Declaring the sibling here would provision a multi-gigabyte Tauri
+# workspace that no step below touches.
+#
+# That step was called "Checkout qontinui-runner (sibling)" until 2026-08-12 and
+# was a plain `actions/checkout` of runner's default branch; it now resolves a
+# declared runner PR (gap 1e). The name is restated here rather than left stale
+# because this file's header makes the by-NAME citation the auditable link
+# between the two lanes — a citation that no longer matches any step in the
+# workflow cannot be checked, which is the failure mode the by-name rule exists
+# to prevent.
+
+# [limits] — STATED EXPLICITLY, because omitting it does NOT mean what it looks
+# like it means.
+#
+# There is exactly ONE knob on the landed runner: `cargo_build_jobs`. There is
+# no `test_threads` (`unknown field 'test_threads', expected 'cargo_build_jobs'`
+# — it is a parse error, not an ignored key), and there is no host-derived
+# sizing anywhere in the executor.
+#
+# The trap: `effective_cargo_build_jobs()` is `cargo_build_jobs.unwrap_or(1)`,
+# and the executor exports that result as CARGO_BUILD_JOBS to every step. So an
+# ABSENT [limits] table does not mean "size me from the host" — it silently
+# means `1`, which is precisely coord's number. Omitting the table to avoid
+# borrowing coord's measurement borrows it anyway, just invisibly.
+#
+# Given the choice is between an implicit 1 and an explicit one, state it, for
+# the same reason coord's manifest states its own: "so the value is a decision
+# on the record rather than an accident of the default." The value is NOT
+# changed here — a serial build is the behaviour this repo already gets on every
+# dispatch, and raising it without a measurement would be the invention the
+# original omission was right to refuse. It is affordable: an unconstrained
+# `cargo build --workspace --all-targets` from cold on a dev box takes ~2.5min
+# for these four small crates, so the serialized build stays far inside the
+# 7200s per-step ceiling. Revisit with a real measurement, or when runner#1017
+# lands host-derived sizing and absence finally means what this file once
+# claimed it meant.
+[limits]
+cargo_build_jobs = 1
+
+[[steps]]
+name = "rust-lock"
+# rust-ci.yml "Cargo.lock is up to date". It is FIRST on purpose: fmt, clippy
+# and build each silently rewrite a stale lock, after which `--locked` passes
+# vacuously. A release PR that forgets the root lock must go red here, not be
+# repaired in passing. `cargo fetch --locked`, not `cargo metadata --locked`:
+# same exit codes, but no stdout. This argv step cannot redirect, and metadata's
+# ~1.3 MB single-line JSON would flood the runner's log tail.
+# Plan: 2026-09-13-schemas-major-release-wedges-consumers.
+command = ["cargo", "fetch", "--locked"]
+
+[[steps]]
+name = "rust-fmt"
+# rust-ci.yml "cargo fmt --check". Gated here, unlike qontinui-coord's manifest,
+# because this repo's main is rustfmt-clean and the Actions lane gates it.
+command = ["cargo", "fmt", "--all", "--", "--check"]
+
+[[steps]]
+name = "rust-clippy"
+# rust-ci.yml "cargo clippy". `-D warnings` is carried through EXACTLY as the
+# workflow spells it — this repo denies all warnings at the command line rather
+# than through a tiered [lints.clippy] table, so dropping it would silently
+# weaken the gate (the opposite of coord's manifest, where ADDING it would
+# strengthen the gate past what CI enforces).
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+timeout_secs = 7200
+
+[[steps]]
+name = "rust-build"
+# rust-ci.yml "cargo build". `--all-targets` is load-bearing: it is what pulls
+# rust-vision-core's `vision-audit` bin, the examples and the test targets into
+# the compile, so a break confined to a non-lib target is caught here rather
+# than at publish time.
+command = ["cargo", "build", "--workspace", "--all-targets"]
+timeout_secs = 7200
+
+[[steps]]
+name = "rust-test"
+# rust-ci.yml "cargo test". Plain libtest, matching the workflow — see gap 6 for
+# what that costs downstream and what changing it would require.
+#
+# NOTHING CAPS TEST PARALLELISM ON THIS LANE, and that is a deliberate accept,
+# not an oversight. On top of a step's own allowlisted env the executor adds
+# exactly three vars of its own — CARGO_BUILD_JOBS, CARGO_TARGET_DIR, CI (these
+# win over the step) — so there is no RUST_TEST_THREADS from anywhere, and a
+# step cannot supply one either (RUST_TEST_THREADS is not in ENV_ALLOWLIST;
+# declaring it is a validation rejection). The remaining route would be argv,
+# `-- --test-threads=N`, which IS expressible.
+#
+# It is not used, for two reasons. It would diverge from the Actions command
+# this file exists to mirror; and the risk it would buy down is small here,
+# because plain `cargo test` is libtest — tests run as THREADS IN ONE PROCESS,
+# not nextest's process-per-test. coord caps its own run at 4 because each of
+# its tests stands up a tokio runtime in its own process at ~1 GiB; these four
+# crates are serde types, tree-sitter bindings and an image pipeline sharing a
+# single test process. Revisit if a dispatch on a real host says otherwise.
+command = ["cargo", "test", "--workspace"]
+timeout_secs = 7200

@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: MIT
 //! Layout analyzer — overlaps, misalignments, off-screen elements, missing
 //! gutters, etc. Pure geometry over [`ElementSnapshot`]; no pixels.
 
 use super::{AnalyzerResult, Finding, Severity};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::{intersection, ElementSnapshot};
+use crate::observation::UnknownCode;
 
 /// Minimum share of the covered element's own area that must be hidden
 /// before a derived occlusion is reported, in percent.
@@ -382,6 +384,7 @@ fn verdict(
 ) -> AnalyzerResult {
     if coverage.with_geometry == 0 {
         return AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             format!(
                 "no element carries a bbox (0/{}), so every geometric check — overlap, \
                  occlusion, zero-area, alignment — examined nothing. An empty finding \
@@ -416,7 +419,12 @@ fn verdict(
     if degradations.is_empty() {
         AnalyzerResult::checked(Some(coverage), findings)
     } else {
-        AnalyzerResult::degraded(degradations.join("; "), Some(coverage), findings)
+        AnalyzerResult::degraded(
+            UnknownCode::InputMissing,
+            degradations.join("; "),
+            Some(coverage),
+            findings,
+        )
     }
 }
 

@@ -1,5 +1,152 @@
 # Changelog
 
+## [5.0.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v5.0.0...rust-v5.0.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **scheduler:** match RecurringAgentParamSchema to coord's served shape; accept TARGET_NONE ([b654866](https://github.com/qontinui/qontinui-schemas/commit/b65486669b0c4c28410efc2fc3fc768636435e92))
+
+## [5.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.8.0...rust-v5.0.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* WorkspaceRoot::require returns WorkspaceRootUnresolved; qontinui_workspace_root and resolve_workspace_root take a session_repo argument; WorkspaceRootKind gains SessionRepoParent.
+
+### Features
+
+* declare the registry snapshot age bound in the spawn contract ([3655957](https://github.com/qontinui/qontinui-schemas/commit/36559574eecc4b6b569b943a11ea0881361fc893))
+* **scheduler:** recurring-agent spec, target, status report; ScheduledTask managed + timezone ([8dad1d5](https://github.com/qontinui/qontinui-schemas/commit/8dad1d5cd2c82430859bcef5832bf4646e859aab))
+* **scheduler:** RemoteAgent carries effort, ultracode and effort_profile ([55eedce](https://github.com/qontinui/qontinui-schemas/commit/55eedceb1a60d0f348866c221338e7a162f98bc4))
+* **session-work-type:** the session run-record vocabulary contract ([b12e73f](https://github.com/qontinui/qontinui-schemas/commit/b12e73f152ab92a24d11cf4825ba1870b7c7cc53))
+* **spawn-authorization:** seed admission_stall_fix_dispatch as its own kind ([a14ee98](https://github.com/qontinui/qontinui-schemas/commit/a14ee98cda4f0af69b6262539df4f07db85ae710))
+* spec_model — typed spec-artifact frontmatter and the EARS vocabulary ([162dd0a](https://github.com/qontinui/qontinui-schemas/commit/162dd0a9df655e483799876c62eb4aed70106b23))
+* typed workspace-root refusal and the session-repository rung ([441c49d](https://github.com/qontinui/qontinui-schemas/commit/441c49d854b884c9ee2ffd7176d9838d3e2b1800))
+* **types:** journey graph queries over the edge ledger, pinned to multistate ([429d17f](https://github.com/qontinui/qontinui-schemas/commit/429d17f64f28c5aafcdc089f48d04ee70a9670fd))
+* **types:** public trusted_edge_row and JourneyFilter::keeps for the runner's edge-timing route ([31b2286](https://github.com/qontinui/qontinui-schemas/commit/31b2286e5459868abc014ab95b6f0aefbd4bb837))
+* **vision-core:** interaction timeline, timeline assertions, ledger projection and edge timing ([3d6c9bf](https://github.com/qontinui/qontinui-schemas/commit/3d6c9bfb338bb240fba1b021f59ce2b0a557c07d))
+
+
+### Bug Fixes
+
+* **paths:** a symlinked worktree spelling still resolves; pin the format against real git ([f44a1c3](https://github.com/qontinui/qontinui-schemas/commit/f44a1c35427023723e5249edf71ca1b00f2598d8))
+* **types:** a departure left out of the navigation set never settles a negative ([06f15ac](https://github.com/qontinui/qontinui-schemas/commit/06f15ac3130d6d6ba5aeabf587e1e998f2e91801))
+* **types:** a rejected row's trigger is untrusted; absent gate names an unobserved subject ([6a83a29](https://github.com/qontinui/qontinui-schemas/commit/6a83a29f0966691517bb02dcd4b547852eeb4052))
+* **types:** a settle_timeout-only destination is unconfirmed, never a settled dead end ([280b7f5](https://github.com/qontinui/qontinui-schemas/commit/280b7f5899e6c17459c5b3317a4d58083ada377d))
+* **types:** a URL-trigger row is never a genuine negative; test the pop settle_timeout self-loop ([d9d1349](https://github.com/qontinui/qontinui-schemas/commit/d9d13492bad0f0ae67e87399ec53320e9bdd18ea))
+* **types:** absent is unreachable over an empty or non-writing ledger; count back arrivals ([9edc750](https://github.com/qontinui/qontinui-schemas/commit/9edc750639a338a4f6b684a81b459a15132bbc9c))
+* **types:** an error arrival does not confirm a destination ([b2d0c4a](https://github.com/qontinui/qontinui-schemas/commit/b2d0c4a50c41ed396894b8930e0f4e93579d8e7d))
+* **types:** count an excluded negative on a node the graph drops; enumeration invariant ([a595ddd](https://github.com/qontinui/qontinui-schemas/commit/a595ddd842d077bb0a0b09c86bacb20dbed32ad7))
+* **types:** error click elsewhere has unknown destination; self-loops are not arrivals ([49f7dae](https://github.com/qontinui/qontinui-schemas/commit/49f7dae193087622c8211cb266659b8aff1d9b33))
+* **types:** nothing in a rejected row is trusted; settle_timeout elsewhere is unknown ([5af035b](https://github.com/qontinui/qontinui-schemas/commit/5af035ba5ccd53396586e592887aadd188e8187c))
+* **types:** placement keys on the full row; invalid frontier nodes are unplaced ([f064e72](https://github.com/qontinui/qontinui-schemas/commit/f064e72db13e7e0da3aec3afbafc0444e701f18e))
+* **types:** prior knowledge never settles beside an open frontier or a non-writing ledger ([7f76b2f](https://github.com/qontinui/qontinui-schemas/commit/7f76b2fc692d0fcbeb9a01e01f51c4a791f46669))
+* **types:** settle_timeout self-loop is unmeasured; an error self-loop is a genuine negative ([ecf7248](https://github.com/qontinui/qontinui-schemas/commit/ecf7248c0638e6c4660f7bdb552fdd18d478e455))
+* **types:** unplaceable frontier rows, URL arrivals and graph-wide doubt never settle a negative ([58bd297](https://github.com/qontinui/qontinui-schemas/commit/58bd2976cb5dc0175f4a73fffb88830c9438b2ee))
+* **vision-core:** the ledger projection keeps element counts, never element identities ([a7b5c4b](https://github.com/qontinui/qontinui-schemas/commit/a7b5c4b9a9dc7170d01b07bccea1455fb6384644))
+
+## [4.8.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.7.0...rust-v4.8.0) (2026-10-22)
+
+
+### Features
+
+* add ScheduledTaskType::Script (command, working_directory, timeout_seconds) ([20c02a8](https://github.com/qontinui/qontinui-schemas/commit/20c02a87d257a34fbff761c8f8f82f3a2c9fa44a))
+* build_census pure core, owner classifier and capacity cause ([ac4b36e](https://github.com/qontinui/qontinui-schemas/commit/ac4b36e840a6ccf9223e0ca6a81ddf9ed9fe3716))
+* **ci-exec:** capture run outcomes and share coord's run_outcomes validator ([2f886a3](https://github.com/qontinui/qontinui-schemas/commit/2f886a3f2650d82a91b4cd0e7a43a4e9113578d4))
+* **spawn-authorization:** operator_page_remediation spawn kind ([9777f7e](https://github.com/qontinui/qontinui-schemas/commit/9777f7e91b7965495d7e7d2f10043dae48700f50))
+* **types:** host_sizing — shared cargo job/slot sizing + golden table ([5a75977](https://github.com/qontinui/qontinui-schemas/commit/5a75977cdfdd75fcdf16e510ee673ff31d417748))
+
+
+### Bug Fixes
+
+* **ci-exec:** bound and harden the run-outcomes capture ([d8bd1bc](https://github.com/qontinui/qontinui-schemas/commit/d8bd1bc7ce0e90b68554bc9630167e7a376defc8))
+* **ci-exec:** bump zip to 9 for RUSTSEC-2026-0367..0369 ([3ac862b](https://github.com/qontinui/qontinui-schemas/commit/3ac862bcb2ed38860445a4befbd30185096d6ef0))
+* restore run-outcomes capture and ts 2.4.0 reverted by 3ac862bc ([0d2fd65](https://github.com/qontinui/qontinui-schemas/commit/0d2fd65ed1f2b7e71b7276901b0266270c167aa9))
+* **types:** pin build_jobs rounding and the 8 GiB edge; mirror host-probe in ci.toml ([03960d9](https://github.com/qontinui/qontinui-schemas/commit/03960d9f25c4d6701d64ed97ef8b6c2ef343984c))
+
+## [4.7.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.6.0...rust-v4.7.0) (2026-10-13)
+
+
+### Features
+
+* **cloud_twin:** add cloud twin contract module ([8e40ed8](https://github.com/qontinui/qontinui-schemas/commit/8e40ed8f4ccd15a20dc1a94c40f61e70483b1eb1))
+* **cloud_twin:** compute SubstitutionBlock here and validate wire invariants ([eda1fff](https://github.com/qontinui/qontinui-schemas/commit/eda1fff782851dc8ca0d19b6391b09d23aa466a4))
+
+
+### Bug Fixes
+
+* **cloud_twin:** bound n and oracle_share of unknown-op blocks on the wire ([490fb97](https://github.com/qontinui/qontinui-schemas/commit/490fb97541eee52d28d6fecb3d780947780b3145))
+* **cloud_twin:** check substitution blocks against their exercised ops ([fe01f37](https://github.com/qontinui/qontinui-schemas/commit/fe01f37975d0baa7d1eb0299360c4a2717e62a3d))
+* **cloud_twin:** close remaining wire gaps and refuse misspelled fields ([13cd143](https://github.com/qontinui/qontinui-schemas/commit/13cd1437957555c6dad7b26460122dc4fae24609))
+
+## [4.6.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.1...rust-v4.6.0) (2026-10-13)
+
+
+### Features
+
+* **types:** add ImageSlotSpec, the declared contract of one image placement ([1288679](https://github.com/qontinui/qontinui-schemas/commit/12886796e2c83d8b9fce7ceec204a1c230e0a091))
+
+
+### Bug Fixes
+
+* **types:** close the ImageSlotSpec pre-PR review findings ([775abdc](https://github.com/qontinui/qontinui-schemas/commit/775abdcc7577e496c4f67ff5263fdab5b6eee2c6))
+* **types:** make the stale-binding fixture's history true and checkable ([89c3c3d](https://github.com/qontinui/qontinui-schemas/commit/89c3c3db4712ca35901294b40d9192f2dcdb10c2))
+* **types:** pin the stale-binding exemption and compare region edges exactly ([73a6085](https://github.com/qontinui/qontinui-schemas/commit/73a6085746f433686277de70b5feaa51ac1e2170))
+
+## [4.5.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.5.0...rust-v4.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* address pre-PR review of the glossary v2 corrections ([e797a9b](https://github.com/qontinui/qontinui-schemas/commit/e797a9b443121d3580b7d6129b4ed961378639b7))
+* correct seven glossary terms that disagree with the services (glossary v2) ([2253e55](https://github.com/qontinui/qontinui-schemas/commit/2253e55cc8d40a90508484dc3ff65d3231616b68))
+
+## [4.5.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.4.0...rust-v4.5.0) (2026-10-13)
+
+
+### Features
+
+* **types:** CliProfile, SessionFailure and a shared CapabilityState ([0662611](https://github.com/qontinui/qontinui-schemas/commit/066261185d58160f06a1c3c69c1a157730974233))
+
+## [4.4.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.3.0...rust-v4.4.0) (2026-10-06)
+
+
+### Features
+
+* build_admission — the pure per-invocation build admission core ([cdb815a](https://github.com/qontinui/qontinui-schemas/commit/cdb815a655149bb453ea312af89d31426fb63c22))
+
+
+### Bug Fixes
+
+* build_admission backfill uses p50 shadow and p90 candidates; floor respects the reserve ([cb72d39](https://github.com/qontinui/qontinui-schemas/commit/cb72d397b6aea6bc89ae20764a38946797388a05))
+* build_admission names BelowReserve when an idle host holds the floor back ([3ca5b0a](https://github.com/qontinui/qontinui-schemas/commit/3ca5b0aeb372872d717c814c783a99332823cb21))
+* build_admission review findings — jobs identity, lone paused lease, floor scope ([bc4d7df](https://github.com/qontinui/qontinui-schemas/commit/bc4d7dfd960249f11fe7c0cd50ee060fa01ae4a3))
+
+## [4.3.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.2.0...rust-v4.3.0) (2026-10-06)
+
+
+### Features
+
+* **journey:** a Navigation trigger names no affordance at all ([862b5d5](https://github.com/qontinui/qontinui-schemas/commit/862b5d58eac25984add58b50d8c4d22297bfab54))
+* **journey:** validate the Navigation trigger invariant ([db340c6](https://github.com/qontinui/qontinui-schemas/commit/db340c67a38d7ca4f2289bd7d931b79105059679))
+
+## [4.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.1.0...rust-v4.2.0) (2026-10-06)
+
+
+### Features
+
+* **journey:** ChokePoint::Navigation for agent-driven navigation ([0b9dba5](https://github.com/qontinui/qontinui-schemas/commit/0b9dba5bf9141ca5175f395f124abc9ba1e55291))
+* **refusal:** generic HTTP-class refusal codes every producer can share ([3db4fba](https://github.com/qontinui/qontinui-schemas/commit/3db4fba446afa07774cd04991ce93cd29e5e0ae5))
+* **rust:** commit the refusal render fixture generator ([d9e7fd4](https://github.com/qontinui/qontinui-schemas/commit/d9e7fd4c1ddbc30c7adb634520c9d02dc519faf8))
+* **types:** shared Page&lt;T&gt;, Bound and keyset cursor codec for bounded reads ([d6cc075](https://github.com/qontinui/qontinui-schemas/commit/d6cc075278ccf8e53404288a302f502ce91abf0a))
+
+
+### Bug Fixes
+
+* **refusal:** a retry_later target says what to re-check before retrying ([ccf7b86](https://github.com/qontinui/qontinui-schemas/commit/ccf7b86f4e9b22c0f61f07e79ad68994e92848aa))
+* **refusal:** carry the retry_later target doc into the generated bindings ([c1be97a](https://github.com/qontinui/qontinui-schemas/commit/c1be97a259900ff8bb56bad8840bb98e7c1d00c2))
+
 ## [4.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v4.0.0...rust-v4.1.0) (2026-10-02)
 
 

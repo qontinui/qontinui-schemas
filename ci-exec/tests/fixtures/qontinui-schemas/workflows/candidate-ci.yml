@@ -1,0 +1,57 @@
+name: Candidate CI
+
+# Runs CI on coord's merge-scheduler speculative candidate refs —
+# `merge-candidate/**`, `merge-candidate-spec/**`, `merge-candidate-batch/**`.
+#
+# WHY THIS EXISTS (qontinui-schemas was the last fleet repo missing it):
+# coord's PR-merge orchestrator lands a PR by pushing the dry-rebased tip to a
+# `merge-candidate/<proposal>` ref and waiting for CI to report on that head
+# (it polls `coord.pr_check_runs` for (repo, head_sha) via `ci_outcome_for`).
+# None of this repo's other workflows trigger on those refs — `rust-ci` /
+# `schema-drift` push-trigger only on `main` (path-filtered), and
+# `commitlint` / `secret-scan` are `pull_request`-only. So a candidate push
+# produced ZERO check runs, which coord's `bypass_policy` misclassifies as a
+# CI-infrastructure outage after 3 silent 1800s cycles → it invokes the
+# `actions_outage` bypass and reports "landed" but the fast-forward defers
+# (base moved), leaving the PR open to loop forever. Observed live wedging
+# qontinui-schemas #97 for days (2026-07-03 → -07-05). qontinui-coord and
+# qontinui-runner already wired the same trigger; this closes the gap.
+#
+# NO `paths:` filter, deliberately: a fast-forward candidate (main didn't
+# advance since the proposal branched) introduces zero new commits, so a
+# path-filtered trigger matches nothing and fires no workflow — "no checks"
+# is indistinguishable from "CI never ran" to coord's land gate. Every
+# candidate ref MUST produce a check run.
+#
+# ONLY rust-ci is invoked here, on purpose. coord's `ci_outcome_for` requires
+# the candidate head to carry >=1 check run all concluding success/neutral/
+# skipped — it does NOT match specific required-context names — so one green,
+# self-contained check both breaks the zero-check outage loop and satisfies
+# the land gate. The other required checks are unsafe or unnecessary on a
+# push ref: `commitlint` is PR-only; `secret-scan` scopes gitleaks to
+# `${{ github.event.pull_request.base.sha }}..head.sha` which is empty off a
+# PR (would fail); `check-drift` does a cross-repo sibling checkout of
+# qontinui-runner (an extra failure mode not needed for an any-green gate).
+# rust-ci (fmt + clippy + build + test) is self-contained and is the
+# substantive correctness gate. All three already ran green on the PR head,
+# and a fast-forward candidate is the same tree.
+
+on:
+  push:
+    branches:
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+
+# One concurrency group per candidate ref (each proposal pushes a unique
+# ref) so parallel proposals never cancel each other; cancel-in-progress OFF
+# — a rare mid-run re-push is cheaper to duplicate than to leave a candidate
+# head with a half-reported check set.
+concurrency:
+  group: candidate-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rust-ci:
+    uses: ./.github/workflows/rust-ci.yml
+    secrets: inherit

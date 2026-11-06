@@ -1,0 +1,94 @@
+name: Publish @qontinui/shared-types to npm
+
+# Tag-triggered publish for the TypeScript package only.
+# We use the `ts-v*` prefix so this workflow does not fire for any future
+# Rust crate tag scheme (this repo also hosts the Rust `qontinui-types` crate).
+#
+# Uses npm Trusted Publishing (OIDC). No long-lived NPM_TOKEN — GitHub
+# mints a short-lived OIDC JWT that npm verifies against the per-package
+# trust policy configured at npmjs.com.
+#
+# To release: bump `ts/package.json` version, then:
+#   git tag ts-v0.2.2
+#   git push --tags
+#
+# One-time npmjs.com setup (per package, by an @qontinui maintainer):
+#   npmjs.com → @qontinui/shared-types → Settings → Trusted Publisher →
+#   Add: organization=qontinui, repository=qontinui-schemas,
+#        workflow filename=publish.yml, environment=(blank).
+on:
+  push:
+    tags:
+      - 'ts-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for npm trusted publishing — GitHub mints a short-lived
+      # OIDC JWT that npm verifies against the per-package trust policy
+      # configured at npmjs.com. No long-lived NPM_TOKEN secret needed.
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to 11.5.1+ for trusted publishing
+        # setup-node with node-version: '20' ships npm@10.8.2 (the npm
+        # bundled with that Node release), but npm Trusted Publishers
+        # requires 11.5.1+. Without this upgrade the publish step sends
+        # an empty auth header and gets 404 even when the OIDC +
+        # provenance flow succeeds. Independent of the action version.
+        #
+        # PINNED TO THE 11 LINE, deliberately — this was `npm@latest`, which
+        # became a time bomb the moment npm cut 12.x. npm 12 requires
+        # node ^22.22.2 || ^24.15.0 || >=26.0.0, so on the node 20 pinned
+        # above it fails the install outright:
+        #
+        #   npm error notsup Required: {"node":"^22.22.2 || ^24.15.0 || >=26.0.0"}
+        #   npm error notsup Actual:   {"npm":"10.8.2","node":"v20.20.2"}
+        #
+        # That took down every `ts-v*` publish (runs 2026-07-29T18:33Z and
+        # 2026-07-30T04:18Z both died here), leaving the published
+        # `@qontinui/shared-types` stuck at 0.8.1 while ts/package.json had
+        # already moved on. `@latest` in a step whose own
+        # stated requirement is a FLOOR ("11.5.1+") buys nothing and silently
+        # couples this job to npm's release cadence. Bump the major here
+        # deliberately, together with node-version, or not at all.
+        run: npm install --global 'npm@^11.5.1'
+        working-directory: .
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (source + generated .d.ts gate)
+        # `npm run build` is tsup, which does NOT type-check: it transpiles and
+        # runs rollup-dts over the declarations. So without this step a `ts-v*`
+        # tag on a commit carrying a broken generated binding built green and
+        # published. `ts-typecheck.yml` covers pull_request and push-to-main,
+        # but a tag can be cut from any commit — including one that never went
+        # through a PR — so the publish path needs its own gate rather than
+        # inheriting confidence from a job that may not have run on this sha.
+        #
+        # `ts/package.json`'s `prepublishOnly` runs this too, which makes the
+        # step redundant on paper. It is stated here anyway so the failure lands
+        # on a named step BEFORE the OIDC publish begins, instead of surfacing
+        # inside `npm publish` output after the token has been minted.
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish
+        # --provenance generates an attestation linking the npm tarball
+        # back to this exact commit + workflow run, signed by the OIDC
+        # token. Surfaces on the package's npm page under "Provenance".
+        run: npm publish --access public --provenance

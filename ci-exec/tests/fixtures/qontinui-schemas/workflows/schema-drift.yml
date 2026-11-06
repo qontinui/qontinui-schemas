@@ -1,0 +1,678 @@
+name: schema-drift
+
+# Fails CI when the generated TypeScript or Python type bindings under
+# qontinui-schemas/ are out of sync with the Rust sources that drive them.
+#
+# Trigger scope: this side catches drift introduced by changes to
+# qontinui-schemas's own Rust sources. The mirror workflow in
+# qontinui-runner (`qontinui-types-drift.yml`) catches drift introduced
+# by changes to runner-side schema files (`src-tauri/src/schema_export.rs`,
+# `tauri_event_payloads.rs`, `relay_envelopes.rs`, `scripts/generate_types.sh`).
+# Together they form a two-sided gate around the cross-repo codegen
+# contract.
+#
+# qontinui-schemas is a standalone repo; this workflow recreates the
+# sibling layout (qontinui-schemas/ + qontinui-runner/ at $GITHUB_WORKSPACE)
+# that generate_types.sh and the runner crate's path-deps expect.
+#
+# WHERE THE CONSUMER COMPILE WENT (this is not a coverage drop). This
+# workflow used to carry a second job, `check-consumers`, which compiled
+# qontinui-runner against the PR's schemas. That job is gone and its
+# coverage is now STRICTLY LARGER, in runner-consumer-check.yml:
+#
+#   - it is a MATRIX over consumers (qontinui-runner AND
+#     qontinui-supervisor), not a single hardcoded consumer;
+#   - it compiles consumer `main` UNCONDITIONALLY, and only falls back to
+#     a DECLARED, open, main-based, SHA-pinned adaptation PR when main
+#     breaks — where `check-consumers` had no escape hatch at all;
+#   - its required context is `consumer-gate`, which replaced
+#     `check-consumers` in ruleset 16104588 on 2026-08-04.
+#
+# Keeping both meant compiling the runner workspace TWICE per PR (~33 min
+# of runner-minutes). `check-drift` stays here because it is a genuinely
+# different check: codegen freshness, not consumer compilation.
+#
+# ---------------------------------------------------------------------------
+# WHICH qontinui-runner TREE THIS REGENERATES AGAINST (added 2026-08-12)
+# ---------------------------------------------------------------------------
+#
+# Until now this workflow checked qontinui-runner out with NO `ref:` at all,
+# so it ALWAYS took runner's default branch. That is the right answer for a
+# solo schemas PR and the WRONG answer for a coordinated pair, because
+# codegen freshness is a property of BOTH trees at once:
+#
+#     output(runner Rust, schemas Rust) == schemas' checked-in bindings
+#
+# The standing pattern that breaks on it: a Rust type is authored in
+# qontinui-runner (`src-tauri/src/schema_export.rs`), and a schemas PR carries
+# nothing but the REGENERATED BINDINGS. Regenerating those bindings against
+# runner MAIN — which does not have the type yet — DELETES the very files the
+# schemas PR adds, so `check-drift` reds. It is a REQUIRED context
+# (ruleset 16104588), so the PR is unmergeable, and no push to the schemas PR
+# can fix it: the missing input is in the other repo.
+#
+# That is not hypothetical and it is not rare. Four instances in six weeks,
+# each a "regenerate bindings for <runner-authored types>" PR red on
+# check-drift: #95 (HelperTask), #112 (Projects dashboard, paired with
+# runner#905), #119 (agent-command, closed), and #136 (AgentCommandError,
+# paired with runner#1019 — open and blocked on exactly this since
+# 2026-08-07). The runner half of that last deadlock is described at length in
+# qontinui-runner/.github/actions/checkout-sibling/action.yml (PHASE C).
+#
+# So the sibling checkout now resolves a DECLARED runner PR — the coord
+# dep-edge label the pair already has to apply for merge ordering — and falls
+# back to runner's default branch when nothing is declared.
+#
+# WHY IT REUSES qontinui-runner's ACTION RATHER THAN PORTING IT HERE.
+#
+# This repo already carries one hand-written copy of that resolver, inline in
+# runner-consumer-check.yml's leg 2. Two copies of a cross-repo contract have
+# ALREADY drifted: the runner action's header calls out this repo's copy for
+# comparing the label's repo part with an EXACT string match, which silently
+# misses every bare-form `coord:*=<repo>#<n>` label (the owner is optional in
+# coord's grammar — qontinui-coord src/pr_merge/dep_graph.rs:136-137). Writing
+# a THIRD copy to fix a problem caused by having two is not a fix.
+#
+# The usual objection to a cross-repo action — it couples this repo's CI to
+# another repo at bootstrap time — does not bind HERE, and it is worth being
+# precise about why rather than waving it away. This job ALREADY cannot run
+# without qontinui-runner: it checks the repo out and EXECUTES
+# `generate_types.sh` from it. Referencing an action from the same ref is
+# strictly LESS trust than this workflow already extends, and adds no failure
+# domain it did not already have. Do not generalise this to schemas workflows
+# that have no such dependency (rust-ci, commitlint, secret-scan) — for those
+# the objection stands and the answer would be different.
+#
+# DIRECTION SAFETY — and be precise about WHERE it comes from, because the
+# mechanism is not the one it will eventually be. Only a LEADING runner
+# sibling is followed: one whose PR merges BEFORE this one, whose tree
+# therefore predicts what runner main will be when this PR lands. That is the
+# direction schemas#136 and every other instance above needs.
+#
+# TODAY that property holds BY CONSTRUCTION, not by an opt-out. The action at
+# `@main` reads exactly two label forms and both of them encode "the sibling
+# leads" (`coord:downstream-of=<runner>#<n>` on this PR;
+# `coord:upstream-of=<schemas>#<this>` on a runner PR). A declaration pointing
+# the other way matches neither, so it falls through the no-declaration path
+# and is INDISTINGUISHABLE from having no label at all — the resolver does not
+# announce a declination, because it never saw a declaration. The behaviour is
+# safe; the diagnostics are not yet good.
+#
+# RESOLVED 2026-08-27 — this paragraph used to say the opposite, and the
+# instruction it carried expired without anything noticing.
+#
+# qontinui-runner#1028 added the other two forms plus the
+# `accept-trailing-sibling` input, and it MERGED 2026-08-12. Its old
+# instruction here — "do not add the input before #1028 lands" — was correct
+# when written and became stale the moment it did, so for two weeks a shipped
+# hatch sat unarmed while qontinui-schemas#144 was unmergeable by construction.
+# A dated, conditional instruction in a comment has no mechanism that re-checks
+# it; treat that as the defect class, not as a one-off.
+#
+# The input is now PASSED (see the resolver step), so BOTH merge orders
+# resolve. `trailing-declined` is consequently unreachable from this call site;
+# the reporting step keeps its arm anyway, because the input could be turned
+# off again and a silently-missing arm is worse than an unused one.
+#
+# The LIMITATION note this used to point at is GONE, because the limitation it
+# described is the one now closed. See instead "WHAT THIS COSTS" on the
+# resolver step, which states what following an unlanded tree actually buys and
+# what it does not. The governing rule -- compile sites off, pair questions on
+# -- is the compile-vs-pair paragraph in the action's header ("Only a step
+# whose question is genuinely about the PAIR opts in").
+#
+# WHAT THIS DOES ADD TO THE TRUST SURFACE, stated because the paragraph above
+# deliberately narrows the claim. Reusing runner main's ACTION is less trust
+# than this job already extends. Following a DECLARED PR is not the same
+# question: the tree whose `generate_types.sh` gets executed and whose
+# `build.rs` gets compiled is then an unlanded, unreviewed runner head rather
+# than landed main. It is bounded — the action rejects a head that is not on
+# qontinui-runner itself, so a fork PR cannot aim this at arbitrary code, and
+# the token here is read-only — but the bound is "anyone with push access to
+# qontinui-runner", not "anything that passed runner review". Opting in is per
+# PR and visible as a label, which is the mitigation.
+
+on:
+  # Manual trigger: useful when a cross-repo coordination fix lands on
+  # qontinui-runner main but nothing on qontinui-schemas main has
+  # touched rust/src/** since — the workflow's last main run can stay
+  # cosmetically red for a long stretch even though the underlying
+  # drift is fixed. `gh workflow run schema-drift.yml --ref main`
+  # refreshes the visible status without forcing a noop rust/src/**
+  # commit.
+  #
+  # ⚠️ IT REFRESHES THE VISIBLE STATUS ONLY — IT DOES NOT UNBLOCK COORD.
+  # coord scores main from `coord.ci_baselines`, and
+  # `establishes_main_baseline()` accepts `event == Some("push")` and
+  # nothing else (qontinui-coord crates/coord/src/ci_baseline.rs). A
+  # `workflow_dispatch` run neither writes NOR prunes that baseline — the
+  # Option-C refinement is explicit that a red baseline may be cleared
+  # ONLY by a real push verdict. So after a green dispatch you get a green
+  # checkmark on GitHub while coord still reports main-red and still holds
+  # every PR in this repo.
+  #
+  # THE REMEDY IS A RE-RUN, NOT A DISPATCH AND NOT A NEW COMMIT.
+  # `gh run rerun --failed <the failed push run>` re-runs the ORIGINAL
+  # push run: GitHub reuses the same run id, bumps `run_attempt`, and
+  # KEEPS `event: push`, so coord ingests it as a real baseline. coord
+  # says so itself — ci_baseline.rs: "a re-run preserves `event: push`
+  # and writes a real baseline", and the run-id guard is deliberately
+  # `<` rather than `<=` precisely "so an equal id MUST still write …
+  # That is the sanctioned red-main remedy".
+  #
+  # Why not "just push a commit touching a `paths:` glob": while main is
+  # red coord blocks EVERY PR in this repo, including the one carrying
+  # that commit — so it cannot land, and the suggestion is circular. The
+  # re-run needs no PR at all, which is exactly why it is the remedy.
+  #
+  # Note the re-run re-executes at the SAME sha; it clears the red only
+  # if the inputs have genuinely changed since (e.g. the paired
+  # qontinui-runner fix landed on runner main). Re-running against an
+  # unchanged world just reproduces the red.
+  #
+  # Measured 2026-08-30: main sat red ~33h on exactly this shape while
+  # PRs #154 and #155 were blocked behind it.
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "rust/src/**"
+      # The gate must re-run when the gate itself changes. The pull_request
+      # trigger below is unfiltered so it always does; this makes the
+      # post-merge main run match, rather than leaving main's visible status
+      # frozen at whatever the last rust/src/** push produced.
+      - ".github/workflows/schema-drift.yml"
+      # THE GENERATED OUTPUT ITSELF — newly load-bearing as of the declared-
+      # sibling resolution below, and this list was wrong without it.
+      #
+      # A bindings-only PR (the whole class this resolver exists to unblock —
+      # #95, #112, #119, #136) touches NEITHER of the two entries above: it
+      # changes only ts/src/generated/** and src/qontinui_schemas/generated/**.
+      # So no push run ever fired for it.
+      #
+      # That was harmless while the PR verdict was always taken against runner
+      # main, because the pre-merge verdict WAS the verdict main would give.
+      # It is not harmless now: with a declared sibling the pre-merge green is
+      # a claim about a tree that has not landed, so re-measuring after the
+      # land is the only thing that closes the loop. If the paired runner PR is
+      # squashed, amended, reordered or abandoned between the two lands, these
+      # bindings are drifted on main and nothing would say so until some
+      # unrelated PR reds and blames an innocent author.
+      #
+      # candidate-ci.yml deliberately excludes check-drift from candidate refs,
+      # so this push trigger is the ONLY post-merge measurement there is.
+      - "ts/src/generated/**"
+      - "src/qontinui_schemas/generated/**"
+  pull_request:
+    branches: [main]
+    # No path filter on the PR trigger so the `check-drift` required-check
+    # status posts on every PR. Required-check rules look for check-runs
+    # created by the pull_request event; a path-filtered trigger that
+    # doesn't fire (e.g. the release-please bot's PR, which only touches
+    # rust/Cargo.toml + rust/CHANGELOG.md, not rust/src/**) leaves the
+    # required check in the "missing" state and the PR fails the rule
+    # with no way to satisfy it short of admin bypass. Running the full
+    # regen on every PR is ~2 min wasted on irrelevant PRs but is the
+    # only mechanism that posts the required status. PRs without
+    # rust/src/** changes will produce no diff and pass quickly.
+    #
+    # `labeled`/`unlabeled` are LOAD-BEARING, not decoration, and listing
+    # `types:` at all means the three defaults must be listed too — naming
+    # any type REPLACES the default [opened, synchronize, reopened] rather
+    # than adding to it, so omitting them would stop this required check from
+    # posting on a plain PR open.
+    #
+    # The sibling escape hatch is a coord dep-edge LABEL, so this gate has to
+    # re-evaluate when one is applied. Under the defaults alone, applying
+    # `coord:downstream-of=qontinui-runner#<n>` fires no workflow at all: the
+    # author would declare the pair and watch nothing happen, which is exactly
+    # the failure mode runner-consumer-check.yml documents for its own label
+    # hatch. `unlabeled` is equally deliberate — removing the declaration must
+    # re-evaluate too, or the gate can be satisfied and then quietly
+    # un-satisfied.
+    #
+    # This is also the one thing this side can do that the runner side cannot:
+    # qontinui-types-drift.yml is path-filtered, so its resolver's error text
+    # has to tell authors "the runner has no 'labeled' trigger — push a commit
+    # or re-run manually". This trigger is unfiltered already, so adding the
+    # two types costs nothing.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Paired with the `labeled`/`unlabeled` types above, on the precedent of
+# runner-consumer-check.yml — which added the identical types list for the
+# identical label-hatch reason and this block with it.
+#
+# The POINT of re-firing on a label is to SUPERSEDE a verdict computed against
+# the wrong runner tree, so the superseded run should die rather than run to
+# completion. Without this, applying a declaration leaves two same-named
+# check-runs racing to report on one head SHA — not something to leave to luck
+# on a required context — and each loser still burns a full Tauri workspace
+# compile (this file budgets ~33 min of runner-minutes for two of them; see
+# the note at the top). coord applies and strips dep labels programmatically,
+# so that multiplies this repo's most expensive required check per label
+# event.
+# Cancellation is scoped to PR runs ON PURPOSE. `github.ref` already separates
+# them (`refs/pull/<n>/merge` vs `refs/heads/main`), so a blanket
+# `cancel-in-progress: true` would not cross the streams — but it WOULD let one
+# push to main cancel another's run, and the push trigger above is now the only
+# post-merge drift measurement this repo takes (candidate-ci.yml excludes
+# check-drift). Superseding it is defensible in theory, since the newer run
+# measures a newer tree; it is not worth the risk to the one measurement that
+# closes the declared-sibling loop, and main pushes matching these paths are
+# rare enough that the saved minutes are noise.
+concurrency:
+  group: schema-drift-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least-privilege, stated explicitly rather than inherited.
+#
+# The sibling resolver below reads this PR's labels and qontinui-runner's open
+# PRs through the API, so `pull-requests: read` is a real requirement here,
+# not boilerplate. (With no declaration to find it still makes those two
+# reads; on a non-pull_request event it short-circuits to the default branch
+# with no API call at all.)
+#
+# Stated here rather than inherited from the repo-level
+# `default_workflow_permissions`, which is an operator-flippable setting that
+# is INVISIBLE in this file: flipping it to `restricted` would break sibling
+# resolution with nothing in any diff to explain it. No job here needs a write
+# scope — `contents: read` covers the checkouts.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    # ONE value for the generator's path, used by every step that touches it:
+    # the two check-generated-drift.sh invocations PARSE this script (to prove
+    # its output dirs are the ones they inspect), and the regen step EXECUTES
+    # it. Before this was hoisted, those were two independently-written path
+    # strings that merely happened to agree — so the script being cross-checked
+    # was not provably the script being run, which is the same
+    # "coupled-by-convention" defect the cross-check itself exists to close.
+    # Absolute, because the gate runs with working-directory: qontinui-schemas
+    # while the regen step runs from $GITHUB_WORKSPACE.
+    env:
+      GENERATE_TYPES_SH: ${{ github.workspace }}/qontinui-runner/src-tauri/scripts/generate_types.sh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          path: qontinui-schemas
+
+      # Resolve WHICH qontinui-runner tree to regenerate against — the
+      # DECLARED sibling PR when the pair declared one, runner's default
+      # branch otherwise — and materialise it SHA-pinned. See the long note in
+      # the header for why this replaced a bare `actions/checkout` of runner
+      # and why it reuses the runner's action instead of porting it.
+      #
+      # `repo:` is stated even though the action defaults to
+      # qontinui-schemas: from HERE the sibling is the runner. Getting that
+      # backwards would make the action resolve this repo against itself.
+      #
+      # `path:` is explicit because this job checks schemas out under
+      # `path: qontinui-schemas`, so the sibling belongs beside it at the
+      # workspace ROOT — not at the action's default
+      # `$GITHUB_WORKSPACE/../<name>`. `GENERATE_TYPES_SH` above is written
+      # against exactly this location.
+      #
+      # `accept-trailing-sibling: 'true'` is PASSED below. Both merge orders now
+      # resolve, which closes the LIMITATION this step used to carry: a schemas
+      # PR that LEADS, whose runner adaptation TRAILS. That case had no hatch,
+      # and it is not hypothetical — qontinui-schemas#144 sat unmergeable on it,
+      # its four `add!` registrations living on the open runner#1147, which
+      # already carried the correct `coord:downstream-of=qontinui-schemas#144`
+      # declaration. The resolver read that as no declaration at all.
+      #
+      # The opt-in decision, made in daylight as the old text asked. For a DRIFT
+      # check the question is about the PAIR — "do the checked-in artifacts
+      # match what the paired tree generates" — so it must read that tree in
+      # either merge order. That is exactly the axis the action itself sorts on
+      # (the compile-vs-pair paragraph in its header), and the runner's mirror gate
+      # (`qontinui-types-drift.yml`) has been opted in since 2026-08-12.
+      # This workflow is its twin; the asymmetry was the anomaly.
+      #
+      # WHAT THIS COSTS, stated rather than discovered later. A green here is a
+      # claim about a tree that has NOT landed. Between a leading schemas PR
+      # landing and its trailing runner PR landing, main's push-triggered run
+      # WILL be red — that is real, and the runner side already accepted the
+      # same window. Clearing that red needs a RE-RUN of the failed push run
+      # (`gh run rerun --failed <run id>`) once the sibling lands, because only
+      # `event: push` establishes a coord baseline; the `workflow_dispatch`
+      # trigger on this workflow refreshes the badge and leaves coord holding
+      # every PR in the repo. The trigger comment above carries the long form. A
+      # trailing head is also not merged with runner main, so if main has moved
+      # any codegen input since it branched, the regen reds on UNRELATED types;
+      # check that before blaming the schemas author. Note the compile half is
+      # already measured by `consumer-gate` (runner-consumer-check.yml leg 2),
+      # which resolves a trailing runner PR too — so this makes the repo's two
+      # required cross-repo gates agree rather than introducing a new posture.
+      - name: Check out sibling qontinui-runner (declared PR, else default branch)
+        id: sibling
+        uses: qontinui/qontinui-runner/.github/actions/checkout-sibling@main
+        with:
+          repo: qontinui/qontinui-runner
+          path: ${{ github.workspace }}/qontinui-runner
+          # ARMED 2026-08-27. This is a PAIR question, not a compile question,
+          # and the action's own rule sorts sites on exactly that axis
+          # (its header's compile-vs-pair paragraph): a site asking "do the
+          # checked-in artifacts match what the paired tree generates" must read
+          # that tree in EITHER merge order; every COMPILE site leaves this off.
+          # The runner's mirror gate `qontinui-types-drift.yml` has set it on
+          # its own `check-drift` sibling checkout since 2026-08-12. This is
+          # its twin -- the same contract measured from the other side -- so
+          # leaving it off was the asymmetry, not the safe default.
+          accept-trailing-sibling: 'true'
+
+      # Make the resolution legible in the run itself, not only inside the
+      # action's step log. A drift verdict means something different depending
+      # on which tree produced it, and a reader who does not know which tree
+      # was used cannot act on either colour: green against the wrong tree is
+      # the vacuous green this file's other guards exist to prevent, and red
+      # against the wrong tree sends the author to regenerate bindings that
+      # were already correct.
+      - name: Report which qontinui-runner tree this regenerated against
+        env:
+          SIB_SOURCE: ${{ steps.sibling.outputs.source }}
+          SIB_REF: ${{ steps.sibling.outputs.ref }}
+          SIB_SHA: ${{ steps.sibling.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # A refname may legally contain `|`, which would break out of the
+          # markdown table cell below. Values arrive via env: and are never
+          # re-parsed by the shell, so this is a rendering fix, not a security
+          # one — but a mangled provenance row is exactly the thing this step
+          # exists to make unambiguous.
+          SIB_REF="${SIB_REF//|/\\|}"
+          {
+            echo "### qontinui-runner tree used for regeneration"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| declaration | \`${SIB_SOURCE:-none}\` |"
+            echo "| ref | \`${SIB_REF:-main}\` |"
+            echo "| commit | \`${SIB_SHA:-n/a - default branch tip}\` |"
+            echo ""
+            # The resolver emits exactly one of: `none`; `trailing-declined`;
+            # or a `+`-joined subset of the four declaration forms
+            # (`downstream-of`, `upstream-of`, `self-upstream-of`,
+            # `sibling-downstream-of`). ANY of those may carry a trailing
+            # `+pinned`. Checkable against the action rather than guessed at:
+            # its `add_form`/`SOURCE=` lines build the join, `apply_pin`
+            # appends the suffix, and the `source:` output description spells
+            # out both. Cited by NAME, not by line number — the numbers this
+            # list used to carry had already moved by the time anyone re-read
+            # them, which is how the suffix came to be called nonexistent.
+            #
+            # `+pinned` IS emitted, and this site does not opt in to it: the
+            # action's `pin-file` input defaults to a non-empty path
+            # (`.github/sibling-pins.conf`), and `apply_pin` resolves that
+            # against $GITHUB_WORKSPACE first, then against the root of the
+            # repo owning the action. From here the second path is the
+            # RUNNER's manifest, because this job checks schemas out under
+            # `path: qontinui-schemas` so $GITHUB_WORKSPACE/.github does not
+            # exist. Neither manifest lists qontinui/qontinui-runner today, so
+            # the suffix cannot fire — but that is a fact about two config
+            # files, one of them in another repo, not a property of this
+            # workflow. Route it EXPLICITLY and FIRST. A pin means the tree
+            # came from neither a declaration nor a default-branch tip, which
+            # is the third answer the suffix exists to keep distinguishable,
+            # and every other arm below states it wrongly: `*)`, where an
+            # unrouted `none+pinned` lands, would announce a DECLARED runner
+            # PR that was never resolved.
+            case "${SIB_SOURCE:-none}" in
+              *+pinned)
+                echo "No declaration resolved, so the RECORDED PIN was used: the"
+                echo "commit above is the one CI is configured to build against --"
+                echo "NOT runner's default-branch tip, and NOT a PR head."
+                echo ""
+                echo "So a green here is a claim about that pinned commit alone. If"
+                echo "runner main has moved a codegen input since the pin was"
+                echo "recorded, this says nothing about whether these bindings match"
+                echo "runner main; the bump PR that moves the pin is where that gets"
+                echo "measured. The pin is deliberately the LOWEST-priority answer --"
+                echo "a coord dep-edge label on this PR outranks it, so declare the"
+                echo "pair to build against a different runner tree for this PR."
+                echo "The resolver's log line above names the manifest and the sha."
+                echo ""
+                echo "The 'ref' row above still reads main. That is the resolver's"
+                echo "default, not a second answer -- a pin is a COMMIT, and the"
+                echo "commit row is what was actually checked out."
+                ;;
+              none)
+                echo "No LEADING qontinui-runner sibling was resolved, so this"
+                echo "regenerated against runner's default branch — the correct"
+                echo "baseline for a schemas-only change."
+                echo ""
+                echo "This says nothing about whether a label EXISTS -- but"
+                echo "DIRECTION is no longer a possible explanation. This site sets"
+                echo "accept-trailing-sibling, so all four label forms resolve and a"
+                echo "declaration in EITHER merge order would have been followed."
+                echo ""
+                echo "So if you expected a pair to be followed and got none, the"
+                echo "cause is one of: no coord dep-edge label on either PR; a"
+                echo "malformed label; or one naming a CLOSED or nonexistent PR."
+                echo "Check that the label exists and its target is open -- do NOT"
+                echo "go re-pointing the direction, which was the pre-2026-08-27"
+                echo "advice here and is now a dead end."
+                ;;
+              trailing-declined)
+                # UNREACHABLE from this call site, and deliberately kept — the
+                # header says so ("`trailing-declined` is consequently
+                # unreachable ... a silently-missing arm is worse than an
+                # unused one") and this is the arm it is talking about. What
+                # the header does not say, and a reader standing here needs:
+                # the action assigns this value only under
+                # `[ -z "${leads}" ] && [ "${ACCEPT_TRAILING:-false}" != "true" ]`,
+                # so the one thing that can make this text appear in a real run
+                # is the `accept-trailing-sibling: 'true'` above having been
+                # removed. Check that first. And note where the live trailing
+                # case went: an ACCEPTED trailing sibling is `*)` now, handled
+                # by the ORDER split at the bottom of it, not here.
+                echo "A declaration was found but it orders the runner PR AFTER this"
+                echo "one, so it was DECLINED and the default branch used instead."
+                echo "If this PR carries bindings for a type that only exists on that"
+                echo "runner PR, the drift red below is expected until it lands."
+                ;;
+              *)
+                echo "Regenerated against the DECLARED runner PR above, NOT runner"
+                echo "main. A green here means the bindings match the PAIRED tree."
+                echo ""
+                echo "It does not by itself prove they will match runner main: that"
+                echo "holds only if the declared PR lands, unaltered, before this one."
+                echo "The push-triggered run on main re-measures against real runner"
+                echo "main after the land — that is the check that closes the loop,"
+                echo "and it is why the generated dirs are in this workflow's push"
+                echo "paths. If the pair's landing order slips, expect it to red."
+                echo ""
+                echo "The declared tree is a PR HEAD, not a merge with runner main."
+                echo "If runner main has moved any codegen input since that head"
+                echo "branched, this can red on an UNRELATED type -- check that"
+                echo "before regenerating anything."
+                # Which merge ORDER was declared changes what to expect next, so
+                # say it rather than printing the trailing caveat for both. The
+                # action tracks the same split (action.yml `leads`/`trails`): the
+                # LEADING forms are `downstream-of`/`upstream-of`, the TRAILING
+                # ones `self-upstream-of`/`sibling-downstream-of`. A pair declared
+                # in BOTH directions is rejected before this step runs (a cycle,
+                # action.yml `Contradictory merge ORDER`), so a `+`-join is always
+                # all-leading or all-trailing and this test cannot straddle. Match
+                # TRAILING first: `*upstream-of*` would also catch
+                # `self-upstream-of`.
+                case "${SIB_SOURCE:-}" in
+                  *self-upstream-of*|*sibling-downstream-of*)
+                    echo ""
+                    echo "ORDER: the runner PR is declared to land AFTER this one --"
+                    echo "a TRAILING sibling, which this site accepts. So the tree"
+                    echo "measured above will not be runner main for a while yet,"
+                    echo "and main WILL read red on schema-drift between the two"
+                    echo "lands. Once the sibling lands, clear that red with"
+                    echo "'gh run rerun --failed <the failed push run>': a re-run"
+                    echo "keeps event: push, which is the only event coord accepts"
+                    echo "as a main baseline. A 'gh workflow run schema-drift.yml"
+                    echo "--ref main' dispatch refreshes the badge only -- it leaves"
+                    echo "coord red, and so leaves every PR in this repo held."
+                    ;;
+                  *)
+                    echo ""
+                    echo "ORDER: the runner PR is declared to land BEFORE this one --"
+                    echo "a LEADING sibling. In that order runner main already"
+                    echo "carries the paired change by the time this PR lands, so no"
+                    echo "red window on main is expected. If the order slips and"
+                    echo "this lands first, the trailing case applies instead: main"
+                    echo "reds until the sibling lands, and only"
+                    echo "'gh run rerun --failed <the failed push run>' clears it"
+                    echo "for coord -- a --ref main dispatch refreshes the badge"
+                    echo "and leaves coord red."
+                    ;;
+                esac
+                ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "sibling declaration=${SIB_SOURCE:-none} ref=${SIB_REF:-main} sha=${SIB_SHA:-}"
+
+      # generate_types.sh runs `cargo build --bin export_schemas` which
+      # links the runner lib (Tauri-dependent). Tauri 2.x on Linux probes
+      # for libwebkit2gtk-4.1, libsoup, libgtk etc. via pkg-config in
+      # build scripts. Without these, cargo aborts at link/probe time.
+      # Mirrors the canonical list from qontinui-runner/.github/workflows/ci.yml.
+      - name: Install Tauri Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libatspi2.0-dev \
+            at-spi2-core
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      # compile_typescript.mjs does `import { compile } from
+      # 'json-schema-to-typescript'` from qontinui-schemas/scripts/.
+      # Node ESM resolution walks up to qontinui-schemas/node_modules/,
+      # so the package must be installed locally (a global -g install
+      # is not in Node ESM's default resolution path). package-lock.json
+      # is .gitignore'd, so `npm install` (not `npm ci`) — fresh resolve
+      # from the registry each run.
+      #
+      # That is only safe because both codegen deps are pinned EXACTLY (no
+      # caret) in qontinui-schemas/package.json: `json-schema-to-typescript`
+      # emits the .d.ts and `prettier` formats it, so either floating would
+      # surface every upstream release as fresh "drift" on PRs that changed
+      # nothing — the same reason datamodel-code-generator is pinned below.
+      # Until this change the TS side had no pin and it did not matter,
+      # because the TS arm of this gate was vacuously green. Now that it has
+      # signal, an unpinned generator would red every PR in both repos and
+      # read as "the new gate is broken" — which is how anti-vacuity guards
+      # get reverted. Bump deliberately, and regenerate in the same commit.
+      - name: Install qontinui-schemas npm deps
+        working-directory: qontinui-schemas
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Pin datamodel-code-generator: each minor version tweaks Pydantic
+      # output (e.g. 0.56→0.57 adds `from pydantic import Field` imports
+      # to enum-only modules). Without a pin, every upstream release would
+      # surface as fresh "drift" until someone regen'd locally with the
+      # new version. Bump deliberately, not by accident.
+      - name: Install datamodel-code-generator
+        run: pip install 'datamodel-code-generator==0.57.0'
+
+      # tauri_build::build() in qontinui-runner/src-tauri/build.rs reads
+      # tauri.conf.json's `frontendDist: "../dist"` and panics if the path
+      # doesn't exist. We don't actually need a real frontend build for
+      # schema export — the export_schemas binary only touches Rust schemar
+      # registries — so stub an empty dist/ with a placeholder index.html.
+      # The build script's `tauri::generate_context!()` will embed the
+      # placeholder, which is fine: the binary that reads the embedded
+      # frontend (the actual runner) is never invoked here.
+      - name: Stub qontinui-runner frontend dist
+        run: |
+          mkdir -p qontinui-runner/dist
+          printf '<!DOCTYPE html><html><head></head><body>schema-drift CI stub</body></html>\n' > qontinui-runner/dist/index.html
+
+      # generate_types.sh warns-and-skips instead of failing when node or
+      # datamodel-codegen is missing, leaving the working tree pristine — which
+      # would make every arm of the check below report a green it never
+      # verified. The arms verify the BASELINE; this verifies that the
+      # REGENERATION will actually happen. See the script for detail.
+      - name: Preflight — codegen toolchain present
+        working-directory: qontinui-schemas
+        run: bash scripts/check-generated-drift.sh --preflight
+
+      # CARGO_TARGET_DIR override: qontinui-runner is a workspace (Cargo.toml
+      # at the runner root declares [workspace] members = ["src-tauri", ...]),
+      # so cargo's default target-dir is qontinui-runner/target/. But
+      # generate_types.sh:21 hardcodes
+      # SCHEMAS_JSON="$PROJECT_ROOT/target/schemas.json" where
+      # $PROJECT_ROOT = qontinui-runner/src-tauri/. Force cargo to write to
+      # the script-expected per-package target dir so the bash redirection
+      # on script line 73 finds an existing target/ parent.
+      - name: Regenerate types
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
+        run: bash "$GENERATE_TYPES_SH"
+
+      # Uploaded on failed runs too, so a red drift check hands the developer
+      # the exact bytes CI expected instead of only a diff to reverse-engineer.
+      # Reproducing this output locally needs the full sibling-runner Rust
+      # toolchain plus the pinned datamodel-codegen; downloading the artifact
+      # and committing it is the cheap path.
+      #
+      # `!cancelled()` rather than `always()`: `always()` also runs during
+      # cancellation, and `continue-on-error` keeps a transient upload blip
+      # from reddening an otherwise-green gate. This artifact is purely
+      # diagnostic — it must never be the reason the gate fails, in either
+      # direction.
+      - name: Upload regenerated bindings
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-bindings
+          path: |
+            qontinui-schemas/ts/src/generated
+            qontinui-schemas/src/qontinui_schemas/generated
+          # `warn`, not `error`: this step runs on failed runs too, and a
+          # regen that died before writing anything must surface as the regen
+          # failure it is, not as a second, misleading upload failure.
+          if-no-files-found: warn
+
+      # The anti-vacuity guard. Implementation lives in this repo's
+      # scripts/check-generated-drift.sh, and qontinui-runner's mirror
+      # workflow (qontinui-types-drift.yml) invokes THE SAME FILE from the
+      # checkout it already makes of this repo.
+      #
+      # That is deliberate. The two workflows are one cross-repo contract, and
+      # a comment asking humans to keep them in step is not a mechanism — they
+      # diverged once inside a single change. Sharing the script makes the
+      # check travel on the same branch as the bindings it guards.
+      #
+      # Short version of what it does: `git diff` is blind to untracked files,
+      # so a gate that only diffs can be silenced by untracking its own
+      # baseline. That is exactly what happened — ts/src/generated was swept
+      # out of the index in 34709ada and this workflow's TypeScript arm was
+      # vacuously green from then until the change that added this script. So
+      # the script also asserts the baseline exists (arm 0) and looks for
+      # untracked regenerated output (arm 1), not just a diff (arm 2).
+      - name: Check for drift
+        working-directory: qontinui-schemas
+        run: bash scripts/check-generated-drift.sh --verify

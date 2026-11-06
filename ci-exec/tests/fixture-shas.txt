@@ -1,0 +1,9 @@
+multistate cd3dac4fc78b69feb956ab3ff2f535c08d8cec6d 1
+qontinui 6520f167cfeee37fae2085b0fad27206f1a0ea2a 3
+qontinui-cloud-control 77958e56177d27c0b71790e448f77102e39d39e1 2
+qontinui-runner fa7862a3e066b8c211886b6d9e730c8979d4fcbc 29
+qontinui-schemas adf1d7ec9c9ead55cfa07b04d03cb7b27266ce95 11
+qontinui-web 5d508d5f87ba3e05595a9dcc2256a7b8e457f0b1 27
+ui-bridge 7487dd9596b638cfaeae3cda9d7d295c546b4db6 11
+qontinui-supervisor a6e57285bb18d4213b85aab3a3173bad0152ff3b 3
+qontinui-inspect 0c43eca01a33f1522e9d6abab2ceeb954aee10a0 1

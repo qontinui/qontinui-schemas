@@ -1,0 +1,51 @@
+name: pending-registration-audit
+
+# Daily audit of codegen/pending-registration.toml — the declared waits that let
+# schema-drift's `check-drift` accept bindings ahead of qontinui-runner main.
+# Plan: 2026-10-13-schemas-check-drift-red-while-bindings-await-runner-registration
+#
+# WHY A SCHEDULE. `check-drift` only measures when something is pushed, so a row
+# whose runner PR closed, expired, or already landed (STALE) could otherwise sit
+# unnoticed between pushes. This job reds — with one `::error::` per row — on any
+# row that is INERT, STALE, or within 3 days of its 14-day expiry, and stays
+# green otherwise. It regenerates nothing and reads only GitHub.
+#
+# WHY A SEPARATE WORKFLOW — never a job inside schema-drift.yml. coord scores
+# main per (repo, workflow name), and scheduled runs of schema-drift would feed
+# coord's baseline-freshness check (qontinui-coord stuck_pr_watcher.rs). A red
+# audit there could read as a stale or red `check-drift` baseline and hold every
+# PR — the exact defect the declared waits exist to remove. A `schedule` run of
+# THIS workflow establishes no baseline (`establishes_main_baseline()` accepts
+# `event == push` only), so its red is an alarm that holds nothing.
+#
+# Public repo: GitHub-hosted runner, no spend (production-and-cost
+# github-actions-spend-is-zero governs private repos only).
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pending-registration-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Audit pending registrations
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/pending_registration.py audit

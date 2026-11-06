@@ -136,6 +136,23 @@ pub struct SpawnAuthorizationContract {
     pub max_fanout_bound: i32,
     /// What a freshly seeded row's `default_enabled` is.
     pub default_enabled: bool,
+    /// How old a last-known-good registry value may be and still decide a
+    /// spawn while the registry cannot be read; past it, the class-aware cold
+    /// arm decides instead. Without a bound, a read that fails for good (a
+    /// revoked credential, a decommissioned database) would let a value from
+    /// days ago override a preference the user changed since.
+    ///
+    /// Both enforcement points apply it, and they must agree, or for the
+    /// difference between the two bounds coord and the runner answer the same
+    /// switch differently. coord's registry fallback reads it from here.
+    ///
+    /// NOT yet single-sourced at the runner: `qontinui-runner` still declares
+    /// its own `MAX_SNAPSHOT_AGE` (12 h, `agent_authorization.rs`), equal to
+    /// this value today. That arm closes when the runner adopts the contract;
+    /// until then a change here must be matched there, which coord's
+    /// `the_retention_bound_is_the_contracts` makes a deliberate act by
+    /// restating the runner's value.
+    pub max_snapshot_age_secs: u64,
     pub kind_seeds: Vec<KindSeed>,
     pub class_seeds: Vec<ClassSeed>,
 }
@@ -231,6 +248,14 @@ impl SpawnAuthorizationContract {
                 "default_fanout_bound {} must be within 1..={}",
                 self.default_fanout_bound, self.max_fanout_bound
             ));
+        }
+        // A zero bound retains nothing: every read error would take the cold
+        // arm, which is the "unreadable resolves to a default" behaviour the
+        // retained value exists to replace.
+        if self.max_snapshot_age_secs == 0 {
+            return Err("max_snapshot_age_secs must be positive — a zero bound \
+                        retains no last-known value at all"
+                .into());
         }
         // One kind is one row, so `agent_name` must resolve to exactly one
         // path. `seeded_keys` dedupes on the (name, path) PAIR and so cannot
@@ -354,7 +379,7 @@ mod tests {
     #[test]
     fn the_embedded_contract_parses_and_validates() {
         let c = contract();
-        assert_eq!(c.kind_seeds.len(), 9, "the nine coord spawn kinds");
+        assert_eq!(c.kind_seeds.len(), 11, "the eleven coord spawn kinds");
         assert_eq!(c.spawn_paths.len(), 3);
         assert_eq!(c.dispositions, vec!["block", "degrade", "warn_proceed"]);
     }
@@ -376,6 +401,15 @@ mod tests {
         // of the contract that nothing else in this crate touches — so without
         // this assertion it could be flipped with no test going red.
         assert!(c.default_enabled);
+    }
+
+    /// The registry snapshot bound is the runner's 12 h `MAX_SNAPSHOT_AGE`.
+    /// Nothing in this crate reads the field, so this is the assertion that
+    /// keeps an edit to it from passing unnoticed while the runner still
+    /// declares its own copy.
+    #[test]
+    fn the_snapshot_age_bound_is_twelve_hours() {
+        assert_eq!(contract().max_snapshot_age_secs, 12 * 60 * 60);
     }
 
     /// The vocabularies are queryable, and the accessors actually discriminate.
@@ -420,12 +454,55 @@ mod tests {
         );
     }
 
+    /// The operator pager's remediation dispatch outlives the request that
+    /// started it, so it must sit under the standing-continuation class —
+    /// the counts above would not notice it moving to another path.
+    #[test]
+    fn operator_page_remediation_is_a_standing_continuation() {
+        let c = contract();
+        let k = c
+            .kind_seeds
+            .iter()
+            .find(|k| k.agent_name == "operator_page_remediation")
+            .expect("operator_page_remediation is seeded");
+        assert_eq!(k.spawn_path, "standing_continuation");
+    }
+
+    /// The stalled-train responder is its OWN kind, not a passenger on the
+    /// class row.
+    ///
+    /// coord consults it under its own key (`next_step::dispatch_admission_stall_fix`,
+    /// `preflight_vetoing(.., "admission_stall_fix_dispatch", ..)`), exactly as
+    /// it consults the PR and red-main fixers under theirs, so that an operator
+    /// deselecting one fixer does not silence the other two. Without a seed
+    /// that key resolved NO row and the consult fell through to the
+    /// `standing_continuation` class row alone — whose only off-switch stops
+    /// every standing spawn at once. Seeded, the responder has a per-path
+    /// off-switch of its own and stays under the standing class.
+    #[test]
+    fn admission_stall_fix_dispatch_is_seeded_as_its_own_standing_kind() {
+        let c = contract();
+        let k = c
+            .kind_seeds
+            .iter()
+            .find(|k| k.agent_name == "admission_stall_fix_dispatch")
+            .expect("admission_stall_fix_dispatch is seeded");
+        assert_eq!(k.spawn_path, "standing_continuation");
+        assert!(
+            c.seeded_keys().contains(&(
+                "admission_stall_fix_dispatch".to_string(),
+                "standing_continuation".to_string()
+            )),
+            "the seeder must WRITE the (kind, path) key coord's consult reads"
+        );
+    }
+
     /// Every seeded key is unique and every kind's path is a declared path.
     #[test]
     fn seeded_keys_are_well_formed() {
         let c = contract();
         let keys = c.seeded_keys();
-        assert_eq!(keys.len(), 9 + 2, "9 kinds + 2 seeded classes");
+        assert_eq!(keys.len(), 11 + 2, "11 kinds + 2 seeded classes");
         for (_, path) in &keys {
             assert!(c.spawn_paths.contains(path), "unknown path {path}");
         }
@@ -482,6 +559,17 @@ mod tests {
         let mut c = valid();
         c.default_fanout_bound = c.max_fanout_bound + 1;
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_a_zero_snapshot_age() {
+        let mut c = valid();
+        c.max_snapshot_age_secs = 0;
+        assert!(
+            c.validate().is_err(),
+            "a zero bound retains nothing, so every registry read error would \
+             resolve to the cold arm's default"
+        );
     }
 
     #[test]

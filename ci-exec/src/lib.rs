@@ -1,0 +1,84 @@
+//! The Qontinui CI executor.
+//!
+//! One executor, one manifest (plan
+//! `2026-10-04-coord-managed-ci-for-every-tenant-with-an-actions-free-mode`,
+//! D2/D3): a repo's `.qontinui/ci.toml` is the single source of what its CI
+//! runs, and this crate is the single thing that runs it — on the runner app
+//! lending a desktop, on the headless CI host agent, and in any shell through
+//! the `qontinui-ci` binary, which needs no coord at all (D5).
+//!
+//! The executed commands come EXCLUSIVELY from the manifest at the checked-out
+//! commit; a dispatch supplies a commit and a job name, never a command.
+//!
+//! | Module | What it owns |
+//! |---|---|
+//! | [`manifest`] | the `ci.toml` schema (v1 and v2 `[[jobs]]`) and its validation |
+//! | [`executor`] | one job end-to-end: checkout → manifest → canonical gate → provisioning → steps → report → cleanup |
+//! | [`checkout`] | the dispatch-scoped worktree and its cleanup |
+//! | [`sibling`] | sibling-repo resolution and materialisation |
+//! | [`sibling_git`] | the isolated git environment a sibling's git runs under |
+//! | [`tools`] | the closed tool registry and its version-keyed cache |
+//! | [`services`] | the closed container-service registry and its lifecycle |
+//! | [`junit`] | capturing a run's test report before cleanup removes it |
+//! | [`outcomes`] | capturing a run's `run_outcomes` entries before cleanup removes them |
+//! | [`host_sizing`] | build/test parallelism sized from the host |
+//! | [`canonical`] | the `[canonical]` toolchain gate |
+//! | [`dispatch`] | the dispatch payload and the [`dispatch::Admission`] seam |
+//! | [`report`] | the [`report::Reporter`] seam and the capture-before-cleanup receipt |
+//! | [`model`] | the `[model]` declaration, and model access for the steps that declare it |
+//! | [`host`] | the traits a host implements |
+//! | [`standalone`] | the host implementations for a plain shell (`qontinui-ci`) |
+//! | [`import`] (feature `import`) | `qontinui-ci import`: GitHub workflows → a v2 manifest, and the `--report` coverage check |
+//! | [`gen_workflow`] (feature `import`) | `qontinui-ci gen-workflow`: the generated hybrid-mode GitHub workflow and its `--check` |
+//! | [`gha`] (feature `import`) | the read-only GitHub workflow model the importer reads |
+//! | [`shell`] (feature `import`) | the argv subset of shell a `run:` script must stay inside to be imported |
+
+pub mod canonical;
+pub mod checkout;
+pub mod dispatch;
+pub mod executor;
+#[cfg(feature = "import")]
+pub mod gen_workflow;
+#[cfg(feature = "import")]
+pub mod gha;
+pub mod host;
+pub mod host_sizing;
+#[cfg(feature = "import")]
+pub mod import;
+pub mod junit;
+pub mod manifest;
+pub mod model;
+pub mod outcomes;
+pub mod report;
+pub mod services;
+#[cfg(feature = "import")]
+pub mod shell;
+pub mod sibling;
+pub mod sibling_git;
+pub mod standalone;
+pub mod tools;
+
+/// The local directory NAME for a repo slug: `owner/name` → `name`; a bare
+/// name passes through. Primary checkouts, dispatch worktrees and siblings are
+/// all laid out by this name, because it is what a relative path dependency
+/// (`../qontinui-schemas`) spells.
+pub fn local_repo_name(repo: &str) -> &str {
+    repo.rsplit('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(repo)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::local_repo_name;
+
+    #[test]
+    fn local_repo_name_is_the_slug_basename() {
+        assert_eq!(
+            local_repo_name("qontinui/qontinui-runner"),
+            "qontinui-runner"
+        );
+        assert_eq!(local_repo_name("qontinui-runner"), "qontinui-runner");
+    }
+}

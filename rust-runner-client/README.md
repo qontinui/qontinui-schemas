@@ -5,6 +5,12 @@ Typed Rust HTTP client for the [qontinui-runner](https://github.com/qontinui/qon
 [`qontinui-types::wire::placement`](https://docs.rs/qontinui-types) so the
 wire format is single-sourced.
 
+From 0.3.0 on, its minor version moves with each `qontinui-types` major
+(0.3.x builds on `qontinui-types` 5.x), so a `^0.3` requirement does not pull
+in a new `qontinui-types` major. The 0.2.x line spanned several
+`qontinui-types` majors (0.2 to 4.x). A `^0.2` requirement does not select
+0.3.0, so moving to `qontinui-types` 5 means changing the requirement to `0.3`.
+
 Used by `qontinui-supervisor` and any future fleet-management UI to avoid
 duplicating URL building, the runner's `ApiResponse<T>` envelope unwrapping,
 and the round-trip parsing.
@@ -64,12 +70,11 @@ not `native-tls`, to match the rest of the qontinui ecosystem.
   Breaking changes will bump the minor version per Cargo's pre-1.0 SemVer
   rules; the CHANGELOG calls them out explicitly. Wire-format compatibility
   is the responsibility of `qontinui-types`.
-- **Runner version**: built against the `/spawn-placement/{preview,temp}`
-  surface the runner has stabilized as of `qontinui-types 0.1.x`. The
-  `qontinui-types` dependency is constrained as `^0.1`, so a runner that
-  speaks `qontinui-types 0.2.x` will not be compatible without a runner-client
-  bump.
+- **Runner version**: built against the runner's `/spawn-placement/{preview,temp}`
+  surface. The `qontinui-types` dependency is a caret requirement on one major
+  (see the top of this file), so a runner speaking a newer `qontinui-types`
+  major needs a runner-client minor built on it.
 
 ## License
 
-Apache-2.0. See the workspace [`LICENSE`](https://github.com/qontinui/qontinui-schemas/blob/main/LICENSE).
+AGPL-3.0-or-later. See the workspace [`LICENSE`](https://github.com/qontinui/qontinui-schemas/blob/main/LICENSE).

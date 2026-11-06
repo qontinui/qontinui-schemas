@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Integration tests for Phase 1 of the UI Bridge vision pipeline. Covers
 //! every distinct Verify branch and the `safe_image` happy path.
 

@@ -1,0 +1,21 @@
+name: boundary-guard
+
+# Fails the build if cloud-control (open, AGPL) ever imports the closed
+# qontinui-coord service source. cloud-control may call coord over its network
+# API, but must never import its source. See scripts/check_no_coord_import.py.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  no-coord-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: cloud-control must not import qontinui-coord source
+        run: python3 scripts/check_no_coord_import.py

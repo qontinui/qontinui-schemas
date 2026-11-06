@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Typography analyzer — clusters elements by font characteristics and
 //! flags inconsistencies. e.g., "16 text elements but 4 distinct
 //! font-family declarations" usually indicates an unsynced design system.
@@ -7,6 +8,7 @@ use std::collections::BTreeMap;
 use super::{AnalyzerResult, Finding, Severity};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::ElementSnapshot;
+use crate::observation::UnknownCode;
 
 pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     let coverage = SnapshotCoverage::of(snapshot);
@@ -39,6 +41,7 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     // list before the verdict existed.
     if text_elements == 0 {
         return AnalyzerResult::blocked(
+            UnknownCode::InputMissing,
             format!(
                 "no element carries text (0/{}), so no font family, size or line-height \
                  was observed and no consistency claim can be made.",

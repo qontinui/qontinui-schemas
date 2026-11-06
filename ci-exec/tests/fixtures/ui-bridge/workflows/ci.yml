@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      # Coord pushes the rebased-onto-main tip of a merge proposal to these
+      # refs before it lands. Without these globs the candidate lane runs
+      # almost nothing, so the tree that actually lands is less checked than
+      # the PR head. See plan 2026-08-23-stacked-pr-ci-parity Phase 4.
+      - 'merge-candidate/**'
+      - 'merge-candidate-spec/**'
+      - 'merge-candidate-batch/**'
+  # Unfiltered on purpose: a stacked PR (base != main) must get the same check
+  # set as a base-on-main PR. Plan 2026-08-23-stacked-pr-ci-parity Phase 5.
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # 22.x: LTS that supports `node --experimental-strip-types` so the
+        # diagnostics generator (scripts/gen-diagnostics.ts) runs with no
+        # transpile step in `diagnostics:check`.
+        node-version: [22.x]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Diagnostics drift check
+        # Re-runs scripts/gen-diagnostics.ts and fails on any drift between
+        # diagnostics/codes.json and the committed TS/Python mirrors. The Rust
+        # mirror lives in qontinui-schemas and is drift-checked by that repo's
+        # own CI (it is not checked out here).
+        run: npm run diagnostics:check
+
+      - name: Redaction surface ratchet
+        # §4.6 Layer-3: fails if the UI Bridge route surface or the Layer-2
+        # projection-module list drifts from redaction-surface.manifest.json —
+        # so a new client-reachable route/projection gets a conscious redaction
+        # decision. Runs before Lint (Layers 1-2) so a surface change is caught
+        # even when the new file has no raw-read lint violation yet.
+        run: npm run redaction:check-surface
+
+      - name: Dependency range ratchet
+        # Fails if a published package declares an internal @qontinui/* range
+        # that is unbounded above, a hand-maintained OR-chain, or stale against
+        # the depended-on package's current source version. Guards the
+        # invariant PR #147 established; without it every one of those defects
+        # is reintroducible by a single hand edit.
+        run: npm run deps:check-ranges
+
+      - name: Documentation symbol ratchet self-test
+        # Pins the parsers and roster checks of the step below against fixtures.
+        # It runs FIRST on purpose: a regression in that gate does not turn it
+        # red, it turns it QUIET — every silent pass found there so far (a fence
+        # trailing an `@example` tag, a `//` comment run split by a blank line)
+        # was ACCEPTED while its siblings in the same file failed correctly, and
+        # nothing about a green run distinguishes a gate that checked 496 blocks
+        # from one that checked 495. So a broken gate is reported as a broken
+        # gate rather than as a clean repository.
+        run: npm run docs:check-symbols:test
+
+      - name: Documentation symbol ratchet
+        # Name-checks every import in every fenced ts/tsx/js block on every
+        # guarded documentation surface — docs-site/docs, docs, packages/,
+        # examples/, and the root README.md / CONTRIBUTING.md (see DOC_SURFACES
+        # in the script) — against the workspace's real package names, `exports`
+        # maps and export surfaces. The surfaces beyond docs-site matter as much
+        # as it does: README.md is the repo's front door and a package's README
+        # is its npm page, so an unscoped name there 404s for a reader who never
+        # opens the docs site at all.
+        #
+        # It checks a second surface no markdown glob can reach: the COMMENTS of
+        # every tracked .ts/.tsx/.mts/.cts/.js/.jsx/.mjs/.cjs source. A JSDoc
+        # `@example` is documentation that ships — it renders in every IDE hover
+        # and is the copy a reader is most likely to paste. #160 found two such
+        # blocks importing `@anthropic-ai/ui-bridge-sdk`, a scope this project
+        # has never owned, and fixed them by hand because nothing was looking;
+        # the same rule now judges a fenced block wherever a reader meets it.
+        # Because it reads FENCED blocks, that surface has a roster check of its
+        # own: an `@example` carrying no fence — or one trailing the tag, which
+        # opens no block — is read by nothing, so the step fails and names it
+        # rather than passing over a blind spot in silence.
+        #
+        # It also refuses a published target the build never emits. A
+        # package's manifest is its public API, so a target whose `dist/…` file
+        # no tsup `entry` produces is ERR_MODULE_NOT_FOUND in every installed
+        # copy — or, for a `bin`, `npx` failing on the first command a new user
+        # runs — and it is invisible to the check above by construction, which
+        # resolves every dist target back to `src`, exactly where such a target
+        # still looks healthy. `@qontinui/ui-bridge` published "./discovery"
+        # that way, and the `@example` importing it was reported as fully
+        # VERIFIED. Every manifest field that names a built file is read, not
+        # `exports` alone: `bin`, `main`, `module`, `types`, `unpkg`, `jsdelivr`
+        # — so a package publishing its entry points the legacy way, with no
+        # `exports` map at all, is checked rather than skipped.
+        #
+        # A declared entry does not guarantee a DECLARATION, so a `types`
+        # target is asked one question further: an entry in a `dts: false`
+        # tsup block emits the JavaScript and no `.d.ts`, so the target above
+        # passes while a TypeScript consumer still gets TS2307 in every
+        # installed copy. `dts: false` is only read as evidence for a package
+        # whose `build` script runs no `tsc` pass; anything else is UNKNOWN
+        # and is skipped rather than guessed at. Known instances are
+        # enumerated in UNDECLARED_TYPE_WAIVERS with a reason, and that list
+        # is exact and shrink-only — a waiver that waives nothing fails.
+        #
+        # The roster is also checked for COMPLETENESS: every .md/.mdx file the
+        # repo tracks must be on a guarded surface or named in UNGUARDED_DOCS
+        # with a reason, so a new documentation tree cannot land unchecked. The
+        # file list comes from `git ls-files`, which is what keeps the verdict a
+        # property of the commit rather than of whatever the working tree
+        # happens to have built (coverage/, target/, .next/ ...).
+        # The `docs` job cannot host this: it runs
+        # `npm ci` with working-directory docs-site, so packages/* is never
+        # installed there and there would be nothing to resolve against. This
+        # job's root `npm ci` is what makes the check possible, which is why the
+        # gate lives here beside the other ratchets rather than next to the
+        # Docusaurus build it protects.
+        #
+        # Docusaurus validates links and MDX syntax and nothing else — it never
+        # executes, type-checks or even name-checks a code block, so a page can
+        # name a nonexistent package and three nonexistent exports and still
+        # build green. That is exactly how it happened.
+        run: npm run docs:check-symbols
+
+      - name: CI manifest ratchet
+        # Validates .qontinui/ci.toml against the runner's parser contract and
+        # enforces the parity invariant that file's header declares: its steps
+        # mirror this job and `docs`, step for step and in order. Without it the
+        # product's local-CI lane silently drifts to running FEWER gates than
+        # this one — and a lane that is green because it checks less is the
+        # worst outcome for two lanes meant to agree on a verdict.
+        run: npm run ci:check-manifest
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # Topological build order lives in the root build script — see README "Development".
+        run: npm run build
+
+      - name: Build again (order-independence guard)
+        # The first build always runs on a clean checkout, so it never walks a
+        # workspace's built `dist/` — which is exactly why CI stayed green
+        # through the esbuild externals bug fixed in dee0f20: bundling the
+        # wrapper barrel only reaches its Node-only imports once
+        # ui-bridge-wrapper HAS a dist/. Every local build after the first hit
+        # it; CI could not. Re-running the build over the populated tree is the
+        # cheap reproduction of that state, and keeps the class fixed.
+        run: npm run build
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+  python-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: packages/ui-bridge-python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint with ruff
+        working-directory: packages/ui-bridge-python
+        run: ruff check .
+
+      - name: Type check with mypy
+        working-directory: packages/ui-bridge-python
+        run: mypy ui_bridge
+
+      - name: Test with pytest
+        working-directory: packages/ui-bridge-python
+        run: pytest
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Build documentation
+        working-directory: docs-site
+        run: npm run build

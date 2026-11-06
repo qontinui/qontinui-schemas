@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Post-encode metadata stripping for PNG / JPEG / WebP byte streams.
 //!
 //! Each format has a well-defined container structure with a small set of

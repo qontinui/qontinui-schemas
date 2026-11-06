@@ -1,0 +1,25 @@
+{
+  "status": "unknown",
+  "unknown": {
+    "code": "input_missing",
+    "detail": "all 3 registered element(s) report visible: false (hidden=1, occluded=2), so whatever is on screen is not a registered element and there is nothing on screen to measure; this says nothing about whether the page is blank"
+  },
+  "provenance": {
+    "producer": {
+      "id": "sdk/page-health",
+      "version": "0.36.0"
+    },
+    "observedAt": "2026-09-19T13:11:23.919Z",
+    "evaluatedAt": "2026-11-02T00:00:00.000Z",
+    "coverage": {
+      "considered": 0,
+      "measured": 0,
+      "unmeasured": []
+    },
+    "confidence": null,
+    "cache": null,
+    "source": {
+      "snapshotId": "ubs2_4g_4g_8cf05f521ac8a312_9fd9a75c99edb7e9"
+    }
+  }
+}

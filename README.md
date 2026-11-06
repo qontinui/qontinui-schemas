@@ -182,6 +182,8 @@ This is an open-source project maintained by Joshua Spinak. Breaking changes are
 
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for full terms.
 
+**One exception: the `vision-audit` analyzer is MIT.** The [`rust-vision-core/`](rust-vision-core/) crate (`qontinui-vision-core`) and the `vision-audit` binary built from it are licensed under the MIT License — see [`rust-vision-core/LICENSE`](rust-vision-core/LICENSE). The analyzer runs inside other people's development pipelines (CI style gates, acceptance harnesses), so it carries the same permissive licence as the UI Bridge. It depends on no other crate in this repository. Everything else here stays AGPL-3.0-or-later.
+
 ## Related Projects
 
 - [qontinui](https://github.com/qontinui/qontinui) - Core automation library

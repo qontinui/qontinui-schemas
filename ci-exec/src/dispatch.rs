@@ -1,0 +1,406 @@
+//! The dispatch protocol every CI host speaks: the payload coord sends, the
+//! identifier gates that run before any of it touches disk or a URL, and the
+//! [`Admission`] seam a host puts in front of the executor.
+//!
+//! Coord publishes two events per device:
+//!
+//! - `events.ci.build_requested.<device_id>` — a [`DispatchPayload`];
+//! - `events.ci.build_cancelled.<device_id>` — a [`CancelPayload`].
+//!
+//! How a host receives them (the runner's `/ws` subscription, the host agent's
+//! slot loop) is the host's business; what they mean is this module's.
+
+use serde::Deserialize;
+use tracing::warn;
+
+/// Default manifest path when the dispatch omits it.
+fn default_manifest_path() -> String {
+    ".qontinui/ci.toml".to_string()
+}
+
+/// The job a dispatch runs when it names none. A v1 manifest reads as exactly
+/// one job of this name, so every dispatch coord sends today (it does not name
+/// a job yet) runs the whole v1 step list, as before.
+pub const DEFAULT_JOB: &str = "ci";
+
+/// A `events.ci.build_requested.<device_id>` dispatch payload. Unknown fields
+/// are tolerated (coord may grow the shape); `manifest_path`, `job` and
+/// `coord_http_url` degrade to sane defaults so a slightly-lean payload is
+/// still runnable/reportable.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DispatchPayload {
+    pub dispatch_id: String,
+    /// Coord repo slug (`owner/name`) or bare repo name.
+    pub repo: String,
+    pub head_sha: String,
+    /// Resolved fetch URL (for coord-origin repos this is the git door /
+    /// mirror — a branch pushed only to GitHub is invisible there).
+    pub fetch_url: String,
+    /// `refs/heads/merge-candidate/<proposal_id>` or `refs/ci-dispatch/…`.
+    pub candidate_ref: String,
+    /// Pull request this dispatch is validating, when there is one.
+    ///
+    /// This is the ONLY key the sibling declaration rule turns on
+    /// ([`crate::sibling::resolve_declaration`]), and its absence is a real
+    /// answer, not a gap to paper over: coord pushes the SAME
+    /// `refs/heads/merge-candidate/<proposal_id>` into every repo of a
+    /// multi-repo proposal, so a dispatch with no pull request resolves
+    /// siblings to their branch WITHOUT a declaration probe — exactly what the
+    /// Actions composite action does off a `pull_request` event, and for the
+    /// same reason (the candidate ref is force-pushed and deleted as the
+    /// proposal resolves).
+    #[serde(default)]
+    pub pr_number: Option<u64>,
+    #[serde(default = "default_manifest_path")]
+    pub manifest_path: String,
+    /// The manifest job to run (`[[jobs]].name`). `None` — what every coord
+    /// dispatch is today — runs [`DEFAULT_JOB`]; see [`Self::job_name`]. Kept
+    /// as an `Option` rather than defaulted at parse time because the
+    /// executor must know whether the job was NAMED: a defaulted job a v2
+    /// manifest does not declare is a non-verdict (`job_not_declared`), while
+    /// a named job it does not declare is the manifest's fault. An empty or
+    /// all-whitespace `job` names nothing, so it reads as `None`.
+    #[serde(default, deserialize_with = "blank_is_none")]
+    pub job: Option<String>,
+    /// Check-run context coord will publish the verdict under. The executor
+    /// only logs it (the verdict write is coord-side, keyed by dispatch_id).
+    #[serde(default)]
+    pub check_name: String,
+    /// Coord HTTP base for the progress/result POSTs. Empty ⇒ the host falls
+    /// back to its own configured coord base.
+    #[serde(default)]
+    pub coord_http_url: String,
+    /// Coord's per-dispatch model-access decision (plan
+    /// `2026-10-13-ci-node-runs-model-dependent-eval-steps`, D7). Absent — an
+    /// older coord — reads as `not_offered_by_coord`: the executor fails
+    /// closed.
+    #[serde(default)]
+    pub model_access: Option<ModelAccessGrant>,
+}
+
+/// Coord's answer to "may this dispatch's `model = true` steps call a model".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ModelAccessGrant {
+    #[serde(default)]
+    pub granted: bool,
+    /// Coord's closed refusal reason when not granted (`fork_pr`,
+    /// `preference_off_repo`, …).
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// `live`, `last_known` or `unknown` — how coord read the preference.
+    #[serde(default)]
+    pub basis: Option<String>,
+    /// Coord's own account of a failed read behind a refusal (always with
+    /// `grant_unavailable`, sometimes with `fork_status_unknown`,
+    /// `preference_unknown` or `rate_capped`). Free text: it goes to the
+    /// dispatch log only, never into a step's environment, where only the
+    /// closed `reason` is exported.
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
+/// `""` / whitespace-only → `None`; anything else is kept as sent.
+fn blank_is_none<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let raw = Option::<String>::deserialize(d)?;
+    Ok(raw.filter(|s| !s.trim().is_empty()))
+}
+
+impl DispatchPayload {
+    /// The job this dispatch runs: the one it names, else [`DEFAULT_JOB`].
+    pub fn job_name(&self) -> &str {
+        self.job.as_deref().unwrap_or(DEFAULT_JOB)
+    }
+}
+
+/// A `events.ci.build_cancelled.<device_id>` payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CancelPayload {
+    pub dispatch_id: String,
+}
+
+/// A dispatch_id is used in filesystem paths (`.ci-worktrees/<id>`) and in
+/// the progress/result URL path, so it must be a plain token. Coord mints
+/// UUIDs; anything else is dropped before it can touch disk or a URL.
+pub fn dispatch_id_is_safe(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// The repo slug is joined into local paths via its basename
+/// ([`crate::local_repo_name`]); require plain `owner/name`-style tokens so a
+/// hostile slug can't traverse. Every `/`-separated segment must be non-empty
+/// and not `.`: a leading or trailing `/` (`"/"`, `"/tmp/x/"`) or a `//` would
+/// make the basename empty or the whole slug, and an absolute or empty name
+/// handed to `Path::join` REPLACES or IS the CI root.
+pub fn repo_slug_is_safe(repo: &str) -> bool {
+    !repo.is_empty()
+        && repo.len() <= 200
+        && !repo.contains("..")
+        && repo
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+        && repo.split('/').all(|seg| !seg.is_empty() && seg != ".")
+}
+
+/// A host's gate between "coord sent a dispatch" and "the executor runs it".
+///
+/// Host-pressure admission — slot caps, memory headroom, disk floors, queueing
+/// — is specific to the machine, so each host implements it; the runner's
+/// lives in its `ci_node::admission`. Whatever an implementation admits it runs
+/// through [`crate::executor::run_dispatch`], and whatever it rejects it
+/// reports as `cancelled` with a reason (a rejection is a non-verdict about the
+/// code).
+pub trait Admission: Send + Sync {
+    /// Accept, defer or reject one dispatch.
+    fn submit(&self, payload: DispatchPayload);
+    /// Cancel a running or queued dispatch. Unknown ids are a no-op.
+    fn cancel(&self, dispatch_id: &str);
+}
+
+/// The two coord events this protocol carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchEvent {
+    BuildRequested,
+    BuildCancelled,
+}
+
+/// Parse one event body and hand it to `admission`. A body that does not parse
+/// is logged and dropped — one malformed frame must never stop a host's event
+/// loop.
+pub fn route(admission: &dyn Admission, event: DispatchEvent, body: serde_json::Value) {
+    match event {
+        DispatchEvent::BuildRequested => match serde_json::from_value::<DispatchPayload>(body) {
+            Ok(payload) => admission.submit(payload),
+            Err(e) => warn!("ci: build_requested payload did not parse: {e}"),
+        },
+        DispatchEvent::BuildCancelled => match serde_json::from_value::<CancelPayload>(body) {
+            Ok(cancel) => admission.cancel(&cancel.dispatch_id),
+            Err(e) => warn!("ci: build_cancelled payload did not parse: {e}"),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[test]
+    fn dispatch_id_safety_gate() {
+        assert!(dispatch_id_is_safe("0198f2b4-1111-7aaa-bbbb-cccccccccccc"));
+        assert!(dispatch_id_is_safe("abc_DEF-123"));
+        assert!(!dispatch_id_is_safe(""));
+        assert!(!dispatch_id_is_safe("../../etc"));
+        assert!(!dispatch_id_is_safe("a/b"));
+        assert!(!dispatch_id_is_safe("a b"));
+        assert!(!dispatch_id_is_safe(&"x".repeat(65)));
+    }
+
+    #[test]
+    fn repo_slug_safety_gate() {
+        assert!(repo_slug_is_safe("qontinui/qontinui-runner"));
+        assert!(repo_slug_is_safe("qontinui-runner"));
+        assert!(repo_slug_is_safe("owner/repo.name"));
+        assert!(!repo_slug_is_safe(""));
+        assert!(!repo_slug_is_safe("owner/../secret"));
+        assert!(!repo_slug_is_safe("repo name"));
+        assert!(!repo_slug_is_safe("repo\\name"));
+        // Leading/trailing `/`, empty segments and `.` segments: the basename
+        // would be empty, absolute, or `.` — each one the CI root itself.
+        for bad in [
+            "/",
+            "/tmp/x/",
+            "/abs",
+            "owner/",
+            "owner//name",
+            ".",
+            "owner/.",
+        ] {
+            assert!(!repo_slug_is_safe(bad), "{bad}");
+        }
+    }
+
+    /// The dispatch payload parses from the pinned wire contract, and the
+    /// optional fields default when omitted — `job` to the one job a v1
+    /// manifest has, so a coord that does not send it keeps working.
+    #[test]
+    fn dispatch_payload_parses_pinned_contract() {
+        let full: DispatchPayload = serde_json::from_value(serde_json::json!({
+            "dispatch_id": "0198f2b4-1111-7aaa-bbbb-cccccccccccc",
+            "repo": "qontinui/qontinui-runner",
+            "head_sha": "deadbeef",
+            "fetch_url": "https://github.com/qontinui/qontinui-runner.git",
+            "candidate_ref": "refs/heads/merge-candidate/42",
+            "manifest_path": ".qontinui/ci.toml",
+            "check_name": "qontinui-ci-node",
+            "coord_http_url": "https://coord.qontinui.io",
+        }))
+        .expect("pinned contract must parse");
+        assert_eq!(full.manifest_path, ".qontinui/ci.toml");
+        assert_eq!(full.check_name, "qontinui-ci-node");
+        assert_eq!(full.pr_number, None);
+        assert_eq!(full.job, None);
+        assert_eq!(full.job_name(), DEFAULT_JOB);
+
+        // The sibling declaration key and a named job, when coord sends them.
+        let with_pr: DispatchPayload = serde_json::from_value(serde_json::json!({
+            "dispatch_id": "d1",
+            "repo": "r",
+            "head_sha": "s",
+            "fetch_url": "u",
+            "candidate_ref": "refs/heads/merge-candidate/1",
+            "pr_number": 1008,
+            "job": "holder-crates",
+        }))
+        .expect("pr_number and job must parse");
+        assert_eq!(with_pr.pr_number, Some(1008));
+        assert_eq!(with_pr.job.as_deref(), Some("holder-crates"));
+        assert_eq!(with_pr.job_name(), "holder-crates");
+
+        let lean: DispatchPayload = serde_json::from_value(serde_json::json!({
+            "dispatch_id": "d1",
+            "repo": "r",
+            "head_sha": "s",
+            "fetch_url": "u",
+            "candidate_ref": "refs/heads/merge-candidate/1",
+        }))
+        .expect("lean payload must parse with defaults");
+        assert_eq!(lean.manifest_path, ".qontinui/ci.toml");
+        assert!(lean.check_name.is_empty());
+        assert!(lean.coord_http_url.is_empty());
+    }
+
+    /// Coord's model-access key parses with its closed reason, tolerates
+    /// keys it does not know (`dial`), and is `None` from an older coord —
+    /// which the executor reads as `not_offered_by_coord`.
+    #[test]
+    fn model_access_parses_and_is_absent_from_an_older_coord() {
+        let base = serde_json::json!({
+            "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+            "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x",
+        });
+        let older: DispatchPayload = serde_json::from_value(base.clone()).unwrap();
+        assert_eq!(older.model_access, None);
+        let mut refused = base.clone();
+        refused["model_access"] = serde_json::json!({
+            "granted": false, "reason": "fork_pr", "basis": "live", "dial": {"tenant": "on"},
+        });
+        let refused: DispatchPayload = serde_json::from_value(refused).unwrap();
+        let grant = refused.model_access.unwrap();
+        assert!(!grant.granted);
+        assert_eq!(grant.reason.as_deref(), Some("fork_pr"));
+        let mut granted = base;
+        granted["model_access"] = serde_json::json!({"granted": true, "basis": "live"});
+        let granted: DispatchPayload = serde_json::from_value(granted).unwrap();
+        assert!(granted.model_access.unwrap().granted);
+    }
+
+    /// The exact grant objects coord's `ModelAccess::to_json` writes (the
+    /// shared fixture qontinui-coord asserts it produces, at
+    /// `crates/coord/testdata/ci_model_access/model_access_grants.json`)
+    /// parse here, `null` reason and `detail` included.
+    #[test]
+    fn coord_grant_fixture_parses() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../testdata/model/model_access_grants.json"))
+                .unwrap();
+        let parse = |key: &str| -> ModelAccessGrant {
+            serde_json::from_value(fixture[key].clone()).unwrap_or_else(|e| panic!("{key}: {e}"))
+        };
+        let granted = parse("granted");
+        assert!(granted.granted);
+        assert_eq!(granted.reason, None);
+        assert_eq!(granted.basis.as_deref(), Some("live"));
+        assert_eq!(granted.detail, None);
+        let unavailable = parse("grant_unavailable");
+        assert!(!unavailable.granted);
+        assert_eq!(unavailable.reason.as_deref(), Some("grant_unavailable"));
+        assert_eq!(unavailable.basis.as_deref(), Some("unknown"));
+        assert_eq!(
+            unavailable.detail.as_deref(),
+            Some("tenant_repos:pg_error:57P01")
+        );
+        let off = parse("preference_off_repo");
+        assert_eq!(off.reason.as_deref(), Some("preference_off_repo"));
+        assert_eq!(off.detail, None);
+        for key in ["grant_unavailable", "preference_off_repo"] {
+            let reason = parse(key).reason.unwrap();
+            assert!(
+                crate::model::COORD_REFUSALS.contains(&reason.as_str()),
+                "{reason} is a coord reason ci-exec does not know"
+            );
+        }
+    }
+
+    #[derive(Default)]
+    struct Seen {
+        submitted: Mutex<Vec<String>>,
+        cancelled: Mutex<Vec<String>>,
+    }
+
+    impl Admission for Seen {
+        fn submit(&self, payload: DispatchPayload) {
+            self.submitted.lock().unwrap().push(payload.dispatch_id);
+        }
+        fn cancel(&self, dispatch_id: &str) {
+            self.cancelled.lock().unwrap().push(dispatch_id.to_string());
+        }
+    }
+
+    /// Each event reaches its admission method, and a body that does not parse
+    /// reaches neither.
+    #[test]
+    fn route_hands_each_event_to_its_admission_method() {
+        let seen = Seen::default();
+        route(
+            &seen,
+            DispatchEvent::BuildRequested,
+            serde_json::json!({
+                "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+                "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x",
+            }),
+        );
+        route(
+            &seen,
+            DispatchEvent::BuildCancelled,
+            serde_json::json!({ "dispatch_id": "d2" }),
+        );
+        route(
+            &seen,
+            DispatchEvent::BuildRequested,
+            serde_json::json!({ "nope": 1 }),
+        );
+        route(
+            &seen,
+            DispatchEvent::BuildCancelled,
+            serde_json::json!("garbage"),
+        );
+        assert_eq!(seen.submitted.lock().unwrap().as_slice(), ["d1"]);
+        assert_eq!(seen.cancelled.lock().unwrap().as_slice(), ["d2"]);
+    }
+
+    /// A blank `job` names nothing: it is the defaulted job, not a job named
+    /// "" that no manifest could declare.
+    #[test]
+    fn a_blank_job_reads_as_defaulted() {
+        for blank in ["", "   ", "\t"] {
+            let p: DispatchPayload = serde_json::from_value(serde_json::json!({
+                "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+                "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x",
+                "job": blank,
+            }))
+            .unwrap();
+            assert_eq!(p.job, None, "{blank:?}");
+            assert_eq!(p.job_name(), DEFAULT_JOB);
+        }
+        let null: DispatchPayload = serde_json::from_value(serde_json::json!({
+            "dispatch_id": "d1", "repo": "r", "head_sha": "s",
+            "fetch_url": "u", "candidate_ref": "refs/ci-dispatch/x", "job": null,
+        }))
+        .unwrap();
+        assert_eq!(null.job, None);
+    }
+}

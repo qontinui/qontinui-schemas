@@ -18,9 +18,10 @@ pub mod import_resolver;
 pub mod layering;
 
 pub use code_graph::{
-    compute_fingerprints, fingerprint_content, repo_hash, BlastRadius, CachedCodeGraph, ClassNode,
-    CodeGraph, ExportNode, FileFingerprint, FileNode, FunctionNode, ImportEdge, IncrementalInput,
-    ResolutionKind, RiskLevel,
+    compute_fingerprints, fingerprint_content, is_parsed_extension, is_parsed_source,
+    language_for_extension, repo_hash, BlastRadius, CachedCodeGraph, ClassNode, CodeGraph,
+    ExportNode, FileFingerprint, FileNode, FunctionNode, ImportEdge, IncrementalInput,
+    ResolutionKind, RiskLevel, PARSED_EXTENSIONS,
 };
 pub use import_resolver::{ImportResolver, Resolution};
 pub use layering::{

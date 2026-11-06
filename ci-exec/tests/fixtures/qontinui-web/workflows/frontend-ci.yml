@@ -1,0 +1,298 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+      # The pinned vocabulary the no-dev-stack-fallback vocabulary test reads.
+      - "fleet-nouns.pin.toml"
+      - ".github/actions/fleet-nouns-vocab/**"
+  push:
+    branches: [main, develop]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+      # The pinned vocabulary the no-dev-stack-fallback vocabulary test reads.
+      - "fleet-nouns.pin.toml"
+      - ".github/actions/fleet-nouns-vocab/**"
+  workflow_dispatch:
+
+# Least privilege for GITHUB_TOKEN (zizmor excessive-permissions). A job
+# that needs more declares its own `permissions:`.
+permissions:
+  contents: read
+
+jobs:
+  lint-and-typecheck:
+    # Job cap (plan 2026-09-07-nothing-escalates-a-pr-wedged-on-one-block-reason Phase 2): 40 green runs measured 2026-09-23,
+    # p50 7.10 / p90 7.41 / max 7.73 min; cap = max(5, 2x max). Replaces the 360-min default.
+    timeout-minutes: 20
+    name: Lint and TypeScript check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout qontinui-web
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # The pinned fleet-noun vocabulary (fleet-nouns.pin.toml) for
+      # backend/tests/test_fleet_nouns_ratchet.py and the frontend rule's
+      # vocabulary test; sets QONTINUI_FLEET_NOUNS_FILE. Plan
+      # 2026-09-20-the-published-product-works-without-knowing-a-development-environment-exists A5.
+      - name: Fleet-noun vocabulary (pinned)
+        uses: ./.github/actions/fleet-nouns-vocab
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      # `npm run lint` is `next lint` (src/) followed by `lint:config`: the
+      # files beside src/ — next.config.mjs, config/ (the rewrite resolver)
+      # and scripts/ — get the full rule set too,
+      # @qontinui-web/no-dev-stack-fallback included. Errors fail; console
+      # warnings in CLI scripts do not.
+      - name: Lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      # `npm run type-check`, NOT a bare `npx tsc --noEmit`: the script points
+      # tsc at `tsconfig.typecheck.json`, which is where the `@cloud/*` route
+      # alias is declared. That mapping cannot live in `tsconfig.json` —
+      # Next feeds tsconfig `paths` to webpack via `JsConfigPathsPlugin`,
+      # which would then override the alias and resolve every composed cloud
+      # build back to the OSS stubs. A bare `tsc` here fails on every route
+      # shim. See frontend/tsconfig.typecheck.json.
+      - name: TypeScript check
+        working-directory: ./frontend
+        run: npm run type-check
+
+      - name: Unit tests
+        working-directory: ./frontend
+        run: npm test
+
+      # ADVISORY, last, bounded, and unable to fail the job: has schemas main
+      # moved past fleet-nouns.pin.toml? A drift is a ::warning:: with the bump
+      # recipe — the pin exists so that a vocabulary edit is adopted by a
+      # reviewed PR here, never by an unrelated one going red.
+      - name: Fleet-noun vocabulary drift from schemas main (advisory)
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          read -r PIN_REF PIN_SHA256 < <(python3 -c 'import tomllib; p = tomllib.load(open("fleet-nouns.pin.toml", "rb"))["fleet_nouns"]; print(p["ref"], p["sha256"])')
+          main_file="$RUNNER_TEMP/fleet-nouns-main.toml"
+          if ! curl -fsSL --connect-timeout 10 --max-time 30 --retry 2 -o "$main_file" https://raw.githubusercontent.com/qontinui/qontinui-schemas/main/fleet-nouns.toml; then
+            echo "::warning title=fleet-noun vocabulary drift::could not fetch schemas main's fleet-nouns.toml -- drift from the pin ($PIN_REF) is UNKNOWN"
+            exit 0
+          fi
+          main_sha256="$(sha256sum "$main_file" | cut -d' ' -f1)"
+          if [ "$main_sha256" = "$PIN_SHA256" ]; then
+            echo "fleet-nouns.toml on schemas main matches the pin ($PIN_REF)."
+          else
+            echo "::warning title=fleet-noun vocabulary drift::schemas main's fleet-nouns.toml (sha256 $main_sha256) differs from the pin ($PIN_REF, sha256 $PIN_SHA256). Bump fleet-nouns.pin.toml in a PR, rebaseline with QONTINUI_FLEET_NOUNS_REBASELINE=1 (backend/tests/test_fleet_nouns_ratchet.py) and review the diff."
+          fi
+
+  vercel-install-script:
+    # Job cap (plan 2026-09-07-nothing-escalates-a-pr-wedged-on-one-block-reason Phase 2): 40 green runs measured 2026-09-23,
+    # p50 2.12 / p90 2.30 / max 2.40 min; network-bound npm installs,
+    # so 10 rather than the formula's 5. Replaces the 360-min default.
+    timeout-minutes: 10
+    # `frontend/scripts/vercel-install.sh` is what Vercel runs to build the
+    # COMPOSED shape for qontinui.io, and it is the one step in that path that
+    # nothing else exercises. `composed-cloud-build` below hand-rolls its own
+    # checkout + overlay against cloud-control's floating `main` — deliberately,
+    # so it catches cross-repo drift — so it stays green while the deploy script
+    # itself is broken. Without this job the production deploy would be the
+    # FIRST execution of that script on Linux, and its designed failure mode is
+    # "the build fails loudly", which is the correct behaviour and a terrible
+    # place to discover a typo.
+    #
+    # So: run the real script, end to end, at the pinned sha, and assert the
+    # two things the deployment depends on — the overlay resolves, and the
+    # marker the deployment serves is valid JSON naming that same pin.
+    name: Vercel install script (composed deploy path)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout qontinui-web
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # Invoked exactly as the root `vercel.json` invokes it (from the repo
+      # root), so a path that only resolves from `frontend/` fails here.
+      - name: Run the deploy install command
+        run: bash frontend/scripts/vercel-install.sh --config-source ci
+
+      - name: Assert the overlay resolved and the marker is honest
+        run: |
+          set -euo pipefail
+          test -f frontend/node_modules/@qontinui/cloud-control/frontend/src/index.ts
+          PIN="$(grep -vE '^[[:space:]]*(#|$)' frontend/cloud-control.pin | head -n 1 | tr -d '[:space:]')"
+          SIBLING_HEAD="$(git -C .sibling/qontinui-cloud-control rev-parse HEAD)"
+          [ "$SIBLING_HEAD" = "$PIN" ] || {
+            echo "sibling is at $SIBLING_HEAD, pin says $PIN" >&2
+            exit 1
+          }
+          node -e '
+            const fs = require("node:fs");
+            const pin = process.argv[1];
+            const m = JSON.parse(fs.readFileSync("frontend/public/composed-build.json", "utf8"));
+            if (m.composed !== true) throw new Error("marker does not report a composed build");
+            if (m.configSource !== "ci") throw new Error(`configSource=${m.configSource}, expected ci`);
+            if (m.cloudControlSha !== pin) throw new Error(`marker sha ${m.cloudControlSha} != pin ${pin}`);
+            console.log("marker OK:", JSON.stringify(m));
+          ' "$PIN"
+
+      # Type-check the PINNED combination. `composed-cloud-build` builds
+      # cloud-control's default branch, deliberately, so it detects drift — but
+      # that means nothing anywhere builds the pair that actually deploys.
+      # `preserveSymlinks` + the overlay put cloud-control's raw sources inside
+      # this app's `strict` graph, so this is a real check of the two together:
+      # it is what caught the type defects cloud-control `d89aa6f` repairs.
+      - name: TypeScript check (pinned composition)
+        working-directory: ./frontend
+        run: npm run type-check
+
+      # The guard the deploy leans on: if the overlay is NOT there, the script
+      # must fail rather than quietly hand Vercel the OSS shape. Asserting the
+      # success path alone would leave that branch untested — and it is the
+      # branch the whole design is about.
+      - name: Assert it refuses to fall back to the OSS shape
+        run: |
+          set -uo pipefail
+          rm -rf frontend/node_modules/@qontinui/cloud-control
+          rm -f frontend/public/composed-build.json
+          cp frontend/cloud-control.pin /tmp/pin.bak
+          # A well-formed sha that resolves to nothing: the fetch must fail,
+          # and the script must exit non-zero WITHOUT writing a marker.
+          echo '0000000000000000000000000000000000000000' > frontend/cloud-control.pin
+          # Actions runs `run:` blocks under `bash -e`, and that errexit is
+          # applied outside this script — a bare call would abort the step the
+          # moment the install command exits non-zero, which is the very thing
+          # this test is trying to observe. An `if` condition suspends errexit
+          # for the command it tests, so the exit code survives to be asserted.
+          if bash frontend/scripts/vercel-install.sh --config-source ci; then
+            rc=0
+          else
+            rc=$?
+          fi
+          cp /tmp/pin.bak frontend/cloud-control.pin
+          if [ "$rc" -eq 0 ]; then
+            echo 'script exited 0 with an unresolvable pin' >&2
+            exit 1
+          fi
+          if [ -f frontend/public/composed-build.json ]; then
+            echo 'script wrote a composed marker on a failing path' >&2
+            exit 1
+          fi
+          echo "refusal path OK (exit $rc, no marker written)"
+
+  composed-cloud-build:
+    # Job cap (plan 2026-09-07-nothing-escalates-a-pr-wedged-on-one-block-reason Phase 2): 40 green runs measured 2026-09-23,
+    # p50 9.76 / p90 10.24 / max 12.80 min; cap = max(5, 2x max). Replaces the 360-min default.
+    timeout-minutes: 30
+    # The other job builds the OSS-only shape, which is the ONLY shape any CI
+    # exercised before this one existed — and it is the shape in which
+    # @qontinui/cloud-control registers nothing by design. So every defect in
+    # the composition was invisible here, and the extension surface shipped
+    # completely inert: an unresolvable `webpackIgnore` import, in a Server
+    # Component, whose failure a `.catch(() => {})` swallowed.
+    #
+    # This job builds the composed cloud shape — the one qontinui.io actually
+    # runs. `npm test` picks up the composed half of
+    # `cloud-extensions-boot.registration.test.tsx` (skipped in the OSS job),
+    # which asserts that cloud-control's services and components are really in
+    # the client-side slot registry. The build then proves webpack can compile
+    # the package's raw sources inside the host graph.
+    #
+    # Mirrors how the BACKEND half of this same composition is already gated
+    # in backend-ci.yml: check out the sibling repo, install it as an explicit
+    # step, run the suite against it. cloud-control is AGPL/public, so the
+    # checkout needs no extra credentials.
+    #
+    # See frontend/docs/composed-cloud-build.md.
+    name: Composed cloud build (with @qontinui/cloud-control)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout qontinui-web
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # actions/checkout cannot write outside $GITHUB_WORKSPACE, so the
+      # sibling lands inside it. The overlay script takes the path explicitly,
+      # so it does not have to be the usual `../qontinui-cloud-control`.
+      - name: Checkout qontinui-cloud-control
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: qontinui/qontinui-cloud-control
+          path: .sibling/qontinui-cloud-control
+          persist-credentials: false
+
+      # The pinned fleet-noun vocabulary (fleet-nouns.pin.toml) for
+      # backend/tests/test_fleet_nouns_ratchet.py and the frontend rule's
+      # vocabulary test; sets QONTINUI_FLEET_NOUNS_FILE. Plan
+      # 2026-09-20-the-published-product-works-without-knowing-a-development-environment-exists A5.
+      - name: Fleet-noun vocabulary (pinned)
+        uses: ./.github/actions/fleet-nouns-vocab
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install the cloud-control overlay
+        working-directory: ./frontend
+        env:
+          QONTINUI_CLOUD_CONTROL_PATH: ${{ github.workspace }}/.sibling/qontinui-cloud-control
+        run: npm run cloud:install
+
+      # Lint and type-check run in BOTH shapes, not just OSS. In the composed
+      # shape `@cloud/*` resolves into cloud-control's raw sources, so this is
+      # the only place they are type-checked at all — the package has no
+      # tsconfig, no build step and no CI of its own, and it is checked here
+      # under this app's `strict` settings.
+      - name: Lint (composed)
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: TypeScript check (composed)
+        working-directory: ./frontend
+        run: npm run type-check
+
+      # Declares the shape so `cloud-route-shims.test.ts` can assert it agrees.
+      # Without it the composed cases are skipped on a silently-failed overlay
+      # and the job goes green having tested the OSS shape twice.
+      - name: Unit tests (composed)
+        env:
+          QONTINUI_COMPOSED_BUILD: "1"
+        working-directory: ./frontend
+        run: npm test
+
+      - name: Build (composed)
+        working-directory: ./frontend
+        run: npm run build

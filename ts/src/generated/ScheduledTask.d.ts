@@ -9,6 +9,7 @@ import type { CatchUpPolicy } from "./CatchUpPolicy";
 import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
 import type { ConditionStatus } from "./ConditionStatus";
 import type { IdleCondition } from "./IdleCondition";
+import type { ManagedBy } from "./ManagedBy";
 import type { McpConnectionRef } from "./McpConnectionRef";
 import type { ProbeCondition } from "./ProbeCondition";
 import type { RepositoryInactiveCondition } from "./RepositoryInactiveCondition";
@@ -81,6 +82,12 @@ export interface ScheduledTask {
    */
   launchFailureBackoffSeconds: number;
   /**
+   * Set when the task was created by the runner's reconciler from a
+   * fleet-wide recurring-agent declaration rather than by a user. `None` =
+   * an unmanaged, user-created task, which the reconciler never touches.
+   */
+  managed?: ManagedBy | null;
+  /**
    * ISO 8601 timestamp of last modification.
    */
   modifiedAt: string;
@@ -108,4 +115,12 @@ export interface ScheduledTask {
    * Task type and its per-type configuration.
    */
   task: ScheduledTaskType;
+  /**
+   * IANA time zone this task's schedule is interpreted in (e.g.
+   * `Europe/Berlin`). Takes precedence over the global
+   * [`SchedulerSettings::timezone`]; `None` = the scheduler's zone. Lets one
+   * fleet-wide declaration mean either "local night on every device" or a
+   * fixed instant.
+   */
+  timezone?: string | null;
 }

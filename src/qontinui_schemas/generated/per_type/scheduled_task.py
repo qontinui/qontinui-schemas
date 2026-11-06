@@ -98,6 +98,54 @@ class IdleCondition(BaseModel):
     enabled: Annotated[bool, Field(description='Whether this condition is active.')]
 
 
+class ManagedBy(BaseModel):
+    """
+    Provenance of a [`ScheduledTask`] that the runner reconciles from a
+    fleet-wide declaration (plan
+    `2026-10-29-recurring-agents-declared-in-coord-reconciled-by-runner`, D5).
+
+    `(source, tenant_id, agent)` is the managed key: the runner holds at most
+    one task per key. What the reconciler compares to decide whether a task is
+    current is `digest`, never `version` — a catalog fix in coord's code moves
+    no row version, and a deleted-and-recreated agent restarts its version at 1.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    agent: Annotated[
+        str,
+        Field(
+            description="The recurring agent's name — its join key across coord's status, run\nrequests and this managed task (coord forbids renames)."
+        ),
+    ]
+    digest: Annotated[
+        str | None,
+        Field(
+            description='sha256 (64 lowercase hex) of the resolved spec coord served when this\ntask was applied. `None` = applied from a declaration that carried no\ndigest.'
+        ),
+    ] = None
+    source: Annotated[
+        str,
+        Field(
+            description='Which declaration store the task came from — [`MANAGED_SOURCE_COORD`].\nA plain string rather than an enum, so a stored task from a newer\nsource still loads; the consumer decides what it recognises.'
+        ),
+    ]
+    tenantId: Annotated[
+        str,
+        Field(
+            description='The coord tenant (UUID) whose declaration this task applies. A device\nbound to several tenants holds one managed task per tenant and agent.'
+        ),
+    ]
+    version: Annotated[
+        int,
+        Field(
+            description="The declaration's row version when applied. History and display only.",
+            ge=0,
+        ),
+    ]
+
+
 class McpConnectionRef(BaseModel):
     """
     Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
@@ -349,14 +397,27 @@ class ScheduledTaskType5(BaseModel):
 class ScheduledTaskType6(BaseModel):
     """
     Run an ad-hoc Claude agent prompt without pre-registering it in the
-    Prompt Library. Reuses the runner's existing `POST /prompts/run`
-    ad-hoc surface — no separate Claude CLI plumbing required.
+    Prompt Library. The runner launches it as one headless `claude`
+    session through its own spawn seam; the recorded outcome is that
+    session's exit status (success iff exit code 0).
     """
 
     allowed_tools: Annotated[
         list[str] | None,
         Field(
             description='Allowed tool names (e.g. `["Bash", "Read", "Write", "Edit"]`).\nEmpty = use the runner\'s default tool allow-list.'
+        ),
+    ] = None
+    effort: Annotated[
+        str | None,
+        Field(
+            description='Optional reasoning-effort level for the spawned session: one of\n`low`, `medium`, `high`, `xhigh` or `max`. `None` leaves the level\nto the runner. A plain string rather than an enum, so a stored\ntask carrying a level this crate does not list still loads; the\nconsumer validates it.'
+        ),
+    ] = None
+    effort_profile: Annotated[
+        str | None,
+        Field(
+            description='Optional kebab-case name of a spawn-effort profile (e.g.\n`research`, `implementation`) that the runner resolves to an\neffort level and an ultracode setting. `None` leaves the choice\nto the runner.'
         ),
     ] = None
     max_turns: Annotated[
@@ -389,10 +450,45 @@ class ScheduledTaskType6(BaseModel):
             ge=0,
         ),
     ] = None
+    ultracode: Annotated[
+        bool | None,
+        Field(
+            description='Optional ultracode switch (standing dynamic-workflow orchestration)\nfor the spawned session. `Some(true)` turns it on, `Some(false)`\nkeeps it off, and `None` leaves the choice to the runner.'
+        ),
+    ] = None
     working_directory: Annotated[
         str | None,
         Field(
             description="Working directory for the spawned session. `None` means the\nrunner's project root. Stored as a string (not `PathBuf`) to keep\nthis crate JSON-Schema-friendly."
+        ),
+    ] = None
+
+
+class ScheduledTaskType7(BaseModel):
+    """
+    Run a shell command in-binary (no Claude session). The recorded
+    outcome is the command's exit status: success iff exit code 0; a
+    timeout is a failure.
+    """
+
+    command: Annotated[
+        str,
+        Field(
+            description='Shell command line, run via the platform shell (`sh -c`; on\nWindows `bash -c`, then `cmd /C` as the fallback).'
+        ),
+    ]
+    task_type: Literal['Script']
+    timeout_seconds: Annotated[
+        int | None,
+        Field(
+            description='Wall-clock timeout in seconds. `None` (or 0) = runner default\n(600s = 10 min).',
+            ge=0,
+        ),
+    ] = None
+    working_directory: Annotated[
+        str | None,
+        Field(
+            description="Working directory for the command. `None` = the runner's project\nroot."
         ),
     ] = None
 
@@ -405,6 +501,7 @@ class ScheduledTaskType(
         | ScheduledTaskType4
         | ScheduledTaskType5
         | ScheduledTaskType6
+        | ScheduledTaskType7
     ]
 ):
     root: Annotated[
@@ -413,7 +510,8 @@ class ScheduledTaskType(
         | ScheduledTaskType3
         | ScheduledTaskType4
         | ScheduledTaskType5
-        | ScheduledTaskType6,
+        | ScheduledTaskType6
+        | ScheduledTaskType7,
         Field(
             description='Type of task to schedule.\n\nInternally tagged by `task_type`: the variant fields are inlined alongside\nthe discriminator rather than nested under a `value` key.',
             discriminator='task_type',
@@ -594,6 +692,12 @@ class ScheduledTask(BaseModel):
             ge=0,
         ),
     ] = 60
+    managed: Annotated[
+        ManagedBy | None,
+        Field(
+            description="Set when the task was created by the runner's reconciler from a\nfleet-wide recurring-agent declaration rather than by a user. `None` =\nan unmanaged, user-created task, which the reconciler never touches."
+        ),
+    ] = None
     modifiedAt: Annotated[
         str, Field(description='ISO 8601 timestamp of last modification.')
     ]
@@ -623,3 +727,9 @@ class ScheduledTask(BaseModel):
         ScheduledTaskType,
         Field(description='Task type and its per-type configuration.'),
     ]
+    timezone: Annotated[
+        str | None,
+        Field(
+            description='IANA time zone this task\'s schedule is interpreted in (e.g.\n`Europe/Berlin`). Takes precedence over the global\n[`SchedulerSettings::timezone`]; `None` = the scheduler\'s zone. Lets one\nfleet-wide declaration mean either "local night on every device" or a\nfixed instant.'
+        ),
+    ] = None

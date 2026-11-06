@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `qontinui-vision-core` — image pipeline + output contract.
 //!
 //! Composable image stages that produce bytes guaranteed to satisfy a declared
@@ -17,13 +18,18 @@ pub mod assertions;
 pub mod cache;
 pub mod contract;
 pub mod coverage;
+pub mod edge_timing;
+pub mod element_media;
 pub mod element_snapshot;
 pub mod encode;
 pub mod error;
 pub mod frame;
+pub mod observation;
+pub mod page_health;
 pub mod pipeline;
 pub mod stage;
 pub mod strip;
+pub mod timeline;
 
 pub use analyzers::{AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Finding, Severity};
 pub use assertions::{
@@ -33,11 +39,28 @@ pub use assertions::{
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use coverage::SnapshotCoverage;
+pub use edge_timing::{
+    edge_timing, EdgeTiming, EdgeTimingRow, EdgeTimingSample, MetricDistribution,
+};
+pub use element_media::{
+    src_digest_of, ElementMedia, MediaAlt, MediaDecoding, MediaFetchPriority, MediaKind,
+    MediaLoadState, MediaLoading, MediaSize, ObjectFit,
+};
 pub use element_snapshot::{
     display_snapshot_id, intersection, region_contains, regions_overlap, Element, ElementSnapshot,
-    Rgb,
+    Rgb, VisibilityReason,
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};
+pub use observation::{
+    CacheProvenance, Observation, ObservationCoverage, ObservationError, ObservationState,
+    ObservationStatus, Producer, Provenance, UnknownCode, UnknownInfo, UnmeasuredDimension,
+};
+pub use page_health::{PageHealthFinding, PageHealthSeverity, PageHealthValue};
 pub use pipeline::{multi_run, MultiOutput, Pipeline};
 pub use stage::{Annotation, AnnotationStyle, RedactKind, RedactRegion, ResizeStrategy, Stage};
+pub use timeline::{
+    AnimationEndReason, ChangeTimeline, DetectedAnimation, ExpectedStateOutcome,
+    ExpectedStateResult, TimelineEvent, TimelineEventBase, TimelineSource, TimelineSummary,
+    LEDGER_SOURCE_KEYS,
+};

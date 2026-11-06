@@ -1,0 +1,613 @@
+{
+  "about": "Journey-query golden vectors. `multistate` blocks are output of multistate graph_utils.py at the commit in journey-golden.provenance.json; `handVerified` blocks are derived by hand in generate_golden.py. Regenerate with that script; never hand-edit.",
+  "families": [
+    {
+      "affordanceEdges": [
+        [
+          "a",
+          "b"
+        ],
+        [
+          "b",
+          "c"
+        ],
+        [
+          "c",
+          "a"
+        ],
+        [
+          "c",
+          "d"
+        ],
+        [
+          "d",
+          "e"
+        ]
+      ],
+      "handVerified": {
+        "backOnly": []
+      },
+      "multistate": {
+        "distances": {
+          "a": {
+            "a": 0,
+            "b": 1,
+            "c": 2,
+            "d": 3,
+            "e": 4
+          },
+          "b": {
+            "a": 2,
+            "b": 0,
+            "c": 1,
+            "d": 2,
+            "e": 3
+          },
+          "c": {
+            "a": 1,
+            "b": 2,
+            "c": 0,
+            "d": 1,
+            "e": 2
+          },
+          "d": {
+            "d": 0,
+            "e": 1
+          },
+          "e": {
+            "e": 0
+          }
+        },
+        "reachable": {
+          "a": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "b": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "c": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "d": [
+            "d",
+            "e"
+          ],
+          "e": [
+            "e"
+          ]
+        },
+        "terminalStatesWithoutSelfLoops": [
+          "e"
+        ]
+      },
+      "name": "cycle_with_tail",
+      "nodes": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "otherEdges": [],
+      "source": "multistate"
+    },
+    {
+      "affordanceEdges": [
+        [
+          "a",
+          "a"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "b",
+          "b"
+        ],
+        [
+          "c",
+          "c"
+        ]
+      ],
+      "handVerified": {
+        "backOnly": []
+      },
+      "multistate": {
+        "distances": {
+          "a": {
+            "a": 0,
+            "b": 1
+          },
+          "b": {
+            "b": 0
+          },
+          "c": {
+            "c": 0
+          }
+        },
+        "reachable": {
+          "a": [
+            "a",
+            "b"
+          ],
+          "b": [
+            "b"
+          ],
+          "c": [
+            "c"
+          ]
+        },
+        "terminalStatesWithoutSelfLoops": [
+          "b",
+          "c"
+        ]
+      },
+      "name": "self_loops",
+      "nodes": [
+        "a",
+        "b",
+        "c"
+      ],
+      "otherEdges": [],
+      "source": "multistate"
+    },
+    {
+      "affordanceEdges": [
+        [
+          "a",
+          "b"
+        ],
+        [
+          "b",
+          "c"
+        ],
+        [
+          "x",
+          "y"
+        ],
+        [
+          "y",
+          "x"
+        ]
+      ],
+      "handVerified": {
+        "backOnly": []
+      },
+      "multistate": {
+        "distances": {
+          "a": {
+            "a": 0,
+            "b": 1,
+            "c": 2
+          },
+          "b": {
+            "b": 0,
+            "c": 1
+          },
+          "c": {
+            "c": 0
+          },
+          "x": {
+            "x": 0,
+            "y": 1
+          },
+          "y": {
+            "x": 1,
+            "y": 0
+          },
+          "z": {
+            "z": 0
+          }
+        },
+        "reachable": {
+          "a": [
+            "a",
+            "b",
+            "c"
+          ],
+          "b": [
+            "b",
+            "c"
+          ],
+          "c": [
+            "c"
+          ],
+          "x": [
+            "x",
+            "y"
+          ],
+          "y": [
+            "x",
+            "y"
+          ],
+          "z": [
+            "z"
+          ]
+        },
+        "terminalStatesWithoutSelfLoops": [
+          "c",
+          "z"
+        ]
+      },
+      "name": "disconnected_components",
+      "nodes": [
+        "a",
+        "b",
+        "c",
+        "x",
+        "y",
+        "z"
+      ],
+      "otherEdges": [
+        {
+          "from": "z",
+          "outcome": "no_change",
+          "to": "z",
+          "trigger": "initial"
+        },
+        {
+          "from": "c",
+          "outcome": "changed",
+          "to": "x",
+          "trigger": "push"
+        }
+      ],
+      "source": "multistate"
+    },
+    {
+      "affordanceEdges": [
+        [
+          "home",
+          "list"
+        ],
+        [
+          "list",
+          "detail"
+        ],
+        [
+          "list",
+          "modal"
+        ],
+        [
+          "detail",
+          "list"
+        ]
+      ],
+      "handVerified": {
+        "backOnly": [
+          "modal",
+          "orphan"
+        ]
+      },
+      "multistate": {
+        "distances": {
+          "detail": {
+            "detail": 0,
+            "list": 1,
+            "modal": 2
+          },
+          "home": {
+            "detail": 2,
+            "home": 0,
+            "list": 1,
+            "modal": 2
+          },
+          "list": {
+            "detail": 1,
+            "list": 0,
+            "modal": 1
+          },
+          "modal": {
+            "modal": 0
+          },
+          "orphan": {
+            "orphan": 0
+          }
+        },
+        "reachable": {
+          "detail": [
+            "detail",
+            "list",
+            "modal"
+          ],
+          "home": [
+            "detail",
+            "home",
+            "list",
+            "modal"
+          ],
+          "list": [
+            "detail",
+            "list",
+            "modal"
+          ],
+          "modal": [
+            "modal"
+          ],
+          "orphan": [
+            "orphan"
+          ]
+        },
+        "terminalStatesWithoutSelfLoops": [
+          "modal",
+          "orphan"
+        ]
+      },
+      "name": "pop_only_exit",
+      "nodes": [
+        "home",
+        "list",
+        "modal",
+        "detail",
+        "orphan"
+      ],
+      "otherEdges": [
+        {
+          "from": "modal",
+          "outcome": "changed",
+          "to": "list",
+          "trigger": "pop"
+        },
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "orphan",
+          "trigger": "push"
+        },
+        {
+          "from": "orphan",
+          "outcome": "changed",
+          "to": "home",
+          "trigger": "pop"
+        }
+      ],
+      "source": "multistate"
+    },
+    {
+      "affordanceEdges": [
+        [
+          "a",
+          "c"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "b",
+          "d"
+        ],
+        [
+          "c",
+          "d"
+        ],
+        [
+          "d",
+          "e"
+        ],
+        [
+          "b",
+          "e"
+        ],
+        [
+          "e",
+          "f"
+        ],
+        [
+          "f",
+          "e"
+        ]
+      ],
+      "handVerified": {
+        "backOnly": []
+      },
+      "multistate": {
+        "distances": {
+          "a": {
+            "a": 0,
+            "b": 1,
+            "c": 1,
+            "d": 2,
+            "e": 2,
+            "f": 3
+          },
+          "b": {
+            "b": 0,
+            "d": 1,
+            "e": 1,
+            "f": 2
+          },
+          "c": {
+            "c": 0,
+            "d": 1,
+            "e": 2,
+            "f": 3
+          },
+          "d": {
+            "d": 0,
+            "e": 1,
+            "f": 2
+          },
+          "e": {
+            "e": 0,
+            "f": 1
+          },
+          "f": {
+            "e": 1,
+            "f": 0
+          }
+        },
+        "reachable": {
+          "a": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "b": [
+            "b",
+            "d",
+            "e",
+            "f"
+          ],
+          "c": [
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "d": [
+            "d",
+            "e",
+            "f"
+          ],
+          "e": [
+            "e",
+            "f"
+          ],
+          "f": [
+            "e",
+            "f"
+          ]
+        },
+        "terminalStatesWithoutSelfLoops": []
+      },
+      "name": "diamond_with_shortcut",
+      "nodes": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "otherEdges": [],
+      "source": "multistate"
+    },
+    {
+      "affordanceEdges": [
+        [
+          "home",
+          "list"
+        ],
+        [
+          "list",
+          "detail"
+        ],
+        [
+          "home",
+          "settings"
+        ],
+        [
+          "selfclick",
+          "selfclick"
+        ]
+      ],
+      "handVerified": {
+        "requiresPriorKnowledge": {
+          "deep": {
+            "initial": 1,
+            "push": 2
+          },
+          "hashpage": {
+            "hash": 1
+          },
+          "selfclick": {
+            "push": 1
+          }
+        }
+      },
+      "name": "prior_knowledge",
+      "nodes": [
+        "backonly",
+        "deep",
+        "detail",
+        "errored",
+        "hashpage",
+        "home",
+        "list",
+        "selfclick",
+        "settings"
+      ],
+      "otherEdges": [
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "deep",
+          "trigger": "push"
+        },
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "deep",
+          "trigger": "push"
+        },
+        {
+          "from": "deep",
+          "outcome": "no_change",
+          "to": "deep",
+          "trigger": "initial"
+        },
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "settings",
+          "trigger": "push"
+        },
+        {
+          "from": "list",
+          "outcome": "changed",
+          "to": "hashpage",
+          "trigger": "hash"
+        },
+        {
+          "from": "list",
+          "outcome": "changed",
+          "to": "backonly",
+          "trigger": "replace"
+        },
+        {
+          "from": "detail",
+          "outcome": "changed",
+          "to": "backonly",
+          "trigger": "pop"
+        },
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "selfclick",
+          "trigger": "push"
+        },
+        {
+          "from": "home",
+          "outcome": "changed",
+          "to": "errored",
+          "trigger": "push"
+        },
+        {
+          "from": "list",
+          "outcome": "error",
+          "to": "errored",
+          "trigger": "affordance"
+        }
+      ],
+      "source": "hand-verified"
+    }
+  ],
+  "nodeSpecId": "golden"
+}

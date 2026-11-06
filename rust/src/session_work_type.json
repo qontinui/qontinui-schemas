@@ -1,0 +1,111 @@
+{
+  "$comment": "CANONICAL. The one declaration of the session run-record vocabulary (work types, initiators, end reasons, end sources, bind origins) and the classifier version. See session_work_type.rs for why this is a data file and for the rules on editing it.",
+  "classifier_version": 1,
+  "work_types": [
+    {
+      "name": "post_merge",
+      "description": "A session continued from a gate that coord's auto-PR-merged producer registered, run after one of its PRs landed."
+    },
+    {
+      "name": "pr_fix_red_ci",
+      "description": "A PR fixer dispatched because the PR's diagnosis names red CI checks."
+    },
+    {
+      "name": "pr_fix_conflict",
+      "description": "A PR fixer dispatched because the PR's diagnosis names a merge conflict."
+    },
+    {
+      "name": "admission_stall_fix",
+      "description": "A fixer dispatched under the admission_stall_fix dispatch source to unstick a PR the merge train will not admit."
+    },
+    {
+      "name": "red_main_fix",
+      "description": "A fixer dispatched under the red_main_fix dispatch source for a repo whose main branch is red."
+    },
+    {
+      "name": "merge_shepherd",
+      "description": "An unlandable-PR shepherd, dispatched from shepherd tiers 1 to 3 or carrying the merge_shepherd or merge_fixer role."
+    },
+    {
+      "name": "next_step",
+      "description": "A session dispatched under the next_step dispatch source to continue stale work from its resolved next step."
+    },
+    {
+      "name": "unit_dispatch",
+      "description": "A work-unit dispatch (unit_continuation or work_plan) whose continuation names no recognised skill."
+    },
+    {
+      "name": "condition_autodispatch",
+      "description": "A spawn of the condition_autodispatch kind, running a condition group's audit on its schedule or trigger."
+    },
+    {
+      "name": "operator_page_remediation",
+      "description": "A spawn of the operator_page_remediation kind, dispatching the steward that owns a paged condition."
+    },
+    {
+      "name": "implement_plan",
+      "description": "A session whose gate continuation skill, or whose operator's first slash command, is implement-plan."
+    },
+    {
+      "name": "implement_phase",
+      "description": "A session whose gate continuation skill, or whose operator's first slash command, is implement-phase."
+    },
+    {
+      "name": "vet_imp",
+      "description": "A session whose gate continuation skill, or whose operator's first slash command, is vet-imp."
+    },
+    {
+      "name": "vet_plan",
+      "description": "A session whose gate continuation skill, or whose operator's first slash command, is vet-plan."
+    },
+    {
+      "name": "verify_plan_status",
+      "description": "A session whose gate continuation skill, or whose operator's first slash command, is verify-plan-status."
+    },
+    {
+      "name": "gate_continuation_other",
+      "description": "Any other run_skill gate continuation; the raw skill name is kept beside the verdict."
+    },
+    {
+      "name": "steward",
+      "description": "A runner scheduler task running one of the stewards (dev-ops, findings, cleanup, merge-train or return-to-main)."
+    },
+    {
+      "name": "onboarding_audit",
+      "description": "A repo-onboarding audit started by the onboarding invoke_spawn."
+    },
+    {
+      "name": "operator_interactive",
+      "description": "A session the operator started whose first slash command, if any, is not a recognised work type."
+    },
+    {
+      "name": "unknown",
+      "description": "Nothing above matched; counted and shown as its own type, never folded into another."
+    }
+  ],
+  "initiators": [
+    "operator",
+    "coord",
+    "runner_local",
+    "unknown"
+  ],
+  "end_reasons": [
+    "exited",
+    "poll_dead",
+    "superseded",
+    "operator_closed",
+    "finished_close",
+    "runner_stopped",
+    "handoff_detached",
+    "inferred_lost",
+    "other"
+  ],
+  "end_sources": [
+    "observed",
+    "inferred"
+  ],
+  "bind_origins": [
+    "authoritative",
+    "reconciled"
+  ]
+}

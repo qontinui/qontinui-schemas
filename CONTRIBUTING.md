@@ -12,6 +12,8 @@ What this means for you as a contributor:
 - If you (or anyone else) runs a modified version of qontinui as a network service, the AGPL requires you to publish your modifications under AGPL too — this is the "network copyleft" provision and the reason this project chose AGPL.
 - For typical self-hosting, internal use, forking, or contributing back, AGPL is no different from GPL in practice.
 
+**Exception — `rust-vision-core/` is MIT.** The `qontinui-vision-core` crate and its `vision-audit` binary are licensed under the MIT License ([`rust-vision-core/LICENSE`](rust-vision-core/LICENSE)); every Rust source file in it starts with `// SPDX-License-Identifier: MIT`. Contributions to that directory are licensed inbound under MIT; contributions anywhere else are AGPL-3.0-or-later. Keep `rust-vision-core` free of dependencies on the AGPL crates in this workspace, by path or from crates.io, or it can no longer be distributed under MIT. [`rust-vision-core/tests/license_posture.rs`](rust-vision-core/tests/license_posture.rs) fails `cargo test` if a source file loses the header, if the manifest or `LICENSE` stops saying MIT, or if a direct dependency declares a source other than crates.io or is named after a crate in this workspace. It cannot see the licence of a crates.io dependency, a `[patch]` on any other crate, or transitive dependencies, so those stay a question for review.
+
 If your employer has policies about contributing to AGPL projects, please confirm with them before you submit a PR.
 
 ## Developer Certificate of Origin (DCO)
@@ -20,7 +22,7 @@ Contributions are accepted under the **Developer Certificate of Origin (DCO) 1.1
 
     git commit -s -m "your message"
 
-This appends `Signed-off-by: Your Name <your@email>` from your `git config user.name` / `user.email`. The DCO bot verifies the trailer on every PR commit. Your contributions are licensed inbound under the same `AGPL-3.0-or-later` as the project (inbound = outbound); you retain copyright in your contributions. No relicensing rights are granted — the dual-/commercial-license lever is retained only on the embeddable `ui-bridge` library (via its CLA), not on the apps/libraries in this repository.
+This appends `Signed-off-by: Your Name <your@email>` from your `git config user.name` / `user.email`. The DCO bot verifies the trailer on every PR commit. Your contributions are licensed inbound under the same licence as the code they change — `AGPL-3.0-or-later`, or MIT inside `rust-vision-core/` (inbound = outbound); you retain copyright in your contributions. No relicensing rights are granted — the apps/libraries in this repository keep no dual-/commercial-license lever (the embeddable `ui-bridge` library, which used to keep one through a CLA, is now MIT-licensed and takes contributions under the DCO as well).
 
 Trivial changes (typo fixes, single-line documentation tweaks) still benefit from a sign-off but the maintainer may waive it at their discretion.
 
@@ -71,9 +73,21 @@ These must be green on your PR before merge:
 
   So if you declared a pair and the run still reports `declaration=none`, **direction is no longer a possible explanation** — it was the right first guess before 2026-08-27 and it is now a dead end. What remains: no coord dep-edge label on either PR, a malformed value, or one naming a **closed** or nonexistent PR.
 
-  A green `check-drift` against a declared sibling is a claim about a tree that **hasn't landed**, and the cost of that is worth expecting rather than rediscovering. Between the two lands `main` here **will** read red on `schema-drift`, and while `main` is red coord holds *every* PR in this repo. Measured 2026-08-30: `main` sat red ~33h on exactly this shape after qontinui-schemas#144 landed ahead of its runner half, with #154 and #155 blocked behind it throughout.
+  A green `check-drift` against a declared sibling is a claim about a tree that **hasn't landed**. When this PR is the one that lands FIRST, the push run on `main` afterwards regenerates against runner `main`, which does not register your type yet, so it deletes your bindings. Until 2026-10-13 that read red, and while `main` is red coord holds *every* PR in this repo (measured 2026-08-30: ~33h after qontinui-schemas#144; and again four times in twelve days in October).
 
-  Clearing it needs a **re-run of the failed push run** (`gh run rerun --failed <run-id>`), and only after the paired runner PR has landed — a re-run re-executes at the same sha, so against an unchanged world it just reproduces the red. A re-run keeps `event: push`, which is what coord ingests as a baseline; `gh workflow run schema-drift.yml --ref main` refreshes the GitHub checkmark but writes no baseline at all (`establishes_main_baseline` accepts `event == Some("push")` and nothing else — qontinui-coord `crates/coord/src/ci_baseline.rs`), so it leaves coord red while looking like it worked. Pushing a fixing commit is circular: it needs a PR, and PRs are what the red is blocking.
+  **Declare the wait in the same PR: `codegen/pending-registration.toml`.** Add one row per type your PR adds bindings for:
+
+  ```toml
+  [[pending]]
+  type = "CliProfile"                             # exactly as the runner's add!("…") names it
+  runner_pr = "qontinui/qontinui-runner#1990"     # the PR that registers it
+  added = 2026-10-12                              # a date between this PR's creation and today (UTC)
+  schemas_pr = "qontinui/qontinui-schemas#212"    # this PR
+  ```
+
+  `check-drift` enforces it: when it resolved a TRAILING runner declaration it requires a row for every binding file this PR adds, naming exactly that declared runner PR, naming **this** PR as `schemas_pr`, and already ACTIVE-eligible (the PR open, its head registering the type). On a miss it prints the rows to paste, with both PR numbers filled in. On `main`, a row lets arm 2 accept the deletion of exactly that type's 2 files (`ts/src/generated/<T>.d.ts`, its `per_type/<module>.py`) and 3 barrel lines, and only while the runner PR is open, its head registers the type, and the row is at most 14 days old. Anything else — a binding regenerated *differently*, any other barrel line, any other file — still reds. Each run's summary lists every row as `ACTIVE`, `INERT (<reason>)` or `STALE`. When the runner PR lands the row reads `STALE`; delete it (the daily `pending-registration-audit` workflow reds until you do, without holding any PR). The full contract is in the file's header and in `scripts/pending_registration.py`.
+
+  If `main` is red on `check-drift` for some OTHER reason, clearing it needs a **re-run of the failed push run** (`gh run rerun --failed <run-id>`) once the cause is fixed — a re-run re-executes at the same sha, so against an unchanged world it just reproduces the red. A re-run keeps `event: push`, which is what coord ingests as a baseline; `gh workflow run schema-drift.yml --ref main` refreshes the GitHub checkmark but writes no baseline at all (`establishes_main_baseline` accepts `event == Some("push")` and nothing else — qontinui-coord `crates/coord/src/ci_baseline.rs`), so it leaves coord red while looking like it worked.
 
   **This is not a `schema-drift` quirk.** coord's baseline table is keyed per repo and workflow name, and `establishes_main_baseline()` inspects only the event — so a `workflow_dispatch` of *any* push-triggered gate in this repo, `rust-ci` very much included, refreshes that workflow's badge and leaves coord holding every PR. `rust-ci`'s dispatch is the one an operator reaches for on a red `main`, and it is the wrong lever. Whichever gate reddened `main`, the remedy is the same: `gh run rerun --failed` on *its* failed push run.
 
@@ -288,7 +302,10 @@ Two ways to get there:
   and the consumers' version bounds turned five checks red with a
   version-resolution error (qontinui-schemas#160, 2026-09-02 → 09-07,
   10+ coord `ci-not-green` cycles). The `release-pr-sanity` workflow now fails
-  a release PR with this recipe when a base manifest version has no tag:
+  a release PR with this recipe when a base manifest version of a package in
+  `release-please-config.json` has no tag. A manifest row with no package there
+  (`ci-exec`, written by the cargo-workspace plugin, `publish = false`) never
+  gets a tag and is skipped:
   1. find the landed release commit —
      `git log --format='%h %an %s' -3 -- release-please-manifest.json`;
   2. create the release release-please would have, for each component:
@@ -367,6 +384,15 @@ patch-bumps `qontinui-runner-client`, and regenerates the root `Cargo.lock`.
 So do not hand-widen it. `rust-ci` checks the lock with `cargo fetch --locked`,
 and `publish-rust.yml` makes the runner-client publish wait until the required
 qontinui-types version is on crates.io.
+The one exception is a feature PR that hand-declares the next `qontinui-types`
+version so a consumer's sibling pin can tell it from `main`: when that version
+is a MAJOR, this bound moves to it in the same commit (a `^N` bound cannot
+select N+1), and release-please later rewrites it to the same value. Such a
+hand-declared version must equal what release-please computes from the tagged
+manifest anchor over EVERY unreleased commit under the component's path, not
+just this PR's (the highest of: `fix` = one patch, `feat` = one minor, `feat!` =
+one major above the anchor), never stack on another unreleased hand bump, and
+never touch `release-please-manifest.json`.
 
 **On a qontinui-types MAJOR, give runner-client a real version too.** The
 plugin always PATCH-bumps a dependent, so 0.2.0 would become 0.2.1 while its
@@ -376,6 +402,19 @@ a commit touching `rust-runner-client/` with a `Release-As: 0.3.0` footer in
 the same release. A `feat!` does not do this: without `bump-minor-pre-major`,
 release-please turns a breaking change on a 0.x crate into 1.0.0. Plan:
 `2026-09-13-schemas-major-release-wedges-consumers`.
+`release-pr-sanity` fails the release PR if runner-client's minor did not move.
+
+The footer only counts while nothing but trailers follows it to the end of the
+message; a blank line does not protect it from later prose. `git cherry-pick -x`
+appends `(cherry picked from commit …)` after it, and release-please then reads
+no `Release-As` at all, without any error. That
+happened to the 0.3.0 commit (`f6107595`) when #269 carried it over from #206,
+so release PR #262 proposed runner-client 0.2.14. To carry such a commit to a new
+branch, cherry-pick it without `-x`, or remove that line from the message. A
+`Rebased-By:` trailer added at land is harmless. The check is the release PR
+itself: it must name the version you asked for, and if it does not, land another
+commit with a clean footer. The type can stay `docs`, because a commit carrying
+this footer is listed in the changelog even though `docs` is otherwise hidden.
 
 The ergonomics of skipping the anchor: every override generates one stale
 "chore: release main" PR proposing the wrong version that you close by hand. The

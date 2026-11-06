@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Pipeline composer + executor.
 
 use image::codecs::jpeg::JpegEncoder;

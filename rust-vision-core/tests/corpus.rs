@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Corpus integration test — Phase 6.0 scaffolding.
 //!
 //! Walks `tests/fixtures/analyzer_corpus/{frames,golden}/`, loads each
@@ -97,6 +98,7 @@ fn parse_analyzer(name: &str) -> Option<Analyzer> {
         "color" => Some(Analyzer::Color),
         "dynamic" => Some(Analyzer::Dynamic),
         "elements" => Some(Analyzer::Elements),
+        "image" => Some(Analyzer::Image),
         _ => None,
     }
 }
@@ -115,6 +117,8 @@ fn check_one(stem: &str, frame_path: &Path, golden_path: &Path) -> Result<(), St
         frame: None,
         snapshot: Some(&snapshot),
         prior_frame: None,
+        text_hidden_frame: None,
+        text_hidden_ids: None,
     };
 
     for (analyzer_name, expectation) in &golden.analyzers {

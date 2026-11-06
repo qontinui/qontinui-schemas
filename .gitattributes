@@ -32,6 +32,10 @@ src/qontinui_schemas/generated/** text eol=lf
 # them to CRLF and fail the digest test locally. `-text` stores and checks them
 # out byte-for-byte; the committed blobs are LF already.
 rust/tests/fixtures/ui_bridge_sdk/*.json -text
+# The page-health pair (rust-vision-core/tests/ui_bridge_sdk_page_health_wire.rs)
+# sits one directory down, which the pattern above does not reach (`*` stops at
+# `/`); same reason, same rule.
+rust/tests/fixtures/ui_bridge_sdk/page_health/*.json -text
 
 # The glossary source and the Rust table generated from it
 # (rust/tests/glossary_source.rs). The test normalises CRLF before hashing and
@@ -41,3 +45,35 @@ rust/tests/fixtures/ui_bridge_sdk/*.json -text
 glossary/terms.toml text eol=lf
 glossary/versions.lock text eol=lf
 rust/src/glossary/generated.rs text eol=lf
+
+# qontinui-ci import / gen-workflow golden tests (ci-exec/tests/import_golden.rs).
+# The goldens are compared byte-for-byte against the importer's LF output, and
+# the fixtures are copies of other repos' origin/main blobs (LF). Under
+# core.autocrlf=true a Windows checkout rewrote the goldens to CRLF, so
+# ci-exec-windows failed with every line equal ("expected None, got None").
+# The committed blobs are already LF; this changes no committed bytes.
+ci-exec/tests/golden/** text eol=lf
+ci-exec/tests/fixtures/** text eol=lf
+
+# The BoundedReadMeta cross-language fixtures (rust/tests/round_trip.rs,
+# tests/test_round_trip.py). Both suites compare against the fixture's exact
+# RFC 8785 JCS bytes, so a CRLF checkout under core.autocrlf=true fails the
+# Rust half on every Windows box for a reason unrelated to the contract.
+# `-text` checks them out byte-for-byte; the committed blobs are LF already.
+tests/fixtures/bounded_read_meta_*.json -text
+
+# The cargo build-jobs golden table (rust/tests/build_jobs_golden.rs). Its sha256
+# is pinned in qontinui-claude-config (scripts/lib/build-jobs-golden.tsv.sha256),
+# so a CRLF checkout must not change its bytes.
+rust/tests/fixtures/build-jobs-golden.tsv -text
+
+# The image analyzer's fixture corpus (rust-vision-core/tests/image_corpus.rs).
+# Its pixels ARE the test data and its hashes are pinned in
+# expected_hashes.json, so no checkout may touch their bytes.
+rust-vision-core/tests/fixtures/image_corpus/*.png binary
+rust-vision-core/tests/fixtures/image_corpus/*.jpg binary
+
+# The text-over-image frame pairs (rust-vision-core/tests/text_over_image.rs).
+# Their pixels are the test data: frame A and frame B must differ exactly
+# where the glyphs paint, so no checkout may touch their bytes.
+rust-vision-core/tests/fixtures/text_over_image/*.png binary

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Convenience entry point: build a [`Pipeline`](crate::Pipeline) from an
 //! [`OutputContract`](crate::OutputContract) and run it.
 //!

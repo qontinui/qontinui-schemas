@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Structured error type for the vision pipeline.
 
 use crate::Region;

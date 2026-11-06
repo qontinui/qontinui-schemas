@@ -1,0 +1,68 @@
+name: release-please
+
+# Release-please monorepo mode for the polyglot schemas surface.
+#
+# On every push to main, release-please scans new conventional-commits
+# against components defined in release-please-config.json and either
+# opens/updates a release PR (with version bumps + CHANGELOG entries)
+# or — when an existing release PR is merged — creates per-component
+# tags like `rust-v0.1.2`, `rust-runner-client-v0.1.0`, `ts-v0.2.4`.
+#
+# Those tags are consumed by the per-language publish workflows:
+#   rust-v*, rust-runner-client-v*  → publish-rust.yml (cargo publish)
+#   ts-v*                            → publish.yml      (npm publish)
+#
+# The release PR MUST require explicit human merge — do not enable
+# auto-merge on release-please PRs (per qontinui-dev-notes/
+# rust-release-engineering/non-goals: "release-please's release PR IS
+# the human gate").
+#
+# Authentication: this workflow uses a GitHub App token rather than the
+# default GITHUB_TOKEN. Reason: GitHub's loop-prevention rule suppresses
+# downstream workflows on bot-opened PRs created by GITHUB_TOKEN, which
+# means commitlint never fires on the release PR — so it can never
+# satisfy the required-checks rule and merging it always needs admin
+# bypass. Opening the PR via a non-GITHUB_TOKEN identity (the
+# `qontinui-release-please` GitHub App) makes commitlint fire normally.
+# See CONTRIBUTING.md § "release-please PRs always need admin-bypass"
+# for the historical context.
+#
+# Required secrets:
+#   RELEASE_PLEASE_APP_ID       — numeric App ID from the App's
+#                                  General settings page
+#   RELEASE_PLEASE_PRIVATE_KEY  — full .pem contents from the App's
+#                                  Generated private key download
+
+on:
+  push:
+    branches: [main]
+  # Manual trigger: useful for re-running after a secret/config change
+  # without forcing a noop commit to main, or for kicking the bot to
+  # re-evaluate its release PR after a manual cleanup. Mirrors the
+  # workflow_dispatch escape hatch on rust-ci.yml and schema-drift.yml —
+  # including the caveat both of those now carry: a dispatch run writes no
+  # `coord.ci_baselines` row, so it can refresh this workflow's badge but
+  # cannot clear a coord-red main. Only a `push` run does that, or a
+  # `gh run rerun --failed` of one, which keeps `event: push`.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: release-please-manifest.json
+          token: ${{ steps.app-token.outputs.token }}

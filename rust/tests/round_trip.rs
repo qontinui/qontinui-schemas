@@ -80,7 +80,7 @@ fn schedule_expression_condition_roundtrips() {
 }
 
 // ============================================================================
-// Scheduler — ScheduledTaskType (all five variants, internally tagged with
+// Scheduler — ScheduledTaskType (all seven variants, internally tagged with
 // `task_type`)
 // ============================================================================
 
@@ -151,6 +151,165 @@ fn scheduled_task_type_background_capture_roundtrips() {
     assert_eq!(v["task_type"], "BackgroundCapture");
     let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
+}
+
+#[test]
+fn scheduled_task_type_script_roundtrips() {
+    let t = ScheduledTaskType::Script {
+        command: "bash scripts/x.sh --flag".to_string(),
+        working_directory: Some("/repo".to_string()),
+        timeout_seconds: Some(900),
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["task_type"], "Script");
+    assert_eq!(v["command"], "bash scripts/x.sh --flag");
+    assert_eq!(v["timeout_seconds"], 900);
+    assert_eq!(v["working_directory"], "/repo");
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+
+    // Optional fields omitted on the wire deserialize to None.
+    let min: ScheduledTaskType =
+        serde_json::from_str(r#"{"task_type":"Script","command":"true"}"#).unwrap();
+    // ...and None fields are left off the wire (skip_serializing_if).
+    let min_wire = serde_json::to_value(&min).unwrap();
+    assert!(min_wire.get("working_directory").is_none());
+    assert!(min_wire.get("timeout_seconds").is_none());
+    // `command` is required.
+    assert!(serde_json::from_str::<ScheduledTaskType>(r#"{"task_type":"Script"}"#).is_err());
+    match min {
+        ScheduledTaskType::Script {
+            working_directory,
+            timeout_seconds,
+            ..
+        } => {
+            assert!(working_directory.is_none());
+            assert!(timeout_seconds.is_none());
+        }
+        _ => panic!("wrong variant"),
+    }
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_roundtrips() {
+    let t = ScheduledTaskType::RemoteAgent {
+        prompt: "run /research-plan nightly".to_string(),
+        working_directory: Some("/repo".to_string()),
+        allowed_tools: vec!["Bash".to_string(), "Read".to_string()],
+        model: Some("claude-opus-5-5".to_string()),
+        effort: Some("max".to_string()),
+        ultracode: Some(true),
+        effort_profile: Some("research".to_string()),
+        mcp_connections: vec![McpConnectionRef {
+            name: "coord".to_string(),
+            url: Some("http://127.0.0.1:9876/coord-mcp".to_string()),
+        }],
+        max_turns: Some(20),
+        timeout_seconds: Some(900),
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    let v: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["task_type"], "RemoteAgent");
+    assert_eq!(v["prompt"], "run /research-plan nightly");
+    assert_eq!(v["model"], "claude-opus-5-5");
+    assert_eq!(v["effort"], "max");
+    assert_eq!(v["ultracode"], true);
+    assert_eq!(v["effort_profile"], "research");
+    assert_eq!(v["mcp_connections"][0]["name"], "coord");
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    match back {
+        ScheduledTaskType::RemoteAgent {
+            effort,
+            ultracode,
+            effort_profile,
+            ..
+        } => {
+            assert_eq!(effort.as_deref(), Some("max"));
+            assert_eq!(ultracode, Some(true));
+            assert_eq!(effort_profile.as_deref(), Some("research"));
+        }
+        _ => panic!("wrong variant"),
+    }
+
+    // `prompt` is required.
+    assert!(serde_json::from_str::<ScheduledTaskType>(r#"{"task_type":"RemoteAgent"}"#).is_err());
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_without_effort_fields_is_byte_identical() {
+    // A task stored before `effort`, `ultracode` and `effort_profile` existed,
+    // spelled in this crate's own serialization order. It must load with all
+    // three as None and write back byte for byte, so no stored task changes
+    // shape.
+    let stored = concat!(
+        r#"{"task_type":"RemoteAgent","prompt":"p","working_directory":"/repo","#,
+        r#""allowed_tools":["Bash"],"model":"claude-opus-5-5","#,
+        r#""mcp_connections":[{"name":"coord"}],"max_turns":20,"timeout_seconds":900}"#,
+    );
+    let t: ScheduledTaskType = serde_json::from_str(stored).unwrap();
+    match &t {
+        ScheduledTaskType::RemoteAgent {
+            effort,
+            ultracode,
+            effort_profile,
+            ..
+        } => {
+            assert!(effort.is_none());
+            assert!(ultracode.is_none());
+            assert!(effort_profile.is_none());
+        }
+        _ => panic!("wrong variant"),
+    }
+    assert_eq!(serde_json::to_string(&t).unwrap(), stored);
+
+    // The minimal task, only the required `prompt`, round-trips the same way:
+    // a None field is left off the wire, never written as `null`.
+    let min = r#"{"task_type":"RemoteAgent","prompt":"p"}"#;
+    let t: ScheduledTaskType = serde_json::from_str(min).unwrap();
+    assert_eq!(serde_json::to_string(&t).unwrap(), min);
+}
+
+#[test]
+fn scheduled_task_type_remote_agent_keeps_explicit_effort_values() {
+    // `Some(false)` is an explicit "off", distinct from "not set": it reaches
+    // the wire, where None is omitted.
+    let t = ScheduledTaskType::RemoteAgent {
+        prompt: "p".to_string(),
+        working_directory: None,
+        allowed_tools: vec![],
+        model: None,
+        effort: None,
+        ultracode: Some(false),
+        effort_profile: None,
+        mcp_connections: vec![],
+        max_turns: None,
+        timeout_seconds: None,
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    assert_eq!(
+        json,
+        r#"{"task_type":"RemoteAgent","prompt":"p","ultracode":false}"#
+    );
+    match serde_json::from_str::<ScheduledTaskType>(&json).unwrap() {
+        ScheduledTaskType::RemoteAgent { ultracode, .. } => {
+            assert_eq!(ultracode, Some(false));
+        }
+        _ => panic!("wrong variant"),
+    }
+
+    // `effort` is a plain string, so a level this crate does not list still
+    // loads and writes back unchanged. Validating it is the consumer's job.
+    let unlisted = r#"{"task_type":"RemoteAgent","prompt":"p","effort":"turbo"}"#;
+    let t: ScheduledTaskType = serde_json::from_str(unlisted).unwrap();
+    match &t {
+        ScheduledTaskType::RemoteAgent { effort, .. } => {
+            assert_eq!(effort.as_deref(), Some("turbo"));
+        }
+        _ => panic!("wrong variant"),
+    }
+    assert_eq!(serde_json::to_string(&t).unwrap(), unlisted);
 }
 
 // ============================================================================
@@ -227,6 +386,14 @@ fn scheduled_task_fully_populated_roundtrips() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: Some("Europe/Berlin".to_string()),
+        managed: Some(ManagedBy {
+            source: MANAGED_SOURCE_COORD.to_string(),
+            tenant_id: "7d6c1c2e-1b7a-4e43-9a43-6f1f0f3c2a11".to_string(),
+            agent: "cleanup-steward".to_string(),
+            version: 3,
+            digest: Some("a".repeat(64)),
+        }),
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -259,6 +426,8 @@ fn scheduled_task_minimally_populated_roundtrips() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: None,
+        managed: None,
     };
     let json = serde_json::to_string(&task).unwrap();
     let back: ScheduledTask = serde_json::from_str(&json).unwrap();
@@ -293,16 +462,22 @@ fn scheduled_task_minimal_elides_none_fields() {
         catch_up_grace_seconds: 300,
         consecutive_launch_failures: 0,
         launch_failure_backoff_seconds: 60,
+        timezone: None,
+        managed: None,
     };
     let json = serde_json::to_string(&task).unwrap();
     let v: Value = serde_json::from_str(&json).unwrap();
+    // `ScheduledTask` serializes camelCase, so these are the wire spellings. A
+    // snake_case name here would be absent whatever the serde attributes say.
     for absent_field in [
         "description",
-        "success_criteria",
-        "last_run",
-        "next_run",
+        "successCriteria",
+        "lastRun",
+        "nextRun",
         "conditions",
-        "condition_status",
+        "conditionStatus",
+        "timezone",
+        "managed",
     ] {
         assert!(
             v.get(absent_field).is_none(),
@@ -9676,4 +9851,311 @@ fn probe_condition_schema_declares_the_poll_floor() {
         json!(3600)
     );
     assert_eq!(schema["additionalProperties"], json!(false));
+}
+
+// ============================================================================
+// Bounded reads — BoundedReadMeta (the Layer-2 envelope every list door serves)
+// ============================================================================
+
+/// A probe page: `total` and nothing counted, a cursor, no narrowing. The
+/// `null`s must survive the trip AS KEYS — on this wire `null` is a value
+/// ("no count ran"), not an absence.
+#[test]
+fn bounded_read_meta_with_null_total_roundtrips() {
+    use qontinui_types::page::{BoundKind, BoundedReadMeta};
+    let wire = json!({
+        "count": 20, "limit": 20, "shown": 20,
+        "total": null, "truncated": true, "bound_kind": "at_least",
+        "next_cursor": "eyJ2IjoxfQ", "available": true, "filter_narrowed": null,
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(meta.bound_kind, BoundKind::AtLeast);
+    assert_eq!(meta.total, None);
+    assert_eq!(serde_json::to_value(&meta).unwrap(), wire);
+
+    let last = json!({
+        "count": 3, "limit": 20, "shown": 3,
+        "total": null, "truncated": false, "bound_kind": "complete",
+        "next_cursor": null, "available": true, "filter_narrowed": null,
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(last.clone()).unwrap();
+    assert_eq!(meta.next_cursor, None);
+    assert_eq!(serde_json::to_value(&meta).unwrap(), last);
+
+    // A RANKED read: truncated, no cursor, and the door that walks the corpus.
+    let ranked = json!({
+        "count": 50, "limit": 50, "shown": 50,
+        "total": null, "truncated": true, "bound_kind": "at_least",
+        "next_cursor": null, "available": true, "filter_narrowed": null,
+        "enumerate_via": "GET /api/v1/memory/records",
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(ranked.clone()).unwrap();
+    assert_eq!(
+        meta.enumerate_via.as_deref(),
+        Some("GET /api/v1/memory/records")
+    );
+    assert_eq!(serde_json::to_value(&meta).unwrap(), ranked);
+}
+
+/// A window-count page: `bound_kind: exact` carries a NUMBER in `total`, and
+/// a narrowed filter rides beside it.
+#[test]
+fn bounded_read_meta_with_exact_total_roundtrips() {
+    use qontinui_types::page::{BoundKind, BoundedReadMeta, FilterNarrowing};
+    let wire = json!({
+        "count": 2, "limit": 2, "shown": 2,
+        "total": 1483, "truncated": true, "bound_kind": "exact",
+        "next_cursor": "abc", "available": true,
+        "filter_narrowed": {"parameter": "resource_keys", "applied": 100, "cap": 100},
+        "enumerate_via": null,
+    });
+    let meta: BoundedReadMeta = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(meta.bound_kind, BoundKind::Exact);
+    assert_eq!(meta.total, Some(1483));
+    assert_eq!(
+        meta.filter_narrowed,
+        Some(FilterNarrowing {
+            parameter: "resource_keys".into(),
+            applied: 100,
+            cap: 100
+        })
+    );
+    let json = serde_json::to_string(&meta).unwrap();
+    let back: BoundedReadMeta = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    assert_eq!(serde_json::to_value(&back).unwrap(), wire);
+}
+
+// ----------------------------------------------------------------------------
+// BoundedReadMeta — the cross-language fixture contract (Rust half)
+// ----------------------------------------------------------------------------
+//
+// Each `tests/fixtures/bounded_read_meta_*.json` is stored in RFC 8785 (JCS)
+// canonical form, one line. The Rust half here and `tests/test_round_trip.py`
+// both deserialize it into the typed model (the generated Pydantic model on
+// the Python side), re-serialize, canonicalize with JCS and compare BYTES
+// against the file — not `Value`/dict equality, which would pass a key that
+// went missing on the way out as long as the other side also dropped it.
+// Plan `2026-09-05-every-bounded-read-is-a-page-that-reads-as-a-corpus`
+// Phase 1.
+
+/// Every envelope key. `null` is a value on this wire, so each must be
+/// PRESENT on serialization — an absent `total` would read as "older server",
+/// not "no count ran".
+const BOUNDED_READ_META_KEYS: [&str; 10] = [
+    "available",
+    "bound_kind",
+    "count",
+    "enumerate_via",
+    "filter_narrowed",
+    "limit",
+    "next_cursor",
+    "shown",
+    "total",
+    "truncated",
+];
+
+const BOUNDED_READ_META_FIXTURES: [(&str, &str); 8] = [
+    (
+        "exact",
+        include_str!("../../tests/fixtures/bounded_read_meta_exact.json"),
+    ),
+    (
+        "at_least",
+        include_str!("../../tests/fixtures/bounded_read_meta_at_least.json"),
+    ),
+    (
+        "complete",
+        include_str!("../../tests/fixtures/bounded_read_meta_complete.json"),
+    ),
+    (
+        "unknown",
+        include_str!("../../tests/fixtures/bounded_read_meta_unknown.json"),
+    ),
+    (
+        "unavailable",
+        include_str!("../../tests/fixtures/bounded_read_meta_unavailable.json"),
+    ),
+    (
+        "filter_narrowed",
+        include_str!("../../tests/fixtures/bounded_read_meta_filter_narrowed.json"),
+    ),
+    (
+        "ranked_not_pageable",
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json"),
+    ),
+    // The shape `POST /memory/query` serves when no retrieval arm was capped:
+    // an EXACT pool size beside a ranking that cannot page, so `truncated`
+    // is true with no cursor and `enumerate_via` names the walk. No Rust
+    // `Page` constructor emits it (a ranking there is always a probe), which
+    // is why it is pinned here as a fixture rather than as a producer test.
+    (
+        "ranked_exact",
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_exact.json"),
+    ),
+];
+
+#[test]
+fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
+    use qontinui_types::page::BoundedReadMeta;
+    for (name, raw) in BOUNDED_READ_META_FIXTURES {
+        let expected = raw.trim_end_matches('\n');
+        // The fixture itself must already be canonical, or the byte
+        // comparison below would be against a spelling neither side emits.
+        let as_value: Value = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            serde_jcs::to_string(&as_value).unwrap(),
+            expected,
+            "{name}: fixture is not in JCS canonical form"
+        );
+
+        let meta: BoundedReadMeta = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("{name}: fixture does not deserialize: {e}"));
+        let reserialized = serde_json::to_value(&meta).unwrap();
+        let obj = reserialized.as_object().unwrap();
+        for key in BOUNDED_READ_META_KEYS {
+            assert!(
+                obj.contains_key(key),
+                "{name}: key `{key}` missing on serialization"
+            );
+        }
+        assert_eq!(
+            obj.len(),
+            BOUNDED_READ_META_KEYS.len(),
+            "{name}: unexpected extra keys"
+        );
+        assert_eq!(
+            serde_jcs::to_string(&meta).unwrap(),
+            expected,
+            "{name}: JCS bytes diverged after the round trip"
+        );
+
+        // An ABSENT key must be refused, never defaulted to `null`.
+        for key in BOUNDED_READ_META_KEYS {
+            let mut missing = as_value.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(
+                serde_json::from_value::<BoundedReadMeta>(missing).is_err(),
+                "{name}: a payload missing `{key}` deserialized"
+            );
+        }
+    }
+}
+
+/// The producer, not just the model: the constructors a door calls emit
+/// exactly the `unavailable` and `ranked_not_pageable` fixtures.
+#[test]
+fn bounded_read_meta_fixtures_are_what_the_page_constructors_emit() {
+    use qontinui_types::page::Page;
+    let meta = Page::<()>::unavailable(20).meta();
+    assert_eq!(
+        serde_jcs::to_string(&meta).unwrap(),
+        include_str!("../../tests/fixtures/bounded_read_meta_unavailable.json")
+            .trim_end_matches('\n')
+    );
+
+    let ranked = Page::not_pageable(
+        (0..51).collect::<Vec<u32>>(),
+        50,
+        "GET /api/v1/memory/records",
+    );
+    assert_eq!(
+        serde_jcs::to_string(&ranked.meta()).unwrap(),
+        include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json")
+            .trim_end_matches('\n')
+    );
+}
+
+/// The wire half of `Page`'s envelope invariant, checked on every fixture.
+///
+/// `Page::envelope_is_consistent` (`rust/src/page.rs`) is PRIVATE — its
+/// constructors enforce it and `Page::meta` `debug_assert!`s it — so it cannot
+/// be called on a deserialized `BoundedReadMeta`. This re-expresses the same
+/// predicate over the wire keys, clause for clause; if the two ever diverge,
+/// `page.rs` is the authority and this copy is the one to fix.
+fn bounded_read_meta_envelope_is_consistent(meta: &qontinui_types::page::BoundedReadMeta) -> bool {
+    let cursor = meta.next_cursor.is_some();
+    let via = meta.enumerate_via.is_some();
+    match (meta.truncated, cursor, via) {
+        // A cursor IS the walk, so it never names another one.
+        (_, true, true) => false,
+        // A cursor only ever sits beside `truncated: true`.
+        (truncated, true, false) => truncated == Some(true),
+        // Truncated with no way forward is only honest for a ranking that
+        // names the door which walks the corpus.
+        (Some(true), false, via) => via,
+        _ => true,
+    }
+}
+
+#[test]
+fn bounded_read_meta_fixtures_satisfy_the_page_envelope_invariant() {
+    use qontinui_types::page::BoundedReadMeta;
+    for (name, raw) in BOUNDED_READ_META_FIXTURES {
+        let meta: BoundedReadMeta = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("{name}: fixture does not deserialize: {e}"));
+        assert!(
+            bounded_read_meta_envelope_is_consistent(&meta),
+            "{name}: fixture violates the Page envelope invariant \
+             (truncated={:?} next_cursor={:?} enumerate_via={:?})",
+            meta.truncated,
+            meta.next_cursor,
+            meta.enumerate_via
+        );
+    }
+}
+
+/// The predicate copy above must REJECT each forbidden state, or the fixture
+/// check is vacuous.
+#[test]
+fn bounded_read_meta_envelope_predicate_rejects_each_forbidden_state() {
+    use qontinui_types::page::BoundedReadMeta;
+    let base: Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/bounded_read_meta_exact.json"
+    ))
+    .unwrap();
+    let with = |truncated: Value, cursor: Value, via: Value| -> BoundedReadMeta {
+        let mut v = base.clone();
+        let o = v.as_object_mut().unwrap();
+        o.insert("truncated".into(), truncated);
+        o.insert("next_cursor".into(), cursor);
+        o.insert("enumerate_via".into(), via);
+        serde_json::from_value(v).unwrap()
+    };
+    // cursor beside enumerate_via
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        json!("tok"),
+        json!("door")
+    )));
+    // cursor beside truncated false / null
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(false),
+        json!("tok"),
+        Value::Null
+    )));
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        Value::Null,
+        json!("tok"),
+        Value::Null
+    )));
+    // truncated with no way forward
+    assert!(!bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        Value::Null,
+        Value::Null
+    )));
+    // and the two honest truncated shapes pass
+    assert!(bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        json!("tok"),
+        Value::Null
+    )));
+    assert!(bounded_read_meta_envelope_is_consistent(&with(
+        json!(true),
+        Value::Null,
+        json!("door")
+    )));
 }
