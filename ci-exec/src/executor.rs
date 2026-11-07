@@ -1488,6 +1488,41 @@ mod tests {
 
     // ── End to end, through the public entry point, on a real git repo ──
 
+    /// One lock for every test here that plants a process env var or runs a
+    /// step that prints the env. The process env is shared by every test in
+    /// the binary, so without it a test printing the env inherits another
+    /// test's planted name — a non-UTF-8 one stops the output pump and fails
+    /// that test with no code defect behind it. A tokio mutex because the
+    /// guard is held across `.await`, and it has no poisoning, so a failed
+    /// holder does not fail every later one.
+    static PROCESS_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// Process env vars planted for one test, removed when this drops — on
+    /// the normal path and on a panic alike, so a failing test cannot leak a
+    /// planted name into the tests that run after it.
+    struct PlantedEnv(Vec<std::ffi::OsString>);
+
+    impl PlantedEnv {
+        fn plant<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(
+            pairs: impl IntoIterator<Item = (K, V)>,
+        ) -> Self {
+            let mut keys = Vec::new();
+            for (k, v) in pairs {
+                std::env::set_var(k.as_ref(), v);
+                keys.push(k.as_ref().to_os_string());
+            }
+            PlantedEnv(keys)
+        }
+    }
+
+    impl Drop for PlantedEnv {
+        fn drop(&mut self) {
+            for k in &self.0 {
+                std::env::remove_var(k);
+            }
+        }
+    }
+
     /// `(conclusion, "name=conclusion" per step, reason)` per verdict filed.
     type Filed = Arc<std::sync::Mutex<Vec<(Conclusion, Vec<String>, Option<String>)>>>;
 
@@ -2050,6 +2085,7 @@ command = ["git", "--version"]
     #[cfg(unix)]
     #[tokio::test]
     async fn a_model_step_on_a_host_with_no_broker_runs_with_the_refusal() {
+        let _env = PROCESS_ENV_LOCK.lock().await;
         let (_tmp, root, head) = repo_with(&format!(
             "version = 1\n{MODEL_TABLE}[[steps]]\nname = \"plain\"\ncommand = [\"env\"]\n\
              [[steps]]\nname = \"llm\"\ncommand = [\"env\"]\nmodel = true\n"
@@ -2083,23 +2119,21 @@ command = ["git", "--version"]
     #[cfg(unix)]
     #[tokio::test]
     async fn the_scrub_strips_inherited_credentials_and_every_step_gets_an_empty_config_dir() {
-        let planted: Vec<String> = crate::model::MODEL_CREDENTIAL_ENV
-            .iter()
-            .map(|k| k.to_string())
-            .chain(["DOCS_EVAL_MODEL_CMD".to_string()])
-            .collect();
-        for k in &planted {
-            std::env::set_var(k, format!("inherited-leak-{k}"));
-        }
+        let _env = PROCESS_ENV_LOCK.lock().await;
+        let planted = PlantedEnv::plant(
+            crate::model::MODEL_CREDENTIAL_ENV
+                .iter()
+                .copied()
+                .chain(["DOCS_EVAL_MODEL_CMD"])
+                .map(|k| (k, format!("inherited-leak-{k}"))),
+        );
         let (_tmp, root, head) = repo_with(
             "version = 1\n[[steps]]\nname = \"s1\"\ncommand = [\"env\"]\n\
              [[steps]]\nname = \"s2\"\ncommand = [\"sh\", \"-c\", \"ls -A $CLAUDE_CONFIG_DIR; touch $CLAUDE_CONFIG_DIR/planted; echo S2-DONE\"]\n\
              [[steps]]\nname = \"s3\"\ncommand = [\"sh\", \"-c\", \"ls -A $CLAUDE_CONFIG_DIR; echo S3-DONE\"]\n",
         );
         let (c, rec) = run(&root, &head, None).await;
-        for k in &planted {
-            std::env::remove_var(k);
-        }
+        drop(planted);
         assert_eq!(c, Conclusion::Success, "{:#?}", rec.lines.lock().unwrap());
         let lines = rec.lines.lock().unwrap().clone();
         let s1 = step_out(&lines, "s1");
@@ -2125,13 +2159,13 @@ command = ["git", "--version"]
     #[cfg(unix)]
     #[tokio::test]
     async fn arming_an_inherited_model_command_never_reaches_a_ci_step() {
-        const KEY: &str = "ARMING_PROBE_MODEL_CMD";
-        std::env::set_var(KEY, "arming-planted-model-cmd");
+        let _env = PROCESS_ENV_LOCK.lock().await;
+        let planted = PlantedEnv::plant([("ARMING_PROBE_MODEL_CMD", "arming-planted-model-cmd")]);
         let (_tmp, root, head) = repo_with(
             "version = 1\n[[steps]]\nname = \"probe\"\ncommand = [\"sh\", \"-c\", \"echo seen=${ARMING_PROBE_MODEL_CMD:-absent}; echo cfg=${CLAUDE_CONFIG_DIR:-unset}\"]\n",
         );
         let (c, rec) = run(&root, &head, None).await;
-        std::env::remove_var(KEY);
+        drop(planted);
         let lines = rec.lines.lock().unwrap().clone();
         assert_eq!(c, Conclusion::Success, "{lines:#?}");
         assert!(
@@ -2159,11 +2193,16 @@ command = ["git", "--version"]
     /// `ARMING_NU*` name, because the raw name is not valid UTF-8 and the
     /// output pump stops at the first line that is not. The manifest bans `"`
     /// in argv, so the probe's strings arrive through `-v`.
+    ///
+    /// A second non-Unicode control, `ARMING_NX\xff_KEEP`, is not a model
+    /// command and must reach the step: its own fixed marker proves this
+    /// host's `awk` keeps a non-Unicode name at all, so an absent
+    /// `ARMING_NU(other)` line means the scrub removed it, not that `awk`
+    /// never saw it.
     #[cfg(unix)]
     #[tokio::test]
     async fn arming_a_non_unicode_inherited_model_command_never_reaches_a_ci_step() {
         use std::os::unix::ffi::OsStrExt;
-        const KEEP: &str = "ARMING_NU_KEEP";
         const PROBE: &str = r#"
 version = 1
 [[steps]]
@@ -2174,17 +2213,27 @@ command = [
     "-v", "keep=ARMING_NU_KEEP",
     "-v", "s=seen=",
     "-v", "o=seen=ARMING_NU(other)",
+    "-v", "px=ARMING_NX",
+    "-v", "x=seen=ARMING_NX(control)",
     "-v", "d=done",
-    "BEGIN { for (k in ENVIRON) { if (index(k, p) == 1) { if (k == keep) { print s k } else { print o } } }; print d }",
+    "BEGIN { for (k in ENVIRON) { if (index(k, p) == 1) { if (k == keep) { print s k } else { print o } }; if (index(k, px) == 1) { print x } }; print d }",
 ]
 "#;
-        let planted = std::ffi::OsStr::from_bytes(b"ARMING_NU\xff_MODEL_CMD");
-        std::env::set_var(planted, "arming-planted");
-        std::env::set_var(KEEP, "arming-planted");
+        let _env = PROCESS_ENV_LOCK.lock().await;
+        let planted = PlantedEnv::plant([
+            (
+                std::ffi::OsStr::from_bytes(b"ARMING_NU\xff_MODEL_CMD"),
+                "arming-planted",
+            ),
+            (std::ffi::OsStr::new("ARMING_NU_KEEP"), "arming-planted"),
+            (
+                std::ffi::OsStr::from_bytes(b"ARMING_NX\xff_KEEP"),
+                "arming-planted",
+            ),
+        ]);
         let (_tmp, root, head) = repo_with(PROBE);
         let (c, rec) = run(&root, &head, None).await;
-        std::env::remove_var(planted);
-        std::env::remove_var(KEEP);
+        drop(planted);
         let lines = rec.lines.lock().unwrap().clone();
         assert_eq!(c, Conclusion::Success, "{lines:#?}");
         let out = step_out(&lines, "probe");
@@ -2195,6 +2244,11 @@ command = [
         assert!(
             out.iter().any(|l| l.ends_with("seen=ARMING_NU_KEEP")),
             "the positive control did not reach the step: {lines:#?}"
+        );
+        assert!(
+            out.contains(&"seen=ARMING_NX(control)"),
+            "the non-Unicode control did not reach the step, so this host's awk \
+             cannot show whether the scrub removed a non-Unicode name: {lines:#?}"
         );
         let other: Vec<&str> = out
             .iter()
