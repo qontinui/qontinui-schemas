@@ -52,3 +52,35 @@ fn every_outcome_fold_vector_holds() {
         );
     }
 }
+
+/// The vectors pin behaviour; this pins the rest — serde attributes, the
+/// hand-written JSON Schema, the wire checks — by requiring the marked region
+/// of the two Rust copies to be byte-identical. An edit to one copy alone
+/// (say, `deny_unknown_fields` on one wire struct) goes red here.
+#[test]
+fn the_two_rust_copies_of_the_fold_are_byte_identical() {
+    fn region(rel: &str) -> String {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let begin = text
+            .find("// --- twin: begin")
+            .unwrap_or_else(|| panic!("{rel}: no twin-begin marker"));
+        let end = text
+            .find("// --- twin: end ---")
+            .unwrap_or_else(|| panic!("{rel}: no twin-end marker"));
+        assert!(begin < end, "{rel}: twin markers out of order");
+        text[begin..end].to_string()
+    }
+    let types = region("src/outcome.rs");
+    let vision = region("../rust-vision-core/src/assertions/fold.rs");
+    assert!(
+        types.contains("pub fn fold_outcomes("),
+        "twin region lost the fold"
+    );
+    assert!(
+        types == vision,
+        "the twinned region of rust/src/outcome.rs and \
+         rust-vision-core/src/assertions/fold.rs has diverged; make the same edit in both"
+    );
+}
