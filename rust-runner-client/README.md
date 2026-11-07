@@ -6,10 +6,11 @@ Typed Rust HTTP client for the [qontinui-runner](https://github.com/qontinui/qon
 wire format is single-sourced.
 
 From 0.3.0 on, its minor version moves with each `qontinui-types` major
-(0.3.x builds on `qontinui-types` 5.x), so a `^0.3` requirement does not pull
-in a new `qontinui-types` major. The 0.2.x line spanned several
-`qontinui-types` majors (0.2 to 4.x). A `^0.2` requirement does not select
-0.3.0, so moving to `qontinui-types` 5 means changing the requirement to `0.3`.
+(0.3.x builds on `qontinui-types` 5.x, 0.4.x on 6.x), so a caret requirement
+on one minor does not pull in a new `qontinui-types` major. The 0.2.x line
+spanned several `qontinui-types` majors (0.2 to 4.x). A `^0.2` requirement
+does not select 0.3.0, so moving to `qontinui-types` 5 means changing the
+requirement to `0.3`, and moving to 6 means changing it to `0.4`.
 
 Used by `qontinui-supervisor` and any future fleet-management UI to avoid
 duplicating URL building, the runner's `ApiResponse<T>` envelope unwrapping,
