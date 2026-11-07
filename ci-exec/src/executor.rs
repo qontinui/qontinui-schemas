@@ -1165,7 +1165,8 @@ async fn run_step(
 /// pump goes on. (`lines()` returns `InvalidData` there: the pump ended, the
 /// rest of the log was dropped silently, and a step still writing met a
 /// closed read end and died of SIGPIPE.) A final line with no trailing `\n`
-/// is still logged. Any other read error is logged once, then the pump ends.
+/// is still logged. Any other read error is logged once, and the rest of the
+/// stream is drained unlogged so the writer is never cut off.
 async fn pump_lines<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
     stream: R,
     sink: Arc<dyn LogSink>,
@@ -1192,6 +1193,9 @@ async fn pump_lines<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
                 sink.push(&format!(
                     "[ci-node] step {step_name} {stream_tag} read error: {e}"
                 ));
+                // Keep draining so a step still writing is never cut off by a
+                // closed read end (SIGPIPE); what it writes now is discarded.
+                let _ = tokio::io::copy(&mut reader, &mut tokio::io::sink()).await;
                 break;
             }
         }
@@ -2126,7 +2130,7 @@ command = ["printf", 'a\n\377\nb\n']
         let out = step_out(&lines, "bytes");
         assert_eq!(out.len(), 3, "{lines:#?}");
         assert_eq!(out[0], "a", "{lines:#?}");
-        assert!(out[1].contains('\u{FFFD}'), "{lines:#?}");
+        assert_eq!(out[1], "\u{FFFD}", "{lines:#?}");
         assert_eq!(out[2], "b", "{lines:#?}");
     }
 
@@ -2158,6 +2162,11 @@ command = ["sh", "-c", "printf 'x\\377\\n'; seq 1 40000"]
             out.last()
         );
         assert_eq!(out.len(), 40001, "last: {:?}", out.last());
+        assert_eq!(out[0], "x\u{FFFD}", "{lines:#?}");
+        assert!(
+            ci_node.iter().all(|l| !l.contains("read error")),
+            "{ci_node:#?}"
+        );
         assert_eq!(out.last(), Some(&"40000"));
     }
 
