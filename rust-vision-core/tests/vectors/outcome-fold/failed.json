@@ -1,0 +1,17 @@
+{
+  "description": "One failure is a failure.",
+  "input": [
+    {
+      "outcome": "failed"
+    }
+  ],
+  "expected": {
+    "outcome": "failed",
+    "outcomeCounts": {
+      "passed": 0,
+      "failed": 1,
+      "unknown": 0
+    },
+    "unknownCodes": []
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "description": "An empty input is unknown(no_results), never passed.",
+  "input": [],
+  "expected": {
+    "outcome": "unknown",
+    "outcomeCounts": {
+      "passed": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "unknownCodes": [
+      "no_results"
+    ]
+  }
+}
