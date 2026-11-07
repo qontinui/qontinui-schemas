@@ -49,6 +49,7 @@
 //! no way to report without having been handed the capture slot. Re-breaking
 //! this requires deleting a type, not reordering two lines.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -917,13 +918,14 @@ fn build_step_command(
 /// manifest, so the shim path cannot smuggle shell syntax.
 ///
 /// `removals` are taken out of the inherited environment FIRST (the step env
-/// scrub, see [`crate::model::scrub`]); `envs` are applied after, so an
-/// executor-owned value such as `CLAUDE_CONFIG_DIR` is set, not removed.
+/// scrub, see [`crate::model::scrub`]), each under the spelling it was
+/// inherited with; `envs` are applied after, so an executor-owned value such
+/// as `CLAUDE_CONFIG_DIR` is set, not removed.
 fn spawn_step_child(
     process: &dyn ProcessSpawn,
     step: &CiStep,
     cwd: &Path,
-    removals: &[String],
+    removals: &[OsString],
     envs: &[(String, String)],
 ) -> Result<tokio::process::Child, String> {
     let apply = |cmd: &mut tokio::process::Command| {
