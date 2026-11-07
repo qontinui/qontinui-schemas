@@ -221,11 +221,11 @@ jobs:
     #
     # It must also contain every step bound below it, or a step that runs to
     # its own bound expires as a job timeout, which GitHub concludes
-    # `cancelled`. The steps after `cargo test` that carry one sum to 11 min
-    # (setup-python 3, setup-node 3, the provisioning env e2e 5). The job
-    # measured 4.25-6.30 min hosted over 9 runs and 3.92 on the pool over 1
-    # (2026-11-03..06), so 17.3 min at most, which leaves room for a cold
-    # cache.
+    # `cancelled`. The steps after `cargo test` that carry one sum to 12 min
+    # (the extractor sentinel 1, setup-python 3, setup-node 3, the provisioning
+    # env e2e 5). The job measured 4.25-6.30 min hosted over 9 runs and 3.92 on
+    # the pool over 1 (2026-11-03..06), so 18.3 min at most, which leaves room
+    # for a cold cache.
     timeout-minutes: 30
     steps:
       # persist-credentials: false because no later step needs git auth, and
@@ -486,6 +486,56 @@ jobs:
                  "of the suite ran, never that it passed. cargo's own error above is the cause."
           fi
           exit "${SUBRC}"
+
+      - name: ci-exec's Unix extractor tests ran on this leg
+        # The three tests below are the regression tests for the node-tree
+        # extractor's arbitrary-write bug. Their `#[cfg(unix)]` arms are the
+        # ones that discriminate, and they are the arms a Linux CI-node host
+        # runs. This is the only Linux leg that executes them, so a rename, a
+        # filter or a cfg that drops one would leave `cargo test` green while
+        # the arm ran nowhere. The step reads the log the step above wrote
+        # (no cargo) and fails unless each one printed `... ok` inside the
+        # ci-exec lib test binary's own section of it. Plan
+        # 2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
+        # Phase 4.
+        #
+        # NOT mirrored in .qontinui/ci.toml: it reads a log file that only the
+        # Actions step above writes.
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          OUT="$RUNNER_TEMP/cargo-test.out"
+          SECTION="$RUNNER_TEMP/ci-exec-lib-tests.out"
+          if [ ! -s "$OUT" ]; then
+            echo "::error::$OUT is missing or empty, so whether ci-exec's Unix extractor tests ran is UNKNOWN, not a pass."
+            exit 1
+          fi
+          # The lib test binary's section runs from its `Running unittests
+          # src/lib.rs (...qontinui_ci_exec-<hash>)` line to the next `Running`
+          # or `Doc-tests` line. Colour codes go first: dtolnay/rust-toolchain
+          # exports CARGO_TERM_COLOR=always.
+          awk '
+            { gsub(/\033\[[0-9;]*[a-zA-Z]/, "") }
+            /^[[:space:]]*(Running|Doc-tests)[[:space:]]/ {
+              inside = ($0 ~ /Running unittests src\/lib\.rs \([^)]*\/qontinui_ci_exec-[0-9a-f]+\)/)
+              next
+            }
+            inside { sub(/[[:space:]]+$/, ""); print }
+          ' "$OUT" > "$SECTION"
+          MISSING=0
+          for TEST in \
+            tools::tests::two_link_chain_cannot_escape_the_extraction_root \
+            tools::tests::no_symlink_is_ever_created_under_the_destination \
+            tools::tests::a_contained_link_chain_materialises
+          do
+            if grep -Fqx "test $TEST ... ok" "$SECTION"; then
+              echo "ran: test $TEST ... ok"
+            else
+              echo "::error::ci-exec's $TEST did not print '... ok' in this leg's cargo test output. Its #[cfg(unix)] arm runs on no other Linux leg; dropping it has to be a decision, not an accident."
+              MISSING=1
+            fi
+          done
+          exit "$MISSING"
 
       - name: fleet-nouns.toml patterns agree across Rust, Python and JS
         # fleet-nouns.toml promises one meaning per pattern under Rust `regex`,
