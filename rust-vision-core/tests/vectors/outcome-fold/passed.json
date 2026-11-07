@@ -1,0 +1,17 @@
+{
+  "description": "One pass is a pass.",
+  "input": [
+    {
+      "outcome": "passed"
+    }
+  ],
+  "expected": {
+    "outcome": "passed",
+    "outcomeCounts": {
+      "passed": 1,
+      "failed": 0,
+      "unknown": 0
+    },
+    "unknownCodes": []
+  }
+}
