@@ -175,7 +175,7 @@
       "type": "execute_playbook",
       "id": "agentic-playbook-0203",
       "name": "Replay login playbook",
-      "playbookPath": "playbooks/login.md",
+      "content": "### Step 1: Open the login page\nNavigate to /login and wait for the sign-in form.",
       "timeoutSeconds": 300
     },
     {
