@@ -35,9 +35,10 @@ pub mod timeline;
 
 pub use analyzers::{AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Finding, Severity};
 pub use assertions::{
-    evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
-    ComponentDiffReport, ComponentFinding, ComponentFindingKind, EvalContext, OcrBlockRef,
-    TextMatchKind, TextTarget, TypographyDimension, ViewportComparison, WcagLevel,
+    evaluate as evaluate_assertion, fold_outcomes, fold_results, Assertion, AssertionOutcome,
+    AssertionResult, BaselineEntry, ComponentDiffReport, ComponentFinding, ComponentFindingKind,
+    EvalContext, FoldedOutcome, OcrBlockRef, OutcomeCounts, TextMatchKind, TextTarget,
+    TypographyDimension, Verdict, ViewportComparison, WcagLevel,
 };
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use component_capture::{

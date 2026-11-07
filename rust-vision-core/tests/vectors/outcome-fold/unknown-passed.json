@@ -1,0 +1,26 @@
+{
+  "description": "An unknown beats passes: a pass beside an unchecked item is not a pass.",
+  "input": [
+    {
+      "outcome": "passed"
+    },
+    {
+      "outcome": "unknown",
+      "code": "no_expectation"
+    },
+    {
+      "outcome": "passed"
+    }
+  ],
+  "expected": {
+    "outcome": "unknown",
+    "outcomeCounts": {
+      "passed": 2,
+      "failed": 0,
+      "unknown": 1
+    },
+    "unknownCodes": [
+      "no_expectation"
+    ]
+  }
+}
