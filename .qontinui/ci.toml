@@ -156,6 +156,24 @@
 #    version 1, whose one job runs on whatever OS the dispatched host has, so it
 #    cannot pin a Windows leg. A version 2 manifest can (`os = "windows"` on a
 #    job) once this repo's executors all understand v2.
+#
+# 11. rust-ci's "ci-exec's Unix extractor tests ran on this leg" step is NOT
+#    mirrored. It reads $RUNNER_TEMP/cargo-test.out, a log file that only the
+#    Actions `cargo test` step writes, and fails unless ci-exec's three
+#    extractor regression tests printed `... ok` in it. This lane's
+#    `rust-test` step leaves no such log for a later step to read. (Plan
+#    2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
+#    Phase 4.)
+#
+# 12. rust-ci's provisioning env e2e (its actions/setup-python and
+#    actions/setup-node steps and "Provisioning env e2e", and the same three
+#    in ci-exec-windows) is NOT mirrored. The test needs a host Python 3
+#    interpreter with `venv`, which the CI-node lane refuses to install
+#    (`no_python_refusal` in ci-exec/src/tools.rs: the lane provisions node and
+#    Python PACKAGES, never an interpreter), plus the two setup actions, which
+#    are Actions, not commands. It also runs the test binary it recovers from
+#    the Actions `cargo test` step's log rather than invoking cargo again.
+#    (Same plan, Phase 3.)
 # ===========================================================================
 
 version = 1
