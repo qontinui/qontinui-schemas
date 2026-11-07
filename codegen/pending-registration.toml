@@ -37,3 +37,23 @@
 #
 # CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
 # the daily pending-registration-audit workflow reds until the row is deleted.
+
+# Plan 2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass,
+# Phase 1c: the shared three-state outcome and the renamed spec-check verdict.
+[[pending]]
+type = "FoldedOutcome"
+runner_pr = "qontinui/qontinui-runner#2712"
+added = 2026-11-07
+schemas_pr = "qontinui/qontinui-schemas#291"
+
+[[pending]]
+type = "OutcomeCounts"
+runner_pr = "qontinui/qontinui-runner#2712"
+added = 2026-11-07
+schemas_pr = "qontinui/qontinui-schemas#291"
+
+[[pending]]
+type = "SpecAssertionVerdict"
+runner_pr = "qontinui/qontinui-runner#2712"
+added = 2026-11-07
+schemas_pr = "qontinui/qontinui-schemas#291"
