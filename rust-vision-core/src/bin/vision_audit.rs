@@ -125,10 +125,12 @@ ANALYZE:
 ASSERT:
     --assertions JSON array of assertion objects ({\"type\":\"no_overlap\", ...}).
     --baseline-dir  dir of <name>.json baselines for no_layout_shift_since.
-    Exit 0 iff every assertion PASSED; else 2. An assertion that could not be
-    evaluated (missing element, missing measurement, unregistered baseline)
-    reports `outcome: \"unknown\"` and is NOT a pass -- it counts toward exit 2,
-    because an unchecked assertion must never read as a green one.
+    Exit 0 iff every assertion PASSED; 3 when the assertion list is EMPTY
+    (the fold is `unknown(no_results)`: nothing was checked, so no verdict);
+    else 2. An assertion that could not be evaluated (missing element, missing
+    measurement, unregistered baseline) reports `outcome: \"unknown\"` and is
+    NOT a pass -- it counts toward exit 2, because an unchecked assertion must
+    never read as a green one.
 
 BASELINE:
     Serialize the snapshot's element bboxes to <baseline-dir>/<name>.json so a
@@ -2023,6 +2025,14 @@ mod tests {
         // frame; renaming either silently downgrades that caller.
         assert!(USAGE.contains("--scale-factor <n>"));
         assert!(USAGE.contains("[--frame <file>"));
+    }
+
+    #[test]
+    fn the_usage_states_the_no_verdict_exit() {
+        // The help text is the exit contract a caller reads; it must not
+        // still promise that an empty assertion list exits 0 or 2.
+        assert!(USAGE.contains("3 when the assertion list is EMPTY"));
+        assert!(USAGE.contains("unknown(no_results)"));
     }
 
     #[test]
