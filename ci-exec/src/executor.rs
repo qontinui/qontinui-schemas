@@ -1159,15 +1159,42 @@ async fn run_step(
 }
 
 /// Per-line pump for one stream.
+///
+/// Reads the bytes up to each `\n` and renders them lossily, so a line that
+/// is not valid UTF-8 shows with U+FFFD in place of the bad bytes and the
+/// pump goes on. (`lines()` returns `InvalidData` there: the pump ended, the
+/// rest of the log was dropped silently, and a step still writing met a
+/// closed read end and died of SIGPIPE.) A final line with no trailing `\n`
+/// is still logged. Any other read error is logged once, then the pump ends.
 async fn pump_lines<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
     stream: R,
     sink: Arc<dyn LogSink>,
     step_name: String,
     stream_tag: &'static str,
 ) {
-    let mut lines = BufReader::new(stream).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        sink.push(&format!("[{step_name}:{stream_tag}] {line}"));
+    let mut reader = BufReader::new(stream);
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf).await {
+            Ok(0) => break,
+            Ok(_) => {
+                if buf.last() == Some(&b'\n') {
+                    buf.pop();
+                    if buf.last() == Some(&b'\r') {
+                        buf.pop();
+                    }
+                }
+                let line = String::from_utf8_lossy(&buf);
+                sink.push(&format!("[{step_name}:{stream_tag}] {line}"));
+            }
+            Err(e) => {
+                sink.push(&format!(
+                    "[ci-node] step {step_name} {stream_tag} read error: {e}"
+                ));
+                break;
+            }
+        }
     }
 }
 
@@ -1491,8 +1518,9 @@ mod tests {
     /// One lock for every test here that plants a process env var or runs a
     /// step that prints the env. The process env is shared by every test in
     /// the binary, so without it a test printing the env inherits another
-    /// test's planted name — a non-UTF-8 one stops the output pump and fails
-    /// that test with no code defect behind it. A tokio mutex because the
+    /// test's planted name, and its output carries a line it never expected
+    /// (a non-UTF-8 name shows as U+FFFD and does not stop the output pump),
+    /// failing that test with no code defect behind it. A tokio mutex because the
     /// guard is held across `.await`, and it has no poisoning, so a failed
     /// holder does not fail every later one.
     static PROCESS_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -2245,8 +2273,9 @@ command = ["sh", "-c", "printf 'x\\377\\n'; seq 1 40000"]
     /// cannot represent, and it matches with `index()` rather than a regex so
     /// the invalid byte meets no locale-dependent matcher. It prints NAMES
     /// only: the control's own name, and a fixed marker for any other
-    /// `ARMING_NU*` name, because the raw name is not valid UTF-8 and the
-    /// output pump stops at the first line that is not. The manifest bans `"`
+    /// `ARMING_NU*` name, because the raw name is not valid UTF-8: the output
+    /// pump shows it with U+FFFD in place of the bad byte (and does not stop),
+    /// so only a fixed marker can be matched exactly. The manifest bans `"`
     /// in argv, so the probe's strings arrive through `-v`.
     ///
     /// A second non-Unicode control, `ARMING_NX\xff_KEEP`, is not a model
