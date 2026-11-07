@@ -2145,4 +2145,65 @@ command = ["git", "--version"]
             "the step did not get the pinned empty CLAUDE_CONFIG_DIR: {lines:#?}"
         );
     }
+
+    /// Arming test for an inherited `*_MODEL_CMD` whose name is NOT valid
+    /// Unicode, entered where production enters the scrub: `run` drives
+    /// `run_dispatch` -> `run_step` -> `current_step_env_removals`. Removing
+    /// such a key under its lossy spelling removes a different variable, and
+    /// the real one reaches the step.
+    ///
+    /// The probe runs `awk` DIRECTLY, since a POSIX shell may drop a name it
+    /// cannot represent, and it matches with `index()` rather than a regex so
+    /// the invalid byte meets no locale-dependent matcher. It prints NAMES
+    /// only: the control's own name, and a fixed marker for any other
+    /// `ARMING_NU*` name, because the raw name is not valid UTF-8 and the
+    /// output pump stops at the first line that is not. The manifest bans `"`
+    /// in argv, so the probe's strings arrive through `-v`.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn arming_a_non_unicode_inherited_model_command_never_reaches_a_ci_step() {
+        use std::os::unix::ffi::OsStrExt;
+        const KEEP: &str = "ARMING_NU_KEEP";
+        const PROBE: &str = r#"
+version = 1
+[[steps]]
+name = "probe"
+command = [
+    "awk",
+    "-v", "p=ARMING_NU",
+    "-v", "keep=ARMING_NU_KEEP",
+    "-v", "s=seen=",
+    "-v", "o=seen=ARMING_NU(other)",
+    "-v", "d=done",
+    "BEGIN { for (k in ENVIRON) { if (index(k, p) == 1) { if (k == keep) { print s k } else { print o } } }; print d }",
+]
+"#;
+        let planted = std::ffi::OsStr::from_bytes(b"ARMING_NU\xff_MODEL_CMD");
+        std::env::set_var(planted, "arming-planted");
+        std::env::set_var(KEEP, "arming-planted");
+        let (_tmp, root, head) = repo_with(PROBE);
+        let (c, rec) = run(&root, &head, None).await;
+        std::env::remove_var(planted);
+        std::env::remove_var(KEEP);
+        let lines = rec.lines.lock().unwrap().clone();
+        assert_eq!(c, Conclusion::Success, "{lines:#?}");
+        let out = step_out(&lines, "probe");
+        assert!(
+            out.contains(&"done"),
+            "the probe did not finish: {lines:#?}"
+        );
+        assert!(
+            out.iter().any(|l| l.ends_with("seen=ARMING_NU_KEEP")),
+            "the positive control did not reach the step: {lines:#?}"
+        );
+        let other: Vec<&str> = out
+            .iter()
+            .copied()
+            .filter(|l| l.contains("seen=ARMING_NU") && !l.ends_with("seen=ARMING_NU_KEEP"))
+            .collect();
+        assert!(
+            other.is_empty(),
+            "an inherited non-Unicode *_MODEL_CMD reached the step: {other:?}"
+        );
+    }
 }
