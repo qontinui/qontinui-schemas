@@ -1,0 +1,23 @@
+{
+  "description": "A failure beats an unknown; the unknown's code is still reported.",
+  "input": [
+    {
+      "outcome": "unknown",
+      "code": "stale_input"
+    },
+    {
+      "outcome": "failed"
+    }
+  ],
+  "expected": {
+    "outcome": "failed",
+    "outcomeCounts": {
+      "passed": 0,
+      "failed": 1,
+      "unknown": 1
+    },
+    "unknownCodes": [
+      "stale_input"
+    ]
+  }
+}

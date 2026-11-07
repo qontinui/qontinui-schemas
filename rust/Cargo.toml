@@ -13,6 +13,8 @@ exclude = [
   "tests/refusal_render.rs",
   "examples/refusal_render_fixtures.rs",
   "tests/workspace_root_refusal.rs",
+  # Reads the golden vectors from ../rust-vision-core/tests/vectors/outcome-fold.
+  "tests/outcome_fold_vectors.rs",
   "tests/common/**",
 ]
 

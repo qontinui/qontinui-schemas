@@ -1,0 +1,23 @@
+{
+  "description": "All passed (at least one) is passed.",
+  "input": [
+    {
+      "outcome": "passed"
+    },
+    {
+      "outcome": "passed"
+    },
+    {
+      "outcome": "passed"
+    }
+  ],
+  "expected": {
+    "outcome": "passed",
+    "outcomeCounts": {
+      "passed": 3,
+      "failed": 0,
+      "unknown": 0
+    },
+    "unknownCodes": []
+  }
+}
