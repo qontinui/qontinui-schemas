@@ -556,6 +556,41 @@ mod tests {
         assert!(!message.contains("s3cret"));
     }
 
+    /// The out-of-band path actually delivers: a value passed as env reaches
+    /// the child, and never appears in the command line.
+    ///
+    /// Moved here from `tools.rs`, unchanged but for the [`ChildEnv`] it now
+    /// has to name: `tools.rs`'s test module names nothing this module added,
+    /// so the code before the allowlist still compiles it.
+    #[tokio::test]
+    async fn run_capture_env_delivers_a_value_without_putting_it_on_the_argv() {
+        #[cfg(target_os = "windows")]
+        let (program, args) = ("cmd.exe", vec!["/C", "echo %QONTINUI_TEST_SECRET%"]);
+        #[cfg(not(target_os = "windows"))]
+        let (program, args) = ("sh", vec!["-c", "printf %s \"$QONTINUI_TEST_SECRET\""]);
+
+        // `services`' shape: a container-runtime child, which inherits.
+        let out = crate::tools::run_capture_env(
+            &PlainSpawn,
+            ChildEnv::ContainerRuntime,
+            program,
+            &args,
+            Duration::from_secs(30),
+            None,
+            &[(
+                "QONTINUI_TEST_SECRET".to_string(),
+                "correcthorsebatterystaple".to_string(),
+            )],
+        )
+        .await
+        .expect("the child must run");
+        // The value reached the child. That it is not on the argv is asserted
+        // where it is actually decided — `services::run_argv`, whose output is
+        // the thing that could carry it — rather than against a literal here
+        // that never contained it.
+        assert!(out.contains("correcthorsebatterystaple"), "got {out:?}");
+    }
+
     /// The real spawn function: a provisioning child sees only allowlisted
     /// names, and still receives a variable its caller passed explicitly.
     #[tokio::test]
