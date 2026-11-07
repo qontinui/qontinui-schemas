@@ -2078,6 +2078,61 @@ command = ["git", "--version"]
             .collect()
     }
 
+    /// Arming sentinel for the output pump: a line that is not valid UTF-8
+    /// shows in the log with U+FFFD in place of the bad byte, and every line
+    /// after it is still logged. The old `lines()` pump ended at the first
+    /// such line and dropped the rest of the step's output silently.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_non_utf8_line_shows_as_a_replacement_character_and_the_log_goes_on() {
+        let (_tmp, root, head) = repo_with(
+            r#"version = 1
+[[steps]]
+name = "bytes"
+command = ["printf", 'a\n\377\nb\n']
+"#,
+        );
+        let (c, rec) = run(&root, &head, None).await;
+        let lines = rec.lines.lock().unwrap().clone();
+        assert_eq!(c, Conclusion::Success, "{lines:#?}");
+        let out = step_out(&lines, "bytes");
+        assert_eq!(out.len(), 3, "{lines:#?}");
+        assert_eq!(out[0], "a", "{lines:#?}");
+        assert!(out[1].contains('\u{FFFD}'), "{lines:#?}");
+        assert_eq!(out[2], "b", "{lines:#?}");
+    }
+
+    /// A step that keeps writing past a non-UTF-8 line, well beyond the pipe
+    /// buffer, still succeeds and its whole log arrives: the pump keeps
+    /// draining the pipe, so the writer is never cut off by a closed read end.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_step_writing_past_a_non_utf8_line_succeeds_with_its_whole_log() {
+        let (_tmp, root, head) = repo_with(
+            r#"version = 1
+[[steps]]
+name = "flood"
+command = ["sh", "-c", "printf 'x\\377\\n'; seq 1 40000"]
+"#,
+        );
+        let (c, rec) = run(&root, &head, None).await;
+        let lines = rec.lines.lock().unwrap().clone();
+        let out = step_out(&lines, "flood");
+        let ci_node: Vec<&String> = lines
+            .iter()
+            .filter(|l| l.starts_with("[ci-node]"))
+            .collect();
+        assert_eq!(
+            c,
+            Conclusion::Success,
+            "out lines: {}, last: {:?}, ci-node lines: {ci_node:#?}",
+            out.len(),
+            out.last()
+        );
+        assert_eq!(out.len(), 40001, "last: {:?}", out.last());
+        assert_eq!(out.last(), Some(&"40000"));
+    }
+
     /// The arming sentinel: on a host with no broker a `model = true` step
     /// still runs, with `QONTINUI_CI_MODEL_REFUSED=host_has_no_broker` and no
     /// model variables; a plain step gets neither. Every step gets the
