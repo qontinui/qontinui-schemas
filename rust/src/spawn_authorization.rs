@@ -144,14 +144,10 @@ pub struct SpawnAuthorizationContract {
     ///
     /// Both enforcement points apply it, and they must agree, or for the
     /// difference between the two bounds coord and the runner answer the same
-    /// switch differently. coord's registry fallback reads it from here.
-    ///
-    /// NOT yet single-sourced at the runner: `qontinui-runner` still declares
-    /// its own `MAX_SNAPSHOT_AGE` (12 h, `agent_authorization.rs`), equal to
-    /// this value today. That arm closes when the runner adopts the contract;
-    /// until then a change here must be matched there, which coord's
-    /// `the_retention_bound_is_the_contracts` makes a deliberate act by
-    /// restating the runner's value.
+    /// switch differently. Both read it from here: coord's registry fallback
+    /// (`max_retained_age`) and the runner's `max_snapshot_age()`
+    /// (`agent_authorization.rs`). Neither declares its own copy, so an edit
+    /// here moves both bounds together.
     pub max_snapshot_age_secs: u64,
     pub kind_seeds: Vec<KindSeed>,
     pub class_seeds: Vec<ClassSeed>,
@@ -403,10 +399,11 @@ mod tests {
         assert!(c.default_enabled);
     }
 
-    /// The registry snapshot bound is the runner's 12 h `MAX_SNAPSHOT_AGE`.
-    /// Nothing in this crate reads the field, so this is the assertion that
-    /// keeps an edit to it from passing unnoticed while the runner still
-    /// declares its own copy.
+    /// The registry snapshot bound is 12 h. Coord and the runner both read
+    /// it from the contract, so an edit moves both enforcement points at once
+    /// — and nothing in this crate reads the field, so this is the assertion
+    /// that keeps such an edit (it changes how long a stale preference can
+    /// decide a spawn fleet-wide) a deliberate act rather than an unnoticed one.
     #[test]
     fn the_snapshot_age_bound_is_twelve_hours() {
         assert_eq!(contract().max_snapshot_age_secs, 12 * 60 * 60);
