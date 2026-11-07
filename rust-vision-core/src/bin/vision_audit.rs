@@ -51,10 +51,10 @@ use qontinui_vision_core::assertions::{
     evaluate as evaluate_assertion, fold_results, Assertion, AssertionOutcome, AssertionResult,
     BaselineEntry, EvalContext, FoldedOutcome,
 };
-use qontinui_vision_core::UnknownCode;
 use qontinui_vision_core::coverage::SnapshotCoverage;
 use qontinui_vision_core::element_snapshot::{display_snapshot_id, ElementSnapshot};
 use qontinui_vision_core::frame::{Frame, FrameSource};
+use qontinui_vision_core::UnknownCode;
 
 // ===========================================================================
 // Exit-code contract (centralized so tests can reference the same constants).
@@ -909,7 +909,7 @@ pub fn assert_all_frames(
         .map(|a| evaluate_assertion(a, &ctx))
         .collect();
     let verdict = fold_results(&results);
-    let counts = verdict.outcome_counts;
+    let counts = verdict.outcome_counts();
     AssertReport {
         // An un-evaluated assertion is not a pass, and neither is an empty
         // list: only a `passed` fold is green.
@@ -931,11 +931,11 @@ pub fn assert_all_frames(
 /// The exit code an assert report maps to (D8): 0 iff the fold is `passed`,
 /// 3 for `unknown(no_results)` (an empty list), 2 for everything else.
 fn assert_exit(report: &AssertReport) -> u8 {
-    match report.verdict.outcome {
+    match report.verdict.outcome() {
         AssertionOutcome::Passed => EXIT_OK,
         AssertionOutcome::Unknown
-            if report.verdict.outcome_counts.total() == 0
-                && report.verdict.unknown_codes == [UnknownCode::NoResults] =>
+            if report.verdict.outcome_counts().total() == 0
+                && report.verdict.unknown_codes() == [UnknownCode::NoResults] =>
         {
             EXIT_NO_RESULTS
         }
@@ -948,17 +948,17 @@ fn assert_summary(report: &AssertReport) -> String {
     // `assert` actually returns — style-gate embeds this line in its cell, so
     // it must never say "FAIL (exit 2)" over an exit 3.
     let exit = assert_exit(report);
-    let word = match report.verdict.outcome {
+    let word = match report.verdict.outcome() {
         AssertionOutcome::Passed => "passed",
         AssertionOutcome::Failed => "failed",
         AssertionOutcome::Unknown => "unknown",
     };
-    let codes = if report.verdict.unknown_codes.is_empty() {
+    let codes = if report.verdict.unknown_codes().is_empty() {
         String::new()
     } else {
         let names: Vec<&str> = report
             .verdict
-            .unknown_codes
+            .unknown_codes()
             .iter()
             .map(|c| c.as_str())
             .collect();
@@ -1533,8 +1533,8 @@ mod tests {
     fn an_empty_assertion_list_is_unknown_no_results_and_exits_3() {
         let report = assert_all(&snap_with_overlap(), None, &[], &HashMap::new());
         assert!(!report.all_passed);
-        assert_eq!(report.verdict.outcome, AssertionOutcome::Unknown);
-        assert_eq!(report.verdict.unknown_codes, vec![UnknownCode::NoResults]);
+        assert_eq!(report.verdict.outcome(), AssertionOutcome::Unknown);
+        assert_eq!(report.verdict.unknown_codes(), vec![UnknownCode::NoResults]);
         assert_eq!(assert_exit(&report), EXIT_NO_RESULTS);
         let summary = assert_summary(&report);
         let first = summary.lines().next().unwrap();
@@ -1545,7 +1545,10 @@ mod tests {
         assert!(!summary.contains("FAIL"), "{summary}");
         let wire = serde_json::to_value(&report).unwrap();
         assert_eq!(wire["verdict"]["outcome"], "unknown");
-        assert_eq!(wire["verdict"]["unknownCodes"], serde_json::json!(["no_results"]));
+        assert_eq!(
+            wire["verdict"]["unknownCodes"],
+            serde_json::json!(["no_results"])
+        );
         assert_eq!(wire["allPassed"], false);
 
         // End to end through the CLI.
@@ -1572,7 +1575,11 @@ mod tests {
         let snap = snap_with_overlap();
         let bl = HashMap::new();
         let pass = assert_all(&snap, None, &[Assertion::NoClipping { region: None }], &bl);
-        assert!(assert_summary(&pass).lines().next().unwrap().ends_with("-> passed (exit 0)"));
+        assert!(assert_summary(&pass)
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("-> passed (exit 0)"));
         let fail = assert_all(
             &snap,
             None,
@@ -1583,7 +1590,11 @@ mod tests {
             &bl,
         );
         assert_eq!(assert_exit(&fail), EXIT_GATE_FAILED);
-        assert!(assert_summary(&fail).lines().next().unwrap().ends_with("-> failed (exit 2)"));
+        assert!(assert_summary(&fail)
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("-> failed (exit 2)"));
     }
 
     // ---- assert attribution ----

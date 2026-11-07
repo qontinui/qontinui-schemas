@@ -17,9 +17,10 @@
 //! to crates.io from `publish-rust.yml`), so the definitions are twinned. Both
 //! copies run the golden vectors in `rust-vision-core/tests/vectors/outcome-fold/`
 //! (`tests/outcome_fold_vectors.rs` here), both pin [`UnknownCode::ALL`] to the
-//! `UB-OBS-*` registry codes of [`crate::ui_bridge_diagnostics`], and the
-//! runner's schema export compares their JSON Schemas. Collapse the twin into
-//! one definition when either the licence split or the publication changes.
+//! `UB-OBS-*` registry codes of [`crate::ui_bridge_diagnostics`], and
+//! `tests/outcome_fold_vectors.rs` requires the region between the `twin:`
+//! markers to be byte-identical in both copies. Collapse the twin into one definition when either the
+//! licence split or the publication changes.
 //! Plan `2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass` D2.
 
 use std::fmt;
@@ -236,6 +237,7 @@ impl AssertionOutcome {
 // The fold
 // ---------------------------------------------------------------------------
 
+// --- twin: begin (kept byte-identical with the other copy; tests/outcome_fold_vectors.rs checks) ---
 /// One verdict as the fold reads it: an outcome, and — iff that outcome is
 /// [`AssertionOutcome::Unknown`] — the typed reason.
 ///
@@ -243,7 +245,7 @@ impl AssertionOutcome {
 /// constructors are the only way in) and on the wire (deserialization refuses
 /// an `unknown` without a `code`, and a `code` on any other outcome), so the
 /// fold can always report WHY an unknown is unknown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Verdict {
     outcome: AssertionOutcome,
@@ -283,8 +285,42 @@ impl Verdict {
     }
 }
 
+/// The schema states the same invariant the deserializer enforces, so a
+/// binding generated from it (TS, Python) refuses what Rust refuses: a
+/// `passed`/`failed` verdict with no `code`, or an `unknown` one with a
+/// required `code`, and no other fields.
+impl JsonSchema for Verdict {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Verdict".into()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let code = generator.subschema_for::<UnknownCode>();
+        schemars::json_schema!({
+            "description": "One verdict: an outcome, and a typed `code` iff that outcome is `unknown`.",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": { "outcome": { "type": "string", "enum": ["passed", "failed"] } },
+                    "required": ["outcome"],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "outcome": { "type": "string", "const": "unknown" },
+                        "code": code
+                    },
+                    "required": ["outcome", "code"],
+                    "additionalProperties": false
+                }
+            ]
+        })
+    }
+}
+
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct VerdictWire {
     outcome: AssertionOutcome,
     #[serde(default)]
@@ -329,22 +365,101 @@ impl OutcomeCounts {
 
 /// The fold's answer. Serialized camelCase (`outcomeCounts`, `unknownCodes`),
 /// the names the ui-bridge SDK already ships.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+///
+/// Only [`fold_outcomes`] builds one, and deserialization re-checks what the
+/// fold guarantees: the outcome is the one the counts imply, an empty fold is
+/// `unknown` with exactly `[no_results]`, and codes are present iff something
+/// was unknown. So a `FoldedOutcome` read off the wire cannot say `passed`
+/// over zero results, or `passed` beside a failure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FoldedOutcome {
-    pub outcome: AssertionOutcome,
-    pub outcome_counts: OutcomeCounts,
+    outcome: AssertionOutcome,
+    outcome_counts: OutcomeCounts,
     /// The distinct codes of the `unknown` inputs, in first-seen order —
     /// `[no_results]` for an empty input, `[]` when nothing was unknown. Kept
     /// on a `failed` fold too: the failure decides the outcome, and the
     /// unknowns beside it are still work someone owes.
-    pub unknown_codes: Vec<UnknownCode>,
+    unknown_codes: Vec<UnknownCode>,
 }
 
 impl FoldedOutcome {
+    pub const fn outcome(&self) -> AssertionOutcome {
+        self.outcome
+    }
+
+    pub const fn outcome_counts(&self) -> OutcomeCounts {
+        self.outcome_counts
+    }
+
+    pub fn unknown_codes(&self) -> &[UnknownCode] {
+        &self.unknown_codes
+    }
+
     /// The gate bit: only a `passed` fold is green.
     pub fn passed(&self) -> bool {
         self.outcome.passed()
+    }
+
+    /// Why `self` is not a value [`fold_outcomes`] could have returned, if it
+    /// is not.
+    fn inconsistency(&self) -> Option<String> {
+        let c = self.outcome_counts;
+        if c.total() == 0 {
+            return (self.outcome != AssertionOutcome::Unknown
+                || self.unknown_codes != [UnknownCode::NoResults])
+            .then(|| "an empty fold is `unknown` with exactly `[no_results]`".to_string());
+        }
+        let implied = if c.failed > 0 {
+            AssertionOutcome::Failed
+        } else if c.unknown > 0 {
+            AssertionOutcome::Unknown
+        } else {
+            AssertionOutcome::Passed
+        };
+        if self.outcome != implied {
+            return Some(format!(
+                "outcome {:?} contradicts the counts {c:?}, which fold to {implied:?}",
+                self.outcome
+            ));
+        }
+        if (c.unknown > 0) == self.unknown_codes().is_empty() {
+            return Some("`unknownCodes` must be non-empty iff `outcomeCounts.unknown` > 0".into());
+        }
+        if self.unknown_codes.len() > c.unknown {
+            return Some("more distinct `unknownCodes` than unknown verdicts".into());
+        }
+        let mut seen = Vec::with_capacity(self.unknown_codes.len());
+        for code in &self.unknown_codes {
+            if seen.contains(code) {
+                return Some(format!("`unknownCodes` repeats {code}"));
+            }
+            seen.push(*code);
+        }
+        None
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FoldedOutcomeWire {
+    outcome: AssertionOutcome,
+    outcome_counts: OutcomeCounts,
+    unknown_codes: Vec<UnknownCode>,
+}
+
+impl<'de> Deserialize<'de> for FoldedOutcome {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let w = FoldedOutcomeWire::deserialize(d)?;
+        let f = Self {
+            outcome: w.outcome,
+            outcome_counts: w.outcome_counts,
+            unknown_codes: w.unknown_codes,
+        };
+        match f.inconsistency() {
+            None => Ok(f),
+            Some(why) => Err(de::Error::custom(format!("not a fold result: {why}"))),
+        }
     }
 }
 
@@ -386,11 +501,12 @@ pub fn fold_outcomes(verdicts: &[Verdict]) -> FoldedOutcome {
         unknown_codes,
     }
 }
+// --- twin: end ---
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use serde_json::{json, Value};
     use std::collections::BTreeSet;
 
     #[test]
@@ -463,9 +579,15 @@ mod tests {
                 Some(format!("UB-OBS-{}", rhs.split('"').next()?))
             })
             .collect();
-        assert!(registry.len() >= 9, "parsed only {} UB-OBS codes", registry.len());
-        let envelope: BTreeSet<String> =
-            UnknownCode::ALL.iter().map(|c| c.diagnostic_code()).collect();
+        assert!(
+            registry.len() >= 9,
+            "parsed only {} UB-OBS codes",
+            registry.len()
+        );
+        let envelope: BTreeSet<String> = UnknownCode::ALL
+            .iter()
+            .map(|c| c.diagnostic_code())
+            .collect();
         let only_envelope: Vec<_> = envelope.difference(&registry).collect();
         let only_registry: Vec<_> = registry.difference(&envelope).collect();
         assert!(
@@ -474,8 +596,10 @@ mod tests {
              UB-OBS registry entry without an UnknownCode: {only_registry:?}"
         );
         for c in UnknownCode::ALL {
-            let parsed: crate::ui_bridge_diagnostics::UiBridgeErrorCode =
-                c.diagnostic_code().parse().expect("registry parses its own code");
+            let parsed: crate::ui_bridge_diagnostics::UiBridgeErrorCode = c
+                .diagnostic_code()
+                .parse()
+                .expect("registry parses its own code");
             assert_eq!(parsed.as_str(), c.diagnostic_code());
         }
     }
@@ -483,9 +607,9 @@ mod tests {
     #[test]
     fn empty_is_unknown_no_results_never_passed() {
         let f = fold_outcomes(&[]);
-        assert_eq!(f.outcome, AssertionOutcome::Unknown);
-        assert_eq!(f.unknown_codes, vec![UnknownCode::NoResults]);
-        assert_eq!(f.outcome_counts.total(), 0);
+        assert_eq!(f.outcome(), AssertionOutcome::Unknown);
+        assert_eq!(f.unknown_codes(), vec![UnknownCode::NoResults]);
+        assert_eq!(f.outcome_counts().total(), 0);
         assert!(!f.passed());
     }
 
@@ -496,13 +620,13 @@ mod tests {
             Verdict::failed(),
             Verdict::passed(),
         ]);
-        assert_eq!(f.outcome, AssertionOutcome::Failed);
-        assert_eq!(f.unknown_codes, vec![UnknownCode::InputMissing]);
+        assert_eq!(f.outcome(), AssertionOutcome::Failed);
+        assert_eq!(f.unknown_codes(), vec![UnknownCode::InputMissing]);
         let f = fold_outcomes(&[Verdict::passed(), Verdict::unknown(UnknownCode::StaleInput)]);
-        assert_eq!(f.outcome, AssertionOutcome::Unknown);
+        assert_eq!(f.outcome(), AssertionOutcome::Unknown);
         let f = fold_outcomes(&[Verdict::passed(), Verdict::passed()]);
-        assert_eq!(f.outcome, AssertionOutcome::Passed);
-        assert!(f.unknown_codes.is_empty());
+        assert_eq!(f.outcome(), AssertionOutcome::Passed);
+        assert!(f.unknown_codes().is_empty());
     }
 
     #[test]
@@ -513,10 +637,10 @@ mod tests {
             Verdict::unknown(UnknownCode::StaleInput),
         ]);
         assert_eq!(
-            f.unknown_codes,
+            f.unknown_codes(),
             vec![UnknownCode::StaleInput, UnknownCode::InputMissing]
         );
-        assert_eq!(f.outcome_counts.unknown, 3);
+        assert_eq!(f.outcome_counts().unknown, 3);
     }
 
     #[test]
@@ -530,7 +654,51 @@ mod tests {
             serde_json::from_value(json!({"outcome": "unknown", "code": "no_expectation"}))
                 .unwrap();
         assert_eq!(v, Verdict::unknown(UnknownCode::NoExpectation));
-        assert_eq!(serde_json::to_value(Verdict::passed()).unwrap(), json!({"outcome": "passed"}));
+        assert_eq!(
+            serde_json::to_value(Verdict::passed()).unwrap(),
+            json!({"outcome": "passed"})
+        );
+    }
+
+    #[test]
+    fn folded_outcome_wire_refuses_a_pass_the_fold_could_not_give() {
+        let read = |v| serde_json::from_value::<FoldedOutcome>(v);
+        // Passed over nothing: the absence this plan exists to stop reading as green.
+        assert!(read(json!({"outcome": "passed",
+            "outcomeCounts": {"passed": 0, "failed": 0, "unknown": 0}, "unknownCodes": []}))
+        .is_err());
+        // Passed beside a failure.
+        assert!(read(json!({"outcome": "passed",
+            "outcomeCounts": {"passed": 1, "failed": 3, "unknown": 0}, "unknownCodes": []}))
+        .is_err());
+        // Unknown with no reason.
+        assert!(read(json!({"outcome": "unknown",
+            "outcomeCounts": {"passed": 0, "failed": 0, "unknown": 1}, "unknownCodes": []}))
+        .is_err());
+        // Every fold result round-trips.
+        for f in [
+            fold_outcomes(&[]),
+            fold_outcomes(&[Verdict::passed()]),
+            fold_outcomes(&[Verdict::failed(), Verdict::unknown(UnknownCode::StaleInput)]),
+            fold_outcomes(&[
+                Verdict::unknown(UnknownCode::NotReported),
+                Verdict::passed(),
+            ]),
+        ] {
+            assert_eq!(read(serde_json::to_value(&f).unwrap()).unwrap(), f);
+        }
+    }
+
+    #[test]
+    fn verdict_schema_states_the_code_iff_unknown_invariant() {
+        let schema = serde_json::to_value(schemars::schema_for!(Verdict)).unwrap();
+        let arms = schema["oneOf"].as_array().expect("oneOf");
+        assert_eq!(arms.len(), 2);
+        assert_eq!(arms[0]["required"], json!(["outcome"]));
+        assert_eq!(arms[1]["required"], json!(["outcome", "code"]));
+        assert!(arms
+            .iter()
+            .all(|a| a["additionalProperties"] == json!(false)));
     }
 
     #[test]
