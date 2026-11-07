@@ -321,6 +321,34 @@ mod tests {
             .collect()
     }
 
+    /// Is `token` shaped like an environment variable NAME? Only such a token
+    /// may appear in a message. A child here prints names only, but the
+    /// Windows names printer also echoes the leading text of each further line
+    /// of a multi-line value, so any other token could be part of a value.
+    fn name_shaped(token: &str) -> bool {
+        let mut chars = token.chars();
+        chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '(' | ')'))
+    }
+
+    /// `names` as a message may show them: the name-shaped tokens, plus a
+    /// count of any others, which are never printed.
+    fn shown(names: &[String]) -> String {
+        let printable: Vec<&str> = names
+            .iter()
+            .map(String::as_str)
+            .filter(|n| name_shaped(n))
+            .collect();
+        let withheld = names.len() - printable.len();
+        if withheld == 0 {
+            format!("{printable:?}")
+        } else {
+            format!("{printable:?} (+{withheld} token(s) withheld: not name-shaped)")
+        }
+    }
+
     fn os(pairs: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
         pairs
             .iter()
@@ -434,7 +462,9 @@ mod tests {
     /// passwords, and a mutation run spawns it without `env_clear()`. On Unix
     /// awk lists `ENVIRON`'s keys (`env | cut -d= -f1` would print a line of
     /// a multi-line value). On Windows a `.cmd` echoes the text before the
-    /// first `=` of each `set` line.
+    /// first `=` of each `set` line, and each further line of a multi-line
+    /// value is a `set` line of its own, so every message here shows tokens
+    /// through [`shown`], which prints only name-shaped ones.
     fn names_printer(dir: &Path) -> (String, Vec<String>) {
         if cfg!(target_os = "windows") {
             let script = dir.join("print-env-names.cmd");
@@ -471,8 +501,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let (program, args) = names_printer(dir.path());
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        // The child prints names only, so even the error text carries none.
-        let out = crate::tools::run_capture_env(
+        let out = match crate::tools::run_capture_env(
             process,
             ChildEnv::Provisioning,
             &program,
@@ -482,12 +511,49 @@ mod tests {
             envs,
         )
         .await
-        .expect("the names printer must run");
+        {
+            Ok(out) => out,
+            // A spawn or timeout error carries no child output. An `exited`
+            // error carries all of it, which is not printable (see
+            // `names_printer`).
+            Err(e) if e.starts_with("spawn ") || e.contains(" did not answer ") => {
+                panic!("the names printer did not run: {e}")
+            }
+            Err(_) => panic!(
+                "the names printer exited non-zero; its output is withheld because it may \
+                 carry part of a value"
+            ),
+        };
         out.lines()
             .map(str::trim)
             .filter(|line| !line.is_empty())
             .map(str::to_string)
             .collect()
+    }
+
+    /// A message shows a child's token only when it is shaped like a name.
+    #[test]
+    fn only_name_shaped_tokens_are_ever_shown() {
+        for name in [
+            "PATH",
+            "_X1",
+            "ProgramFiles(x86)",
+            "QONTINUI_E2E_CANARY_PASSWORD",
+        ] {
+            assert!(name_shaped(name), "{name}");
+        }
+        // A continuation line of a multi-line value, as the Windows printer
+        // can echo one, never qualifies.
+        for not_a_name in ["", "1X", "=C:", "s3cret value", "-----BEGIN", "a/b", "x.y"] {
+            assert!(!name_shaped(not_a_name), "{not_a_name:?}");
+        }
+        let tokens = ["PATH", "s3cret value", "HOME"].map(String::from);
+        let message = shown(&tokens);
+        assert_eq!(
+            message,
+            r#"["PATH", "HOME"] (+1 token(s) withheld: not name-shaped)"#
+        );
+        assert!(!message.contains("s3cret"));
     }
 
     /// The real spawn function: a provisioning child sees only allowlisted
@@ -502,29 +568,41 @@ mod tests {
         let unexpected = outside(&names, &allowed);
         assert!(
             unexpected.is_empty(),
-            "a provisioning child saw names outside the allowlist: {unexpected:?}"
+            "a provisioning child saw names outside the allowlist: {}",
+            shown(&unexpected)
         );
         for required in ["PATH", "PIP_CONFIG_FILE", EXPLICIT] {
             assert!(
                 listed(&names, required),
-                "{required} did not reach the child, which saw {names:?}"
+                "{required} did not reach the child, which saw {}",
+                shown(&names)
             );
         }
     }
 
-    /// A host whose `command` sets two variables of its own on every command:
-    /// one allowlisted name, and one `*_PASSWORD`.
+    /// A host whose `command` sets two variables of its own on every command,
+    /// one allowlisted name and one `*_PASSWORD`, and removes a third,
+    /// [`HOST_REMOVED`].
     struct HostSetsVariables {
         allowlisted: &'static str,
     }
 
     const HOST_SET_PASSWORD: &str = "QONTINUI_HOST_SET_PASSWORD";
 
+    /// An allowlisted name the test process carries, which the host removes:
+    /// the host may narrow the allowlisted environment, never widen it.
+    const HOST_REMOVED: &str = if cfg!(target_os = "windows") {
+        "USERPROFILE"
+    } else {
+        "HOME"
+    };
+
     impl ProcessSpawn for HostSetsVariables {
         fn command(&self, program: &str) -> tokio::process::Command {
             let mut cmd = PlainSpawn.command(program);
             cmd.env(self.allowlisted, "set-by-the-host")
-                .env(HOST_SET_PASSWORD, "not-a-real-secret");
+                .env(HOST_SET_PASSWORD, "not-a-real-secret")
+                .env_remove(HOST_REMOVED);
             cmd
         }
         fn std_command(&self, program: &str) -> std::process::Command {
@@ -541,22 +619,25 @@ mod tests {
         }
     }
 
+    /// An allowlisted name this process does not carry, so its presence in a
+    /// child can only be the host's doing.
+    fn an_absent_allowlisted_name() -> &'static str {
+        BASE.iter()
+            .copied()
+            .find(|name| std::env::var_os(name).is_none())
+            .expect(
+                "every allowlisted name is set in this environment, so a host-set one \
+                 cannot be told apart from an inherited one",
+            )
+    }
+
     /// What a host's `ProcessSpawn::command` sets explicitly passes the same
     /// allowlist as what the process inherits: the allowlisted name survives,
     /// the `*_PASSWORD` does not. That holds for every implementer of the
     /// public trait, present and future.
     #[tokio::test]
     async fn a_variable_the_host_set_survives_only_if_allowlisted() {
-        // An allowlisted name this process does not carry, so its presence in
-        // the child can only be the host's doing.
-        let allowlisted = BASE
-            .iter()
-            .copied()
-            .find(|name| std::env::var_os(name).is_none())
-            .expect(
-                "every allowlisted name is set in this environment, so a host-set one \
-                 cannot be told apart from an inherited one",
-            );
+        let allowlisted = an_absent_allowlisted_name();
         let names = names_seen_by(&HostSetsVariables { allowlisted }, &[]).await;
         assert!(
             listed(&names, allowlisted),
@@ -565,6 +646,31 @@ mod tests {
         assert!(
             !listed(&names, HOST_SET_PASSWORD),
             "the host set {HOST_SET_PASSWORD}, which the allowlist refuses, and the child saw it"
+        );
+    }
+
+    /// A name the host REMOVED stays removed, although the allowlist admits it
+    /// and this process carries it: the host's own posture is re-applied after
+    /// the allowlisted names, so a host can narrow the environment but never
+    /// widen it. A test of its own, so a mutation that keeps every host-set
+    /// variable (no `env_clear()`) cannot mask this one.
+    #[tokio::test]
+    async fn a_name_the_host_removed_stays_removed() {
+        assert!(
+            std::env::var_os(HOST_REMOVED).is_some(),
+            "{HOST_REMOVED} is not set in this environment, so the host's removal of it \
+             cannot be told apart from its absence"
+        );
+        let names = names_seen_by(
+            &HostSetsVariables {
+                allowlisted: an_absent_allowlisted_name(),
+            },
+            &[],
+        )
+        .await;
+        assert!(
+            !listed(&names, HOST_REMOVED),
+            "the host removed {HOST_REMOVED}, and the child still saw the inherited one"
         );
     }
 
@@ -838,8 +944,9 @@ print("qontinui-env-probe 1.0.0")
                 .lines()
                 .map(str::to_string)
                 .collect();
-            // Names only: this line is the measurement a CI log carries.
-            println!("{call}: the verify child saw {names:?}");
+            // Names only, and only name-shaped ones: this line is the
+            // measurement a CI log carries.
+            println!("{call}: the verify child saw {}", shown(&names));
 
             // The canaries first, so a failure names the one that leaked: the
             // password means no allowlist was applied at all, the proxy means
@@ -854,13 +961,15 @@ print("qontinui-env-probe 1.0.0")
             let unexpected = outside(&names, &allowed);
             assert!(
                 unexpected.is_empty(),
-                "{call}: the verify child saw names outside the allowlist: {unexpected:?}"
+                "{call}: the verify child saw names outside the allowlist: {}",
+                shown(&unexpected)
             );
             // Lower bound: the child came through `build`'s provisioning arm.
             for required in ["PATH", "PIP_CONFIG_FILE"] {
                 assert!(
                     listed(&names, required),
-                    "{call}: {required} did not reach the verify child, which saw {names:?}"
+                    "{call}: {required} did not reach the verify child, which saw {}",
+                    shown(&names)
                 );
             }
         }

@@ -3285,6 +3285,112 @@ mod tests {
         assert!(resolve_executable(dir.path(), "definitely-absent").is_none());
     }
 
+    /// THE ARMING TEST for the provisioning allowlist: a credential the host
+    /// set on a command never reaches a provisioning child.
+    ///
+    /// It names nothing but `provision`, the `ProcessSpawn` trait and
+    /// `CiTool`, so it compiles against the code from before the allowlist,
+    /// and it is RED there: that code passed every variable a host set on a
+    /// command through to the child. The host is the shape that matters. A
+    /// runner keeps plaintext passwords and a CI box a `GITHUB_TOKEN`, and a
+    /// host's `ProcessSpawn::command` is where a host-set variable enters.
+    ///
+    /// Offline. Every program the fake host is asked for is one shell script,
+    /// which records the NAMES of its environment (never a value) beside
+    /// itself, answers `--version` like a Python 3, and fails everything else.
+    /// So provisioning `twine` stops at the venv, after the interpreter probe,
+    /// its first child, has been recorded.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_provisioning_child_never_sees_a_host_set_password() {
+        const CANARY: &str = "QONTINUI_ARMING_CANARY_PASSWORD";
+        const FAKE_INTERPRETER: &str = concat!(
+            "awk 'BEGIN { for (k in ENVIRON) print k }' >> \"$(dirname \"$0\")/seen-names.txt\"\n",
+            "if [ \"$#\" -eq 1 ] && [ \"$1\" = --version ]; then echo 'Python 3.12.0'; exit 0; fi\n",
+            "exit 1\n",
+        );
+
+        /// A host whose every command is the fake interpreter, carrying a
+        /// credential-shaped variable the host set itself.
+        struct HostWithACredential {
+            script: PathBuf,
+        }
+        impl ProcessSpawn for HostWithACredential {
+            fn command(&self, _program: &str) -> tokio::process::Command {
+                let mut cmd = tokio::process::Command::new("sh");
+                cmd.arg(&self.script).env(CANARY, "x");
+                cmd
+            }
+            fn std_command(&self, program: &str) -> std::process::Command {
+                PlainSpawn.std_command(program)
+            }
+            fn arm_tree(&self, cmd: &mut tokio::process::Command) {
+                PlainSpawn.arm_tree(cmd)
+            }
+            fn attach_tree(
+                &self,
+                child: &tokio::process::Child,
+            ) -> Box<dyn crate::host::TreeGuard> {
+                PlainSpawn.attach_tree(child)
+            }
+            fn step_containment(&self) -> Box<dyn crate::host::StepContainment> {
+                PlainSpawn.step_containment()
+            }
+        }
+
+        /// Only a token shaped like an environment name may appear in a
+        /// message; anything else is counted, never printed.
+        fn shown(names: &[&str]) -> String {
+            let name_shaped = |n: &&str| {
+                let mut chars = n.chars();
+                chars
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                    && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '(' | ')'))
+            };
+            let printable: Vec<&str> = names.iter().copied().filter(name_shaped).collect();
+            format!(
+                "{printable:?} (+{} token(s) withheld: not name-shaped)",
+                names.len() - printable.len()
+            )
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script = dir.path().join("fake-interpreter");
+        std::fs::write(&script, FAKE_INTERPRETER).expect("write the fake interpreter");
+        let tools = [CiTool {
+            name: "twine".to_string(),
+            version: "6.1.0".to_string(),
+        }];
+        // The fake refuses `-m venv`, so provisioning fails; only the children
+        // it ran before stopping matter here.
+        let _ = provision(
+            &HostWithACredential { script },
+            &dir.path().join("ci-root"),
+            &tools,
+            &mut |_line| {},
+        )
+        .await;
+
+        let seen = std::fs::read_to_string(dir.path().join("seen-names.txt"))
+            .expect("the fake interpreter never ran, so this test proved nothing");
+        let names: Vec<&str> = seen
+            .lines()
+            .map(str::trim)
+            .filter(|n| !n.is_empty())
+            .collect();
+        assert!(
+            !names.contains(&CANARY),
+            "{CANARY}, which the host set on the command, reached a provisioning child; it saw {}",
+            shown(&names)
+        );
+        assert!(
+            names.contains(&"PATH"),
+            "PATH did not reach the provisioning child; it saw {}",
+            shown(&names)
+        );
+    }
+
     /// A missing interpreter must produce a refusal that NAMES what is
     /// missing and says so — never a silent skip.
     #[test]

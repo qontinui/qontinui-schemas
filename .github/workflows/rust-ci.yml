@@ -605,17 +605,9 @@ jobs:
           # PKG_CONFIG_PATH, and the dependency graph carries cc/cmake/
           # pkg-config build scripts, so a second cargo invocation could
           # rebuild inside this job's cap. Run the ci-exec lib test binary the
-          # `cargo test` step built, recovered from its log. awk reads the
-          # whole file and exits only at the end, so no pipe is cut short.
-          BIN=$(awk '
-            { gsub(/\033\[[0-9;]*[a-zA-Z]/, ""); gsub(/\\/, "/") }
-            bin == "" && match($0, /Running unittests src\/lib\.rs \([^)]*\/qontinui_ci_exec-[0-9a-f]+(\.exe)?\)/) {
-              bin = substr($0, RSTART, RLENGTH)
-              sub(/^Running unittests src\/lib\.rs \(/, "", bin)
-              sub(/\)$/, "", bin)
-            }
-            END { print bin }
-          ' "$RUNNER_TEMP/cargo-test.out")
+          # `cargo test` step built, recovered from its log by the script both
+          # lanes share.
+          BIN=$(awk -f .github/scripts/ci-exec-lib-test-binary.awk "$RUNNER_TEMP/cargo-test.out")
           if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
             echo "::error::found no runnable ci-exec lib test binary in $RUNNER_TEMP/cargo-test.out, so the e2e did not run. That is UNKNOWN, not a pass."
             exit 1
@@ -683,17 +675,10 @@ jobs:
           QONTINUI_E2E_CANARY_PASSWORD: canary-not-a-credential
         run: |
           # NO CARGO HERE, as in rust-ci: run the binary the step above built.
-          # Its log spells the path with backslashes, which awk turns around.
+          # Its log spells the path with backslashes, which the shared script
+          # turns around.
           TMP_DIR="$(cygpath -u "$RUNNER_TEMP")"
-          BIN=$(awk '
-            { gsub(/\033\[[0-9;]*[a-zA-Z]/, ""); gsub(/\\/, "/") }
-            bin == "" && match($0, /Running unittests src\/lib\.rs \([^)]*\/qontinui_ci_exec-[0-9a-f]+(\.exe)?\)/) {
-              bin = substr($0, RSTART, RLENGTH)
-              sub(/^Running unittests src\/lib\.rs \(/, "", bin)
-              sub(/\)$/, "", bin)
-            }
-            END { print bin }
-          ' "$TMP_DIR/cargo-test.out")
+          BIN=$(awk -f .github/scripts/ci-exec-lib-test-binary.awk "$TMP_DIR/cargo-test.out")
           if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
             echo "::error::found no ci-exec lib test binary in $TMP_DIR/cargo-test.out, so the e2e did not run. That is UNKNOWN, not a pass."
             exit 1
