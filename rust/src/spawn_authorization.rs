@@ -147,7 +147,7 @@ pub struct SpawnAuthorizationContract {
     /// switch differently. Both read it from here: coord's registry fallback
     /// (`max_retained_age`) and the runner's `max_snapshot_age()`
     /// (`agent_authorization.rs`). Neither declares its own copy, so an edit
-    /// here moves both bounds together.
+    /// here moves both bounds together once each is rebuilt against it.
     pub max_snapshot_age_secs: u64,
     pub kind_seeds: Vec<KindSeed>,
     pub class_seeds: Vec<ClassSeed>,
