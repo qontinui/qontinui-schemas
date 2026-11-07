@@ -5,32 +5,19 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
-import type { AssertionMiss } from "./AssertionMiss";
-import type { CandidateMiss } from "./CandidateMiss";
-import type { FieldDiff } from "./FieldDiff";
-import type { MatchedElement } from "./MatchedElement";
-import type { MissReason } from "./MissReason";
-
 /**
- * Internally-tagged on `status` — `{ "status": "pass", "matched": {...} }`
- * or `{ "status": "fail", "miss": {...} }`. Distinct from the
- * worker-output `{ "type": ..., "data": ... }` envelope used elsewhere
- * in the codebase.
+ * Which of the THREE things happened to an assertion.
+ *
+ * `passed: bool` alone cannot say them: it collapses "evaluated, and the
+ * expectation was violated" together with "could not be evaluated at all".
+ * Those are different facts and call for different action — the first is a
+ * bug in the page, the second is a gap in the snapshot (or in the caller's
+ * inputs), and only the first should send anyone looking at the UI.
+ *
+ * The bit is kept alongside as the GATE, and every consumer that reads it
+ * keeps its current behaviour: [`AssertionOutcome::Unknown`] is
+ * `passed = false`. That is deliberate and is the safe direction — a
+ * vacuous pass over an un-evaluated assertion is a silent false negative
+ * for exactly the bug the assertion was written to catch.
  */
-export type AssertionOutcome =
-  | {
-      /**
-       * The element that satisfied the assertion.
-       */
-      matched: MatchedElement;
-      status: "pass";
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * Diagnostic detail.
-       */
-      miss: AssertionMiss;
-      status: "fail";
-      [k: string]: unknown;
-    };
+export type AssertionOutcome = "passed" | "failed" | "unknown";

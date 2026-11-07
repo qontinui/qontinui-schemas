@@ -1,0 +1,20 @@
+{
+  "description": "One unknown is unknown, and carries its code.",
+  "input": [
+    {
+      "outcome": "unknown",
+      "code": "input_missing"
+    }
+  ],
+  "expected": {
+    "outcome": "unknown",
+    "outcomeCounts": {
+      "passed": 0,
+      "failed": 0,
+      "unknown": 1
+    },
+    "unknownCodes": [
+      "input_missing"
+    ]
+  }
+}

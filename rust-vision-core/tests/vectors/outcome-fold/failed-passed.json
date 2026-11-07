@@ -1,0 +1,20 @@
+{
+  "description": "A failure beats a pass.",
+  "input": [
+    {
+      "outcome": "passed"
+    },
+    {
+      "outcome": "failed"
+    }
+  ],
+  "expected": {
+    "outcome": "failed",
+    "outcomeCounts": {
+      "passed": 1,
+      "failed": 1,
+      "unknown": 0
+    },
+    "unknownCodes": []
+  }
+}

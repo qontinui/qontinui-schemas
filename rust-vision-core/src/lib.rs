@@ -33,8 +33,9 @@ pub mod timeline;
 
 pub use analyzers::{AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Finding, Severity};
 pub use assertions::{
-    evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
-    EvalContext, OcrBlockRef, TextMatchKind, TextTarget, TypographyDimension, WcagLevel,
+    evaluate as evaluate_assertion, fold_outcomes, fold_results, Assertion, AssertionOutcome,
+    AssertionResult, BaselineEntry, EvalContext, FoldedOutcome, OcrBlockRef, OutcomeCounts,
+    TextMatchKind, TextTarget, TypographyDimension, Verdict, WcagLevel,
 };
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
