@@ -9676,9 +9676,9 @@ fn full_runner_step_snake_aliases_match_camel_keys() {
     let pairs = [
         (
             json!({"type": "execute_playbook", "id": "p", "name": "n",
-                   "playbook_path": "playbooks/login.md", "timeout_seconds": 300}),
+                   "content": "### Step 1: Open the login page", "timeout_seconds": 300}),
             json!({"type": "execute_playbook", "id": "p", "name": "n",
-                   "playbookPath": "playbooks/login.md", "timeoutSeconds": 300}),
+                   "content": "### Step 1: Open the login page", "timeoutSeconds": 300}),
         ),
         (
             json!({"type": "dag_approval", "id": "a", "name": "n",

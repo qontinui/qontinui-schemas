@@ -924,6 +924,11 @@ pub struct CodeExecutionStep {
 
 /// Drive a state machine through recorded transitions from a playbook.
 ///
+/// The playbook travels inline in `content`, the only body the runner's
+/// executor reads. There is no path form: a `playbookPath` key on a stored
+/// step is ignored when it is decoded and dropped when the step is written
+/// back.
+///
 /// Wire tag: `"execute_playbook"`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -933,13 +938,6 @@ pub struct ExecutePlaybookStep {
     /// Playbook markdown content (inline).
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "content")]
     pub content: Option<String>,
-    /// Path to a playbook file.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "playbook_path"
-    )]
-    pub playbook_path: Option<String>,
     /// Timeout in seconds.
     #[serde(
         default,
@@ -1896,13 +1894,39 @@ mod tests {
     fn execute_playbook_step_round_trip() {
         let step = FullRunnerStep::ExecutePlaybook(ExecutePlaybookStep {
             base: base("ep1", "Drive State Machine"),
-            playbook_path: Some("/artifacts/playbook.md".into()),
+            content: Some("### Step 1: Open the login page".into()),
             ..Default::default()
         });
         let json = serde_json::to_value(&step).unwrap();
         assert_type_tag(&json, "execute_playbook");
-        assert_eq!(json["playbookPath"], "/artifacts/playbook.md");
+        assert_eq!(json["content"], "### Step 1: Open the login page");
         assert_eq!(roundtrip(&step), step);
+    }
+
+    #[test]
+    fn execute_playbook_step_drops_a_legacy_playbook_path() {
+        // `playbookPath` was deleted because the runner's executor never read
+        // it. A stored step that still carries one must keep decoding (both
+        // spellings the field used to accept), and must not carry the path
+        // back out when it is written again.
+        for key in ["playbookPath", "playbook_path"] {
+            let mut raw = json!({
+                "type": "execute_playbook", "id": "ep1", "name": "Drive State Machine",
+                "content": "### Step 1: Open the login page"
+            });
+            raw[key] = json!("/artifacts/playbook.md");
+            let step: FullRunnerStep = serde_json::from_value(raw)
+                .unwrap_or_else(|e| panic!("a step carrying `{key}` must still decode: {e}"));
+            let back = serde_json::to_value(&step).unwrap();
+            assert_type_tag(&back, "execute_playbook");
+            assert_eq!(back["content"], "### Step 1: Open the login page");
+            for gone in ["playbookPath", "playbook_path"] {
+                assert!(
+                    back.get(gone).is_none(),
+                    "`{gone}` survived a round trip from `{key}`: {back}"
+                );
+            }
+        }
     }
 
     #[test]

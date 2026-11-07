@@ -11,6 +11,11 @@ import type { VerificationCategoryKind } from "./VerificationCategoryKind";
 /**
  * Drive a state machine through recorded transitions from a playbook.
  *
+ * The playbook travels inline in `content`, the only body the runner's
+ * executor reads. There is no path form: a `playbookPath` key on a stored
+ * step is ignored when it is decoded and dropped when the step is written
+ * back.
+ *
  * Wire tag: `"execute_playbook"`.
  */
 export interface ExecutePlaybookStep {
@@ -50,10 +55,6 @@ export interface ExecutePlaybookStep {
    * Display name for the step. Absent or `null` reads as `""`.
    */
   name: string;
-  /**
-   * Path to a playbook file.
-   */
-  playbookPath?: string | null;
   /**
    * Whether this step is required (default: `true` on consumer side).
    */
