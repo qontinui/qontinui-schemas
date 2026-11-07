@@ -18,6 +18,8 @@
 //! | [`sibling`] | sibling-repo resolution and materialisation |
 //! | [`sibling_git`] | the isolated git environment a sibling's git runs under |
 //! | [`tools`] | the closed tool registry and its version-keyed cache |
+//! | [`child_env`] | the allowlisted environment every provisioning child starts from |
+//! | `package_index` | where a Python tool's distribution comes from, and the test-only registry overlay |
 //! | [`services`] | the closed container-service registry and its lifecycle |
 //! | [`junit`] | capturing a run's test report before cleanup removes it |
 //! | [`outcomes`] | capturing a run's `run_outcomes` entries before cleanup removes them |
@@ -35,6 +37,7 @@
 
 pub mod canonical;
 pub mod checkout;
+pub mod child_env;
 pub mod dispatch;
 pub mod executor;
 #[cfg(feature = "import")]
@@ -57,6 +60,8 @@ pub mod sibling;
 pub mod sibling_git;
 pub mod standalone;
 pub mod tools;
+
+mod package_index;
 
 /// The local directory NAME for a repo slug: `owner/name` → `name`; a bare
 /// name passes through. Primary checkouts, dispatch worktrees and siblings are
