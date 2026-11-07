@@ -301,7 +301,10 @@ impl JsonSchema for Verdict {
             "oneOf": [
                 {
                     "type": "object",
-                    "properties": { "outcome": { "type": "string", "enum": ["passed", "failed"] } },
+                    "properties": {
+                        "outcome": { "type": "string", "enum": ["passed", "failed"] },
+                        "code": { "type": "null" }
+                    },
                     "required": ["outcome"],
                     "additionalProperties": false
                 },
@@ -350,7 +353,7 @@ impl<'de> Deserialize<'de> for Verdict {
 
 /// How many of the folded verdicts landed in each state.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OutcomeCounts {
     pub passed: usize,
     pub failed: usize,
@@ -373,6 +376,7 @@ impl OutcomeCounts {
 /// over zero results, or `passed` beside a failure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct FoldedOutcome {
     outcome: AssertionOutcome,
     outcome_counts: OutcomeCounts,
@@ -405,7 +409,16 @@ impl FoldedOutcome {
     /// is not.
     fn inconsistency(&self) -> Option<String> {
         let c = self.outcome_counts;
-        if c.total() == 0 {
+        // Counts come off the wire, so their sum is checked rather than
+        // trusted: a wrapped total must not pass for an empty fold.
+        let Some(total) = c
+            .passed
+            .checked_add(c.failed)
+            .and_then(|t| t.checked_add(c.unknown))
+        else {
+            return Some("`outcomeCounts` overflows when summed".into());
+        };
+        if total == 0 {
             return (self.outcome != AssertionOutcome::Unknown
                 || self.unknown_codes != [UnknownCode::NoResults])
             .then(|| "an empty fold is `unknown` with exactly `[no_results]`".to_string());
@@ -675,6 +688,16 @@ mod tests {
         assert!(read(json!({"outcome": "unknown",
             "outcomeCounts": {"passed": 0, "failed": 0, "unknown": 1}, "unknownCodes": []}))
         .is_err());
+        // Counts whose sum overflows are refused, not wrapped to an empty fold.
+        assert!(read(json!({"outcome": "unknown",
+            "outcomeCounts": {"passed": usize::MAX, "failed": 1, "unknown": 0},
+            "unknownCodes": ["no_results"]}))
+        .is_err());
+        // An unknown field in the counts is refused.
+        assert!(read(json!({"outcome": "passed",
+            "outcomeCounts": {"passed": 1, "failed": 0, "unknown": 0, "skipped": 5},
+            "unknownCodes": []}))
+        .is_err());
         // Every fold result round-trips.
         for f in [
             fold_outcomes(&[]),
@@ -699,6 +722,15 @@ mod tests {
         assert!(arms
             .iter()
             .all(|a| a["additionalProperties"] == json!(false)));
+        assert!(
+            arms[1]["properties"]["code"]["$ref"]
+                .as_str()
+                .is_some_and(|r| r.ends_with("/UnknownCode")),
+            "the unknown arm's code must reference UnknownCode: {}",
+            arms[1]
+        );
+        let folded = serde_json::to_value(schemars::schema_for!(FoldedOutcome)).unwrap();
+        assert_eq!(folded["additionalProperties"], json!(false));
     }
 
     #[test]
