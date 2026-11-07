@@ -218,6 +218,14 @@ jobs:
     # A backstop for a hang: hosted runs take 3-7 min and a warm pool run about
     # 4, and on a four-registration pool one stuck job would otherwise hold a
     # quarter of it for the 360-min default.
+    #
+    # It must also contain every step bound below it, or a step that runs to
+    # its own bound expires as a job timeout, which GitHub concludes
+    # `cancelled`. The steps after `cargo test` that carry one sum to 11 min
+    # (setup-python 3, setup-node 3, the provisioning env e2e 5). The job
+    # measured 4.25-6.30 min hosted over 9 runs and 3.92 on the pool over 1
+    # (2026-11-03..06), so 17.3 min at most, which leaves room for a cold
+    # cache.
     timeout-minutes: 30
     steps:
       # persist-credentials: false because no later step needs git auth, and
@@ -496,6 +504,87 @@ jobs:
             hit_matrix_for_the_cross_engine_check
           python3 .github/scripts/fleet-nouns-portability.py "$RUNNER_TEMP/fleet-nouns-rust.json"
 
+      # ── Provisioning env e2e (Linux leg; ci-exec-windows is the other) ─────
+      #
+      # The hermetic proof that a CI-node provisioning child (an installer, or
+      # the `--version` run that verifies an installed tool) sees only the
+      # allowlisted environment, never the host's credentials. The test
+      # provisions a probe distribution through the real `tools::provision`
+      # and asserts on the names its verify child recorded. Plan
+      # 2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
+      # Phase 3.
+      #
+      # These steps come AFTER every step that runs python3 or node, because
+      # both setup actions change what later steps resolve (setup-python also
+      # exports LD_LIBRARY_PATH and PKG_CONFIG_PATH on Linux).
+      #
+      # Hosted only, for now. The self-hosted pool runs them once a run there
+      # is measured capable (the plan's Phase 1.3); until then it stays
+      # UNKNOWN, and it loses only the re-run on main and on merge candidates.
+      # Every pull request takes the hosted floor, so a PR's own run always
+      # exercises them.
+      #
+      # NOT mirrored in .qontinui/ci.toml: the test needs a host Python 3 with
+      # `venv`, which the CI-node lane never installs (`no_python_refusal` in
+      # ci-exec/src/tools.rs), plus the setup-python and setup-node actions.
+      - uses: actions/setup-python@v5
+        if: runner.environment == 'github-hosted'
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v5
+        if: runner.environment == 'github-hosted'
+        timeout-minutes: 3
+        with:
+          node-version: "22"
+
+      - name: Provisioning env e2e
+        if: runner.environment == 'github-hosted'
+        timeout-minutes: 5
+        shell: bash
+        env:
+          # The two canaries. The test fails unless both are in its own
+          # environment, and fails if either reaches the verify child. The
+          # proxy is a closed loopback port, harmless under the probe's
+          # `--no-index`.
+          HTTPS_PROXY: http://127.0.0.1:9
+          QONTINUI_E2E_CANARY_PASSWORD: canary-not-a-credential
+        run: |
+          # NO CARGO HERE. setup-python changed PATH, LD_LIBRARY_PATH and
+          # PKG_CONFIG_PATH, and the dependency graph carries cc/cmake/
+          # pkg-config build scripts, so a second cargo invocation could
+          # rebuild inside this job's cap. Run the ci-exec lib test binary the
+          # `cargo test` step built, recovered from its log. awk reads the
+          # whole file and exits only at the end, so no pipe is cut short.
+          BIN=$(awk '
+            { gsub(/\033\[[0-9;]*[a-zA-Z]/, ""); gsub(/\\/, "/") }
+            bin == "" && match($0, /Running unittests src\/lib\.rs \([^)]*\/qontinui_ci_exec-[0-9a-f]+(\.exe)?\)/) {
+              bin = substr($0, RSTART, RLENGTH)
+              sub(/^Running unittests src\/lib\.rs \(/, "", bin)
+              sub(/\)$/, "", bin)
+            }
+            END { print bin }
+          ' "$RUNNER_TEMP/cargo-test.out")
+          if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+            echo "::error::found no runnable ci-exec lib test binary in $RUNNER_TEMP/cargo-test.out, so the e2e did not run. That is UNKNOWN, not a pass."
+            exit 1
+          fi
+          BIN="$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")"
+          # cargo runs a unit-test binary from its package directory, and so
+          # does this step. `--show-output` prints the names the verify child
+          # saw (names only, never values): that line is the measurement.
+          cd ci-exec
+          "$BIN" --ignored --exact --show-output \
+            child_env::tests::provisioning_children_see_only_allowlisted_names \
+            2>&1 | tee "$RUNNER_TEMP/provisioning-env-e2e.out"
+          # `--exact` on a renamed test matches nothing, and libtest exits 0 on
+          # `0 passed`, so the one pass has to show.
+          if ! grep -q 'test result: ok\. 1 passed' "$RUNNER_TEMP/provisioning-env-e2e.out"; then
+            echo "::error::the provisioning env e2e did not report exactly one passing test. A renamed test runs nothing; that is UNKNOWN, not a pass."
+            exit 1
+          fi
+
   ci-exec-windows:
     # The CI executor (ci-exec) runs on Windows CI nodes too — the runner's
     # desktop lane is mostly Windows — and its tests carry Windows-only arms
@@ -505,7 +594,8 @@ jobs:
     #
     # NOT mirrored in .qontinui/ci.toml: that manifest is v1, whose one job
     # runs on any OS, so it cannot pin a Windows leg. A v2 `os = "windows"`
-    # job can, once this repo's manifest moves to v2.
+    # job can, once this repo's manifest moves to v2. The provisioning env e2e
+    # below is not mirrored for that reason and for rust-ci's.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -515,4 +605,55 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: cargo test -p qontinui-ci-exec --features import
-        run: cargo test --locked -p qontinui-ci-exec --features import
+        # Teed to a file so the provisioning env e2e below runs the lib test
+        # binary this step built instead of invoking cargo again. bash runs
+        # with `-eo pipefail`, so cargo's own status still decides the step.
+        shell: bash
+        run: cargo test --locked -p qontinui-ci-exec --features import 2>&1 | tee "$(cygpath -u "$RUNNER_TEMP")/cargo-test.out"
+
+      # The provisioning env e2e's Windows leg; rust-ci's copy says what it
+      # proves. Windows is where the allowlist has the most to get right
+      # (SystemRoot, APPDATA, LOCALAPPDATA, ComSpec, PATHEXT, compared
+      # case-insensitively), and the leg has no pool, so it always runs.
+      - uses: actions/setup-python@v5
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v5
+        timeout-minutes: 3
+        with:
+          node-version: "22"
+
+      - name: Provisioning env e2e
+        timeout-minutes: 5
+        shell: bash
+        env:
+          HTTPS_PROXY: http://127.0.0.1:9
+          QONTINUI_E2E_CANARY_PASSWORD: canary-not-a-credential
+        run: |
+          # NO CARGO HERE, as in rust-ci: run the binary the step above built.
+          # Its log spells the path with backslashes, which awk turns around.
+          TMP_DIR="$(cygpath -u "$RUNNER_TEMP")"
+          BIN=$(awk '
+            { gsub(/\033\[[0-9;]*[a-zA-Z]/, ""); gsub(/\\/, "/") }
+            bin == "" && match($0, /Running unittests src\/lib\.rs \([^)]*\/qontinui_ci_exec-[0-9a-f]+(\.exe)?\)/) {
+              bin = substr($0, RSTART, RLENGTH)
+              sub(/^Running unittests src\/lib\.rs \(/, "", bin)
+              sub(/\)$/, "", bin)
+            }
+            END { print bin }
+          ' "$TMP_DIR/cargo-test.out")
+          if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
+            echo "::error::found no ci-exec lib test binary in $TMP_DIR/cargo-test.out, so the e2e did not run. That is UNKNOWN, not a pass."
+            exit 1
+          fi
+          BIN="$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")"
+          cd ci-exec
+          "$BIN" --ignored --exact --show-output \
+            child_env::tests::provisioning_children_see_only_allowlisted_names \
+            2>&1 | tee "$TMP_DIR/provisioning-env-e2e.out"
+          if ! grep -q 'test result: ok\. 1 passed' "$TMP_DIR/provisioning-env-e2e.out"; then
+            echo "::error::the provisioning env e2e did not report exactly one passing test. A renamed test runs nothing; that is UNKNOWN, not a pass."
+            exit 1
+          fi
