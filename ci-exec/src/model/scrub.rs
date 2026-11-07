@@ -76,22 +76,25 @@ const EMPTY_CONFIG_DIR_NAME: &str = ".ci-claude-config";
 
 /// Every variable to remove from a step's environment, given the keys the
 /// executor's own process holds and the host's extra list. Sorted and
-/// de-duplicated.
+/// de-duplicated. An inherited key is returned exactly as inherited, so one
+/// that is not valid Unicode is removed under its own name.
 pub fn step_env_removals(
     inherited_keys: impl IntoIterator<Item = OsString>,
     host_scrubbed: &[&str],
-) -> Vec<String> {
-    let mut out: Vec<String> = MODEL_CREDENTIAL_ENV
+) -> Vec<OsString> {
+    let mut out: Vec<OsString> = MODEL_CREDENTIAL_ENV
         .iter()
         .chain(host_scrubbed.iter())
-        .map(|k| k.to_string())
+        .map(OsString::from)
         .collect();
     for key in inherited_keys {
-        // A key that is not valid Unicode cannot end in the ASCII suffix in a
-        // way a manifest could name; compare on the lossy spelling anyway so a
-        // mangled key is still removed when it carries the suffix.
-        let key = key.to_string_lossy().into_owned();
-        if is_model_command_key(&key) {
+        // Match on the lossy VIEW, but remove the key's OWN spelling. A lossy
+        // conversion never alters an ASCII character and the suffix is ASCII,
+        // so the view ends in the suffix exactly when the key does. The
+        // converted string itself would name a different variable whenever
+        // the key is not valid Unicode, and removing it would leave this one
+        // inherited.
+        if is_model_command_key(&key.to_string_lossy()) {
             out.push(key);
         }
     }
@@ -102,7 +105,7 @@ pub fn step_env_removals(
 
 /// The removals for a step run from this process: its own environment's keys
 /// plus the host's list.
-pub fn current_step_env_removals(host_scrubbed: &[&str]) -> Vec<String> {
+pub fn current_step_env_removals(host_scrubbed: &[&str]) -> Vec<OsString> {
     step_env_removals(std::env::vars_os().map(|(k, _)| k), host_scrubbed)
 }
 
@@ -124,6 +127,8 @@ pub fn fresh_empty_config_dir(dispatch_root: &Path) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     #[test]
@@ -137,26 +142,49 @@ mod tests {
         .map(OsString::from);
         let r = step_env_removals(inherited, &["QONTINUI_TEST_LOGIN_PASSWORD"]);
         for k in MODEL_CREDENTIAL_ENV {
-            assert!(r.contains(&k.to_string()), "{k}");
+            assert!(r.contains(&OsString::from(*k)), "{k}");
         }
-        assert!(r.contains(&"DOCS_EVAL_MODEL_CMD".to_string()));
-        assert!(r.contains(&"REFERENCE_EVAL_MODEL_CMD".to_string()));
-        assert!(r.contains(&"QONTINUI_TEST_LOGIN_PASSWORD".to_string()));
-        assert!(!r.contains(&"PATH".to_string()));
-        assert!(!r.contains(&"HOME".to_string()));
+        assert!(r.contains(&OsString::from("DOCS_EVAL_MODEL_CMD")));
+        assert!(r.contains(&OsString::from("REFERENCE_EVAL_MODEL_CMD")));
+        assert!(r.contains(&OsString::from("QONTINUI_TEST_LOGIN_PASSWORD")));
+        assert!(!r.contains(&OsString::from("PATH")));
+        assert!(!r.contains(&OsString::from("HOME")));
+    }
+
+    /// An inherited key that is not valid Unicode is removed under its OWN
+    /// spelling, byte for byte. Its lossy spelling (`\xff` -> U+FFFD) names a
+    /// different variable, so removing that would leave this one inherited.
+    #[cfg(unix)]
+    #[test]
+    fn a_non_unicode_inherited_model_command_is_removed_under_its_own_spelling() {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let inherited = [OsString::from_vec(b"P\xff_MODEL_CMD".to_vec())];
+        let r = step_env_removals(inherited, &[]);
+        assert!(
+            r.iter().any(|k| k.as_bytes() == b"P\xff_MODEL_CMD"),
+            "the inherited key is not in the removals byte for byte: {r:?}"
+        );
+        assert!(
+            !r.iter()
+                .any(|k| k.as_bytes() == "P\u{FFFD}_MODEL_CMD".as_bytes()),
+            "the removals name the lossy spelling, a different variable: {r:?}"
+        );
     }
 
     /// D11's list, spelled out once more as literals so an edit to the
-    /// constant has to edit this too.
+    /// constant has to edit this too. Compared as sets in BOTH directions and
+    /// by count, so a name dropped from the constant, a name added to it, and
+    /// a repeated name each turn this red.
     #[test]
-    fn the_credential_class_is_the_planned_list() {
-        for k in [
+    fn the_credential_class_is_exactly_the_planned_list() {
+        let planned: [&str; 31] = [
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_AUTH_TOKEN",
             "CLAUDE_CODE_OAUTH_TOKEN",
             "ANTHROPIC_BASE_URL",
             "ANTHROPIC_CUSTOM_HEADERS",
             "CLAUDE_CONFIG_DIR",
+            // The provider-switch set.
             "CLAUDE_CODE_USE_BEDROCK",
             "CLAUDE_CODE_USE_VERTEX",
             "CLAUDE_CODE_USE_FOUNDRY",
@@ -167,9 +195,7 @@ mod tests {
             "ANTHROPIC_VERTEX_BASE_URL",
             "ANTHROPIC_FOUNDRY_BASE_URL",
             "ANTHROPIC_FOUNDRY_RESOURCE",
-            "OPENAI_API_KEY",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
+            // Credential-bearing names read off the installed CLI.
             "AWS_BEARER_TOKEN_BEDROCK",
             "ANTHROPIC_FOUNDRY_API_KEY",
             "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
@@ -178,9 +204,41 @@ mod tests {
             "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
             "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
             "CLAUDE_CODE_GATEWAY_TOKEN",
-        ] {
-            assert!(MODEL_CREDENTIAL_ENV.contains(&k), "{k}");
-        }
+            // Provider switches the same binary reads beside the ones above.
+            "CLAUDE_CODE_USE_MANTLE",
+            "CLAUDE_CODE_USE_GATEWAY",
+            "CLAUDE_CODE_SKIP_MANTLE_AUTH",
+            "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
+            // Other providers' keys.
+            "OPENAI_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+        ];
+        let planned_set: BTreeSet<&str> = planned.iter().copied().collect();
+        assert_eq!(planned_set.len(), 31, "the planned list repeats a name");
+
+        let class: BTreeSet<&str> = MODEL_CREDENTIAL_ENV.iter().copied().collect();
+        let missing: Vec<&str> = planned_set.difference(&class).copied().collect();
+        let unplanned: Vec<&str> = class.difference(&planned_set).copied().collect();
+        assert!(
+            missing.is_empty(),
+            "planned but missing from MODEL_CREDENTIAL_ENV: {missing:?}"
+        );
+        assert!(
+            unplanned.is_empty(),
+            "in MODEL_CREDENTIAL_ENV but not planned: {unplanned:?}"
+        );
+
+        assert_eq!(
+            MODEL_CREDENTIAL_ENV.len(),
+            31,
+            "MODEL_CREDENTIAL_ENV must hold exactly the 31 planned names"
+        );
+        assert_eq!(
+            class.len(),
+            MODEL_CREDENTIAL_ENV.len(),
+            "MODEL_CREDENTIAL_ENV repeats a name"
+        );
     }
 
     #[test]
