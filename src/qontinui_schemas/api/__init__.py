@@ -116,10 +116,7 @@ from qontinui_schemas.api.rag import (
 )
 from qontinui_schemas.api.testing import (
     # Enums; Request schemas; Response schemas;
-    # Analytics; Historical Data (Config Testing)
-    ActionDataBatch,
-    ActionDataBatchResponse,
-    ActionDataCreate,
+    # Analytics
     CoverageTrendDataPoint,
     CoverageTrendResponse,
     CoverageUpdate,
@@ -134,12 +131,8 @@ from qontinui_schemas.api.testing import (
     DeficiencyStatus,
     DeficiencyType,
     DeficiencyUpdate,
-    HistoricalFrameResponse,
-    HistoricalResultRequest,
-    HistoricalResultResponse,
     PaginatedResponse,
     Pagination,
-    PlaybackRequest,
     ReliabilityResponse,
     ScreenshotMetadata,
     ScreenshotType,
@@ -299,14 +292,6 @@ __all__ = [
     "CoverageTrendResponse",
     "TransitionReliabilityStats",
     "ReliabilityResponse",
-    # Historical Data (Config Testing)
-    "HistoricalResultRequest",
-    "HistoricalResultResponse",
-    "ActionDataCreate",
-    "ActionDataBatch",
-    "ActionDataBatchResponse",
-    "HistoricalFrameResponse",
-    "PlaybackRequest",
     # ==========================================================================
     # Feedback Scores API (Opik integration)
     # ==========================================================================
