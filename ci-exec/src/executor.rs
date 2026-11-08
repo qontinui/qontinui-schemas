@@ -1443,21 +1443,23 @@ mod tests {
         std::fs::write(primary.join("keep.txt"), "primary").unwrap();
 
         let mut workspace = DispatchWorkspace::new(&base, repo, dispatch_id, Arc::new(PlainSpawn));
-        workspace.services = ServiceStack::for_test(
-            dispatch_id,
-            Some("qontinui-no-such-container-runtime"),
-            &["qontinui-ci-0198f2b4-2222-7aaa-bbbb-cccccccccccc-redis"],
-        );
         // Held across the move, because `cleanup` consumes the workspace and
         // the point of this test is what cleanup DID, not what it left behind.
-        let removals = workspace.services.removal_log();
+        // The recorder logs a removal only when its child actually runs.
+        let recorder = crate::services::recording_spawn::RecordingSpawn::new();
+        workspace.services = ServiceStack::for_test(
+            dispatch_id,
+            recorder.clone(),
+            Some("docker"),
+            &["qontinui-ci-0198f2b4-2222-7aaa-bbbb-cccccccccccc-redis"],
+        );
         workspace.cleanup(ResultReported::for_test()).await;
 
         // The services half: cleanup must have issued the forced removal. Its
         // name says "tears down services", so it has to assert that — the
         // earlier version asserted only on the directory.
         assert_eq!(
-            removals.lock().unwrap().clone(),
+            recorder.removals(),
             vec![vec![
                 "rm".to_string(),
                 "-f".to_string(),
