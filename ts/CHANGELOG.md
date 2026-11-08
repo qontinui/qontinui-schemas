@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.5.0...ts-v3.0.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* delete ExecutePlaybookStep.playbook_path, which no executor reads
+
+### Features
+
+* delete ExecutePlaybookStep.playbook_path, which no executor reads ([c945e03](https://github.com/qontinui/qontinui-schemas/commit/c945e036fceeeaf56ec169ed25fa1cb776802a6f))
+
 ## [2.5.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.4.1...ts-v2.5.0) (2026-11-02)
 
 

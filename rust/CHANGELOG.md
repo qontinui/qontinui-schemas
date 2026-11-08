@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v5.0.1...rust-v6.0.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* delete ExecutePlaybookStep.playbook_path, which no executor reads
+
+### Features
+
+* delete ExecutePlaybookStep.playbook_path, which no executor reads ([c945e03](https://github.com/qontinui/qontinui-schemas/commit/c945e036fceeeaf56ec169ed25fa1cb776802a6f))
+
 ## [5.0.1](https://github.com/qontinui/qontinui-schemas/compare/rust-v5.0.0...rust-v5.0.1) (2026-11-03)
 
 
