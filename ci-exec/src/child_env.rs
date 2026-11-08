@@ -251,21 +251,44 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    /// The part of a spawn error that names the program, its redacted argv and
-    /// its exit status. `run_capture_env` appends the child's whole output in
-    /// parentheses after that, and a test message must never carry child
-    /// output (it could echo an environment value), so the rest is withheld.
+    use std::time::Duration;
+
+    /// What a test message may say about a spawn error: the program, its
+    /// redacted argv and the exit status, never child output (it could echo
+    /// an environment value). Fails closed: any shape not recognised here is
+    /// withheld whole.
+    ///
+    /// - `spawn <program>: <os error>` and `... did not answer ... within`
+    ///   carry no child output, so their first line passes.
+    /// - `... exited <status> (<child output>)`, the `run_capture_env` shape,
+    ///   keeps the text before ` exited ` plus at most 60 characters of the
+    ///   status, cut at ` (`. If that prefix holds `reported ` (the
+    ///   `find_python` refusal quotes a candidate's stdout there), the whole
+    ///   error is withheld.
     fn headline(e: &impl std::fmt::Display) -> String {
         let text = e.to_string();
-        match text.find(" exited ") {
-            Some(at) => match text[at..].find(" (") {
-                Some(paren) => format!("{} (child output withheld)", &text[..at + paren]),
-                None => text,
-            },
-            None => format!("<error withheld: {} bytes>", text.len()),
+        let first_line = text.lines().next().unwrap_or("");
+        if first_line.starts_with("spawn ") || first_line.contains(" did not answer ") {
+            return first_line.to_string();
         }
+        let withheld = format!("<error withheld: {} bytes>", text.len());
+        let Some(at) = first_line.find(" exited ") else {
+            return withheld;
+        };
+        let prefix = &first_line[..at];
+        if prefix.contains("reported ") {
+            return withheld;
+        }
+        let rest = &first_line[at + " exited ".len()..];
+        let status: String = rest
+            .split(" (")
+            .next()
+            .unwrap_or("")
+            .chars()
+            .take(60)
+            .collect();
+        format!("{prefix} exited {status} (child output withheld)")
     }
-    use std::time::Duration;
 
     // ── Literals: what these tests hold the code to ──────────────────────
     //
@@ -979,11 +1002,15 @@ print("qontinui-env-probe 1.0.0")
             let dirs =
                 crate::tools::provision(&PlainSpawn, &root, &tools, &mut |line| log.push(line))
                     .await
-                    .unwrap_or_else(|e| panic!("{call}: provisioning the probe failed: {}", headline(&e)));
+                    .unwrap_or_else(|e| {
+                        panic!("{call}: provisioning the probe failed: {}", headline(&e))
+                    });
             assert_eq!(dirs, vec![tool_dir.join("bin")], "{call}");
             assert!(
                 log.iter().any(|line| line.contains(path_taken)),
-                "{call}: provision did not take the {call} path: {log:?}"
+                "{call}: provision did not take the {call} path ({} log lines withheld: \
+                 they can carry child output)",
+                log.len()
             );
             let names: Vec<String> = std::fs::read_to_string(&seen)
                 .unwrap_or_else(|e| {
@@ -1047,11 +1074,17 @@ print("qontinui-env-probe 1.0.0")
                     headline(&e)
                 )
             });
-        println!("node {version}: {reports:?}");
+        // Only each report's leading program word is printed: the rest is a
+        // child's stdout, which a test message never carries.
+        let verified: Vec<&str> = reports
+            .iter()
+            .filter_map(|r| r.split_whitespace().next())
+            .collect();
+        println!("node {version}: verified {verified:?}");
         for companion in ["npm ", "npx "] {
             assert!(
                 reports.iter().any(|r| r.starts_with(companion)),
-                "node's companion {companion}did not verify: {reports:?}"
+                "node's companion {companion}did not verify (verified: {verified:?})"
             );
         }
     }
