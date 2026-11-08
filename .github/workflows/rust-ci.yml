@@ -223,9 +223,10 @@ jobs:
     # its own bound expires as a job timeout, which GitHub concludes
     # `cancelled`. The steps after `cargo test` that carry one sum to 12 min
     # (the extractor sentinel 1, setup-python 3, setup-node 3, the provisioning
-    # env e2e 5). The job measured 4.25-6.30 min hosted over 9 runs and 3.92 on
-    # the pool over 1 (2026-11-03..06), so 18.3 min at most, which leaves room
-    # for a cold cache.
+    # env e2e 5). The adopting author read the job at 4.25-6.30 min hosted over
+    # 9 runs and 3.92 on the pool over 1 (2026-11-03..06; run ids not kept), so
+    # about 18.3 min at most, which leaves room for a cold cache. Re-measure
+    # before tightening this cap.
     timeout-minutes: 30
     steps:
       # persist-credentials: false because no later step needs git auth, and
@@ -491,7 +492,8 @@ jobs:
         # The three tests below are the regression tests for the node-tree
         # extractor's arbitrary-write bug. Their `#[cfg(unix)]` arms are the
         # ones that discriminate, and they are the arms a Linux CI-node host
-        # runs. This is the only Linux leg that executes them, so a rename, a
+        # runs. In this repo this is the only Linux job that runs cargo tests
+        # (the only workflow carrying `cargo test`), so a rename, a
         # filter or a cfg that drops one would leave `cargo test` green while
         # the arm ran nowhere. The step reads the log the step above wrote
         # (no cargo) and fails unless each one printed `... ok` inside the
@@ -639,6 +641,10 @@ jobs:
     # job can, once this repo's manifest moves to v2. The provisioning env e2e
     # below is not mirrored for that reason and for rust-ci's.
     runs-on: windows-latest
+    # A hung cargo would otherwise run to the 360-min default. The new steps
+    # below carry their own bounds (setup-python 3, setup-node 3, the e2e 5);
+    # this cap contains them plus the build and test run.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 

@@ -123,7 +123,9 @@ pub const PROVISIONING_BASE_ENV: &[&str] = &[
     // `actions/setup-python` installs is built `--enable-shared` with an rpath
     // naming its build-time tool cache, and setup-python exports
     // `LD_LIBRARY_PATH=<installDir>/lib` so that the interpreter loads from a
-    // tool cache anywhere else, as on a self-hosted pool.
+    // tool cache anywhere else, as on a self-hosted pool (read 2026-11-06 in
+    // `actions/python-versions` `builders/ubuntu-python-builder.psm1` and
+    // `actions/setup-python` `src/find-python.ts`; plan D3).
     #[cfg(target_os = "linux")]
     "LD_LIBRARY_PATH",
 ];
@@ -248,6 +250,21 @@ mod tests {
     use sha2::Digest;
     use std::io::Write;
     use std::path::{Path, PathBuf};
+
+    /// The part of a spawn error that names the program, its redacted argv and
+    /// its exit status. `run_capture_env` appends the child's whole output in
+    /// parentheses after that, and a test message must never carry child
+    /// output (it could echo an environment value), so the rest is withheld.
+    fn headline(e: &impl std::fmt::Display) -> String {
+        let text = e.to_string();
+        match text.find(" exited ") {
+            Some(at) => match text[at..].find(" (") {
+                Some(paren) => format!("{} (child output withheld)", &text[..at + paren]),
+                None => text,
+            },
+            None => format!("<error withheld: {} bytes>", text.len()),
+        }
+    }
     use std::time::Duration;
 
     // ── Literals: what these tests hold the code to ──────────────────────
@@ -962,7 +979,7 @@ print("qontinui-env-probe 1.0.0")
             let dirs =
                 crate::tools::provision(&PlainSpawn, &root, &tools, &mut |line| log.push(line))
                     .await
-                    .unwrap_or_else(|e| panic!("{call}: provisioning the probe failed: {e}"));
+                    .unwrap_or_else(|e| panic!("{call}: provisioning the probe failed: {}", headline(&e)));
             assert_eq!(dirs, vec![tool_dir.join("bin")], "{call}");
             assert!(
                 log.iter().any(|line| line.contains(path_taken)),
@@ -1025,8 +1042,9 @@ print("qontinui-env-probe 1.0.0")
             .await
             .unwrap_or_else(|e| {
                 panic!(
-                    "node {version} at {} failed verification under the allowlist: {e}",
-                    node_dir.display()
+                    "node {version} at {} failed verification under the allowlist: {}",
+                    node_dir.display(),
+                    headline(&e)
                 )
             });
         println!("node {version}: {reports:?}");
