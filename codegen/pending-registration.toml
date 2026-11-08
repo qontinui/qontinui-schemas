@@ -37,3 +37,28 @@
 #
 # CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
 # the daily pending-registration-audit workflow reds until the row is deleted.
+
+# The saved-tab-list layout types (schemas#300), awaiting runner#2750.
+[[pending]]
+type = "TerminalLayout"
+runner_pr = "qontinui/qontinui-runner#2750"
+added = 2026-11-08
+schemas_pr = "qontinui/qontinui-schemas#300"
+
+[[pending]]
+type = "TerminalLayoutPage"
+runner_pr = "qontinui/qontinui-runner#2750"
+added = 2026-11-08
+schemas_pr = "qontinui/qontinui-schemas#300"
+
+[[pending]]
+type = "TerminalLayoutRunner"
+runner_pr = "qontinui/qontinui-runner#2750"
+added = 2026-11-08
+schemas_pr = "qontinui/qontinui-schemas#300"
+
+[[pending]]
+type = "TerminalLayoutSession"
+runner_pr = "qontinui/qontinui-runner#2750"
+added = 2026-11-08
+schemas_pr = "qontinui/qontinui-schemas#300"
