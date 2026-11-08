@@ -25,6 +25,9 @@ export interface NextAction {
    * retrying, because the earlier attempt may already have taken effect (a
    * [`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then
    * says so. Omit it on a retry that is safe to repeat blindly.
+   * On [`NextActionKind::RequestAccess`] it names WHO can grant the access,
+   * as a role noun in the reader's words (`"a project admin"`), and is
+   * rendered unquoted.
    */
   target?: string | null;
   /**
