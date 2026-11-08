@@ -147,15 +147,31 @@ on:
   #     it, so this push run compiles consumer `main` before the adaptation is
   #     there and fails. Leg 2 cannot run on a push — there is no PR to read a
   #     declaration from — so schemas `main` stays red from the land until a
-  #     later PUSH verdict compiles. Nothing makes that happen by itself: a
-  #     compile failure is a GENUINE failure to coord's red-main lane, whose
-  #     re-run of one is behind `auto_fix_red_main_flaky` (default OFF) and
-  #     fires at most once per episode, almost always before the adaptation
-  #     has landed. So it clears when someone runs
-  #     `gh run rerun <this run> --failed` AFTER the adaptation lands (a re-run
-  #     keeps `event: push`), or when the next land goes through coord's
-  #     main-red waiver lane. A `workflow_dispatch` does NOT clear it: coord
-  #     never writes or prunes a baseline from a non-push run.
+  #     later PUSH verdict compiles. Coord now produces that verdict itself:
+  #     when the adaptation (D) declared with `coord:upstream-of=<consumer>#<n>`
+  #     ON THE SCHEMAS PR lands (coord-recorded) after this run's latest attempt
+  #     started, and this run is a genuine failure whose head_sha is that
+  #     schemas PR's land sha or a later schemas land's, coord's red-main
+  #     self-heal re-runs this run's failed jobs once (a re-run keeps
+  #     `event: push`, and re-reads consumer `main` live, so it now compiles
+  #     against D). It is latched per landed D in the red_main alert's
+  #     `detail.adaptation_reruns.<workflow>` (at most 3 per episode and
+  #     workflow), rides `auto_fix_red_main` (default ON) rather than the flaky
+  #     arm, and fires only for workflows listed in
+  #     `.qontinui/cross-repo-gates.toml` at this run's head sha. The edge lives
+  #     as long as the schemas PR's `coord:upstream-of` label: removing it from
+  #     a merged PR disables the re-run. A `coord:downstream-of` declaration on
+  #     the consumer PR ALONE does NOT buy it, and neither does an undeclared
+  #     break, an adaptation landing more than ~7 days after the schemas PR, or
+  #     this run being red for an unrelated reason. It fails closed while coord
+  #     cannot read the declaration file or this run's start time. For those,
+  #     `gh run rerun <this run> --failed` AFTER the cause is fixed stays the
+  #     remedy, or the next land
+  #     through coord's main-red waiver lane. A `workflow_dispatch` does NOT
+  #     clear it: coord never writes or prunes a baseline from a non-push run.
+  #     (Plan 2026-11-02-a-sequenced-cross-repo-break-leaves-the-upstream-main-
+  #     red-until-a-human-reruns-it; coord
+  #     crates/coord/src/stuck_pr_watcher/adaptation_rerun.rs.)
   push:
     branches: [main]
   workflow_dispatch:
