@@ -302,9 +302,10 @@ pub enum NextActionKind {
     /// The caller lacks a membership or role that someone else can grant: ask
     /// them for access, then try again. [`NextAction::target`] names WHO can
     /// grant it, in the reader's words (`"a project admin"`, `"your
-    /// organization's owner"`) — a role noun, never an identifier, so the
-    /// refusal reveals no authorization state. The remedy is a different
-    /// actor, which is why this is its own kind rather than a target on
+    /// organization's owner"`) — a role noun that names no person, group or
+    /// resource (a producer obligation this type does not enforce). The
+    /// remedy is a different actor, which is why this is its own kind rather
+    /// than a target on
     /// [`NextActionKind::FixRequest`] (the request is not malformed) or
     /// [`NextActionKind::NoneTerminal`] (something CAN be done).
     RequestAccess,
@@ -897,7 +898,8 @@ mod tests {
     }
 
     /// `request_access` names WHO can grant the access, unquoted, in the
-    /// reader's words. Every non-Rust mirror copies these exact sentences.
+    /// reader's words. Every non-Rust mirror must reproduce these exact
+    /// sentences (pinned for them by `examples/refusal_render_fixtures.rs`).
     #[test]
     fn request_access_names_who_grants_access() {
         assert_eq!(NextActionKind::RequestAccess.as_str(), "request_access");
@@ -915,6 +917,14 @@ mod tests {
             NextAction::new(NextActionKind::RequestAccess).render(),
             "Ask an administrator to grant you access, then try again"
         );
+        // Unquoted is not uncleaned: line breaks and double quotes in the
+        // target are still neutralised by `quotable`.
+        assert_eq!(
+            NextAction::new(NextActionKind::RequestAccess)
+                .with_target("a project\n\"admin\"")
+                .render(),
+            "Ask a project 'admin' to grant you access, then try again"
+        );
         // A blank target is no target: the reader still learns whom to ask.
         assert_eq!(
             NextAction::new(NextActionKind::RequestAccess)
@@ -923,8 +933,7 @@ mod tests {
             "Ask an administrator to grant you access, then try again"
         );
         assert_eq!(
-            serde_json::to_value(NextAction::new(NextActionKind::RequestAccess))
-                .unwrap()["kind"],
+            serde_json::to_value(NextAction::new(NextActionKind::RequestAccess)).unwrap()["kind"],
             "request_access"
         );
     }
