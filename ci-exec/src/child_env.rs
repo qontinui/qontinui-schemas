@@ -258,13 +258,14 @@ mod tests {
     /// an environment value). Fails closed: any shape not recognised here is
     /// withheld whole.
     ///
-    /// - `spawn <program>: <os error>` and `... did not answer ... within`
-    ///   carry no child output, so their first line passes.
+    /// - A first line holding `reported ` anywhere is withheld whole:
+    ///   `find_python`'s refusal quotes a candidate's stdout there.
     /// - `... exited <status> (<child output>)`, the `run_capture_env` shape,
-    ///   keeps the text before ` exited ` plus at most 60 characters of the
-    ///   status, cut at ` (`. If that prefix holds `reported ` (the
-    ///   `find_python` refusal quotes a candidate's stdout there), the whole
-    ///   error is withheld.
+    ///   keeps the text before the first ` exited ` plus at most 60
+    ///   characters of the status, cut at ` (`.
+    /// - Without ` exited `, `spawn <program>: <os error>` and the exact
+    ///   timeout shape `<program> did not answer [<argv>] within <n>s` carry
+    ///   no child output, so their first line passes.
     fn headline(e: &impl std::fmt::Display) -> String {
         let text = e.to_string();
         let first_line = text.lines().next().unwrap_or("");
@@ -275,17 +276,12 @@ mod tests {
         if first_line.contains("reported ") {
             return withheld;
         }
-        let exited = first_line.find(" exited ");
-        if exited.is_none() {
-            if first_line.starts_with("spawn ") {
-                return first_line.to_string();
-            }
-            if is_did_not_answer(first_line) {
+        let Some(at) = first_line.find(" exited ") else {
+            if first_line.starts_with("spawn ") || is_did_not_answer(first_line) {
                 return first_line.to_string();
             }
             return withheld;
-        }
-        let at = exited.unwrap_or_default();
+        };
         let prefix = &first_line[..at];
         let rest = &first_line[at + " exited ".len()..];
         let status: String = rest
@@ -320,7 +316,13 @@ mod tests {
         let cases = [
             // find_python's refusal: a candidate's stdout, then a timeout.
             "no Python 3 interpreter found — tried (python3: reported \"SECRET=hunter2\"; \
-             python: python [\"--version\"] did not answer within 30s)",
+             python: python did not answer [\"--version\"] within 30s)",
+            // ...and beside an exited candidate, where only the `reported `
+            // check withholds it.
+            "no Python 3 interpreter found — tried (python3: reported \"SECRET=hunter2\"; \
+             python: python [\"--version\"] exited exit status: 9009 (x))",
+            // a spawn line must not pass once ` exited ` follows it.
+            "spawn npm: x exited 1 (TOKEN=abc)",
             // child output that merely contains the timeout words.
             "npm [\"ci\"] exited exit status: 1 (TOKEN=abc registry did not answer in time)",
             "npm [\"ci\"] exited exit status: 1 (TOKEN=abc)",
@@ -619,8 +621,8 @@ mod tests {
             // A spawn or timeout error carries no child output. An `exited`
             // error carries all of it, which is not printable (see
             // `names_printer`).
-            Err(e) if e.starts_with("spawn ") || e.contains(" did not answer ") => {
-                panic!("the names printer did not run: {e}")
+            Err(e) if !e.contains(" exited ") => {
+                panic!("the names printer did not run: {}", headline(&e))
             }
             Err(_) => panic!(
                 "the names printer exited non-zero; its output is withheld because it may \
