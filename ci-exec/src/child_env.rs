@@ -268,17 +268,25 @@ mod tests {
     fn headline(e: &impl std::fmt::Display) -> String {
         let text = e.to_string();
         let first_line = text.lines().next().unwrap_or("");
-        if first_line.starts_with("spawn ") || first_line.contains(" did not answer ") {
-            return first_line.to_string();
-        }
         let withheld = format!("<error withheld: {} bytes>", text.len());
-        let Some(at) = first_line.find(" exited ") else {
-            return withheld;
-        };
-        let prefix = &first_line[..at];
-        if prefix.contains("reported ") {
+        // find_python's refusal quotes a candidate's stdout after `reported `,
+        // and a child can print anything inside ` exited ... (`: check both
+        // before any arm that would pass the line through.
+        if first_line.contains("reported ") {
             return withheld;
         }
+        let exited = first_line.find(" exited ");
+        if exited.is_none() {
+            if first_line.starts_with("spawn ") {
+                return first_line.to_string();
+            }
+            if is_did_not_answer(first_line) {
+                return first_line.to_string();
+            }
+            return withheld;
+        }
+        let at = exited.unwrap_or_default();
+        let prefix = &first_line[..at];
         let rest = &first_line[at + " exited ".len()..];
         let status: String = rest
             .split(" (")
@@ -288,6 +296,61 @@ mod tests {
             .take(60)
             .collect();
         format!("{prefix} exited {status} (child output withheld)")
+    }
+
+    /// `run_capture_env`'s timeout shape, anchored at both ends:
+    /// `<program> did not answer [<argv>] within <n>s`.
+    fn is_did_not_answer(line: &str) -> bool {
+        let Some(at) = line.find(" did not answer [") else {
+            return false;
+        };
+        let Some(within) = line.rfind("] within ") else {
+            return false;
+        };
+        let secs = &line[within + "] within ".len()..];
+        within > at
+            && !line[..at].contains(' ')
+            && secs.len() > 1
+            && secs.ends_with('s')
+            && secs[..secs.len() - 1].chars().all(|c| c.is_ascii_digit())
+    }
+
+    #[test]
+    fn headline_never_passes_child_output() {
+        let cases = [
+            // find_python's refusal: a candidate's stdout, then a timeout.
+            "no Python 3 interpreter found — tried (python3: reported \"SECRET=hunter2\"; \
+             python: python [\"--version\"] did not answer within 30s)",
+            // child output that merely contains the timeout words.
+            "npm [\"ci\"] exited exit status: 1 (TOKEN=abc registry did not answer in time)",
+            "npm [\"ci\"] exited exit status: 1 (TOKEN=abc)",
+            "something else entirely: TOKEN=abc",
+        ];
+        for case in cases {
+            let shown = headline(&case);
+            assert!(
+                !shown.contains("hunter2") && !shown.contains("TOKEN"),
+                "headline passed child output for case {:?}",
+                case.len()
+            );
+        }
+        assert_eq!(
+            headline(&"npm [\"ci\"] exited exit status: 1 (TOKEN=abc)"),
+            "npm [\"ci\"] exited exit status: 1 (child output withheld)"
+        );
+        let timeout = "python3 [\"-m\", \"venv\"] did not answer within 60s";
+        assert!(!is_did_not_answer(timeout), "argv is printed in [...]");
+        let timeout = "python3 [\"-m\", \"venv\"] did not answer [\"x\"] within 60s";
+        assert!(
+            !is_did_not_answer(timeout),
+            "program must be one word before the argv"
+        );
+        let timeout = "python3 did not answer [\"-m\", \"venv\"] within 60s";
+        assert_eq!(headline(&timeout), timeout);
+        assert_eq!(
+            headline(&"spawn python3: No such file or directory"),
+            "spawn python3: No such file or directory"
+        );
     }
 
     // ── Literals: what these tests hold the code to ──────────────────────

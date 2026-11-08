@@ -492,8 +492,8 @@ jobs:
         # The three tests below are the regression tests for the node-tree
         # extractor's arbitrary-write bug. Their `#[cfg(unix)]` arms are the
         # ones that discriminate, and they are the arms a Linux CI-node host
-        # runs. This is the only job pinned to Linux (the only workflow
-        # carrying `cargo test`), so a rename, a
+        # runs. This is the only Linux job that runs ci-exec's lib tests
+        # (rust-ci is the only workflow carrying `cargo test`), so a rename, a
         # filter or a cfg that drops one would leave `cargo test` green while
         # the arm ran nowhere. The step reads the log the step above wrote
         # (no cargo) and fails unless each one printed `... ok` inside the
@@ -533,7 +533,7 @@ jobs:
             if grep -Fqx "test $TEST ... ok" "$SECTION"; then
               echo "ran: test $TEST ... ok"
             else
-              echo "::error::ci-exec's $TEST did not print '... ok' in this leg's cargo test output. Its #[cfg(unix)] arm runs in no other Linux-pinned job here; dropping it has to be a decision, not an accident."
+              echo "::error::ci-exec's $TEST did not print '... ok' in this leg's cargo test output. Its #[cfg(unix)] arm runs in no other Linux job that runs cargo test; dropping it has to be a decision, not an accident."
               MISSING=1
             fi
           done
