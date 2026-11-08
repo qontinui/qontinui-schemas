@@ -531,6 +531,10 @@ from .per_type.task_type import TaskType
 from .per_type.template_ref import TemplateRef
 from .per_type.terminal_exit_event import TerminalExitEvent
 from .per_type.terminal_info import TerminalInfo
+from .per_type.terminal_layout import TerminalLayout
+from .per_type.terminal_layout_page import TerminalLayoutPage
+from .per_type.terminal_layout_runner import TerminalLayoutRunner
+from .per_type.terminal_layout_session import TerminalLayoutSession
 from .per_type.terminal_output_event import TerminalOutputEvent
 from .per_type.test_type import TestType
 from .per_type.text_match_type import TextMatchType
@@ -1157,6 +1161,10 @@ __all__ = [
     "TemplateRef",
     "TerminalExitEvent",
     "TerminalInfo",
+    "TerminalLayout",
+    "TerminalLayoutPage",
+    "TerminalLayoutRunner",
+    "TerminalLayoutSession",
     "TerminalOutputEvent",
     "TestType",
     "TextMatchType",
