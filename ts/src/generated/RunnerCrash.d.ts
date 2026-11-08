@@ -22,6 +22,10 @@ export interface RunnerCrash {
    */
   panicMessage: string;
   /**
+   * Pid of the crashed process, if the dump recorded one.
+   */
+  pid?: number | null;
+  /**
    * ISO 8601 timestamp when the crash was reported.
    */
   reportedAt: string;
