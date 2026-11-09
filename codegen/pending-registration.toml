@@ -62,3 +62,22 @@ type = "TerminalLayoutSession"
 runner_pr = "qontinui/qontinui-runner#2750"
 added = 2026-11-08
 schemas_pr = "qontinui/qontinui-schemas#300"
+
+# The shared three-state outcome (schemas#308, plan 2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass Phase 1b/1c), awaiting runner#2811.
+[[pending]]
+type = "FoldedOutcome"
+runner_pr = "qontinui/qontinui-runner#2811"
+added = 2026-11-09
+schemas_pr = "qontinui/qontinui-schemas#308"
+
+[[pending]]
+type = "OutcomeCounts"
+runner_pr = "qontinui/qontinui-runner#2811"
+added = 2026-11-09
+schemas_pr = "qontinui/qontinui-schemas#308"
+
+[[pending]]
+type = "SpecAssertionVerdict"
+runner_pr = "qontinui/qontinui-runner#2811"
+added = 2026-11-09
+schemas_pr = "qontinui/qontinui-schemas#308"
