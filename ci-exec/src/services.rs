@@ -191,6 +191,7 @@ use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+use crate::child_env::ChildEnv;
 use crate::host::ProcessSpawn;
 use crate::manifest::CiService;
 use crate::tools::run_capture;
@@ -678,6 +679,7 @@ impl ServiceStack {
             let stale = removal_argv(&name);
             let _ = run_capture(
                 process,
+                ChildEnv::ContainerRuntime,
                 &runtime,
                 &removal_args(&stale),
                 CONTAINER_CMD_TIMEOUT,
@@ -754,6 +756,7 @@ impl ServiceStack {
                     let leftover = removal_argv(name);
                     let _ = run_capture(
                         process,
+                        ChildEnv::ContainerRuntime,
                         runtime,
                         &removal_args(&leftover),
                         CONTAINER_CMD_TIMEOUT,
@@ -1127,6 +1130,7 @@ async fn detect_runtime(
         // `run`.
         match run_capture(
             process,
+            ChildEnv::ContainerRuntime,
             candidate,
             &["info", "--format", "{{.ServerVersion}}"],
             RUNTIME_PROBE_TIMEOUT,
@@ -1254,7 +1258,16 @@ async fn run_owned_env(
     envs: &[(String, String)],
 ) -> Result<String, String> {
     let args: Vec<&str> = argv.iter().map(String::as_str).collect();
-    crate::tools::run_capture_env(process, runtime, &args, timeout, None, envs).await
+    crate::tools::run_capture_env(
+        process,
+        ChildEnv::ContainerRuntime,
+        runtime,
+        &args,
+        timeout,
+        None,
+        envs,
+    )
+    .await
 }
 
 /// Does this `run` failure mean the host port was taken between reservation
@@ -1396,6 +1409,7 @@ async fn container_is_running(
 ) -> Result<bool, String> {
     let out = run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &["inspect", "-f", "{{.State.Running}}", name],
         CONTAINER_CMD_TIMEOUT,
@@ -1415,6 +1429,7 @@ async fn container_ip(
 ) -> Result<String, String> {
     let out = run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &[
             "inspect",
@@ -1435,6 +1450,7 @@ async fn container_ip(
 async fn container_logs(process: &dyn ProcessSpawn, runtime: &str, name: &str) -> String {
     match run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &["logs", "--tail", LOG_TAIL_LINES, name],
         CONTAINER_CMD_TIMEOUT,
@@ -2271,13 +2287,19 @@ mod tests {
             "{{range .Mounts}}{{if eq .Type \"volume\"}}{{.Name}} {{end}}{{end}}",
         ];
         inspect.extend(stack.container_names().iter().map(String::as_str));
-        let volumes: Vec<String> =
-            run_capture(&PlainSpawn, &runtime, &inspect, CONTAINER_CMD_TIMEOUT, None)
-                .await
-                .expect("inspect must answer")
-                .split_whitespace()
-                .map(str::to_string)
-                .collect();
+        let volumes: Vec<String> = run_capture(
+            &PlainSpawn,
+            ChildEnv::ContainerRuntime,
+            &runtime,
+            &inspect,
+            CONTAINER_CMD_TIMEOUT,
+            None,
+        )
+        .await
+        .expect("inspect must answer")
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
         assert!(
             volumes.len() >= 2,
             "every registry image declares a VOLUME, so each container owns one: {volumes:?}"
@@ -2295,6 +2317,7 @@ mod tests {
         // Nothing labelled with this dispatch survives.
         let leftovers = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &[
                 "ps",
@@ -2317,6 +2340,7 @@ mod tests {
         // 2026-10-02-orphaned-anonymous-docker-volumes-stop-producers-and-reap-nightly).
         let remaining = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &["volume", "ls", "-q"],
             CONTAINER_CMD_TIMEOUT,
@@ -2367,6 +2391,7 @@ mod tests {
         stack.teardown().await;
         let leftovers = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &[
                 "ps",
