@@ -19,6 +19,7 @@ export type NextActionKind =
   | "none_terminal"
   | "report_defect"
   | "fix_request"
+  | "request_access"
   | "resnapshot"
   | "scroll_into_view"
   | "wait_for_enabled"

@@ -191,10 +191,15 @@ use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+use crate::child_env::ChildEnv;
 use crate::host::ProcessSpawn;
 use crate::manifest::CiService;
 use crate::tools::run_capture;
 use std::sync::Arc;
+
+/// The recording [`ProcessSpawn`] the teardown tests observe removals through.
+#[cfg(test)]
+pub(crate) mod recording_spawn;
 
 /// Container runtimes tried, in order. A miss is a refusal naming this list —
 /// never a silent skip. `podman` is here because its CLI is command-compatible
@@ -581,24 +586,14 @@ pub(crate) struct ServiceStack {
     /// detected, which only happens when a manifest declares a service.
     runtime: Option<String>,
     /// Container names, registered BEFORE creation.
-    containers: Vec<String>,
-    /// Every removal command this stack actually ISSUED, recorded inside the
-    /// removal loop.
     ///
-    /// This exists because the alternative was a set of teardown tests that a
-    /// regression could not fail: asserting "the vec is empty afterwards"
-    /// passes just as well when the removal loop is deleted and only the
-    /// `mem::take` remains. Recording the command binds the test to the
-    /// behaviour instead of to the bookkeeping — and it is the ONLY
-    /// CI-runnable detector, since the tests that drive a real daemon are
-    /// `#[ignore]`d and CI has no Docker.
-    removals: RemovalLog,
+    /// What teardown REMOVED is observed through [`Self::process`], never
+    /// recorded here: the tests pass a `recording_spawn::RecordingSpawn`,
+    /// whose recorder child logs a command only when it is executed. A
+    /// pre-execution record (the retired `RemovalLog`) stayed green with the
+    /// execution deleted.
+    containers: Vec<String>,
 }
-
-/// Shared handle so a caller that has already moved the stack (the executor's
-/// `DispatchWorkspace::cleanup` consumes `self`) can still assert what was
-/// removed.
-pub(crate) type RemovalLog = std::sync::Arc<std::sync::Mutex<Vec<Vec<String>>>>;
 
 impl ServiceStack {
     pub(crate) fn new(dispatch_id: &str, process: Arc<dyn ProcessSpawn>) -> Self {
@@ -607,20 +602,6 @@ impl ServiceStack {
             process,
             runtime: None,
             containers: Vec::new(),
-            removals: RemovalLog::default(),
-        }
-    }
-
-    /// Handle onto [`Self::removals`], for a caller that needs to assert what
-    /// teardown did after the stack itself is gone.
-    #[cfg(test)]
-    pub(crate) fn removal_log(&self) -> RemovalLog {
-        std::sync::Arc::clone(&self.removals)
-    }
-
-    fn record_removal(&self, argv: &[String]) {
-        if let Ok(mut log) = self.removals.lock() {
-            log.push(argv.to_vec());
         }
     }
 
@@ -678,6 +659,7 @@ impl ServiceStack {
             let stale = removal_argv(&name);
             let _ = run_capture(
                 process,
+                ChildEnv::ContainerRuntime,
                 &runtime,
                 &removal_args(&stale),
                 CONTAINER_CMD_TIMEOUT,
@@ -754,6 +736,7 @@ impl ServiceStack {
                     let leftover = removal_argv(name);
                     let _ = run_capture(
                         process,
+                        ChildEnv::ContainerRuntime,
                         runtime,
                         &removal_args(&leftover),
                         CONTAINER_CMD_TIMEOUT,
@@ -964,7 +947,6 @@ impl ServiceStack {
         };
         for name in containers {
             let argv = removal_argv(&name);
-            self.record_removal(&argv);
             match run_owned(process, &runtime, &argv, CONTAINER_CMD_TIMEOUT).await {
                 Ok(_) => info!("ci_node: removed service container {name}"),
                 Err(e) => warn!("ci_node: removing service container {name} failed: {e}"),
@@ -973,13 +955,17 @@ impl ServiceStack {
     }
 
     #[cfg(test)]
-    pub(crate) fn for_test(dispatch_id: &str, runtime: Option<&str>, containers: &[&str]) -> Self {
+    pub(crate) fn for_test(
+        dispatch_id: &str,
+        process: Arc<dyn ProcessSpawn>,
+        runtime: Option<&str>,
+        containers: &[&str],
+    ) -> Self {
         Self {
             dispatch_id: dispatch_id.to_string(),
-            process: Arc::new(crate::standalone::PlainSpawn),
+            process,
             runtime: runtime.map(str::to_string),
             containers: containers.iter().map(|c| (*c).to_string()).collect(),
-            removals: RemovalLog::default(),
         }
     }
 
@@ -1014,7 +1000,6 @@ impl Drop for ServiceStack {
         );
         for name in containers {
             let argv = removal_argv(&name);
-            self.record_removal(&argv);
             if let Err(e) = reap_blocking(process, &runtime, &argv, DROP_REAP_BUDGET) {
                 warn!("ci_node: last-resort reap of {name} failed: {e}");
             }
@@ -1127,6 +1112,7 @@ async fn detect_runtime(
         // `run`.
         match run_capture(
             process,
+            ChildEnv::ContainerRuntime,
             candidate,
             &["info", "--format", "{{.ServerVersion}}"],
             RUNTIME_PROBE_TIMEOUT,
@@ -1254,7 +1240,16 @@ async fn run_owned_env(
     envs: &[(String, String)],
 ) -> Result<String, String> {
     let args: Vec<&str> = argv.iter().map(String::as_str).collect();
-    crate::tools::run_capture_env(process, runtime, &args, timeout, None, envs).await
+    crate::tools::run_capture_env(
+        process,
+        ChildEnv::ContainerRuntime,
+        runtime,
+        &args,
+        timeout,
+        None,
+        envs,
+    )
+    .await
 }
 
 /// Does this `run` failure mean the host port was taken between reservation
@@ -1396,6 +1391,7 @@ async fn container_is_running(
 ) -> Result<bool, String> {
     let out = run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &["inspect", "-f", "{{.State.Running}}", name],
         CONTAINER_CMD_TIMEOUT,
@@ -1415,6 +1411,7 @@ async fn container_ip(
 ) -> Result<String, String> {
     let out = run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &[
             "inspect",
@@ -1435,6 +1432,7 @@ async fn container_ip(
 async fn container_logs(process: &dyn ProcessSpawn, runtime: &str, name: &str) -> String {
     match run_capture(
         process,
+        ChildEnv::ContainerRuntime,
         runtime,
         &["logs", "--tail", LOG_TAIL_LINES, name],
         CONTAINER_CMD_TIMEOUT,
@@ -1463,6 +1461,7 @@ fn free_loopback_port() -> Result<u16, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::recording_spawn::{RecordingSpawn, Rule};
     use super::*;
     use crate::standalone::PlainSpawn;
 
@@ -1857,53 +1856,149 @@ mod tests {
         assert!(err.contains("cancelled"), "got: {err}");
     }
 
-    /// Teardown ISSUES a forced removal for exactly the containers this
-    /// dispatch registered — asserted on the commands, not on the bookkeeping.
+    /// Teardown EXECUTES a forced removal for exactly the containers this
+    /// dispatch registered, asserted on the commands the recorder child RAN
+    /// rather than on the bookkeeping.
     ///
     /// Asserting "the vec is empty afterwards" would pass just as well if the
-    /// removal loop were deleted and only the `mem::take` remained, which makes
-    /// it no regression detector at all. The recorded commands bind the test to
-    /// the behaviour, and they are the only detector CI can run: the tests that
-    /// drive a real daemon are `#[ignore]`d and CI has no Docker.
+    /// removal loop were deleted and only the `mem::take` remained. A record
+    /// taken before the command runs passes just as well if the execution is
+    /// deleted. `RecordingSpawn` logs a command only when its child runs, so
+    /// only the execution satisfies this test. It is the detector CI can run:
+    /// the tests that drive a real daemon are `#[ignore]`d and CI has no Docker.
     ///
-    /// The runtime named here does not exist, which also pins best-effort: a
-    /// removal that cannot run is not an error the caller sees, and it must
-    /// still empty the stack so `Drop` does not try again.
+    /// Every removal is scripted to FAIL, which also pins best-effort: a
+    /// failed removal is not an error the caller sees, and the stack must
+    /// still be emptied so `Drop` does not try again.
     #[tokio::test]
     async fn teardown_issues_a_forced_removal_for_every_container() {
+        let spawn = RecordingSpawn::scripted(&[Rule {
+            subcommand: "rm",
+            exit: 1,
+            output: "Error: daemon unavailable",
+        }]);
+        // Not `CONTAINER_RUNTIMES[0]`, so a teardown that hard-codes the first
+        // candidate instead of the runtime that created the containers reds.
         let mut stack = ServiceStack::for_test(
             "d-teardown",
-            Some("qontinui-no-such-container-runtime"),
+            spawn.clone(),
+            Some("podman"),
             &[
                 "qontinui-ci-d-teardown-redis",
                 "qontinui-ci-d-teardown-postgres",
             ],
         );
-        let log = stack.removal_log();
         assert_eq!(stack.container_names().len(), 2);
 
         stack.teardown().await;
 
-        let issued = log.lock().unwrap().clone();
         assert_eq!(
-            issued,
+            spawn.removals(),
             vec![
                 removal_argv("qontinui-ci-d-teardown-redis"),
                 removal_argv("qontinui-ci-d-teardown-postgres"),
             ],
-            "teardown must issue a forced removal per registered container"
+            "teardown must execute a forced removal per registered container"
+        );
+        assert!(
+            spawn.issued().iter().all(|line| line[0] == "podman"),
+            "teardown must remove through the runtime that created the containers: {:?}",
+            spawn.issued()
         );
         assert!(
             stack.container_names().is_empty(),
             "teardown must empty the stack even when the removal command fails"
         );
 
-        // Idempotent: a second teardown issues nothing new, and neither does
+        // Idempotent: a second teardown executes nothing new, and neither does
         // the Drop that follows.
         stack.teardown().await;
-        assert_eq!(log.lock().unwrap().len(), 2);
+        assert_eq!(spawn.issued().len(), 2);
         drop(stack);
-        assert_eq!(log.lock().unwrap().len(), 2);
+        assert_eq!(spawn.issued().len(), 2);
+    }
+
+    /// `provision_with` driven against a recorder whose `run` fails with a
+    /// non-port error: detection answers, and every other subcommand
+    /// succeeds. Returns what the recorder RAN and the provision error.
+    async fn provision_with_a_failing_start(dispatch_id: &str) -> (Arc<RecordingSpawn>, String) {
+        let spawn = RecordingSpawn::scripted(&[
+            Rule {
+                subcommand: "info",
+                exit: 0,
+                output: "24.0.7",
+            },
+            Rule {
+                subcommand: "run",
+                exit: 125,
+                output: "Error response from daemon: image pull failed",
+            },
+        ]);
+        let mut stack = ServiceStack::new(dispatch_id, spawn.clone());
+        let mut lines = Vec::new();
+        let err = stack
+            .provision_with(
+                &[declared("redis", "7-alpine")],
+                &["docker"],
+                Duration::from_secs(5),
+                &mut |l| lines.push(l),
+                &CancellationToken::new(),
+            )
+            .await
+            .expect_err("a failed start must fail the provision");
+        // The container was registered before creation, so teardown still owes
+        // its removal: the one teardown path runs on failure too.
+        stack.teardown().await;
+        (spawn, err)
+    }
+
+    /// Before `run --name`, provisioning EXECUTES a removal of any stale
+    /// container left at this name by a crashed earlier attempt. This removal
+    /// site was untested until the recorder could script a daemon.
+    #[tokio::test]
+    async fn a_stale_container_is_removed_before_the_run() {
+        let (spawn, _) = provision_with_a_failing_start("d-stale").await;
+        let name = container_name("d-stale", "redis");
+        let subcommands: Vec<String> = spawn.issued().iter().map(|l| l[1].clone()).collect();
+        let first_run = subcommands
+            .iter()
+            .position(|s| s == "run")
+            .expect("the start must have been attempted");
+        let first_rm = subcommands
+            .iter()
+            .position(|s| s == "rm")
+            .expect("a removal must have run");
+        assert!(
+            first_rm < first_run,
+            "the stale removal must run BEFORE the start: {subcommands:?}"
+        );
+        assert_eq!(spawn.removals()[0], removal_argv(&name));
+    }
+
+    /// A failed start EXECUTES a removal of whatever the runtime left behind
+    /// under the name before giving up. A non-port failure is not retried, so
+    /// exactly one `run` is attempted. Teardown then removes the registered
+    /// name once more. This removal site was untested until the recorder
+    /// could script a daemon.
+    #[tokio::test]
+    async fn a_failed_start_removes_what_the_runtime_left_behind() {
+        let (spawn, err) = provision_with_a_failing_start("d-leftover").await;
+        assert!(err.contains("could not be started"), "got: {err}");
+        let name = container_name("d-leftover", "redis");
+        let subcommands: Vec<String> = spawn.issued().iter().map(|l| l[1].clone()).collect();
+        assert_eq!(
+            subcommands,
+            vec!["info", "rm", "run", "rm", "rm"],
+            "detect, stale removal, one start, leftover removal, teardown removal"
+        );
+        assert_eq!(
+            spawn.removals(),
+            vec![
+                removal_argv(&name),
+                removal_argv(&name),
+                removal_argv(&name)
+            ]
+        );
     }
 
     /// The removal is a FORCED remove by exact name — never a filter, never a
@@ -1936,11 +2031,12 @@ mod tests {
         );
     }
 
-    /// The stale pre-run removal and the leftover removal after a failed start
-    /// run through `run_capture` directly and no runtime-free test reaches
-    /// them, so pin the CONVENTION instead: nothing in this module spells a
-    /// removal argv by hand — every one goes through `removal_argv`, which the
-    /// tests above pin to carry `-v`.
+    /// The CONVENTION behind the removal tests: nothing in this module spells
+    /// a removal argv by hand. Every one goes through `removal_argv`, which
+    /// the tests above pin to carry `-v`. The stale and leftover removal sites
+    /// are also pinned by behaviour (`a_stale_container_is_removed_before_the_run`,
+    /// `a_failed_start_removes_what_the_runtime_left_behind`); this guards a
+    /// future removal site that no test drives yet.
     #[test]
     fn no_removal_argv_is_spelled_by_hand() {
         let src = include_str!("services.rs");
@@ -1952,22 +2048,25 @@ mod tests {
     }
 
     /// A stack that still holds containers is not silently forgotten when it is
-    /// dropped without a teardown — the reaper ISSUES the removal. Asserted on
-    /// the command, because "does not panic" is satisfied by an empty `drop`.
+    /// dropped without a teardown: the reaper EXECUTES the removal. Asserted on
+    /// what the recorder child ran, because "does not panic" is satisfied by
+    /// an empty `drop`, and a record taken before the spawn is satisfied by a
+    /// reaper that never spawns.
     #[test]
     fn dropping_a_live_stack_reaps_rather_than_leaking() {
+        let spawn = RecordingSpawn::new();
         let stack = ServiceStack::for_test(
             "d-drop",
-            Some("qontinui-no-such-container-runtime"),
+            spawn.clone(),
+            Some("docker"),
             &["qontinui-ci-d-drop-redis"],
         );
-        let log = stack.removal_log();
         let started = Instant::now();
         drop(stack);
         assert_eq!(
-            log.lock().unwrap().clone(),
+            spawn.removals(),
             vec![removal_argv("qontinui-ci-d-drop-redis")],
-            "the last-resort reaper must actually issue the removal"
+            "the last-resort reaper must actually execute the removal"
         );
         // And it is BOUNDED: a wedged daemon must not own this thread forever.
         assert!(started.elapsed() < DROP_REAP_BUDGET);
@@ -2271,30 +2370,33 @@ mod tests {
             "{{range .Mounts}}{{if eq .Type \"volume\"}}{{.Name}} {{end}}{{end}}",
         ];
         inspect.extend(stack.container_names().iter().map(String::as_str));
-        let volumes: Vec<String> =
-            run_capture(&PlainSpawn, &runtime, &inspect, CONTAINER_CMD_TIMEOUT, None)
-                .await
-                .expect("inspect must answer")
-                .split_whitespace()
-                .map(str::to_string)
-                .collect();
+        let volumes: Vec<String> = run_capture(
+            &PlainSpawn,
+            ChildEnv::ContainerRuntime,
+            &runtime,
+            &inspect,
+            CONTAINER_CMD_TIMEOUT,
+            None,
+        )
+        .await
+        .expect("inspect must answer")
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
         assert!(
             volumes.len() >= 2,
             "every registry image declares a VOLUME, so each container owns one: {volumes:?}"
         );
 
-        let log = stack.removal_log();
+        // On a real daemon the proof that teardown removed them is the
+        // label query below: nothing of this dispatch survives.
         stack.teardown().await;
         assert!(stack.container_names().is_empty());
-        assert_eq!(
-            log.lock().unwrap().len(),
-            2,
-            "teardown must issue one removal per container"
-        );
 
         // Nothing labelled with this dispatch survives.
         let leftovers = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &[
                 "ps",
@@ -2317,6 +2419,7 @@ mod tests {
         // 2026-10-02-orphaned-anonymous-docker-volumes-stop-producers-and-reap-nightly).
         let remaining = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &["volume", "ls", "-q"],
             CONTAINER_CMD_TIMEOUT,
@@ -2367,6 +2470,7 @@ mod tests {
         stack.teardown().await;
         let leftovers = run_capture(
             &PlainSpawn,
+            ChildEnv::ContainerRuntime,
             &runtime,
             &[
                 "ps",

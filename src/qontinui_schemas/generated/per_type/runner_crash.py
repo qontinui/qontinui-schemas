@@ -25,6 +25,12 @@ class RunnerCrash(BaseModel):
     panicMessage: Annotated[
         str, Field(description='Panic message captured from the runner process.')
     ]
+    pid: Annotated[
+        int | None,
+        Field(
+            description='Pid of the crashed process, if the dump recorded one.', ge=0
+        ),
+    ] = None
     reportedAt: Annotated[
         str, Field(description='ISO 8601 timestamp when the crash was reported.')
     ]

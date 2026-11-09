@@ -299,6 +299,16 @@ pub enum NextActionKind {
     /// The request itself is malformed: correct it and send it again. Sending
     /// it unchanged fails the same way.
     FixRequest,
+    /// The caller lacks a membership or role that someone else can grant: ask
+    /// them for access, then try again. [`NextAction::target`] names WHO can
+    /// grant it, in the reader's words (`"a project admin"`, `"your
+    /// organization's owner"`) — a role noun that names no person, group or
+    /// resource (a producer obligation this type does not enforce). The
+    /// remedy is a different actor, which is why this is its own kind rather
+    /// than a target on
+    /// [`NextActionKind::FixRequest`] (the request is not malformed) or
+    /// [`NextActionKind::NoneTerminal`] (something CAN be done).
+    RequestAccess,
     /// Take a fresh snapshot of the page; element references may have changed.
     Resnapshot,
     /// Scroll or navigate so the element is visible, then retry.
@@ -329,6 +339,7 @@ impl NextActionKind {
         NextActionKind::NoneTerminal,
         NextActionKind::ReportDefect,
         NextActionKind::FixRequest,
+        NextActionKind::RequestAccess,
         NextActionKind::Resnapshot,
         NextActionKind::ScrollIntoView,
         NextActionKind::WaitForEnabled,
@@ -348,6 +359,7 @@ impl NextActionKind {
             NextActionKind::NoneTerminal => "none_terminal",
             NextActionKind::ReportDefect => "report_defect",
             NextActionKind::FixRequest => "fix_request",
+            NextActionKind::RequestAccess => "request_access",
             NextActionKind::Resnapshot => "resnapshot",
             NextActionKind::ScrollIntoView => "scroll_into_view",
             NextActionKind::WaitForEnabled => "wait_for_enabled",
@@ -415,6 +427,9 @@ pub struct NextAction {
     /// retrying, because the earlier attempt may already have taken effect (a
     /// [`RefusalCode::UpstreamTimeout`] write); [`NextAction::render`] then
     /// says so. Omit it on a retry that is safe to repeat blindly.
+    /// On [`NextActionKind::RequestAccess`] it names WHO can grant the access,
+    /// as a role noun in the reader's words (`"a project admin"`), and is
+    /// rendered unquoted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// For [`NextActionKind::RetryLater`]: the earliest useful retry, in whole
@@ -522,7 +537,9 @@ impl NextAction {
     /// The second clause of [`Refusal::render`]: what to do, as an imperative
     /// sentence without its closing full stop. Never empty. A target is
     /// quoted in plain double quotes (never markup) after [`quotable`]
-    /// cleaning.
+    /// cleaning — except on [`NextActionKind::RequestAccess`], whose target is
+    /// a person to ask ("Ask a project admin …"), not a value to type, so it
+    /// is cleaned the same way but not quoted.
     pub fn render(&self) -> String {
         const UNNAMED: &str = "(it did not name one, which is itself a defect worth reporting)";
         let target = quotable(self.target.as_deref());
@@ -589,6 +606,12 @@ impl NextAction {
             (NextActionKind::FixRequest, None) => {
                 "Correct the request and send it again; sending it unchanged fails the same way"
                     .to_string()
+            }
+            (NextActionKind::RequestAccess, Some(t)) => {
+                format!("Ask {t} to grant you access, then try again")
+            }
+            (NextActionKind::RequestAccess, None) => {
+                "Ask an administrator to grant you access, then try again".to_string()
             }
             (NextActionKind::Resnapshot, _) => {
                 "Take a fresh snapshot of the page, then retry".to_string()
@@ -874,6 +897,47 @@ mod tests {
         }
     }
 
+    /// `request_access` names WHO can grant the access, unquoted, in the
+    /// reader's words. Every non-Rust mirror must reproduce these exact
+    /// sentences (pinned for them by `examples/refusal_render_fixtures.rs`).
+    #[test]
+    fn request_access_names_who_grants_access() {
+        assert_eq!(NextActionKind::RequestAccess.as_str(), "request_access");
+        assert_eq!(
+            NextActionKind::from_wire("request_access"),
+            Some(NextActionKind::RequestAccess)
+        );
+        assert_eq!(
+            NextAction::new(NextActionKind::RequestAccess)
+                .with_target("a project admin")
+                .render(),
+            "Ask a project admin to grant you access, then try again"
+        );
+        assert_eq!(
+            NextAction::new(NextActionKind::RequestAccess).render(),
+            "Ask an administrator to grant you access, then try again"
+        );
+        // Unquoted is not uncleaned: line breaks and double quotes in the
+        // target are still neutralised by `quotable`.
+        assert_eq!(
+            NextAction::new(NextActionKind::RequestAccess)
+                .with_target("a project\n\"admin\"")
+                .render(),
+            "Ask a project 'admin' to grant you access, then try again"
+        );
+        // A blank target is no target: the reader still learns whom to ask.
+        assert_eq!(
+            NextAction::new(NextActionKind::RequestAccess)
+                .with_target("  ")
+                .render(),
+            "Ask an administrator to grant you access, then try again"
+        );
+        assert_eq!(
+            serde_json::to_value(NextAction::new(NextActionKind::RequestAccess)).unwrap()["kind"],
+            "request_access"
+        );
+    }
+
     #[test]
     fn every_kind_is_listed_in_all() {
         let count = |k: NextActionKind| match k {
@@ -887,6 +951,7 @@ mod tests {
             | NextActionKind::NoneTerminal
             | NextActionKind::ReportDefect
             | NextActionKind::FixRequest
+            | NextActionKind::RequestAccess
             | NextActionKind::Resnapshot
             | NextActionKind::ScrollIntoView
             | NextActionKind::WaitForEnabled
@@ -896,7 +961,7 @@ mod tests {
         };
         assert_eq!(
             NextActionKind::ALL.iter().map(|k| count(*k)).sum::<usize>(),
-            14
+            15
         );
         assert!(!NextActionKind::ALL.contains(&NextActionKind::Unrecognised));
         assert!(!RefusalSource::ALL.contains(&RefusalSource::Unrecognised));

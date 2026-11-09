@@ -97,6 +97,9 @@ pub struct RunnerCrash {
     pub thread: String,
     /// ISO 8601 timestamp when the crash was reported.
     pub reported_at: String,
+    /// Pid of the crashed process, if the dump recorded one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
 }
 
 // ============================================================================
