@@ -955,16 +955,22 @@ fn assert_summary(report: &AssertReport) -> String {
         AssertionOutcome::Failed => "failed",
         AssertionOutcome::Unknown => "unknown",
     };
-    let codes = if report.verdict.unknown_codes().is_empty() {
-        String::new()
-    } else {
-        let names: Vec<&str> = report
-            .verdict
-            .unknown_codes()
-            .iter()
-            .map(|c| c.as_str())
-            .collect();
-        format!("({})", names.join(", "))
+    let names: Vec<&str> = report
+        .verdict
+        .unknown_codes()
+        .iter()
+        .map(|c| c.as_str())
+        .collect();
+    let codes = match report.verdict.outcome() {
+        _ if names.is_empty() => String::new(),
+        // On `unknown` the codes ARE the reason: `unknown(no_results)`.
+        AssertionOutcome::Unknown => format!("({})", names.join(", ")),
+        // On `failed` the failure decided the outcome; the codes only say what
+        // else could not be evaluated, so they are labelled rather than glued
+        // to the word, where they would read as the failure's cause.
+        AssertionOutcome::Failed | AssertionOutcome::Passed => {
+            format!("; unknown: {}", names.join(", "))
+        }
     };
     let mut lines = vec![format!(
         "vision-audit assert: {} passed, {} failed, {} not evaluated of {} -> {word}{codes} (exit {exit})",
@@ -1597,6 +1603,34 @@ mod tests {
             .next()
             .unwrap()
             .ends_with("-> failed (exit 2)"));
+
+        // A failed fold that also holds an unknown keeps `failed` as the word
+        // and LABELS the codes: glued on as `failed(<code>)` they would read as
+        // the cause of the failure.
+        let mixed = assert_all(
+            &snap,
+            None,
+            &[
+                Assertion::NoOverlap {
+                    elements: ["a".into(), "b".into()],
+                    tolerance_px: None,
+                },
+                Assertion::NoOverlap {
+                    elements: ["a".into(), "unregistered".into()],
+                    tolerance_px: None,
+                },
+            ],
+            &bl,
+        );
+        assert_eq!(mixed.verdict.outcome(), AssertionOutcome::Failed);
+        assert!(!mixed.verdict.unknown_codes().is_empty());
+        let line = assert_summary(&mixed).lines().next().unwrap().to_string();
+        assert!(
+            line.contains("-> failed; unknown: "),
+            "verdict line: {line}"
+        );
+        assert!(!line.contains("failed("), "verdict line: {line}");
+        assert!(line.ends_with("(exit 2)"), "verdict line: {line}");
     }
 
     // ---- assert attribution ----
