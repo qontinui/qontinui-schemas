@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Verdict table for consumer-verdict-annotation.sh, run in CI on every PR
 # (job consumer-verdict-annotation-test in runner-consumer-check.yml). Asserts
-# the exact line for both reasons with real values (qontinui-schemas#309's
-# declared adaptation qontinui-runner#2794, as measured 2026-11-09), every
-# refusal arm (exit 2, empty stdout), and that no output carries the
-# not-a-verdict phrase. No network.
+# the exact line for both reasons with example values (the qontinui-schemas#309 /
+# qontinui-runner#2794 pair this plan was measured on), every refusal arm
+# (exit 2, empty stdout, and the refusal names the arm it took), and that no
+# output carries the not-a-verdict phrase. No network.
 set -euo pipefail
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/consumer-verdict-annotation.sh"
@@ -33,18 +33,25 @@ expect_line() {
   echo "ok   $name"
 }
 
-# expect_refusal <name> <args...>
+# expect_refusal <name> <stderr substring naming the arm> <args...>
 expect_refusal() {
-  local name="$1"
-  shift
+  local name="$1" arm="$2"
+  shift 2
   cases=$((cases + 1))
-  local got rc=0
-  got="$(bash "$script" "$@" 2>/dev/null)" || rc=$?
+  local got rc=0 err
+  err="$(mktemp)"
+  got="$(bash "$script" "$@" 2>"$err")" || rc=$?
   if [ "$rc" -ne 2 ] || [ -n "$got" ]; then
     echo "FAIL $name: want exit 2 and empty stdout, got rc=$rc stdout='$got'"
-    fails=$((fails + 1))
+    fails=$((fails + 1)); rm -f "$err"
     return
   fi
+  if ! grep -qF -- "$arm" "$err"; then
+    echo "FAIL $name: refusal did not name arm '$arm': $(cat "$err")"
+    fails=$((fails + 1)); rm -f "$err"
+    return
+  fi
+  rm -f "$err"
   echo "ok   $name"
 }
 
@@ -64,23 +71,29 @@ expect_line "checks-red exact line" \
 expect_line "multi-line message is flattened to one line" \
   "::error title=adaptation-awaited qontinui/qontinui-runner#2794@${red_sha} checks-red::a b" \
   checks-red "$repo" 2794 "$red_sha" $'a\nb'
+expect_line "CR and CRLF are flattened too" \
+  "::error title=adaptation-awaited qontinui/qontinui-runner#2794@${red_sha} checks-red::a  b c" \
+  checks-red "$repo" 2794 "$red_sha" $'a\r\nb\rc'
+expect_line "percent is escaped so runner decoding cannot alter the message" \
+  "::error title=adaptation-awaited qontinui/qontinui-runner#2794@${red_sha} checks-red::100%25 done %250A" \
+  checks-red "$repo" 2794 "$red_sha" '100% done %0A'
 
 # --- refusal arms ------------------------------------------------------------
-expect_refusal "wrong arg count" checks-red "$repo" 2794 "$red_sha"
-expect_refusal "reason: the probe's long form" declared-pr-checks-red "$repo" 2794 "$red_sha" m
-expect_refusal "reason: empty" "" "$repo" 2794 "$red_sha" m
-expect_refusal "repo: no owner" checks-red qontinui-runner 2794 "$red_sha" m
-expect_refusal "repo: comma" checks-red "qontinui/qontinui,runner" 2794 "$red_sha" m
-expect_refusal "repo: colon" checks-red "qontinui/qontinui:runner" 2794 "$red_sha" m
-expect_refusal "repo: three segments" checks-red "a/b/c" 2794 "$red_sha" m
-expect_refusal "repo: space" checks-red "qontinui/qontinui runner" 2794 "$red_sha" m
-expect_refusal "repo: not-a-verdict phrase" checks-red "(not a verdict on this PR)" 2794 "$red_sha" m
-expect_refusal "number: not digits" checks-red "$repo" "#2794" "$red_sha" m
-expect_refusal "number: empty" checks-red "$repo" "" "$red_sha" m
-expect_refusal "sha: short" checks-red "$repo" 2794 2c7e9073b m
-expect_refusal "sha: uppercase" checks-red "$repo" 2794 "${red_sha^^}" m
-expect_refusal "sha: 41 hex" checks-red "$repo" 2794 "${red_sha}0" m
-expect_refusal "sha: empty" checks-red "$repo" 2794 "" m
+expect_refusal "wrong arg count" "expected 5 arguments" checks-red "$repo" 2794 "$red_sha"
+expect_refusal "reason: the probe's long form" "is not checks-pending" declared-pr-checks-red "$repo" 2794 "$red_sha" m
+expect_refusal "reason: empty" "is not checks-pending" "" "$repo" 2794 "$red_sha" m
+expect_refusal "repo: no owner" "is not <owner>/<repo>" checks-red qontinui-runner 2794 "$red_sha" m
+expect_refusal "repo: comma" "is not <owner>/<repo>" checks-red "qontinui/qontinui,runner" 2794 "$red_sha" m
+expect_refusal "repo: colon" "is not <owner>/<repo>" checks-red "qontinui/qontinui:runner" 2794 "$red_sha" m
+expect_refusal "repo: three segments" "is not <owner>/<repo>" checks-red "a/b/c" 2794 "$red_sha" m
+expect_refusal "repo: space" "is not <owner>/<repo>" checks-red "qontinui/qontinui runner" 2794 "$red_sha" m
+expect_refusal "repo: not-a-verdict phrase" "is not <owner>/<repo>" checks-red "(not a verdict on this PR)" 2794 "$red_sha" m
+expect_refusal "number: not digits" "is not digits" checks-red "$repo" "#2794" "$red_sha" m
+expect_refusal "number: empty" "is not digits" checks-red "$repo" "" "$red_sha" m
+expect_refusal "sha: short" "is not 40 lowercase hex" checks-red "$repo" 2794 2c7e9073b m
+expect_refusal "sha: uppercase" "is not 40 lowercase hex" checks-red "$repo" 2794 "$(printf '%s' "$red_sha" | tr a-f A-F)" m
+expect_refusal "sha: 41 hex" "is not 40 lowercase hex" checks-red "$repo" 2794 "${red_sha}0" m
+expect_refusal "sha: empty" "is not 40 lowercase hex" checks-red "$repo" 2794 "" m
 
 echo ""
 if [ "$fails" -ne 0 ]; then

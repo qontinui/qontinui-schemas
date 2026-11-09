@@ -16,7 +16,9 @@
 #   owner/repo  over [A-Za-z0-9_.-]
 #   n        the adaptation PR number (digits)
 #   sha      the adaptation head the probe read (40 lowercase hex)
-#   message  free text (newlines are flattened so the output stays one line)
+#   message  free text: newlines are flattened so the output stays one line,
+#            and `%` is escaped to %25 so the runner's workflow-command
+#            decoding (%25 %0D %0A) cannot alter it
 #
 # Refuses with exit 2 and NOTHING on stdout on any malformed input, so a
 # caller's fallback (the untitled line) is what lands and coord reads the red
@@ -48,12 +50,16 @@ esac
 
 title="adaptation-awaited ${repo}#${num}@${sha} ${reason}"
 
+# Defence in depth: the repo/number/sha patterns above already exclude every
+# character these arms test for, so they are unreachable today. They stay so a
+# future loosening of those patterns cannot emit a title coord would misparse.
 case "$title" in
   *,*) refuse "title would contain a comma: $title" ;;
   *:*) refuse "title would contain a colon: $title" ;;
   *"(not a verdict on this PR)"*) refuse "title would carry the not-a-verdict phrase" ;;
 esac
 
+message="${message//%/%25}"
 message="${message//$'\r'/ }"
 message="${message//$'\n'/ }"
 
