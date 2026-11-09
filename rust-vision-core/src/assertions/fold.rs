@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 //! The fold: many three-state verdicts into one.
 //!
-//! One rule, shared by every instrument that rolls verdicts up (vision-audit,
-//! the runner's assert route, the SDK, Spec CI):
+//! One rule for every instrument that rolls verdicts up. vision-audit folds
+//! through it here; the runner, the SDK and Spec CI move onto the same rule in
+//! the later phases of plan
+//! `2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass` and its
+//! sibling plans:
 //!
 //! 1. any [`AssertionOutcome::Failed`] → `failed`;
 //! 2. else any [`AssertionOutcome::Unknown`] → `unknown`;
@@ -18,8 +21,9 @@
 //! same types and the same rule; this crate is MIT and takes no dependency on
 //! the AGPL `qontinui-types`, so the definitions are twinned rather than
 //! shared. The golden vectors in `tests/vectors/outcome-fold/` are run by BOTH
-//! crates (and vendored by the TS twins), so a behavioural drift reddens a
-//! test, and `qontinui-types`' `tests/outcome_fold_vectors.rs` requires the
+//! crates (the SDK's TS twin is to vendor them too, plan Phase 2), so a
+//! behavioural drift reddens a test, and `qontinui-types`'
+//! `tests/outcome_fold_vectors.rs` requires the
 //! region between the `twin:` markers to be byte-identical in both copies, so
 //! a serde or schema drift does too. Collapse the twin into one definition
 //! if the licence split or qontinui-types' publication ever changes.
@@ -155,8 +159,13 @@ pub struct OutcomeCounts {
 }
 
 impl OutcomeCounts {
+    /// Every verdict counted. Saturates at `usize::MAX` instead of
+    /// overflowing: an `OutcomeCounts` can be deserialized on its own, outside
+    /// the checks a [`FoldedOutcome`] runs.
     pub const fn total(&self) -> usize {
-        self.passed + self.failed + self.unknown
+        self.passed
+            .saturating_add(self.failed)
+            .saturating_add(self.unknown)
     }
 }
 
@@ -166,8 +175,9 @@ impl OutcomeCounts {
 /// Only [`fold_outcomes`] builds one, and deserialization re-checks what the
 /// fold guarantees: the outcome is the one the counts imply, an empty fold is
 /// `unknown` with exactly `[no_results]`, and codes are present iff something
-/// was unknown. So a `FoldedOutcome` read off the wire cannot say `passed`
-/// over zero results, or `passed` beside a failure.
+/// was unknown. So a `FoldedOutcome` that Rust deserializes off the wire
+/// cannot say `passed` over zero results, or `passed` beside a failure. The
+/// generated TS and Python bindings carry the shape only, not these checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -334,6 +344,26 @@ pub fn fold_results(results: &[AssertionResult]) -> FoldedOutcome {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// `total()` saturates rather than overflowing: an `OutcomeCounts`
+    /// deserializes on its own, outside `FoldedOutcome`'s checked sum, so a
+    /// wire value can carry counts whose plain sum would overflow (a debug
+    /// build panics on that, a release build wraps).
+    #[test]
+    fn outcome_counts_total_saturates_instead_of_overflowing() {
+        let counts = OutcomeCounts {
+            passed: usize::MAX,
+            failed: 1,
+            unknown: 0,
+        };
+        assert_eq!(counts.total(), usize::MAX);
+        let counts = OutcomeCounts {
+            passed: 1,
+            failed: usize::MAX,
+            unknown: usize::MAX,
+        };
+        assert_eq!(counts.total(), usize::MAX);
+    }
 
     #[test]
     fn empty_is_unknown_no_results_never_passed() {

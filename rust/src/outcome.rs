@@ -34,8 +34,8 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// WHY a producer could not answer. A closed vocabulary: an agent branches on
-/// the code, and the human-readable [`UnknownInfo::detail`] is never the only
-/// carrier of the reason.
+/// the code, and a human-readable detail (`UnknownInfo::detail` in
+/// vision-core) is never the only carrier of the reason.
 ///
 /// Adding a member is a wire change for every consumer (runner, ui-bridge,
 /// ui-bridge-mcp); the diagnostic-code registry name of each is
@@ -195,8 +195,9 @@ impl fmt::Display for UnknownCode {
 /// bug in the page, the second is a gap in the snapshot (or in the caller's
 /// inputs), and only the first should send anyone looking at the UI.
 ///
-/// The bit is kept alongside as the GATE, and every consumer that reads it
-/// keeps its current behaviour: [`AssertionOutcome::Unknown`] is
+/// Where a `passed` bit is kept alongside (vision-core's
+/// `AssertionResult::passed`), it stays the GATE, and every consumer that
+/// reads it keeps its current behaviour: [`AssertionOutcome::Unknown`] is
 /// `passed = false`. That is deliberate and is the safe direction — a
 /// vacuous pass over an un-evaluated assertion is a silent false negative
 /// for exactly the bug the assertion was written to catch.
@@ -361,8 +362,13 @@ pub struct OutcomeCounts {
 }
 
 impl OutcomeCounts {
+    /// Every verdict counted. Saturates at `usize::MAX` instead of
+    /// overflowing: an `OutcomeCounts` can be deserialized on its own, outside
+    /// the checks a [`FoldedOutcome`] runs.
     pub const fn total(&self) -> usize {
-        self.passed + self.failed + self.unknown
+        self.passed
+            .saturating_add(self.failed)
+            .saturating_add(self.unknown)
     }
 }
 
@@ -372,8 +378,9 @@ impl OutcomeCounts {
 /// Only [`fold_outcomes`] builds one, and deserialization re-checks what the
 /// fold guarantees: the outcome is the one the counts imply, an empty fold is
 /// `unknown` with exactly `[no_results]`, and codes are present iff something
-/// was unknown. So a `FoldedOutcome` read off the wire cannot say `passed`
-/// over zero results, or `passed` beside a failure.
+/// was unknown. So a `FoldedOutcome` that Rust deserializes off the wire
+/// cannot say `passed` over zero results, or `passed` beside a failure. The
+/// generated TS and Python bindings carry the shape only, not these checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
@@ -521,6 +528,26 @@ mod tests {
     use super::*;
     use serde_json::{json, Value};
     use std::collections::BTreeSet;
+
+    /// `total()` saturates rather than overflowing: an `OutcomeCounts`
+    /// deserializes on its own, outside `FoldedOutcome`'s checked sum, so a
+    /// wire value can carry counts whose plain sum would overflow (a debug
+    /// build panics on that, a release build wraps).
+    #[test]
+    fn outcome_counts_total_saturates_instead_of_overflowing() {
+        let counts = OutcomeCounts {
+            passed: usize::MAX,
+            failed: 1,
+            unknown: 0,
+        };
+        assert_eq!(counts.total(), usize::MAX);
+        let counts = OutcomeCounts {
+            passed: 1,
+            failed: usize::MAX,
+            unknown: usize::MAX,
+        };
+        assert_eq!(counts.total(), usize::MAX);
+    }
 
     #[test]
     fn unknown_code_is_exactly_the_contract_set() {
