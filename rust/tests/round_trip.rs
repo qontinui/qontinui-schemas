@@ -7455,12 +7455,10 @@ fn state_machine_import_name_optional() {
 // ============================================================================
 
 use qontinui_types::verification::{
-    Confidence, CriterionOverride, CriterionType, DomainAssignment, DomainVerificationResult,
-    ExtendIterationsRequest, Finding as VerificationFinding, IterationVerificationResults,
-    OverrideCollection, StageTransition, SuccessCriterion, TaskCompletionResult,
+    Confidence, CriterionOverride, CriterionType, DomainAssignment, ExtendIterationsRequest,
+    Finding as VerificationFinding, OverrideCollection, StageTransition, SuccessCriterion,
     VerificationAgentContext, VerificationMethod as VerifMethod, VerificationPlan as VerifPlan,
-    VerificationResult as VerifResult, WorkerCoordinationMessage, WorkerDomain, WorkerInstance,
-    WorkerSignal, WorkerStatus,
+    WorkerCoordinationMessage, WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
 };
 
 #[test]
@@ -7785,46 +7783,6 @@ fn confidence_roundtrips_lowercase() {
 }
 
 #[test]
-fn verification_result_roundtrips() {
-    let r = VerifResult {
-        criterion_id: "c1".to_string(),
-        passed: false,
-        criterion_type: CriterionType::Deterministic,
-        confidence: Some(Confidence::High),
-        observations: vec!["Type error in main.rs:42".to_string()],
-        issues: vec!["E0308 mismatched types".to_string()],
-        suggestions: vec!["Convert u32 to i32".to_string()],
-        raw_output: Some("error[E0308]".to_string()),
-    };
-    let json = serde_json::to_string(&r).unwrap();
-    let back: VerifResult = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn iteration_verification_results_roundtrips() {
-    let r = IterationVerificationResults {
-        iteration: 3,
-        deterministic_results: vec![],
-        ai_results: vec![],
-        deterministic_passed: true,
-        ai_passed: true,
-        all_passed: true,
-        failure_summary: None,
-        applied_overrides: vec![],
-        overridden_criteria: vec![],
-    };
-    let json = serde_json::to_string(&r).unwrap();
-    let v: Value = serde_json::from_str(&json).unwrap();
-    // Empty collection fields should be skipped on the wire.
-    assert!(v.get("applied_overrides").is_none());
-    assert!(v.get("overridden_criteria").is_none());
-    assert!(v.get("failure_summary").is_none());
-    let back: IterationVerificationResults = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
 fn criterion_override_roundtrips() {
     let o = CriterionOverride {
         criterion_id: "c1".to_string(),
@@ -7848,60 +7806,6 @@ fn override_collection_default_roundtrips() {
     assert!(v.get("overrides").is_none());
     let back: OverrideCollection = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn task_completion_result_success_roundtrips() {
-    // Internally tagged by `status`.
-    let r = TaskCompletionResult::Success {
-        iterations: 5,
-        findings: vec![],
-        verification_results: IterationVerificationResults {
-            iteration: 5,
-            deterministic_results: vec![],
-            ai_results: vec![],
-            deterministic_passed: true,
-            ai_passed: true,
-            all_passed: true,
-            failure_summary: None,
-            applied_overrides: vec![],
-            overridden_criteria: vec![],
-        },
-    };
-    let json = serde_json::to_string(&r).unwrap();
-    let v: Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["status"], "success");
-    assert_eq!(v["iterations"], 5);
-    let back: TaskCompletionResult = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn task_completion_result_all_variants_roundtrip() {
-    let variants = vec![
-        TaskCompletionResult::Failed {
-            reason: "max iterations".to_string(),
-            iterations: 10,
-            last_results: None,
-            findings: vec![],
-        },
-        TaskCompletionResult::Stopped {
-            at_iteration: 3,
-            findings: vec![],
-            can_resume: true,
-        },
-        TaskCompletionResult::Paused {
-            at_iteration: 10,
-            max_iterations: 10,
-            last_results: None,
-            findings: vec![],
-        },
-    ];
-    for v in variants {
-        let json = serde_json::to_string(&v).unwrap();
-        let back: TaskCompletionResult = serde_json::from_str(&json).unwrap();
-        assert_eq!(json, serde_json::to_string(&back).unwrap());
-    }
 }
 
 #[test]
@@ -7949,22 +7853,6 @@ fn extend_iterations_request_roundtrips() {
         v2.get("guidance").is_none(),
         "None guidance must be skipped"
     );
-}
-
-#[test]
-fn domain_verification_result_roundtrips() {
-    let d = DomainVerificationResult {
-        domain_id: "frontend".to_string(),
-        worker_ids: vec!["w1".to_string()],
-        results: vec![],
-        all_passed: true,
-        failure_summary: None,
-    };
-    let json = serde_json::to_string(&d).unwrap();
-    let v: Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("failure_summary").is_none());
-    let back: DomainVerificationResult = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 
 // ============================================================================

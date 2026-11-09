@@ -2,15 +2,19 @@
 //!
 //! Wire-format types for the orchestrator's planning → execution → verification
 //! pipeline: success criteria, verification plans, worker instances and their
-//! signals, findings, iteration-level verification results, criterion overrides,
-//! and the task-completion envelope.
+//! signals, findings, criterion overrides, and stage transitions.
+//!
+//! The orchestrator verifier's result DTOs (`VerificationResult`,
+//! `DomainVerificationResult`, `IterationVerificationResults`,
+//! `TaskCompletionResult`) were deleted with that verifier: no production path
+//! in any consumer filled them. The product's verification contract is
+//! `crate::task_run` (`VerificationPhaseResult` and its responses).
 //!
 //! These types are a port of the shape-bearing portion of
 //! `qontinui-runner/src-tauri/src/orchestrator/types.rs`. Behavior
 //! (constructors that stamp timestamps, parsers that extract signals from AI
-//! output text, override-application logic, feedback-string builders) stays in
-//! the runner — this crate is data-only. The runner exposes behavior via
-//! extension traits in `orchestrator::types`.
+//! output text) stays in the runner — this crate is data-only. The runner
+//! exposes behavior via extension traits in `orchestrator::types`.
 //!
 //! Wire-format notes:
 //! - Dates/times are ISO 8601 `String`s (see crate-level docs).
@@ -22,8 +26,6 @@
 //! - `WorkerSignal` uses `{ "signal": ..., "data": ... }` as its discriminator
 //!   pair — `signal` rather than `type` to avoid collision with other tagged
 //!   unions and to match the pre-extraction wire.
-//! - `TaskCompletionResult` uses `{ "status": ..., ... }` with the variant
-//!   fields inlined (internally tagged).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -426,36 +428,6 @@ pub enum WorkerCoordinationMessage {
     },
 }
 
-/// Result of domain-scoped verification.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
-pub struct DomainVerificationResult {
-    /// Domain that was verified.
-    #[serde(alias = "domain_id")]
-    pub domain_id: String,
-
-    /// Workers that contributed to this domain.
-    #[serde(alias = "worker_ids")]
-    pub worker_ids: Vec<String>,
-
-    /// Verification results for domain-specific criteria.
-    #[serde(alias = "results")]
-    pub results: Vec<VerificationResult>,
-
-    /// Whether all domain criteria passed.
-    #[serde(alias = "all_passed")]
-    pub all_passed: bool,
-
-    /// Summary of any failures.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "failure_summary"
-    )]
-    pub failure_summary: Option<String>,
-}
-
 // ============================================================================
 // Worker signals & findings
 // ============================================================================
@@ -544,100 +516,8 @@ pub enum Confidence {
 }
 
 // ============================================================================
-// Verification results
+// Verification agent context & iteration control
 // ============================================================================
-
-/// Result of a single verification check.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
-pub struct VerificationResult {
-    /// The criterion that was checked.
-    #[serde(alias = "criterion_id")]
-    pub criterion_id: String,
-
-    /// Whether the check passed.
-    #[serde(alias = "passed")]
-    pub passed: bool,
-
-    /// Type of verification performed.
-    #[serde(alias = "criterion_type")]
-    pub criterion_type: CriterionType,
-
-    /// Confidence level (for AI verification).
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "confidence")]
-    pub confidence: Option<Confidence>,
-
-    /// What was observed.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "observations")]
-    pub observations: Vec<String>,
-
-    /// Issues found (if failed).
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "issues")]
-    pub issues: Vec<String>,
-
-    /// Suggestions for fixing (if failed).
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "suggestions")]
-    pub suggestions: Vec<String>,
-
-    /// Raw output / details, e.g., captured command output.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "raw_output")]
-    pub raw_output: Option<String>,
-}
-
-/// Aggregated verification results for a single iteration.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
-pub struct IterationVerificationResults {
-    /// Iteration number.
-    #[serde(alias = "iteration")]
-    pub iteration: u32,
-
-    /// Deterministic verification results.
-    #[serde(alias = "deterministic_results")]
-    pub deterministic_results: Vec<VerificationResult>,
-
-    /// AI verification results (empty if skipped).
-    #[serde(alias = "ai_results")]
-    pub ai_results: Vec<VerificationResult>,
-
-    /// Whether all required deterministic checks passed.
-    #[serde(alias = "deterministic_passed")]
-    pub deterministic_passed: bool,
-
-    /// Whether all required AI checks passed (true if no AI criteria).
-    #[serde(alias = "ai_passed")]
-    pub ai_passed: bool,
-
-    /// Overall pass/fail.
-    #[serde(alias = "all_passed")]
-    pub all_passed: bool,
-
-    /// Human-readable summary of failures.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "failure_summary"
-    )]
-    pub failure_summary: Option<String>,
-
-    /// Criterion overrides applied in this iteration.
-    #[serde(
-        default,
-        skip_serializing_if = "Vec::is_empty",
-        alias = "applied_overrides"
-    )]
-    pub applied_overrides: Vec<CriterionOverride>,
-
-    /// Criteria that failed but were accepted due to overrides.
-    #[serde(
-        default,
-        skip_serializing_if = "Vec::is_empty",
-        alias = "overridden_criteria"
-    )]
-    pub overridden_criteria: Vec<String>,
-}
 
 /// Context passed to the verification agent (intentionally limited — does not
 /// include work history, to avoid biasing AI evaluation).
@@ -720,66 +600,8 @@ pub struct OverrideCollection {
 }
 
 // ============================================================================
-// Task completion & stage tracking
+// Stage tracking
 // ============================================================================
-
-/// Task-completion result.
-///
-/// Internally tagged by `status`: the variant fields are inlined alongside the
-/// discriminator rather than nested under a `data` key.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "status")]
-pub enum TaskCompletionResult {
-    /// Task completed successfully.
-    #[serde(rename = "success")]
-    Success {
-        /// Number of iterations used.
-        iterations: u32,
-        /// Findings accumulated during the run.
-        findings: Vec<Finding>,
-        /// Final verification results.
-        verification_results: IterationVerificationResults,
-    },
-
-    /// Task failed (max iterations or unrecoverable error).
-    #[serde(rename = "failed")]
-    Failed {
-        /// Human-readable reason for the failure.
-        reason: String,
-        /// Number of iterations attempted.
-        iterations: u32,
-        /// Last verification results (if any).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        last_results: Option<IterationVerificationResults>,
-        /// Findings accumulated during the run.
-        findings: Vec<Finding>,
-    },
-
-    /// Task stopped by user or system.
-    #[serde(rename = "stopped")]
-    Stopped {
-        /// Iteration at which the task was stopped.
-        at_iteration: u32,
-        /// Findings accumulated up to the stop.
-        findings: Vec<Finding>,
-        /// Whether the task can be resumed from this point.
-        can_resume: bool,
-    },
-
-    /// Task paused at max iterations, awaiting user decision.
-    #[serde(rename = "paused")]
-    Paused {
-        /// Iteration at which the task paused.
-        at_iteration: u32,
-        /// The max-iteration limit that triggered the pause.
-        max_iterations: u32,
-        /// Last verification results (if any).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        last_results: Option<IterationVerificationResults>,
-        /// Findings accumulated up to the pause.
-        findings: Vec<Finding>,
-    },
-}
 
 /// A record of a stage transition during task execution.
 ///
