@@ -277,4 +277,35 @@ mod tests {
         let back = serde_json::to_value(&runner).unwrap();
         assert_eq!(back["instances"], json["instances"]);
     }
+
+    fn crash_json_without_pid() -> serde_json::Value {
+        serde_json::json!({
+            "filePath": "C:/dumps/crash.json",
+            "panicMessage": "boom",
+            "panicLocation": "src/main.rs:1",
+            "thread": "main",
+            "reportedAt": "2026-11-08T00:00:00Z"
+        })
+    }
+
+    /// A dump that recorded no pid (and every runner predating
+    /// qontinui-runner#2551) omits `pid`; it must read as `None` and be
+    /// omitted again on the way out rather than serialized as `null`.
+    #[test]
+    fn runner_crash_without_pid_round_trips_with_the_key_absent() {
+        let json = crash_json_without_pid();
+        let crash: RunnerCrash = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(crash.pid, None);
+        assert_eq!(serde_json::to_value(&crash).unwrap(), json);
+    }
+
+    /// Pins the wire key `pid` the runner stamps on `recent_crash`.
+    #[test]
+    fn runner_crash_with_pid_round_trips() {
+        let mut json = crash_json_without_pid();
+        json["pid"] = serde_json::json!(4242);
+        let crash: RunnerCrash = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(crash.pid, Some(4242));
+        assert_eq!(serde_json::to_value(&crash).unwrap(), json);
+    }
 }
