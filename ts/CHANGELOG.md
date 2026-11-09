@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v3.0.0...ts-v3.1.0) (2026-11-09)
+
+
+### Features
+
+* **refusal:** regenerate bindings for request_access ([3e6c0ff](https://github.com/qontinui/qontinui-schemas/commit/3e6c0fffc2f43f9078ffe62ae5b8ea9e8ff14843))
+* **schemas:** RunnerCrash carries the crashed process's pid ([dfe1964](https://github.com/qontinui/qontinui-schemas/commit/dfe19640728b484b298ecfa1ab11e26b04c2ef8d))
+* **terminal:** TerminalLayout wire type for the runner's GET /terminal-layout ([f6c2016](https://github.com/qontinui/qontinui-schemas/commit/f6c20161c931c4be61f2bac09af308e7e6144db0))
+
 ## [3.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v2.5.0...ts-v3.0.0) (2026-11-08)
 
 

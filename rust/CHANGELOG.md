@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.0.0...rust-v6.1.0) (2026-11-09)
+
+
+### Features
+
+* **refusal:** add request_access next-action kind ([cfea2b8](https://github.com/qontinui/qontinui-schemas/commit/cfea2b88430591186b50b2b6e2e4e381ef649824))
+* **schemas:** RunnerCrash carries the crashed process's pid ([dfe1964](https://github.com/qontinui/qontinui-schemas/commit/dfe19640728b484b298ecfa1ab11e26b04c2ef8d))
+* **terminal:** TerminalLayout wire type for the runner's GET /terminal-layout ([f6c2016](https://github.com/qontinui/qontinui-schemas/commit/f6c20161c931c4be61f2bac09af308e7e6144db0))
+
 ## [6.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v5.0.1...rust-v6.0.0) (2026-11-08)
 
 
