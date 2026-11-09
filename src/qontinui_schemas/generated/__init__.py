@@ -222,8 +222,6 @@ from .per_type.helper_task_payload import HelperTaskPayload
 from .per_type.helper_task_source import HelperTaskSource
 from .per_type.helper_task_status import HelperTaskStatus
 from .per_type.helper_verdict import HelperVerdict
-from .per_type.historical_action_query import HistoricalActionQuery
-from .per_type.historical_action_result import HistoricalActionResult
 from .per_type.http_config import HttpConfig
 from .per_type.http_method import HttpMethod
 from .per_type.idle_condition import IdleCondition
@@ -353,7 +351,6 @@ from .per_type.pathfinding_step import PathfindingStep
 from .per_type.pattern_options import PatternOptions
 from .per_type.pending_question import PendingQuestion
 from .per_type.pipeline_config import PipelineConfig
-from .per_type.playback_frame_request import PlaybackFrameRequest
 from .per_type.playwright_execution_mode import PlaywrightExecutionMode
 from .per_type.point import Point
 from .per_type.policy_conjunct import PolicyConjunct
@@ -852,8 +849,6 @@ __all__ = [
     "HelperTaskSource",
     "HelperTaskStatus",
     "HelperVerdict",
-    "HistoricalActionQuery",
-    "HistoricalActionResult",
     "HttpConfig",
     "HttpMethod",
     "IdleCondition",
@@ -983,7 +978,6 @@ __all__ = [
     "PatternOptions",
     "PendingQuestion",
     "PipelineConfig",
-    "PlaybackFrameRequest",
     "PlaywrightExecutionMode",
     "Point",
     "PolicyConjunct",
