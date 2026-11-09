@@ -133,7 +133,6 @@ from .per_type.discovery_transition_trigger import DiscoveryTransitionTrigger
 from .per_type.display_node import DisplayNode
 from .per_type.domain_assignment import DomainAssignment
 from .per_type.domain_knowledge import DomainKnowledge
-from .per_type.domain_verification_result import DomainVerificationResult
 from .per_type.ears_pattern import EarsPattern
 from .per_type.edge_timing import EdgeTiming
 from .per_type.effect_check_step import EffectCheckStep
@@ -251,7 +250,6 @@ from .per_type.issue_source import IssueSource
 from .per_type.issue_status import IssueStatus
 from .per_type.issue_type import IssueType
 from .per_type.iteration_result import IterationResult
-from .per_type.iteration_verification_results import IterationVerificationResults
 from .per_type.job_item import JobItem
 from .per_type.job_list_response import JobListResponse
 from .per_type.job_status import JobStatus
@@ -506,7 +504,6 @@ from .per_type.structured_signal import StructuredSignal
 from .per_type.success_criterion import SuccessCriterion
 from .per_type.summarization_config import SummarizationConfig
 from .per_type.target_config import TargetConfig
-from .per_type.task_completion_result import TaskCompletionResult
 from .per_type.task_execution_record import TaskExecutionRecord
 from .per_type.task_run import TaskRun
 from .per_type.task_run_backend import TaskRunBackend
@@ -599,7 +596,6 @@ from .per_type.verification_category_kind import VerificationCategoryKind
 from .per_type.verification_method import VerificationMethod
 from .per_type.verification_phase_result import VerificationPhaseResult
 from .per_type.verification_plan import VerificationPlan
-from .per_type.verification_result import VerificationResult
 from .per_type.verification_result_response import VerificationResultResponse
 from .per_type.verification_results_list_response import VerificationResultsListResponse
 from .per_type.verification_step_details import VerificationStepDetails
@@ -763,7 +759,6 @@ __all__ = [
     "DisplayNode",
     "DomainAssignment",
     "DomainKnowledge",
-    "DomainVerificationResult",
     "EarsPattern",
     "EdgeTiming",
     "EffectCheckStep",
@@ -881,7 +876,6 @@ __all__ = [
     "IssueStatus",
     "IssueType",
     "IterationResult",
-    "IterationVerificationResults",
     "JobItem",
     "JobListResponse",
     "JobStatus",
@@ -1136,7 +1130,6 @@ __all__ = [
     "SuccessCriterion",
     "SummarizationConfig",
     "TargetConfig",
-    "TaskCompletionResult",
     "TaskExecutionRecord",
     "TaskRun",
     "TaskRunBackend",
@@ -1229,7 +1222,6 @@ __all__ = [
     "VerificationMethod",
     "VerificationPhaseResult",
     "VerificationPlan",
-    "VerificationResult",
     "VerificationResultResponse",
     "VerificationResultsListResponse",
     "VerificationStepDetails",
