@@ -51,8 +51,6 @@ from qontinui_schemas.api.execution import (
     ExecutionTrendDataPoint,
     ExecutionTrendResponse,
     ExecutionWorkflowMetadata,
-    HistoricalActionQuery,
-    HistoricalActionResult,
     IssueSeverity,
     IssueSource,
     IssueStatus,
@@ -60,7 +58,6 @@ from qontinui_schemas.api.execution import (
     LLMCostSummary,
     LLMMetrics,
     ModelCostBreakdown,
-    PlaybackFrameRequest,
     RunnerMetadata,
     RunStatus,
     RunType,
@@ -69,7 +66,7 @@ from qontinui_schemas.api.execution import (
 from qontinui_schemas.api.execution import Pagination as ExecutionPagination
 from qontinui_schemas.api.execution import (
     # Enums; Metadata; Execution Run; Action Execution;
-    # Screenshot; Issue; Analytics; Historical Playback; Pagination
+    # Screenshot; Issue; Analytics; Pagination
     ScreenshotType as ExecutionScreenshotType,
 )
 from qontinui_schemas.api.feedback import (
@@ -207,10 +204,6 @@ __all__ = [
     "ExecutionTrendResponse",
     "CostTrendDataPoint",
     "CostTrendResponse",
-    # Historical Playback
-    "HistoricalActionQuery",
-    "HistoricalActionResult",
-    "PlaybackFrameRequest",
     "ExecutionPagination",
     # ==========================================================================
     # RAG API

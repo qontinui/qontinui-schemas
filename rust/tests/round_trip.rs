@@ -4191,9 +4191,8 @@ use qontinui_types::execution::{
     ActionReliabilityStats, CostTrendDataPoint, CostTrendResponse, ExecutionIssueBatch,
     ExecutionIssueBatchResponse, ExecutionIssueDetail, ExecutionIssueListResponse,
     ExecutionIssueUpdate, ExecutionRunDetail, ExecutionRunListResponse, ExecutionTrendDataPoint,
-    ExecutionTrendResponse, HistoricalActionQuery, HistoricalActionResult, IssueSource,
-    IssueStatus, IssueType, LLMCostSummary, ModelCostBreakdown, PlaybackFrameRequest,
-    VisualComparisonResult,
+    ExecutionTrendResponse, IssueSource, IssueStatus, IssueType, LLMCostSummary,
+    ModelCostBreakdown, VisualComparisonResult,
 };
 use qontinui_types::task_run::Pagination as TrPagination;
 
@@ -4604,61 +4603,6 @@ fn cost_trend_response_roundtrips() {
     let back: CostTrendResponse = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&back).expect("re-serialize");
     assert_json_values_equal(&json1, &json2);
-}
-
-#[test]
-fn historical_action_query_roundtrips() {
-    let q = HistoricalActionQuery {
-        action_type: Some(ExecActionType::Click),
-        action_name: Some("Click Submit".to_string()),
-        state_name: None,
-        success_only: true,
-        project_id: Some("p-1".to_string()),
-        workflow_id: Some("wf-login".to_string()),
-        limit: 25,
-    };
-    let json1 = serde_json::to_string(&q).expect("serialize");
-    let v: Value = serde_json::from_str(&json1).expect("parse");
-    assert_eq!(v["actionType"], "click");
-    assert_eq!(v["successOnly"], true);
-    let back: HistoricalActionQuery = serde_json::from_str(&json1).expect("deserialize");
-    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
-}
-
-#[test]
-fn historical_action_result_roundtrips() {
-    let mut inp = HashMap::new();
-    inp.insert("x".to_string(), json!(10));
-    let mut out = HashMap::new();
-    out.insert("clicked".to_string(), json!(true));
-    let r = HistoricalActionResult {
-        id: "a-1".to_string(),
-        action_type: ExecActionType::Click,
-        action_name: "Click".to_string(),
-        status: ActionStatus::Success,
-        from_state: Some("form".to_string()),
-        to_state: Some("submitted".to_string()),
-        input_data: inp,
-        output_data: out,
-        duration_ms: 120,
-        screenshot_url: Some("https://example.com/s.png".to_string()),
-        has_screenshot: true,
-    };
-    let json1 = serde_json::to_string(&r).expect("serialize");
-    let back: HistoricalActionResult = serde_json::from_str(&json1).expect("deserialize");
-    let json2 = serde_json::to_string(&back).expect("re-serialize");
-    assert_json_values_equal(&json1, &json2);
-}
-
-#[test]
-fn playback_frame_request_roundtrips() {
-    let r = PlaybackFrameRequest {
-        action_ids: vec!["a-1".to_string(), "a-2".to_string(), "a-3".to_string()],
-        include_screenshots: false,
-    };
-    let json1 = serde_json::to_string(&r).expect("serialize");
-    let back: PlaybackFrameRequest = serde_json::from_str(&json1).expect("deserialize");
-    assert_eq!(json1, serde_json::to_string(&back).expect("re-serialize"));
 }
 
 // ============================================================================
