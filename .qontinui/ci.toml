@@ -92,10 +92,12 @@
 #    that reads the PULL REQUEST's commits. This lane dispatches a SHA; there is
 #    no pull request in scope and no Action runtime to host.
 #
-# 4. secret-scan.yml — its gitleaks step is `curl … | tar -xz` (a pipe, banned
-#    in argv) and then scopes the scan with
-#    `--log-opts=<base.sha>..<head.sha>` taken from the pull_request event
-#    context, which this lane does not have. Note candidate-ci.yml already
+# 4. secret-scan.yml —
+#    its gitleaks fetch (.github/scripts/fetch-gitleaks.sh) downloads a pinned
+#    linux_x64 tarball from github.com at run time (gitleaks is not in the
+#    ci_node tool registry), and its scan step then scopes the scan with
+#    `--log-opts=<base.sha>..<head.sha>` from the pull_request event context,
+#    which this lane does not have. Note candidate-ci.yml already
 #    records that this check "is empty off a PR (would fail)".
 #
 # 5. publish.yml, publish-rust.yml, release-please.yml — tag/release lanes, not
