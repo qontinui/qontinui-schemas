@@ -6,7 +6,6 @@
  */
 
 import type { AssertionMiss } from "./AssertionMiss";
-import type { AssertionOutcome } from "./AssertionOutcome";
 import type { AssertionResult } from "./AssertionResult";
 import type { AssertionSeverityCounts } from "./AssertionSeverityCounts";
 import type { BridgeFingerprint } from "./BridgeFingerprint";
@@ -20,12 +19,14 @@ import type { MissReason } from "./MissReason";
 import type { ProvenanceMix } from "./ProvenanceMix";
 import type { RecommendedState } from "./RecommendedState";
 import type { SectionVerdict } from "./SectionVerdict";
+import type { SpecAssertionVerdict } from "./SpecAssertionVerdict";
 import type { SpecCheckConfidence } from "./SpecCheckConfidence";
 import type { SpecCheckResult } from "./SpecCheckResult";
 import type { SpecCheckSummary } from "./SpecCheckSummary";
 import type { SpecProvenance } from "./SpecProvenance";
 import type { SpecSection } from "./SpecSection";
 import type { StateMatchResult } from "./StateMatchResult";
+import type { UnknownCode } from "./UnknownCode";
 
 /**
  * The output of the test-phase verify subtask: how completely a generated
