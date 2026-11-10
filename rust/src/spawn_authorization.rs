@@ -38,12 +38,15 @@
 //! - A class row that is deliberately NOT seeded records `seeded: false` **and
 //!   a `reason`** ([`ClassSeed`]). An omission expressed as an absent literal
 //!   is invisible; expressed as data, a test can assert on it.
-//! - **Every key is declared.** All three types are `deny_unknown_fields`, so
+//! - **Every key is declared.** All four types are `deny_unknown_fields`, so
 //!   a key this module does not know fails the PARSE rather than being
 //!   silently dropped. A hopeful `"disposition"` on a row type that has none
 //!   would otherwise read as set and behave as absent — the 2026-08-03 shape,
 //!   one level down. Adding a field to the JSON therefore means adding it here
 //!   in the same change; that coupling is deliberate.
+//! - A name the RUNNER authorizes a spawn under by name goes in
+//!   `runner_keys` ([`RunnerKey`]), NEVER in `kind_seeds`: kind seeds are rows
+//!   coord seeds, and runner keys must never be seeded.
 //! - Adding a spawn path or disposition is a vocabulary change: the DB columns
 //!   are deliberately `CHECK`-free (`agent_registry.rs`'s
 //!   "Vocabulary lives in Rust, not the DB", citing coord's
@@ -71,7 +74,7 @@ pub const CONTRACT_JSON: &str = include_str!("spawn_authorization.json");
 
 /// One coord-initiated spawn KIND: a concrete reason coord starts an agent.
 ///
-/// `deny_unknown_fields`, here and on the two types below, because serde's
+/// `deny_unknown_fields`, here and on the types below, because serde's
 /// default is to DROP a key it does not recognize. In an artifact whose whole
 /// premise is that nothing silently disagrees, a mistyped or hopeful key
 /// (`"dispostion"`, or a `"disposition"` on a row type that has none) would
@@ -99,6 +102,57 @@ pub struct ClassSeed {
     /// Required when `seeded` is false; `None` when it is true.
     pub reason: Option<String>,
     pub purpose: String,
+}
+
+/// A name the RUNNER authorizes a spawn under BY NAME — declared, never
+/// seeded.
+///
+/// The runner passes a literal registry key to `authorize_spawn` at a handful
+/// of call sites (`Some("runner-instance")`, the `/sessions/spawn` roles, …),
+/// and its `most_restrictive_disable` vetoes the spawn whenever ANY disabled
+/// registry row carries that name, whatever the row's class. So a row of one
+/// of these names is load-bearing even though no `.claude/agents/<name>.md`
+/// defines it, and a "definition-less row" sweep that disabled it would stop
+/// every spawn authorized under the key.
+///
+/// Declared here so the narrowing-only retire doors — coord's
+/// `POST /coord/agent-registry/retire` and the web seeder's
+/// `--retire-orphans` — read one list and REFUSE such a row rather than
+/// disable it.
+///
+/// **Never seeded**, which is why this is not a [`KindSeed`]: seeding an
+/// enabled row named after the key would let that row govern the spawn
+/// outright (the runner's `lookup_row` step 1), so a class-level disable —
+/// e.g. of `in_session_subagent` — would stop reaching it. Declaring a key
+/// therefore changes no authorization decision. [`validate`] keeps the two
+/// lists disjoint.
+///
+/// [`validate`]: SpawnAuthorizationContract::validate
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunnerKey {
+    /// The registry key, in coord's `validate_agent_name` grammar.
+    pub agent_name: String,
+    /// The `SpawnPath` the runner passes alongside the key at its call site.
+    pub spawn_path: String,
+    /// Where in `qontinui-runner` the key is authorized — what a guard test
+    /// there pins in both directions.
+    pub call_site: String,
+    pub purpose: String,
+}
+
+/// The longest `agent_name` coord's `validate_agent_name` admits.
+const MAX_AGENT_NAME_LEN: usize = 64;
+
+/// Coord's registry-name grammar (`validate_agent_name`): 1..=64 characters of
+/// `[a-z0-9_-]`. A runner key outside it could never be stored as a row, so
+/// declaring it would protect nothing and read as if it did.
+fn is_registry_agent_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= MAX_AGENT_NAME_LEN
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
 /// The whole contract.
@@ -151,6 +205,11 @@ pub struct SpawnAuthorizationContract {
     pub max_snapshot_age_secs: u64,
     pub kind_seeds: Vec<KindSeed>,
     pub class_seeds: Vec<ClassSeed>,
+    /// The runner's by-name spawn keys. Declared, NEVER seeded — see
+    /// [`RunnerKey`]. Not part of [`seeded_keys`].
+    ///
+    /// [`seeded_keys`]: SpawnAuthorizationContract::seeded_keys
+    pub runner_keys: Vec<RunnerKey>,
 }
 
 impl SpawnAuthorizationContract {
@@ -344,6 +403,69 @@ impl SpawnAuthorizationContract {
         for (name, path) in self.seeded_keys() {
             if !seen.insert((name.clone(), path.clone())) {
                 return Err(format!("duplicate seeded key ({name}, {path})"));
+            }
+        }
+        self.validate_runner_keys()
+    }
+
+    /// The [`RunnerKey`] arm of [`validate`](Self::validate).
+    fn validate_runner_keys(&self) -> Result<(), String> {
+        let mut seen = std::collections::HashSet::new();
+        for k in &self.runner_keys {
+            if k.agent_name.trim().is_empty() {
+                return Err("a runner key has a blank agent_name".into());
+            }
+            for (field, value) in [
+                ("spawn_path", &k.spawn_path),
+                ("call_site", &k.call_site),
+                ("purpose", &k.purpose),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(format!("runner key `{}` has a blank {field}", k.agent_name));
+                }
+            }
+            if !is_registry_agent_name(&k.agent_name) {
+                return Err(format!(
+                    "runner key `{}` is outside the registry agent_name grammar \
+                     (1..={MAX_AGENT_NAME_LEN} chars of [a-z0-9_-]) — no row could \
+                     ever carry it, so declaring it protects nothing",
+                    k.agent_name
+                ));
+            }
+            if !self.is_spawn_path(&k.spawn_path) {
+                return Err(format!(
+                    "runner key `{}` declares unknown spawn_path `{}`",
+                    k.agent_name, k.spawn_path
+                ));
+            }
+            if !seen.insert(k.agent_name.as_str()) {
+                return Err(format!("runner key `{}` is declared twice", k.agent_name));
+            }
+            // A runner key is declared and NEVER seeded. One that is also a
+            // kind seed would be seeded after all, and an enabled seeded row
+            // governs the spawn outright, out of reach of a class disable.
+            if self.kind_seeds.iter().any(|s| s.agent_name == k.agent_name) {
+                return Err(format!(
+                    "runner key `{}` is also a kind_seeds agent_name — runner \
+                     keys are never seeded, and a seeded row of that name would \
+                     govern the spawn outright",
+                    k.agent_name
+                ));
+            }
+            // Class rows key as (spawn_path, spawn_path), so a runner key named
+            // after a path (or a class seed's path) IS that class row.
+            if self.is_spawn_path(&k.agent_name)
+                || self
+                    .class_seeds
+                    .iter()
+                    .any(|c| c.spawn_path == k.agent_name)
+            {
+                return Err(format!(
+                    "runner key `{}` is named after a spawn_path / class seed; \
+                     class rows key as (spawn_path, spawn_path), so the key would \
+                     be that class row",
+                    k.agent_name
+                ));
             }
         }
         Ok(())
@@ -688,6 +810,127 @@ mod tests {
             "class rows key as (spawn_path, spawn_path), so a kind named after a \
              path is indistinguishable from that path's class row"
         );
+    }
+
+    /// The runner's five by-name spawn keys are declared — and NOT seeded.
+    #[test]
+    fn the_runner_keys_are_declared_and_unseeded() {
+        let c = contract();
+        let names: Vec<&str> = c
+            .runner_keys
+            .iter()
+            .map(|k| k.agent_name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "runner-instance",
+                "orchestration-fix-agent",
+                "auto-review",
+                "summarize-session",
+                "implement-plan",
+            ]
+        );
+        let path = |n: &str| {
+            c.runner_keys
+                .iter()
+                .find(|k| k.agent_name == n)
+                .map(|k| k.spawn_path.as_str())
+                .unwrap()
+        };
+        // The SpawnPath each runner call site passes beside the key.
+        assert_eq!(path("runner-instance"), "in_session_subagent");
+        assert_eq!(path("orchestration-fix-agent"), "in_session_subagent");
+        for role in ["auto-review", "summarize-session", "implement-plan"] {
+            assert_eq!(path(role), "standing_continuation");
+        }
+        let seeded: Vec<String> = c.seeded_keys().into_iter().map(|(n, _)| n).collect();
+        for n in names {
+            assert!(
+                !seeded.iter().any(|s| s == n),
+                "runner key `{n}` must never be seeded"
+            );
+        }
+    }
+
+    fn runner_key_err(mutate: impl FnOnce(&mut SpawnAuthorizationContract)) -> String {
+        let mut c = valid();
+        mutate(&mut c);
+        c.validate()
+            .expect_err("the mutated contract must be refused")
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_with_a_blank_name() {
+        let e = runner_key_err(|c| c.runner_keys[0].agent_name = "  ".into());
+        assert!(e.contains("blank agent_name"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_with_a_blank_field() {
+        for field in ["spawn_path", "call_site", "purpose"] {
+            let e = runner_key_err(|c| {
+                let k = &mut c.runner_keys[0];
+                match field {
+                    "spawn_path" => k.spawn_path = " ".into(),
+                    "call_site" => k.call_site = String::new(),
+                    _ => k.purpose = "\t".into(),
+                }
+            });
+            assert!(e.contains(&format!("blank {field}")), "{field}: {e}");
+        }
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_outside_the_registry_grammar() {
+        // The looping supervisor's display-name shape: no row can carry it.
+        for bad in ["Merge Shepherd", "runner.instance", "RUNNER-INSTANCE"] {
+            let e = runner_key_err(|c| c.runner_keys[0].agent_name = bad.into());
+            assert!(e.contains("registry agent_name grammar"), "{bad}: {e}");
+        }
+        let long = "a".repeat(MAX_AGENT_NAME_LEN + 1);
+        let e = runner_key_err(|c| c.runner_keys[0].agent_name = long);
+        assert!(e.contains("registry agent_name grammar"), "{e}");
+        // The boundary itself is admitted.
+        let mut c = valid();
+        c.runner_keys[0].agent_name = "a".repeat(MAX_AGENT_NAME_LEN);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_on_an_unknown_path() {
+        let e = runner_key_err(|c| c.runner_keys[0].spawn_path = "not_a_path".into());
+        assert!(e.contains("unknown spawn_path"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_duplicate_runner_key() {
+        let e = runner_key_err(|c| {
+            let dup = c.runner_keys[0].clone();
+            c.runner_keys.push(dup);
+        });
+        assert!(e.contains("declared twice"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_that_is_also_a_kind_seed() {
+        let e = runner_key_err(|c| {
+            let k = &c.kind_seeds[0];
+            let (name, path) = (k.agent_name.clone(), k.spawn_path.clone());
+            c.runner_keys[0].agent_name = name;
+            c.runner_keys[0].spawn_path = path;
+        });
+        assert!(e.contains("also a kind_seeds agent_name"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_runner_key_named_after_a_spawn_path() {
+        // Every class seed's path is a spawn_path (validated above), so this
+        // covers both: a runner key IS the class row it is named after.
+        for path in valid().spawn_paths {
+            let e = runner_key_err(|c| c.runner_keys[0].agent_name = path.clone());
+            assert!(e.contains("named after a spawn_path"), "{path}: {e}");
+        }
     }
 
     #[test]

@@ -90,5 +90,37 @@
       "reason": null,
       "purpose": "Class-level opt-in for every coord-initiated spawn that outlives the request. Resolved by runner funnel sites that carry no agent name (a gate continuation carries a gate_id, not an agent); disabling it stops ALL standing spawns on devices that reach this door."
     }
+  ],
+  "runner_keys": [
+    {
+      "agent_name": "runner-instance",
+      "spawn_path": "in_session_subagent",
+      "call_site": "qontinui-runner src-tauri/src/mcp/misc.rs authorize_spawn(Some(\"runner-instance\"))",
+      "purpose": "The key the runner authorizes a runner-instance spawn (a secondary runner process, not an agent session) under, so instance management can be re-enabled separately from AI subagents. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
+    },
+    {
+      "agent_name": "orchestration-fix-agent",
+      "spawn_path": "in_session_subagent",
+      "call_site": "qontinui-runner src-tauri/src/orchestration_loop/fix_agent.rs authorize_spawn(Some(\"orchestration-fix-agent\"))",
+      "purpose": "The key the runner authorizes an orchestration loop's one-shot `claude --print` fix agent under. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
+    },
+    {
+      "agent_name": "auto-review",
+      "spawn_path": "standing_continuation",
+      "call_site": "qontinui-runner src-tauri/src/mcp/sessions.rs role_slash_command arm, authorized as req.role on POST /sessions/spawn",
+      "purpose": "The `/sessions/spawn` role that dispatches `/auto-review`; the role is the registry key the spawn is authorized under. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
+    },
+    {
+      "agent_name": "summarize-session",
+      "spawn_path": "standing_continuation",
+      "call_site": "qontinui-runner src-tauri/src/mcp/sessions.rs role_slash_command arm, authorized as req.role on POST /sessions/spawn",
+      "purpose": "The `/sessions/spawn` role that dispatches `/summarize-session`; the role is the registry key the spawn is authorized under. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
+    },
+    {
+      "agent_name": "implement-plan",
+      "spawn_path": "standing_continuation",
+      "call_site": "qontinui-runner src-tauri/src/mcp/sessions.rs role_slash_command arm, authorized as req.role on POST /sessions/spawn",
+      "purpose": "The `/sessions/spawn` role that dispatches `/implement-plan`; the role is the registry key the spawn is authorized under. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
+    }
   ]
 }
