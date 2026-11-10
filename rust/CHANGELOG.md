@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.1.0...rust-v6.2.0) (2026-11-10)
+
+
+### Features
+
+* **spawn-contract:** declare the runner's by-name spawn keys as unseeded runner_keys ([9377410](https://github.com/qontinui/qontinui-schemas/commit/93774102e7bf9208af0a5a2fb4ceb5a00a74906b))
+
+
+### Bug Fixes
+
+* **spawn-contract:** name the half of coord's grammar runner_keys checks; drop an unreachable branch ([39287a8](https://github.com/qontinui/qontinui-schemas/commit/39287a8d51831411a98d2cb6776faebfac619393))
+
 ## [6.1.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.0.0...rust-v6.1.0) (2026-11-09)
 
 
