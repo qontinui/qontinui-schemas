@@ -57,8 +57,13 @@ name: runner-consumer-check
 #    (schemas first, adaptation immediately after), and coord's
 #    dep_graph.rs `parse_label_to_edge` already orders by it — this gate
 #    adds no new mechanism, it only makes the declaration REQUIRED.
-# 3. This workflow re-runs on the `labeled` event and goes green once the
-#    declared PR compiles against this PR's schemas.
+# 3. Applying the label re-fires this workflow (`labeled`). That run goes
+#    green only if the declared PR is ALREADY green on every required check
+#    of its repo's `main` AND compiles against this PR's schemas. While its
+#    CI is pending or red the run goes red with `declared-pr-checks-pending`
+#    / `declared-pr-checks-red`, and NOTHING re-fires it when the declared PR
+#    turns green: after it does, `gh run rerun <run> --failed` (or remove and
+#    re-apply the label).
 #
 # NOTE the label alone does not make the consumer PR's OWN CI green: the
 # runner resolves its schemas sibling by BRANCH NAME
@@ -763,6 +768,7 @@ jobs:
               echo "Declared adaptation ${CONSUMER_REPO}#${target} @ ${sha} is RED on required context(s): ${red_list}"
               echo "found=false" >> "$GITHUB_OUTPUT"
               echo "number=$target" >> "$GITHUB_OUTPUT"
+              echo "sha=$sha" >> "$GITHUB_OUTPUT"
               echo "red_contexts=$red_list" >> "$GITHUB_OUTPUT"
               echo "reason=declared-pr-checks-red" >> "$GITHUB_OUTPUT"
               exit 0
@@ -772,6 +778,7 @@ jobs:
               echo "Declared adaptation ${CONSUMER_REPO}#${target} @ ${sha} has required context(s) not yet green: ${pending_list}"
               echo "found=false" >> "$GITHUB_OUTPUT"
               echo "number=$target" >> "$GITHUB_OUTPUT"
+              echo "sha=$sha" >> "$GITHUB_OUTPUT"
               echo "pending_contexts=$pending_list" >> "$GITHUB_OUTPUT"
               echo "reason=declared-pr-checks-pending" >> "$GITHUB_OUTPUT"
               exit 0
@@ -903,9 +910,6 @@ jobs:
             exit 0
           fi
 
-          echo "::error::${CONSUMER}: breaking change with no verified adaptation."
-          echo ""
-
           # A red/pending adaptation is its OWN failure mode with its OWN
           # remedy — never let it fall into the generic catch-all below, which
           # would describe an adaptation that exists and compiles as an
@@ -916,7 +920,30 @@ jobs:
             declared-pr-checks-red|declared-pr-checks-pending) checks_case="yes" ;;
           esac
 
+          if [ -z "$checks_case" ]; then
+            echo "::error::${CONSUMER}: breaking change with no verified adaptation."
+            echo ""
+          fi
+
           if [ -n "$checks_case" ]; then
+            # The TYPED annotation: its title tells coord this red is "awaiting
+            # a declared adaptation's CI", not a real break (title grammar:
+            # .github/scripts/consumer-verdict-annotation.sh). If the script
+            # refuses (malformed input), fall back to the untitled line, so
+            # coord reads the red as unexplained — never a wrong title.
+            if [ "$DECLARE_REASON" = "declared-pr-checks-red" ]; then
+              annotation_msg="${CONSUMER}: breaking change awaiting declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM:-?}, RED on required check(s): ${DECLARED_RED:-<unknown>}"
+            else
+              annotation_msg="${CONSUMER}: breaking change awaiting declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM:-?}, required check(s) not yet green: ${DECLARED_PENDING:-<unknown>}"
+            fi
+            if annotation="$(bash "${GITHUB_WORKSPACE}/qontinui-schemas/.github/scripts/consumer-verdict-annotation.sh" \
+                  "${DECLARE_REASON#declared-pr-}" "$CONSUMER_REPO" "${DECLARED_NUM:-}" "${DECLARED_SHA:-}" \
+                  "$annotation_msg")"; then
+              echo "$annotation"
+            else
+              echo "::error::${CONSUMER}: breaking change with no verified adaptation."
+            fi
+            echo ""
             if [ "$DECLARE_REASON" = "declared-pr-checks-red" ]; then
               echo "The declared adaptation ${CONSUMER_REPO}#${DECLARED_NUM} is RED on required status check(s):"
               echo "  ${DECLARED_RED:-<unknown>}"
@@ -944,7 +971,7 @@ jobs:
             echo "         frozen payload, but every cross-repo read in leg 2 is LIVE, so it correctly"
             echo "         sees the now-green adaptation), or"
             echo "       * remove and re-apply the coord:upstream-of label (fires 'unlabeled'/'labeled')."
-            echo "     Either way leg 1 recompiles: budget ~38 min."
+            echo "     Either way leg 1 recompiles: budget a few minutes with a warm cache, plus the hosted queue."
             echo "  NOT workflow_dispatch — it carries no PR number, so leg 2 exits 'not-a-pull-request'"
             echo "  and no declaration can resolve."
             echo ""
@@ -979,7 +1006,12 @@ jobs:
           echo "  2. Label THIS PR:  coord:upstream-of=${CONSUMER}#<pr-number>"
           echo "     Use the coord-pr-label skill — it validates the namespace before sending."
           echo "     Direction matters: upstream-of makes the NAMED PR wait; this PR never waits."
-          echo "  3. This gate re-runs on the 'labeled' event automatically — no manual re-run needed."
+          echo "  3. Applying the label re-fires this workflow ('labeled'). That run goes green only if the"
+          echo "     declared PR is ALREADY green on every required check of its repo's main and compiles"
+          echo "     against this PR. While its CI is pending or red the run goes red with"
+          echo "     declared-pr-checks-pending / declared-pr-checks-red, and NOTHING re-fires it when the"
+          echo "     declared PR turns green: after it does, run gh run rerun ${{ github.run_id }} --failed"
+          echo "     (or remove and re-apply the label)."
           echo "  4. The declared PR must ALSO be green on its own required checks — a declaration"
           echo "     that cannot land does not sequence anything."
           echo ""
@@ -1178,9 +1210,32 @@ jobs:
               echo "::error::NO VERDICT: consumer-check was cancelled before any consumer reached a verdict. This is not evidence a consumer is broken. A superseding run posts the verdict; otherwise re-run this workflow."
               exit 1
               ;;
+            failure)
+              # Typed title: this aggregate has no failure of its own — its red
+              # is derived from consumer-check's (coord pairs it with that run's
+              # adaptation-awaited annotation, when there is one).
+              echo "::error title=verdict-derived consumer-check::At least one consumer is broken by this PR with no verified adaptation."
+              echo "Open the per-consumer consumer-check job above for the exact label to apply."
+              exit 1
+              ;;
             *)
               echo "::error::At least one consumer is broken by this PR with no verified adaptation."
               echo "Open the per-consumer consumer-check job above for the exact label to apply."
               exit 1
               ;;
           esac
+
+  # ------------------------------------------------------------------
+  # consumer-verdict-annotation-test: the typed annotation's title grammar
+  # (adaptation-awaited ...) is a contract coord parses. consumer-check only
+  # emits it on a breaking PR with a pending/red declared adaptation, so
+  # without this job nothing would exercise a change to the script until that
+  # rare red was already wrong. Deliberately NOT in consumer-gate's `needs`.
+  # ------------------------------------------------------------------
+  consumer-verdict-annotation-test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: The consumer verdict annotation's lines and refusals
+        run: bash .github/scripts/test-consumer-verdict-annotation.sh

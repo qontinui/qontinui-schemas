@@ -26,6 +26,16 @@
 ts/src/generated/** text eol=lf
 src/qontinui_schemas/generated/** text eol=lf
 
+# Every Rust test fixture (rust/tests/fixtures/**). Several are goldens the
+# tests compare byte-for-byte or pin by sha256: image_slot/schema.json
+# (image_slot_fixtures.rs, against schemars' LF output) and journey-golden.json
+# (journey_golden.rs, against its provenance sidecar). Under core.autocrlf=true a
+# Windows checkout rewrote them to CRLF and failed those tests on every Windows
+# box for a reason unrelated to their content. All 73 files are text and the
+# committed blobs are already LF, so this changes no committed bytes. The
+# narrower `-text` rules below come later and so still win for their paths.
+rust/tests/fixtures/** text eol=lf
+
 # Recorded UI Bridge SDK wire fixtures (rust/tests/ui_bridge_sdk_wire.rs). Their
 # .provenance.json sidecars pin each fixture's sha256, so a checkout must never
 # rewrite their bytes: under core.autocrlf=true a Windows checkout would convert
