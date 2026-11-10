@@ -87,3 +87,11 @@ rust-vision-core/tests/fixtures/image_corpus/*.jpg binary
 # Their pixels are the test data: frame A and frame B must differ exactly
 # where the glyphs paint, so no checkout may touch their bytes.
 rust-vision-core/tests/fixtures/text_over_image/*.png binary
+
+# The recorded UI Bridge SDK timeline captures (rust-vision-core/tests/
+# timeline_wire.rs). Their .provenance.json sidecars pin each capture's
+# sha256, and under core.autocrlf=true a Windows checkout rewrote them to CRLF,
+# so all six timeline_wire tests failed on every Windows box with "changed
+# after capture" and cargo stopped before the test targets after it. `-text`
+# checks them out byte-for-byte; the committed blobs are LF already.
+rust-vision-core/tests/fixtures/ui_bridge_timeline/*.json -text
