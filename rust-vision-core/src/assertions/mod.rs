@@ -106,12 +106,16 @@ pub enum Assertion {
     ///
     /// Horizontal: `scroll_width_px > bbox.w` means the laid-out text is
     /// wider than the box showing it, i.e. it is ellipsised or clipped.
-    /// Vertical: `bbox.h` shorter than ~1.5x the font size.
+    /// Vertical: `scroll_height_px > bbox.h` means it is taller than the box.
+    /// Without `scroll_height_px` the vertical arm falls back to an ESTIMATE:
+    /// `bbox.h` shorter than ~1.5x `font_size_px` fails.
     ///
-    /// The horizontal arm needs the producer to populate `scroll_width_px`;
-    /// without it that arm reports UNKNOWN rather than passing, because a
-    /// silent pass on the un-measured axis is what let truncated labels
-    /// through before.
+    /// A failure on either arm fails the assertion, even when the other arm
+    /// measured nothing. Otherwise an arm that measured nothing — no
+    /// `scroll_width_px`, or neither `scroll_height_px` nor `font_size_px` —
+    /// makes it `unknown{input_missing}` rather than a pass, because a silent
+    /// pass on an un-measured axis is what let truncated labels through
+    /// before.
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -153,7 +157,11 @@ pub enum Assertion {
         tolerance_px: Option<u32>,
     },
     /// No descendant element extends past its parent's clip rect.
-    /// `region` scopes the check to a subtree.
+    /// `region` scopes the check to the children whose box intersects it.
+    ///
+    /// The parent is read from `parent_id`, so a snapshot in which no
+    /// element carries one has no hierarchy to check: that is
+    /// `unknown{input_missing}`, never a vacuous pass.
     NoClipping {
         #[serde(default)]
         region: Option<Region>,
@@ -187,7 +195,9 @@ pub enum Assertion {
     /// `state-entered` events. A state that was already active throughout
     /// FAILS: the action did not enter it. `ms` is the caller's bound.
     StateEnteredWithin { state: String, ms: u64 },
-    /// Element passes WCAG contrast at the named level (AA 4.5:1 or AAA 7.0:1).
+    /// Element passes WCAG contrast at the named level: AA 4.5:1 or AAA 7:1
+    /// for normal text, AA 3:1 or AAA 4.5:1 for large-scale text (see
+    /// [`TextScale`] for which text is large).
     ContrastMeetsWcag {
         element: String,
         #[serde(default = "default_wcag_aa")]
@@ -358,10 +368,65 @@ pub enum WcagLevel {
 }
 
 impl WcagLevel {
-    pub fn min_ratio(self) -> f64 {
+    /// The minimum contrast ratio this level demands of text at `scale`:
+    /// WCAG 2.x success criteria 1.4.3 (AA) and 1.4.6 (AAA).
+    pub fn min_ratio(self, scale: TextScale) -> f64 {
+        match (self, scale) {
+            (Self::Aa, TextScale::Normal) => 4.5,
+            (Self::Aa, TextScale::Large) => 3.0,
+            (Self::Aaa, TextScale::Normal) => 7.0,
+            (Self::Aaa, TextScale::Large) => 4.5,
+        }
+    }
+}
+
+/// WCAG's two text sizes. "Large scale" text is at least 18 point, or at
+/// least 14 point and bold, and gets the relaxed contrast thresholds
+/// ([`WcagLevel::min_ratio`]).
+///
+/// In CSS pixels (96 per inch, so 4/3 px per point) that is at least
+/// [`Self::LARGE_MIN_PX`], or at least [`Self::LARGE_BOLD_MIN_PX`] with a
+/// weight of at least [`Self::BOLD_MIN_WEIGHT`].
+///
+/// An input the producer did not measure never makes text large, because
+/// that is the lenient direction. With no `font_size_px` the text is
+/// [`Self::Normal`]; with no `font_weight` it is not bold, so it is large
+/// only when its size alone qualifies.
+///
+/// The comparisons run on the `f32` the snapshot carries. The UI Bridge SDK's
+/// TypeScript port of this rule is held to it by
+/// `tests/fixtures/vision_assertions_conformance.json`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextScale {
+    Normal,
+    Large,
+}
+
+impl TextScale {
+    /// 18 pt in CSS pixels.
+    pub const LARGE_MIN_PX: f32 = 24.0;
+    /// 14 pt in CSS pixels is 18.666…; the rule takes it at 18.66.
+    pub const LARGE_BOLD_MIN_PX: f32 = 18.66;
+    /// The weight at which text counts as bold: CSS `bold` computes to 700.
+    pub const BOLD_MIN_WEIGHT: f32 = 700.0;
+
+    /// The scale of `el`'s text, from its measured size and weight.
+    pub fn of(el: &crate::element_snapshot::Element) -> Self {
+        let Some(size) = el.font_size_px else {
+            return Self::Normal;
+        };
+        let bold = el.font_weight.is_some_and(|w| w >= Self::BOLD_MIN_WEIGHT);
+        if size >= Self::LARGE_MIN_PX || (bold && size >= Self::LARGE_BOLD_MIN_PX) {
+            Self::Large
+        } else {
+            Self::Normal
+        }
+    }
+
+    fn as_str(self) -> &'static str {
         match self {
-            Self::Aa => 4.5,
-            Self::Aaa => 7.0,
+            Self::Normal => "normal",
+            Self::Large => "large",
         }
     }
 }
@@ -532,17 +597,17 @@ pub struct AssertionResult {
     /// more-than-three-families drift, `elements`' 24 px target are policy
     /// choices over exact inputs and correctly state `None`.
     ///
-    /// [`Assertion::TextFitsContainer`]'s **vertical** arm IS that, and is
-    /// the one place in this evaluator where `None` is a KNOWN GAP in this
-    /// field's coverage rather than a claim of exactness. It thresholds
-    /// `bbox.h` against a hard-coded `font_size_px * 1.5` line-height guess
-    /// and its own failure detail says "text likely clipped". It states
-    /// `None` today because `1.5` is an unmeasured constant: deriving a
-    /// number from it would manufacture exactly the precision this field
-    /// exists to avoid. Its horizontal arm (`scroll_width_px` against the
-    /// box) is a real measurement and is genuinely exact. Closing the
-    /// vertical gap needs a measured line height on the wire, not a
-    /// coefficient invented here.
+    /// [`Assertion::TextFitsContainer`]'s **vertical fallback** IS that, and
+    /// is the one place in this evaluator where `None` is a KNOWN GAP in this
+    /// field's coverage rather than a claim of exactness. When the snapshot
+    /// carries no `scroll_height_px`, the vertical arm thresholds `bbox.h`
+    /// against a hard-coded `font_size_px * 1.5` line-height guess, and its
+    /// own detail says "text likely clipped" or "estimated". It states
+    /// `None` because `1.5` is an unmeasured constant: deriving a number from
+    /// it would manufacture exactly the precision this field exists to avoid.
+    /// The measured arms (`scroll_width_px` and `scroll_height_px` against
+    /// the box) are genuinely exact, so a producer that sends
+    /// `scroll_height_px` closes the gap for its elements.
     #[serde(default)]
     pub confidence: Option<f64>,
 }
@@ -1298,12 +1363,12 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             )
         }
     };
-    // Two axes, and they fail differently. HORIZONTAL truncation is a
-    // measurement (`scroll_width_px` vs the box) and is the common case —
-    // a `truncate` / `text-overflow: ellipsis` label whose name is cut to
-    // a fragment. VERTICAL is an estimate from font size against the box
-    // height. Only heights were checked before, so every ellipsised label
-    // in the app passed this assertion.
+    // Two axes, and both are measurements when the producer sends them:
+    // HORIZONTAL is `scroll_width_px` against the box (the common case, a
+    // `truncate` / `text-overflow: ellipsis` label whose name is cut to a
+    // fragment), VERTICAL is `scroll_height_px` against it. Only the vertical
+    // arm has a fallback, an estimate from the font size, kept for producers
+    // that do not send `scroll_height_px` yet.
     if el.text.is_none() {
         return AssertionResult::pass_with(assertion, "element has no text — vacuously fits");
     }
@@ -1319,7 +1384,10 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             )
         }
     };
-    // --- Horizontal: a measurement, so it is the stronger signal. ---
+    // A failure on either arm is a verdict, whatever the other arm measured,
+    // so both are checked before an unmeasured arm can make this Unknown.
+
+    // --- Horizontal: measured, or not at all. ---
     if let Some(sw) = el.scroll_width_px {
         if sw > bbox.w {
             let how = match el.text_overflow.as_deref() {
@@ -1340,33 +1408,83 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         }
     }
 
-    // --- Vertical: an estimate from the declared font size. ---
-    if let Some(size) = el.font_size_px {
-        // Reasonable upper bound: text line height is ~font_size * 1.5.
-        let needed = (size * 1.5).ceil() as u32;
-        if bbox.h < needed {
-            return AssertionResult::fail(
+    // --- Vertical: measured; else estimated from the font size; else not at all. ---
+    let vertical = match (el.scroll_height_px, el.font_size_px) {
+        // The measurement decides alone. The estimate is not consulted even
+        // when it disagrees: a `leading-none` label is exactly as tall as its
+        // font, which the 1.5x guess would call clipped.
+        (Some(sh), _) => {
+            if sh > bbox.h {
+                return AssertionResult::fail(
+                    assertion,
+                    format!(
+                        "text overflows vertically: content is {sh}px tall but the box is \
+                         only {}px ({}px hidden)",
+                        bbox.h,
+                        sh - bbox.h
+                    ),
+                );
+            }
+            VerticalFit::Measured
+        }
+        (None, Some(size)) => {
+            // Reasonable upper bound: text line height is ~font_size * 1.5.
+            let needed = (size * 1.5).ceil() as u32;
+            if bbox.h < needed {
+                return AssertionResult::fail(
+                    assertion,
+                    format!(
+                        "element height {} px is less than ~1.5×{}px font ({needed} px expected) — text likely clipped",
+                        bbox.h, size
+                    ),
+                );
+            }
+            VerticalFit::Estimated
+        }
+        (None, None) => VerticalFit::Unmeasured,
+    };
+
+    // Neither arm failed. Pass only when both of them looked: an arm that
+    // measured nothing was never checked, and reporting that as a pass is
+    // what let ellipsised labels through.
+    let horizontal_measured = el.scroll_width_px.is_some();
+    match (horizontal_measured, vertical) {
+        (true, VerticalFit::Measured) => AssertionResult::pass(assertion),
+        (true, VerticalFit::Estimated) => AssertionResult::pass_with(
+            assertion,
+            "horizontal fit measured; vertical fit ESTIMATED from the font size (~1.5x), \
+             because the snapshot carries no `scroll_height_px` for this element",
+        ),
+        (_, _) => {
+            let mut unmeasured = Vec::with_capacity(2);
+            if !horizontal_measured {
+                unmeasured.push("horizontal fit (no `scroll_width_px`)");
+            }
+            if vertical == VerticalFit::Unmeasured {
+                unmeasured.push("vertical fit (neither `scroll_height_px` nor `font_size_px`)");
+            }
+            AssertionResult::unknown(
                 assertion,
+                UnknownCode::InputMissing,
                 format!(
-                    "element height {} px is less than ~1.5×{}px font ({needed} px expected) — text likely clipped",
-                    bbox.h, size
+                    "element '{element}': the snapshot does not measure its {}, so that was \
+                     never checked, and nothing it did measure failed",
+                    unmeasured.join(" or its ")
                 ),
-            );
+            )
         }
     }
+}
 
-    // Both arms are clear — but say which ones actually RAN. An element
-    // with no `scroll_width_px` was never checked for truncation, and
-    // reporting that as an unqualified pass is what let ellipsised labels
-    // through.
-    if el.scroll_width_px.is_none() {
-        return AssertionResult::pass_with(
-            assertion,
-            "vertical fit OK; horizontal fit UNKNOWN — the snapshot carries no \
-             `scroll_width_px` for this element, so truncation was not checked",
-        );
-    }
-    AssertionResult::pass(assertion)
+/// How [`eval_text_fits`]' vertical arm was decided, when it did not fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VerticalFit {
+    /// `scroll_height_px` against the box.
+    Measured,
+    /// The `font_size_px * 1.5` fallback.
+    Estimated,
+    /// Neither input was on the snapshot.
+    Unmeasured,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1777,6 +1895,19 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         Ok(s) => s,
         Err(r) => return r,
     };
+    // The parent is read from `parent_id`, so a snapshot that carries none
+    // has no hierarchy to check. "No child extends past its parent" over no
+    // children at all is a vacuous pass, and it was how every page from a
+    // producer that emits no `parent_id` cleared this assertion.
+    if !snap.elements.iter().any(|el| el.parent_id.is_some()) {
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            "no element in the snapshot carries a `parent_id`, so there is no parent to clip \
+             against and nothing was checked. The producer must send each element's \
+             `parent_id` for no_clipping to answer",
+        );
+    }
     // Build a parent → bbox map for O(1) lookup. Only positioned elements
     // are clip candidates / clip ancestors.
     let mut bbox_by_id: HashMap<&str, Region> = HashMap::with_capacity(snap.elements.len());
@@ -1852,17 +1983,25 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
         }
     };
     let ratio = crate::analyzers::color::wcag_contrast(fg, bg);
-    let needed = level.min_ratio();
+    let scale = TextScale::of(el);
+    let needed = level.min_ratio(scale);
+    let text = scale.as_str();
     if ratio < needed {
         AssertionResult::fail(
             assertion,
             format!(
-                "contrast ratio {:.2}:1 below WCAG {:?} minimum {:.1}:1",
+                "contrast ratio {:.2}:1 below WCAG {:?} minimum {:.1}:1 for {text} text",
                 ratio, level, needed
             ),
         )
     } else {
-        AssertionResult::pass_with(assertion, format!("contrast ratio {:.2}:1", ratio))
+        AssertionResult::pass_with(
+            assertion,
+            format!(
+                "contrast ratio {:.2}:1 (WCAG {:?} needs {:.1}:1 for {text} text)",
+                ratio, level, needed
+            ),
+        )
     }
 }
 
@@ -3783,9 +3922,10 @@ mod tests {
     }
 
     #[test]
-    fn text_fits_reports_horizontal_unknown_when_scroll_width_is_absent() {
-        // The un-measured axis must not read as a clean pass — that silent
-        // pass is the defect this arm exists to close.
+    fn text_fits_is_unknown_when_scroll_width_is_absent() {
+        // The un-measured axis must not read as a pass, even a qualified
+        // one: that silent pass is the defect this arm exists to close. The
+        // vertical estimate fits here, and it is still not enough.
         let mut e = el("label", 0, 0, 80, 20);
         e.text = Some("qontinui-web-frontend".into());
         e.font_size_px = Some(10.0);
@@ -3800,12 +3940,49 @@ mod tests {
             },
             &ctx,
         );
-        assert!(res.passed, "vertical fit is genuinely OK here");
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
+        assert_eq!(res.code, Some(UnknownCode::InputMissing));
         let d = res.detail.unwrap_or_default();
         assert!(
-            d.contains("UNKNOWN"),
-            "an unchecked axis must say so, not pass silently: {d}"
+            d.contains("scroll_width_px"),
+            "the detail must name the missing measurement: {d}"
         );
+    }
+
+    /// The large-text boundaries, on the `f32` the snapshot carries. 18.66
+    /// is taken exactly as the producer sends it, and an unmeasured input
+    /// never makes text large.
+    #[test]
+    fn text_scale_reads_size_and_weight_and_never_assumes_large() {
+        let text = |size: Option<f32>, weight: Option<f32>| Element {
+            id: "t".into(),
+            font_size_px: size,
+            font_weight: weight,
+            ..Default::default()
+        };
+        let cases = [
+            (None, None, TextScale::Normal),
+            (None, Some(900.0), TextScale::Normal),
+            (Some(23.99), None, TextScale::Normal),
+            (Some(24.0), None, TextScale::Large),
+            (Some(18.66), None, TextScale::Normal),
+            (Some(18.66), Some(699.0), TextScale::Normal),
+            (Some(18.66), Some(700.0), TextScale::Large),
+            (Some(18.65), Some(700.0), TextScale::Normal),
+            (Some(20.0), Some(950.5), TextScale::Large),
+        ];
+        for (size, weight, want) in cases {
+            assert_eq!(
+                TextScale::of(&text(size, weight)),
+                want,
+                "size {size:?}, weight {weight:?}"
+            );
+        }
+        // ...and the four thresholds it selects.
+        assert_eq!(WcagLevel::Aa.min_ratio(TextScale::Normal), 4.5);
+        assert_eq!(WcagLevel::Aa.min_ratio(TextScale::Large), 3.0);
+        assert_eq!(WcagLevel::Aaa.min_ratio(TextScale::Normal), 7.0);
+        assert_eq!(WcagLevel::Aaa.min_ratio(TextScale::Large), 4.5);
     }
 
     #[test]

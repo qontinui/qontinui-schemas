@@ -1269,6 +1269,16 @@ mod tests {
         }
     }
 
+    /// An assertion [`snap_with_overlap`] genuinely passes: `a` and `b` share
+    /// a top edge. It carries no parent relationships, so `no_clipping` is
+    /// unknown over it rather than the pass it once was.
+    fn aligned_a_b() -> Assertion {
+        Assertion::AlignedHorizontally {
+            elements: vec!["a".into(), "b".into()],
+            axis_tolerance_px: None,
+        }
+    }
+
     #[test]
     fn analyze_exit_default_is_ok_even_with_findings() {
         let snap = snap_with_overlap();
@@ -1469,13 +1479,9 @@ mod tests {
     fn assert_all_passed_vs_failed() {
         let snap = snap_with_overlap();
         let bl = HashMap::new();
-        // Passing assertion: no_clipping (no parent relationships -> passes).
-        let pass = assert_all(
-            &snap,
-            Some(&frame_1x1()),
-            &[Assertion::NoClipping { region: None }],
-            &bl,
-        );
+        // Passing assertion: a and b share a top edge. (Not no_clipping: with
+        // no parent relationships that is unknown, not a pass.)
+        let pass = assert_all(&snap, Some(&frame_1x1()), &[aligned_a_b()], &bl);
         assert!(pass.all_passed);
 
         // Failing assertion: a and b overlap.
@@ -1530,7 +1536,7 @@ mod tests {
         let report = assert_all(
             &snap_with_overlap(),
             Some(&frame_1x1()),
-            &[Assertion::NoClipping { region: None }],
+            &[aligned_a_b()],
             &HashMap::new(),
         );
         assert!(report.all_passed);
@@ -1925,12 +1931,7 @@ mod tests {
         // Only the L1 image assertions read `ctx.frame`; the rest evaluate
         // without one, so a required frame would gate values they never use.
         let bl = HashMap::new();
-        let r = assert_all(
-            &snap_with_overlap(),
-            None,
-            &[Assertion::NoClipping { region: None }],
-            &bl,
-        );
+        let r = assert_all(&snap_with_overlap(), None, &[aligned_a_b()], &bl);
         assert!(r.all_passed);
     }
 
