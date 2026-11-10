@@ -206,6 +206,17 @@ pub struct Element {
     /// Computed font size in CSS pixels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font_size_px: Option<f32>,
+    /// Computed font weight, unitless: `getComputedStyle(el).fontWeight` read
+    /// as a number, so 400 is normal and 700 is bold. A variable font may
+    /// report any value from 1 to 1000, which is why this is not an integer.
+    ///
+    /// [`crate::assertions::Assertion::ContrastMeetsWcag`] reads it to decide
+    /// whether text is WCAG "large scale" (see
+    /// [`crate::assertions::TextScale`]). `None` means the producer did not
+    /// measure it, and unmeasured text is never assumed bold: it is large only
+    /// when its size alone makes it so.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_weight: Option<f32>,
     /// Font family declaration as the SDK saw it. May be a comma-list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font_family: Option<String>,
@@ -319,7 +330,7 @@ pub struct Element {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occluded_pct: Option<f32>,
 
-    // ---- Horizontal text overflow ----------------------------------------
+    // ---- Text overflow ----------------------------------------------------
     /// Width of the element's laid-out content in CSS pixels — the DOM's
     /// `scrollWidth`. When it exceeds the element's own `bbox.w`, the text
     /// is horizontally truncated (a Tailwind `truncate`, a
@@ -330,6 +341,16 @@ pub struct Element {
     /// in this codebase — passed cleanly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_width_px: Option<u32>,
+    /// Height of the element's laid-out content in CSS pixels — the DOM's
+    /// `scrollHeight`. When it exceeds the element's own `bbox.h`, the text
+    /// overflows its box vertically: a fixed-height label that wrapped onto
+    /// a line it cannot show, or a `line-clamp`.
+    ///
+    /// The MEASURED vertical arm of `text_fits_container`. Without it that
+    /// arm falls back to an estimate from `font_size_px`, and with neither
+    /// it measured nothing, which reads Unknown rather than passing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll_height_px: Option<u32>,
     /// The producer's own `text-overflow` computed style (`"ellipsis"`,
     /// `"clip"`, …), when known. Only used to sharpen a finding's wording;
     /// the truncation verdict itself comes from `scroll_width_px`, which
