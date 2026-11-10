@@ -152,7 +152,7 @@
     {
       "id": "text-fits-both-arms-measured-passes",
       "kind": "text_fits_container",
-      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 20}]},
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 24}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 18}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "passed", "code": null}
     },
@@ -162,6 +162,27 @@
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 120, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 20}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "text-fits-content-height-equal-to-the-box-passes",
+      "kind": "text_fits_container",
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 20}]},
+      "assertion": {"type": "text_fits_container", "element": "label"},
+      "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "text-fits-content-one-px-taller-than-the-box-fails",
+      "kind": "text_fits_container",
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 21}]},
+      "assertion": {"type": "text_fits_container", "element": "label"},
+      "expected": {"outcome": "failed", "code": null}
+    },
+    {
+      "id": "text-fits-content-one-px-wider-than-the-box-fails",
+      "kind": "text_fits_container",
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 120, "h": 20}, "text": "Save changes", "scroll_width_px": 121, "scroll_height_px": 20}]},
+      "assertion": {"type": "text_fits_container", "element": "label"},
+      "expected": {"outcome": "failed", "code": null}
     },
     {
       "id": "text-fits-horizontal-overflow-fails",

@@ -40,6 +40,14 @@
 //! multiplication (in JavaScript, `Math.fround`), or it disagrees within about
 //! 1e-6 of a boundary: `10.666667 * 1.5` ceils to 16 in `f32` and to 17 in
 //! `f64`. The cases stay clear of such values; the rule does not.
+//!
+//! **Geometry, for a port.** By producer contract `bbox.w` and `bbox.h` are
+//! the CEILING of the fractional `getBoundingClientRect()` size (see
+//! `Element::bbox`), and `scroll_width_px` / `scroll_height_px` are the DOM's
+//! integer `scrollWidth` / `scrollHeight`. `text_fits_container` compares them
+//! strictly, with no slack: content exactly as large as the box fits, and
+//! content one pixel larger does not. The `text-fits-content-*` cases pin both
+//! sides of that boundary.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 

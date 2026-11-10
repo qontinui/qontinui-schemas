@@ -173,6 +173,15 @@ pub struct Element {
     /// text presence, typography). Web snapshots always populate this, so
     /// `Option` is a strict superset — existing payloads round-trip
     /// byte-identically (`skip_serializing_if` omits `None`).
+    ///
+    /// **Rounding is a producer contract:** `w` and `h` are the CEILING of
+    /// the fractional `getBoundingClientRect()` width and height.
+    /// `text_fits_container` compares the DOM's integer
+    /// [`Self::scroll_width_px`] and [`Self::scroll_height_px`] with them
+    /// strictly and with no slack: content as large as the box fits, and
+    /// content one pixel larger does not. Rounding the box UP is what keeps
+    /// its own fractional pixel from reading as a pixel of overflow, so a
+    /// producer must not round it to nearest or down.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<Region>,
     /// Visible text content (innerText / accessibilityLabel equivalent).
@@ -340,6 +349,9 @@ pub struct Element {
     /// `text_fits_container` compared only heights before this field
     /// existed, so an ellipsised label — the dominant way a name gets lost
     /// in this codebase — passed cleanly.
+    ///
+    /// Compared with `bbox.w` strictly and with no slack; `bbox.w` is the
+    /// ceiling of the fractional width (see [`Self::bbox`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_width_px: Option<u32>,
     /// Height of the element's laid-out content in CSS pixels — the DOM's
@@ -350,6 +362,9 @@ pub struct Element {
     /// The MEASURED vertical arm of `text_fits_container`. Without it that
     /// arm falls back to an estimate from `font_size_px`, and with neither
     /// it measured nothing, which reads Unknown rather than passing.
+    ///
+    /// Compared with `bbox.h` strictly and with no slack; `bbox.h` is the
+    /// ceiling of the fractional height (see [`Self::bbox`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_height_px: Option<u32>,
     /// The producer's own `text-overflow` computed style (`"ellipsis"`,
