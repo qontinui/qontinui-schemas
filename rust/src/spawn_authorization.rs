@@ -132,7 +132,7 @@ pub struct ClassSeed {
 #[serde(deny_unknown_fields)]
 pub struct RunnerKey {
     /// The registry key, in the character-and-length half of coord's
-    /// `validate_agent_name` grammar (see [`is_registry_agent_name`]).
+    /// `validate_agent_name` grammar (see `is_registry_agent_name`).
     pub agent_name: String,
     /// The `SpawnPath` the runner passes alongside the key at its call site.
     pub spawn_path: String,
