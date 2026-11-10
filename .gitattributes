@@ -95,3 +95,8 @@ rust-vision-core/tests/fixtures/text_over_image/*.png binary
 # after capture" and cargo stopped before the test targets after it. `-text`
 # checks them out byte-for-byte; the committed blobs are LF already.
 rust-vision-core/tests/fixtures/ui_bridge_timeline/*.json -text
+
+# The assertion conformance fixture (rust-vision-core/tests/conformance.rs).
+# The UI Bridge SDK vendors it byte-for-byte behind a drift check, so it is LF
+# on every platform, in the working tree as well as the blob.
+rust-vision-core/tests/fixtures/vision_assertions_conformance.json text eol=lf
