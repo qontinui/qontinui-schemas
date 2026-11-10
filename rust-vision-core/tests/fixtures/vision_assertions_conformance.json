@@ -157,28 +157,28 @@
       "expected": {"outcome": "passed", "code": null}
     },
     {
-      "id": "text-fits-content-exactly-filling-the-box-passes",
+      "id": "text-fits-content-exactly-filling-the-ceiled-box-passes",
       "kind": "text_fits_container",
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 120, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 20}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "passed", "code": null}
     },
     {
-      "id": "text-fits-content-height-equal-to-the-box-passes",
+      "id": "text-fits-content-as-tall-as-the-ceiled-box-passes",
       "kind": "text_fits_container",
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 20}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "passed", "code": null}
     },
     {
-      "id": "text-fits-content-one-px-taller-than-the-box-fails",
+      "id": "text-fits-content-one-px-taller-than-the-ceiled-box-fails",
       "kind": "text_fits_container",
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "text": "Save changes", "scroll_width_px": 120, "scroll_height_px": 21}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "failed", "code": null}
     },
     {
-      "id": "text-fits-content-one-px-wider-than-the-box-fails",
+      "id": "text-fits-content-one-px-wider-than-the-ceiled-box-fails",
       "kind": "text_fits_container",
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 120, "h": 20}, "text": "Save changes", "scroll_width_px": 121, "scroll_height_px": 20}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
@@ -322,6 +322,16 @@
       "snapshot": {"elements": [
         {"id": "a", "bbox": {"x": 0, "y": 0, "w": 100, "h": 50}},
         {"id": "b", "bbox": {"x": 100, "y": 0, "w": 100, "h": 50}}
+      ]},
+      "assertion": {"type": "no_overlap", "elements": ["a", "b"]},
+      "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "no-overlap-adjacent-flex-thirds-rounded-to-the-nearest-pixel-pass",
+      "kind": "no_overlap",
+      "snapshot": {"elements": [
+        {"id": "a", "bbox": {"x": 33, "y": 0, "w": 34, "h": 20}},
+        {"id": "b", "bbox": {"x": 67, "y": 0, "w": 33, "h": 20}}
       ]},
       "assertion": {"type": "no_overlap", "elements": ["a", "b"]},
       "expected": {"outcome": "passed", "code": null}

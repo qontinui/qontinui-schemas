@@ -174,14 +174,21 @@ pub struct Element {
     /// `Option` is a strict superset — existing payloads round-trip
     /// byte-identically (`skip_serializing_if` omits `None`).
     ///
-    /// **Rounding is a producer contract:** `w` and `h` are the CEILING of
-    /// the fractional `getBoundingClientRect()` width and height.
-    /// `text_fits_container` compares the DOM's integer
+    /// **Rounding, per kind.** For the geometry kinds (`no_overlap`,
+    /// `element_above`, `no_clipping`, the alignment and layout-shift checks)
+    /// this is the producer's best integer rounding of the fractional
+    /// `getBoundingClientRect()`. Rounding every box UP would inflate it:
+    /// three 33.333 px flex items would read as overlapping.
+    ///
+    /// `text_fits_container` is the exception. Its comparison box is the
+    /// border box rounded UP, the ceiling of the fractional width and height,
+    /// and it reads that box's `w` and `h` from this field. It compares
     /// [`Self::scroll_width_px`] and [`Self::scroll_height_px`] with them
-    /// strictly and with no slack: content as large as the box fits, and
-    /// content one pixel larger does not. Rounding the box UP is what keeps
-    /// its own fractional pixel from reading as a pixel of overflow, so a
-    /// producer must not round it to nearest or down.
+    /// strictly, with no slack: content as large as the box fits, and one
+    /// pixel larger does not. Rounding UP keeps the box's own fractional pixel
+    /// from reading as a pixel of overflow. A snapshot that carries the
+    /// geometry rounding here instead makes the text fit stricter by at most
+    /// one pixel at that boundary, never more lenient.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<Region>,
     /// Visible text content (innerText / accessibilityLabel equivalent).
@@ -350,8 +357,9 @@ pub struct Element {
     /// existed, so an ellipsised label — the dominant way a name gets lost
     /// in this codebase — passed cleanly.
     ///
-    /// Compared with `bbox.w` strictly and with no slack; `bbox.w` is the
-    /// ceiling of the fractional width (see [`Self::bbox`]).
+    /// `text_fits_container` compares it with the width of its comparison
+    /// box, the border box rounded UP, strictly and with no slack (see
+    /// [`Self::bbox`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_width_px: Option<u32>,
     /// Height of the element's laid-out content in CSS pixels — the DOM's
@@ -363,8 +371,9 @@ pub struct Element {
     /// arm falls back to an estimate from `font_size_px`, and with neither
     /// it measured nothing, which reads Unknown rather than passing.
     ///
-    /// Compared with `bbox.h` strictly and with no slack; `bbox.h` is the
-    /// ceiling of the fractional height (see [`Self::bbox`]).
+    /// `text_fits_container` compares it with the height of its comparison
+    /// box, the border box rounded UP, strictly and with no slack (see
+    /// [`Self::bbox`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_height_px: Option<u32>,
     /// The producer's own `text-overflow` computed style (`"ellipsis"`,

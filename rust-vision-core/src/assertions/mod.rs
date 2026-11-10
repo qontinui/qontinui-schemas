@@ -118,10 +118,13 @@ pub enum Assertion {
     /// before. An element with no `text` is `unknown{input_missing}` too: an
     /// absent `text` cannot be told from one the producer did not capture.
     ///
-    /// Both measured comparisons are strict, with no slack, against a box the
-    /// producer reports as the ceiling of its fractional rect (see
-    /// [`crate::element_snapshot::Element::bbox`]): content exactly as large
-    /// as the box fits, and content one pixel larger does not.
+    /// Both measured comparisons are strict, with no slack, against the
+    /// comparison box: the border box rounded UP (the ceiling of its
+    /// fractional width and height), whose `w` and `h` are read from the
+    /// element's `bbox`. Content exactly as large as that box fits, and one
+    /// pixel larger does not. Only this kind rounds up; the geometry kinds
+    /// read `bbox` as the producer's best integer rounding (see
+    /// [`crate::element_snapshot::Element::bbox`]).
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
