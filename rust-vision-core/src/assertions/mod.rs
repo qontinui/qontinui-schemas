@@ -115,7 +115,8 @@ pub enum Assertion {
     /// `scroll_width_px`, or neither `scroll_height_px` nor `font_size_px` —
     /// makes it `unknown{input_missing}` rather than a pass, because a silent
     /// pass on an un-measured axis is what let truncated labels through
-    /// before.
+    /// before. An element with no `text` is `unknown{input_missing}` too: an
+    /// absent `text` cannot be told from one the producer did not capture.
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -159,9 +160,12 @@ pub enum Assertion {
     /// No descendant element extends past its parent's clip rect.
     /// `region` scopes the check to the children whose box intersects it.
     ///
-    /// The parent is read from `parent_id`, so a snapshot in which no
-    /// element carries one has no hierarchy to check: that is
-    /// `unknown{input_missing}`, never a vacuous pass.
+    /// A pass needs at least one child that was actually compared: in scope,
+    /// with a bbox, and with a `parent_id` that resolves to an element with a
+    /// bbox. A check that compared none is `unknown{input_missing}`, never a
+    /// vacuous pass: a snapshot in which no element carries a `parent_id`,
+    /// every parent unresolved or unpositioned, every parented child
+    /// unpositioned, or a `region` that holds no parented child.
     NoClipping {
         #[serde(default)]
         region: Option<Region>,
@@ -1369,8 +1373,19 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     // fragment), VERTICAL is `scroll_height_px` against it. Only the vertical
     // arm has a fallback, an estimate from the font size, kept for producers
     // that do not send `scroll_height_px` yet.
+    //
+    // No `text` is not "nothing to fit": `Element::text` is `None` both for
+    // an element without text and for one whose producer did not capture it,
+    // and the two cannot be told apart. So it is unknown, not a vacuous pass.
     if el.text.is_none() {
-        return AssertionResult::pass_with(assertion, "element has no text — vacuously fits");
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "element '{element}' carries no `text`, which cannot be told from text the \
+                 producer did not capture, so text fit was never checked"
+            ),
+        );
     }
     let bbox = match el.bbox {
         Some(bb) => bb,
@@ -1895,10 +1910,13 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         Ok(s) => s,
         Err(r) => return r,
     };
-    // The parent is read from `parent_id`, so a snapshot that carries none
-    // has no hierarchy to check. "No child extends past its parent" over no
-    // children at all is a vacuous pass, and it was how every page from a
-    // producer that emits no `parent_id` cleared this assertion.
+    // "No child extends past its parent" over no compared child at all is a
+    // vacuous pass, so a check that compared nothing is unknown. This first
+    // arm is the commonest way to get there, and it is answered on its own
+    // because it names the producer's gap: a snapshot with no `parent_id`
+    // has no hierarchy at all, and that was how every page from a producer
+    // that emits none cleared this assertion. The general arm is after the
+    // loop.
     if !snap.elements.iter().any(|el| el.parent_id.is_some()) {
         return AssertionResult::unknown(
             assertion,
@@ -1917,6 +1935,9 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         }
     }
     let mut offender: Option<(String, String)> = None;
+    // Children actually compared with their parent: in scope, positioned,
+    // and with a parent that resolves to a positioned element.
+    let mut compared = 0usize;
     for el in &snap.elements {
         // A bbox-less child has no geometry to clip — skip it.
         let Some(el_bbox) = el.bbox else { continue };
@@ -1928,6 +1949,7 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
                         continue;
                     }
                 }
+                compared += 1;
                 if !region_contains(*parent_bbox, el_bbox) {
                     offender = Some((el.id.clone(), parent_id.clone()));
                     break;
@@ -1939,6 +1961,14 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         AssertionResult::fail(
             assertion,
             format!("element '{child}' extends past its parent '{parent}'"),
+        )
+    } else if compared == 0 {
+        // Every parent unresolved or unpositioned, every parented child
+        // unpositioned, or a `region` that holds no parented child.
+        AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            "no child with a positioned parent was in scope, so nothing was checked",
         )
     } else {
         AssertionResult::pass(assertion)
