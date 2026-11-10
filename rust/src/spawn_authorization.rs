@@ -131,12 +131,15 @@ pub struct ClassSeed {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunnerKey {
-    /// The registry key, in coord's `validate_agent_name` grammar.
+    /// The registry key, in the character-and-length half of coord's
+    /// `validate_agent_name` grammar (see [`is_registry_agent_name`]).
     pub agent_name: String,
     /// The `SpawnPath` the runner passes alongside the key at its call site.
     pub spawn_path: String,
-    /// Where in `qontinui-runner` the key is authorized — what a guard test
-    /// there pins in both directions.
+    /// Where in `qontinui-runner` the key is authorized. A runner guard test
+    /// (Phase 3 of plan
+    /// `2026-11-10-the-spawn-contract-names-the-runners-by-name-spawn-keys`)
+    /// is to pin each key to such a site in both directions.
     pub call_site: String,
     pub purpose: String,
 }
@@ -144,9 +147,14 @@ pub struct RunnerKey {
 /// The longest `agent_name` coord's `validate_agent_name` admits.
 const MAX_AGENT_NAME_LEN: usize = 64;
 
-/// Coord's registry-name grammar (`validate_agent_name`): 1..=64 characters of
-/// `[a-z0-9_-]`. A runner key outside it could never be stored as a row, so
-/// declaring it would protect nothing and read as if it did.
+/// The character-and-length half of coord's registry-name grammar
+/// (`validate_agent_name`): 1..=64 characters of `[a-z0-9_-]`. A runner key
+/// outside it could never be stored as a row, so declaring it would protect
+/// nothing and read as if it did.
+///
+/// Coord also refuses a short list of RESERVED names (route segments such as
+/// `prefs`). That list is coord's to own and is deliberately not copied here:
+/// a runner key never needs one, and a copy would be one more literal to drift.
 fn is_registry_agent_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_AGENT_NAME_LEN
@@ -453,13 +461,10 @@ impl SpawnAuthorizationContract {
                 ));
             }
             // Class rows key as (spawn_path, spawn_path), so a runner key named
-            // after a path (or a class seed's path) IS that class row.
-            if self.is_spawn_path(&k.agent_name)
-                || self
-                    .class_seeds
-                    .iter()
-                    .any(|c| c.spawn_path == k.agent_name)
-            {
+            // after a path IS that class row. Every class seed's path is
+            // already a declared spawn_path (checked above), so this one test
+            // also covers a key named after a class seed.
+            if self.is_spawn_path(&k.agent_name) {
                 return Err(format!(
                     "runner key `{}` is named after a spawn_path / class seed; \
                      class rows key as (spawn_path, spawn_path), so the key would \
