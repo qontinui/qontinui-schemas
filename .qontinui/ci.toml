@@ -171,9 +171,9 @@
 #    2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
 #    Phase 4.)
 #
-# 12. rust-ci's provisioning env e2e (its actions/setup-python and
-#    actions/setup-node steps and "Provisioning env e2e", and the same three
-#    in ci-exec-windows) is NOT mirrored. The test needs a host Python 3
+# 12. The provisioning env e2e (the provisioning-env-e2e-linux job's
+#    actions/setup-python and actions/setup-node steps and "Provisioning env
+#    e2e", and the same three in ci-exec-windows) is NOT mirrored. The test needs a host Python 3
 #    interpreter with `venv`, which the CI-node lane refuses to install
 #    (`no_python_refusal` in ci-exec/src/tools.rs: the lane provisions node and
 #    Python PACKAGES, never an interpreter), plus the two setup actions, which
