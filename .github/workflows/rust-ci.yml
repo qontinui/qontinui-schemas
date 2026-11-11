@@ -33,8 +33,9 @@ name: Rust CI
 #     require it green for the tagged commit before publishing, and lets
 #     candidate-ci.yml run it on coord's merge-candidate refs. The `route`
 #     job below may move the Linux `rust-ci` job onto the self-hosted pool
-#     for candidate-ci.yml and for this file's own push / dispatch runs —
-#     never for publish-rust.yml, and never for a pull_request.
+#     for candidate-ci.yml and for this file's own push / dispatch /
+#     same-repo pull_request runs — never for publish-rust.yml, and never
+#     for a fork pull_request.
 
 on:
   pull_request:
@@ -76,18 +77,29 @@ on:
 jobs:
   # ── Where the Linux `rust-ci` job runs ──────────────────────────────────
   #
-  # On a run that is NOT a pull_request (coord's merge-candidate refs, through
-  # candidate-ci.yml; main pushes; workflow_dispatch) this job decides whether
+  # On a run that is NOT a fork pull_request (coord's merge-candidate refs,
+  # through candidate-ci.yml; main pushes; workflow_dispatch; same-repo
+  # pull_requests) this job decides whether
   # `rust-ci` runs on the self-hosted pool `[self-hosted, Linux, X64, ram-16g]`
   # or on the free GitHub-hosted `ubuntu-latest` floor. On 2026-11-03 the pool
   # is four repo-level registrations on nawa (`nawa-schemas-1..4`, 60 GiB
   # MemoryHigh units). Why: the org is on GitHub Free, about 20 concurrent
   # hosted jobs shared by every public repo's PR CI, and candidate CI queued
   # behind them (queue-wait p90 16.6 min, max 22.6, over ~12 merge-candidate
-  # runs measured 2026-11-03, for a job that runs 3-7 min). pull_request runs
-  # never reach the pool and skip this job: a fork PR must not run on a fleet
-  # host (decision_record self-hosted-runners-on-public-repos), and a PR
-  # backlog would saturate a pool sized for the train.
+  # runs measured 2026-11-03, for a job that runs 3-7 min). A FORK
+  # pull_request never reaches the pool and skips this job.
+  #
+  # PULL REQUESTS ROUTE TOO (2026-11-11). A same-repo pull_request routes
+  # exactly like a push: external PRs are prohibited on every qontinui repo, so
+  # a PR run executes the same code a push run would and repo visibility is not
+  # a trust boundary (decision_record self-hosted-runners-on-public-repos,
+  # amendment 2026-11-04; policy production-and-cost
+  # external-prs-are-prohibited-so-public-repo-ci-is-not-a-trust-boundary).
+  # A FORK pull_request (head repo != this repo) still goes to the floor: an
+  # optional free guard on top of the fork-PR approval policy,
+  # `all_external_contributors`, which stays. A PR backlog is a capacity
+  # question, and the router's SATURATED / STALLED overflow under `auto` is
+  # what bounds it; the forced `self-hosted` lane gives that overflow up.
   #
   # The CALLER is checked as well as the event. publish-rust.yml calls this
   # workflow as the gate before a crates.io upload, and that run stays on the
@@ -146,7 +158,7 @@ jobs:
   # out or is skipped leaves rust-ci on the floor (or, forced, on the pool),
   # never SKIPPED, which coord's check classification would count as passing.
   route:
-    if: ${{ github.run_attempt == 1 && github.event_name != 'pull_request' && vars.SCHEMAS_CI_LINUX_LANE == 'auto' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) }}
+    if: ${{ github.run_attempt == 1 && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.SCHEMAS_CI_LINUX_LANE == 'auto' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -198,23 +210,24 @@ jobs:
     # reviewer can tell an intended gap from an oversight.
     #
     # `route` (above) decides where this job runs. `!cancelled()` is
-    # load-bearing: on a pull_request `route` is SKIPPED, and a job that needs
-    # a skipped job is skipped too, which would turn the required `rust-ci`
-    # context into `skipped` (= passing to coord) on every PR.
+    # load-bearing: on a fork pull_request, a re-run or a non-`auto` lane
+    # `route` is SKIPPED, and a job that needs a skipped job is skipped too,
+    # which would turn the required `rust-ci` context into `skipped`
+    # (= passing to coord).
     needs: route
     if: ${{ !cancelled() }}
-    # The pool, on a FIRST attempt of a run that is not a pull_request and
+    # The pool, on a FIRST attempt of a run that is not a fork pull_request and
     # whose caller is this file or candidate-ci.yml (the allow-list in
     # `route`'s `if:`), when the lane is forced `self-hosted` or `route` said
     # so under `auto` (its `labels` output). Everything else is the hosted
-    # floor: a pull_request, any re-run, publish-rust.yml, the `hosted`/unset
+    # floor: a fork pull_request, any re-run, publish-rust.yml, the `hosted`/unset
     # lane, and a route job that produced nothing. The check name stays
     # `rust-ci` (`rust-ci / rust-ci` under candidate-ci.yml): it is the job
     # id, not the pool, and it is a required context. The pool label set is
     # spelled twice (here and in `route`'s --self-hosted-labels); change both
     # together.
     # coord-pools: [self-hosted, Linux, X64, ram-16g] | [ubuntu-latest]
-    runs-on: ${{ fromJSON((github.run_attempt == 1 && github.event_name != 'pull_request' && vars.SCHEMAS_CI_LINUX_LANE == 'self-hosted' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) && '["self-hosted","Linux","X64","ram-16g"]') || (github.run_attempt == 1 && needs.route.outputs.labels) || '["ubuntu-latest"]') }}
+    runs-on: ${{ fromJSON((github.run_attempt == 1 && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.SCHEMAS_CI_LINUX_LANE == 'self-hosted' && (contains(github.workflow_ref, '/.github/workflows/rust-ci.yml@') || contains(github.workflow_ref, '/.github/workflows/candidate-ci.yml@')) && '["self-hosted","Linux","X64","ram-16g"]') || (github.run_attempt == 1 && needs.route.outputs.labels) || '["ubuntu-latest"]') }}
     # A backstop for a hang: hosted runs take 3-7 min and a warm pool run about
     # 4, and on a four-registration pool one stuck job would otherwise hold a
     # quarter of it for the 360-min default.
