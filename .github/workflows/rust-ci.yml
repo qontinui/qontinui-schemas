@@ -234,12 +234,12 @@ jobs:
     #
     # It must also contain every step bound below it, or a step that runs to
     # its own bound expires as a job timeout, which GitHub concludes
-    # `cancelled`. The steps after `cargo test` that carry one sum to 12 min
-    # (the extractor sentinel 1, setup-python 3, setup-node 3, the provisioning
-    # env e2e 5). The adopting author read the job at 4.25-6.30 min hosted over
-    # 9 runs and 3.92 on the pool over 1 (2026-11-03..06; run ids not kept), so
-    # about 18.3 min at most, which leaves room for a cold cache. Re-measure
-    # before tightening this cap.
+    # `cancelled`. The steps after `cargo test` that carry one sum to 1 min
+    # (the extractor sentinel) since the provisioning env e2e moved to its own
+    # job (`provisioning-env-e2e-linux`, 2026-11-11). The adopting author read
+    # the job at 4.25-6.30 min hosted over 9 runs and 3.92 on the pool over 1
+    # (2026-11-03..06; run ids not kept), which leaves room for a cold cache.
+    # Re-measure before tightening this cap.
     timeout-minutes: 30
     steps:
       # persist-credentials: false because no later step needs git auth, and
@@ -505,11 +505,12 @@ jobs:
         # The three tests below are the regression tests for the node-tree
         # extractor's arbitrary-write bug. Their `#[cfg(unix)]` arms are the
         # ones that discriminate, and they are the arms a Linux CI-node host
-        # runs. This is the only Linux job that runs ci-exec's lib tests
-        # (rust-ci is the only workflow carrying `cargo test`), so a rename, a
-        # filter or a cfg that drops one would leave `cargo test` green while
-        # the arm ran nowhere. The step reads the log the step above wrote
-        # (no cargo) and fails unless each one printed `... ok` inside the
+        # runs. This is the one Linux job that runs ci-exec's lib tests on
+        # every run, the merge-candidate runs included (the
+        # provisioning-env-e2e-linux job runs them too, but skips merge-candidate
+        # refs), so a rename, a filter or a cfg that drops one would leave
+        # `cargo test` green while the arm ran nowhere it is checked. The
+        # step reads the log the step above wrote (no cargo) and fails unless each one printed `... ok` inside the
         # ci-exec lib test binary's own section of it. Plan
         # 2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
         # Phase 4.
@@ -546,7 +547,7 @@ jobs:
             if grep -Fqx "test $TEST ... ok" "$SECTION"; then
               echo "ran: test $TEST ... ok"
             else
-              echo "::error::ci-exec's $TEST did not print '... ok' in this leg's cargo test output. Its #[cfg(unix)] arm runs in no other Linux job that runs cargo test; dropping it has to be a decision, not an accident."
+              echo "::error::ci-exec's $TEST did not print '... ok' in this leg's cargo test output. No other Linux job checks that its #[cfg(unix)] arm ran; dropping it has to be a decision, not an accident."
               MISSING=1
             fi
           done
@@ -569,43 +570,73 @@ jobs:
             hit_matrix_for_the_cross_engine_check
           python3 .github/scripts/fleet-nouns-portability.py "$RUNNER_TEMP/fleet-nouns-rust.json"
 
-      # ── Provisioning env e2e (Linux leg; ci-exec-windows is the other) ─────
-      #
-      # The hermetic proof that a CI-node provisioning child (an installer, or
-      # the `--version` run that verifies an installed tool) sees only the
-      # allowlisted environment, never the host's credentials. The test
-      # provisions a probe distribution through the real `tools::provision`
-      # and asserts on the names its verify child recorded. Plan
-      # 2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
-      # Phase 3.
-      #
-      # These steps come AFTER every step that runs python3 or node, because
-      # both setup actions change what later steps resolve (setup-python also
-      # exports LD_LIBRARY_PATH and PKG_CONFIG_PATH on Linux).
-      #
-      # Hosted only, for now. The self-hosted pool runs them once a run there
-      # is measured capable (the plan's Phase 1.3); until then it stays
-      # UNKNOWN, and it loses only the re-run on main and on merge candidates.
-      # Every pull request takes the hosted floor, so a PR's own run always
-      # exercises them.
-      #
-      # NOT mirrored in .qontinui/ci.toml: the test needs a host Python 3 with
-      # `venv`, which the CI-node lane never installs (`no_python_refusal` in
-      # ci-exec/src/tools.rs), plus the setup-python and setup-node actions.
+  provisioning-env-e2e-linux:
+    # ── Provisioning env e2e, Linux leg (ci-exec-windows is the other) ──────
+    #
+    # The hermetic proof that a CI-node provisioning child (an installer, or
+    # the `--version` run that verifies an installed tool) sees only the
+    # allowlisted environment, never the host's credentials. The test
+    # provisions a probe distribution through the real `tools::provision`
+    # and asserts on the names its verify child recorded. Plan
+    # 2026-11-06-ci-node-provisioning-children-inherit-only-an-allowlisted-environment,
+    # Phase 3.
+    #
+    # ITS OWN JOB, PINNED HOSTED (2026-11-11). It used to be three steps at
+    # the end of `rust-ci` gated on `runner.environment == 'github-hosted'`,
+    # on the premise that every pull request takes the hosted floor. Same-repo
+    # pull requests now route to the self-hosted pool like pushes (see
+    # `route`), so under that gate the e2e would silently stop running on
+    # PRs, and under a forced `self-hosted` lane on every first attempt. It
+    # stays on `ubuntu-latest` until a pool run is measured capable (the
+    # plan's Phase 1.3): setup-python and setup-node change PATH,
+    # LD_LIBRARY_PATH and PKG_CONFIG_PATH, which a persistent shared host must
+    # not inherit. This repo is public, so the hosted minutes are free.
+    #
+    # NOT mirrored in .qontinui/ci.toml: the test needs a host Python 3 with
+    # `venv`, which the CI-node lane never installs (`no_python_refusal` in
+    # ci-exec/src/tools.rs), plus the setup-python and setup-node actions.
+    #
+    # SKIPPED ON MERGE-CANDIDATE REFS. Candidate CI is what the self-hosted
+    # routing exists to keep off the shared hosted queue, so a hosted job there
+    # would put coord's land wait back behind it. The PR's own run is where
+    # this proof is made; a merge candidate carries the same tree rebased.
+    # Under candidate-ci.yml (workflow_call) `github.ref` is the caller's, so
+    # the candidate ref is what this reads.
+    if: ${{ !startsWith(github.ref, 'refs/heads/merge-candidate') }}
+    runs-on: ubuntu-latest
+    # Build and test of one crate (hosted, cached) plus the steps' own bounds
+    # (setup-python 3, setup-node 3, the e2e 5).
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test -p qontinui-ci-exec --features import
+        # Teed to a file so the e2e below runs the lib test binary this step
+        # built instead of invoking cargo again. bash runs with
+        # `-eo pipefail`, so cargo's own status still decides the step.
+        shell: bash
+        run: cargo test --locked -p qontinui-ci-exec --features import 2>&1 | tee "$RUNNER_TEMP/cargo-test.out"
+
+      # These come AFTER every cargo step, because both setup actions change
+      # what later steps resolve (setup-python also exports LD_LIBRARY_PATH and
+      # PKG_CONFIG_PATH on Linux).
       - uses: actions/setup-python@v5
-        if: runner.environment == 'github-hosted'
         timeout-minutes: 3
         with:
           python-version: "3.12"
 
       - uses: actions/setup-node@v5
-        if: runner.environment == 'github-hosted'
         timeout-minutes: 3
         with:
           node-version: "22"
 
       - name: Provisioning env e2e
-        if: runner.environment == 'github-hosted'
         timeout-minutes: 5
         shell: bash
         env:
@@ -620,8 +651,8 @@ jobs:
           # PKG_CONFIG_PATH, and the dependency graph carries cc/cmake/
           # pkg-config build scripts, so a second cargo invocation could
           # rebuild inside this job's cap. Run the ci-exec lib test binary the
-          # `cargo test` step built, recovered from its log by the script both
-          # lanes share.
+          # `cargo test` step above built, recovered from its log by the script
+          # both legs share.
           BIN=$(awk -f .github/scripts/ci-exec-lib-test-binary.awk "$RUNNER_TEMP/cargo-test.out")
           if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
             echo "::error::found no runnable ci-exec lib test binary in $RUNNER_TEMP/cargo-test.out, so the e2e did not run. That is UNKNOWN, not a pass."
@@ -652,7 +683,7 @@ jobs:
     # NOT mirrored in .qontinui/ci.toml: that manifest is v1, whose one job
     # runs on any OS, so it cannot pin a Windows leg. A v2 `os = "windows"`
     # job can, once this repo's manifest moves to v2. The provisioning env e2e
-    # below is not mirrored for that reason and for rust-ci's.
+    # below is not mirrored for that reason and for provisioning-env-e2e-linux's.
     runs-on: windows-latest
     # A hung cargo would otherwise run to the 360-min default. The new steps
     # below carry their own bounds (setup-python 3, setup-node 3, the e2e 5);
@@ -672,8 +703,8 @@ jobs:
         shell: bash
         run: cargo test --locked -p qontinui-ci-exec --features import 2>&1 | tee "$(cygpath -u "$RUNNER_TEMP")/cargo-test.out"
 
-      # The provisioning env e2e's Windows leg; rust-ci's copy says what it
-      # proves. Windows is where the allowlist has the most to get right
+      # The provisioning env e2e's Windows leg; provisioning-env-e2e-linux says
+      # what it proves. Windows is where the allowlist has the most to get right
       # (SystemRoot, APPDATA, LOCALAPPDATA, ComSpec, PATHEXT, compared
       # case-insensitively), and the leg has no pool, so it always runs.
       - uses: actions/setup-python@v5
@@ -693,7 +724,8 @@ jobs:
           HTTPS_PROXY: http://127.0.0.1:9
           QONTINUI_E2E_CANARY_PASSWORD: canary-not-a-credential
         run: |
-          # NO CARGO HERE, as in rust-ci: run the binary the step above built.
+          # NO CARGO HERE, as in provisioning-env-e2e-linux: run the binary the
+          # step above built.
           # Its log spells the path with backslashes, which the shared script
           # turns around.
           TMP_DIR="$(cygpath -u "$RUNNER_TEMP")"
