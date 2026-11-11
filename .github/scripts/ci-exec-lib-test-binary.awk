@@ -6,8 +6,9 @@
 #
 # The answer is the path inside the log's
 # `Running unittests src/lib.rs (<dir>/qontinui_ci_exec-<hash>)` line. Both
-# lanes of rust-ci.yml's "Provisioning env e2e" call this to run the binary
-# the `cargo test` step already built, instead of invoking cargo a second time.
+# legs of rust-ci.yml's "Provisioning env e2e" (the provisioning-env-e2e-linux
+# and ci-exec-windows jobs) call this to run the binary their `cargo test` step
+# already built, instead of invoking cargo a second time.
 #
 # * Colour codes are stripped first: dtolnay/rust-toolchain exports
 #   CARGO_TERM_COLOR=always.
