@@ -9,7 +9,7 @@ use super::GlossaryEntry;
 /// The glossary's `version` (glossary/terms.toml).
 pub const GLOSSARY_VERSION: u32 = 3;
 /// SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock).
-pub const GLOSSARY_CONTENT_SHA256: &str = "a8b744cd63c549dd58da91353cb6103dc0f5de28adcbddb2d69df1db5cf3bbed";
+pub const GLOSSARY_CONTENT_SHA256: &str = "033ed6046b5fae2313b916fb51fa91d0f726759eaa859700dd7ed3404d269570";
 
 /// A term the product glossary defines, by its stable snake_case id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
@@ -225,7 +225,7 @@ pub static GLOSSARY: &[GlossaryEntry] = &[
         id: GlossaryTerm::MergeTrain,
         term: "Merge train",
         short: "The service that lands pull requests: it rebases each onto the latest main, runs CI, keeps overlapping changes apart and lands them in order.",
-        long: "By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do, unless something listed below holds it back.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.\n\nWhat holds a pull request back: draft status; a hold placed on it with a stated reason (by a person, an agent or the service itself), which can be set to release itself when a gate clears; a change to a path marked for escalation (secrets or infrastructure, for example); a dependency label naming another pull request that has not landed yet; or a failing main branch, unless the pull request's own checks pass once it is rebased onto main. Passing checks are needed to land, but not enough on their own. Its answer for one pull request is the **merge verdict**.",
+        long: "By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do, unless something listed below holds it back.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.\n\nWhat holds a pull request back: draft status; a hold placed on it with a stated reason (by a person, an agent or the service itself), which can be set to release itself when a gate clears; a change to a path marked for escalation (secrets or infrastructure, for example); a dependency label naming another pull request that has not landed yet; a failing main branch, unless the pull request's own checks pass once it is rebased onto main; or a main branch whose check status is not known yet. Passing checks are needed to land, but not enough on their own. Its answer for one pull request is the **merge verdict**.",
         see_also: &[GlossaryTerm::MergeVerdict, GlossaryTerm::Landed, GlossaryTerm::Gate],
         since: 1,
     },
