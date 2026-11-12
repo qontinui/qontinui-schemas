@@ -20,9 +20,9 @@ export interface GlossaryEntry<Id extends GlossaryTerm = GlossaryTerm> {
 }
 
 /** The glossary's `version` (glossary/terms.toml). */
-export const GLOSSARY_VERSION: number = 2;
+export const GLOSSARY_VERSION: number = 3;
 /** SHA-256 of the canonical glossary content (the parsed terms as JSON; see glossary/versions.lock). */
-export const GLOSSARY_CONTENT_SHA256 = "9f0bb2a99e2b2cee5c4ec306724fc225ecfc8ad93fa29bd38411a343fc519981";
+export const GLOSSARY_CONTENT_SHA256 = "a8b744cd63c549dd58da91353cb6103dc0f5de28adcbddb2d69df1db5cf3bbed";
 
 /** Every term id, in glossary order. */
 export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
@@ -117,8 +117,8 @@ export const GLOSSARY: { readonly [Id in GlossaryTerm]: GlossaryEntry<Id> } = {
     id: "merge_train",
     term: "Merge train",
     short: "The service that lands pull requests: it rebases each onto the latest main, runs CI, keeps overlapping changes apart and lands them in order.",
-    long: "By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.\n\nWhat holds a pull request back: draft status, a gate carrying a merge continuation, or a dependency label naming another pull request that has not landed yet. Its answer for one pull request is the **merge verdict**.",
-    see_also: ["merge_verdict", "landed", "continuation"],
+    long: "By policy, the **merge train** is the one route by which pull requests land on a repository it manages. A green, non-draft pull request is queued with nothing further to do, unless something listed below holds it back.\n\nFor each one it dry-rebases onto current main, detects file overlap with other queued changes (two that touch the same files are kept apart), runs CI, and lands by fast-forward push. The queue is first in, first out; a *land next* priority lane exists but is off unless enabled.\n\nWhat holds a pull request back: draft status; a hold placed on it with a stated reason (by a person, an agent or the service itself), which can be set to release itself when a gate clears; a change to a path marked for escalation (secrets or infrastructure, for example); a dependency label naming another pull request that has not landed yet; or a failing main branch, unless the pull request's own checks pass once it is rebased onto main. Passing checks are needed to land, but not enough on their own. Its answer for one pull request is the **merge verdict**.",
+    see_also: ["merge_verdict", "landed", "gate"],
     since: 1,
   },
   "merge_verdict": {
