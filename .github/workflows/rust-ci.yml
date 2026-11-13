@@ -249,8 +249,8 @@ jobs:
       #      falls back to (it reads 1.95.0 on nawa), and an in-place `stable`
       #      update could swap the compiler under a concurrent job. One
       #      registration runs one job at a time, so a RUSTUP_HOME per
-      #      registration has neither problem. It downloads `stable` once per
-      #      registration and per release.
+      #      registration has neither problem. It downloads the pinned toolchain
+      #      (rust-toolchain.toml) once per registration and per pin bump.
       #   3. A memory-derived compile cap. cargo's default parallelism is nproc
       #      (128 on nawa), a memory spike no unit cap survives.
       #      CARGO_BUILD_JOBS is the smallest of MemTotal and every cgroup
@@ -327,8 +327,10 @@ jobs:
           grep -qx '/target' "$exclude" 2>/dev/null || echo '/target' >> "$exclude"
           echo "target -> $cache ($((used_kb / 1048576)) GiB already built); RUSTUP_HOME -> $state/rustup"
 
-      - uses: dtolnay/rust-toolchain@stable
+      # rust-toolchain.toml pins this; keep every `toolchain:` line in step.
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.95.0"
           components: clippy, rustfmt
 
       # Hosted only. A self-hosted job builds in its registration's persistent
@@ -648,7 +650,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: dtolnay/rust-toolchain@stable
+      # rust-toolchain.toml pins this; keep every `toolchain:` line in step.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
 
       - uses: Swatinem/rust-cache@v2
 

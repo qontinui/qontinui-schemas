@@ -562,8 +562,12 @@ jobs:
             libatspi2.0-dev \
             at-spi2-core
 
+      # Builds the RUNNER checkout, so qontinui-runner's own
+      # rust-toolchain.toml governs; this tracks that pin (and ours).
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
 
       - name: Set up Node.js
         uses: actions/setup-node@v5

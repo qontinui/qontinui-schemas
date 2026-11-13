@@ -1,0 +1,9 @@
+# Pinned to the toolchain this workspace's consumers build it with:
+# qontinui-runner, qontinui-coord and qontinui-supervisor pin 1.95.0 in their
+# own rust-toolchain.toml (qontinui-inspect in its workflow). Unpinned `stable`
+# turned rust-ci red on 2026-11-12, when the runners picked up Rust 1.100.0 and
+# its stricter clippy (#319). Bump deliberately, in step with the siblings' pins
+# and with every `toolchain: "1.95.0"` line in .github/workflows/.
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]

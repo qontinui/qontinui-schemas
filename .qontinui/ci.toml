@@ -136,11 +136,15 @@
 #    There is no tool registry on main at all (no ci_node/tools.rs, no `tools`
 #    key); tool provisioning is what runner#1017 adds. So this lane provisions
 #    NOTHING, and "needs nothing" is emphatically not what that means: every
-#    step below assumes a stable Rust toolchain WITH the `clippy` and `rustfmt`
-#    components already on PATH. The Actions lane gets those from
-#    `dtolnay/rust-toolchain@stable`, which is an Action, not a command. On a
-#    machine without them the fmt and clippy steps fail on a missing binary,
-#    which is a HOST problem this manifest cannot fix and must not pretend to.
+#    step below assumes the Rust toolchain rust-toolchain.toml pins (1.95.0)
+#    WITH the `clippy` and `rustfmt` components. The Actions lane installs it
+#    with `dtolnay/rust-toolchain`, which is an Action, not a command. On a CI
+#    node that manages Rust through rustup, the pin is provisioned IMPLICITLY:
+#    the first cargo call (`cargo fetch --locked`) auto-installs 1.95.0 with
+#    both components, unless RUSTUP_AUTO_INSTALL=0. A node without rustup (a
+#    distro cargo) ignores the file and runs its own version, and one without
+#    clippy or rustfmt fails those steps on a missing binary, which is a HOST
+#    problem this manifest cannot fix and must not pretend to.
 #
 # 8. NO Swatinem/rust-cache EQUIVALENT. The Actions lane restores a warm cargo
 #    cache; a cold CI node compiles the workspace from scratch, which is why the
