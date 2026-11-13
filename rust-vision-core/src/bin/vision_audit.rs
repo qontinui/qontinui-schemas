@@ -1247,12 +1247,15 @@ mod tests {
         // interactive elements.
         let mk = |id: &str, x: i32| Element {
             id: id.into(),
-            bbox: Some(Region {
-                x,
-                y: 0,
-                w: 100,
-                h: 50,
-            }),
+            bbox: Some(
+                Region {
+                    x,
+                    y: 0,
+                    w: 100,
+                    h: 50,
+                }
+                .into(),
+            ),
             text: None,
             role: None,
             interactable: true,
@@ -1310,12 +1313,15 @@ mod tests {
         // implicit in the exit code.
         let mk = |id: &str, x: i32| Element {
             id: id.into(),
-            bbox: Some(Region {
-                x,
-                y: 0,
-                w: 10,
-                h: 10,
-            }),
+            bbox: Some(
+                Region {
+                    x,
+                    y: 0,
+                    w: 10,
+                    h: 10,
+                }
+                .into(),
+            ),
             text: None,
             role: None,
             interactable: false,
@@ -1620,12 +1626,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut e = Element {
             id: "hdr".into(),
-            bbox: Some(Region {
-                x: 1,
-                y: 2,
-                w: 3,
-                h: 4,
-            }),
+            bbox: Some(
+                Region {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                }
+                .into(),
+            ),
             text: None,
             role: None,
             interactable: false,
@@ -1656,12 +1665,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let base_el = Element {
             id: "a".into(),
-            bbox: Some(Region {
-                x: 0,
-                y: 0,
-                w: 100,
-                h: 50,
-            }),
+            bbox: Some(
+                Region {
+                    x: 0,
+                    y: 0,
+                    w: 100,
+                    h: 50,
+                }
+                .into(),
+            ),
             text: None,
             role: None,
             interactable: false,
@@ -1997,12 +2009,15 @@ mod tests {
         ElementSnapshot {
             elements: vec![Element {
                 id: "hero".into(),
-                bbox: Some(Region {
-                    x: 120,
-                    y: 20,
-                    w: 80,
-                    h: 60,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 120,
+                        y: 20,
+                        w: 80,
+                        h: 60,
+                    }
+                    .into(),
+                ),
                 // `fill` paints the whole box, so the box's pixels are the
                 // image's (a fit that may letterbox, unplaced, is unreadable).
                 media: Some(qontinui_vision_core::ElementMedia {

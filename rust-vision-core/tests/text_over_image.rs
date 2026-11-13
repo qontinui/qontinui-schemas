@@ -65,7 +65,7 @@ struct Case {
 fn hero(bbox: Region) -> Element {
     Element {
         id: "hero".into(),
-        bbox: Some(bbox),
+        bbox: Some(bbox.into()),
         media: Some(ElementMedia {
             object_fit: Some(ObjectFit::Fill),
             ..ElementMedia::new(MediaKind::Img)
@@ -82,7 +82,7 @@ fn case(name: &str) -> Case {
     let ch = |i: usize| fg[i].as_u64().unwrap() as u8;
     let heading = Element {
         id: "heading".into(),
-        bbox: Some(region(&c["text"])),
+        bbox: Some(region(&c["text"]).into()),
         text: Some(m["text"].as_str().unwrap().to_string()),
         fg_color: Some(Rgb::new(ch(0), ch(1), ch(2))),
         ..Default::default()
@@ -393,14 +393,17 @@ fn a_hero_occluded_by_its_scrim_is_measured() {
 #[test]
 fn a_box_that_touches_an_image_with_no_glyph_over_it_is_not_over_it() {
     let mut held = case("held");
-    let t = held.snap.elements[1].bbox.unwrap();
+    let t = held.snap.elements[1].region().unwrap();
     // The bottom 6 px of the line box are padding under the ink.
-    held.snap.elements[0].bbox = Some(Region {
-        x: 0,
-        y: t.y + t.h as i32 - 3,
-        w: 320,
-        h: 40,
-    });
+    held.snap.elements[0].bbox = Some(
+        Region {
+            x: 0,
+            y: t.y + t.h as i32 - 3,
+            w: 320,
+            h: 40,
+        }
+        .into(),
+    );
     let r = held.assert_aa();
     assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
     assert!(
@@ -485,12 +488,15 @@ fn a_failure_stands_beside_an_unmeasured_text_and_a_pass_does_not() {
     // glyphs drawn in either frame: no mask, so no colour can be measured.
     let unmeasurable = |id: &str| Element {
         id: id.into(),
-        bbox: Some(Region {
-            x: 200,
-            y: 120,
-            w: 100,
-            h: 30,
-        }),
+        bbox: Some(
+            Region {
+                x: 200,
+                y: 120,
+                w: 100,
+                h: 30,
+            }
+            .into(),
+        ),
         text: Some("caption".into()),
         ..Default::default()
     };
@@ -606,12 +612,15 @@ fn a_short_label_in_a_wide_box_is_measured() {
     }
     let label = Element {
         id: "label".into(),
-        bbox: Some(Region {
-            x: 0,
-            y: 40,
-            w,
-            h: 28,
-        }),
+        bbox: Some(
+            Region {
+                x: 0,
+                y: 40,
+                w,
+                h: 28,
+            }
+            .into(),
+        ),
         text: Some("Hi".into()),
         fg_color: Some(Rgb::new(255, 255, 255)),
         ..Default::default()
@@ -640,15 +649,18 @@ fn a_short_label_in_a_wide_box_is_measured() {
 #[test]
 fn only_leaf_text_elements_are_measured() {
     let mut scrim = case("scrim");
-    let t = scrim.snap.elements[1].bbox.unwrap();
+    let t = scrim.snap.elements[1].region().unwrap();
     scrim.snap.elements.push(Element {
         id: "link".into(),
-        bbox: Some(Region {
-            x: t.x - 4,
-            y: t.y - 4,
-            w: t.w + 8,
-            h: t.h + 8,
-        }),
+        bbox: Some(
+            Region {
+                x: t.x - 4,
+                y: t.y - 4,
+                w: t.w + 8,
+                h: t.h + 8,
+            }
+            .into(),
+        ),
         text: scrim.snap.elements[1].text.clone(),
         fg_color: Some(Rgb::new(20, 20, 20)),
         children_ids: vec!["heading".into()],
@@ -724,7 +736,7 @@ fn a_box_over_a_glyph_free_white_region_never_falsely_passes() {
         (255, AssertionOutcome::Unknown),
     ] {
         let mut wide = case("wide_heading");
-        let t = wide.snap.elements[1].bbox.unwrap();
+        let t = wide.snap.elements[1].region().unwrap();
         for y in t.y as u32..(t.y as u32 + t.h) {
             for x in 240..300u32 {
                 for f in [&mut wide.a, &mut wide.b] {
@@ -782,13 +794,16 @@ fn a_glow_text_shadow_is_judged_on_the_glyph_pixels() {
         } else {
             case(name)
         };
-        let t = banner.snap.elements[1].bbox.unwrap();
-        banner.snap.elements[0].bbox = Some(Region {
-            x: t.x - 20,
-            y: t.y - 20,
-            w: t.w + 40,
-            h: t.h + 40,
-        });
+        let t = banner.snap.elements[1].region().unwrap();
+        banner.snap.elements[0].bbox = Some(
+            Region {
+                x: t.x - 20,
+                y: t.y - 20,
+                w: t.w + 40,
+                h: t.h + 40,
+            }
+            .into(),
+        );
         let r = banner.assert_aa();
         let want = if name == "glow_mid" {
             AssertionOutcome::Passed
@@ -1065,12 +1080,15 @@ fn low_coverage_edge_pixels_are_not_sampled() {
     }
     let label = |w| Element {
         id: "label".into(),
-        bbox: Some(Region {
-            x: 10,
-            y: 30,
-            w,
-            h: 30,
-        }),
+        bbox: Some(
+            Region {
+                x: 10,
+                y: 30,
+                w,
+                h: 30,
+            }
+            .into(),
+        ),
         text: Some("label".into()),
         fg_color: Some(Rgb::new(0, 0, 0)),
         ..Default::default()
@@ -1207,12 +1225,15 @@ fn a_hairline_face_whose_ink_peaks_under_half_coverage_is_measured() {
     }
     let text = Element {
         id: "label".into(),
-        bbox: Some(Region {
-            x: 14,
-            y: 34,
-            w: 56,
-            h: 28,
-        }),
+        bbox: Some(
+            Region {
+                x: 14,
+                y: 34,
+                w: 56,
+                h: 28,
+            }
+            .into(),
+        ),
         text: Some("HH".into()),
         fg_color: Some(Rgb::new(255, 255, 255)),
         ..Default::default()
@@ -1277,7 +1298,7 @@ fn painted(
 fn white_text(id: &str, bbox: Region) -> Element {
     Element {
         id: id.into(),
-        bbox: Some(bbox),
+        bbox: Some(bbox.into()),
         text: Some(id.into()),
         fg_color: Some(Rgb::new(255, 255, 255)),
         ..Default::default()
@@ -1313,12 +1334,15 @@ fn hero_value(
 fn text_reported_not_visible_over_the_image_blocks_a_pass() {
     let badge = |reason: Option<VisibilityReason>| Element {
         id: "badge".into(),
-        bbox: Some(Region {
-            x: 200,
-            y: 120,
-            w: 100,
-            h: 30,
-        }),
+        bbox: Some(
+            Region {
+                x: 200,
+                y: 120,
+                w: 100,
+                h: 30,
+            }
+            .into(),
+        ),
         text: Some("New".into()),
         fg_color: Some(Rgb::new(250, 250, 250)),
         visible: Some(false),
@@ -1578,7 +1602,7 @@ fn a_css_background_heros_own_text_is_measured() {
     let (a, b) = painted((w, h), bg, &strokes, 255);
     let hero_div = |text: &str, children: Vec<String>| Element {
         id: "hero".into(),
-        bbox: Some(region_at(0, 0, w, h)),
+        bbox: Some(region_at(0, 0, w, h).into()),
         text: Some(text.into()),
         fg_color: Some(Rgb::new(255, 255, 255)),
         media: Some(ElementMedia::new(MediaKind::CssBackground)),
@@ -1700,7 +1724,7 @@ fn a_button_label_beside_its_icon_is_not_unknown() {
     button.children_ids = vec!["icon".into()];
     let icon = Element {
         id: "icon".into(),
-        bbox: Some(region_at(110, 40, 16, 16)),
+        bbox: Some(region_at(110, 40, 16, 16).into()),
         media: Some(ElementMedia::new(MediaKind::Svg)),
         ..Default::default()
     };
@@ -2042,7 +2066,7 @@ fn a_declared_colour_that_does_not_paint_the_glyphs_is_unknown() {
 #[test]
 fn a_visually_hidden_label_does_not_block_a_pass() {
     let mut scrim = case("scrim");
-    let hero_box = scrim.snap.elements[0].bbox.unwrap();
+    let hero_box = scrim.snap.elements[0].region().unwrap();
     scrim.snap.elements.push(white_text(
         "sr-only",
         region_at(hero_box.x + 5, hero_box.y + 5, 1, 1),
@@ -2081,21 +2105,21 @@ fn the_text_index_is_not_quadratic_in_the_page() {
         Element {
             id: "main".into(),
             text: Some("x".repeat(n)),
-            bbox: Some(region_at(0, 0, 100, 100)),
+            bbox: Some(region_at(0, 0, 100, 100).into()),
             children_ids: vec!["ul".into()],
             ..Default::default()
         },
         Element {
             id: "ul".into(),
             text: Some("x".repeat(n)),
-            bbox: Some(region_at(0, 0, 100, 100)),
+            bbox: Some(region_at(0, 0, 100, 100).into()),
             ..Default::default()
         },
     ];
     elements.extend((0..n).map(|i| Element {
         id: format!("li{i}"),
         text: Some("x".into()),
-        bbox: Some(region_at(0, 0, 10, 10)),
+        bbox: Some(region_at(0, 0, 10, 10).into()),
         parent_id: Some("ul".into()),
         ..Default::default()
     }));
@@ -2397,7 +2421,7 @@ fn the_local_shift_search_is_bounded_at_scale_factor_4() {
     let [a, b] = frames;
     let hero_div = Element {
         id: "hero".into(),
-        bbox: Some(region_at(0, 0, w, h)),
+        bbox: Some(region_at(0, 0, w, h).into()),
         text: Some("Welcome".into()),
         fg_color: Some(Rgb::new(255, 255, 255)),
         media: Some(ElementMedia::new(MediaKind::CssBackground)),

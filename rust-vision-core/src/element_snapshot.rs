@@ -9,10 +9,12 @@
 //!
 //! Geometry is in CSS pixels throughout — `getBoundingClientRect()` space for
 //! a web page, the platform's device-independent units for other sources —
-//! never frame pixels, and uses [`Region`] (from `frame.rs`). A frame captured
-//! at a device pixel ratio holds that many buffer pixels per CSS pixel, so a
-//! reader of pixels maps each box onto the buffer first with
-//! [`crate::Frame::css_region_to_pixels`]. Visual properties (color, font
+//! never frame pixels. An element's box is an [`ElementRect`], the producer's
+//! UNROUNDED measurement, and each consumer rounds it onto the integer
+//! [`Region`] grid (from `frame.rs`) by its own kind's rule: see
+//! [`ElementRect`]. A frame captured at a device pixel ratio holds that many
+//! buffer pixels per CSS pixel, so a reader of pixels maps each box onto the
+//! buffer first with [`crate::Frame::css_region_to_pixels`]. Visual properties (color, font
 //! size, etc) are optional because not every snapshot source can populate
 //! them — analyzers/assertions that depend on
 //! a missing field surface a soft "skipped: missing X" finding instead of
@@ -165,7 +167,7 @@ pub struct Element {
     /// Stable identifier. Matches the SDK's element registry id where one
     /// exists; otherwise an opaque token.
     pub id: String,
-    /// Pixel-space bounding box. `None` when the snapshot source could not
+    /// Bounding box in CSS pixels. `None` when the snapshot source could not
     /// measure geometry (e.g. a mobile `discover` snapshot that includes
     /// hidden/unmeasured elements). Geometry-based analyzers/assertions
     /// SKIP bbox-less elements (they surface no spurious findings); the
@@ -174,23 +176,17 @@ pub struct Element {
     /// `Option` is a strict superset — existing payloads round-trip
     /// byte-identically (`skip_serializing_if` omits `None`).
     ///
-    /// **Rounding, per kind.** For the geometry kinds (`no_overlap`,
-    /// `element_above`, `no_clipping`, the alignment and layout-shift checks)
-    /// this is the producer's best integer rounding of the fractional
-    /// `getBoundingClientRect()`. Rounding every box UP would inflate it:
-    /// three 33.333 px flex items would read as overlapping.
-    ///
-    /// `text_fits_container` is the exception. Its comparison box is the
-    /// border box rounded UP, the ceiling of the fractional width and height,
-    /// and it reads that box's `w` and `h` from this field. It compares
-    /// [`Self::scroll_width_px`] and [`Self::scroll_height_px`] with them
-    /// strictly, with no slack: content as large as the box fits, and one
-    /// pixel larger does not. Rounding UP keeps the box's own fractional pixel
-    /// from reading as a pixel of overflow. A snapshot that carries the
-    /// geometry rounding here instead makes the text fit stricter by at most
-    /// one pixel at that boundary, never more lenient.
+    /// **Unrounded.** This is the producer's measurement as it took it,
+    /// `getBoundingClientRect()`'s fractions included, and the producer does
+    /// not round it. Each kind rounds it itself, because no single integer box
+    /// serves them all: the geometry kinds snap its edges to the nearest pixel
+    /// ([`ElementRect::grid_region`], through [`Self::region`]), and
+    /// `text_fits_container` rounds its width and height UP
+    /// ([`ElementRect::ceil_size`]); [`ElementRect`] lists who reads which. A
+    /// producer that sends whole numbers is read the same way, a whole number
+    /// being its own rounding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bbox: Option<Region>,
+    pub bbox: Option<ElementRect>,
     /// Visible text content (innerText / accessibilityLabel equivalent).
     /// `None` when the element has no text or the snapshot source didn't
     /// populate it. The two cannot be told apart, which is why
@@ -358,8 +354,8 @@ pub struct Element {
     /// in this codebase — passed cleanly.
     ///
     /// `text_fits_container` compares it with the width of its comparison
-    /// box, the border box rounded UP, strictly and with no slack (see
-    /// [`Self::bbox`]).
+    /// box, `bbox.w` rounded UP, strictly and with no slack (see
+    /// [`ElementRect::ceil_size`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_width_px: Option<u32>,
     /// Height of the element's laid-out content in CSS pixels — the DOM's
@@ -372,8 +368,8 @@ pub struct Element {
     /// it measured nothing, which reads Unknown rather than passing.
     ///
     /// `text_fits_container` compares it with the height of its comparison
-    /// box, the border box rounded UP, strictly and with no slack (see
-    /// [`Self::bbox`]).
+    /// box, `bbox.h` rounded UP, strictly and with no slack (see
+    /// [`ElementRect::ceil_size`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_height_px: Option<u32>,
     /// The producer's own `text-overflow` computed style (`"ellipsis"`,
@@ -395,6 +391,179 @@ pub struct Element {
     /// converter unwraps the UI Bridge SDK's media observation into it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub media: Option<ElementMedia>,
+}
+
+impl Element {
+    /// This element's box on the pixel grid, as every geometry check reads it:
+    /// [`Self::bbox`] with each edge snapped to the nearest pixel
+    /// ([`ElementRect::grid_region`]). `None` when the element has no bbox.
+    pub fn region(&self) -> Option<Region> {
+        self.bbox.map(|b| b.grid_region())
+    }
+}
+
+/// An element's box as the producer measured it: CSS pixels, UNROUNDED.
+/// `getBoundingClientRect()`'s `x`, `y`, `width` and `height`, fractions
+/// included.
+///
+/// Each kind rounds it itself, because one integer box cannot serve them all.
+/// A box rounded to the nearest pixel can hold less than its content: a
+/// 119.4 px label holding 120 px of text would read as overflowing. A box
+/// rounded UP inflates: three 33.333 px flex items would read as overlapping.
+/// So the producer sends the measurement, and:
+///
+/// - the geometry kinds (`no_overlap`, `element_above`, `no_clipping`, the
+///   alignment and layout-shift checks, `contains_text`'s OCR fallback), and
+///   every analyzer that places a box or reads the pixels under it, read
+///   [`Self::grid_region`], each EDGE snapped to the nearest pixel;
+/// - `text_fits_container` reads [`Self::ceil_size`], the width and height
+///   rounded UP;
+/// - a size held against a threshold (the elements analyzer's 24 px target,
+///   the layout analyzer's zero-area box) reads `w` and `h` as measured, so
+///   the verdict does not move with where the box happens to sit on the grid.
+///
+/// On the wire the four keys are JSON numbers. A whole value is written as an
+/// integer (`120`, never `120.0`), as JavaScript writes it, so a snapshot of
+/// whole numbers round-trips byte for byte. `w` and `h` are sizes: a negative
+/// or non-finite one is refused when deserializing, as the unsigned integer
+/// these fields used to be refused it.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(try_from = "ElementRectWire")]
+pub struct ElementRect {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+impl ElementRect {
+    /// The box on the pixel grid, as the geometry kinds read it. Each EDGE is
+    /// rounded to the nearest pixel, ties toward +∞ (JavaScript's
+    /// `Math.round`): `left = round(x)`, `top = round(y)`,
+    /// `right = round(x + w)`, `bottom = round(y + h)`, with `x + w` and
+    /// `y + h` summed in `f64` first. Width and height are the differences of
+    /// the rounded edges, never rounded on their own, so two boxes that share
+    /// an edge in the layout still share it on the grid: rounding `x` and `w`
+    /// separately can open a phantom pixel of overlap between them.
+    pub fn grid_region(&self) -> Region {
+        let left = round_px(self.x);
+        let top = round_px(self.y);
+        let right = round_px(self.x + self.w);
+        let bottom = round_px(self.y + self.h);
+        // Float-to-int `as` saturates, so an absurd coordinate clamps rather
+        // than wrapping; a negative extent (only constructible in Rust, the
+        // wire refuses it) reads as empty.
+        Region {
+            x: left as i32,
+            y: top as i32,
+            w: (right - left).max(0.0) as u32,
+            h: (bottom - top).max(0.0) as u32,
+        }
+    }
+
+    /// The width and height `text_fits_container` compares content with,
+    /// each rounded UP: the ceiling of the unrounded border box, so the box's
+    /// own fractional pixel never reads as a pixel of overflow (a 119.4 px box
+    /// holds 120 px of content, and not 121).
+    pub fn ceil_size(&self) -> (u32, u32) {
+        (self.w.ceil() as u32, self.h.ceil() as u32)
+    }
+}
+
+/// A whole-pixel [`Region`] is an exact measurement: the conversion loses
+/// nothing, and [`ElementRect::grid_region`] gives the same region back.
+impl From<Region> for ElementRect {
+    fn from(r: Region) -> Self {
+        Self {
+            x: f64::from(r.x),
+            y: f64::from(r.y),
+            w: f64::from(r.w),
+            h: f64::from(r.h),
+        }
+    }
+}
+
+/// The wire form [`ElementRect`] is read through, so the refusals live in one
+/// place.
+#[derive(Deserialize)]
+struct ElementRectWire {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+impl TryFrom<ElementRectWire> for ElementRect {
+    type Error = String;
+
+    fn try_from(r: ElementRectWire) -> Result<Self, Self::Error> {
+        if ![r.x, r.y, r.w, r.h].iter().all(|v| v.is_finite()) {
+            return Err(format!(
+                "bbox fields must be finite numbers, got x {} y {} w {} h {}",
+                r.x, r.y, r.w, r.h
+            ));
+        }
+        if r.w < 0.0 || r.h < 0.0 {
+            return Err(format!(
+                "bbox w and h are sizes and cannot be negative, got w {} h {}",
+                r.w, r.h
+            ));
+        }
+        Ok(Self {
+            x: r.x,
+            y: r.y,
+            w: r.w,
+            h: r.h,
+        })
+    }
+}
+
+impl Serialize for ElementRect {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut s = serializer.serialize_struct("ElementRect", 4)?;
+        s.serialize_field("x", &Px(self.x))?;
+        s.serialize_field("y", &Px(self.y))?;
+        s.serialize_field("w", &Px(self.w))?;
+        s.serialize_field("h", &Px(self.h))?;
+        s.end()
+    }
+}
+
+/// One [`ElementRect`] coordinate on the wire: a whole value as an integer,
+/// anything else as a float.
+struct Px(f64);
+
+impl Serialize for Px {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // 2^53: past it an f64 no longer holds every integer, so it is not
+        // written as one.
+        const EXACT_INT: f64 = 9_007_199_254_740_992.0;
+        let v = self.0;
+        if v.fract() == 0.0 && v.abs() <= EXACT_INT {
+            if v >= 0.0 {
+                serializer.serialize_u64(v as u64)
+            } else {
+                serializer.serialize_i64(v as i64)
+            }
+        } else {
+            serializer.serialize_f64(v)
+        }
+    }
+}
+
+/// Nearest integer, ties toward +∞: JavaScript's `Math.round`, so the UI
+/// Bridge SDK's in-tab evaluator and this crate snap the same coordinate to
+/// the same pixel. `f64::round` sends a tie away from zero instead, which
+/// differs on a negative tie: `-10.5` rounds to `-11` there and to `-10` here.
+fn round_px(v: f64) -> f64 {
+    let floor = v.floor();
+    // `v - floor` is exact wherever it can land on 0.5, so the tie test is too.
+    if v - floor >= 0.5 {
+        floor + 1.0
+    } else {
+        floor
+    }
 }
 
 /// [`Element::visibility_reason`]: why an element is reported not visible.
@@ -587,26 +756,113 @@ mod tests {
         let el: Element = serde_json::from_str(json).expect("negative origin must deserialize");
         let bbox = el.bbox.expect("bbox present");
         assert_eq!(
-            bbox.x, -9999,
+            bbox.x, -9999.0,
             "true negative x must survive, not clamp to 0"
         );
-        assert_eq!(bbox.y, -48, "true negative y must survive, not clamp to 0");
-        assert_eq!(bbox.w, 120);
-        assert_eq!(bbox.h, 32);
+        assert_eq!(
+            bbox.y, -48.0,
+            "true negative y must survive, not clamp to 0"
+        );
+        assert_eq!(bbox.w, 120.0);
+        assert_eq!(bbox.h, 32.0);
+        assert_eq!(el.region(), Some(region(-9999, -48, 120, 32)));
 
-        // ...and re-serializes verbatim, so a snapshot can be persisted and
-        // re-read without drifting toward the origin.
+        // ...and re-serializes verbatim, whole numbers as integers, so a
+        // snapshot can be persisted and re-read without drifting toward the
+        // origin or gaining a `.0`.
         let re = serde_json::to_string(&bbox).unwrap();
-        let back: Region = serde_json::from_str(&re).unwrap();
+        assert_eq!(re, r#"{"x":-9999,"y":-48,"w":120,"h":32}"#);
+        let back: ElementRect = serde_json::from_str(&re).unwrap();
         assert_eq!(back, bbox);
     }
 
     #[test]
     fn negative_extent_is_unrepresentable() {
-        // `w`/`h` stay unsigned on purpose: a negative extent is meaningless,
-        // so the type rejects it rather than a consumer having to defend.
-        let json = r#"{"x":0,"y":0,"w":-5,"h":10}"#;
-        assert!(serde_json::from_str::<Region>(json).is_err());
+        // A negative extent is meaningless, so the wire refuses it rather than
+        // a consumer having to defend, as the unsigned integer these fields
+        // used to be refused it.
+        for json in [
+            r#"{"x":0,"y":0,"w":-5,"h":10}"#,
+            r#"{"x":0,"y":0,"w":5,"h":-0.5}"#,
+        ] {
+            assert!(serde_json::from_str::<ElementRect>(json).is_err(), "{json}");
+        }
+        assert!(serde_json::from_str::<Region>(r#"{"x":0,"y":0,"w":-5,"h":10}"#).is_err());
+    }
+
+    // ---------------------------------------------------------------
+    // The unrounded box. The producer sends `getBoundingClientRect()` as it
+    // measured it, and each kind rounds: the geometry kinds snap edges to the
+    // nearest pixel, `text_fits_container` rounds the size up.
+    // ---------------------------------------------------------------
+
+    fn rect(x: f64, y: f64, w: f64, h: f64) -> ElementRect {
+        ElementRect { x, y, w, h }
+    }
+
+    #[test]
+    fn a_fractional_box_round_trips_byte_for_byte() {
+        let json = r#"{"x":0.5,"y":-3.25,"w":119.4,"h":19.6}"#;
+        let r: ElementRect = serde_json::from_str(json).unwrap();
+        assert_eq!(r, rect(0.5, -3.25, 119.4, 19.6));
+        assert_eq!(serde_json::to_string(&r).unwrap(), json);
+    }
+
+    #[test]
+    fn a_whole_pixel_region_converts_exactly_and_snaps_back_to_itself() {
+        let r = region(-20, 7, 40, 33);
+        assert_eq!(ElementRect::from(r).grid_region(), r);
+        assert_eq!(ElementRect::from(r).ceil_size(), (40, 33));
+    }
+
+    #[test]
+    fn grid_region_snaps_edges_to_the_nearest_pixel() {
+        // 33.333..66.667 snaps to 33..67.
+        assert_eq!(
+            rect(33.333, 0.0, 33.334, 20.0).grid_region(),
+            region(33, 0, 34, 20)
+        );
+        // Sub-pixel slop on both edges: 0.4..50.3 snaps to 0..50.
+        assert_eq!(
+            rect(0.4, 0.0, 49.9, 20.0).grid_region(),
+            region(0, 0, 50, 20)
+        );
+    }
+
+    #[test]
+    fn grid_region_keeps_a_shared_edge_shared() {
+        // 0.6 + 10.6 is the same f64 as 11.2, so the two boxes touch. Rounding
+        // the size on its own (round(0.6) + round(10.6) = 1 + 11) would end
+        // the first at 12 and overlap the second by a pixel.
+        let a = rect(0.6, 0.0, 10.6, 20.0).grid_region();
+        let b = rect(11.2, 0.0, 5.0, 20.0).grid_region();
+        assert_eq!(a, region(1, 0, 10, 20));
+        assert_eq!(b, region(11, 0, 5, 20));
+        assert!(!regions_overlap(a, b));
+        assert_eq!(a.right(), b.x as i64);
+    }
+
+    #[test]
+    fn grid_region_breaks_ties_toward_positive_infinity() {
+        // JavaScript's Math.round, not f64::round: -10.5 is -10, not -11.
+        assert_eq!(
+            rect(-20.0, 0.0, 9.5, 1.0).grid_region(),
+            region(-20, 0, 10, 1)
+        );
+        assert_eq!(
+            rect(10.5, -0.5, 1.0, 1.0).grid_region(),
+            region(11, 0, 1, 1)
+        );
+        assert_eq!(round_px(-10.5), -10.0);
+        assert_eq!(round_px(-10.6), -11.0);
+        assert_eq!(round_px(0.49999999999999994), 0.0);
+    }
+
+    #[test]
+    fn ceil_size_rounds_the_box_up() {
+        assert_eq!(rect(0.0, 0.0, 119.4, 19.6).ceil_size(), (120, 20));
+        assert_eq!(rect(3.7, 0.0, 120.0, 20.0).ceil_size(), (120, 20));
+        assert_eq!(rect(0.0, 0.0, 0.0, 0.25).ceil_size(), (0, 1));
     }
 
     #[test]
@@ -675,7 +931,7 @@ mod tests {
         let snap = ElementSnapshot {
             elements: vec![Element {
                 id: "btn".to_string(),
-                bbox: Some(region(0, 0, 40, 20)),
+                bbox: Some(region(0, 0, 40, 20).into()),
                 text: None,
                 role: None,
                 interactable: true,

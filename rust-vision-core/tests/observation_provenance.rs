@@ -48,7 +48,7 @@ fn solid_frame(w: u32, h: u32, color: [u8; 4]) -> Frame {
 fn el(id: &str, x: i32) -> Element {
     Element {
         id: id.to_string(),
-        bbox: Some(region(x, 0, 100, 40)),
+        bbox: Some(region(x, 0, 100, 40).into()),
         text: Some(format!("label {id}")),
         interactable: true,
         ..Default::default()
@@ -97,7 +97,7 @@ fn every_finding_from_a_real_run_names_its_analyzer() {
         })
         .collect();
     let mut tiny = el("tiny", 150);
-    tiny.bbox = Some(region(150, 0, 16, 16));
+    tiny.bbox = Some(region(150, 0, 16, 16).into());
     elements.push(tiny);
     // `image` speaks on a media element over the flat frame: its crop is a
     // low-entropy fill, which is an Info `image_placeholder` finding.
@@ -105,7 +105,7 @@ fn every_finding_from_a_real_run_names_its_analyzer() {
         id: "img".into(),
         // Slot-sized (both sides >= 48 CSS px): a smaller flat image is a
         // swatch, not a placeholder.
-        bbox: Some(region(150, 5, 50, 50)),
+        bbox: Some(region(150, 5, 50, 50).into()),
         // `fill` paints the whole box, so the box's pixels are the image's.
         media: Some(ElementMedia {
             object_fit: Some(ObjectFit::Fill),
