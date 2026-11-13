@@ -16,6 +16,7 @@
 pub mod analyzers;
 pub mod assertions;
 pub mod cache;
+pub mod component_capture;
 pub mod contract;
 pub mod coverage;
 pub mod edge_timing;
@@ -34,9 +35,15 @@ pub mod timeline;
 pub use analyzers::{AnalyzeInput, Analyzer, AnalyzerResult, AnalyzerVerdict, Finding, Severity};
 pub use assertions::{
     evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
-    EvalContext, OcrBlockRef, TextMatchKind, TextTarget, TypographyDimension, WcagLevel,
+    ComponentDiffReport, ComponentFinding, ComponentFindingKind, EvalContext, OcrBlockRef,
+    TextMatchKind, TextTarget, TypographyDimension, ViewportComparison, WcagLevel,
 };
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
+pub use component_capture::{
+    CapturePortal, CaptureRect, CaptureRoot, CaptureTarget, CaptureTargetKind, CaptureViewport,
+    ClipAncestor, ComponentBaseline, ComponentCapture, ComponentCaptureNode,
+    COMPONENT_CAPTURE_SCHEMA_VERSION,
+};
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
 pub use coverage::SnapshotCoverage;
 pub use edge_timing::{

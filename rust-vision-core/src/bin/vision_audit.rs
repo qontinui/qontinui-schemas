@@ -897,6 +897,9 @@ pub fn assert_all_frames(
         ocr_blocks: None, // runner-side only
         baselines: Some(baselines),
         timeline: None, // a timeline arrives through the runner's /vision/assert only
+        // Component captures/baselines arrive through the runner's /vision/assert only.
+        component_baselines: None,
+        component_captures: None,
     };
     let results: Vec<AssertionResult> = assertions
         .iter()
