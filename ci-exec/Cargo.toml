@@ -32,8 +32,10 @@ path = "tests/import_golden.rs"
 required-features = ["import"]
 
 [features]
-# The GitHub-workflow importer and the hybrid workflow generator.
-import = ["dep:serde_yaml_ng"]
+# The GitHub-workflow importer and the hybrid workflow generator. It also
+# carries the `qontinui-ci` CLI's log subscriber, the only user of
+# `tracing-subscriber`: library consumers (the runner, coord) install their own.
+import = ["dep:serde_yaml_ng", "dep:tracing-subscriber"]
 
 [dependencies]
 bytes = "1"
@@ -59,7 +61,10 @@ tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process"
 tokio-util = "0.7"
 toml = "1"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
+# The `qontinui-ci` CLI's log subscriber (feature `import`, which that binary
+# requires). Optional so a library build does not compile it: cargo's
+# `unused_dependencies` lint (1.100) flags it otherwise.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"], optional = true }
 zip = "9"
 
 [target.'cfg(unix)'.dependencies]
