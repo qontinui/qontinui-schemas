@@ -241,6 +241,22 @@ jobs:
     # (2026-11-03..06; run ids not kept), which leaves room for a cold cache.
     # Re-measure before tightening this cap.
     timeout-minutes: 30
+    # A newer push to a PR supersedes that PR's in-flight `rust-ci`. Same-repo
+    # PR runs take a self-hosted pool slot, so without this a superseded head
+    # holds its slot until it finishes, and under SCHEMAS_CI_LINUX_LANE=
+    # self-hosted (no hosted overflow) merge candidates queue behind those dead
+    # runs. Job-level, not workflow-level, because this file is also a
+    # workflow_call callee. Scoped to a FIRST-ATTEMPT pull_request run ON
+    # PURPOSE: every other run (push, dispatch, both workflow_call callers,
+    # whose event is the caller's, and any re-run) gets a group unique to that
+    # run and attempt, so nothing outside a PR is ever cancelled or serialized,
+    # and re-running a superseded head can never cancel the current head's
+    # rust-ci (the newest group member always wins). Do not add a caller that
+    # is triggered by pull_request: it would share rust-ci-pr-<n> with this
+    # file's own PR run and the two would cancel each other.
+    concurrency:
+      group: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && format('rust-ci-pr-{0}', github.event.pull_request.number) || format('rust-ci-run-{0}-{1}', github.run_id, github.run_attempt) }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
     steps:
       # persist-credentials: false because no later step needs git auth, and
       # on the pool .git/config outlives the job in a home every registration
