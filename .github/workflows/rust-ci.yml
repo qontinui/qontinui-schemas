@@ -545,6 +545,18 @@ jobs:
           done
           exit "$MISSING"
 
+      - name: Pool label set and lane declaration agree everywhere
+        # The pool label set is spelled in `route`'s --self-hosted-labels, this
+        # job's `# coord-pools:` line and its runs-on forced literal, and in
+        # .qontinui/ci-pool-variables.toml, the declaration coord's
+        # pool-variable controller reads to decide SCHEMAS_CI_LINUX_LANE. If
+        # they drift, the router counts no pool jobs (a dead pool reads healthy)
+        # or coord judges the wrong pool. Needs Python 3.11+ (tomllib), as the
+        # fleet-nouns step below does. Not mirrored in .qontinui/ci.toml (gap 13).
+        run: |
+          bash .github/scripts/test-ci-lane-labels.sh
+          python3 -I -B .github/scripts/check-ci-lane-labels.py .github/workflows/rust-ci.yml
+
       - name: fleet-nouns.toml patterns agree across Rust, Python and JS
         # fleet-nouns.toml promises one meaning per pattern under Rust `regex`,
         # Python `re` and JS `new RegExp(p)`, because its consumer lints are
@@ -561,17 +573,6 @@ jobs:
             cargo test -p qontinui-types --test fleet_nouns_vocabulary \
             hit_matrix_for_the_cross_engine_check
           python3 .github/scripts/fleet-nouns-portability.py "$RUNNER_TEMP/fleet-nouns-rust.json"
-
-      - name: Pool label set and lane declaration agree everywhere
-        # The pool label set is spelled in `route`'s --self-hosted-labels, this
-        # job's `# coord-pools:` line and its runs-on forced literal, and in
-        # .qontinui/ci-pool-variables.toml, the declaration coord's
-        # pool-variable controller reads to decide SCHEMAS_CI_LINUX_LANE. If
-        # they drift, the router counts no pool jobs (a dead pool reads healthy)
-        # or coord judges the wrong pool. Needs Python 3.11+ (tomllib).
-        run: |
-          bash .github/scripts/test-ci-lane-labels.sh
-          python3 -I -B .github/scripts/check-ci-lane-labels.py .github/workflows/rust-ci.yml
 
       # ── Provisioning env e2e (Linux leg; ci-exec-windows is the other) ─────
       #

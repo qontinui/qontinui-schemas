@@ -136,7 +136,7 @@ def parse_declaration(text: str) -> dict[str, list[str]]:
 
 
 def check(text: str, declared: dict[str, list[str]] | None = None) -> list[str]:
-    """Drift in ci.yml; with `declared`, also against the lane-variable declaration."""
+    """Drift in rust-ci.yml; with `declared`, also against the lane-variable declaration."""
     problems: list[str] = []
     lanes_read: set[str] = set()
     jobs = split_jobs(text)
