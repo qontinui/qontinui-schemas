@@ -225,8 +225,9 @@ type ImageCrop<'a> = (&'a Element, &'a ElementMedia, Crop);
 struct PageCrops<'a> {
     /// Every examined image and its crop.
     crops: Vec<ImageCrop<'a>>,
-    /// Images left out as unrendered ([`img::unrendered`]: a zero-area box,
-    /// or reported `hidden` / `no-layout` — nothing of them is on the frame).
+    /// Images left out as unrendered ([`img::unrendered`]: a box on no whole
+    /// pixel, or reported `hidden` / `no-layout` — nothing of them is on the
+    /// frame).
     unrendered: usize,
     /// CSS-background rows, left out with a disclosed note: their painted
     /// region is set by background-size, -position and -repeat, which no
@@ -322,7 +323,8 @@ fn nothing_examined(a: Assertion, page: &PageCrops<'_>) -> AssertionResult {
 fn unrendered_note(n: usize) -> String {
     if n > 0 {
         format!(
-            " ({n} unrendered image(s) left out: a zero-area box, or reported hidden / no-layout)"
+            " ({n} unrendered image(s) left out: a box on no whole pixel, or reported hidden / \
+             no-layout)"
         )
     } else {
         String::new()
