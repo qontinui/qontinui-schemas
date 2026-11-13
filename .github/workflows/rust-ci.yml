@@ -599,9 +599,11 @@ jobs:
     # ci-exec/src/tools.rs), plus the setup-python and setup-node actions.
     #
     # SKIPPED ON MERGE-CANDIDATE REFS. Candidate CI is what the self-hosted
-    # routing exists to keep off the shared hosted queue, so a hosted job there
-    # would put coord's land wait back behind it. The PR's own run is where
-    # this proof is made; a merge candidate carries the same tree rebased.
+    # routing exists to keep off the shared hosted queue, so this job does not
+    # add a hosted slot there. It does not take coord's land wait off the
+    # hosted queue on its own: ci-exec-windows (windows-latest) still runs on
+    # every candidate. The PR's own run is where this proof is made; a merge
+    # candidate carries the same tree rebased.
     # Under candidate-ci.yml (workflow_call) `github.ref` is the caller's, so
     # the candidate ref is what this reads.
     if: ${{ !startsWith(github.ref, 'refs/heads/merge-candidate') }}
