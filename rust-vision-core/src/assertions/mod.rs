@@ -117,6 +117,14 @@ pub enum Assertion {
     /// pass on an un-measured axis is what let truncated labels through
     /// before. An element that carries no text is `unknown{input_missing}`
     /// too: there is nothing to fit, so nothing was checked.
+    ///
+    /// Both measured comparisons are strict, with no slack, against the
+    /// comparison box: the border box rounded UP (the ceiling of its
+    /// fractional width and height), whose `w` and `h` are read from the
+    /// element's `bbox`. Content exactly as large as that box fits, and one
+    /// pixel larger does not. Only this kind rounds up; the geometry kinds
+    /// read `bbox` as the producer's best integer rounding (see
+    /// [`crate::element_snapshot::Element::bbox`]).
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -411,7 +419,8 @@ pub enum TextScale {
 impl TextScale {
     /// 18 pt in CSS pixels.
     pub const LARGE_MIN_PX: f32 = 24.0;
-    /// 14 pt in CSS pixels is 18.666…; the rule takes it at 18.66.
+    /// 14 pt is 18.6667 CSS px. The threshold is 18.66, which is deliberately
+    /// lenient: by under 0.007 px.
     pub const LARGE_BOLD_MIN_PX: f32 = 18.66;
     /// The weight at which text counts as bold: CSS `bold` computes to 700.
     pub const BOLD_MIN_WEIGHT: f32 = 700.0;

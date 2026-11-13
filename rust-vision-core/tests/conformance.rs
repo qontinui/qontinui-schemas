@@ -40,6 +40,21 @@
 //! multiplication (in JavaScript, `Math.fround`), or it disagrees within about
 //! 1e-6 of a boundary: `10.666667 * 1.5` ceils to 16 in `f32` and to 17 in
 //! `f64`. The cases stay clear of such values; the rule does not.
+//!
+//! **Geometry, for a port.** Rounding is scoped by kind (see `Element::bbox`).
+//!
+//! - `text_fits_container`: the comparison box is the border box rounded UP,
+//!   the ceiling of the fractional `getBoundingClientRect()` width and height,
+//!   and it is what a case's `bbox` `w` and `h` hold. `scroll_width_px` /
+//!   `scroll_height_px` are the DOM's integer `scrollWidth` / `scrollHeight`,
+//!   compared with it strictly, with no slack: content exactly as large as the
+//!   box fits, and one pixel larger does not. The `*-ceiled-box-*` cases pin
+//!   both sides of that boundary.
+//! - The geometry kinds (`no_overlap`, `element_above`, `no_clipping`): `bbox`
+//!   is the producer's best integer rounding of the fractional rect, and
+//!   nothing requires a ceiling there. Rounding every box up would make three
+//!   33.333 px flex items overlap; the `no-overlap-adjacent-flex-thirds-*` case
+//!   is that row, rounded to the nearest pixel.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
