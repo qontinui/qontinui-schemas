@@ -150,10 +150,7 @@ impl JourneyFilter {
                 return false;
             }
         }
-        if self.run_kind.is_some_and(|kind| edge.run_kind != kind) {
-            return false;
-        }
-        true
+        self.run_kind.is_none_or(|kind| edge.run_kind == kind)
     }
 }
 
