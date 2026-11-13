@@ -2,7 +2,8 @@
 //! `matches_isolated_render` through the crate's PUBLIC surface, the way the
 //! runner's `vision/assert` reaches it: the assertion and both captures are
 //! parsed from their wire JSON, and the verdict comes from
-//! `qontinui_vision_core::evaluate_assertion`. The unit tests in
+//! the public dispatcher (`qontinui_vision_core::assertions::evaluate`,
+//! re-exported as `evaluate_assertion`). The unit tests in
 //! `assertions/component.rs` pin the evaluator's semantics; this file pins
 //! that the variant, the capture types and the `EvalContext` fields are all
 //! reachable from outside the crate.
@@ -10,7 +11,7 @@
 use std::collections::HashMap;
 
 use qontinui_vision_core::{
-    evaluate_assertion, Assertion, AssertionOutcome, ComponentBaseline, ComponentCapture,
+    assertions, Assertion, AssertionOutcome, AssertionResult, ComponentBaseline, ComponentCapture,
     ComponentDiffReport, ComponentFindingKind, EvalContext,
 };
 use serde_json::json;
@@ -48,7 +49,7 @@ fn assertion() -> Assertion {
     .expect("the assertion's wire form parses")
 }
 
-fn outcome_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> AssertionOutcome {
+fn result_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> AssertionResult {
     let baselines: HashMap<String, ComponentBaseline> = baseline
         .into_iter()
         .map(|capture| {
@@ -67,36 +68,33 @@ fn outcome_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> 
         component_captures: Some(&captures),
         ..Default::default()
     };
-    let r = evaluate_assertion(&assertion(), &ctx);
-    if r.outcome == AssertionOutcome::Failed {
-        let report: ComponentDiffReport =
-            serde_json::from_str(r.detail.as_deref().expect("a failure carries detail"))
-                .expect("detail is a ComponentDiffReport");
-        assert!(
-            !report.findings.is_empty()
-                && report
-                    .findings
-                    .iter()
-                    .all(|f| f.kind == ComponentFindingKind::Size),
-            "the only divergence is size: {report:?}"
-        );
-    }
-    r.outcome
+    // `assertions::evaluate` is the dispatcher the crate re-exports as
+    // `evaluate_assertion`; the runner calls it under that name.
+    assertions::evaluate(&assertion(), &ctx)
 }
 
 #[test]
 fn a_stretched_component_fails_through_the_public_dispatcher() {
     // 200 of a 400-wide parent in isolation, 1000 of a 1000-wide parent in situ.
-    assert_eq!(
-        outcome_of(Some(capture(200.0, 400.0)), capture(1000.0, 1000.0)),
-        AssertionOutcome::Failed
+    let r = result_of(Some(capture(200.0, 400.0)), capture(1000.0, 1000.0));
+    assert_eq!(r.outcome, AssertionOutcome::Failed);
+    let report: ComponentDiffReport =
+        serde_json::from_str(r.detail.as_deref().expect("a failure carries detail"))
+            .expect("detail is a ComponentDiffReport");
+    assert!(
+        !report.findings.is_empty()
+            && report
+                .findings
+                .iter()
+                .all(|f| f.kind == ComponentFindingKind::Size),
+        "the only divergence is size: {report:?}"
     );
 }
 
 #[test]
 fn an_identical_render_passes_through_the_public_dispatcher() {
     assert_eq!(
-        outcome_of(Some(capture(200.0, 400.0)), capture(200.0, 400.0)),
+        result_of(Some(capture(200.0, 400.0)), capture(200.0, 400.0)).outcome,
         AssertionOutcome::Passed
     );
 }
@@ -104,7 +102,7 @@ fn an_identical_render_passes_through_the_public_dispatcher() {
 #[test]
 fn an_unregistered_baseline_is_unknown_through_the_public_dispatcher() {
     assert_eq!(
-        outcome_of(None, capture(200.0, 400.0)),
+        result_of(None, capture(200.0, 400.0)).outcome,
         AssertionOutcome::Unknown
     );
 }
