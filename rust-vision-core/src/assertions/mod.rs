@@ -115,7 +115,8 @@ pub enum Assertion {
     /// `scroll_width_px`, or neither `scroll_height_px` nor `font_size_px` —
     /// makes it `unknown{input_missing}` rather than a pass, because a silent
     /// pass on an un-measured axis is what let truncated labels through
-    /// before.
+    /// before. An element that carries no text is `unknown{input_missing}`
+    /// too: there is nothing to fit, so nothing was checked.
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -391,7 +392,12 @@ impl WcagLevel {
 /// An input the producer did not measure never makes text large, because
 /// that is the lenient direction. With no `font_size_px` the text is
 /// [`Self::Normal`]; with no `font_weight` it is not bold, so it is large
-/// only when its size alone qualifies.
+/// only when its size alone qualifies. That picks the stricter threshold, but
+/// it is not a measurement: when the verdict hangs on the scale (a ratio
+/// between the large-text and normal-text minimums) and
+/// [`Self::undetermined_by`] names a missing input, `contrast_meets_wcag`
+/// answers `unknown{input_missing}` instead of failing text it could not show
+/// was normal.
 ///
 /// The comparisons run on the `f32` the snapshot carries. The UI Bridge SDK's
 /// TypeScript port of this rule is held to it by
@@ -420,6 +426,22 @@ impl TextScale {
             Self::Large
         } else {
             Self::Normal
+        }
+    }
+
+    /// The missing input that leaves `el`'s scale undecided, if any: no
+    /// `font_size_px` at all, or a size in the bold-large band
+    /// (`LARGE_BOLD_MIN_PX..LARGE_MIN_PX`) with no `font_weight`.
+    pub fn undetermined_by(el: &crate::element_snapshot::Element) -> Option<&'static str> {
+        match el.font_size_px {
+            None => Some("`font_size_px`"),
+            Some(size)
+                if el.font_weight.is_none()
+                    && (Self::LARGE_BOLD_MIN_PX..Self::LARGE_MIN_PX).contains(&size) =>
+            {
+                Some("`font_weight`")
+            }
+            Some(_) => None,
         }
     }
 
@@ -1369,8 +1391,17 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     // fragment), VERTICAL is `scroll_height_px` against it. Only the vertical
     // arm has a fallback, an estimate from the font size, kept for producers
     // that do not send `scroll_height_px` yet.
+    // No text is nothing to fit, and nothing was checked: unknown, never a
+    // vacuous pass (plan 2026-11-09 Phase 0 — a verdict is never read off an
+    // absence). The conformance fixture pins this for every port.
     if el.text.is_none() {
-        return AssertionResult::pass_with(assertion, "element has no text — vacuously fits");
+        return AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "element '{element}' carries no text, so there is no text to fit and nothing was checked"
+            ),
+        );
     }
     let bbox = match el.bbox {
         Some(bb) => bb,
@@ -1917,6 +1948,10 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         }
     }
     let mut offender: Option<(String, String)> = None;
+    // Pairs actually compared. A `parent_id` naming an unregistered or
+    // bbox-less parent, a bbox-less child, or a region holding no child
+    // compares nothing — and nothing compared is unknown, not a pass.
+    let mut compared = 0usize;
     for el in &snap.elements {
         // A bbox-less child has no geometry to clip — skip it.
         let Some(el_bbox) = el.bbox else { continue };
@@ -1928,6 +1963,7 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
                         continue;
                     }
                 }
+                compared += 1;
                 if !region_contains(*parent_bbox, el_bbox) {
                     offender = Some((el.id.clone(), parent_id.clone()));
                     break;
@@ -1939,6 +1975,20 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         AssertionResult::fail(
             assertion,
             format!("element '{child}' extends past its parent '{parent}'"),
+        )
+    } else if compared == 0 {
+        AssertionResult::unknown(
+            assertion,
+            UnknownCode::InputMissing,
+            format!(
+                "no child/parent pair was compared: no element{} has a bbox and a `parent_id` \
+                 naming a registered element with a bbox, so nothing was checked",
+                if scope.is_some() {
+                    " in the region"
+                } else {
+                    ""
+                }
+            ),
         )
     } else {
         AssertionResult::pass(assertion)
@@ -1987,6 +2037,23 @@ fn eval_contrast(element: String, level: WcagLevel, ctx: &EvalContext<'_>) -> As
     let needed = level.min_ratio(scale);
     let text = scale.as_str();
     if ratio < needed {
+        // Below the normal-text minimum but at or above the large-text one:
+        // the verdict hangs on the scale, so an unmeasured size or weight
+        // leaves it unknown rather than failed.
+        let large_needed = level.min_ratio(TextScale::Large);
+        let undecided = TextScale::undetermined_by(el).filter(|_| ratio >= large_needed);
+        if let Some(missing) = undecided {
+            return AssertionResult::unknown(
+                assertion,
+                UnknownCode::InputMissing,
+                format!(
+                    "contrast ratio {ratio:.2}:1 meets the WCAG {level:?} large-text minimum \
+                     {large_needed:.1}:1 but not the normal-text minimum {needed:.1}:1, and the \
+                     snapshot carries no {missing}, so whether the text is large was never \
+                     measured"
+                ),
+            );
+        }
         AssertionResult::fail(
             assertion,
             format!(
