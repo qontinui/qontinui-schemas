@@ -48,7 +48,7 @@ fn assertion() -> Assertion {
     .expect("the assertion's wire form parses")
 }
 
-fn evaluate(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> AssertionOutcome {
+fn outcome_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> AssertionOutcome {
     let baselines: HashMap<String, ComponentBaseline> = baseline
         .into_iter()
         .map(|capture| {
@@ -73,10 +73,11 @@ fn evaluate(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> As
             serde_json::from_str(r.detail.as_deref().expect("a failure carries detail"))
                 .expect("detail is a ComponentDiffReport");
         assert!(
-            report
-                .findings
-                .iter()
-                .any(|f| f.kind == ComponentFindingKind::Size),
+            !report.findings.is_empty()
+                && report
+                    .findings
+                    .iter()
+                    .all(|f| f.kind == ComponentFindingKind::Size),
             "the only divergence is size: {report:?}"
         );
     }
@@ -87,7 +88,7 @@ fn evaluate(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> As
 fn a_stretched_component_fails_through_the_public_dispatcher() {
     // 200 of a 400-wide parent in isolation, 1000 of a 1000-wide parent in situ.
     assert_eq!(
-        evaluate(Some(capture(200.0, 400.0)), capture(1000.0, 1000.0)),
+        outcome_of(Some(capture(200.0, 400.0)), capture(1000.0, 1000.0)),
         AssertionOutcome::Failed
     );
 }
@@ -95,7 +96,7 @@ fn a_stretched_component_fails_through_the_public_dispatcher() {
 #[test]
 fn an_identical_render_passes_through_the_public_dispatcher() {
     assert_eq!(
-        evaluate(Some(capture(200.0, 400.0)), capture(200.0, 400.0)),
+        outcome_of(Some(capture(200.0, 400.0)), capture(200.0, 400.0)),
         AssertionOutcome::Passed
     );
 }
@@ -103,7 +104,7 @@ fn an_identical_render_passes_through_the_public_dispatcher() {
 #[test]
 fn an_unregistered_baseline_is_unknown_through_the_public_dispatcher() {
     assert_eq!(
-        evaluate(None, capture(200.0, 400.0)),
+        outcome_of(None, capture(200.0, 400.0)),
         AssertionOutcome::Unknown
     );
 }
