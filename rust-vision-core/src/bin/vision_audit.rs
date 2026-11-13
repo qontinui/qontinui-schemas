@@ -23,6 +23,11 @@
 //!   * `vision-audit analyze  --snapshot S [--frame F --scale-factor N [--frame-text-hidden T]] [--analyzer A] [--fail-on L]`
 //!   * `vision-audit assert   --snapshot S [--frame F --scale-factor N [--frame-text-hidden T]] --assertions A [--baseline-dir D]`
 //!   * `vision-audit baseline --snapshot S --name N --baseline-dir D`
+//!   * `vision-audit hash <file>...` — perceptual + content hashes of raster
+//!     image files, through the library's [`qontinui_vision_core::hash_file`]
+//!     (the same pHash/dHash the image analyzer runs). Exit 0 when at least one
+//!     file hashed, 1 when every file failed (or none was given); a file that
+//!     cannot be read or decoded is a per-file error object, never a crash.
 //!
 //! A frame always travels with its scale factor: snapshot bboxes are CSS
 //! pixels, the frame is device pixels, and the analyzers map one onto the
@@ -89,6 +94,7 @@ USAGE:
     vision-audit analyze  --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file> [--text-hidden-ids <file>]]] [--analyzer <a>] [--fail-on <level>]
     vision-audit assert   --snapshot <file> [--frame <file> --scale-factor <n> [--frame-text-hidden <file> [--text-hidden-ids <file>]]] --assertions <file> [--baseline-dir <dir>]
     vision-audit baseline --snapshot <file> --name <name> --baseline-dir <dir>
+    vision-audit hash     <file>...
 
 FRAME:
     --frame         PNG/JPEG/WebP screenshot captured in lockstep with the snapshot.
@@ -128,8 +134,22 @@ BASELINE:
     Serialize the snapshot's element bboxes to <baseline-dir>/<name>.json so a
     later `assert` run can evaluate no_layout_shift_since against it.
 
+HASH:
+    Perceptual and content hashes of raster image files (PNG, JPEG, WebP),
+    the same pHash/dHash the image analyzer computes, over the whole image.
+    SVG is NOT supported: rasterise it first, then hash the raster.
+    stdout is one JSON document: {\"files\": [...], \"hashed\": n, \"failed\": m},
+    one entry per argument in argument order:
+      {\"path\", \"ok\": true, \"phash\", \"dhash\", \"width\", \"height\", \"sha256\"}
+      {\"path\", \"ok\": false, \"error\": {\"code\", \"message\"}}
+    phash/dhash are 16 lowercase hex digits (imagehash-compatible; compare by
+    Hamming distance); sha256 is of the file bytes. Error codes: read_failed,
+    decode_failed, empty_image. Exit 0 if at least one file hashed; 1 if every
+    file failed or no file was given. A `--` ends option parsing.
+
 OUTPUT: machine JSON -> stdout, human summary -> stderr.
-EXIT:   0 ok / gate passed, 2 gate failed, 1 usage|io|parse error.
+EXIT:   0 ok / gate passed, 2 gate failed, 1 usage|io|parse error
+        (hash: 1 also when every file failed).
 
 NOTE: OCR/VLM run runner-side only; this bin uses the snapshot-text path and
       reports \"ocr_unavailable\" rather than erroring on OCR-dependent checks.";
@@ -169,6 +189,7 @@ fn run(args: &[String]) -> Result<u8, CliError> {
         "analyze" => run_analyze(rest),
         "assert" => run_assert(rest),
         "baseline" => run_baseline(rest),
+        "hash" => run_hash(rest),
         "-h" | "--help" | "help" => {
             eprintln!("{USAGE}");
             Ok(EXIT_OK)
@@ -1052,6 +1073,72 @@ fn load_baselines(dir: &Path) -> Result<HashMap<String, BaselineEntry>, CliError
         out.insert(stem.to_string(), parsed);
     }
     Ok(out)
+}
+
+// ===========================================================================
+// hash
+// ===========================================================================
+
+/// `vision-audit hash <file>...` — see the HASH section of [`USAGE`].
+fn run_hash(args: &[String]) -> Result<u8, CliError> {
+    let mut paths: Vec<&str> = Vec::new();
+    let mut options_done = false;
+    for arg in args {
+        if !options_done && arg == "--" {
+            options_done = true;
+        } else if !options_done && (arg == "-h" || arg == "--help") {
+            eprintln!("{USAGE}");
+            return Ok(EXIT_OK);
+        } else if !options_done && arg.starts_with('-') && arg.len() > 1 {
+            return Err(CliError::usage(format!(
+                "hash takes no flags, got {arg:?} (use `--` before a file named like a flag)"
+            )));
+        } else {
+            paths.push(arg);
+        }
+    }
+    if paths.is_empty() {
+        return Err(CliError::usage("hash needs at least one file"));
+    }
+
+    let (report, hashed) = hash_report(&paths);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).map_err(|e| CliError::io(e.to_string()))?
+    );
+    let failed = paths.len() - hashed;
+    eprintln!("vision-audit hash: {hashed} hashed, {failed} failed");
+    Ok(if hashed == 0 { EXIT_USAGE } else { EXIT_OK })
+}
+
+/// Hash every path, in order, into the `{files, hashed, failed}` report.
+/// Returns the report and the number of files that hashed.
+fn hash_report(paths: &[&str]) -> (serde_json::Value, usize) {
+    let mut hashed = 0;
+    let files: Vec<serde_json::Value> = paths
+        .iter()
+        .map(|path| match qontinui_vision_core::hash_file(path) {
+            Ok(h) => {
+                hashed += 1;
+                let mut v = serde_json::to_value(&h).unwrap_or_default();
+                if let serde_json::Value::Object(map) = &mut v {
+                    map.insert("path".into(), serde_json::json!(path));
+                    map.insert("ok".into(), serde_json::json!(true));
+                }
+                v
+            }
+            Err(e) => serde_json::json!({
+                "path": path,
+                "ok": false,
+                "error": { "code": e.code(), "message": e.to_string() },
+            }),
+        })
+        .collect();
+    let failed = files.len() - hashed;
+    (
+        serde_json::json!({ "files": files, "hashed": hashed, "failed": failed }),
+        hashed,
+    )
 }
 
 // ===========================================================================

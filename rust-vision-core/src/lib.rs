@@ -24,6 +24,7 @@ pub mod element_snapshot;
 pub mod encode;
 pub mod error;
 pub mod frame;
+pub mod image_hash;
 pub mod observation;
 pub mod page_health;
 pub mod pipeline;
@@ -52,6 +53,7 @@ pub use element_snapshot::{
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};
+pub use image_hash::{hash_bytes, hash_file, ImageHashError, ImageHashes};
 pub use observation::{
     CacheProvenance, Observation, ObservationCoverage, ObservationError, ObservationState,
     ObservationStatus, Producer, Provenance, UnknownCode, UnknownInfo, UnmeasuredDimension,
