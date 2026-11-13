@@ -422,11 +422,13 @@ impl Element {
 ///   the layout analyzer's zero-area box) reads `w` and `h` as measured, so
 ///   the verdict does not move with where the box happens to sit on the grid.
 ///
-/// On the wire the four keys are JSON numbers. A whole value is written as an
-/// integer (`120`, never `120.0`), as JavaScript writes it, so a snapshot of
-/// whole numbers round-trips byte for byte. `w` and `h` are sizes: a negative
-/// or non-finite one is refused when deserializing, as the unsigned integer
-/// these fields used to be refused it.
+/// On the wire the four keys are JSON numbers. A whole value (up to 2^53) is
+/// written as an integer (`120`, never `120.0`), as JavaScript writes it, so
+/// a snapshot of whole numbers round-trips byte for byte. Reading refuses a
+/// non-finite value; a negative `w` or `h`, as the unsigned integer these
+/// fields used to be refused it; and an edge (`x`, `y`, `x + w`, `y + h`)
+/// outside the `i32` range, so every box read snaps to the grid ([`Region`])
+/// with nothing clamped.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(try_from = "ElementRectWire")]
 pub struct ElementRect {
@@ -446,13 +448,20 @@ impl ElementRect {
     /// an edge in the layout still share it on the grid: rounding `x` and `w`
     /// separately can open a phantom pixel of overlap between them.
     pub fn grid_region(&self) -> Region {
-        let left = round_px(self.x);
-        let top = round_px(self.y);
+        // The near edges are clamped into the `i32` range a region's origin
+        // holds BEFORE the extent is taken, so a near edge past it moves
+        // alone and the far edge stays where it was; saturating `x` while
+        // keeping the full `w` would move the far edge instead. The far edges
+        // are not clamped, so every whole-pixel `Region` snaps back to itself
+        // (its far edge can pass `i32::MAX`). Only a box built in Rust gets
+        // past the range (reading refuses such an edge), and the same goes
+        // for an extent past `u32::MAX`, which saturates, and for a negative
+        // one, which reads as empty.
+        let origin = |v: f64| round_px(v).clamp(f64::from(i32::MIN), f64::from(i32::MAX));
+        let left = origin(self.x);
+        let top = origin(self.y);
         let right = round_px(self.x + self.w);
         let bottom = round_px(self.y + self.h);
-        // Float-to-int `as` saturates, so an absurd coordinate clamps rather
-        // than wrapping; a negative extent (only constructible in Rust, the
-        // wire refuses it) reads as empty.
         Region {
             x: left as i32,
             y: top as i32,
@@ -509,6 +518,20 @@ impl TryFrom<ElementRectWire> for ElementRect {
                 r.w, r.h
             ));
         }
+        // Every edge in range rounds to an `i32` too, so the snap to the grid
+        // never has to clamp one.
+        let grid = f64::from(i32::MIN)..=f64::from(i32::MAX);
+        let (right, bottom) = (r.x + r.w, r.y + r.h);
+        if ![r.x, r.y, right, bottom].iter().all(|v| grid.contains(v)) {
+            return Err(format!(
+                "bbox edges must lie within {}..={} px, got left {} top {} right {right} \
+                 bottom {bottom}",
+                grid.start(),
+                grid.end(),
+                r.x,
+                r.y
+            ));
+        }
         Ok(Self {
             x: r.x,
             y: r.y,
@@ -530,17 +553,24 @@ impl Serialize for ElementRect {
     }
 }
 
-/// One [`ElementRect`] coordinate on the wire: a whole value as an integer,
-/// anything else as a float.
+/// One [`ElementRect`] coordinate on the wire: a whole value up to 2^53 as an
+/// integer, anything else as a float.
 struct Px(f64);
 
 impl Serialize for Px {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        // 2^53: past it an f64 no longer holds every integer, so it is not
-        // written as one.
-        const EXACT_INT: f64 = 9_007_199_254_740_992.0;
+        // Up to 2^53 a whole value is written as its integer digits, which
+        // are the digits JavaScript writes for it, so a snapshot of whole
+        // numbers round-trips byte for byte. Past 2^53 JavaScript may write
+        // fewer significant digits padded with zeros (2^60 as
+        // 1152921504606847000, not 1152921504606846976), which neither form
+        // here reproduces; such a value is written as a float, which reads
+        // back as the same f64 and needs no cast that could saturate. Reading
+        // refuses an edge outside `i32`, so only a box built in Rust gets
+        // past the bound.
+        const JS_EXACT_INT: f64 = 9_007_199_254_740_992.0; // 2^53
         let v = self.0;
-        if v.fract() == 0.0 && v.abs() <= EXACT_INT {
+        if v.fract() == 0.0 && v.abs() <= JS_EXACT_INT {
             if v >= 0.0 {
                 serializer.serialize_u64(v as u64)
             } else {
@@ -813,6 +843,13 @@ mod tests {
         let r = region(-20, 7, 40, 33);
         assert_eq!(ElementRect::from(r).grid_region(), r);
         assert_eq!(ElementRect::from(r).ceil_size(), (40, 33));
+        // At the extremes too: a far edge past i32::MAX is not clamped.
+        for r in [
+            region(i32::MAX, i32::MAX, u32::MAX, u32::MAX),
+            region(i32::MIN, i32::MIN, u32::MAX, u32::MAX),
+        ] {
+            assert_eq!(ElementRect::from(r).grid_region(), r);
+        }
     }
 
     #[test]
@@ -863,6 +900,57 @@ mod tests {
         assert_eq!(rect(0.0, 0.0, 119.4, 19.6).ceil_size(), (120, 20));
         assert_eq!(rect(3.7, 0.0, 120.0, 20.0).ceil_size(), (120, 20));
         assert_eq!(rect(0.0, 0.0, 0.0, 0.25).ceil_size(), (0, 1));
+    }
+
+    #[test]
+    fn an_edge_outside_the_i32_grid_is_refused_when_reading() {
+        // The grid holds x = -3e9 only by clamping it to i32::MIN, which
+        // moves the left edge; reading refuses it, and every edge past the
+        // range.
+        for json in [
+            r#"{"x":-3e9,"y":0,"w":3000000100,"h":10}"#,
+            r#"{"x":0,"y":0,"w":3e9,"h":10}"#,
+            r#"{"x":0,"y":2147483647.5,"w":10,"h":0}"#,
+            r#"{"x":0,"y":-2147483649,"w":10,"h":10}"#,
+        ] {
+            assert!(serde_json::from_str::<ElementRect>(json).is_err(), "{json}");
+        }
+        // The whole range is read, and snaps without clamping either edge.
+        let full: ElementRect =
+            serde_json::from_str(r#"{"x":-2147483648,"y":0,"w":4294967295,"h":1}"#).unwrap();
+        assert_eq!(full.grid_region(), region(i32::MIN, 0, u32::MAX, 1));
+        assert_eq!(full.grid_region().right(), i64::from(i32::MAX));
+    }
+
+    #[test]
+    fn grid_region_clamps_a_near_edge_past_the_i32_grid_without_moving_the_far_one() {
+        // Only a box built in Rust can hold this; reading refuses it. Cast
+        // alone, x would saturate to i32::MIN while w kept its full 3e9 + 100,
+        // and the right edge would land at 852516452 instead of 100.
+        let r = rect(-3e9, 0.0, 3e9 + 100.0, 10.0).grid_region();
+        assert_eq!(r.x, i32::MIN);
+        assert_eq!(r.right(), 100);
+    }
+
+    #[test]
+    fn a_whole_value_is_an_integer_on_the_wire_up_to_2_pow_53() {
+        // Up to 2^53 the integer is what JavaScript writes. Past it
+        // JavaScript may round its digits (2^60 is 1152921504606847000),
+        // which neither form reproduces, and a float is written. Both read
+        // back as the same f64. (Reading refuses an edge past the i32 range,
+        // so the JSON is read back as a value, not as a box.)
+        let at = rect(0.0, 0.0, 2f64.powi(53), 1.0);
+        let past = rect(0.0, 0.0, 2f64.powi(60), 1.0);
+        let at_json = serde_json::to_string(&at).unwrap();
+        let past_json = serde_json::to_string(&past).unwrap();
+        assert_eq!(at_json, r#"{"x":0,"y":0,"w":9007199254740992,"h":1}"#);
+        for (json, want, float) in [(&at_json, at.w, false), (&past_json, past.w, true)] {
+            let back: serde_json::Value = serde_json::from_str(json).unwrap();
+            // A float token past 2^53, however serde_json spells it; never
+            // 2^60's integer digits.
+            assert_eq!(back["w"].is_f64(), float, "{json}");
+            assert_eq!(back["w"].as_f64(), Some(want), "{json}");
+        }
     }
 
     #[test]

@@ -54,13 +54,14 @@
 //! background-size, -position and -repeat are not on the wire). When the
 //! fit may letterbox and the drawn rect cannot be established, the image is
 //! not read at all: its pixel values are unknown, as is every assertion over
-//! it. An element that paints NOTHING — a zero-area box, or a producer-stated
-//! `hidden` / `no-layout` — is UNRENDERED ([`unrendered`]): its pixel values
-//! are unknown and it is left out of the page-wide checks. An element that
-//! may paint but cannot be attributed — reported `occluded` (a transparent
-//! overlay reads the same) or `off-screen`, `visible: false` with no reason,
-//! or wholly inside its recorded occluder — is UNREADABLE ([`unreadable`]): a
-//! gap, so the analyzer degrades and page-wide checks answer unknown.
+//! it. An element that paints NOTHING — a box on no whole pixel of the grid
+//! (zero-area, or sub-pixel), or a producer-stated `hidden` / `no-layout` —
+//! is UNRENDERED ([`unrendered`]): its pixel values are unknown and it is
+//! left out of the page-wide checks. An element that may paint but cannot be
+//! attributed — reported `occluded` (a transparent overlay reads the same) or
+//! `off-screen`, `visible: false` with no reason, or wholly inside its
+//! recorded occluder — is UNREADABLE ([`unreadable`]): a gap, so the analyzer
+//! degrades and page-wide checks answer unknown.
 
 pub mod pixels;
 pub mod text_contrast;
@@ -671,8 +672,9 @@ pub struct Crop {
 pub type LocateError = (UnknownCode, String);
 
 /// Why `el` paints NOTHING on the frame, when it paints nothing: a box that
-/// covers no pixel of the grid ([`Element::region`] zero in either extent),
-/// or a producer-stated [`VisibilityReason`] of `hidden` / `no-layout`
+/// snaps to no whole pixel of the grid ([`Element::region`] zero in either
+/// extent), whether measured as zero or a sub-pixel box whose edges snap
+/// together, or a producer-stated [`VisibilityReason`] of `hidden` / `no-layout`
 /// (`display: none`, `visibility: hidden`, `opacity: 0`, no box). `None` when
 /// it may paint.
 ///
@@ -695,13 +697,24 @@ pub fn unrendered(_snapshot: &ElementSnapshot, el: &Element) -> Option<String> {
             }
         ));
     }
-    if let Some(b) = el.region() {
+    if let (Some(measured), Some(b)) = (el.bbox, el.region()) {
         if b.w == 0 || b.h == 0 {
-            return Some(format!(
-                "element '{}' has a zero-area box (display: none, or collapsed), so it paints \
-                 nothing to read",
-                el.id
-            ));
+            // A measured zero is a collapsed box. A box measured with some
+            // size that still snaps to no whole pixel is only sub-pixel: the
+            // same box a fraction further along snaps to one and is read.
+            return Some(if measured.w > 0.0 && measured.h > 0.0 {
+                format!(
+                    "element '{}' is a sub-pixel box ({}x{} px) that snaps to no whole pixel, \
+                     so there is no pixel of it to read",
+                    el.id, measured.w, measured.h
+                )
+            } else {
+                format!(
+                    "element '{}' has a zero-area box (display: none, or collapsed), so it \
+                     paints nothing to read",
+                    el.id
+                )
+            });
         }
     }
     None
@@ -1630,7 +1643,7 @@ pub fn run(
             findings,
         )
     } else {
-        // Unrendered images (hidden, no layout, a zero-area box) paint
+        // Unrendered images (hidden, no layout, a box on no whole pixel) paint
         // nothing, so there is nothing to have measured: not a gap.
         AnalyzerResult::checked(Some(coverage), findings)
     };
@@ -2099,4 +2112,33 @@ fn under_text_busyness(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::element_snapshot::ElementRect;
+
+    fn boxed(x: f64, w: f64, h: f64) -> Element {
+        Element {
+            id: "hairline".into(),
+            bbox: Some(ElementRect { x, y: 0.0, w, h }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_box_on_no_whole_pixel_paints_nothing_and_the_reason_says_which_kind() {
+        let snap = ElementSnapshot::default();
+        // Measured 0.4 px wide, at x = 0 its edges snap together: a sub-pixel
+        // box, not display: none.
+        let why = unrendered(&snap, &boxed(0.0, 0.4, 20.0)).expect("no whole pixel");
+        assert!(why.contains("sub-pixel box (0.4x20 px)"), "{why}");
+        assert!(!why.contains("display: none"), "{why}");
+        // Measured zero: the collapsed box.
+        let why = unrendered(&snap, &boxed(0.0, 0.0, 20.0)).expect("zero area");
+        assert!(why.contains("zero-area box"), "{why}");
+        // The same 0.4 px at x = 0.3 straddles a pixel edge and covers one.
+        assert_eq!(unrendered(&snap, &boxed(0.3, 0.4, 20.0)), None);
+    }
 }
