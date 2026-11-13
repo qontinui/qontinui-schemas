@@ -193,7 +193,8 @@ pub struct Element {
     pub bbox: Option<Region>,
     /// Visible text content (innerText / accessibilityLabel equivalent).
     /// `None` when the element has no text or the snapshot source didn't
-    /// populate it.
+    /// populate it. The two cannot be told apart, which is why
+    /// `text_fits_container` answers Unknown for an element without it.
     ///
     /// **For a media element (`media` is `Some`) this is painted text only,
     /// NEVER its text alternative.** An `<img>`'s `alt`, an `aria-label`, an

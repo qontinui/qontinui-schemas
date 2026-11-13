@@ -292,7 +292,7 @@
     {
       "id": "text-fits-element-without-text-is-unknown",
       "kind": "text_fits_container",
-      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}}]},
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "scroll_width_px": 120, "scroll_height_px": 20}]},
       "assertion": {"type": "text_fits_container", "element": "label"},
       "expected": {"outcome": "unknown", "code": "input_missing"}
     },

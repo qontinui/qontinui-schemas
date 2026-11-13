@@ -168,9 +168,12 @@ pub enum Assertion {
     /// No descendant element extends past its parent's clip rect.
     /// `region` scopes the check to the children whose box intersects it.
     ///
-    /// The parent is read from `parent_id`, so a snapshot in which no
-    /// element carries one has no hierarchy to check: that is
-    /// `unknown{input_missing}`, never a vacuous pass.
+    /// A pass needs at least one child that was actually compared: in scope,
+    /// with a bbox, and with a `parent_id` that resolves to an element with a
+    /// bbox. A check that compared none is `unknown{input_missing}`, never a
+    /// vacuous pass: a snapshot in which no element carries a `parent_id`,
+    /// every parent unresolved or unpositioned, every parented child
+    /// unpositioned, or a `region` that holds no parented child.
     NoClipping {
         #[serde(default)]
         region: Option<Region>,
