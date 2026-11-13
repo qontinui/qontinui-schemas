@@ -1169,11 +1169,12 @@ fn eval_element_above(
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
                  reached. No `occluded_by` attribution names either element as painting over \
-                 the other, and `z_index` is missing on {which}. Reported as `unknown`, not as a failure: nothing was \
-                 measured, so nothing is known — and not as a pass either, because a vacuous \
-                 pass would silently hide the very stacking bug this assertion exists to catch. \
-                 Note `z_index` is the producer's RESOLVED, GLOBAL paint rank: a raw CSS \
-                 `z-index` value is NOT a substitute and must not be projected in its place."
+                 the other, and `z_index` is missing on {which}. Reported as `unknown`, not as \
+                 a failure: nothing was measured, so nothing is known — and not as a pass \
+                 either, because a vacuous pass would silently hide the very stacking bug this \
+                 assertion exists to catch. Note `z_index` is the producer's RESOLVED, GLOBAL \
+                 paint rank: a raw CSS `z-index` value is NOT a substitute and must not be \
+                 projected in its place."
             ),
         );
     };
