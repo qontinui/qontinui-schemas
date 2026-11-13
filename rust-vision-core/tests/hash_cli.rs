@@ -216,3 +216,22 @@ fn non_utf8_argument_is_a_usage_error_not_a_panic() {
     assert_eq!(out.status.code(), Some(1), "a panic exits 101");
     assert!(out.stdout.is_empty());
 }
+
+/// The help text promises a non-UTF-8 path rejects the WHOLE run: a valid file
+/// alongside it is not hashed, and no partial JSON report is printed.
+#[cfg(unix)]
+#[test]
+fn non_utf8_argument_rejects_the_whole_run_even_beside_a_good_file() {
+    use std::os::unix::ffi::OsStrExt;
+    let f = fixtures();
+    let bad = std::ffi::OsStr::from_bytes(b"bad\xffname.png");
+    let out = Command::new(env!("CARGO_BIN_EXE_vision-audit"))
+        .arg("hash")
+        .arg(&f.original)
+        .arg(bad)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty(), "no partial report for the good file");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not valid UTF-8"));
+}

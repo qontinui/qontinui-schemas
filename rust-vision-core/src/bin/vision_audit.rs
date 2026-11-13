@@ -27,7 +27,8 @@
 //!     image files, through the library's [`qontinui_vision_core::hash_file`]
 //!     (the same pHash/dHash the image analyzer runs). Exit 0 when at least one
 //!     file hashed, 1 when every file failed (or none was given); a file that
-//!     cannot be read or decoded is a per-file error object, never a crash.
+//!     cannot be read or decoded is a per-file error object, never a crash. A
+//!     non-UTF-8 argument is a usage error for the whole run, not a per-file one.
 //!
 //! A frame always travels with its scale factor: snapshot bboxes are CSS
 //! pixels, the frame is device pixels, and the analyzers map one onto the
@@ -159,6 +160,8 @@ HASH:
     Hamming distance); sha256 is of the file bytes. Error codes: read_failed,
     decode_failed, empty_image. Exit 0 if at least one file hashed; 1 if every
     file failed or no file was given. A `--` ends option parsing.
+    A path that is not valid UTF-8 is a usage error for the WHOLE run (exit 1,
+    no JSON), not a per-file error entry: rename the file or pass a UTF-8 path.
 
 OUTPUT: machine JSON -> stdout, human summary -> stderr.
 EXIT:   0 ok / gate passed, 2 gate failed, 1 usage|io|parse error
