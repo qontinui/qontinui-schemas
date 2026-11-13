@@ -78,8 +78,9 @@ pub struct ViewportComparison {
     pub in_situ: Option<CaptureViewport>,
     pub baseline_dpr: Option<f64>,
     pub in_situ_dpr: Option<f64>,
-    /// Both viewports (and DPRs) known and equal. `None` when either is
-    /// unknown.
+    /// `Some(true)` when both viewports and both DPRs are known and equal,
+    /// `Some(false)` when all four are known and any differ, `None` when any
+    /// of the four is unknown.
     pub matches: Option<bool>,
 }
 
@@ -148,18 +149,6 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             ),
         );
     };
-    let (Some(b_root), Some(s_root)) = (entry.capture.root_bbox(), in_situ.root_bbox()) else {
-        let side = match (entry.capture.root_bbox(), in_situ.root_bbox()) {
-            (None, None) => "neither capture",
-            (None, Some(_)) => "the baseline capture",
-            _ => "the in-situ capture",
-        };
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!("{side} has root geometry, so the renders were not compared"),
-        );
-    };
     if let (Some(b_sha), Some(s_sha)) =
         (entry.effective_source_sha(), in_situ.source_sha.as_deref())
     {
@@ -175,9 +164,28 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         }
     }
 
+    let (Some(b_root), Some(s_root)) = (entry.capture.root_bbox(), in_situ.root_bbox()) else {
+        let what = match (entry.capture.root_bbox(), in_situ.root_bbox()) {
+            (None, None) => "neither capture has root geometry",
+            (None, Some(_)) => "the baseline capture has no root geometry",
+            _ => "the in-situ capture has no root geometry",
+        };
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!("{what}, so the renders were not compared"),
+        );
+    };
+    // A repeated style prop must not yield a repeated finding.
+    let mut props: Vec<String> = Vec::with_capacity(style_props.len());
+    for p in style_props.iter() {
+        if !props.contains(p) {
+            props.push(p.clone());
+        }
+    }
     let opts = DiffOptions {
         size_tolerance_pct,
-        style_props: &style_props,
+        style_props: &props,
         compare_props,
     };
     let (findings, unknown_checks) = diff(entry, in_situ, b_root, s_root, &opts);
@@ -185,8 +193,12 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     let summary = if findings.is_empty() {
         format!("component '{component}' renders in situ like baseline '{baseline}'")
     } else {
-        let mut kinds: Vec<&str> = findings.iter().map(|f| kind_name(f.kind)).collect();
-        kinds.dedup();
+        let mut kinds: Vec<&str> = Vec::new();
+        for k in findings.iter().map(|f| kind_name(f.kind)) {
+            if !kinds.contains(&k) {
+                kinds.push(k);
+            }
+        }
         format!(
             "component '{component}' diverges in situ from baseline '{baseline}': {} finding(s) ({})",
             findings.len(),
@@ -250,10 +262,11 @@ fn diff(
     clip_check(base, in_situ, b_root, s_root, &mut findings);
     let b_nodes = by_path(base);
     let s_nodes = by_path(in_situ);
-    identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
+    let retagged = identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
     style_check(
         in_situ,
         &b_nodes,
+        &retagged,
         opts.style_props,
         &mut findings,
         &mut notes,
@@ -261,7 +274,7 @@ fn diff(
     if opts.compare_props {
         props_check(base, in_situ, &mut findings, &mut notes);
     }
-    portal_check(in_situ, &b_nodes, &mut findings);
+    portal_check(in_situ, &b_nodes, &retagged, &mut findings);
 
     for n in &base.unknown_checks {
         notes.push(format!("baseline capture: {n}"));
@@ -284,6 +297,15 @@ fn is_descendant(path: &str, ancestor: &str) -> bool {
         path.len() > ancestor.len()
             && path.starts_with(ancestor)
             && path.as_bytes()[ancestor.len()] == b'/'
+    }
+}
+
+/// The parent of a tree path; `None` for the root (`""`).
+fn parent_path(path: &str) -> Option<&str> {
+    if path.is_empty() {
+        None
+    } else {
+        Some(path.rsplit_once('/').map_or("", |(p, _)| p))
     }
 }
 
@@ -497,6 +519,11 @@ fn node_identity_json(n: &ComponentCaptureNode) -> Value {
 /// `child_identity`: tag or component name differs at the same path, or a
 /// node exists on one side only. A null name on either side is UNREADABLE:
 /// the name comparison is skipped and noted, never reported as a mismatch.
+///
+/// Only the topmost divergence of a subtree is reported: nothing beneath a
+/// tag-changed path (nor beneath a one-sided path) is reported again. Returns
+/// the tag-changed paths, beneath which the style and portal checks are
+/// skipped too — the subtree is a different render, not a restyled one.
 fn identity_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -504,13 +531,18 @@ fn identity_check(
     s_nodes: &BTreeMap<&str, &ComponentCaptureNode>,
     findings: &mut Vec<ComponentFinding>,
     notes: &mut Vec<String>,
-) {
+) -> Vec<String> {
     let mut unreadable = 0usize;
+    let mut retagged: Vec<String> = Vec::new();
     for bn in &base.nodes {
         let Some(sn) = s_nodes.get(bn.path.as_str()) else {
             continue;
         };
+        if below_any(&bn.path, &retagged) {
+            continue;
+        }
         if !bn.tag.eq_ignore_ascii_case(&sn.tag) {
+            retagged.push(bn.path.clone());
             findings.push(ComponentFinding {
                 kind: ComponentFindingKind::ChildIdentity,
                 path: bn.path.clone(),
@@ -551,7 +583,10 @@ fn identity_check(
                          missing_in_situ: bool| {
         let mut reported: Vec<String> = Vec::new();
         for n in nodes {
-            if other.contains_key(n.path.as_str()) || below_any(&n.path, &reported) {
+            if other.contains_key(n.path.as_str())
+                || below_any(&n.path, &reported)
+                || below_any(&n.path, &retagged)
+            {
                 continue;
             }
             let what = n
@@ -590,33 +625,44 @@ fn identity_check(
     };
     one_sided(&base.nodes, s_nodes, true);
     one_sided(&in_situ.nodes, b_nodes, false);
+    retagged
 }
 
-/// `style_delta`: a `style_props` key whose value differs at the same path.
-/// A difference already reported on an ancestor with the same two values
-/// (an inherited property cascading down) is not repeated.
+/// `style_delta`: a `style_props` key whose (trimmed) value differs at the
+/// same path. A delta is not repeated on a node whose PARENT carried the same
+/// delta (an inherited property cascading down); since that holds at every
+/// step, a node is suppressed only when every path between it and the
+/// reported ancestor carried the same delta, so a reset in between lets a
+/// re-divergence report. Nothing beneath a tag-changed path is compared.
 fn style_check(
     in_situ: &ComponentCapture,
     b_nodes: &BTreeMap<&str, &ComponentCaptureNode>,
+    retagged: &[String],
     style_props: &[String],
     findings: &mut Vec<ComponentFinding>,
     notes: &mut Vec<String>,
 ) {
-    let mut reported: HashMap<(&str, &str, &str), Vec<String>> = HashMap::new();
+    // (path, prop) -> the trimmed (baseline, in-situ) delta that path carried.
+    let mut carried: HashMap<(&str, &str), (&str, &str)> = HashMap::new();
     let mut one_sided = 0usize;
     for sn in &in_situ.nodes {
         let Some(bn) = b_nodes.get(sn.path.as_str()) else {
             continue;
         };
+        if below_any(&sn.path, retagged) {
+            continue;
+        }
         for prop in style_props {
             match (bn.styles.get(prop), sn.styles.get(prop)) {
                 (Some(bv), Some(sv)) if bv.trim() != sv.trim() => {
-                    let key = (prop.as_str(), bv.as_str(), sv.as_str());
-                    let seen = reported.entry(key).or_default();
-                    if below_any(&sn.path, seen) {
+                    let (bv, sv) = (bv.trim(), sv.trim());
+                    carried.insert((sn.path.as_str(), prop.as_str()), (bv, sv));
+                    let inherited = parent_path(&sn.path)
+                        .and_then(|p| carried.get(&(p, prop.as_str())))
+                        .is_some_and(|d| *d == (bv, sv));
+                    if inherited {
                         continue;
                     }
-                    seen.push(sn.path.clone());
                     findings.push(ComponentFinding {
                         kind: ComponentFindingKind::StyleDelta,
                         path: sn.path.clone(),
@@ -682,16 +728,20 @@ fn props_check(
 }
 
 /// `portal_mismatch`: at the same path, a portal on one side only or a
-/// different mount target.
+/// different mount target. Nothing beneath a tag-changed path is compared.
 fn portal_check(
     in_situ: &ComponentCapture,
     b_nodes: &BTreeMap<&str, &ComponentCaptureNode>,
+    retagged: &[String],
     findings: &mut Vec<ComponentFinding>,
 ) {
     for sn in &in_situ.nodes {
         let Some(bn) = b_nodes.get(sn.path.as_str()) else {
             continue;
         };
+        if below_any(&sn.path, retagged) {
+            continue;
+        }
         let message = match (&bn.portal, &sn.portal) {
             (None, None) => continue,
             (Some(b), Some(s)) if b.mount_target == s.mount_target => continue,
@@ -719,15 +769,8 @@ fn portal_check(
 }
 
 fn compare_viewports(base: &ComponentCapture, in_situ: &ComponentCapture) -> ViewportComparison {
-    let matches = match (base.viewport, in_situ.viewport) {
-        (Some(b), Some(s)) => {
-            let dpr_ok = match (base.dpr, in_situ.dpr) {
-                (Some(bd), Some(sd)) => bd == sd,
-                (None, None) => true,
-                _ => false,
-            };
-            Some(b == s && dpr_ok)
-        }
+    let matches = match (base.viewport, in_situ.viewport, base.dpr, in_situ.dpr) {
+        (Some(bv), Some(sv), Some(bd), Some(sd)) => Some(bv == sv && bd == sd),
         _ => None,
     };
     ViewportComparison {
@@ -1069,15 +1112,34 @@ mod tests {
                 && f.message.contains("<input>")),
             "{ids:?}"
         );
-        assert!(
-            ids.iter()
-                .any(|f| f.path == "1/0" && f.message.contains("missing in situ")),
-            "{ids:?}"
-        );
-        assert_eq!(
-            ids.iter().find(|f| f.path == "1").unwrap().baseline["tag"],
-            json!("div")
-        );
+        // Topmost only: the DatePicker's inner input beneath the retagged
+        // path is not reported again as missing.
+        assert_eq!(ids.len(), 1, "{ids:?}");
+        assert_eq!(rep.findings.len(), 1, "{:?}", rep.findings);
+        assert_eq!(ids[0].baseline["tag"], json!("div"));
+    }
+
+    #[test]
+    fn nothing_beneath_a_tag_changed_path_is_reported() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        // Path "1" is a <section> in situ; beneath it the child's name,
+        // style and portal all differ too, and none of it is reported.
+        situ.nodes[2].tag = "section".to_string();
+        situ.nodes[3].component_name = Some("Other".to_string());
+        base.nodes[3].styles.insert("color".into(), "red".into());
+        situ.nodes[3].styles.insert("color".into(), "blue".into());
+        situ.nodes[3].portal = Some(CapturePortal {
+            mount_target: "body".to_string(),
+            react_parent_path: None,
+        });
+        situ.nodes
+            .push(node("1/1", "b", None, rect(0.0, 0.0, 1.0, 1.0)));
+        let r = run(base, situ);
+        let rep = report(&r);
+        assert_eq!(rep.findings.len(), 1, "{:?}", rep.findings);
+        assert_eq!(rep.findings[0].kind, ComponentFindingKind::ChildIdentity);
+        assert_eq!(rep.findings[0].path, "1");
     }
 
     #[test]
@@ -1201,6 +1263,71 @@ mod tests {
         assert_eq!(color.in_situ["color"], json!("rgb(255, 0, 0)"));
     }
 
+    #[test]
+    fn duplicate_style_props_do_not_duplicate_findings() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        base.nodes[3].styles.insert("color".into(), "red".into());
+        situ.nodes[3].styles.insert("color".into(), "blue".into());
+        let a: Assertion = serde_json::from_value(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "style_props": ["color", "color", "fontSize", "color"],
+        }))
+        .unwrap();
+        let r = run_with(&a, base, situ);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::StyleDelta]);
+    }
+
+    /// The root carries a color delta; its child "1" matches the baseline
+    /// again; "1/0" diverges with the same values as the root. The reset in
+    /// between means "1/0" is reported, not suppressed as inherited.
+    #[test]
+    fn a_reset_in_between_lets_a_re_divergence_report() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        for n in &mut base.nodes {
+            n.styles.insert("color".into(), "black".into());
+        }
+        for n in &mut situ.nodes {
+            n.styles.insert("color".into(), "red".into());
+        }
+        situ.nodes[2].styles.insert("color".into(), "black".into()); // path "1" resets
+        let r = run(base, situ);
+        let paths: Vec<String> = report(&r)
+            .findings
+            .iter()
+            .filter(|f| f.kind == ComponentFindingKind::StyleDelta)
+            .map(|f| f.path.clone())
+            .collect();
+        // "0" inherits the root's delta (suppressed); "1/0" re-diverges.
+        assert_eq!(paths, vec!["".to_string(), "1/0".to_string()]);
+    }
+
+    #[test]
+    fn cascade_suppression_keys_on_trimmed_values() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        for n in &mut base.nodes {
+            n.styles.insert("fontSize".into(), "14px".into());
+        }
+        for n in &mut situ.nodes {
+            n.styles.insert("fontSize".into(), "16px".into());
+        }
+        // Whitespace-only variation down the tree is the same delta.
+        base.nodes[1]
+            .styles
+            .insert("fontSize".into(), " 14px ".into());
+        situ.nodes[1]
+            .styles
+            .insert("fontSize".into(), "16px ".into());
+        let r = run(base, situ);
+        let rep = report(&r);
+        assert_eq!(rep.findings.len(), 1, "{:?}", rep.findings);
+        assert_eq!(rep.findings[0].path, "");
+    }
+
     // ---- props_delta --------------------------------------------------
 
     #[test]
@@ -1310,7 +1437,88 @@ mod tests {
         let r = run(capture(page(), parent_of(page())), situ);
         assert_eq!(r.outcome, AssertionOutcome::Unknown);
         assert_eq!(r.code, Some(UnknownCode::InputMissing));
-        assert!(r.detail.unwrap().contains("in-situ"));
+        assert!(r
+            .detail
+            .unwrap()
+            .starts_with("the in-situ capture has no root geometry,"),);
+
+        let mut base = capture(page(), parent_of(page()));
+        base.root = None;
+        let r = run(base.clone(), capture(page(), parent_of(page())));
+        assert_eq!(r.code, Some(UnknownCode::InputMissing));
+        assert!(r
+            .detail
+            .unwrap()
+            .starts_with("the baseline capture has no root geometry,"),);
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.root = None;
+        let r = run(base, situ);
+        assert_eq!(r.code, Some(UnknownCode::InputMissing));
+        assert!(r
+            .detail
+            .unwrap()
+            .starts_with("neither capture has root geometry,"));
+    }
+
+    #[test]
+    fn staleness_is_reported_before_missing_geometry() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.root = None;
+        situ.source_sha = Some("def456".to_string());
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Unknown);
+        assert_eq!(r.code, Some(UnknownCode::StaleInput));
+    }
+
+    #[test]
+    fn an_invalid_size_tolerance_is_input_missing() {
+        for tol in [f64::NAN, -1.0, f64::INFINITY] {
+            let a = Assertion::MatchesIsolatedRender {
+                component: "date-range-picker".into(),
+                baseline: NAME.into(),
+                size_tolerance_pct: tol,
+                style_props: default_props(),
+                compare_props: false,
+            };
+            let r = run_with(
+                &a,
+                capture(page(), parent_of(page())),
+                capture(page(), parent_of(page())),
+            );
+            assert_eq!(r.outcome, AssertionOutcome::Unknown, "{tol}");
+            assert_eq!(r.code, Some(UnknownCode::InputMissing), "{tol}");
+            assert!(r.detail.unwrap().contains("size_tolerance_pct"));
+        }
+    }
+
+    fn default_props() -> Box<[String]> {
+        DEFAULT_STYLE_PROPS.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn zero_sizes_compare_without_dividing_by_zero() {
+        assert_eq!(rel_diff(0.0, 0.0), 0.0);
+        assert_eq!(rel_diff(0.0, 5.0), f64::INFINITY);
+        assert_eq!(ratio(5.0, Some(0.0)), None);
+        assert_eq!(ratio(5.0, None), None);
+
+        // 0 -> 0 on both axes (a collapsed component on both sides): no
+        // finding. The zero-sized parent leaves the fill ratio unknown.
+        let z = rect(0.0, 0.0, 0.0, 0.0);
+        let r = run(capture(z, Some(z)), capture(z, Some(z)));
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        assert!(report(&r)
+            .unknown_checks
+            .iter()
+            .any(|n| n.starts_with("size:")));
+
+        // 0 -> N: collapsed in isolation, rendered in situ, no fill ratio
+        // on the baseline side, so absolute size decides: a size finding.
+        let s = rect(0.0, 0.0, 300.0, 40.0);
+        let r = run(capture(z, Some(z)), capture(s, Some(s)));
+        assert_eq!(r.outcome, AssertionOutcome::Failed);
+        assert!(kinds(&r).contains(&ComponentFindingKind::Size));
     }
 
     #[test]
@@ -1361,6 +1569,28 @@ mod tests {
         let rep = report(&r);
         assert_eq!(rep.viewport.matches, Some(false));
         assert_eq!(rep.viewport.in_situ_dpr, Some(2.0));
+    }
+
+    #[test]
+    fn a_dpr_only_mismatch_is_reported_and_does_not_fail() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.dpr = Some(2.0);
+        let r = run(capture(page(), parent_of(page())), situ.clone());
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        let v = report(&r).viewport;
+        assert_eq!(v.matches, Some(false));
+        assert_eq!((v.baseline_dpr, v.in_situ_dpr), (Some(1.0), Some(2.0)));
+
+        // One DPR unknown: the comparison is unknown, not a mismatch.
+        situ.dpr = None;
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(report(&r).viewport.matches, None);
+        // All four known and equal.
+        let r = run(
+            capture(page(), parent_of(page())),
+            capture(page(), parent_of(page())),
+        );
+        assert_eq!(report(&r).viewport.matches, Some(true));
     }
 
     // ---- wire ---------------------------------------------------------
