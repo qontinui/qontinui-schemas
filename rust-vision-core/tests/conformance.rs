@@ -55,6 +55,13 @@
 //!   nothing requires a ceiling there. Rounding every box up would make three
 //!   33.333 px flex items overlap; the `no-overlap-adjacent-flex-thirds-*` case
 //!   is that row, rounded to the nearest pixel.
+//!
+//! **Unknown codes, for a port.** Two codes occur. `element_above` with no
+//! paint-order evidence (no `occluded_by` naming either operand as on top, and
+//! a `z_index` missing on either) is `hit_test_unmeasurable`, whether or not
+//! the overlap is required. Every other unknown is `input_missing`, including
+//! an `element_above` operand absent from the snapshot and an operand with no
+//! `bbox` when the overlap is required.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 

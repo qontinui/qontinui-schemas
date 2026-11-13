@@ -529,6 +529,13 @@ class UnknownCode(StrEnum):
     to_node_unobserved = 'to_node_unobserved'
     performance_observer_unsupported = 'performance_observer_unsupported'
     no_event_before_timeout = 'no_event_before_timeout'
+    no_results = 'no_results'
+    no_expectation = 'no_expectation'
+    not_attempted_destructive = 'not_attempted_destructive'
+    not_attempted_write = 'not_attempted_write'
+    not_attempted_by_policy = 'not_attempted_by_policy'
+    not_reported = 'not_reported'
+    hit_test_unmeasurable = 'hit_test_unmeasurable'
 
 
 class UnknownInfo(BaseModel):
