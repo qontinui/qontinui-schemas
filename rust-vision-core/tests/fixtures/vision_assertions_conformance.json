@@ -481,7 +481,7 @@
         {"id": "panel", "bbox": {"x": 100, "y": 50, "w": 400, "h": 400}}
       ]},
       "assertion": {"type": "element_above", "elements": ["menu", "panel"]},
-      "expected": {"outcome": "unknown", "code": "input_missing"}
+      "expected": {"outcome": "unknown", "code": "hit_test_unmeasurable"}
     },
     {
       "id": "element-above-one-paint-rank-missing-is-unknown",
@@ -491,7 +491,27 @@
         {"id": "panel", "bbox": {"x": 100, "y": 50, "w": 400, "h": 400}}
       ]},
       "assertion": {"type": "element_above", "elements": ["menu", "panel"]},
-      "expected": {"outcome": "unknown", "code": "input_missing"}
+      "expected": {"outcome": "unknown", "code": "hit_test_unmeasurable"}
+    },
+    {
+      "id": "element-above-attribution-to-a-third-element-without-paint-ranks-is-unknown",
+      "kind": "element_above",
+      "snapshot": {"elements": [
+        {"id": "menu", "bbox": {"x": 0, "y": 0, "w": 200, "h": 300}},
+        {"id": "panel", "bbox": {"x": 100, "y": 50, "w": 400, "h": 400}, "occluded_by": "toast"}
+      ]},
+      "assertion": {"type": "element_above", "elements": ["menu", "panel"]},
+      "expected": {"outcome": "unknown", "code": "hit_test_unmeasurable"}
+    },
+    {
+      "id": "element-above-without-geometry-or-paint-order-is-unknown-when-overlap-is-not-required",
+      "kind": "element_above",
+      "snapshot": {"elements": [
+        {"id": "menu"},
+        {"id": "panel"}
+      ]},
+      "assertion": {"type": "element_above", "elements": ["menu", "panel"], "require_overlap": false},
+      "expected": {"outcome": "unknown", "code": "hit_test_unmeasurable"}
     },
     {
       "id": "element-above-disjoint-boxes-fail-when-overlap-is-required",

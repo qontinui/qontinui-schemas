@@ -141,12 +141,38 @@ pub enum UnknownCode {
     /// The awaited event did not occur before the timeout, so whether it
     /// would have occurred is unknown.
     NoEventBeforeTimeout,
+    /// Nothing to judge: zero results or assertions were folded, so the
+    /// verdict is unknown — never passed. The UI Bridge SDK's roll-up of a
+    /// `POST /vision/assert` batch answers it for an empty assertion list.
+    NoResults,
+    /// No usable expectation to judge against (assertion criteria that do not
+    /// parse, an empty `activateStates`).
+    NoExpectation,
+    /// Deliberately not attempted, because performing the check would be a
+    /// destructive action.
+    NotAttemptedDestructive,
+    /// Deliberately not attempted, because performing the check would be a
+    /// write.
+    NotAttemptedWrite,
+    /// A policy withheld the attempt (e.g. `stopOnFailure` after an earlier
+    /// failure, an effects allow-list).
+    NotAttemptedByPolicy,
+    /// The producer ran but reported no result for this item.
+    NotReported,
+    /// The hit-test looked and cannot tell whether a pointer reaches the
+    /// target (a null hit, a shadow host on the target's composed path, a
+    /// cross-origin frame, a target computing `pointer-events: none`).
+    /// `element_above` answers it when no paint-order evidence was measured
+    /// (no `occluded_by` attribution and no resolvable `z_index` order),
+    /// which the UI Bridge SDK's in-tab evaluator reaches when no hit-test
+    /// sample shows both elements.
+    HitTestUnmeasurable,
 }
 
 impl UnknownCode {
     /// Every member, in declaration order. The closed set, so a test can
     /// pin it against the wire contract rather than against itself.
-    pub const ALL: [UnknownCode; 16] = [
+    pub const ALL: [UnknownCode; 23] = [
         Self::AppUnreachable,
         Self::CapabilityUnavailableInBuild,
         Self::ProducerFailed,
@@ -163,6 +189,13 @@ impl UnknownCode {
         Self::ToNodeUnobserved,
         Self::PerformanceObserverUnsupported,
         Self::NoEventBeforeTimeout,
+        Self::NoResults,
+        Self::NoExpectation,
+        Self::NotAttemptedDestructive,
+        Self::NotAttemptedWrite,
+        Self::NotAttemptedByPolicy,
+        Self::NotReported,
+        Self::HitTestUnmeasurable,
     ];
 
     /// The snake_case wire value.
@@ -184,6 +217,13 @@ impl UnknownCode {
             Self::ToNodeUnobserved => "to_node_unobserved",
             Self::PerformanceObserverUnsupported => "performance_observer_unsupported",
             Self::NoEventBeforeTimeout => "no_event_before_timeout",
+            Self::NoResults => "no_results",
+            Self::NoExpectation => "no_expectation",
+            Self::NotAttemptedDestructive => "not_attempted_destructive",
+            Self::NotAttemptedWrite => "not_attempted_write",
+            Self::NotAttemptedByPolicy => "not_attempted_by_policy",
+            Self::NotReported => "not_reported",
+            Self::HitTestUnmeasurable => "hit_test_unmeasurable",
         }
     }
 
@@ -904,6 +944,13 @@ mod tests {
                 json!("to_node_unobserved"),
                 json!("performance_observer_unsupported"),
                 json!("no_event_before_timeout"),
+                json!("no_results"),
+                json!("no_expectation"),
+                json!("not_attempted_destructive"),
+                json!("not_attempted_write"),
+                json!("not_attempted_by_policy"),
+                json!("not_reported"),
+                json!("hit_test_unmeasurable"),
             ]
         );
         for c in UnknownCode::ALL {

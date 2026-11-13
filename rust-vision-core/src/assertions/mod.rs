@@ -1038,7 +1038,11 @@ fn inset_region(r: Region, inset: u32) -> Region {
 ///    paints on top; equal means neither does (document order decides, and a
 ///    snapshot does not carry it reliably — the analyzer declines to guess
 ///    there too, and so do we).
-/// 3. Neither available → the assertion cannot be answered. See below.
+/// 3. Neither available → the assertion cannot be answered:
+///    `unknown{hit_test_unmeasurable}`, the code the UI Bridge SDK's in-tab
+///    evaluator gives when no hit-test sample shows both elements. A missing
+///    operand, or missing geometry when the overlap is required, is
+///    `unknown{input_missing}` instead. See below.
 ///
 /// **On the ancestry exemption.** `analyzers::layout` skips ancestor/descendant
 /// pairs, because a descendant painting over its ancestor's box is what nesting
@@ -1156,13 +1160,16 @@ fn eval_element_above(
             (true, false) => format!("'{above_id}'"),
             _ => format!("'{below_id}'"),
         };
+        // No paint-order evidence: the same fact the SDK's in-tab evaluator
+        // reports when no hit-test sample shows both elements, so the same
+        // code (`hit_test_unmeasurable`), not `input_missing`.
         return AssertionResult::unknown(
             assertion,
-            UnknownCode::InputMissing,
+            UnknownCode::HitTestUnmeasurable,
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
-                 reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
-                 missing on {which}. Reported as `unknown`, not as a failure: nothing was \
+                 reached. No `occluded_by` attribution names either element as painting over \
+                 the other, and `z_index` is missing on {which}. Reported as `unknown`, not as a failure: nothing was \
                  measured, so nothing is known — and not as a pass either, because a vacuous \
                  pass would silently hide the very stacking bug this assertion exists to catch. \
                  Note `z_index` is the producer's RESOLVED, GLOBAL paint rank: a raw CSS \
@@ -2662,6 +2669,10 @@ mod tests {
             !res.passed,
             "a vacuous pass here hides the bug being hunted"
         );
+        // No paint-order evidence is the hit-test's own unknown, not a
+        // missing input: both operands and their geometry were supplied.
+        assert_eq!(res.outcome, AssertionOutcome::Unknown);
+        assert_eq!(res.code, Some(UnknownCode::HitTestUnmeasurable));
         let detail = res.detail.unwrap();
         assert!(detail.contains("CANNOT ANSWER"), "{detail}");
         assert!(detail.contains("'a'"), "must name the element: {detail}");
@@ -3513,7 +3524,7 @@ mod tests {
     fn the_code_key_is_on_the_wire_iff_unknown() {
         let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
         let unknown = serde_json::to_value(eval_on(&snap, &above(["a", "b"], true))).unwrap();
-        assert_eq!(unknown["code"], serde_json::json!("input_missing"));
+        assert_eq!(unknown["code"], serde_json::json!("hit_test_unmeasurable"));
         let failed = serde_json::to_value(eval_on(
             &snap,
             &Assertion::NoOverlap {
