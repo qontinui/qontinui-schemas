@@ -1007,7 +1007,7 @@ pub fn texts_over<'a>(
     index: &TextIndex<'a>,
 ) -> Over<'a> {
     let mut over = Over::default();
-    let Some(img) = image.bbox else {
+    let Some(img) = image.region() else {
         return over;
     };
     for t in &snapshot.elements {
@@ -1019,7 +1019,7 @@ pub fn texts_over<'a>(
         } else if !paints_text(snapshot, t) {
             continue;
         }
-        let Some(tb) = t.bbox else { continue };
+        let Some(tb) = t.region() else { continue };
         let Some(css) = intersection(tb, img) else {
             continue;
         };
@@ -1042,7 +1042,7 @@ pub fn texts_over<'a>(
             .iter()
             .copied()
             .filter(|o| o.id != t.id)
-            .filter(|o| o.bbox.is_some_and(|ob| intersection(ob, tb).is_some()))
+            .filter(|o| o.region().is_some_and(|ob| intersection(ob, tb).is_some()))
             .collect();
         let area = |r: Region| r.w as u64 * r.h as u64;
         let t_area = area(tb);
@@ -1050,7 +1050,7 @@ pub fn texts_over<'a>(
             .iter()
             .map(|o| {
                 index.descends(&o.id, &t.id)
-                    || o.bbox.is_some_and(|ob| {
+                    || o.region().is_some_and(|ob| {
                         // The overlap lies in this box, so `t_area - overlap`
                         // cannot wrap; `2 * overlap` could, for a box near
                         // `u32::MAX` square.
@@ -1775,7 +1775,7 @@ pub fn registered(
 ) -> Result<Registration, LocateError> {
     let id = &image.id;
     let s = usable_scale(a.source.scale_factor)?;
-    let img = image.bbox.ok_or_else(|| {
+    let img = image.region().ok_or_else(|| {
         (
             UnknownCode::InputMissing,
             format!(
@@ -1799,7 +1799,7 @@ pub fn registered(
     let mut painted = HashMap::new();
     let floor = min_glyph_px(s);
     for t in index.painters() {
-        let Some(tb) = t.bbox else { continue };
+        let Some(tb) = t.region() else { continue };
         if intersection(tb, img).is_none() {
             continue;
         }
@@ -1937,7 +1937,7 @@ fn measured_glyph_colour(a: &Frame, mask: &[(u32, u32, f64)]) -> (Rgb, f64) {
 /// when the box shows fewer than `floor` differing pixels.
 fn painter_colour(a: &Frame, b: &Frame, el: &Element, floor: usize) -> Option<Rgb> {
     el.fg_color.or_else(|| {
-        let (px, _) = on_frame(a, el.bbox?)?;
+        let (px, _) = on_frame(a, el.region()?)?;
         let area = px.2 as usize * px.3 as usize;
         let (raw, _) = diff_mask(a, b, px, None, area, &|_, _, _, _| true)?;
         (raw.len() >= floor).then(|| measured_glyph_colour(a, &raw).0)
@@ -2006,7 +2006,7 @@ pub fn measure(
             pair.image.id
         ))
     };
-    let text_box = pair.text.bbox.ok_or_else(|| over_frame("the box"))?;
+    let text_box = pair.text.region().ok_or_else(|| over_frame("the box"))?;
     let (over_px, in_frame) = on_frame(a, pair.css).ok_or_else(|| over_frame("the overlap"))?;
     let (box_px, _) = on_frame(a, text_box).ok_or_else(|| over_frame("the box"))?;
     let area = box_px.2 as usize * box_px.3 as usize;
@@ -2029,7 +2029,7 @@ pub fn measure(
         .iter()
         .zip(pair.inner.iter().copied().chain(std::iter::repeat(true)))
         .filter_map(|(o, inner)| {
-            let ob = o.bbox?;
+            let ob = o.region()?;
             let colour = reg.colour_of(a, b, o);
             Some(Other {
                 px: widened(a, ob, margin)?,
@@ -2456,7 +2456,7 @@ pub fn measure(
         let inline = pair.image_inline
             && pair
                 .image
-                .bbox
+                .region()
                 .is_some_and(|ib| region_contains(text_box, ib));
         let beside_glyph = inline.then(|| is_mask.dilated((BLIND_ADJACENT_CSS * s).ceil() as i64));
         // On a noisy capture, a pixel that moved toward the ink by less than

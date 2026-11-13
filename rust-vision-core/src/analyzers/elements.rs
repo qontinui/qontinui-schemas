@@ -57,10 +57,13 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     // relaxed 24×24 minimum from WCAG 2.5.8 (Level AA, 2.2). Only
     // positioned elements can be measured; bbox-less interactive elements
     // are skipped (no geometry → no target-size claim, not a tiny target).
+    // The MEASURED size is compared, not the grid box: a 23.6 px target is
+    // under 24 wherever it sits, and snapping its edges would pass it at
+    // some positions and fail it at others.
     let tiny_targets: Vec<&_> = snapshot
         .elements
         .iter()
-        .filter(|e| e.interactable && e.bbox.map(|b| b.w < 24 || b.h < 24).unwrap_or(false))
+        .filter(|e| e.interactable && e.bbox.map(|b| b.w < 24.0 || b.h < 24.0).unwrap_or(false))
         .collect();
     if !tiny_targets.is_empty() {
         let ids: Vec<String> = tiny_targets.iter().map(|e| e.id.clone()).collect();
@@ -105,13 +108,13 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::element_snapshot::Element;
+    use crate::element_snapshot::{Element, ElementRect};
     use crate::frame::Region;
 
     fn el(id: &str, w: u32, h: u32, inter: bool, text: Option<&str>) -> Element {
         Element {
             id: id.to_string(),
-            bbox: Some(Region { x: 0, y: 0, w, h }),
+            bbox: Some(Region { x: 0, y: 0, w, h }.into()),
             text: text.map(String::from),
             role: None,
             interactable: inter,
@@ -139,6 +142,26 @@ mod tests {
     fn tiny_target_warning() {
         let snap = ElementSnapshot {
             elements: vec![el("close", 16, 16, true, None)],
+            ..Default::default()
+        };
+        let f = run(&snap).findings;
+        assert!(f.iter().any(|x| x.kind == "tiny_target"));
+    }
+
+    #[test]
+    fn a_target_under_24_px_is_tiny_wherever_it_sits_on_the_grid() {
+        // 23.6 px wide at x = 0.3 snaps to the 24 px span 0..24 on the grid;
+        // the measurement is still under the minimum, and is what is compared.
+        let mut e = el("close", 0, 0, true, None);
+        e.bbox = Some(ElementRect {
+            x: 0.3,
+            y: 0.0,
+            w: 23.6,
+            h: 30.0,
+        });
+        assert_eq!(e.region().map(|r| r.w), Some(24));
+        let snap = ElementSnapshot {
+            elements: vec![e],
             ..Default::default()
         };
         let f = run(&snap).findings;

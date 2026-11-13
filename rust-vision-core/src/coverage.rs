@@ -182,12 +182,15 @@ mod tests {
         let snap = ElementSnapshot {
             elements: vec![
                 Element {
-                    bbox: Some(Region {
-                        x: 0,
-                        y: 0,
-                        w: 10,
-                        h: 10,
-                    }),
+                    bbox: Some(
+                        Region {
+                            x: 0,
+                            y: 0,
+                            w: 10,
+                            h: 10,
+                        }
+                        .into(),
+                    ),
                     text: Some("Save".into()),
                     interactable: true,
                     z_index: Some(3),

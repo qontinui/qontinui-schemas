@@ -89,7 +89,7 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
             // bbox is CSS pixels; it is placed on the buffer through the
             // frame's scale factor before a single pixel is read.
             _ => match el
-                .bbox
+                .region()
                 .and_then(|css| frame.css_region_to_pixels(css))
                 .and_then(|px| sample_dominant_two_scored(frame, px))
             {
@@ -574,12 +574,15 @@ mod tests {
     fn text_el(id: &str, fg: Option<Rgb>, bg: Option<Rgb>) -> Element {
         Element {
             id: id.to_string(),
-            bbox: Some(Region {
-                x: 0,
-                y: 0,
-                w: 10,
-                h: 10,
-            }),
+            bbox: Some(
+                Region {
+                    x: 0,
+                    y: 0,
+                    w: 10,
+                    h: 10,
+                }
+                .into(),
+            ),
             text: Some("hello".to_string()),
             role: Some("link".to_string()),
             interactable: true,
@@ -769,7 +772,7 @@ mod tests {
         let snap = ElementSnapshot {
             elements: vec![Element {
                 id: "hero-caption".to_string(),
-                bbox: Some(css),
+                bbox: Some(css.into()),
                 text: Some("caption".to_string()),
                 ..Default::default()
             }],
@@ -866,7 +869,7 @@ mod tests {
                 let snap = ElementSnapshot {
                     elements: vec![Element {
                         id: "empty-box".to_string(),
-                        bbox: Some(css),
+                        bbox: Some(css.into()),
                         text: Some("label".to_string()),
                         ..Default::default()
                     }],

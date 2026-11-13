@@ -48,8 +48,8 @@ pub use element_media::{
     MediaLoadState, MediaLoading, MediaSize, ObjectFit,
 };
 pub use element_snapshot::{
-    display_snapshot_id, intersection, region_contains, regions_overlap, Element, ElementSnapshot,
-    Rgb, VisibilityReason,
+    display_snapshot_id, intersection, region_contains, regions_overlap, Element, ElementRect,
+    ElementSnapshot, Rgb, VisibilityReason,
 };
 pub use error::VisionError;
 pub use frame::{CaptureBackend, Frame, FrameSource, FrameSourceKind, Region};

@@ -666,14 +666,14 @@ fn salience_order(a: Assertion, cta_id: &str, ctx: &EvalContext<'_>) -> Assertio
             format!("'{cta_id}' has no pixels"),
         );
     };
-    let cta_box = cta.bbox.expect("located, so it has a bbox");
+    let cta_box = cta.region().expect("located, so it has a bbox");
     let mut rival: Option<(String, f64)> = None;
     let mut compared = 0usize;
     for el in &snap.elements {
         if el.id == cta.id || !(el.interactable || el.media.is_some()) {
             continue;
         }
-        let Some(b) = el.bbox else { continue };
+        let Some(b) = el.region() else { continue };
         if region_contains(b, cta_box)
             || region_contains(cta_box, b)
             || img::unrendered(snap, el).is_some()

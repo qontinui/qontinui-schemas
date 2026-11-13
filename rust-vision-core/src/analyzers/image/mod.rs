@@ -670,8 +670,9 @@ pub struct Crop {
 /// Why an element could not be located on the frame, typed.
 pub type LocateError = (UnknownCode, String);
 
-/// Why `el` paints NOTHING on the frame, when it paints nothing: a zero-area
-/// box, or a producer-stated [`VisibilityReason`] of `hidden` / `no-layout`
+/// Why `el` paints NOTHING on the frame, when it paints nothing: a box that
+/// covers no pixel of the grid ([`Element::region`] zero in either extent),
+/// or a producer-stated [`VisibilityReason`] of `hidden` / `no-layout`
 /// (`display: none`, `visibility: hidden`, `opacity: 0`, no box). `None` when
 /// it may paint.
 ///
@@ -694,7 +695,7 @@ pub fn unrendered(_snapshot: &ElementSnapshot, el: &Element) -> Option<String> {
             }
         ));
     }
-    if let Some(b) = el.bbox {
+    if let Some(b) = el.region() {
         if b.w == 0 || b.h == 0 {
             return Some(format!(
                 "element '{}' has a zero-area box (display: none, or collapsed), so it paints \
@@ -759,12 +760,12 @@ pub fn unreadable(snapshot: &ElementSnapshot, el: &Element) -> Option<String> {
         }
         _ => {}
     }
-    let b = el.bbox?;
+    let b = el.region()?;
     let top = el
         .occluded_by
         .as_deref()
         .and_then(|id| snapshot.get(id))
-        .and_then(|t| t.bbox)?;
+        .and_then(|t| t.region())?;
     region_contains(top, b).then(|| {
         format!(
             "element '{}' lies wholly inside '{}', which the producer records as occluding it; \
@@ -807,7 +808,7 @@ pub fn locate(
     if let Some(why) = unrendered(snapshot, el).or_else(|| unreadable(snapshot, el)) {
         return Err((UnknownCode::InputMissing, why));
     }
-    let css = el.bbox.ok_or_else(|| {
+    let css = el.region().ok_or_else(|| {
         (
             UnknownCode::InputMissing,
             format!(
@@ -940,7 +941,7 @@ pub fn pair_is_one_stack(a: &Element, b: &Element) -> bool {
             || e.occluded_pct.is_some_and(|p| p > 0.0)
             || e.visible == Some(false)
     };
-    match (a.bbox, b.bbox) {
+    match (a.region(), b.region()) {
         (Some(ra), Some(rb)) => boxes_stack(ra, rb) && (covered(a) || covered(b)),
         _ => false,
     }
@@ -1041,7 +1042,7 @@ fn overlaid_fraction(snapshot: &ElementSnapshot, el: &Element, r: (f64, f64, f64
         .iter()
         .filter(|o| o.id != el.id && unrendered(snapshot, o).is_none())
         .filter_map(|o| {
-            let b = o.bbox?;
+            let b = o.region()?;
             intersection(b, css)?;
             let occluder = el.occluded_by.as_deref() == Some(o.id.as_str());
             let overlay = occluder
@@ -2069,7 +2070,7 @@ fn under_text_busyness(
     snapshot: &ElementSnapshot,
     el: &Element,
 ) -> Vec<TextOverlayBusyness> {
-    let Some(img) = el.bbox else {
+    let Some(img) = el.region() else {
         return Vec::new();
     };
     snapshot
@@ -2080,7 +2081,7 @@ fn under_text_busyness(
         // frame, is not over anything that can be measured.
         .filter(|t| unrendered(snapshot, t).is_none() && unreadable(snapshot, t).is_none())
         .filter_map(|t| {
-            let tb = t.bbox?;
+            let tb = t.region()?;
             if region_contains(tb, img) {
                 return None;
             }

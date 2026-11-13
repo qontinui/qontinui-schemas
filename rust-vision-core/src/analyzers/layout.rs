@@ -56,7 +56,7 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
         .elements
         .iter()
         .filter(|e| e.interactable)
-        .filter_map(|e| e.bbox.map(|b| (e, b)))
+        .filter_map(|e| e.region().map(|b| (e, b)))
         .collect();
 
     // 1. Pairwise overlap among interactive elements (the high-leverage check
@@ -115,7 +115,7 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     let positioned: Vec<(&_, crate::frame::Region)> = snapshot
         .elements
         .iter()
-        .filter_map(|e| e.bbox.map(|b| (e, b)))
+        .filter_map(|e| e.region().map(|b| (e, b)))
         .collect();
 
     // Ancestry, walked to the ROOT rather than one hop.
@@ -211,7 +211,9 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
             }
             let under_area = under_bbox.w as u64 * under_bbox.h as u64;
             if under_area == 0 {
-                continue; // zero_area reports this separately
+                // It covers no pixel of the grid, so nothing of it can be
+                // hidden; a measured zero is zero_area's to report.
+                continue;
             }
             let covered = inter.w as u64 * inter.h as u64;
             let pct = (covered as f64 / under_area as f64) * 100.0;
@@ -268,10 +270,12 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     // 2. Zero-area elements — usually layout regressions ("display:none on a
     // visible-by-spec element" or "width: 0"). bbox-less elements are NOT
     // zero-area; they simply have no measured geometry, so we skip them
-    // rather than fabricate a `zero_area` finding.
+    // rather than fabricate a `zero_area` finding. The MEASURED size is
+    // read, not the grid box: `width: 0` is what this looks for, and a
+    // sub-pixel box is not that wherever its edges happen to snap.
     for el in &snapshot.elements {
         if let Some(bbox) = el.bbox {
-            if bbox.w == 0 || bbox.h == 0 {
+            if bbox.w == 0.0 || bbox.h == 0.0 {
                 findings.push(
                     Finding::new(
                         "zero_area",
@@ -290,7 +294,7 @@ pub fn run(snapshot: &ElementSnapshot) -> AnalyzerResult {
     let mut sorted_y: Vec<(&_, i32)> = snapshot
         .elements
         .iter()
-        .filter_map(|e| e.bbox.map(|b| (e, b.y)))
+        .filter_map(|e| e.region().map(|b| (e, b.y)))
         .collect();
     sorted_y.sort_by_key(|(_, y)| *y);
     let tol_px = 3u32;
@@ -431,13 +435,13 @@ fn verdict(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::element_snapshot::Element;
+    use crate::element_snapshot::{Element, ElementRect};
     use crate::frame::Region;
 
     fn el(id: &str, x: i32, y: i32, w: u32, h: u32, interactable: bool) -> Element {
         Element {
             id: id.to_string(),
-            bbox: Some(Region { x, y, w, h }),
+            bbox: Some(Region { x, y, w, h }.into()),
             text: None,
             role: None,
             interactable,
@@ -622,6 +626,26 @@ mod tests {
         };
         let findings = run(&snap).findings;
         assert!(findings.iter().any(|f| f.kind == "zero_area"));
+    }
+
+    #[test]
+    fn a_sub_pixel_box_is_not_zero_area() {
+        // 0.4 px wide at x = 0 snaps to no pixel at all on the grid, but it
+        // is not `width: 0`: the measured size is what zero_area reads.
+        let mut hairline = el("hairline", 0, 10, 0, 50, false);
+        hairline.bbox = Some(ElementRect {
+            x: 0.0,
+            y: 10.0,
+            w: 0.4,
+            h: 50.0,
+        });
+        assert_eq!(hairline.region().map(|r| r.w), Some(0));
+        let snap = ElementSnapshot {
+            elements: vec![hairline],
+            ..Default::default()
+        };
+        let findings = run(&snap).findings;
+        assert!(!findings.iter().any(|f| f.kind == "zero_area"));
     }
 
     #[test]
