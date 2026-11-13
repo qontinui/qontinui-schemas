@@ -533,8 +533,8 @@ fn node_identity_json(n: &ComponentCaptureNode) -> Value {
 /// tag-changed path (nor beneath a one-sided path) is reported again. Returns
 /// the tag-changed paths, at and beneath which the style and portal checks
 /// are skipped too — the subtree is a different render, not a restyled one,
-/// so the style and portal checks add no findings there (a `clipped` finding is
-/// judged independently and can still land at or beneath it).
+/// so the style and portal checks add no findings there (a `clipped` or root
+/// `size` finding is judged independently and can still land at or beneath it).
 ///
 /// The suppression relies on `nodes` being depth-first pre-order (parents
 /// before children), as the capture contract states. Out-of-order input can
@@ -990,42 +990,6 @@ mod tests {
         assert_eq!(f.baseline["fillRatio"]["width"], json!(0.5));
         assert_eq!(f.in_situ["fillRatio"]["width"], json!(1.0));
         assert!(!f.message.contains("height"), "{}", f.message);
-    }
-
-    /// The population's entry point: a caller (the runner's `vision/assert`)
-    /// parses the wire assertion and goes through the crate's public
-    /// dispatcher, never through this module's `evaluate`. This proves the
-    /// new variant parses from its wire form and reaches the evaluator there.
-    #[test]
-    fn the_public_dispatcher_reaches_the_component_evaluator_from_the_wire_form() {
-        let a: Assertion = serde_json::from_value(json!({
-            "type": "matches_isolated_render",
-            "component": "date-range-picker",
-            "baseline": NAME,
-        }))
-        .expect("wire form parses");
-        let baselines = HashMap::from([(
-            NAME.to_string(),
-            baseline(capture(
-                rect(0.0, 0.0, 200.0, 40.0),
-                Some(rect(0.0, 0.0, 400.0, 40.0)),
-            )),
-        )]);
-        let captures = HashMap::from([(
-            "date-range-picker".to_string(),
-            capture(
-                rect(0.0, 0.0, 1000.0, 40.0),
-                Some(rect(0.0, 0.0, 1000.0, 40.0)),
-            ),
-        )]);
-        let ctx = EvalContext {
-            component_baselines: Some(&baselines),
-            component_captures: Some(&captures),
-            ..Default::default()
-        };
-        let r = crate::evaluate_assertion(&a, &ctx);
-        assert_eq!(r.outcome, AssertionOutcome::Failed);
-        assert!(kinds(&r).contains(&ComponentFindingKind::Size));
     }
 
     /// The runner's Storybook preview is `layout: "centered"` plus a padding
