@@ -78,9 +78,9 @@ pub struct ViewportComparison {
     pub in_situ: Option<CaptureViewport>,
     pub baseline_dpr: Option<f64>,
     pub in_situ_dpr: Option<f64>,
-    /// `Some(true)` when both viewports and both DPRs are known and equal,
-    /// `Some(false)` when all four are known and any differ, `None` when any
-    /// of the four is unknown.
+    /// `Some(false)` when any KNOWN pair differs (both viewports known and
+    /// different, or both DPRs known and different); `Some(true)` only when
+    /// all four are known and equal; `None` otherwise.
     pub matches: Option<bool>,
 }
 
@@ -190,21 +190,7 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     };
     let (findings, unknown_checks) = diff(entry, in_situ, b_root, s_root, &opts);
     let viewport = compare_viewports(&entry.capture, in_situ);
-    let summary = if findings.is_empty() {
-        format!("component '{component}' renders in situ like baseline '{baseline}'")
-    } else {
-        let mut kinds: Vec<&str> = Vec::new();
-        for k in findings.iter().map(|f| kind_name(f.kind)) {
-            if !kinds.contains(&k) {
-                kinds.push(k);
-            }
-        }
-        format!(
-            "component '{component}' diverges in situ from baseline '{baseline}': {} finding(s) ({})",
-            findings.len(),
-            kinds.join(", ")
-        )
-    };
+    let summary = summarize(&component, &baseline, &findings);
     let failed = !findings.is_empty();
     let report = ComponentDiffReport {
         summary,
@@ -220,6 +206,25 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     } else {
         AssertionResult::pass_with(a, detail)
     }
+}
+
+/// The report's one-line summary. Each finding kind is named once, in order
+/// of first appearance, however the findings interleave.
+fn summarize(component: &str, baseline: &str, findings: &[ComponentFinding]) -> String {
+    if findings.is_empty() {
+        return format!("component '{component}' renders in situ like baseline '{baseline}'");
+    }
+    let mut kinds: Vec<&str> = Vec::new();
+    for k in findings.iter().map(|f| kind_name(f.kind)) {
+        if !kinds.contains(&k) {
+            kinds.push(k);
+        }
+    }
+    format!(
+        "component '{component}' diverges in situ from baseline '{baseline}': {} finding(s) ({})",
+        findings.len(),
+        kinds.join(", ")
+    )
 }
 
 fn kind_name(k: ComponentFindingKind) -> &'static str {
@@ -311,6 +316,10 @@ fn parent_path(path: &str) -> Option<&str> {
 
 fn below_any(path: &str, reported: &[String]) -> bool {
     reported.iter().any(|r| is_descendant(path, r))
+}
+
+fn at_or_below_any(path: &str, reported: &[String]) -> bool {
+    reported.iter().any(|r| r == path || is_descendant(path, r))
 }
 
 fn rect_json(r: &CaptureRect) -> Value {
@@ -522,8 +531,14 @@ fn node_identity_json(n: &ComponentCaptureNode) -> Value {
 ///
 /// Only the topmost divergence of a subtree is reported: nothing beneath a
 /// tag-changed path (nor beneath a one-sided path) is reported again. Returns
-/// the tag-changed paths, beneath which the style and portal checks are
-/// skipped too — the subtree is a different render, not a restyled one.
+/// the tag-changed paths, at and beneath which the style and portal checks
+/// are skipped too — the subtree is a different render, not a restyled one,
+/// so one divergence yields one finding.
+///
+/// The suppression relies on `nodes` being depth-first pre-order (parents
+/// before children), as the capture contract states. Out-of-order input can
+/// only OVER-report (a descendant seen before its retagged ancestor is still
+/// compared), which is the safe direction.
 fn identity_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -633,7 +648,14 @@ fn identity_check(
 /// delta (an inherited property cascading down); since that holds at every
 /// step, a node is suppressed only when every path between it and the
 /// reported ancestor carried the same delta, so a reset in between lets a
-/// re-divergence report. Nothing beneath a tag-changed path is compared.
+/// re-divergence report. Nothing at or beneath a tag-changed path is
+/// compared.
+///
+/// The cascade suppression relies on `nodes` being depth-first pre-order
+/// (parents before children), as the capture contract states: a parent's
+/// delta must be recorded before its child is visited. Out-of-order input can
+/// only OVER-report (a child visited first is reported rather than
+/// suppressed), which is the safe direction.
 fn style_check(
     in_situ: &ComponentCapture,
     b_nodes: &BTreeMap<&str, &ComponentCaptureNode>,
@@ -649,7 +671,7 @@ fn style_check(
         let Some(bn) = b_nodes.get(sn.path.as_str()) else {
             continue;
         };
-        if below_any(&sn.path, retagged) {
+        if at_or_below_any(&sn.path, retagged) {
             continue;
         }
         for prop in style_props {
@@ -728,7 +750,8 @@ fn props_check(
 }
 
 /// `portal_mismatch`: at the same path, a portal on one side only or a
-/// different mount target. Nothing beneath a tag-changed path is compared.
+/// different mount target. Nothing at or beneath a tag-changed path is
+/// compared.
 fn portal_check(
     in_situ: &ComponentCapture,
     b_nodes: &BTreeMap<&str, &ComponentCaptureNode>,
@@ -739,7 +762,7 @@ fn portal_check(
         let Some(bn) = b_nodes.get(sn.path.as_str()) else {
             continue;
         };
-        if below_any(&sn.path, retagged) {
+        if at_or_below_any(&sn.path, retagged) {
             continue;
         }
         let message = match (&bn.portal, &sn.portal) {
@@ -769,8 +792,11 @@ fn portal_check(
 }
 
 fn compare_viewports(base: &ComponentCapture, in_situ: &ComponentCapture) -> ViewportComparison {
-    let matches = match (base.viewport, in_situ.viewport, base.dpr, in_situ.dpr) {
-        (Some(bv), Some(sv), Some(bd), Some(sd)) => Some(bv == sv && bd == sd),
+    let vp_eq = base.viewport.zip(in_situ.viewport).map(|(b, s)| b == s);
+    let dpr_eq = base.dpr.zip(in_situ.dpr).map(|(b, s)| b == s);
+    let matches = match (vp_eq, dpr_eq) {
+        (Some(false), _) | (_, Some(false)) => Some(false),
+        (Some(true), Some(true)) => Some(true),
         _ => None,
     };
     ViewportComparison {
@@ -1117,6 +1143,45 @@ mod tests {
         assert_eq!(ids.len(), 1, "{ids:?}");
         assert_eq!(rep.findings.len(), 1, "{:?}", rep.findings);
         assert_eq!(ids[0].baseline["tag"], json!("div"));
+    }
+
+    #[test]
+    fn a_retagged_node_yields_only_its_child_identity_finding() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        situ.nodes[2].tag = "section".to_string();
+        base.nodes[2].styles.insert("color".into(), "red".into());
+        situ.nodes[2].styles.insert("color".into(), "blue".into());
+        situ.nodes[2].portal = Some(CapturePortal {
+            mount_target: "body".to_string(),
+            react_parent_path: None,
+        });
+        let r = run(base, situ);
+        let rep = report(&r);
+        assert_eq!(rep.findings.len(), 1, "{:?}", rep.findings);
+        assert_eq!(rep.findings[0].kind, ComponentFindingKind::ChildIdentity);
+        assert_eq!(rep.findings[0].path, "1");
+    }
+
+    #[test]
+    fn the_summary_names_each_kind_once_however_findings_interleave() {
+        let f = |kind| ComponentFinding {
+            kind,
+            path: String::new(),
+            message: String::new(),
+            baseline: Value::Null,
+            in_situ: Value::Null,
+        };
+        let findings = [
+            f(ComponentFindingKind::StyleDelta),
+            f(ComponentFindingKind::ChildIdentity),
+            f(ComponentFindingKind::StyleDelta),
+        ];
+        assert_eq!(
+            summarize("c", "b", &findings),
+            "component 'c' diverges in situ from baseline 'b': 3 finding(s) \
+             (style_delta, child_identity)"
+        );
     }
 
     #[test]
@@ -1581,10 +1646,18 @@ mod tests {
         assert_eq!(v.matches, Some(false));
         assert_eq!((v.baseline_dpr, v.in_situ_dpr), (Some(1.0), Some(2.0)));
 
-        // One DPR unknown: the comparison is unknown, not a mismatch.
+        // One DPR unknown, viewports equal: unknown, not a mismatch.
         situ.dpr = None;
-        let r = run(capture(page(), parent_of(page())), situ);
+        let r = run(capture(page(), parent_of(page())), situ.clone());
         assert_eq!(report(&r).viewport.matches, None);
+        // One DPR unknown but the known viewports differ: a mismatch.
+        situ.viewport = Some(CaptureViewport {
+            width: 390.0,
+            height: 844.0,
+        });
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        assert_eq!(report(&r).viewport.matches, Some(false));
         // All four known and equal.
         let r = run(
             capture(page(), parent_of(page())),
