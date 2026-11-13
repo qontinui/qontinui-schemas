@@ -38,6 +38,27 @@
 # CLEAN-UP. Once the runner PR lands, the row reads STALE in the push run and
 # the daily pending-registration-audit workflow reds until the row is deleted.
 
+# The cli_session types (first landed by schemas#212 at 86710c89, dropped by
+# dc6c2d01 while runner#1990 sat conflicted), restored for its route-around
+# revival runner#2920.
+[[pending]]
+type = "CapabilityState"
+runner_pr = "qontinui/qontinui-runner#2920"
+added = 2026-11-13
+schemas_pr = "qontinui/qontinui-schemas#SCHEMAS_PR"
+
+[[pending]]
+type = "CliProfile"
+runner_pr = "qontinui/qontinui-runner#2920"
+added = 2026-11-13
+schemas_pr = "qontinui/qontinui-schemas#SCHEMAS_PR"
+
+[[pending]]
+type = "SessionFailure"
+runner_pr = "qontinui/qontinui-runner#2920"
+added = 2026-11-13
+schemas_pr = "qontinui/qontinui-schemas#SCHEMAS_PR"
+
 # The saved-tab-list layout types (schemas#300), awaiting runner#2750.
 [[pending]]
 type = "TerminalLayout"
