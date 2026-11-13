@@ -160,3 +160,59 @@ fn library_hash_file_agrees_with_the_cli() {
     assert_eq!(lib.dhash, hash(cli, "dhash"));
     assert_eq!(lib.sha256, cli["sha256"].as_str().unwrap());
 }
+
+fn run_args(args: &[&str]) -> (i32, Value) {
+    let out = Command::new(env!("CARGO_BIN_EXE_vision-audit"))
+        .arg("hash")
+        .args(args)
+        .output()
+        .unwrap();
+    let json: Value = serde_json::from_slice(&out.stdout).unwrap_or(Value::Null);
+    (out.status.code().unwrap(), json)
+}
+
+#[test]
+fn unknown_flag_and_bare_dash_are_usage_errors() {
+    for bad in ["--frobnicate", "-"] {
+        let (code, report) = run_args(&[bad]);
+        assert_eq!(code, 1, "{bad}");
+        assert_eq!(report, Value::Null, "{bad}: usage errors print no JSON");
+    }
+}
+
+#[test]
+fn help_inside_hash_exits_0_without_json() {
+    let (code, report) = run_args(&["-h"]);
+    assert_eq!(code, 0);
+    assert_eq!(report, Value::Null);
+}
+
+#[test]
+fn double_dash_ends_option_parsing() {
+    let f = fixtures();
+    std::fs::copy(&f.original, f._dir.path().join("-flaglike.png")).unwrap();
+    // Run from the fixture dir so the relative "-..." name reaches the parser.
+    let out = Command::new(env!("CARGO_BIN_EXE_vision-audit"))
+        .current_dir(f._dir.path())
+        .args(["hash", "--", "-flaglike.png"])
+        .output()
+        .unwrap();
+    let report: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(report["hashed"], 1);
+    assert_eq!(report["files"][0]["path"], "-flaglike.png");
+}
+
+#[cfg(unix)]
+#[test]
+fn non_utf8_argument_is_a_usage_error_not_a_panic() {
+    use std::os::unix::ffi::OsStrExt;
+    let bad = std::ffi::OsStr::from_bytes(b"bad\xffname.png");
+    let out = Command::new(env!("CARGO_BIN_EXE_vision-audit"))
+        .arg("hash")
+        .arg(bad)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1), "a panic exits 101");
+    assert!(out.stdout.is_empty());
+}

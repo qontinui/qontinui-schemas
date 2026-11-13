@@ -72,8 +72,21 @@ const EXIT_GATE_FAILED: u8 = 2;
 // ===========================================================================
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
+    // `args_os` rather than `args`: `std::env::args()` PANICS on a non-UTF-8
+    // argument, and `hash` takes arbitrary file paths. Such an argument is a
+    // usage error, never a crash.
+    let args: Result<Vec<String>, CliError> = std::env::args_os()
+        .skip(1)
+        .map(|a| {
+            a.into_string().map_err(|bad| {
+                CliError::usage(format!(
+                    "argument is not valid UTF-8: {:?}",
+                    bad.to_string_lossy()
+                ))
+            })
+        })
+        .collect();
+    match args.and_then(|args| run(&args)) {
         Ok(code) => ExitCode::from(code),
         Err(CliError::Usage(msg)) => {
             eprintln!("error: {msg}\n");
@@ -1089,6 +1102,10 @@ fn run_hash(args: &[String]) -> Result<u8, CliError> {
         } else if !options_done && (arg == "-h" || arg == "--help") {
             eprintln!("{USAGE}");
             return Ok(EXIT_OK);
+        } else if !options_done && arg == "-" {
+            return Err(CliError::usage(
+                "hash does not read stdin; pass a file path (use `-- ./-` for a file named -)",
+            ));
         } else if !options_done && arg.starts_with('-') && arg.len() > 1 {
             return Err(CliError::usage(format!(
                 "hash takes no flags, got {arg:?} (use `--` before a file named like a flag)"
@@ -1120,7 +1137,7 @@ fn hash_report(paths: &[&str]) -> (serde_json::Value, usize) {
         .map(|path| match qontinui_vision_core::hash_file(path) {
             Ok(h) => {
                 hashed += 1;
-                let mut v = serde_json::to_value(&h).unwrap_or_default();
+                let mut v = serde_json::to_value(&h).expect("ImageHashes serialises to JSON");
                 if let serde_json::Value::Object(map) = &mut v {
                     map.insert("path".into(), serde_json::json!(path));
                     map.insert("ok".into(), serde_json::json!(true));
