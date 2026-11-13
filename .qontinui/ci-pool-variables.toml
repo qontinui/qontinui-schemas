@@ -14,10 +14,11 @@
 #
 # `pool` must equal the forced-lane literal of every routed `runs-on` that
 # reads the variable (.github/workflows/rust-ci.yml, beside its
-# `# coord-pools:` line). No lint compares them yet. Once coord can read
-# expression-routed pools (the plan's Phase 2b, the `# coord-pools:` reader),
-# a pool the workflows do not name reads `declaration_mismatch`; until then
-# every entry reads `pool_not_in_eligibility_pass`, right or wrong.
+# `# coord-pools:` line); .github/scripts/check-ci-lane-labels.py fails CI on
+# any drift. Once coord can read expression-routed pools (the plan's Phase 2b,
+# the `# coord-pools:` reader), a pool the workflows do not name reads
+# `declaration_mismatch`; until then every entry reads
+# `pool_not_in_eligibility_pass`, right or wrong, so the lint is the guard.
 # Unknown keys are refused by coord (deny_unknown_fields), never ignored.
 
 [[variables]]
