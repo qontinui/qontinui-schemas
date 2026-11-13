@@ -70,7 +70,14 @@ fn result_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> A
     };
     // `assertions::evaluate` is the dispatcher the crate re-exports as
     // `evaluate_assertion`; the runner calls it under that name.
-    assertions::evaluate(&assertion(), &ctx)
+    // Pin the re-exported name the runner calls: renaming or dropping it
+    // breaks this file, not first the runner.
+    let runner_entry: fn(&Assertion, &EvalContext<'_>) -> AssertionResult =
+        qontinui_vision_core::evaluate_assertion;
+    let via_alias = runner_entry(&assertion(), &ctx);
+    let direct = assertions::evaluate(&assertion(), &ctx);
+    assert_eq!(via_alias.outcome, direct.outcome);
+    direct
 }
 
 #[test]
