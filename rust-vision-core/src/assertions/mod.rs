@@ -63,6 +63,7 @@ use crate::timeline::{ChangeTimeline, ExpectedStateOutcome, TimelineEvent, Timel
 pub use crate::analyzers::image::NaturalRegion;
 
 mod image;
+mod image_facts;
 
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,6 +322,101 @@ pub enum Assertion {
         min_ratio: Option<f64>,
         #[serde(default)]
         percentile: Option<f64>,
+    },
+    /// The image (or every image) loaded. A broken one fails, even collapsed to
+    /// a zero-area box. One still loading, or lazy and not known to be
+    /// off-screen, is Unknown. Page-wide, an off-screen lazy image has not been
+    /// asked to load and is left out.
+    ///
+    /// This and the nine variants after it are the L0 image assertions (plan
+    /// Phase 8): deductions from [`crate::Element::media`], with no frame.
+    /// Without `element` each runs over every element carrying `media`, and an
+    /// absent fact is Unknown, never a pass.
+    ImageLoaded {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// `effective_resolution` (source pixels per device pixel) is at least
+    /// `min_effective`. A vector (inline or `<img src=x.svg>`), CSS backgrounds
+    /// and `role=img` have no such density and are left out. An `img` whose
+    /// `format` names no raster may be a vector, so where it would fail it is
+    /// Unknown.
+    ImageResolutionSufficient {
+        #[serde(default)]
+        element: Option<String>,
+        #[serde(default)]
+        min_effective: Option<f64>,
+    },
+    /// `object-fit` keeps the image's shape: `contain`, `cover`, `none` and
+    /// `scale-down` cannot distort. Under `fill` it fails when the natural and
+    /// rendered aspects differ by more than `max_aspect_delta`, measured as
+    /// `max(a/b, b/a) - 1`; with no measured `object_fit` that difference is
+    /// Unknown. The
+    /// rendered size is the border box after transforms, so a non-uniform
+    /// `transform` goes unseen on the four fits that hold without reading a size,
+    /// and under `fill` a transform, padding, a border or a rotation can read as
+    /// distortion. An `img` whose `format` names no raster may be a vector, so
+    /// where it would fail it is Unknown.
+    ImageNotDistorted {
+        #[serde(default)]
+        element: Option<String>,
+        #[serde(default)]
+        max_aspect_delta: Option<f64>,
+    },
+    /// The box is sized without waiting for the image, so loading cannot shift
+    /// the layout. Judges `img`, `picture` and `video`.
+    ImageDimsReserved {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// An `img` or `picture` that is the LCP element is not lazy and has
+    /// `fetchpriority=high`. Any other image is left out.
+    LcpImagePrioritized {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// The image is decorative or has a text alternative that is not generic
+    /// (`image`, `logo`, a bare number, ...). Video and canvas are left out.
+    ImageHasTextAlternative {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// `effective_resolution` is at most `max_effective`. Same exclusions as
+    /// [`Assertion::ImageResolutionSufficient`].
+    ImageNotOversized {
+        #[serde(default)]
+        element: Option<String>,
+        #[serde(default)]
+        max_effective: Option<f64>,
+    },
+    /// `transfer_bytes` is at most `max_bytes`. A hidden image is still judged,
+    /// because its bytes are paid for. An unfinished lazy image with a non-zero
+    /// box off-screen is left out with its weight unseen, which may under-count one a
+    /// browser fetched ahead of the viewport. Any other lazy image with no measured
+    /// weight is Unknown.
+    ImageWeightWithin {
+        #[serde(default)]
+        element: Option<String>,
+        #[serde(default)]
+        max_bytes: Option<u64>,
+    },
+    /// An `img` or `picture` outside the viewport is lazy. The LCP element is
+    /// left out: [`Assertion::LcpImagePrioritized`] requires the opposite of it.
+    OffscreenImageLazy {
+        #[serde(default)]
+        element: Option<String>,
+    },
+    /// No two rendered images display the same source, by `src_digest`. With
+    /// `element`, compares that image against the rest of the page. Perceptual
+    /// copies are [`Assertion::NoNearDuplicateImages`]; a shared CSS background
+    /// is how sprites work and is left out.
+    ///
+    /// **Only valid against an SDK containing ui-bridge `1667c24`** (#255).
+    /// An older SDK registers each `<picture>` twice, so every `<picture>`
+    /// reads as a duplicate.
+    NoDuplicateImages {
+        #[serde(default)]
+        element: Option<String>,
     },
 }
 
@@ -907,6 +1003,16 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
         | Assertion::ImageSharpnessAtLeast { .. }
         | Assertion::ImageBlockinessWithin { .. }
         | Assertion::TextOverImageContrast { .. } => image::evaluate(a, ctx),
+        Assertion::ImageLoaded { .. }
+        | Assertion::ImageResolutionSufficient { .. }
+        | Assertion::ImageNotDistorted { .. }
+        | Assertion::ImageDimsReserved { .. }
+        | Assertion::LcpImagePrioritized { .. }
+        | Assertion::ImageHasTextAlternative { .. }
+        | Assertion::ImageNotOversized { .. }
+        | Assertion::ImageWeightWithin { .. }
+        | Assertion::OffscreenImageLazy { .. }
+        | Assertion::NoDuplicateImages { .. } => image_facts::evaluate(a, ctx),
     }
 }
 

@@ -59,7 +59,7 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
 
 /// The detail every undeclared threshold answers with (plan Phase 8's rule,
 /// shared here).
-fn undeclared(a: Assertion, name: &str) -> AssertionResult {
+pub(super) fn undeclared(a: Assertion, name: &str) -> AssertionResult {
     AssertionResult::unknown(
         a,
         UnknownCode::InputMissing,
@@ -71,7 +71,7 @@ fn undeclared(a: Assertion, name: &str) -> AssertionResult {
 }
 
 /// A required threshold, finite.
-fn threshold(a: &Assertion, v: Option<f64>, name: &str) -> Result<f64, AssertionResult> {
+pub(super) fn threshold(a: &Assertion, v: Option<f64>, name: &str) -> Result<f64, AssertionResult> {
     match v {
         Some(t) if t.is_finite() => Ok(t),
         Some(t) => Err(AssertionResult::unknown(
@@ -97,7 +97,7 @@ fn require_frame<'a>(
 }
 
 /// The named element, with its media.
-fn media_element<'a>(
+pub(super) fn media_element<'a>(
     a: &Assertion,
     snap: &'a ElementSnapshot,
     id: &str,
