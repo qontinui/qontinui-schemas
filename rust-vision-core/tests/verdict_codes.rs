@@ -130,9 +130,9 @@ fn layout_every_non_checked_arm_carries_a_code() {
 
     // Own degraded arm #1: geometry present, nothing interactable.
     let mut a = bare("a");
-    a.bbox = Some(region(0, 0, 50, 50));
+    a.bbox = Some(region(0, 0, 50, 50).into());
     let mut b = bare("b");
-    b.bbox = Some(region(100, 0, 50, 50));
+    b.bbox = Some(region(100, 0, 50, 50).into());
     let s = snapshot(vec![a, b]);
     let r = run(Analyzer::Layout, None, Some(&s), None);
     assert_arm(
@@ -144,10 +144,10 @@ fn layout_every_non_checked_arm_carries_a_code() {
 
     // Own degraded arm #2: interactable, intersecting, no stacking order.
     let mut a = bare("a");
-    a.bbox = Some(region(0, 0, 50, 50));
+    a.bbox = Some(region(0, 0, 50, 50).into());
     a.interactable = true;
     let mut b = bare("b");
-    b.bbox = Some(region(25, 25, 50, 50));
+    b.bbox = Some(region(25, 25, 50, 50).into());
     b.interactable = true;
     let s = snapshot(vec![a, b]);
     let r = run(Analyzer::Layout, None, Some(&s), None);
@@ -333,7 +333,7 @@ fn image_every_non_checked_arm_carries_a_code() {
     // Own degraded arm #4 (Phase 16): every image located, but a text-hidden
     // frame was supplied that cannot be paired with the frame (another size).
     let mut m = bare("img");
-    m.bbox = Some(region(10, 10, 60, 30));
+    m.bbox = Some(region(10, 10, 60, 30).into());
     m.media = Some(ElementMedia {
         object_fit: Some(qontinui_vision_core::ObjectFit::Fill),
         ..ElementMedia::new(MediaKind::Img)

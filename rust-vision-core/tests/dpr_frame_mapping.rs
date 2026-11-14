@@ -41,12 +41,15 @@ fn a_dpr2_caption_is_sampled_where_it_rendered() {
     let snap = ElementSnapshot {
         elements: vec![Element {
             id: "hero-caption".to_string(),
-            bbox: Some(Region {
-                x: 40,
-                y: 40,
-                w: 20,
-                h: 20,
-            }),
+            bbox: Some(
+                Region {
+                    x: 40,
+                    y: 40,
+                    w: 20,
+                    h: 20,
+                }
+                .into(),
+            ),
             text: Some("caption".to_string()),
             ..Default::default()
         }],

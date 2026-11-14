@@ -62,7 +62,7 @@ fn img_el(id: &str, x: i32, y: i32, img: &image::RgbaImage) -> Element {
     let (w, h) = img.dimensions();
     Element {
         id: id.into(),
-        bbox: Some(Region { x, y, w, h }),
+        bbox: Some(Region { x, y, w, h }.into()),
         media: Some(ElementMedia {
             natural_px: Some(MediaSize::new(w as f32, h as f32)),
             rendered_px: Some(MediaSize::new(w as f32, h as f32)),
@@ -263,12 +263,15 @@ fn a_frame_with_no_media_is_degraded_and_green() {
     let frame = page(200, 100, PAGE, &[]);
     let snap = snapshot(vec![Element {
         id: "btn".into(),
-        bbox: Some(Region {
-            x: 10,
-            y: 10,
-            w: 40,
-            h: 20,
-        }),
+        bbox: Some(
+            Region {
+                x: 10,
+                y: 10,
+                w: 40,
+                h: 20,
+            }
+            .into(),
+        ),
         interactable: true,
         ..Default::default()
     }]);
@@ -431,12 +434,15 @@ fn mutation_off_palette_recolour_moves_the_palette_and_flips_image_palette_withi
 /// y ≈ 0.45..0.76) is cropped away.
 fn banner(position: &str) -> ElementSnapshot {
     let mut el = img_el("hero", 10, 10, &load("base.png"));
-    el.bbox = Some(Region {
-        x: 10,
-        y: 10,
-        w: 128,
-        h: 48,
-    });
+    el.bbox = Some(
+        Region {
+            x: 10,
+            y: 10,
+            w: 128,
+            h: 48,
+        }
+        .into(),
+    );
     let m = el.media.as_mut().unwrap();
     m.rendered_px = Some(MediaSize::new(128.0, 48.0));
     m.object_fit = Some(ObjectFit::Cover);
@@ -673,7 +679,7 @@ fn cta_page(rival: [u8; 4]) -> (Frame, ElementSnapshot) {
     let frame = page(320, 200, bg, &[(&cta, 40, 150), (&other, 200, 40)]);
     let button = |id: &str, x: i32, y: i32| Element {
         id: id.into(),
-        bbox: Some(Region { x, y, w: 64, h: 24 }),
+        bbox: Some(Region { x, y, w: 64, h: 24 }.into()),
         interactable: true,
         ..Default::default()
     };
@@ -815,12 +821,15 @@ fn text_over_an_image_lowers_confidence_and_gets_its_own_busyness() {
     let frame = page(200, 120, PAGE, &[(&img, 10, 10)]);
     let caption = Element {
         id: "caption".into(),
-        bbox: Some(Region {
-            x: 10,
-            y: 10,
-            w: 128,
-            h: 24,
-        }),
+        bbox: Some(
+            Region {
+                x: 10,
+                y: 10,
+                w: 128,
+                h: 24,
+            }
+            .into(),
+        ),
         text: Some("Hello".into()),
         ..Default::default()
     };
@@ -868,7 +877,7 @@ fn draw_clipped(
 fn fitted_el(id: &str, bbox: Region, natural: (u32, u32), fit: ObjectFit, pos: &str) -> Element {
     Element {
         id: id.into(),
-        bbox: Some(bbox),
+        bbox: Some(bbox.into()),
         media: Some(ElementMedia {
             natural_px: Some(MediaSize::new(natural.0 as f32, natural.1 as f32)),
             rendered_px: Some(MediaSize::new(bbox.w as f32, bbox.h as f32)),
@@ -939,12 +948,15 @@ fn an_image_reported_occluded_is_unknown_never_silently_dropped() {
     let frame = page(320, 120, PAGE, &[(&base, 10, 10), (&other, 160, 10)]);
     let scrim = Element {
         id: "scrim".into(),
-        bbox: Some(Region {
-            x: 0,
-            y: 0,
-            w: 150,
-            h: 120,
-        }),
+        bbox: Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 150,
+                h: 120,
+            }
+            .into(),
+        ),
         interactable: true,
         ..Default::default()
     };
@@ -1009,12 +1021,15 @@ fn a_display_none_variant_is_unrendered_not_outside_the_frame() {
     let other = load("other.png");
     let frame = page(320, 120, PAGE, &[(&base, 10, 10), (&other, 160, 10)]);
     let mut variant = img_el("mobile-hero", 0, 0, &base);
-    variant.bbox = Some(Region {
-        x: 0,
-        y: 0,
-        w: 0,
-        h: 0,
-    });
+    variant.bbox = Some(
+        Region {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+        }
+        .into(),
+    );
     let snap = snapshot(vec![
         img_el("hero", 10, 10, &base),
         img_el("other", 160, 10, &other),
@@ -1139,12 +1154,15 @@ fn a_containing_media_element_is_not_an_overlay() {
     let frame = page(200, 120, PAGE, &[(&base, 10, 10)]);
     let section = Element {
         id: "section".into(),
-        bbox: Some(Region {
-            x: 0,
-            y: 0,
-            w: 200,
-            h: 120,
-        }),
+        bbox: Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 200,
+                h: 120,
+            }
+            .into(),
+        ),
         media: Some(ElementMedia::new(MediaKind::CssBackground)),
         ..Default::default()
     };
@@ -1172,12 +1190,15 @@ fn an_svg_is_read_whole_and_a_css_background_is_named_unreadable() {
     for kind in [MediaKind::Svg, MediaKind::RoleImg] {
         let el = Element {
             id: "logo".into(),
-            bbox: Some(Region {
-                x: 10,
-                y: 10,
-                w: 128,
-                h: 96,
-            }),
+            bbox: Some(
+                Region {
+                    x: 10,
+                    y: 10,
+                    w: 128,
+                    h: 96,
+                }
+                .into(),
+            ),
             media: Some(ElementMedia::new(kind)),
             ..Default::default()
         };
@@ -1193,12 +1214,15 @@ fn an_svg_is_read_whole_and_a_css_background_is_named_unreadable() {
     }
     let section = Element {
         id: "section".into(),
-        bbox: Some(Region {
-            x: 0,
-            y: 0,
-            w: 200,
-            h: 120,
-        }),
+        bbox: Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 200,
+                h: 120,
+            }
+            .into(),
+        ),
         media: Some(ElementMedia::new(MediaKind::CssBackground)),
         ..Default::default()
     };
@@ -1235,12 +1259,15 @@ fn an_unreadable_rival_does_not_out_draw_the_cta() {
     let frame = page(200, 120, PAGE, &[(&base, 10, 10)]);
     let caption = Element {
         id: "caption".into(),
-        bbox: Some(Region {
-            x: 10,
-            y: 10,
-            w: 128,
-            h: 24,
-        }),
+        bbox: Some(
+            Region {
+                x: 10,
+                y: 10,
+                w: 128,
+                h: 24,
+            }
+            .into(),
+        ),
         text: Some("Hello".into()),
         visible: Some(false),
         ..Default::default()
@@ -1578,12 +1605,15 @@ fn the_crossed_box_floor_is_in_css_px_on_a_hidpi_frame() {
     let frame = Frame::from_rgba(buf, source);
     let el = |id: &str, x: i32, side_w: u32, side_h: u32| Element {
         id: id.into(),
-        bbox: Some(Region {
-            x,
-            y: 10,
-            w: side_w,
-            h: side_h,
-        }),
+        bbox: Some(
+            Region {
+                x,
+                y: 10,
+                w: side_w,
+                h: side_h,
+            }
+            .into(),
+        ),
         media: Some(ElementMedia {
             natural_px: Some(MediaSize::new((side_w * 2) as f32, (side_h * 2) as f32)),
             rendered_px: Some(MediaSize::new(side_w as f32, side_h as f32)),
@@ -1799,7 +1829,7 @@ fn extreme_media_sizes_stay_finite_and_round_trip() {
 fn flat_el(id: &str, kind: MediaKind, bbox: Region) -> Element {
     Element {
         id: id.into(),
-        bbox: Some(bbox),
+        bbox: Some(bbox.into()),
         media: Some(ElementMedia {
             natural_px: Some(MediaSize::new(bbox.w as f32, bbox.h as f32)),
             rendered_px: Some(MediaSize::new(bbox.w as f32, bbox.h as f32)),

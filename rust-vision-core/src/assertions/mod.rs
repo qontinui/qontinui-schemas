@@ -117,6 +117,14 @@ pub enum Assertion {
     /// pass on an un-measured axis is what let truncated labels through
     /// before. An element that carries no text is `unknown{input_missing}`
     /// too: there is nothing to fit, so nothing was checked.
+    ///
+    /// Both measured comparisons are strict, with no slack, against the
+    /// comparison box: the element's unrounded `bbox` with its width and
+    /// height rounded UP ([`crate::element_snapshot::ElementRect::ceil_size`]).
+    /// Content exactly as large as that box fits, and one pixel larger does
+    /// not, so a 119.4 px label holds 120 px of content. Only this kind rounds
+    /// up; the geometry kinds snap the box's edges to the nearest pixel
+    /// ([`crate::element_snapshot::ElementRect::grid_region`]).
     TextFitsContainer { element: String },
     /// All named elements share a y-baseline within the tolerance.
     AlignedHorizontally {
@@ -160,9 +168,12 @@ pub enum Assertion {
     /// No descendant element extends past its parent's clip rect.
     /// `region` scopes the check to the children whose box intersects it.
     ///
-    /// The parent is read from `parent_id`, so a snapshot in which no
-    /// element carries one has no hierarchy to check: that is
-    /// `unknown{input_missing}`, never a vacuous pass.
+    /// A pass needs at least one child that was actually compared: in scope,
+    /// with a bbox, and with a `parent_id` that resolves to an element with a
+    /// bbox. A check that compared none is `unknown{input_missing}`, never a
+    /// vacuous pass: a snapshot in which no element carries a `parent_id`,
+    /// every parent unresolved or unpositioned, every parented child
+    /// unpositioned, or a `region` that holds no parented child.
     NoClipping {
         #[serde(default)]
         region: Option<Region>,
@@ -411,7 +422,8 @@ pub enum TextScale {
 impl TextScale {
     /// 18 pt in CSS pixels.
     pub const LARGE_MIN_PX: f32 = 24.0;
-    /// 14 pt in CSS pixels is 18.666…; the rule takes it at 18.66.
+    /// 14 pt is 18.6667 CSS px. The threshold is 18.66, which is deliberately
+    /// lenient: by under 0.007 px.
     pub const LARGE_BOLD_MIN_PX: f32 = 18.66;
     /// The weight at which text counts as bold: CSS `bold` computes to 700.
     pub const BOLD_MIN_WEIGHT: f32 = 700.0;
@@ -777,7 +789,7 @@ impl BaselineEntry {
         for el in &snapshot.elements {
             // Only positioned elements can be baselined for layout-shift; a
             // bbox-less element has no geometry to compare against later.
-            if let Some(bbox) = el.bbox {
+            if let Some(bbox) = el.region() {
                 element_bboxes.insert(el.id.clone(), bbox);
             }
         }
@@ -974,7 +986,7 @@ fn eval_no_overlap(
             )
         }
     };
-    let a_bbox = match a.bbox {
+    let a_bbox = match a.region() {
         Some(bb) => bb,
         None => {
             return AssertionResult::unknown(
@@ -987,7 +999,7 @@ fn eval_no_overlap(
             )
         }
     };
-    let b_bbox = match b.bbox {
+    let b_bbox = match b.region() {
         Some(bb) => bb,
         None => {
             return AssertionResult::unknown(
@@ -1047,7 +1059,11 @@ fn inset_region(r: Region, inset: u32) -> Region {
 ///    paints on top; equal means neither does (document order decides, and a
 ///    snapshot does not carry it reliably — the analyzer declines to guess
 ///    there too, and so do we).
-/// 3. Neither available → the assertion cannot be answered. See below.
+/// 3. Neither available → the assertion cannot be answered:
+///    `unknown{hit_test_unmeasurable}`, the code the UI Bridge SDK's in-tab
+///    evaluator gives when no hit-test sample shows both elements. A missing
+///    operand, or missing geometry when the overlap is required, is
+///    `unknown{input_missing}` instead. See below.
 ///
 /// **On the ancestry exemption.** `analyzers::layout` skips ancestor/descendant
 /// pairs, because a descendant painting over its ancestor's box is what nesting
@@ -1106,7 +1122,7 @@ fn eval_element_above(
 
     // 2. Geometry, only when the caller requires the pair to actually overlap.
     if require_overlap {
-        let (above_bbox, below_bbox) = match (above.bbox, below.bbox) {
+        let (above_bbox, below_bbox) = match (above.region(), below.region()) {
             (Some(a), Some(b)) => (a, b),
             _ => {
                 let which = match (above.bbox.is_none(), below.bbox.is_none()) {
@@ -1165,17 +1181,21 @@ fn eval_element_above(
             (true, false) => format!("'{above_id}'"),
             _ => format!("'{below_id}'"),
         };
+        // No paint-order evidence: the same fact the SDK's in-tab evaluator
+        // reports when no hit-test sample shows both elements, so the same
+        // code (`hit_test_unmeasurable`), not `input_missing`.
         return AssertionResult::unknown(
             assertion,
-            UnknownCode::InputMissing,
+            UnknownCode::HitTestUnmeasurable,
             format!(
                 "element_above[{above_id}, {below_id}]: CANNOT ANSWER — no ordering verdict was \
-                 reached. Neither element carries an `occluded_by` attribution, and `z_index` is \
-                 missing on {which}. Reported as `unknown`, not as a failure: nothing was \
-                 measured, so nothing is known — and not as a pass either, because a vacuous \
-                 pass would silently hide the very stacking bug this assertion exists to catch. \
-                 Note `z_index` is the producer's RESOLVED, GLOBAL paint rank: a raw CSS \
-                 `z-index` value is NOT a substitute and must not be projected in its place."
+                 reached. No `occluded_by` attribution names either element as painting over \
+                 the other, and `z_index` is missing on {which}. Reported as `unknown`, not as \
+                 a failure: nothing was measured, so nothing is known — and not as a pass \
+                 either, because a vacuous pass would silently hide the very stacking bug this \
+                 assertion exists to catch. Note `z_index` is the producer's RESOLVED, GLOBAL \
+                 paint rank: a raw CSS `z-index` value is NOT a substitute and must not be \
+                 projected in its place."
             ),
         );
     };
@@ -1223,7 +1243,7 @@ fn eval_contains_text(
             // `e.bbox` is itself Option — a bbox-less element yields `None`
             // here, which simply disables the OCR-region fallback below (the
             // snapshot-text path still works).
-            Some(e) => e.bbox,
+            Some(e) => e.region(),
             None => {
                 return AssertionResult::unknown(
                     assertion,
@@ -1415,12 +1435,16 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             )
         }
     };
+    // The comparison box: the unrounded border box with its width and height
+    // rounded UP, so the box's own fractional pixel never reads as a pixel of
+    // overflow. A 119.4 px label holds 120 px of content.
+    let (box_w, box_h) = bbox.ceil_size();
     // A failure on either arm is a verdict, whatever the other arm measured,
     // so both are checked before an unmeasured arm can make this Unknown.
 
     // --- Horizontal: measured, or not at all. ---
     if let Some(sw) = el.scroll_width_px {
-        if sw > bbox.w {
+        if sw > box_w {
             let how = match el.text_overflow.as_deref() {
                 Some("ellipsis") => "ellipsised",
                 Some("clip") => "clipped",
@@ -1430,10 +1454,9 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             return AssertionResult::fail(
                 assertion,
                 format!(
-                    "text is {how}: content is {sw}px wide but the box is only {}px \
+                    "text is {how}: content is {sw}px wide but the box is only {box_w}px \
                      ({}px hidden). Full text: {shown:?}",
-                    bbox.w,
-                    sw - bbox.w
+                    sw - box_w
                 ),
             );
         }
@@ -1445,14 +1468,13 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         // when it disagrees: a `leading-none` label is exactly as tall as its
         // font, which the 1.5x guess would call clipped.
         (Some(sh), _) => {
-            if sh > bbox.h {
+            if sh > box_h {
                 return AssertionResult::fail(
                     assertion,
                     format!(
                         "text overflows vertically: content is {sh}px tall but the box is \
-                         only {}px ({}px hidden)",
-                        bbox.h,
-                        sh - bbox.h
+                         only {box_h}px ({}px hidden)",
+                        sh - box_h
                     ),
                 );
             }
@@ -1461,12 +1483,11 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         (None, Some(size)) => {
             // Reasonable upper bound: text line height is ~font_size * 1.5.
             let needed = (size * 1.5).ceil() as u32;
-            if bbox.h < needed {
+            if box_h < needed {
                 return AssertionResult::fail(
                     assertion,
                     format!(
-                        "element height {} px is less than ~1.5×{}px font ({needed} px expected) — text likely clipped",
-                        bbox.h, size
+                        "element height {box_h} px is less than ~1.5×{size}px font ({needed} px expected) — text likely clipped"
                     ),
                 );
             }
@@ -1560,7 +1581,7 @@ fn eval_aligned(
                 )
             }
         };
-        let bbox = match el.bbox {
+        let bbox = match el.region() {
             Some(bb) => bb,
             None => {
                 return AssertionResult::fail(
@@ -1888,7 +1909,7 @@ fn eval_layout_shift(
     let mut worst: Option<(String, u32)> = None;
     for el in &snap.elements {
         // Skip bbox-less elements: no current geometry to compare to baseline.
-        let Some(cur) = el.bbox else { continue };
+        let Some(cur) = el.region() else { continue };
         if let Some(prev) = entry.element_bboxes.get(&el.id) {
             let dx = prev.x.abs_diff(cur.x);
             let dy = prev.y.abs_diff(cur.y);
@@ -1943,7 +1964,7 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
     // are clip candidates / clip ancestors.
     let mut bbox_by_id: HashMap<&str, Region> = HashMap::with_capacity(snap.elements.len());
     for el in &snap.elements {
-        if let Some(bbox) = el.bbox {
+        if let Some(bbox) = el.region() {
             bbox_by_id.insert(el.id.as_str(), bbox);
         }
     }
@@ -1954,7 +1975,7 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
     let mut compared = 0usize;
     for el in &snap.elements {
         // A bbox-less child has no geometry to clip — skip it.
-        let Some(el_bbox) = el.bbox else { continue };
+        let Some(el_bbox) = el.region() else { continue };
         if let Some(parent_id) = &el.parent_id {
             // Parent must also be positioned to be a clip ancestor.
             if let Some(parent_bbox) = bbox_by_id.get(parent_id.as_str()) {
@@ -2480,7 +2501,7 @@ mod tests {
     fn el(id: &str, x: i32, y: i32, w: u32, h: u32) -> Element {
         Element {
             id: id.into(),
-            bbox: Some(Region { x, y, w, h }),
+            bbox: Some(Region { x, y, w, h }.into()),
             text: None,
             role: None,
             interactable: false,
@@ -2563,24 +2584,30 @@ mod tests {
         snap_of(vec![
             Element {
                 id: "title-bar".into(),
-                bbox: Some(Region {
-                    x: 0,
-                    y: 0,
-                    w: 1000,
-                    h: 48,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 0,
+                        y: 0,
+                        w: 1000,
+                        h: 48,
+                    }
+                    .into(),
+                ),
                 z_index: Some(10),
                 ..Default::default()
             },
             Element {
                 // CSS `z-50`, resolved inside the title bar's context.
                 id: "title-bar-dropdown".into(),
-                bbox: Some(Region {
-                    x: 700,
-                    y: 40,
-                    w: 240,
-                    h: 300,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 700,
+                        y: 40,
+                        w: 240,
+                        h: 300,
+                    }
+                    .into(),
+                ),
                 parent_id: Some("title-bar".into()),
                 z_index: Some(11),
                 ..Default::default()
@@ -2588,12 +2615,15 @@ mod tests {
             Element {
                 // CSS `z-20`, a sibling stacking context of the title bar's.
                 id: "prompts-panel".into(),
-                bbox: Some(Region {
-                    x: 600,
-                    y: 0,
-                    w: 400,
-                    h: 800,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 600,
+                        y: 0,
+                        w: 400,
+                        h: 800,
+                    }
+                    .into(),
+                ),
                 z_index: Some(20),
                 ..Default::default()
             },
@@ -2637,23 +2667,29 @@ mod tests {
         let snap = snap_of(vec![
             Element {
                 id: "dropdown".into(),
-                bbox: Some(Region {
-                    x: 0,
-                    y: 0,
-                    w: 100,
-                    h: 100,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 0,
+                        y: 0,
+                        w: 100,
+                        h: 100,
+                    }
+                    .into(),
+                ),
                 z_index: Some(1),
                 ..Default::default()
             },
             Element {
                 id: "panel".into(),
-                bbox: Some(Region {
-                    x: 50,
-                    y: 50,
-                    w: 100,
-                    h: 100,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 50,
+                        y: 50,
+                        w: 100,
+                        h: 100,
+                    }
+                    .into(),
+                ),
                 z_index: Some(99),
                 occluded_by: Some("dropdown".into()),
                 ..Default::default()
@@ -2675,12 +2711,15 @@ mod tests {
             el("a", 0, 0, 100, 100),
             Element {
                 id: "b".into(),
-                bbox: Some(Region {
-                    x: 50,
-                    y: 50,
-                    w: 100,
-                    h: 100,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 50,
+                        y: 50,
+                        w: 100,
+                        h: 100,
+                    }
+                    .into(),
+                ),
                 z_index: Some(3),
                 ..Default::default()
             },
@@ -2690,6 +2729,10 @@ mod tests {
             !res.passed,
             "a vacuous pass here hides the bug being hunted"
         );
+        // No paint-order evidence is the hit-test's own unknown, not a
+        // missing input: both operands and their geometry were supplied.
+        assert_eq!(res.outcome, AssertionOutcome::Unknown);
+        assert_eq!(res.code, Some(UnknownCode::HitTestUnmeasurable));
         let detail = res.detail.unwrap();
         assert!(detail.contains("CANNOT ANSWER"), "{detail}");
         assert!(detail.contains("'a'"), "must name the element: {detail}");
@@ -2702,23 +2745,29 @@ mod tests {
         let snap = snap_of(vec![
             Element {
                 id: "a".into(),
-                bbox: Some(Region {
-                    x: 0,
-                    y: 0,
-                    w: 100,
-                    h: 100,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 0,
+                        y: 0,
+                        w: 100,
+                        h: 100,
+                    }
+                    .into(),
+                ),
                 z_index: Some(7),
                 ..Default::default()
             },
             Element {
                 id: "b".into(),
-                bbox: Some(Region {
-                    x: 50,
-                    y: 50,
-                    w: 100,
-                    h: 100,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 50,
+                        y: 50,
+                        w: 100,
+                        h: 100,
+                    }
+                    .into(),
+                ),
                 z_index: Some(7),
                 ..Default::default()
             },
@@ -2755,23 +2804,29 @@ mod tests {
         let snap = snap_of(vec![
             Element {
                 id: "a".into(),
-                bbox: Some(Region {
-                    x: 0,
-                    y: 0,
-                    w: 50,
-                    h: 50,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 0,
+                        y: 0,
+                        w: 50,
+                        h: 50,
+                    }
+                    .into(),
+                ),
                 z_index: Some(5),
                 ..Default::default()
             },
             Element {
                 id: "b".into(),
-                bbox: Some(Region {
-                    x: 500,
-                    y: 500,
-                    w: 50,
-                    h: 50,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 500,
+                        y: 500,
+                        w: 50,
+                        h: 50,
+                    }
+                    .into(),
+                ),
                 z_index: Some(1),
                 ..Default::default()
             },
@@ -2806,12 +2861,15 @@ mod tests {
         // 2. equal z_index
         let z = |id: &str, x: i32, zi: i32| Element {
             id: id.into(),
-            bbox: Some(Region {
-                x,
-                y: 0,
-                w: 100,
-                h: 100,
-            }),
+            bbox: Some(
+                Region {
+                    x,
+                    y: 0,
+                    w: 100,
+                    h: 100,
+                }
+                .into(),
+            ),
             z_index: Some(zi),
             ..Default::default()
         };
@@ -2860,12 +2918,15 @@ mod tests {
             el("b", 50, 50, 100, 100),
             Element {
                 id: "c".into(),
-                bbox: Some(Region {
-                    x: 0,
-                    y: 0,
-                    w: 10,
-                    h: 10,
-                }),
+                bbox: Some(
+                    Region {
+                        x: 0,
+                        y: 0,
+                        w: 10,
+                        h: 10,
+                    }
+                    .into(),
+                ),
                 text: Some("hello".into()),
                 fg_color: Some(Rgb::new(0, 0, 0)),
                 bg_color: Some(Rgb::new(255, 255, 255)),
@@ -2985,12 +3046,15 @@ mod tests {
     fn cannot_answer_is_unknown_while_a_real_inversion_is_failed() {
         let z = |id: &str, zi: Option<i32>| Element {
             id: id.into(),
-            bbox: Some(Region {
-                x: 0,
-                y: 0,
-                w: 100,
-                h: 100,
-            }),
+            bbox: Some(
+                Region {
+                    x: 0,
+                    y: 0,
+                    w: 100,
+                    h: 100,
+                }
+                .into(),
+            ),
             z_index: zi,
             ..Default::default()
         };
@@ -3541,7 +3605,7 @@ mod tests {
     fn the_code_key_is_on_the_wire_iff_unknown() {
         let snap = snap_of(vec![el("a", 0, 0, 100, 100), el("b", 50, 50, 100, 100)]);
         let unknown = serde_json::to_value(eval_on(&snap, &above(["a", "b"], true))).unwrap();
-        assert_eq!(unknown["code"], serde_json::json!("input_missing"));
+        assert_eq!(unknown["code"], serde_json::json!("hit_test_unmeasurable"));
         let failed = serde_json::to_value(eval_on(
             &snap,
             &Assertion::NoOverlap {
@@ -4093,12 +4157,15 @@ mod tests {
             elements: vec![
                 Element {
                     id: "hero".into(),
-                    bbox: Some(Region {
-                        x: 0,
-                        y: 0,
-                        w: 200,
-                        h: 100,
-                    }),
+                    bbox: Some(
+                        Region {
+                            x: 0,
+                            y: 0,
+                            w: 200,
+                            h: 100,
+                        }
+                        .into(),
+                    ),
                     media: Some(ElementMedia {
                         object_fit: Some(ObjectFit::Fill),
                         ..ElementMedia::new(MediaKind::Img)
@@ -4107,12 +4174,15 @@ mod tests {
                 },
                 Element {
                     id: "heading".into(),
-                    bbox: Some(Region {
-                        x: 20,
-                        y: 30,
-                        w: 120,
-                        h: 30,
-                    }),
+                    bbox: Some(
+                        Region {
+                            x: 20,
+                            y: 30,
+                            w: 120,
+                            h: 30,
+                        }
+                        .into(),
+                    ),
                     text: Some("Summer sale".into()),
                     fg_color: Some(Rgb::new(255, 255, 255)),
                     ..Default::default()
