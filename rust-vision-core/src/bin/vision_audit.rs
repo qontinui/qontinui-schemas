@@ -15,8 +15,9 @@
 //!
 //! | exit | meaning                                                       |
 //! |------|--------------------------------------------------------------|
-//! | 0    | OK (analyze: ran; or no finding at/above `--fail-on`. assert: allPassed) |
-//! | 2    | GATE FAILED (a finding at/above `--fail-on`, an analyzer that could not run, or an assertion failed) |
+//! | 0    | OK (analyze: ran; or no finding at/above `--fail-on`. assert: the fold is `passed`) |
+//! | 2    | GATE FAILED (a finding at/above `--fail-on`, an analyzer that could not run, or an assertion failed or was not evaluated) |
+//! | 3    | NO VERDICT (assert: the assertion list was empty — the fold is `unknown(no_results)`, never a pass) |
 //! | 1    | usage / IO / parse error                                      |
 //!
 //! Modes:
@@ -53,12 +54,13 @@ use qontinui_vision_core::analyzers::{
     self, AnalyzeInput, Analyzer, AnalyzerVerdict, Finding, Severity,
 };
 use qontinui_vision_core::assertions::{
-    evaluate as evaluate_assertion, Assertion, AssertionOutcome, AssertionResult, BaselineEntry,
-    EvalContext,
+    evaluate as evaluate_assertion, fold_results, Assertion, AssertionOutcome, AssertionResult,
+    BaselineEntry, EvalContext, FoldedOutcome,
 };
 use qontinui_vision_core::coverage::SnapshotCoverage;
 use qontinui_vision_core::element_snapshot::{display_snapshot_id, ElementSnapshot};
 use qontinui_vision_core::frame::{Frame, FrameSource};
+use qontinui_vision_core::UnknownCode;
 
 // ===========================================================================
 // Exit-code contract (centralized so tests can reference the same constants).
@@ -67,6 +69,10 @@ use qontinui_vision_core::frame::{Frame, FrameSource};
 const EXIT_OK: u8 = 0;
 const EXIT_USAGE: u8 = 1;
 const EXIT_GATE_FAILED: u8 = 2;
+/// `assert` over an EMPTY assertion list: nothing was judged, so the fold is
+/// `unknown(no_results)`. Distinct from 2 so a gate can tell "checked and
+/// red" from "checked nothing"; never 0, because silence is not a pass.
+const EXIT_NO_RESULTS: u8 = 3;
 
 // ===========================================================================
 // main — thin. All real logic lives in testable functions below.
@@ -139,10 +145,12 @@ ANALYZE:
 ASSERT:
     --assertions JSON array of assertion objects ({\"type\":\"no_overlap\", ...}).
     --baseline-dir  dir of <name>.json baselines for no_layout_shift_since.
-    Exit 0 iff every assertion PASSED; else 2. An assertion that could not be
-    evaluated (missing element, missing measurement, unregistered baseline)
-    reports `outcome: \"unknown\"` and is NOT a pass -- it counts toward exit 2,
-    because an unchecked assertion must never read as a green one.
+    Exit 0 iff every assertion PASSED; 3 when the assertion list is EMPTY
+    (the fold is `unknown(no_results)`: nothing was checked, so no verdict);
+    else 2. An assertion that could not be evaluated (missing element, missing
+    measurement, unregistered baseline) reports `outcome: \"unknown\"` and is
+    NOT a pass -- it counts toward exit 2, because an unchecked assertion must
+    never read as a green one.
 
 BASELINE:
     Serialize the snapshot's element bboxes to <baseline-dir>/<name>.json so a
@@ -838,11 +846,7 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
         &assertions,
         &baselines,
     );
-    let exit = if report.all_passed {
-        EXIT_OK
-    } else {
-        EXIT_GATE_FAILED
-    };
+    let exit = assert_exit(&report);
 
     println!(
         "{}",
@@ -878,6 +882,10 @@ pub fn parse_assertions(bytes: &[u8]) -> Result<Vec<Assertion>, String> {
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssertReport {
+    /// The fold over `results` (`qontinui_vision_core::fold_results`): the
+    /// one verdict this report states, and what the exit code is read from.
+    verdict: FoldedOutcome,
+    /// `verdict.outcome == passed` — kept as the wire-stable gate bit.
     all_passed: bool,
     passed: usize,
     /// Assertions that were EVALUATED and VIOLATED. Before the tri-state
@@ -939,19 +947,16 @@ pub fn assert_all_frames(
         .iter()
         .map(|a| evaluate_assertion(a, &ctx))
         .collect();
-    let passed = results
-        .iter()
-        .filter(|r| r.outcome == AssertionOutcome::Passed)
-        .count();
-    let unknown = results.iter().filter(|r| r.outcome.is_unknown()).count();
-    let failed = results.len() - passed - unknown;
+    let verdict = fold_results(&results);
+    let counts = verdict.outcome_counts();
     AssertReport {
-        // An un-evaluated assertion is not a pass. Same gate as before the
-        // tri-state: only `Passed` is green.
-        all_passed: failed + unknown == 0,
-        passed,
-        failed,
-        unknown,
+        // An un-evaluated assertion is not a pass, and neither is an empty
+        // list: only a `passed` fold is green.
+        all_passed: verdict.passed(),
+        passed: counts.passed,
+        failed: counts.failed,
+        unknown: counts.unknown,
+        verdict,
         results,
         frame: FrameEcho::of(frame),
         frame_text_hidden: FrameEcho::of(text_hidden),
@@ -962,18 +967,54 @@ pub fn assert_all_frames(
     }
 }
 
+/// The exit code an assert report maps to (D8): 0 iff the fold is `passed`,
+/// 3 for `unknown(no_results)` (an empty list), 2 for everything else.
+fn assert_exit(report: &AssertReport) -> u8 {
+    match report.verdict.outcome() {
+        AssertionOutcome::Passed => EXIT_OK,
+        AssertionOutcome::Unknown
+            if report.verdict.outcome_counts().total() == 0
+                && report.verdict.unknown_codes() == [UnknownCode::NoResults] =>
+        {
+            EXIT_NO_RESULTS
+        }
+        AssertionOutcome::Failed | AssertionOutcome::Unknown => EXIT_GATE_FAILED,
+    }
+}
+
 fn assert_summary(report: &AssertReport) -> String {
+    // The verdict word is the fold's own outcome, and the exit is the code
+    // `assert` actually returns — style-gate embeds this line in its cell, so
+    // it must never say "FAIL (exit 2)" over an exit 3.
+    let exit = assert_exit(report);
+    let word = match report.verdict.outcome() {
+        AssertionOutcome::Passed => "passed",
+        AssertionOutcome::Failed => "failed",
+        AssertionOutcome::Unknown => "unknown",
+    };
+    let names: Vec<&str> = report
+        .verdict
+        .unknown_codes()
+        .iter()
+        .map(|c| c.as_str())
+        .collect();
+    let codes = match report.verdict.outcome() {
+        _ if names.is_empty() => String::new(),
+        // On `unknown` the codes ARE the reason: `unknown(no_results)`.
+        AssertionOutcome::Unknown => format!("({})", names.join(", ")),
+        // On `failed` the failure decided the outcome; the codes only say what
+        // else could not be evaluated, so they are labelled rather than glued
+        // to the word, where they would read as the failure's cause.
+        AssertionOutcome::Failed | AssertionOutcome::Passed => {
+            format!("; unknown: {}", names.join(", "))
+        }
+    };
     let mut lines = vec![format!(
-        "vision-audit assert: {} passed, {} failed, {} not evaluated of {} -> {}",
+        "vision-audit assert: {} passed, {} failed, {} not evaluated of {} -> {word}{codes} (exit {exit})",
         report.passed,
         report.failed,
         report.unknown,
         report.passed + report.failed + report.unknown,
-        if report.all_passed {
-            "PASS (exit 0)"
-        } else {
-            "FAIL (exit 2)"
-        }
     )];
     // Name the snapshot judged, when the producer supplied one — a CI reader
     // looking at a red gate needs to know WHICH capture failed, not merely
@@ -1605,6 +1646,106 @@ mod tests {
         assert_eq!(fail.failed, 1);
     }
 
+    /// D8: an empty assertion list is `unknown(no_results)` and exits 3 —
+    /// never 0, and not the "checked and red" 2. The stderr line names the
+    /// fold's outcome and the exit actually returned, because style-gate
+    /// embeds that line in its cell.
+    #[test]
+    fn an_empty_assertion_list_is_unknown_no_results_and_exits_3() {
+        let report = assert_all(&snap_with_overlap(), None, &[], &HashMap::new());
+        assert!(!report.all_passed);
+        assert_eq!(report.verdict.outcome(), AssertionOutcome::Unknown);
+        assert_eq!(report.verdict.unknown_codes(), vec![UnknownCode::NoResults]);
+        assert_eq!(assert_exit(&report), EXIT_NO_RESULTS);
+        let summary = assert_summary(&report);
+        let first = summary.lines().next().unwrap();
+        assert!(
+            first.contains("-> unknown(no_results) (exit 3)"),
+            "verdict line: {first}"
+        );
+        assert!(!summary.contains("FAIL"), "{summary}");
+        let wire = serde_json::to_value(&report).unwrap();
+        assert_eq!(wire["verdict"]["outcome"], "unknown");
+        assert_eq!(
+            wire["verdict"]["unknownCodes"],
+            serde_json::json!(["no_results"])
+        );
+        assert_eq!(wire["allPassed"], false);
+
+        // End to end through the CLI.
+        let dir = tempfile::tempdir().unwrap();
+        let snap = dir.path().join("snap.json");
+        std::fs::write(&snap, serde_json::to_vec(&snap_with_overlap()).unwrap()).unwrap();
+        for list in [&br#"[]"#[..], &br#"{"assertions": []}"#[..]] {
+            let spec = dir.path().join("a.json");
+            std::fs::write(&spec, list).unwrap();
+            let args = vec![
+                s("assert"),
+                s("--snapshot"),
+                snap.display().to_string(),
+                s("--assertions"),
+                spec.display().to_string(),
+            ];
+            assert_eq!(run(&args).unwrap(), EXIT_NO_RESULTS);
+        }
+    }
+
+    /// The verdict line on a decided run names the outcome and the real exit.
+    #[test]
+    fn the_verdict_line_names_the_fold_and_the_exit() {
+        let snap = snap_with_overlap();
+        let bl = HashMap::new();
+        let pass = assert_all(&snap, None, &[Assertion::NoClipping { region: None }], &bl);
+        assert!(assert_summary(&pass)
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("-> passed (exit 0)"));
+        let fail = assert_all(
+            &snap,
+            None,
+            &[Assertion::NoOverlap {
+                elements: ["a".into(), "b".into()],
+                tolerance_px: None,
+            }],
+            &bl,
+        );
+        assert_eq!(assert_exit(&fail), EXIT_GATE_FAILED);
+        assert!(assert_summary(&fail)
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("-> failed (exit 2)"));
+
+        // A failed fold that also holds an unknown keeps `failed` as the word
+        // and LABELS the codes: glued on as `failed(<code>)` they would read as
+        // the cause of the failure.
+        let mixed = assert_all(
+            &snap,
+            None,
+            &[
+                Assertion::NoOverlap {
+                    elements: ["a".into(), "b".into()],
+                    tolerance_px: None,
+                },
+                Assertion::NoOverlap {
+                    elements: ["a".into(), "unregistered".into()],
+                    tolerance_px: None,
+                },
+            ],
+            &bl,
+        );
+        assert_eq!(mixed.verdict.outcome(), AssertionOutcome::Failed);
+        assert!(!mixed.verdict.unknown_codes().is_empty());
+        let line = assert_summary(&mixed).lines().next().unwrap().to_string();
+        assert!(
+            line.contains("-> failed; unknown: "),
+            "verdict line: {line}"
+        );
+        assert!(!line.contains("failed("), "verdict line: {line}");
+        assert!(line.ends_with("(exit 2)"), "verdict line: {line}");
+    }
+
     // ---- assert attribution ----
 
     #[test]
@@ -2031,6 +2172,14 @@ mod tests {
         // frame; renaming either silently downgrades that caller.
         assert!(USAGE.contains("--scale-factor <n>"));
         assert!(USAGE.contains("[--frame <file>"));
+    }
+
+    #[test]
+    fn the_usage_states_the_no_verdict_exit() {
+        // The help text is the exit contract a caller reads; it must not
+        // still promise that an empty assertion list exits 0 or 2.
+        assert!(USAGE.contains("3 when the assertion list is EMPTY"));
+        assert!(USAGE.contains("unknown(no_results)"));
     }
 
     #[test]

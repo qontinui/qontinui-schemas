@@ -62,7 +62,10 @@ use crate::timeline::{ChangeTimeline, ExpectedStateOutcome, TimelineEvent, Timel
 
 pub use crate::analyzers::image::NaturalRegion;
 
+mod fold;
 mod image;
+
+pub use fold::{fold_outcomes, fold_results, FoldedOutcome, OutcomeCounts, Verdict};
 
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -469,12 +472,13 @@ pub enum TypographyDimension {
 /// bug in the page, the second is a gap in the snapshot (or in the caller's
 /// inputs), and only the first should send anyone looking at the UI.
 ///
-/// The bit is kept alongside as the GATE, and every consumer that reads it
-/// keeps its current behaviour: [`AssertionOutcome::Unknown`] is
+/// Where a `passed` bit is kept alongside (vision-core's
+/// `AssertionResult::passed`), it stays the GATE, and every consumer that
+/// reads it keeps its current behaviour: [`AssertionOutcome::Unknown`] is
 /// `passed = false`. That is deliberate and is the safe direction — a
 /// vacuous pass over an un-evaluated assertion is a silent false negative
 /// for exactly the bug the assertion was written to catch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssertionOutcome {
     /// The assertion was evaluated against real inputs and HELD.
