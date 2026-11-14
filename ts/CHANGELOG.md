@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v3.1.0...ts-v4.0.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* qontinui_types::verification::VerificationAgentContext and its TS/Python bindings are removed; they had no producer or consumer (coord finding 7c536351 item 1).
+* qontinui_types::verification no longer exports VerificationResult, DomainVerificationResult, IterationVerificationResults or TaskCompletionResult; qontinui_schemas.generated no longer exports their bindings, and @qontinui/shared-types no longer ships them under src/generated (no entry point ever re-exported them).
+
+### Features
+
+* delete the dead VerificationAgentContext DTO ([4c1d051](https://github.com/qontinui/qontinui-schemas/commit/4c1d05168f92e8ee2c3e7552c38b894219080518))
+* delete the orchestrator verifier's result DTOs ([92badbd](https://github.com/qontinui/qontinui-schemas/commit/92badbd052a1fae4ac0df1deb10210efa6d123df))
+* **types:** restore the cli_session bindings for runner[#2920](https://github.com/qontinui/qontinui-schemas/issues/2920) ([b64fdb1](https://github.com/qontinui/qontinui-schemas/commit/b64fdb1837e498152a191e8dff2f391afb1497a0))
+
 ## [3.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v3.0.0...ts-v3.1.0) (2026-11-09)
 
 
