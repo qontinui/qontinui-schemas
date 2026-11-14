@@ -594,7 +594,6 @@ from .per_type.validate_config_request import ValidateConfigRequest
 from .per_type.validate_config_response import ValidateConfigResponse
 from .per_type.validation_rule import ValidationRule
 from .per_type.vector_search_result import VectorSearchResult
-from .per_type.verification_agent_context import VerificationAgentContext
 from .per_type.verification_category_kind import VerificationCategoryKind
 from .per_type.verification_method import VerificationMethod
 from .per_type.verification_phase_result import VerificationPhaseResult
@@ -1223,7 +1222,6 @@ __all__ = [
     "ValidateConfigResponse",
     "ValidationRule",
     "VectorSearchResult",
-    "VerificationAgentContext",
     "VerificationCategoryKind",
     "VerificationMethod",
     "VerificationPhaseResult",

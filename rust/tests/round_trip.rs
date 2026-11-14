@@ -7457,8 +7457,8 @@ fn state_machine_import_name_optional() {
 use qontinui_types::verification::{
     Confidence, CriterionOverride, CriterionType, DomainAssignment, ExtendIterationsRequest,
     Finding as VerificationFinding, OverrideCollection, StageTransition, SuccessCriterion,
-    VerificationAgentContext, VerificationMethod as VerifMethod, VerificationPlan as VerifPlan,
-    WorkerCoordinationMessage, WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
+    VerificationMethod as VerifMethod, VerificationPlan as VerifPlan, WorkerCoordinationMessage,
+    WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
 };
 
 #[test]
@@ -7818,18 +7818,6 @@ fn stage_transition_roundtrips() {
     };
     let json = serde_json::to_string(&s).unwrap();
     let back: StageTransition = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn verification_agent_context_roundtrips() {
-    let c = VerificationAgentContext {
-        screenshot_base64: "iVBORw0KGgo=".to_string(),
-        evaluation_prompt: "Does the dashboard show?".to_string(),
-        goal_context: "Add login flow".to_string(),
-    };
-    let json = serde_json::to_string(&c).unwrap();
-    let back: VerificationAgentContext = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
 }
 

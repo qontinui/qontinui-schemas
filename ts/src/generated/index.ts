@@ -592,7 +592,6 @@ export type { ValidateConfigRequest } from './ValidateConfigRequest';
 export type { ValidateConfigResponse } from './ValidateConfigResponse';
 export type { ValidationRule } from './ValidationRule';
 export type { VectorSearchResult } from './VectorSearchResult';
-export type { VerificationAgentContext } from './VerificationAgentContext';
 export type { VerificationCategoryKind } from './VerificationCategoryKind';
 export type { VerificationMethod } from './VerificationMethod';
 export type { VerificationPhaseResult } from './VerificationPhaseResult';
