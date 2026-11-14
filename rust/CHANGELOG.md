@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.2.0...rust-v7.0.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* qontinui_types::verification::VerificationAgentContext and its TS/Python bindings are removed; they had no producer or consumer (coord finding 7c536351 item 1).
+* qontinui_types::verification no longer exports VerificationResult, DomainVerificationResult, IterationVerificationResults or TaskCompletionResult; qontinui_schemas.generated no longer exports their bindings, and @qontinui/shared-types no longer ships them under src/generated (no entry point ever re-exported them).
+
+### Features
+
+* delete the dead VerificationAgentContext DTO ([4c1d051](https://github.com/qontinui/qontinui-schemas/commit/4c1d05168f92e8ee2c3e7552c38b894219080518))
+* delete the orchestrator verifier's result DTOs ([92badbd](https://github.com/qontinui/qontinui-schemas/commit/92badbd052a1fae4ac0df1deb10210efa6d123df))
+
+
+### Bug Fixes
+
+* **types:** satisfy clippy needless_bool on Rust 1.100 in JourneyFilter::keeps ([a334b16](https://github.com/qontinui/qontinui-schemas/commit/a334b16ffb2c5744abe0c9b3a7131e6d23036f12))
+
 ## [6.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.1.0...rust-v6.2.0) (2026-11-10)
 
 
