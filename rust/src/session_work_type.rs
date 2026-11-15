@@ -38,6 +38,12 @@
 //!   deliberately carries no `CHECK` on `work_type`, so no migration is needed;
 //!   the `CHECK`ed columns (`initiator`, `end_source`, `end_reason`) DO need a
 //!   qontinui-web migration when their lists here change.
+//! - **`dispatch_settable` does NOT bump `classifier_version`.** It declares
+//!   which work types the operator may set a launch model and effort for
+//!   (plan `2026-11-15-operator-sets-spawn-model-and-effort-per-spawn-type`
+//!   Phase 0); it changes no classification verdict, so stored verdicts stay
+//!   valid. `unknown` is never settable — an unclassified spawn launches with
+//!   no operator setting rather than borrowing one.
 //!
 //! ## Scope — Rust only, deliberately
 //!
@@ -51,13 +57,18 @@ use serde::{Deserialize, Serialize};
 /// The canonical contract, embedded at compile time.
 pub const CONTRACT_JSON: &str = include_str!("session_work_type.json");
 
-/// One work type: a wire name and a one-sentence description of what it
-/// covers.
+/// One work type: a wire name, a one-sentence description of what it
+/// covers, and whether the operator may set its launch model and effort.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkType {
     pub name: String,
     pub description: String,
+    /// Can coord's spawn-launch settings (`coord.spawn_launch_settings`)
+    /// carry an operator-chosen model / effort for spawns of this type?
+    /// Required on every entry (no serde default), so a new work type must
+    /// decide it explicitly. `unknown` must be `false`.
+    pub dispatch_settable: bool,
 }
 
 /// The whole contract.
@@ -133,6 +144,20 @@ impl SessionWorkTypeContract {
         self.bind_origins.iter().any(|v| v == value)
     }
 
+    /// Is `value` a declared work type the operator may set a launch model
+    /// and effort for? `false` for an undeclared name.
+    pub fn is_dispatch_settable(&self, value: &str) -> bool {
+        self.work_types
+            .iter()
+            .any(|w| w.name == value && w.dispatch_settable)
+    }
+
+    /// The settable work types, in declaration order — the list coord's
+    /// spawn-launch-settings route serves.
+    pub fn dispatch_settable_work_types(&self) -> impl Iterator<Item = &WorkType> {
+        self.work_types.iter().filter(|w| w.dispatch_settable)
+    }
+
     /// The description of a declared work type, or `None` for an undeclared
     /// name.
     pub fn work_type_description(&self, name: &str) -> Option<&str> {
@@ -205,6 +230,13 @@ impl SessionWorkTypeContract {
                         is counted as unknown, never folded into another initiator"
                 .into());
         }
+        // An unclassified spawn must not borrow an operator launch setting:
+        // `unknown` is the absence of a type, so there is nothing to set.
+        if self.is_dispatch_settable(UNKNOWN) {
+            return Err("work type `unknown` must not be dispatch_settable — an \
+                        unclassified spawn launches with no operator setting"
+                .into());
+        }
         Ok(())
     }
 }
@@ -233,6 +265,12 @@ pub fn classifier_version() -> u32 {
 /// Is `value` a declared `work_type` in the shipped contract?
 pub fn is_work_type(value: &str) -> bool {
     contract().is_work_type(value)
+}
+
+/// Is `value` a work type the operator may set a launch model and effort for,
+/// in the shipped contract?
+pub fn is_dispatch_settable(value: &str) -> bool {
+    contract().is_dispatch_settable(value)
 }
 
 /// Is `value` a declared `initiator` in the shipped contract?
@@ -370,8 +408,8 @@ mod tests {
         )
     }
 
-    const WT_OK: &str = r#"[{"name": "vet_imp", "description": "d"},
-                            {"name": "unknown", "description": "d"}]"#;
+    const WT_OK: &str = r#"[{"name": "vet_imp", "description": "d", "dispatch_settable": true},
+                            {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
     const INIT_OK: &str = r#"["operator", "unknown"]"#;
 
     #[test]
@@ -382,7 +420,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_a_blank_work_type_name() {
-        let wt = r#"[{"name": "  ", "description": "d"}, {"name": "unknown", "description": "d"}]"#;
+        let wt = r#"[{"name": "  ", "description": "d", "dispatch_settable": true}, {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
         let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
         assert!(err.contains("blank"), "{err}");
     }
@@ -397,9 +435,9 @@ mod tests {
 
     #[test]
     fn validate_rejects_a_duplicate_work_type() {
-        let wt = r#"[{"name": "vet_imp", "description": "d"},
-                     {"name": "vet_imp", "description": "e"},
-                     {"name": "unknown", "description": "d"}]"#;
+        let wt = r#"[{"name": "vet_imp", "description": "d", "dispatch_settable": true},
+                     {"name": "vet_imp", "description": "e", "dispatch_settable": true},
+                     {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
         let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
         assert!(err.contains("twice"), "{err}");
     }
@@ -427,7 +465,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_a_missing_unknown_work_type() {
-        let wt = r#"[{"name": "vet_imp", "description": "d"}]"#;
+        let wt = r#"[{"name": "vet_imp", "description": "d", "dispatch_settable": true}]"#;
         let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
         assert!(err.contains("work_types must declare `unknown`"), "{err}");
     }
@@ -449,8 +487,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_a_blank_description() {
-        let wt =
-            r#"[{"name": "vet_imp", "description": " "}, {"name": "unknown", "description": "d"}]"#;
+        let wt = r#"[{"name": "vet_imp", "description": " ", "dispatch_settable": true}, {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
         let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
         assert!(err.contains("description"), "{err}");
     }
@@ -507,7 +544,7 @@ mod tests {
         // clean twins, so the blank and duplicate checks both wave them through.
         for bad in [" vet_imp", "vet_imp ", "Vet_Imp", "vet-imp", "1vet"] {
             let wt = format!(
-                r#"[{{"name": "{bad}", "description": "d"}}, {{"name": "unknown", "description": "d"}}]"#
+                r#"[{{"name": "{bad}", "description": "d", "dispatch_settable": true}}, {{"name": "unknown", "description": "d", "dispatch_settable": false}}]"#
             );
             let err =
                 SessionWorkTypeContract::parse_and_validate(&fixture(&wt, INIT_OK)).unwrap_err();
@@ -556,6 +593,71 @@ mod tests {
                 "work type `{wt}` names no spawn_authorization kind_seeds agent_name"
             );
         }
+    }
+
+    /// The settable set is the shared contract of plan
+    /// `2026-11-15-operator-sets-spawn-model-and-effort-per-spawn-type`:
+    /// coord's settings route, the web panel and the runner all key on these
+    /// exact names. A change here is a contract change, made deliberately.
+    #[test]
+    fn the_shipped_dispatch_settable_set_is_the_plan_contract() {
+        let c = contract();
+        let settable: Vec<&str> = c
+            .dispatch_settable_work_types()
+            .map(|w| w.name.as_str())
+            .collect();
+        assert_eq!(
+            settable,
+            vec![
+                "post_merge",
+                "pr_fix_red_ci",
+                "pr_fix_conflict",
+                "admission_stall_fix",
+                "red_main_fix",
+                "merge_shepherd",
+                "next_step",
+                "unit_dispatch",
+                "condition_autodispatch",
+                "operator_page_remediation",
+                "implement_plan",
+                "implement_phase",
+                "vet_imp",
+                "vet_plan",
+                "verify_plan_status",
+                "gate_continuation_other",
+                "onboarding_audit",
+            ]
+        );
+        for not_settable in ["steward", "operator_interactive", UNKNOWN] {
+            assert!(is_work_type(not_settable), "{not_settable} is declared");
+            assert!(
+                !is_dispatch_settable(not_settable),
+                "{not_settable} must not be settable"
+            );
+        }
+        // An undeclared name is never settable, even if it looks like one.
+        assert!(!is_dispatch_settable("not_a_work_type"));
+        assert!(is_dispatch_settable("vet_imp"));
+    }
+
+    #[test]
+    fn validate_rejects_a_settable_unknown() {
+        let wt = r#"[{"name": "vet_imp", "description": "d", "dispatch_settable": true},
+                     {"name": "unknown", "description": "d", "dispatch_settable": true}]"#;
+        let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
+        assert!(
+            err.contains("`unknown` must not be dispatch_settable"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_work_type_without_dispatch_settable_is_refused() {
+        // Required, no default: a new work type must decide it explicitly.
+        let wt = r#"[{"name": "vet_imp", "description": "d"},
+                     {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
+        let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
+        assert!(err.contains("dispatch_settable"), "{err}");
     }
 
     #[test]
