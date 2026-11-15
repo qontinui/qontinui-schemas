@@ -639,9 +639,17 @@ jobs:
       # $PROJECT_ROOT = qontinui-runner/src-tauri/. Force cargo to write to
       # the script-expected per-package target dir so the bash redirection
       # on script line 73 finds an existing target/ parent.
+      #
+      # GITHUB_TOKEN authenticates the runner crate's `postgresql_embedded`
+      # (bundled) build script, which enumerates theseus-rs/postgresql-binaries
+      # releases on api.github.com at compile time. Unauthenticated, that is
+      # 60 req/hr keyed on the shared GitHub-hosted runner IP and fails the
+      # build with an intermittent 403 (main ee717e3b, 2026-11-15). Same fix as
+      # qontinui-runner ci.yml (plan 2026-07-04-runner-ci-postgresql-embedded-403-fix).
       - name: Regenerate types
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/qontinui-runner/src-tauri/target
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash "$GENERATE_TYPES_SH"
 
       # Uploaded on failed runs too, so a red drift check hands the developer
