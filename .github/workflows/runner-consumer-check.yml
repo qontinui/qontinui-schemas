@@ -427,6 +427,18 @@ jobs:
       # continue-on-error at the STEP level: leg 1 failing is the whole
       # point of leg 2, so the job must survive it and keep going. The
       # job's verdict is computed explicitly at the end.
+      #
+      # GITHUB_TOKEN authenticates the runner crate's `postgresql_embedded`
+      # (bundled) build script, which lists theseus-rs/postgresql-binaries
+      # releases on api.github.com whenever it runs. A `cargo check` runs it
+      # too, on every Rust-cache miss or `postgresql_embedded` bump.
+      # Unauthenticated, that call is rate-limited per shared hosted-runner
+      # IP, and its 403 fails this leg. The verdict would then report the
+      # failure as "runner main does NOT compile against PR schemas", a
+      # breaking-change red the schemas PR did not cause. This is the same
+      # fix schema-drift.yml's Regenerate types step carries (#332) and
+      # qontinui-runner ci.yml carries (plan
+      # 2026-07-04-runner-ci-postgresql-embedded-403-fix). Leg 2 sets it too.
       - name: "Leg 1: cargo check ${{ matrix.consumer }} main against PR schemas"
         id: leg1
         if: steps.gate.outputs.run_gate == 'true'
@@ -434,6 +446,7 @@ jobs:
         working-directory: ${{ matrix.workdir }}
         env:
           CARGO_BUILD_JOBS: "1"
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo check --workspace --all-targets
 
       # ----------------------------------------------------------------
@@ -823,6 +836,8 @@ jobs:
         working-directory: ${{ matrix.workdir }}
         env:
           CARGO_BUILD_JOBS: "1"
+          # See leg 1: authenticates postgresql_embedded's build script.
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo check --workspace --all-targets
 
       # ----------------------------------------------------------------
