@@ -29,7 +29,7 @@
     },
     {
       "name": "merge_shepherd",
-      "description": "An unlandable-PR shepherd, dispatched from shepherd tiers 1 to 3 or carrying the merge_shepherd or merge_fixer role.",
+      "description": "An unlandable-PR shepherd, dispatched from shepherd tiers 1 to 3 or carrying the merge_shepherd or merge_fixer role; also the escalate-review lane, which publishes under the merge_shepherd kind as a merge-train escalation.",
       "dispatch_settable": true
     },
     {

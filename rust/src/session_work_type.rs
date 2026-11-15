@@ -657,7 +657,10 @@ mod tests {
         let wt = r#"[{"name": "vet_imp", "description": "d"},
                      {"name": "unknown", "description": "d", "dispatch_settable": false}]"#;
         let err = SessionWorkTypeContract::parse_and_validate(&fixture(wt, INIT_OK)).unwrap_err();
-        assert!(err.contains("dispatch_settable"), "{err}");
+        assert!(
+            err.contains("missing field") && err.contains("dispatch_settable"),
+            "{err}"
+        );
     }
 
     #[test]
