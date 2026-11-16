@@ -53,6 +53,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::component_capture::{ComponentBaseline, ComponentCapture};
 use crate::element_snapshot::{
     display_snapshot_id, intersection, region_contains, regions_overlap, ElementSnapshot, Rgb,
 };
@@ -62,7 +63,13 @@ use crate::timeline::{ChangeTimeline, ExpectedStateOutcome, TimelineEvent, Timel
 
 pub use crate::analyzers::image::NaturalRegion;
 
+mod component;
 mod image;
+
+pub use component::{
+    ComponentDiffReport, ComponentFinding, ComponentFindingKind, ViewportComparison,
+    DEFAULT_SIZE_TOLERANCE_PCT, DEFAULT_STYLE_PROPS,
+};
 
 /// One assertion. Wire format: `{"type": "no_overlap", "elements": [...]}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -322,6 +329,56 @@ pub enum Assertion {
         #[serde(default)]
         percentile: Option<f64>,
     },
+
+    // ---- Isolated-vs-in-situ render parity (plan 2026-11-13-ui-bridge-
+    // matches-isolated-render-assertion, Phase 1) -------------------------
+    /// The registered `component` renders in situ the way the named
+    /// isolated-render `baseline` (a stored [`crate::ComponentBaseline`],
+    /// typically a Storybook story) rendered it. Compares two
+    /// [`crate::ComponentCapture`]s by STRUCTURE — read from
+    /// [`EvalContext::component_baselines`] and
+    /// [`EvalContext::component_captures`], not from the snapshot — and
+    /// reports typed findings (`size`, `clipped`, `child_identity`,
+    /// `style_delta`, `props_delta`, `portal_mismatch`) as a JSON
+    /// [`ComponentDiffReport`] in the detail.
+    ///
+    /// `size` fires only when, on one axis, BOTH the absolute root size and
+    /// the root-to-parent-content-box fill ratio differ by more than
+    /// `size_tolerance_pct` (default 5). `style_props` (default `display`,
+    /// `fontSize`, `color`, `overflow`) are compared per tree path;
+    /// `props_delta` only with `compare_props`. An unreadable (null)
+    /// component name skips the name comparison with an `unknown_checks`
+    /// note. A viewport mismatch is reported and never fails alone: node
+    /// geometry is root-relative.
+    ///
+    /// `Unknown{input_missing}` when the baseline is unregistered, there is
+    /// no in-situ capture for `component`, or either side lacks root
+    /// geometry; `Unknown{stale_input}` when both source shas are known and
+    /// differ. See `assertions/component.rs`.
+    // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
+    // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
+    // `result_large_err` bound. The wire is unchanged.
+    MatchesIsolatedRender {
+        component: Box<str>,
+        baseline: Box<str>,
+        #[serde(default = "default_size_tolerance_pct")]
+        size_tolerance_pct: f64,
+        #[serde(default = "default_style_props")]
+        style_props: Box<[String]>,
+        #[serde(default)]
+        compare_props: bool,
+    },
+}
+
+fn default_size_tolerance_pct() -> f64 {
+    component::DEFAULT_SIZE_TOLERANCE_PCT
+}
+
+fn default_style_props() -> Box<[String]> {
+    component::DEFAULT_STYLE_PROPS
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn default_wcag_aa() -> WcagLevel {
@@ -836,6 +893,13 @@ pub struct EvalContext<'a> {
     /// each of them `unknown{input_missing}`, naming where a timeline comes
     /// from ([`NO_TIMELINE`]).
     pub timeline: Option<&'a ChangeTimeline>,
+    /// Stored isolated-render captures, keyed by baseline name. Read only by
+    /// [`Assertion::MatchesIsolatedRender`]; `None` (or a missing name) makes
+    /// it `unknown{input_missing}`.
+    pub component_baselines: Option<&'a HashMap<String, ComponentBaseline>>,
+    /// In-situ captures, keyed by the assertion's `component` id. Read only by
+    /// [`Assertion::MatchesIsolatedRender`].
+    pub component_captures: Option<&'a HashMap<String, ComponentCapture>>,
 }
 
 /// Borrowed OCR block (avoids re-serializing the runner-side type).
@@ -907,6 +971,7 @@ pub fn evaluate(assertion: &Assertion, ctx: &EvalContext<'_>) -> AssertionResult
         | Assertion::ImageSharpnessAtLeast { .. }
         | Assertion::ImageBlockinessWithin { .. }
         | Assertion::TextOverImageContrast { .. } => image::evaluate(a, ctx),
+        Assertion::MatchesIsolatedRender { .. } => component::evaluate(a, ctx),
     }
 }
 
