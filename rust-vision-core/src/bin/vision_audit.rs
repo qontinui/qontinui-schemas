@@ -819,7 +819,8 @@ fn run_assert(args: &[String]) -> Result<u8, CliError> {
     // without one they answer `unknown{input_missing}` rather than pass. Every
     // other assertion evaluates from the snapshot, the OCR blocks or the
     // baseline registry, so a required `--frame` would gate values they never
-    // consult. Given, it is paired with `--scale-factor` exactly as in
+    // consult, the L0 image assertions (image_loaded, no_duplicate_images, …)
+    // among them. Given, it is paired with `--scale-factor` exactly as in
     // `analyze`.
     let frame = load_frame_flags(&flags)?;
     let text_hidden = load_text_hidden_flag(&flags, frame.as_ref())?;
@@ -1326,6 +1327,24 @@ mod tests {
     }
 
     // ---- assertions parsing ----
+
+    #[test]
+    fn the_l0_image_assertions_parse_and_evaluate_without_a_frame() {
+        let parsed = parse_assertions(
+            br#"[{"type":"image_loaded"},{"type":"image_not_oversized","max_effective":2.0},
+                {"type":"no_duplicate_images"}]"#,
+        )
+        .unwrap();
+        let snap: ElementSnapshot = serde_json::from_value(serde_json::json!({"elements": [
+            {"id": "hero", "bbox": {"x": 0, "y": 0, "w": 100, "h": 100},
+             "media": {"kind": "img", "load_state": "error", "effective_resolution": 3.0,
+                       "format": "png", "src_digest": "d1"}}
+        ]}))
+        .unwrap();
+        let r = assert_all(&snap, None, &parsed, &HashMap::new());
+        assert_eq!(r.failed, 2, "{:?}", r.results);
+        assert_eq!(r.passed, 1, "{:?}", r.results);
+    }
 
     #[test]
     fn assertions_array_and_wrapper() {
