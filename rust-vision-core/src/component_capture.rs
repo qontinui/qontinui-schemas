@@ -174,17 +174,54 @@ pub struct ClipAncestor {
     pub rect: Option<CaptureRect>,
 }
 
+/// How one axis of a [`ClipAncestor`] treats content that extends past it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverflowAxis {
+    /// `hidden` or `clip`: overflowing content is cut off.
+    Clips,
+    /// `auto`, `scroll` or `overlay`: overflowing content is scrolled to, not
+    /// cut off.
+    Scrolls,
+    /// `visible`: overflowing content is painted.
+    Visible,
+    /// Absent or an unrecognized value: whether it clips is unknown.
+    Unreported,
+}
+
+impl OverflowAxis {
+    fn of(value: Option<&str>) -> Self {
+        match value.map(str::trim) {
+            Some("hidden" | "clip") => Self::Clips,
+            Some("auto" | "scroll" | "overlay") => Self::Scrolls,
+            Some("visible") => Self::Visible,
+            _ => Self::Unreported,
+        }
+    }
+}
+
 impl ClipAncestor {
-    /// Whether this ancestor clips along the horizontal axis. An absent
-    /// overflow value is taken as clipping: the SDK lists only ancestors that
-    /// clip on at least one axis.
-    pub fn clips_x(&self) -> bool {
-        self.overflow_x.as_deref().is_none_or(|v| v != "visible")
+    /// How the horizontal axis treats overflow.
+    pub fn axis_x(&self) -> OverflowAxis {
+        OverflowAxis::of(self.overflow_x.as_deref())
     }
 
-    /// Whether this ancestor clips along the vertical axis.
+    /// How the vertical axis treats overflow.
+    pub fn axis_y(&self) -> OverflowAxis {
+        OverflowAxis::of(self.overflow_y.as_deref())
+    }
+
+    /// Whether this ancestor clips along the horizontal axis: only
+    /// `overflowX` `hidden` or `clip` does. A scroll container (`auto`,
+    /// `scroll`) does not cut its content off, and an absent value is not
+    /// evidence of clipping.
+    pub fn clips_x(&self) -> bool {
+        self.axis_x() == OverflowAxis::Clips
+    }
+
+    /// Whether this ancestor clips along the vertical axis (see
+    /// [`Self::clips_x`]).
     pub fn clips_y(&self) -> bool {
-        self.overflow_y.as_deref().is_none_or(|v| v != "visible")
+        self.axis_y() == OverflowAxis::Clips
     }
 }
 
