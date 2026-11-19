@@ -516,27 +516,8 @@ pub enum Confidence {
 }
 
 // ============================================================================
-// Verification agent context & iteration control
+// Iteration control
 // ============================================================================
-
-/// Context passed to the verification agent (intentionally limited — does not
-/// include work history, to avoid biasing AI evaluation).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
-pub struct VerificationAgentContext {
-    /// The screenshot to evaluate, base64-encoded.
-    #[serde(alias = "screenshot_base64")]
-    pub screenshot_base64: String,
-
-    /// The evaluation prompt from the criterion.
-    #[serde(alias = "evaluation_prompt")]
-    pub evaluation_prompt: String,
-
-    /// Brief goal context (NOT work history).
-    #[serde(alias = "goal_context")]
-    pub goal_context: String,
-}
 
 /// Request to extend iterations after the max has been reached.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
