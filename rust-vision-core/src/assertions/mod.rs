@@ -459,16 +459,23 @@ pub enum Assertion {
     /// geometry is root-relative.
     ///
     /// `Unknown{input_missing}` when the baseline is unregistered, there is
-    /// no in-situ capture for `component`, or either side lacks root
-    /// geometry; `Unknown{stale_input}` when both source shas are known and
-    /// differ. See `assertions/component.rs`.
+    /// no in-situ capture for `component`, either side's `schemaVersion` is
+    /// not [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`], either side lacks
+    /// root geometry, either side has no nodes or no root node (path `""`),
+    /// or `compare_props` is set and either side has no props;
+    /// `Unknown{stale_input}` when both source shas are known and differ.
+    /// See `assertions/component.rs`.
     // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
     // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
     // `result_large_err` bound. The wire is unchanged.
     MatchesIsolatedRender {
         component: Box<str>,
         baseline: Box<str>,
-        #[serde(default = "default_size_tolerance_pct")]
+        /// An explicit JSON `null` takes the default, as an omitted key does.
+        #[serde(
+            default = "default_size_tolerance_pct",
+            deserialize_with = "null_as_default_size_tolerance_pct"
+        )]
         size_tolerance_pct: f64,
         #[serde(default = "default_style_props")]
         style_props: Box<[String]>,
@@ -479,6 +486,16 @@ pub enum Assertion {
 
 fn default_size_tolerance_pct() -> f64 {
     component::DEFAULT_SIZE_TOLERANCE_PCT
+}
+
+/// `size_tolerance_pct`: `null` reads as the default rather than failing the
+/// parse, so a client that serializes an unset optional as `null` gets the
+/// same assertion as one that omits the key.
+fn null_as_default_size_tolerance_pct<'de, D>(d: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<f64>::deserialize(d)?.unwrap_or_else(default_size_tolerance_pct))
 }
 
 fn default_style_props() -> Box<[String]> {

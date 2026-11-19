@@ -20,7 +20,8 @@ use serde_json::{json, Value};
 
 use super::{Assertion, AssertionResult, EvalContext};
 use crate::component_capture::{
-    CaptureRect, CaptureViewport, ComponentBaseline, ComponentCapture, ComponentCaptureNode,
+    CaptureRect, CaptureViewport, ClipAncestor, ComponentBaseline, ComponentCapture,
+    ComponentCaptureNode, OverflowAxis, COMPONENT_CAPTURE_SCHEMA_VERSION,
 };
 use crate::observation::UnknownCode;
 
@@ -125,19 +126,17 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     }
 
     let Some(entry) = ctx.component_baselines.and_then(|m| m.get(&*baseline)) else {
-        let why = if ctx.component_baselines.is_none() {
-            "no component baselines were supplied to the evaluator".to_string()
+        let detail = if ctx.component_baselines.is_none() {
+            "the caller supplied no component inputs (no component baselines were passed to \
+             the evaluator), so the in-situ render was not compared"
+                .to_string()
         } else {
-            format!("component baseline '{baseline}' is not registered")
-        };
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
             format!(
-                "{why}, so the in-situ render was not compared — store it with \
-                 `vision/component-baseline` first"
-            ),
-        );
+                "component baseline '{baseline}' is not registered, so the in-situ render was \
+                 not compared — store it with `vision/component-baseline` first"
+            )
+        };
+        return AssertionResult::unknown(a, UnknownCode::InputMissing, detail);
     };
     let Some(in_situ) = ctx.component_captures.and_then(|m| m.get(&*component)) else {
         return AssertionResult::unknown(
@@ -149,6 +148,19 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             ),
         );
     };
+    let (b_ver, s_ver) = (entry.capture.schema_version, in_situ.schema_version);
+    if b_ver != COMPONENT_CAPTURE_SCHEMA_VERSION || s_ver != COMPONENT_CAPTURE_SCHEMA_VERSION {
+        return AssertionResult::unknown(
+            a,
+            UnknownCode::InputMissing,
+            format!(
+                "capture schema version mismatch: baseline '{baseline}' is schemaVersion \
+                 {b_ver} and the in-situ capture is schemaVersion {s_ver}, but this reader \
+                 understands only schemaVersion {COMPONENT_CAPTURE_SCHEMA_VERSION}, so the \
+                 renders were not compared"
+            ),
+        );
+    }
     if let (Some(b_sha), Some(s_sha)) =
         (entry.effective_source_sha(), in_situ.source_sha.as_deref())
     {
@@ -176,6 +188,43 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             format!("{what}, so the renders were not compared"),
         );
     };
+    // A capture with no node tree (or no root node) would pass with every
+    // per-node check skipped, or fail with every node "missing": neither is
+    // an answer.
+    let has_root_node = |c: &ComponentCapture| c.nodes.iter().any(|n| n.path.is_empty());
+    let missing_tree = |c: &ComponentCapture| {
+        if c.nodes.is_empty() {
+            Some("has no nodes")
+        } else if !has_root_node(c) {
+            Some("has no root node (no node with path \"\")")
+        } else {
+            None
+        }
+    };
+    for (side, c) in [("baseline", &entry.capture), ("in-situ", in_situ)] {
+        if let Some(why) = missing_tree(c) {
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!("the {side} capture {why}, so the renders were not compared"),
+            );
+        }
+    }
+    if compare_props {
+        let missing = match (entry.capture.props.is_none(), in_situ.props.is_none()) {
+            (true, true) => Some("neither capture has props"),
+            (true, false) => Some("the baseline capture has no props"),
+            (false, true) => Some("the in-situ capture has no props"),
+            (false, false) => None,
+        };
+        if let Some(what) = missing {
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!("compare_props was requested but {what}, so the renders were not compared"),
+            );
+        }
+    }
     // A repeated style prop must not yield a repeated finding.
     let mut props: Vec<String> = Vec::with_capacity(style_props.len());
     for p in style_props.iter() {
@@ -264,7 +313,7 @@ fn diff(
         &mut findings,
         &mut notes,
     );
-    clip_check(base, in_situ, b_root, s_root, &mut findings);
+    clip_check(base, in_situ, b_root, s_root, &mut findings, &mut notes);
     let b_nodes = by_path(base);
     let s_nodes = by_path(in_situ);
     let retagged = identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
@@ -277,7 +326,7 @@ fn diff(
         &mut notes,
     );
     if opts.compare_props {
-        props_check(base, in_situ, &mut findings, &mut notes);
+        props_check(base, in_situ, &mut findings);
     }
     portal_check(in_situ, &b_nodes, &retagged, &mut findings);
 
@@ -466,18 +515,50 @@ fn clipping_ancestor(
     })
 }
 
+/// The first clip ancestor in `c` that `node_page` extends past along an
+/// axis that does not clip it — one that scrolls (`auto`, `scroll`) or whose
+/// overflow is unreported — if any.
+fn non_clipping_overflow<'c>(
+    c: &'c ComponentCapture,
+    node_page: &CaptureRect,
+) -> Option<(&'c ClipAncestor, &'static str)> {
+    let soft =
+        |axis: OverflowAxis| matches!(axis, OverflowAxis::Scrolls | OverflowAxis::Unreported);
+    c.clip_ancestors.iter().find_map(|anc| {
+        let rect = anc.rect.filter(CaptureRect::is_finite)?;
+        let past_x = soft(anc.axis_x())
+            && (node_page.x < rect.x - CLIP_EPSILON_PX
+                || node_page.right() > rect.right() + CLIP_EPSILON_PX);
+        let past_y = soft(anc.axis_y())
+            && (node_page.y < rect.y - CLIP_EPSILON_PX
+                || node_page.bottom() > rect.bottom() + CLIP_EPSILON_PX);
+        let axis = match (past_x, past_y) {
+            (true, true) => "x and y",
+            (true, false) => "x",
+            (false, true) => "y",
+            (false, false) => return None,
+        };
+        Some((anc, axis))
+    })
+}
+
 /// `clipped`: a node extends past a clip ancestor in situ, while in isolation
-/// no clip ancestor clipped the node at that path. Only the topmost clipped
-/// node of a subtree is reported.
+/// no clip ancestor clipped the node at that path. Only overflow `hidden` and
+/// `clip` count as clipping: a node that extends outside a scroll container
+/// (`auto`, `scroll`) — or one whose overflow is unreported — is scrolled to,
+/// not cut off, so it is noted and never a `clipped` finding. Only the
+/// topmost clipped (or noted) node of a subtree is reported.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
     b_root: CaptureRect,
     s_root: CaptureRect,
     findings: &mut Vec<ComponentFinding>,
+    notes: &mut Vec<String>,
 ) {
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
+    let mut noted: Vec<String> = Vec::new();
     for node in &in_situ.nodes {
         if below_any(&node.path, &reported) {
             continue;
@@ -487,6 +568,21 @@ fn clip_check(
         };
         let page = rel.offset_by(&s_root);
         let Some((i, clip_rect)) = clipping_ancestor(in_situ, &page) else {
+            if !below_any(&node.path, &noted) {
+                if let Some((anc, axis)) = non_clipping_overflow(in_situ, &page) {
+                    notes.push(format!(
+                        "clipped: <{}> at path '{}' extends outside '{}' on {axis} in situ \
+                         (overflowX {}, overflowY {}); that axis scrolls or is unreported \
+                         rather than clipping, so it is not a clipped finding",
+                        node.tag,
+                        node.path,
+                        anc.descriptor,
+                        anc.overflow_x.as_deref().unwrap_or("?"),
+                        anc.overflow_y.as_deref().unwrap_or("?"),
+                    ));
+                    noted.push(node.path.clone());
+                }
+            }
             continue;
         };
         let baseline_clipped = b_nodes
@@ -644,9 +740,43 @@ fn identity_check(
     retagged
 }
 
+/// CSS properties that inherit by default, in the camelCase spelling the
+/// capture uses. Only these cascade from a parent to its children, so only
+/// these get cascade suppression in [`style_check`]; every `font*` longhand
+/// is matched by prefix in [`is_inherited`].
+const INHERITED_STYLE_PROPS: [&str; 20] = [
+    "color",
+    "lineHeight",
+    "letterSpacing",
+    "wordSpacing",
+    "textAlign",
+    "textIndent",
+    "textTransform",
+    "textShadow",
+    "visibility",
+    "whiteSpace",
+    "wordBreak",
+    "overflowWrap",
+    "direction",
+    "writingMode",
+    "cursor",
+    "listStyle",
+    "listStyleType",
+    "listStylePosition",
+    "quotes",
+    "tabSize",
+];
+
+/// Whether `prop` (camelCase) inherits by default.
+fn is_inherited(prop: &str) -> bool {
+    prop == "font" || prop.starts_with("font") || INHERITED_STYLE_PROPS.contains(&prop)
+}
+
 /// `style_delta`: a `style_props` key whose (trimmed) value differs at the
-/// same path. A delta is not repeated on a node whose PARENT carried the same
-/// delta (an inherited property cascading down); since that holds at every
+/// same path. For an INHERITED property ([`is_inherited`]) a delta is not
+/// repeated on a node whose PARENT carried the same delta (the value
+/// cascading down); a non-inherited one (`display`, `overflow`, …) is
+/// reported at every node that carries it; since that holds at every
 /// step, a node is suppressed only when every path between it and the
 /// reported ancestor carried the same delta, so a reset in between lets a
 /// re-divergence report. Nothing at or beneath a tag-changed path is
@@ -680,9 +810,10 @@ fn style_check(
                 (Some(bv), Some(sv)) if bv.trim() != sv.trim() => {
                     let (bv, sv) = (bv.trim(), sv.trim());
                     carried.insert((sn.path.as_str(), prop.as_str()), (bv, sv));
-                    let inherited = parent_path(&sn.path)
-                        .and_then(|p| carried.get(&(p, prop.as_str())))
-                        .is_some_and(|d| *d == (bv, sv));
+                    let inherited = is_inherited(prop)
+                        && parent_path(&sn.path)
+                            .and_then(|p| carried.get(&(p, prop.as_str())))
+                            .is_some_and(|d| *d == (bv, sv));
                     if inherited {
                         continue;
                     }
@@ -714,11 +845,10 @@ fn props_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
     findings: &mut Vec<ComponentFinding>,
-    notes: &mut Vec<String>,
 ) {
+    // `evaluate` answers `unknown{input_missing}` before diffing when either
+    // side lacks props, so both are present here.
     let (Some(bp), Some(sp)) = (&base.props, &in_situ.props) else {
-        notes
-            .push("props_delta: props not captured on at least one side; not compared".to_string());
         return;
     };
     let (Some(bo), Some(so)) = (bp.as_object(), sp.as_object()) else {
@@ -1058,12 +1188,12 @@ mod tests {
     #[test]
     fn clipped_by_an_in_situ_ancestor_absent_in_isolation() {
         let mut situ = capture(page(), parent_of(page()));
-        // A 300-wide scroll pane at the root's origin: the 400-wide root
-        // overflows it horizontally.
+        // A 300-wide clipping pane at the root's origin: the 400-wide root
+        // overflows it horizontally, and `hidden` cuts it off.
         situ.clip_ancestors = vec![ClipAncestor {
             descriptor: "div.scroll-pane".to_string(),
             overflow_x: Some("hidden".to_string()),
-            overflow_y: Some("auto".to_string()),
+            overflow_y: Some("clip".to_string()),
             rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
         }];
         let r = run(capture(page(), parent_of(page())), situ);
@@ -1723,7 +1853,10 @@ mod tests {
             c.nodes[1].portal.as_ref().unwrap().mount_target,
             "body>div#portal-root"
         );
-        assert!(c.clip_ancestors[0].clips_x() && c.clip_ancestors[0].clips_y());
+        // overflowX hidden clips; overflowY auto scrolls and does not.
+        assert!(c.clip_ancestors[0].clips_x());
+        assert!(!c.clip_ancestors[0].clips_y());
+        assert_eq!(c.clip_ancestors[0].axis_y(), OverflowAxis::Scrolls);
         assert_eq!(c.props, None);
 
         let wire = serde_json::to_value(&c).unwrap();
@@ -1756,5 +1889,228 @@ mod tests {
             "compare_props":false});
         let a: Assertion = serde_json::from_value(wire.clone()).unwrap();
         assert_eq!(serde_json::to_value(&a).unwrap(), wire);
+    }
+
+    // ---- review fixes -------------------------------------------------
+
+    fn props_assertion() -> Assertion {
+        serde_json::from_value(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "compare_props": true,
+        }))
+        .unwrap()
+    }
+
+    fn assert_input_missing(r: &AssertionResult, needle: &str) {
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        assert_eq!(r.code, Some(UnknownCode::InputMissing), "{:?}", r.detail);
+        let d = r.detail.as_deref().unwrap_or_default();
+        assert!(d.contains(needle), "{d}");
+    }
+
+    #[test]
+    fn an_unsupported_schema_version_on_either_side_is_input_missing() {
+        let mut base = capture(page(), parent_of(page()));
+        base.schema_version = 2;
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_input_missing(
+            &r,
+            "schemaVersion 2 and the in-situ capture is schemaVersion 1",
+        );
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.schema_version = 7;
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(
+            &r,
+            "schemaVersion 1 and the in-situ capture is schemaVersion 7",
+        );
+        assert!(r
+            .detail
+            .unwrap()
+            .contains("understands only schemaVersion 1"));
+    }
+
+    #[test]
+    fn a_side_with_no_nodes_is_input_missing() {
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes.clear();
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_input_missing(&r, "the baseline capture has no nodes");
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.nodes.clear();
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "the in-situ capture has no nodes");
+    }
+
+    #[test]
+    fn a_side_with_no_root_node_is_input_missing() {
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes.remove(0);
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_input_missing(&r, "the baseline capture has no root node");
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.nodes.remove(0);
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "the in-situ capture has no root node");
+    }
+
+    #[test]
+    fn compare_props_with_props_missing_on_either_side_is_input_missing() {
+        let with_props = || {
+            let mut c = capture(page(), parent_of(page()));
+            c.props = Some(json!({"mode": "range"}));
+            c
+        };
+        let bare = || capture(page(), parent_of(page()));
+        let a = props_assertion();
+        assert_input_missing(
+            &run_with(&a, bare(), with_props()),
+            "the baseline capture has no props",
+        );
+        assert_input_missing(
+            &run_with(&a, with_props(), bare()),
+            "the in-situ capture has no props",
+        );
+        assert_input_missing(&run_with(&a, bare(), bare()), "neither capture has props");
+        // Without compare_props, absent props are irrelevant.
+        assert_eq!(run(bare(), bare()).outcome, AssertionOutcome::Passed);
+    }
+
+    #[test]
+    fn extending_outside_a_scroll_container_is_noted_not_clipped() {
+        for (ox, oy) in [("auto", "auto"), ("scroll", "visible")] {
+            let mut situ = capture(page(), parent_of(page()));
+            // A 300-wide scroll container: the 400-wide root extends past it
+            // horizontally, and is scrolled to, not cut off.
+            situ.clip_ancestors = vec![ClipAncestor {
+                descriptor: "div.scroller".to_string(),
+                overflow_x: Some(ox.to_string()),
+                overflow_y: Some(oy.to_string()),
+                rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+            }];
+            let r = run(capture(page(), parent_of(page())), situ);
+            assert_eq!(r.outcome, AssertionOutcome::Passed, "{ox}: {:?}", r.detail);
+            let rep = report(&r);
+            assert!(!kinds(&r).contains(&ComponentFindingKind::Clipped));
+            let notes: Vec<_> = rep
+                .unknown_checks
+                .iter()
+                .filter(|n| n.starts_with("clipped:"))
+                .collect();
+            // Topmost only: the root, not its children beneath it.
+            assert_eq!(notes.len(), 1, "{ox}: {notes:?}");
+            assert!(notes[0].contains("div.scroller") && notes[0].contains("on x"));
+        }
+    }
+
+    #[test]
+    fn an_unreported_overflow_axis_is_noted_not_clipped() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.unknown".to_string(),
+            overflow_x: None,
+            overflow_y: None,
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        }];
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        assert!(report(&r)
+            .unknown_checks
+            .iter()
+            .any(|n| n.starts_with("clipped:") && n.contains("div.unknown")));
+    }
+
+    #[test]
+    fn non_inherited_style_deltas_are_reported_at_every_node() {
+        let mut base = capture(page(), parent_of(page()));
+        let mut situ = capture(page(), parent_of(page()));
+        for n in &mut base.nodes {
+            n.styles.insert("display".into(), "block".into());
+            n.styles.insert("overflow".into(), "visible".into());
+        }
+        for n in &mut situ.nodes {
+            n.styles.insert("display".into(), "flex".into());
+            n.styles.insert("overflow".into(), "hidden".into());
+        }
+        let r = run(base, situ);
+        let rep = report(&r);
+        for prop in ["display", "overflow"] {
+            let paths: Vec<&str> = rep
+                .findings
+                .iter()
+                .filter(|f| f.baseline.get(prop).is_some())
+                .map(|f| f.path.as_str())
+                .collect();
+            assert_eq!(paths, vec!["", "0", "1", "1/0"], "{prop}");
+        }
+    }
+
+    #[test]
+    fn the_inherited_set_covers_the_cascading_properties_only() {
+        for p in [
+            "color",
+            "fontSize",
+            "fontFamily",
+            "font",
+            "lineHeight",
+            "visibility",
+        ] {
+            assert!(is_inherited(p), "{p}");
+        }
+        for p in ["display", "overflow", "width", "margin", "backgroundColor"] {
+            assert!(!is_inherited(p), "{p}");
+        }
+    }
+
+    #[test]
+    fn a_null_size_tolerance_takes_the_default() {
+        let a: Assertion = serde_json::from_value(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "size_tolerance_pct": null,
+        }))
+        .expect("an explicit null size_tolerance_pct parses");
+        let Assertion::MatchesIsolatedRender {
+            size_tolerance_pct, ..
+        } = a
+        else {
+            panic!()
+        };
+        assert_eq!(size_tolerance_pct, DEFAULT_SIZE_TOLERANCE_PCT);
+        // A wrong type is still a parse error.
+        assert!(serde_json::from_value::<Assertion>(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "size_tolerance_pct": "5",
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn the_store_it_first_hint_is_given_only_when_baselines_were_supplied() {
+        let captures = HashMap::from([(
+            "date-range-picker".to_string(),
+            capture(page(), parent_of(page())),
+        )]);
+        let ctx = |b| EvalContext {
+            component_baselines: b,
+            component_captures: Some(&captures),
+            ..Default::default()
+        };
+        let none = evaluate(&assertion(), &ctx(None)).detail.unwrap();
+        assert!(none.contains("supplied no component inputs"), "{none}");
+        assert!(!none.contains("vision/component-baseline"), "{none}");
+
+        let empty = HashMap::new();
+        let unreg = evaluate(&assertion(), &ctx(Some(&empty))).detail.unwrap();
+        assert!(unreg.contains("is not registered"), "{unreg}");
+        assert!(unreg.contains("vision/component-baseline"), "{unreg}");
     }
 }

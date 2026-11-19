@@ -42,7 +42,7 @@ pub use assertions::{
 pub use cache::{sha256_of, CacheHit, CacheStats, VisionCache};
 pub use component_capture::{
     CapturePortal, CaptureRect, CaptureRoot, CaptureTarget, CaptureTargetKind, CaptureViewport,
-    ClipAncestor, ComponentBaseline, ComponentCapture, ComponentCaptureNode,
+    ClipAncestor, ComponentBaseline, ComponentCapture, ComponentCaptureNode, OverflowAxis,
     COMPONENT_CAPTURE_SCHEMA_VERSION,
 };
 pub use contract::{AlphaPolicy, ColorSpace, EncodedFormat, MetadataPolicy, OutputContract};
