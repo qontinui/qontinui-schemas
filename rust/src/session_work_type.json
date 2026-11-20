@@ -34,7 +34,7 @@
     },
     {
       "name": "next_step",
-      "description": "A session dispatched under the next_step dispatch source to continue stale work from its resolved next step.",
+      "description": "A session dispatched under the next_step dispatch source, which coord no longer starts; kept so earlier runs and launch settings keyed on it still resolve.",
       "dispatch_settable": true
     },
     {

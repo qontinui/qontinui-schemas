@@ -33,7 +33,7 @@
     {
       "agent_name": "next_step_dispatch",
       "spawn_path": "standing_continuation",
-      "purpose": "Autonomously continue a stale session from its resolved next step."
+      "purpose": "Retired: coord no longer starts this path; the row stays until the contract drops the seed."
     },
     {
       "agent_name": "pr_fix_dispatch",
