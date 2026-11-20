@@ -55,8 +55,9 @@ export interface JourneyDeadEnd {
    * for a different node — the only way out is the browser's back button,
    * a journey finding rather than an exit. `null` = unknown: no such edge
    * was kept, but a `pop` row from this node was filtered or withdrawn, a
-   * kept `pop` edge to another node ended `error` / `settle_timeout`, or a
-   * kept `pop` self-loop ended `settle_timeout`
+   * kept `pop` edge to another node ended `error` / `settle_timeout` /
+   * `verdict_unknown`, or a kept `pop` self-loop ended `settle_timeout` /
+   * `verdict_unknown`
    * (`unmeasuredDepartures.excludedBackArrivals > 0`). `false` otherwise.
    * (A rejected `pop`-claiming row is untrusted and counts in
    * `JourneyGraph::unplaced_rejected_rows`, which lists no node as a dead
@@ -85,7 +86,8 @@ export interface JourneyUnexploredNode {
   };
   /**
    * `true` when no observed arrival at the node closed `changed` or
-   * `no_change` (they were all `settle_timeout` / `error`), so nothing
+   * `no_change` (they were all `settle_timeout` / `error` /
+   * `verdict_unknown`), so nothing
    * confirms it is a real destination rather than an intermediate state
    * ([`JourneyGraphNode::unconfirmed_destination`]).
    */
@@ -93,7 +95,8 @@ export interface JourneyUnexploredNode {
   /**
    * Departures from it the navigation edge set left out (filtered,
    * withdrawn, `settle_timeout` / `error` to another node, `settle_timeout`
-   * self-loops, rejected frontier rows with a valid node).
+   * self-loops, `verdict_unknown` edges, rejected frontier rows with a
+   * valid node).
    */
   unmeasuredDepartures: JourneyUnmeasuredDepartures;
   /**

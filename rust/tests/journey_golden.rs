@@ -308,6 +308,18 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
         g.unknown_destination_arrivals > 0,
         "the family's errored click"
     );
+    // The family's verdict_unknown click is counted as unmeasured, never as a
+    // step or a negative.
+    let detail = g
+        .nodes
+        .iter()
+        .find(|n| family.name_of(&n.key) == "detail")
+        .expect("detail is observed");
+    assert_eq!(detail.unmeasured_departures.verdict_unknown, 1);
+    assert_eq!(
+        g.unknown_destination_arrivals, 2,
+        "the errored click and the verdict_unknown click"
+    );
     assert!(p.nodes.is_empty());
     assert!(p
         .unsettled
@@ -323,13 +335,16 @@ fn requires_prior_knowledge_matches_the_hand_verified_family() {
         assert!(!n.unconfirmed_destination, "{name}");
     }
     // No frontier is given; the only unexplored departures are the family's
-    // own error / settle_timeout edges to another node.
+    // own error / settle_timeout / verdict_unknown edges to another node.
     assert_eq!(p.frontier.open_entries, 0);
     assert!(
         p.frontier
             .unmeasured(&p.coverage, true)
             .iter()
-            .all(|(d, _, _)| matches!(*d, "errored_departures" | "settle_timeout_departures")),
+            .all(|(d, _, _)| matches!(
+                *d,
+                "errored_departures" | "settle_timeout_departures" | "verdict_unknown_departures"
+            )),
         "{:?}",
         p.frontier.unmeasured(&p.coverage, true)
     );

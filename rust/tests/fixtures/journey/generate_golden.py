@@ -166,7 +166,9 @@ FAMILIES = [
 #   selfclick push from home; affordance to itself    -> LISTED {push:1}
 #             (a self-loop click is not a way in)
 #   errored   push from home; affordance from list
-#             that ERRORED but still landed there     -> disqualified
+#             that ERRORED but still landed there;
+#             affordance from detail whose verdict
+#             was never stated (verdict_unknown)      -> disqualified
 
 PRIOR_KNOWLEDGE = {
     "name": "prior_knowledge",
@@ -198,6 +200,7 @@ PRIOR_KNOWLEDGE = {
         {"from": "home", "to": "selfclick", "trigger": "push", "outcome": "changed"},
         {"from": "home", "to": "errored", "trigger": "push", "outcome": "changed"},
         {"from": "list", "to": "errored", "trigger": "affordance", "outcome": "error"},
+        {"from": "detail", "to": "errored", "trigger": "affordance", "outcome": "verdict_unknown"},
     ],
     "handVerified": {
         "requiresPriorKnowledge": {

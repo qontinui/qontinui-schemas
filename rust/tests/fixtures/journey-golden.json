@@ -604,6 +604,12 @@
           "outcome": "error",
           "to": "errored",
           "trigger": "affordance"
+        },
+        {
+          "from": "detail",
+          "outcome": "verdict_unknown",
+          "to": "errored",
+          "trigger": "affordance"
         }
       ],
       "source": "hand-verified"

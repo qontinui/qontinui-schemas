@@ -34,7 +34,8 @@
 //! the graph the query searched: the open frontier entries, grouped by
 //! reason, the departures whose destination was never observed, and the
 //! departures the navigation edge set left out (filtered, withdrawn,
-//! rejected, `settle_timeout` / `error` to another node). The caller (the
+//! rejected, `settle_timeout` / `error` to another node, `verdict_unknown`
+//! anywhere). The caller (the
 //! runner) builds the `Observation<T>` envelope from those facts:
 //! [`JourneySearchFrontier::unmeasured`]`(&coverage, subject_observed)` goes
 //! into `provenance.coverage.unmeasured`, and it ALSO names a ledger that is
@@ -201,7 +202,8 @@ pub struct JourneyGraphNode {
     /// `no_change`, whatever its trigger. Only those two outcomes confirm the
     /// node is a real destination: a `settle_timeout` or `error` arrival's
     /// observed node may be an intermediate state (a spinner, an error
-    /// render). Such a node is never a settled dead end, nor a settled
+    /// render), and a `verdict_unknown` arrival never stated that its action
+    /// landed. Such a node is never a settled dead end, nor a settled
     /// requires-prior-knowledge node.
     pub unconfirmed_destination: bool,
 }
@@ -241,6 +243,14 @@ pub struct JourneyUnmeasuredDepartures {
     /// `error` edges to a DIFFERENT node: the action errored yet the
     /// configuration moved. Dimension `errored_departures`.
     pub errored: u64,
+    /// Affordance edges that closed `verdict_unknown` — the action was
+    /// attempted and its own outcome was never stated — to a DIFFERENT node
+    /// or to the SAME node. Never a navigation step (it does not confirm its
+    /// destination) and never a negative (it does not say nothing happened).
+    /// Dimension `verdict_unknown_departures`. Defaults to 0 when absent, so
+    /// an answer from a producer that predates the counter still parses.
+    #[serde(default)]
+    pub verdict_unknown: u64,
     /// Frontier rows at this node that failed `validate()` — treated as OPEN
     /// entries the read cannot list. A row whose `nodeKey` column disagrees
     /// with its `node` is counted at BOTH keys (the column's, and the valid
@@ -259,9 +269,10 @@ pub struct JourneyUnmeasuredDepartures {
     /// Back-button (`pop`) rows from this node that are not a kept, changed
     /// exit: valid `pop` rows the filter excluded or that were withdrawn
     /// (unless a genuine negative: `no_change`, or `error` on its own node),
-    /// kept `pop` edges to ANOTHER node whose outcome is `error` or
-    /// `settle_timeout`, and kept `pop` self-loops that closed
-    /// `settle_timeout` (the same rules as an affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
+    /// kept `pop` edges to ANOTHER node whose outcome is `error`,
+    /// `settle_timeout` or `verdict_unknown`, and kept `pop` self-loops that
+    /// closed `settle_timeout` or `verdict_unknown` (the same rules as an
+    /// affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
     /// is trusted, so it counts in `JourneyGraph::unplaced_rejected_rows`.
     /// Not a navigation
     /// departure, so a question about one component ignores it; the
@@ -288,13 +299,26 @@ impl JourneyUnmeasuredDepartures {
     }
 
     fn add(&mut self, o: &Self) {
-        self.excluded_back_arrivals += o.excluded_back_arrivals;
-        self.excluded_url_arrivals += o.excluded_url_arrivals;
-        self.filtered_out += o.filtered_out;
-        self.withdrawn += o.withdrawn;
-        self.settle_timeout += o.settle_timeout;
-        self.errored += o.errored;
-        self.rejected_frontier += o.rejected_frontier;
+        // Destructured exhaustively (no `..`): a new counter that is not
+        // summed here is a compile error.
+        let Self {
+            filtered_out,
+            withdrawn,
+            settle_timeout,
+            errored,
+            verdict_unknown,
+            rejected_frontier,
+            excluded_url_arrivals,
+            excluded_back_arrivals,
+        } = *o;
+        self.filtered_out += filtered_out;
+        self.withdrawn += withdrawn;
+        self.settle_timeout += settle_timeout;
+        self.errored += errored;
+        self.verdict_unknown += verdict_unknown;
+        self.rejected_frontier += rejected_frontier;
+        self.excluded_url_arrivals += excluded_url_arrivals;
+        self.excluded_back_arrivals += excluded_back_arrivals;
     }
 }
 
@@ -306,8 +330,9 @@ impl JourneyUnmeasuredDepartures {
 /// observed and the page stayed). A URL-trigger row (`initial` / `push` /
 /// `replace` / `hash`) is never one, whatever its outcome: it is an ARRIVAL
 /// at its node (a reload is `initial` from the node itself), and arrivals
-/// decide `requires_prior_knowledge`. Every other excluded row may still
-/// lead somewhere and is counted.
+/// decide `requires_prior_knowledge`. A `verdict_unknown` row is never one,
+/// wherever it closed: its action's own outcome is the unknown. Every other
+/// excluded row may still lead somewhere and is counted.
 fn genuine_negative(e: &JourneyEdgeObservation) -> bool {
     let click_or_back = matches!(
         e.trigger.navigation_trigger,
@@ -317,8 +342,62 @@ fn genuine_negative(e: &JourneyEdgeObservation) -> bool {
         && match (&e.to_node, e.outcome) {
             (_, EdgeOutcome::NoChange) => true,
             (Some(to), EdgeOutcome::Error) => to.key() == e.from_node.key(),
-            _ => false,
+            // An `error` row with no toNode fails `validate()`; it is never
+            // trusted, so never a negative.
+            (None, EdgeOutcome::Error) => false,
+            // Every variant is listed (no wildcard), so a new outcome must
+            // decide here whether it is a genuine negative.
+            (
+                _,
+                EdgeOutcome::Changed
+                | EdgeOutcome::SettleTimeout
+                | EdgeOutcome::ToNodeUnobserved
+                | EdgeOutcome::VerdictUnknown,
+            ) => false,
         }
+}
+
+/// How an edge closing a given outcome is counted IF it is a click or back
+/// (`affordance` / `pop`) — the caller filters the trigger: one that is
+/// NOT a negative and NOT a confirmed step, so its real destination is
+/// unknown. `None` when the outcome is a negative or a confirmation (or
+/// has no `toNode`). Decided by one exhaustive match over [`EdgeOutcome`],
+/// so a new outcome is a compile error here rather than silently uncounted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnmeasuredAs {
+    /// `settle_timeout`, to another node or a self-loop.
+    SettleTimeout,
+    /// `error` to ANOTHER node (an `error` self-loop observed the failure).
+    Errored,
+    /// `verdict_unknown`, to another node or a self-loop.
+    VerdictUnknown,
+}
+
+impl UnmeasuredAs {
+    /// The classification of an edge closing `outcome`; `self_loop` when its
+    /// recorded destination is its own from-node.
+    fn of(outcome: EdgeOutcome, self_loop: bool) -> Option<Self> {
+        match outcome {
+            EdgeOutcome::SettleTimeout => Some(Self::SettleTimeout),
+            EdgeOutcome::VerdictUnknown => Some(Self::VerdictUnknown),
+            EdgeOutcome::Error if self_loop => None,
+            EdgeOutcome::Error => Some(Self::Errored),
+            // `changed` confirms its destination (a step, or a self-loop
+            // that is not an exit); `no_change` is a genuine negative; a
+            // `to_node_unobserved` row has no toNode and is counted on its
+            // own path.
+            EdgeOutcome::Changed | EdgeOutcome::NoChange | EdgeOutcome::ToNodeUnobserved => None,
+        }
+    }
+
+    /// The affordance counter this classification lands in.
+    fn counter(self, d: &mut JourneyUnmeasuredDepartures) -> &mut u64 {
+        match self {
+            Self::SettleTimeout => &mut d.settle_timeout,
+            Self::Errored => &mut d.errored,
+            Self::VerdictUnknown => &mut d.verdict_unknown,
+        }
+    }
 }
 
 /// Why an edge row is out of the graph — how `build_graph` counts it.
@@ -336,8 +415,8 @@ enum Excluded {
 /// a node from a different node with outcome `changed`. Any of them may be a
 /// way in that the user did not need a URL for, so
 /// [`requires_prior_knowledge`] cannot list the node as settled. An excluded
-/// row that closed `error` or `settle_timeout` (or has no `toNode`) is not
-/// here: its recorded destination may be an intermediate state, so it routes
+/// row that closed `error`, `settle_timeout` or `verdict_unknown` (or has no
+/// `toNode`) is not here: its recorded destination may be an intermediate state, so it routes
 /// to the graph-wide [`JourneyGraph::unknown_destination_arrivals`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -532,8 +611,10 @@ pub struct JourneyGraph {
     /// Affordance or `pop` rows whose real destination is unknown: kept or
     /// trusted-excluded ones with no `toNode` (`to_node_unobserved`), ones
     /// that closed `settle_timeout` or `error` to a DIFFERENT node (that node
-    /// may be an intermediate state), and ones that closed `settle_timeout`
-    /// on the SAME node (the destination may not have rendered yet). Each
+    /// may be an intermediate state), ones that closed `settle_timeout`
+    /// on the SAME node (the destination may not have rendered yet), and
+    /// ones that closed `verdict_unknown` on any node (the action's own
+    /// outcome was never stated, so the recorded node confirms nothing). Each
     /// may arrive at any node, so `requires_prior_knowledge` lists no node as
     /// settled while this is non-zero.
     pub unknown_destination_arrivals: u64,
@@ -795,14 +876,12 @@ pub fn build_graph(
                 match &e.to_node {
                     None => unknown_destination_arrivals += 1,
                     // Closed settle_timeout or error elsewhere, or
-                    // settle_timeout on the same node: the recorded node may
-                    // be an intermediate state, the real one unknown.
+                    // settle_timeout / verdict_unknown anywhere
+                    // (`UnmeasuredAs::of`): the recorded node may be an
+                    // intermediate state (or the action's own outcome was
+                    // never stated), the real one unknown.
                     Some(to)
-                        if (matches!(
-                            e.outcome,
-                            EdgeOutcome::SettleTimeout | EdgeOutcome::Error
-                        ) && to.key() != e.from_node.key())
-                            || e.outcome == EdgeOutcome::SettleTimeout =>
+                        if UnmeasuredAs::of(e.outcome, to.key() == e.from_node.key()).is_some() =>
                     {
                         unknown_destination_arrivals += 1
                     }
@@ -1055,13 +1134,14 @@ pub fn build_graph(
         )
         .collect();
 
-    // settle_timeout / error edges to a DIFFERENT node, and settle_timeout
-    // self-loops: excluded from navigation (affordance) or from the kept
-    // back exits (pop), never a negative.
+    // settle_timeout / error edges to a DIFFERENT node, and settle_timeout /
+    // verdict_unknown edges anywhere: excluded from navigation (affordance)
+    // or from the kept back exits (pop), never a negative.
     let mut nodes = nodes;
     // Unconfirmed destinations: no kept arrival closed changed or no_change.
     // to_key -> "no arrival so far closed changed or no_change". Only those
-    // two outcomes confirm a destination; settle_timeout and error do not.
+    // two outcomes confirm a destination; settle_timeout, error and
+    // verdict_unknown do not.
     let mut settle_only: BTreeMap<&str, bool> = BTreeMap::new();
     // A self-loop is not an arrival.
     for e in graph_edges.iter().filter(|e| e.from_key != e.to_key) {
@@ -1072,50 +1152,37 @@ pub fn build_graph(
         n.unconfirmed_destination = settle_only.get(n.key.as_str()).copied().unwrap_or(false);
     }
     for e in &graph_edges {
-        let click_or_back = matches!(
-            e.trigger.navigation_trigger,
-            NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
-        );
-        if e.from_key == e.to_key {
-            // A click or back that closed settle_timeout with the snapshot
-            // still showing the same node: its destination may simply not
-            // have rendered yet. Unmeasured, not a negative. (An `error`
-            // self-loop observed the failure, and `no_change` observed that
-            // nothing happened: both are genuine negatives.)
-            if click_or_back && e.outcome == EdgeOutcome::SettleTimeout {
-                if let Ok(i) = nodes.binary_search_by(|n| n.key.cmp(&e.from_key)) {
-                    let d = &mut nodes[i].unmeasured_departures;
-                    match e.trigger.navigation_trigger {
-                        NavigationTriggerKind::Pop => d.excluded_back_arrivals += e.observations,
-                        _ => d.settle_timeout += e.observations,
-                    }
-                }
-                kept_unknown_destination_arrivals += e.observations;
-            }
-            continue;
-        }
-        let Ok(i) = nodes.binary_search_by(|n| n.key.cmp(&e.from_key)) else {
+        // A click or back that closed settle_timeout or verdict_unknown
+        // (anywhere), or error elsewhere: excluded from navigation
+        // (affordance) or from the kept back exits (pop), never a negative,
+        // and its real destination is unknown (requires_prior_knowledge
+        // reads this). A settle_timeout self-loop's destination may simply
+        // not have rendered yet; a verdict_unknown one's action may never
+        // have landed. (An `error` self-loop observed the failure, and
+        // `no_change` observed that nothing happened: both are genuine
+        // negatives.)
+        let Some(unmeasured) = UnmeasuredAs::of(e.outcome, e.from_key == e.to_key) else {
             continue;
         };
-        let d = &mut nodes[i].unmeasured_departures;
-        match (e.trigger.navigation_trigger, e.outcome) {
-            (NavigationTriggerKind::Affordance, EdgeOutcome::SettleTimeout) => {
-                d.settle_timeout += e.observations
-            }
-            (NavigationTriggerKind::Affordance, EdgeOutcome::Error) => d.errored += e.observations,
-            (NavigationTriggerKind::Pop, EdgeOutcome::SettleTimeout | EdgeOutcome::Error) => {
-                d.excluded_back_arrivals += e.observations
-            }
-            _ => {}
+        let trigger = e.trigger.navigation_trigger;
+        match trigger {
+            NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop => {}
+            NavigationTriggerKind::Initial
+            | NavigationTriggerKind::Push
+            | NavigationTriggerKind::Replace
+            | NavigationTriggerKind::Hash => continue,
         }
-        // A click or back closed settle_timeout or error elsewhere: its real
-        // destination is unknown (requires_prior_knowledge reads this).
-        if matches!(e.outcome, EdgeOutcome::SettleTimeout | EdgeOutcome::Error)
-            && matches!(
-                e.trigger.navigation_trigger,
-                NavigationTriggerKind::Affordance | NavigationTriggerKind::Pop
-            )
-        {
+        // Every graph edge's from-key was inserted into `node_repr`, from
+        // which `nodes` was built, so the lookup always succeeds.
+        let found = nodes.binary_search_by(|n| n.key.cmp(&e.from_key));
+        debug_assert!(found.is_ok(), "graph edge from an unknown node");
+        if let Ok(i) = found {
+            let d = &mut nodes[i].unmeasured_departures;
+            if trigger == NavigationTriggerKind::Pop {
+                d.excluded_back_arrivals += e.observations;
+            } else {
+                *unmeasured.counter(d) += e.observations;
+            }
             kept_unknown_destination_arrivals += e.observations;
         }
     }
@@ -1267,6 +1334,7 @@ impl JourneySearchFrontier {
     /// | `settle_timeout_departures` | `settle_timeout` affordance edges, to another node or a self-loop | `no_event_before_timeout` |
     /// | `unplaced_rejected_rows` | every untrusted (rejected) edge row, live or withdrawn | `producer_failed` |
     /// | `errored_departures` | `error` affordance edges to another node | `input_missing` |
+    /// | `verdict_unknown_departures` | `verdict_unknown` affordance edges, to another node or a self-loop | `input_missing` |
     /// | `filtered_departures` | affordance rows the filter excluded | `input_missing` |
     /// | `withdrawn_departures` | withdrawn affordance rows | `input_missing` |
     /// | `excluded_back_arrivals` | excluded or unsettled `pop` rows (graph-wide questions only) | `input_missing` |
@@ -1291,11 +1359,22 @@ impl JourneySearchFrontier {
         if !subject_observed {
             out.push(("subject_unobserved", 1, "no_observations"));
         }
-        let d = &self.unmeasured_departures;
+        // Destructured exhaustively (no `..`): a new counter that is not
+        // listed below is a compile error.
+        let JourneyUnmeasuredDepartures {
+            filtered_out,
+            withdrawn,
+            settle_timeout,
+            errored,
+            verdict_unknown,
+            rejected_frontier,
+            excluded_url_arrivals,
+            excluded_back_arrivals,
+        } = self.unmeasured_departures;
         out.extend(
             [
                 ("frontier", self.open_entries, "frontier_open"),
-                ("rejected_frontier", d.rejected_frontier, "frontier_open"),
+                ("rejected_frontier", rejected_frontier, "frontier_open"),
                 (
                     "unplaced_rejected_frontier",
                     self.unplaced_rejected_frontier,
@@ -1308,7 +1387,7 @@ impl JourneySearchFrontier {
                 ),
                 (
                     "settle_timeout_departures",
-                    d.settle_timeout,
+                    settle_timeout,
                     "no_event_before_timeout",
                 ),
                 (
@@ -1316,17 +1395,22 @@ impl JourneySearchFrontier {
                     self.unplaced_rejected_rows,
                     "producer_failed",
                 ),
-                ("errored_departures", d.errored, "input_missing"),
-                ("filtered_departures", d.filtered_out, "input_missing"),
-                ("withdrawn_departures", d.withdrawn, "input_missing"),
+                ("errored_departures", errored, "input_missing"),
+                (
+                    "verdict_unknown_departures",
+                    verdict_unknown,
+                    "input_missing",
+                ),
+                ("filtered_departures", filtered_out, "input_missing"),
+                ("withdrawn_departures", withdrawn, "input_missing"),
                 (
                     "excluded_back_arrivals",
-                    d.excluded_back_arrivals,
+                    excluded_back_arrivals,
                     "input_missing",
                 ),
                 (
                     "excluded_url_arrivals",
-                    d.excluded_url_arrivals,
+                    excluded_url_arrivals,
                     "input_missing",
                 ),
             ]
@@ -1566,8 +1650,9 @@ pub struct JourneyDeadEnd {
     /// for a different node — the only way out is the browser's back button,
     /// a journey finding rather than an exit. `null` = unknown: no such edge
     /// was kept, but a `pop` row from this node was filtered or withdrawn, a
-    /// kept `pop` edge to another node ended `error` / `settle_timeout`, or a
-    /// kept `pop` self-loop ended `settle_timeout`
+    /// kept `pop` edge to another node ended `error` / `settle_timeout` /
+    /// `verdict_unknown`, or a kept `pop` self-loop ended `settle_timeout` /
+    /// `verdict_unknown`
     /// (`unmeasuredDepartures.excludedBackArrivals > 0`). `false` otherwise.
     /// (A rejected `pop`-claiming row is untrusted and counts in
     /// `JourneyGraph::unplaced_rejected_rows`, which lists no node as a dead
@@ -1589,10 +1674,12 @@ pub struct JourneyUnexploredNode {
     pub unobserved_departures: u64,
     /// Departures from it the navigation edge set left out (filtered,
     /// withdrawn, `settle_timeout` / `error` to another node, `settle_timeout`
-    /// self-loops, rejected frontier rows with a valid node).
+    /// self-loops, `verdict_unknown` edges, rejected frontier rows with a
+    /// valid node).
     pub unmeasured_departures: JourneyUnmeasuredDepartures,
     /// `true` when no observed arrival at the node closed `changed` or
-    /// `no_change` (they were all `settle_timeout` / `error`), so nothing
+    /// `no_change` (they were all `settle_timeout` / `error` /
+    /// `verdict_unknown`), so nothing
     /// confirms it is a real destination rather than an intermediate state
     /// ([`JourneyGraphNode::unconfirmed_destination`]).
     pub unconfirmed_destination: bool,
@@ -1844,8 +1931,8 @@ pub struct JourneyPriorKnowledge {
 /// `initial | push | replace | hash` arrival and NO kept arrival by an
 /// affordance or pop edge from a different observed node. That
 /// disqualifying edge counts whatever its outcome (back-navigation means
-/// the user had been there by some other way; an `error` or `settle_timeout`
-/// arrival is conservatively a way in too, and its unknown real destination
+/// the user had been there by some other way; an `error`, `settle_timeout`
+/// or `verdict_unknown` arrival is conservatively a way in too, and its unknown real destination
 /// is also counted graph-wide in
 /// [`JourneyGraph::unknown_destination_arrivals`]). An `affordance` or `pop` edge from a node
 /// to itself neither qualifies nor disqualifies it; an `initial | push |

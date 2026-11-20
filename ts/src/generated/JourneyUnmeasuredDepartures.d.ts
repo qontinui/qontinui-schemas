@@ -30,9 +30,10 @@ export interface JourneyUnmeasuredDepartures {
    * Back-button (`pop`) rows from this node that are not a kept, changed
    * exit: valid `pop` rows the filter excluded or that were withdrawn
    * (unless a genuine negative: `no_change`, or `error` on its own node),
-   * kept `pop` edges to ANOTHER node whose outcome is `error` or
-   * `settle_timeout`, and kept `pop` self-loops that closed
-   * `settle_timeout` (the same rules as an affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
+   * kept `pop` edges to ANOTHER node whose outcome is `error`,
+   * `settle_timeout` or `verdict_unknown`, and kept `pop` self-loops that
+   * closed `settle_timeout` or `verdict_unknown` (the same rules as an
+   * affordance edge's). A REJECTED pop row is not here — nothing in a rejected row
    * is trusted, so it counts in `JourneyGraph::unplaced_rejected_rows`.
    * Not a navigation
    * departure, so a question about one component ignores it; the
@@ -75,6 +76,15 @@ export interface JourneyUnmeasuredDepartures {
    * `settle_timeout_departures`.
    */
   settleTimeout: number;
+  /**
+   * Affordance edges that closed `verdict_unknown` — the action was
+   * attempted and its own outcome was never stated — to a DIFFERENT node
+   * or to the SAME node. Never a navigation step (it does not confirm its
+   * destination) and never a negative (it does not say nothing happened).
+   * Dimension `verdict_unknown_departures`. Defaults to 0 when absent, so
+   * an answer from a producer that predates the counter still parses.
+   */
+  verdictUnknown: number;
   /**
    * Withdrawn affordance rows (`invalidatedAt` set) that pass `validate()`,
    * unless they are a genuine negative (`no_change`, or `error` on their

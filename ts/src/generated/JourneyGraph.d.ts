@@ -63,8 +63,10 @@ export interface JourneyGraph {
    * Affordance or `pop` rows whose real destination is unknown: kept or
    * trusted-excluded ones with no `toNode` (`to_node_unobserved`), ones
    * that closed `settle_timeout` or `error` to a DIFFERENT node (that node
-   * may be an intermediate state), and ones that closed `settle_timeout`
-   * on the SAME node (the destination may not have rendered yet). Each
+   * may be an intermediate state), ones that closed `settle_timeout`
+   * on the SAME node (the destination may not have rendered yet), and
+   * ones that closed `verdict_unknown` on any node (the action's own
+   * outcome was never stated, so the recorded node confirms nothing). Each
    * may arrive at any node, so `requires_prior_knowledge` lists no node as
    * settled while this is non-zero.
    */
@@ -118,7 +120,8 @@ export interface JourneyGraphNode {
    * `no_change`, whatever its trigger. Only those two outcomes confirm the
    * node is a real destination: a `settle_timeout` or `error` arrival's
    * observed node may be an intermediate state (a spinner, an error
-   * render). Such a node is never a settled dead end, nor a settled
+   * render), and a `verdict_unknown` arrival never stated that its action
+   * landed. Such a node is never a settled dead end, nor a settled
    * requires-prior-knowledge node.
    */
   unconfirmedDestination: boolean;

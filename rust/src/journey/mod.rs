@@ -528,6 +528,16 @@ pub enum EdgeOutcome {
     /// A second action arrived before any snapshot closed this edge, so the
     /// destination is unknown. The only outcome with a null `toNode`.
     ToNodeUnobserved,
+    /// The action was attempted and its OWN outcome was not stated — the
+    /// reply carried no verdict. Neither an error nor a success. As a
+    /// producer's hint it wins over `changed` / `no_change` (as `error`
+    /// does): `no_change` means "the action landed", which an unstated
+    /// verdict cannot claim. The observed destination is still stored in
+    /// `toNode`, but it never confirms a destination, and the journey
+    /// queries count the edge as unmeasured, never as a negative. A producer
+    /// leaves the frontier untouched for it: whether the affordance
+    /// activated is exactly what is unknown.
+    VerdictUnknown,
 }
 
 impl EdgeOutcome {
@@ -539,6 +549,7 @@ impl EdgeOutcome {
             Self::Error => "error",
             Self::SettleTimeout => "settle_timeout",
             Self::ToNodeUnobserved => "to_node_unobserved",
+            Self::VerdictUnknown => "verdict_unknown",
         }
     }
 }
@@ -1029,7 +1040,11 @@ mod tests {
             edge(Some(modelled_node()), EdgeOutcome::NoChange).validate(),
             Ok(())
         );
-        for outcome in [EdgeOutcome::Error, EdgeOutcome::SettleTimeout] {
+        for outcome in [
+            EdgeOutcome::Error,
+            EdgeOutcome::SettleTimeout,
+            EdgeOutcome::VerdictUnknown,
+        ] {
             assert_eq!(edge(Some(modelled_node()), outcome).validate(), Ok(()));
             assert_eq!(edge(Some(other_node()), outcome).validate(), Ok(()));
         }
@@ -1043,6 +1058,15 @@ mod tests {
             Err(JourneyContractError::ToNodeOutcomeMismatch {
                 to_node: "null",
                 outcome: EdgeOutcome::Changed,
+            })
+        );
+        // A verdict_unknown edge still observed its destination: a null
+        // toNode is as wrong for it as for `changed`.
+        assert_eq!(
+            edge(None, EdgeOutcome::VerdictUnknown).validate(),
+            Err(JourneyContractError::ToNodeOutcomeMismatch {
+                to_node: "null",
+                outcome: EdgeOutcome::VerdictUnknown,
             })
         );
     }
@@ -1235,6 +1259,7 @@ mod tests {
                 (Error, "error"),
                 (SettleTimeout, "settle_timeout"),
                 (ToNodeUnobserved, "to_node_unobserved"),
+                (VerdictUnknown, "verdict_unknown"),
             ],
             EdgeOutcome::as_str,
         );
@@ -1345,6 +1370,7 @@ mod tests {
             EdgeOutcome::Error,
             EdgeOutcome::SettleTimeout,
             EdgeOutcome::ToNodeUnobserved,
+            EdgeOutcome::VerdictUnknown,
         ] {
             assert_eq!(round_trip(&outcome), outcome);
         }

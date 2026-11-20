@@ -1,7 +1,7 @@
 {
   "fixture": "journey-golden.json",
-  "generate_command": "python3 rust/tests/fixtures/journey/generate_golden.py",
-  "generatedAt": "2026-10-20",
+  "generate_command": "python3 rust/tests/fixtures/journey/generate_golden.py --ref cd3dac4fc78b69feb956ab3ff2f535c08d8cec6d",
+  "generatedAt": "2026-11-20",
   "generator": "rust/tests/fixtures/journey/generate_golden.py",
   "multistate_commit": "cd3dac4fc78b69feb956ab3ff2f535c08d8cec6d",
   "multistate_functions": [
@@ -10,8 +10,8 @@
     "get_reachable_states"
   ],
   "multistate_module": "src/multistate/testing/exploration/graph_utils.py",
-  "multistate_ref": "origin/main",
+  "multistate_ref": "cd3dac4fc78b69feb956ab3ff2f535c08d8cec6d",
   "multistate_repo": "qontinui/multistate",
   "python": "3.13.5",
-  "sha256": "b3d92b48a23b3bc61d9fd275b5c1d8045ac5bfc097d3250ee7c763077afed828"
+  "sha256": "3c5b839b3df286e71cd2c4f4004293e0770991773a1ab03eda1709c10171db5b"
 }

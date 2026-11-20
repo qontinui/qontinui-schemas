@@ -33,7 +33,12 @@ export interface JourneyGraphEdge {
    * How the edge closed.
    */
   outcome:
-    "changed" | "no_change" | "error" | "settle_timeout" | "to_node_unobserved";
+    | "changed"
+    | "no_change"
+    | "error"
+    | "settle_timeout"
+    | "to_node_unobserved"
+    | "verdict_unknown";
   /**
    * `toNode.key()`.
    */

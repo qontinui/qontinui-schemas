@@ -2572,13 +2572,26 @@ fn excluded_row_enumeration_violations() -> (usize, Vec<String>) {
         T::Replace,
         T::Hash,
     ];
+    // Every EdgeOutcome. A new variant fails to compile in the exhaustive
+    // match below, next to this list, which it must also join.
     let outcomes = [
         O::Changed,
         O::NoChange,
         O::Error,
         O::SettleTimeout,
         O::ToNodeUnobserved,
+        O::VerdictUnknown,
     ];
+    for o in outcomes {
+        match o {
+            O::Changed
+            | O::NoChange
+            | O::Error
+            | O::SettleTimeout
+            | O::ToNodeUnobserved
+            | O::VerdictUnknown => {}
+        }
+    }
     let froms: [&'static str; 4] = ["s", "a", "b", "n"];
     let tos: [&'static str; 6] = ["s", "a", "b", "n", "m", "SELF"];
     let mut out = Vec::new();
@@ -2683,5 +2696,339 @@ fn rr15_an_excluded_genuine_negative_on_an_unkept_node_is_counted() {
                 "{label}"
             );
         }
+    }
+}
+
+// --- verdict_unknown: unmeasured, never a negative, never a confirmation ------
+// Plan 2026-11-18-the-journey-ledger-never-records-an-unknown-action-verdict-
+// as-a-success-or-a-failure, D1.
+
+#[test]
+fn verdict_unknown_click_elsewhere_is_unmeasured_not_a_step() {
+    let ledger = a_b_c(e("2", "b", "c").outcome(EdgeOutcome::VerdictUnknown));
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    let b = &g.node(&key("b")).unwrap().unmeasured_departures;
+    assert_eq!(b.verdict_unknown, 1);
+    assert_eq!(b.errored, 0);
+    assert_eq!(b.settle_timeout, 0);
+    // Not a navigation step...
+    assert_eq!(reachable_from(&g, &key("a")).steps_to(&key("c")), None);
+    // ...and not a negative.
+    assert_c_unknown_via(&g, "verdict_unknown_departures", "input_missing");
+    // It never confirms its destination.
+    assert!(g.node(&key("c")).unwrap().unconfirmed_destination);
+    // Its real destination is unknown (kept arrival).
+    assert_eq!(g.unknown_destination_arrivals, 1);
+}
+
+#[test]
+fn verdict_unknown_self_loop_is_unmeasured_not_a_dead_end() {
+    // Unlike an `error` self-loop (a genuine negative), a click that stayed on
+    // its node with no stated verdict may never have landed: b is not a
+    // settled dead end.
+    let ledger = a_b_c(e("2", "b", "b").outcome(EdgeOutcome::VerdictUnknown));
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("b"))
+            .unwrap()
+            .unmeasured_departures
+            .verdict_unknown,
+        1
+    );
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    let d = dead_ends(&g);
+    assert!(d.dead_ends.iter().all(|x| x.node_key != key("b")));
+    assert!(d.unexplored.iter().any(|x| x.node_key == key("b")));
+    assert!(d.frontier.unmeasured(&d.coverage, true).contains(&(
+        "verdict_unknown_departures",
+        1,
+        "input_missing"
+    )));
+}
+
+#[test]
+fn verdict_unknown_pop_counts_as_an_excluded_back_arrival() {
+    // Kept pop to another node and a kept pop self-loop: both unsettle
+    // back_only, neither counts in the affordance counter.
+    for to in ["a", "b"] {
+        let ledger = edges(&[
+            e("1", "a", "b"),
+            e("2", "b", to)
+                .kind(NavigationTriggerKind::Pop)
+                .outcome(EdgeOutcome::VerdictUnknown),
+        ]);
+        let g = build_graph(&ledger, &[], &writing(), &no_filter());
+        let d = &g.node(&key("b")).unwrap().unmeasured_departures;
+        assert_eq!(d.excluded_back_arrivals, 1, "pop to {to}");
+        assert_eq!(d.verdict_unknown, 0, "pop to {to}");
+        assert_eq!(g.unknown_destination_arrivals, 1, "pop to {to}");
+        // b has no affordance exit; its only back exit is unmeasured.
+        let b = dead_ends(&g)
+            .dead_ends
+            .into_iter()
+            .find(|x| x.node_key == key("b"))
+            .expect("b is a dead end");
+        assert_eq!(b.back_only, None, "pop to {to}");
+    }
+}
+
+#[test]
+fn verdict_unknown_click_counts_toward_kept_unknown_destination_arrivals() {
+    // The rr12_1 shape: y is reached only by an initial load, but a click
+    // whose verdict was never stated may really have landed on y.
+    let g = build_graph(
+        &with_click_into_q(EdgeOutcome::VerdictUnknown),
+        &[],
+        &writing(),
+        &no_filter(),
+    );
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    let p = requires_prior_knowledge(&g);
+    assert!(p.nodes.is_empty(), "{:?}", p.nodes);
+    let y = p.unsettled.iter().find(|n| n.node_key == key("y")).unwrap();
+    assert_eq!(y.unknown_destination_arrivals, 1);
+}
+
+#[test]
+fn excluded_verdict_unknown_rows_are_never_genuine_negatives() {
+    // Filtered out, elsewhere and on its own node alike: counted as a
+    // filtered departure and an unknown destination, never skipped.
+    for to in ["c", "b"] {
+        let mut ledger = a_b_c(e("2", "b", to).outcome(EdgeOutcome::VerdictUnknown));
+        assert!(!genuine_negative(&ledger[1]), "to {to}");
+        ledger[1].app_version = Some("2.0.0".into());
+        let f = JourneyFilter {
+            app_version: Some("1.0.0".into()),
+            ..JourneyFilter::default()
+        };
+        let g = build_graph(&ledger, &[], &writing(), &f);
+        assert_eq!(
+            g.node(&key("b"))
+                .unwrap()
+                .unmeasured_departures
+                .filtered_out,
+            1,
+            "to {to}"
+        );
+        assert_eq!(g.unknown_destination_arrivals, 1, "to {to}");
+        // An excluded verdict_unknown arrival is counted as an unknown
+        // destination (asserted above), never as arrival doubt; the
+        // control-backed check of that is
+        // an_excluded_verdict_unknown_click_puts_no_arrival_doubt_on_a_reachable_destination.
+        if to == "c" {
+            // c is reached only by the filtered row: no kept row shows it.
+            assert!(g.node(&key("c")).is_none());
+        }
+    }
+    // Withdrawn: the same.
+    let mut ledger = a_b_c(e("2", "b", "b").outcome(EdgeOutcome::VerdictUnknown));
+    ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("b")).unwrap().unmeasured_departures.withdrawn,
+        1
+    );
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    // Withdrawn, to ANOTHER node: the same, and c (seen only in that row)
+    // is not in the graph.
+    let mut ledger = a_b_c(e("2", "b", "c").outcome(EdgeOutcome::VerdictUnknown));
+    ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+    let g = build_graph(&ledger, &[], &writing(), &no_filter());
+    assert_eq!(
+        g.node(&key("b")).unwrap().unmeasured_departures.withdrawn,
+        1
+    );
+    assert_eq!(g.unknown_destination_arrivals, 1);
+    assert!(g.node(&key("c")).is_none());
+}
+
+#[test]
+fn an_excluded_verdict_unknown_click_puts_no_arrival_doubt_on_a_reachable_destination() {
+    // A KEPT typed-URL row (a -> c, push) makes c a graph node, so arrival
+    // doubt at c is observable. The excluded b -> c click is the only
+    // affordance arrival at c; a URL row adds no doubt.
+    let ledger_with = |outcome: EdgeOutcome, withdrawn: bool| {
+        let mut ledger = edges(&[
+            e("1", "a", "b"),
+            e("2", "b", "c").outcome(outcome),
+            e("3", "a", "c").kind(NavigationTriggerKind::Push),
+        ]);
+        if withdrawn {
+            ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+        } else {
+            ledger[1].app_version = Some("2.0.0".into());
+        }
+        ledger
+    };
+    let version_filter = JourneyFilter {
+        app_version: Some("1.0.0".into()),
+        ..JourneyFilter::default()
+    };
+    for withdrawn in [false, true] {
+        let f = if withdrawn {
+            no_filter()
+        } else {
+            version_filter.clone()
+        };
+        let arm = if withdrawn { "withdrawn" } else { "filtered" };
+
+        // Control: the same row closing `changed` IS arrival doubt at c, so
+        // the zero below is a measured zero, not an unobservable one.
+        let g = build_graph(
+            &ledger_with(EdgeOutcome::Changed, withdrawn),
+            &[],
+            &writing(),
+            &f,
+        );
+        let doubt = g.node(&key("c")).expect("c is a graph node").arrival_doubt;
+        assert_eq!(
+            (doubt.filtered, doubt.withdrawn),
+            if withdrawn { (0, 1) } else { (1, 0) },
+            "{arm} control"
+        );
+        assert_eq!(g.unknown_destination_arrivals, 0, "{arm} control");
+
+        // verdict_unknown: no arrival doubt at c; an unknown destination.
+        let g = build_graph(
+            &ledger_with(EdgeOutcome::VerdictUnknown, withdrawn),
+            &[],
+            &writing(),
+            &f,
+        );
+        let c = g.node(&key("c")).expect("c is a graph node");
+        assert!(c.arrival_doubt.is_zero(), "{arm}: {:?}", c.arrival_doubt);
+        assert_eq!(g.unknown_destination_arrivals, 1, "{arm}");
+        let d = &g.node(&key("b")).unwrap().unmeasured_departures;
+        assert_eq!(
+            (d.filtered_out, d.withdrawn),
+            if withdrawn { (0, 1) } else { (1, 0) },
+            "{arm}"
+        );
+    }
+}
+
+#[test]
+fn verdict_unknown_counter_adds_and_serializes() {
+    let a = JourneyUnmeasuredDepartures {
+        verdict_unknown: 2,
+        ..Default::default()
+    };
+    let mut total = JourneyUnmeasuredDepartures::default();
+    total.add(&a);
+    total.add(&a);
+    assert_eq!(total.verdict_unknown, 4);
+    assert_eq!(total.for_navigation().verdict_unknown, 4);
+    assert!(!total.is_zero());
+    assert_eq!(serde_json::to_value(a).unwrap()["verdictUnknown"], json!(2));
+    // An answer from a producer that predates the counter still parses.
+    let mut older = serde_json::to_value(a).unwrap();
+    older.as_object_mut().unwrap().remove("verdictUnknown");
+    let parsed: JourneyUnmeasuredDepartures = serde_json::from_value(older).unwrap();
+    assert_eq!(parsed.verdict_unknown, 0);
+}
+
+#[test]
+fn a_kept_url_trigger_verdict_unknown_edge_is_no_departure() {
+    // A typed URL / reload is an arrival, not a departure the app offers: a
+    // verdict_unknown one adds no departure counter and no unknown
+    // destination (it still counts as a URL arrival at its node).
+    for to in ["c", "b"] {
+        let ledger = a_b_c(
+            e("2", "b", to)
+                .kind(NavigationTriggerKind::Initial)
+                .outcome(EdgeOutcome::VerdictUnknown),
+        );
+        let g = build_graph(&ledger, &[], &writing(), &no_filter());
+        assert!(
+            g.node(&key("b")).unwrap().unmeasured_departures.is_zero(),
+            "to {to}"
+        );
+        assert_eq!(g.unknown_destination_arrivals, 0, "to {to}");
+    }
+    // It still counts as a URL arrival at its node. Elsewhere: c is reached
+    // only by that initial load, so it qualifies with {initial: 1}.
+    let url_arrivals = |g: &JourneyGraph, name: &str| {
+        let p = requires_prior_knowledge(g);
+        p.nodes
+            .iter()
+            .map(|n| (n.node_key.clone(), n.arrivals.clone()))
+            .chain(
+                p.unsettled
+                    .iter()
+                    .map(|n| (n.node_key.clone(), n.arrivals.clone())),
+            )
+            .find(|(k, _)| *k == key(name))
+            .map(|(_, a)| a)
+    };
+    let g = build_graph(
+        &a_b_c(
+            e("2", "b", "c")
+                .kind(NavigationTriggerKind::Initial)
+                .outcome(EdgeOutcome::VerdictUnknown),
+        ),
+        &[],
+        &writing(),
+        &no_filter(),
+    );
+    assert_eq!(
+        url_arrivals(&g, "c"),
+        Some(BTreeMap::from([("initial".to_string(), 1)]))
+    );
+    // ...and, like every verdict_unknown arrival, it never confirms c.
+    assert!(
+        g.node(&key("c")).unwrap().unconfirmed_destination,
+        "a URL-trigger verdict_unknown arrival leaves c unconfirmed"
+    );
+    // A reload of its own node (b reached only by a push): counted beside
+    // the push.
+    let g = build_graph(
+        &edges(&[
+            e("1", "a", "b").kind(NavigationTriggerKind::Push),
+            e("2", "b", "b")
+                .kind(NavigationTriggerKind::Initial)
+                .outcome(EdgeOutcome::VerdictUnknown),
+        ]),
+        &[],
+        &writing(),
+        &no_filter(),
+    );
+    assert_eq!(
+        url_arrivals(&g, "b"),
+        Some(BTreeMap::from([
+            ("initial".to_string(), 1),
+            ("push".to_string(), 1)
+        ]))
+    );
+}
+
+#[test]
+fn excluded_verdict_unknown_pop_rows_are_back_arrivals_with_unknown_destinations() {
+    for withdrawn in [false, true] {
+        let mut ledger = edges(&[
+            e("1", "a", "b"),
+            e("2", "b", "a")
+                .kind(NavigationTriggerKind::Pop)
+                .outcome(EdgeOutcome::VerdictUnknown),
+        ]);
+        let f = if withdrawn {
+            ledger[1].invalidated_at = Some("2026-10-02T00:00:00Z".into());
+            no_filter()
+        } else {
+            ledger[1].app_version = Some("2.0.0".into());
+            JourneyFilter {
+                app_version: Some("1.0.0".into()),
+                ..JourneyFilter::default()
+            }
+        };
+        let g = build_graph(&ledger, &[], &writing(), &f);
+        let d = &g.node(&key("b")).unwrap().unmeasured_departures;
+        assert_eq!(d.excluded_back_arrivals, 1, "withdrawn={withdrawn}");
+        assert_eq!(d.verdict_unknown, 0, "withdrawn={withdrawn}");
+        assert_eq!(g.unknown_destination_arrivals, 1, "withdrawn={withdrawn}");
+        // Its recorded destination is not trusted: no arrival doubt at a.
+        assert!(
+            g.node(&key("a")).unwrap().arrival_doubt.is_zero(),
+            "withdrawn={withdrawn}"
+        );
     }
 }

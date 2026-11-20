@@ -10,8 +10,8 @@
  * a node from a different node with outcome `changed`. Any of them may be a
  * way in that the user did not need a URL for, so
  * [`requires_prior_knowledge`] cannot list the node as settled. An excluded
- * row that closed `error` or `settle_timeout` (or has no `toNode`) is not
- * here: its recorded destination may be an intermediate state, so it routes
+ * row that closed `error`, `settle_timeout` or `verdict_unknown` (or has no
+ * `toNode`) is not here: its recorded destination may be an intermediate state, so it routes
  * to the graph-wide [`JourneyGraph::unknown_destination_arrivals`].
  */
 export interface JourneyArrivalDoubt {
