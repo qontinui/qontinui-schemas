@@ -717,7 +717,7 @@ pub struct UiBridgeStep {
         alias = "severity_threshold"
     )]
     pub severity_threshold: Option<UiBridgeSeverity>,
-    /// Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.
+    /// Snapshot target — `"control"` or `"sdk"`.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",

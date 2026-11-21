@@ -119,7 +119,7 @@ export interface UiBridgeStep {
    */
   timeoutMs?: number | null;
   /**
-   * Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.
+   * Snapshot target — `"control"` or `"sdk"`.
    */
   uiBridgeSnapshotTarget?: string | null;
   /**
