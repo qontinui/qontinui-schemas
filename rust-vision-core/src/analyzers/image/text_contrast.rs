@@ -3083,6 +3083,22 @@ fn max_1d(v: &[f32], r: usize, out: &mut [f32]) {
     }
 }
 
+/// The detail for a snapshot whose producer refused `n` content rows at its
+/// registration cap. Shared by the image analyzer's `textContrast` and
+/// [`crate::Assertion::TextOverImageContrast`].
+pub fn content_dropped_detail(n: u32) -> String {
+    format!(
+        "the snapshot dropped {n} content row(s) at its producer's registration cap \
+         (`registration.contentDropped`), so text no check read may lie over an image"
+    )
+}
+
+/// The disclosure for a snapshot whose producer did not report the count.
+pub fn content_dropped_unreported() -> &'static str {
+    "the snapshot did not report how many content rows it dropped \
+     (`registration.contentDropped` absent), so text it holds no row for is not ruled out"
+}
+
 /// The Unknown for a text element the producer did not report hiding, when
 /// it reported a list ([`crate::analyzers::AnalyzeInput::text_hidden_ids`]).
 pub fn not_reported_hidden(id: &str) -> LocateError {
