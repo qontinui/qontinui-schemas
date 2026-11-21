@@ -180,7 +180,6 @@ from .per_type.execution_trend_response import ExecutionTrendResponse
 from .per_type.exit_check_result import ExitCheckResult
 from .per_type.exit_strategy import ExitStrategy
 from .per_type.export_result import ExportResult
-from .per_type.extend_iterations_request import ExtendIterationsRequest
 from .per_type.external_ref import ExternalRef
 from .per_type.field_diff import FieldDiff
 from .per_type.file_change import FileChange
@@ -609,7 +608,6 @@ from .per_type.virtual_desktop import VirtualDesktop
 from .per_type.visual_assertion_type import VisualAssertionType
 from .per_type.visual_comparison_result import VisualComparisonResult
 from .per_type.wait_options import WaitOptions
-from .per_type.worker_coordination_message import WorkerCoordinationMessage
 from .per_type.worker_domain import WorkerDomain
 from .per_type.worker_instance import WorkerInstance
 from .per_type.worker_output import WorkerOutput
@@ -808,7 +806,6 @@ __all__ = [
     "ExitCheckResult",
     "ExitStrategy",
     "ExportResult",
-    "ExtendIterationsRequest",
     "ExternalRef",
     "FieldDiff",
     "FileChange",
@@ -1237,7 +1234,6 @@ __all__ = [
     "VisualAssertionType",
     "VisualComparisonResult",
     "WaitOptions",
-    "WorkerCoordinationMessage",
     "WorkerDomain",
     "WorkerInstance",
     "WorkerOutput",

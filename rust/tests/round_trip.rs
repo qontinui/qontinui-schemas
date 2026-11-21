@@ -7455,10 +7455,9 @@ fn state_machine_import_name_optional() {
 // ============================================================================
 
 use qontinui_types::verification::{
-    Confidence, CriterionOverride, CriterionType, DomainAssignment, ExtendIterationsRequest,
-    Finding as VerificationFinding, OverrideCollection, StageTransition, SuccessCriterion,
-    VerificationMethod as VerifMethod, VerificationPlan as VerifPlan, WorkerCoordinationMessage,
-    WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
+    Confidence, CriterionOverride, CriterionType, DomainAssignment, Finding as VerificationFinding,
+    OverrideCollection, StageTransition, SuccessCriterion, VerificationMethod as VerifMethod,
+    VerificationPlan as VerifPlan, WorkerDomain, WorkerInstance, WorkerSignal, WorkerStatus,
 };
 
 #[test]
@@ -7657,58 +7656,6 @@ fn worker_instance_minimal_roundtrips() {
 }
 
 #[test]
-fn worker_coordination_message_files_modified_roundtrips() {
-    // Externally tagged as { "type": ..., "data": { ... } }.
-    let m = WorkerCoordinationMessage::FilesModified {
-        worker_id: "w1".to_string(),
-        files: vec!["src/a.rs".to_string()],
-    };
-    let json = serde_json::to_string(&m).unwrap();
-    let v: Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["type"], "files_modified");
-    assert_eq!(v["data"]["worker_id"], "w1");
-    assert_eq!(v["data"]["files"][0], "src/a.rs");
-    let back: WorkerCoordinationMessage = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn worker_coordination_message_all_variants_roundtrip() {
-    let finding = VerificationFinding {
-        id: "f1".to_string(),
-        finding_type: "bug".to_string(),
-        description: "crash".to_string(),
-        evidence: None,
-        confidence: Confidence::High,
-        related_files: vec![],
-    };
-    let variants = vec![
-        WorkerCoordinationMessage::SharedFinding {
-            worker_id: "w1".to_string(),
-            finding,
-        },
-        WorkerCoordinationMessage::Blocked {
-            worker_id: "w1".to_string(),
-            waiting_for: "w2".to_string(),
-            reason: "schema update".to_string(),
-        },
-        WorkerCoordinationMessage::ReadyForVerification {
-            worker_id: "w1".to_string(),
-            domain: Some("frontend".to_string()),
-        },
-        WorkerCoordinationMessage::SyncPoint {
-            worker_ids: vec!["w1".to_string(), "w2".to_string()],
-            reason: "merge".to_string(),
-        },
-    ];
-    for v in variants {
-        let json = serde_json::to_string(&v).unwrap();
-        let back: WorkerCoordinationMessage = serde_json::from_str(&json).unwrap();
-        assert_eq!(json, serde_json::to_string(&back).unwrap());
-    }
-}
-
-#[test]
 fn worker_signal_roundtrips_all_variants() {
     // Tagged with `signal` (not `type`) to match pre-extraction wire.
     let wc = WorkerSignal::WorkComplete {
@@ -7819,28 +7766,6 @@ fn stage_transition_roundtrips() {
     let json = serde_json::to_string(&s).unwrap();
     let back: StageTransition = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&back).unwrap());
-}
-
-#[test]
-fn extend_iterations_request_roundtrips() {
-    let r = ExtendIterationsRequest {
-        additional_iterations: 5,
-        guidance: Some("focus on tests".to_string()),
-    };
-    let json = serde_json::to_string(&r).unwrap();
-    let back: ExtendIterationsRequest = serde_json::from_str(&json).unwrap();
-    assert_eq!(json, serde_json::to_string(&back).unwrap());
-
-    let r2 = ExtendIterationsRequest {
-        additional_iterations: 2,
-        guidance: None,
-    };
-    let json2 = serde_json::to_string(&r2).unwrap();
-    let v2: Value = serde_json::from_str(&json2).unwrap();
-    assert!(
-        v2.get("guidance").is_none(),
-        "None guidance must be skipped"
-    );
 }
 
 // ============================================================================
