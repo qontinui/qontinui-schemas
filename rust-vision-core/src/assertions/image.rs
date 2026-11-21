@@ -225,8 +225,9 @@ type ImageCrop<'a> = (&'a Element, &'a ElementMedia, Crop);
 struct PageCrops<'a> {
     /// Every examined image and its crop.
     crops: Vec<ImageCrop<'a>>,
-    /// Images left out as unrendered ([`img::unrendered`]: a zero-area box,
-    /// or reported `hidden` / `no-layout` — nothing of them is on the frame).
+    /// Images left out as unrendered ([`img::unrendered`]: a box on no whole
+    /// pixel, or reported `hidden` / `no-layout` — nothing of them is on the
+    /// frame).
     unrendered: usize,
     /// CSS-background rows, left out with a disclosed note: their painted
     /// region is set by background-size, -position and -repeat, which no
@@ -322,7 +323,8 @@ fn nothing_examined(a: Assertion, page: &PageCrops<'_>) -> AssertionResult {
 fn unrendered_note(n: usize) -> String {
     if n > 0 {
         format!(
-            " ({n} unrendered image(s) left out: a zero-area box, or reported hidden / no-layout)"
+            " ({n} unrendered image(s) left out: a box on no whole pixel, or reported hidden / \
+             no-layout)"
         )
     } else {
         String::new()
@@ -666,14 +668,14 @@ fn salience_order(a: Assertion, cta_id: &str, ctx: &EvalContext<'_>) -> Assertio
             format!("'{cta_id}' has no pixels"),
         );
     };
-    let cta_box = cta.bbox.expect("located, so it has a bbox");
+    let cta_box = cta.region().expect("located, so it has a bbox");
     let mut rival: Option<(String, f64)> = None;
     let mut compared = 0usize;
     for el in &snap.elements {
         if el.id == cta.id || !(el.interactable || el.media.is_some()) {
             continue;
         }
-        let Some(b) = el.bbox else { continue };
+        let Some(b) = el.region() else { continue };
         if region_contains(b, cta_box)
             || region_contains(cta_box, b)
             || img::unrendered(snap, el).is_some()

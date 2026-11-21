@@ -93,6 +93,8 @@ pub enum UiBridgeErrorCode {
     UbObsCapabilityUnavailableInBuild,
     /// `UB-OBS-FRONTIER-OPEN`
     UbObsFrontierOpen,
+    /// `UB-OBS-HIT-TEST-UNMEASURABLE`
+    UbObsHitTestUnmeasurable,
     /// `UB-OBS-INPUT-MISSING`
     UbObsInputMissing,
     /// `UB-OBS-LEDGER-SCHEMA-ABSENT`
@@ -105,8 +107,20 @@ pub enum UiBridgeErrorCode {
     UbObsNeedsMultiFrameInput,
     /// `UB-OBS-NO-EVENT-BEFORE-TIMEOUT`
     UbObsNoEventBeforeTimeout,
+    /// `UB-OBS-NO-EXPECTATION`
+    UbObsNoExpectation,
     /// `UB-OBS-NO-OBSERVATIONS`
     UbObsNoObservations,
+    /// `UB-OBS-NO-RESULTS`
+    UbObsNoResults,
+    /// `UB-OBS-NOT-ATTEMPTED-BY-POLICY`
+    UbObsNotAttemptedByPolicy,
+    /// `UB-OBS-NOT-ATTEMPTED-DESTRUCTIVE`
+    UbObsNotAttemptedDestructive,
+    /// `UB-OBS-NOT-ATTEMPTED-WRITE`
+    UbObsNotAttemptedWrite,
+    /// `UB-OBS-NOT-REPORTED`
+    UbObsNotReported,
     /// `UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED`
     UbObsPerformanceObserverUnsupported,
     /// `UB-OBS-PRODUCER-FAILED`
@@ -179,13 +193,20 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbObsBelowConfidenceFloor => "UB-OBS-BELOW-CONFIDENCE-FLOOR",
             UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild => "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD",
             UiBridgeErrorCode::UbObsFrontierOpen => "UB-OBS-FRONTIER-OPEN",
+            UiBridgeErrorCode::UbObsHitTestUnmeasurable => "UB-OBS-HIT-TEST-UNMEASURABLE",
             UiBridgeErrorCode::UbObsInputMissing => "UB-OBS-INPUT-MISSING",
             UiBridgeErrorCode::UbObsLedgerSchemaAbsent => "UB-OBS-LEDGER-SCHEMA-ABSENT",
             UiBridgeErrorCode::UbObsLedgerWriteFailing => "UB-OBS-LEDGER-WRITE-FAILING",
             UiBridgeErrorCode::UbObsModelReplyUnparseable => "UB-OBS-MODEL-REPLY-UNPARSEABLE",
             UiBridgeErrorCode::UbObsNeedsMultiFrameInput => "UB-OBS-NEEDS-MULTI-FRAME-INPUT",
             UiBridgeErrorCode::UbObsNoEventBeforeTimeout => "UB-OBS-NO-EVENT-BEFORE-TIMEOUT",
+            UiBridgeErrorCode::UbObsNoExpectation => "UB-OBS-NO-EXPECTATION",
             UiBridgeErrorCode::UbObsNoObservations => "UB-OBS-NO-OBSERVATIONS",
+            UiBridgeErrorCode::UbObsNoResults => "UB-OBS-NO-RESULTS",
+            UiBridgeErrorCode::UbObsNotAttemptedByPolicy => "UB-OBS-NOT-ATTEMPTED-BY-POLICY",
+            UiBridgeErrorCode::UbObsNotAttemptedDestructive => "UB-OBS-NOT-ATTEMPTED-DESTRUCTIVE",
+            UiBridgeErrorCode::UbObsNotAttemptedWrite => "UB-OBS-NOT-ATTEMPTED-WRITE",
+            UiBridgeErrorCode::UbObsNotReported => "UB-OBS-NOT-REPORTED",
             UiBridgeErrorCode::UbObsPerformanceObserverUnsupported => "UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED",
             UiBridgeErrorCode::UbObsProducerFailed => "UB-OBS-PRODUCER-FAILED",
             UiBridgeErrorCode::UbObsProducerNotRun => "UB-OBS-PRODUCER-NOT-RUN",
@@ -243,13 +264,20 @@ impl UiBridgeErrorCode {
             UiBridgeErrorCode::UbObsBelowConfidenceFloor,
             UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild,
             UiBridgeErrorCode::UbObsFrontierOpen,
+            UiBridgeErrorCode::UbObsHitTestUnmeasurable,
             UiBridgeErrorCode::UbObsInputMissing,
             UiBridgeErrorCode::UbObsLedgerSchemaAbsent,
             UiBridgeErrorCode::UbObsLedgerWriteFailing,
             UiBridgeErrorCode::UbObsModelReplyUnparseable,
             UiBridgeErrorCode::UbObsNeedsMultiFrameInput,
             UiBridgeErrorCode::UbObsNoEventBeforeTimeout,
+            UiBridgeErrorCode::UbObsNoExpectation,
             UiBridgeErrorCode::UbObsNoObservations,
+            UiBridgeErrorCode::UbObsNoResults,
+            UiBridgeErrorCode::UbObsNotAttemptedByPolicy,
+            UiBridgeErrorCode::UbObsNotAttemptedDestructive,
+            UiBridgeErrorCode::UbObsNotAttemptedWrite,
+            UiBridgeErrorCode::UbObsNotReported,
             UiBridgeErrorCode::UbObsPerformanceObserverUnsupported,
             UiBridgeErrorCode::UbObsProducerFailed,
             UiBridgeErrorCode::UbObsProducerNotRun,
@@ -328,13 +356,20 @@ impl FromStr for UiBridgeErrorCode {
             "UB-OBS-BELOW-CONFIDENCE-FLOOR" => Ok(UiBridgeErrorCode::UbObsBelowConfidenceFloor),
             "UB-OBS-CAPABILITY-UNAVAILABLE-IN-BUILD" => Ok(UiBridgeErrorCode::UbObsCapabilityUnavailableInBuild),
             "UB-OBS-FRONTIER-OPEN" => Ok(UiBridgeErrorCode::UbObsFrontierOpen),
+            "UB-OBS-HIT-TEST-UNMEASURABLE" => Ok(UiBridgeErrorCode::UbObsHitTestUnmeasurable),
             "UB-OBS-INPUT-MISSING" => Ok(UiBridgeErrorCode::UbObsInputMissing),
             "UB-OBS-LEDGER-SCHEMA-ABSENT" => Ok(UiBridgeErrorCode::UbObsLedgerSchemaAbsent),
             "UB-OBS-LEDGER-WRITE-FAILING" => Ok(UiBridgeErrorCode::UbObsLedgerWriteFailing),
             "UB-OBS-MODEL-REPLY-UNPARSEABLE" => Ok(UiBridgeErrorCode::UbObsModelReplyUnparseable),
             "UB-OBS-NEEDS-MULTI-FRAME-INPUT" => Ok(UiBridgeErrorCode::UbObsNeedsMultiFrameInput),
             "UB-OBS-NO-EVENT-BEFORE-TIMEOUT" => Ok(UiBridgeErrorCode::UbObsNoEventBeforeTimeout),
+            "UB-OBS-NO-EXPECTATION" => Ok(UiBridgeErrorCode::UbObsNoExpectation),
             "UB-OBS-NO-OBSERVATIONS" => Ok(UiBridgeErrorCode::UbObsNoObservations),
+            "UB-OBS-NO-RESULTS" => Ok(UiBridgeErrorCode::UbObsNoResults),
+            "UB-OBS-NOT-ATTEMPTED-BY-POLICY" => Ok(UiBridgeErrorCode::UbObsNotAttemptedByPolicy),
+            "UB-OBS-NOT-ATTEMPTED-DESTRUCTIVE" => Ok(UiBridgeErrorCode::UbObsNotAttemptedDestructive),
+            "UB-OBS-NOT-ATTEMPTED-WRITE" => Ok(UiBridgeErrorCode::UbObsNotAttemptedWrite),
+            "UB-OBS-NOT-REPORTED" => Ok(UiBridgeErrorCode::UbObsNotReported),
             "UB-OBS-PERFORMANCE-OBSERVER-UNSUPPORTED" => Ok(UiBridgeErrorCode::UbObsPerformanceObserverUnsupported),
             "UB-OBS-PRODUCER-FAILED" => Ok(UiBridgeErrorCode::UbObsProducerFailed),
             "UB-OBS-PRODUCER-NOT-RUN" => Ok(UiBridgeErrorCode::UbObsProducerNotRun),

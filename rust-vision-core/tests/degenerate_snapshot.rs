@@ -27,12 +27,15 @@ use qontinui_vision_core::{
 fn healthy_el(id: &str, x: i32) -> Element {
     Element {
         id: id.to_string(),
-        bbox: Some(Region {
-            x,
-            y: 0,
-            w: 100,
-            h: 40,
-        }),
+        bbox: Some(
+            Region {
+                x,
+                y: 0,
+                w: 100,
+                h: 40,
+            }
+            .into(),
+        ),
         text: Some(format!("label {id}")),
         interactable: true,
         ..Default::default()
@@ -335,12 +338,15 @@ fn zero_interactable_degrades_rather_than_blocks_when_geometry_is_present() {
     // statement about the page" on the analyzer's most valuable output.
     let covered = Element {
         id: "session-name".into(),
-        bbox: Some(Region {
-            x: 0,
-            y: 0,
-            w: 100,
-            h: 20,
-        }),
+        bbox: Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 20,
+            }
+            .into(),
+        ),
         text: Some("prod-deploy-7".into()),
         interactable: false,
         occluded_by: Some("toast".into()),

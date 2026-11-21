@@ -40,6 +40,41 @@
 //! multiplication (in JavaScript, `Math.fround`), or it disagrees within about
 //! 1e-6 of a boundary: `10.666667 * 1.5` ceils to 16 in `f32` and to 17 in
 //! `f64`. The cases stay clear of such values; the rule does not.
+//!
+//! **Geometry, for a port.** A case's `bbox` is the producer's UNROUNDED
+//! measurement: `getBoundingClientRect()`'s `x`, `y`, `width` and `height` as
+//! doubles, fractions included (a whole value is written as an integer). The
+//! producer rounds nothing. Each kind rounds the box itself, by its own rule
+//! (see `ElementRect`), and a port applies the same rule to the same doubles.
+//!
+//! - `text_fits_container` compares content with `ceil(w)` and `ceil(h)`.
+//!   `scroll_width_px` / `scroll_height_px` are the DOM's integer
+//!   `scrollWidth` / `scrollHeight`, compared with those strictly, with no
+//!   slack: content exactly as large as the ceiled box fits, and one pixel
+//!   larger does not, so a 119.4 px box holds 120 px. The vertical estimate
+//!   compares `ceil(h)` with `ceil(font_size_px * 1.5)`. The `*-ceiled-box-*`
+//!   cases pin both sides of the boundary, and the `*-fractional-*` ones that
+//!   the ceiling is taken of the unrounded size.
+//! - The geometry kinds (`no_overlap`, `element_above`, `no_clipping`) snap
+//!   each EDGE to the nearest pixel: `left = round(x)`, `top = round(y)`,
+//!   `right = round(x + w)`, `bottom = round(y + h)`, with `x + w` and `y + h`
+//!   summed as doubles first, and `round` being JavaScript's `Math.round`
+//!   (nearest, ties toward +∞: `-11.5` rounds to `-11`, where Rust's
+//!   `f64::round` gives `-12`). Width and height are differences of rounded
+//!   edges, never rounded on their own, and every comparison after the snap
+//!   is on integers. So two boxes sharing a fractional edge share it on the
+//!   grid, and no box is rounded up: rounding every box up would make three
+//!   33.333 px flex items overlap. The `*-fractional-*` cases of these kinds
+//!   pin the snap: a sub-pixel overlap that rounds away, a shared fractional
+//!   edge, an overlap that survives the snap, a negative tie, and a flex row
+//!   of 33.333 px thirds.
+//!
+//! **Unknown codes, for a port.** Two codes occur. `element_above` with no
+//! paint-order evidence (no `occluded_by` naming either operand as on top, and
+//! a `z_index` missing on either) is `hit_test_unmeasurable`, whether or not
+//! the overlap is required. Every other unknown is `input_missing`, including
+//! an `element_above` operand absent from the snapshot and an operand with no
+//! `bbox` when the overlap is required.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 

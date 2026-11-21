@@ -526,7 +526,7 @@ fn weight_within(el: &Element, m: &ElementMedia, max: u64) -> Verdict {
         // mid-download. A zero-area box reads as off-screen wherever it sits.
         None if m.load_state == Some(MediaLoadState::Lazy)
             && m.in_viewport == Some(false)
-            && el.bbox.is_some_and(|b| b.w > 0 && b.h > 0) =>
+            && el.bbox.is_some_and(|b| b.w > 0.0 && b.h > 0.0) =>
         {
             Verdict::NotApplicable(format!(
                 "element '{id}' is off-screen and lazy and has not finished loading, so its \
@@ -631,12 +631,15 @@ mod tests {
     fn image(id: &str, media: ElementMedia) -> Element {
         Element {
             id: id.into(),
-            bbox: Some(Region {
-                x: 0,
-                y: 0,
-                w: 100,
-                h: 100,
-            }),
+            bbox: Some(
+                Region {
+                    x: 0,
+                    y: 0,
+                    w: 100,
+                    h: 100,
+                }
+                .into(),
+            ),
             media: Some(media),
             ..Default::default()
         }
@@ -729,12 +732,15 @@ mod tests {
     }
 
     fn zero_area(mut el: Element) -> Element {
-        el.bbox = Some(Region {
-            x: 0,
-            y: 0,
-            w: 0,
-            h: 0,
-        });
+        el.bbox = Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 0,
+                h: 0,
+            }
+            .into(),
+        );
         el
     }
 
@@ -1614,12 +1620,15 @@ mod tests {
     #[test]
     fn no_duplicate_images_ignores_a_hidden_twin() {
         let mut twin = sourced("mobile", MediaKind::Img, Some("d1"));
-        twin.bbox = Some(Region {
-            x: 0,
-            y: 0,
-            w: 0,
-            h: 0,
-        });
+        twin.bbox = Some(
+            Region {
+                x: 0,
+                y: 0,
+                w: 0,
+                h: 0,
+            }
+            .into(),
+        );
         let r = run(
             duplicates_a(),
             vec![sourced("desktop", MediaKind::Img, Some("d1")), twin],
