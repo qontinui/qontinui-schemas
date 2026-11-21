@@ -6,11 +6,12 @@
  */
 
 import type { AssertionMiss } from "./AssertionMiss";
-import type { AssertionOutcome } from "./AssertionOutcome";
 import type { CandidateMiss } from "./CandidateMiss";
 import type { FieldDiff } from "./FieldDiff";
 import type { MatchedElement } from "./MatchedElement";
 import type { MissReason } from "./MissReason";
+import type { SpecAssertionVerdict } from "./SpecAssertionVerdict";
+import type { UnknownCode } from "./UnknownCode";
 
 /**
  * Per-assertion evaluation result wrapper.
@@ -29,9 +30,9 @@ export interface AssertionResult {
    */
   description: string;
   /**
-   * Pass / fail discriminator + payload.
+   * Pass / fail / unknown discriminator + payload.
    */
-  outcome: AssertionOutcome;
+  outcome: SpecAssertionVerdict;
   /**
    * Free-form severity string — `"critical"` / `"error"` / `"warning"`
    * / `"info"`. Free-form so policy adapters can introduce new tiers

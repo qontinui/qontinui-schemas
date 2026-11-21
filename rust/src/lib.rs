@@ -158,6 +158,11 @@ pub mod journey;
 pub mod mcp_config;
 pub mod memory;
 pub mod orchestration_config;
+/// The shared verdict vocabulary — `passed | failed | unknown` plus a typed
+/// [`outcome::UnknownCode`] — and the one fold every instrument rolls verdicts
+/// up with (an empty input is `unknown(no_results)`, never a pass). Twinned
+/// with `qontinui-vision-core`'s MIT copy; see the module doc.
+pub mod outcome;
 /// Bounded reads — the shared [`page::Page`] type, the [`page::BoundedReadMeta`]
 /// wire envelope and the keyset cursor codec every list-shaped read serves, so a
 /// capped page can no longer read as the corpus. See
