@@ -12,6 +12,7 @@
 use std::collections::BTreeMap;
 
 use super::{AnalyzerResult, Finding, Severity};
+use crate::assertions::{TextScale, WcagLevel};
 use crate::coverage::SnapshotCoverage;
 use crate::element_snapshot::{ElementSnapshot, Rgb};
 use crate::frame::{Frame, Region};
@@ -98,10 +99,17 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
         let declared = sampled_confidence.is_none();
         let ratio = wcag_contrast(fg, bg);
         ratios_computed += 1;
+        // WCAG 1.4.3: large-scale text needs 3:1, other text 4.5:1. The same
+        // rule `contrast_meets_wcag` applies, through the same type, so the
+        // two cannot drift. An unmeasured size or weight never makes text
+        // large (the strict direction); the message says so when that matters.
+        let text_scale = TextScale::of(el);
+        let needed = WcagLevel::Aa.min_ratio(text_scale);
+        let scale_note = scale_note(el, text_scale, ratio);
 
         if declared {
             declared_checked += 1;
-            if ratio < 4.5 {
+            if ratio < needed {
                 declared_low_contrast += 1;
                 findings.push(
                     Finding::new(
@@ -112,14 +120,18 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
                             Severity::Warning
                         },
                         format!(
-                            "element {} text contrast ratio {:.2}:1 (WCAG AA requires ≥4.5)",
-                            el.id, ratio
+                            "element {} text contrast ratio {:.2}:1 (WCAG AA requires ≥{:.1} for {} text){}",
+                            el.id,
+                            ratio,
+                            needed,
+                            scale_label(text_scale),
+                            scale_note
                         ),
                     )
                     .with_elements(vec![el.id.clone()]),
                 );
             }
-        } else if ratio < 4.5 {
+        } else if ratio < needed {
             // Pixel-sampled, no declared colors: informational only. Never
             // Warning/Critical and never counted toward density — the
             // two-mode histogram is unreliable for sparse text.
@@ -137,8 +149,12 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
                     Severity::Info,
                     format!(
                         "element {} text contrast sampled (no declared colors): \
-                         ratio≈{:.2}:1 — informational, WCAG AA wants ≥4.5",
-                        el.id, ratio
+                         ratio≈{:.2}:1 — informational, WCAG AA wants ≥{:.1} for {} text{}",
+                        el.id,
+                        ratio,
+                        needed,
+                        scale_label(text_scale),
+                        scale_note
                     ),
                 )
                 .with_elements(vec![el.id.clone()])
@@ -170,6 +186,25 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
         )
     });
     verdict(coverage, ratios_computed, findings, unusable_scale)
+}
+
+fn scale_label(scale: TextScale) -> &'static str {
+    match scale {
+        TextScale::Normal => "normal",
+        TextScale::Large => "large",
+    }
+}
+
+/// Say so when the text was held to the normal-text minimum only because its
+/// size or weight was not measured, and the ratio sits where that decided it.
+fn scale_note(el: &crate::element_snapshot::Element, scale: TextScale, ratio: f64) -> String {
+    let large_needed = WcagLevel::Aa.min_ratio(TextScale::Large);
+    match TextScale::undetermined_by(el) {
+        Some(missing) if scale == TextScale::Normal && ratio >= large_needed => {
+            format!("; {missing} not measured, so the text was assumed normal-sized")
+        }
+        _ => String::new(),
+    }
 }
 
 /// Classify a completed color run.
@@ -597,6 +632,64 @@ mod tests {
             .find(|x| x.kind == "low_contrast")
             .expect("declared low_contrast finding");
         assert_eq!(lc.severity, Severity::Critical);
+    }
+
+    fn sized_el(size: Option<f32>, weight: Option<f32>) -> Element {
+        let mut e = text_el(
+            "t",
+            Some(Rgb::new(0x80, 0x80, 0x80)),
+            Some(Rgb::new(255, 255, 255)),
+        );
+        e.font_size_px = size;
+        e.font_weight = weight;
+        e
+    }
+
+    fn low_contrast_of(el: Element) -> Option<crate::analyzers::Finding> {
+        let f = solid_frame(10, 10, [0xff, 0xff, 0xff, 0xff]);
+        let snap = ElementSnapshot {
+            elements: vec![el],
+            ..Default::default()
+        };
+        run(&f, &snap)
+            .findings
+            .into_iter()
+            .find(|x| x.kind == "low_contrast")
+    }
+
+    #[test]
+    fn large_text_passes_at_three_to_one() {
+        // #808080 on white is ~3.95:1: below 4.5, above 3.0.
+        assert!(low_contrast_of(sized_el(Some(24.0), None)).is_none());
+        assert!(low_contrast_of(sized_el(Some(18.66), Some(700.0))).is_none());
+    }
+
+    #[test]
+    fn near_large_text_still_warns() {
+        // Just under the size, or bold-large without bold, is normal text.
+        for el in [
+            sized_el(Some(23.9), None),
+            sized_el(Some(18.66), Some(400.0)),
+            sized_el(Some(16.0), Some(700.0)),
+        ] {
+            let f = low_contrast_of(el).expect("normal text below 4.5 warns");
+            assert_eq!(f.severity, Severity::Warning);
+        }
+    }
+
+    #[test]
+    fn unmeasured_scale_is_normal_and_says_so() {
+        let f = low_contrast_of(sized_el(None, None)).expect("warns");
+        assert_eq!(f.severity, Severity::Warning);
+        assert!(f.detail.contains("font_size_px"), "{}", f.detail);
+    }
+
+    #[test]
+    fn large_text_below_three_is_still_critical() {
+        let mut e = sized_el(Some(30.0), None);
+        e.fg_color = Some(Rgb::new(0xcc, 0xcc, 0xcc)); // ~1.6:1 on white
+        let f = low_contrast_of(e).expect("fails 3:1");
+        assert_eq!(f.severity, Severity::Critical);
     }
 
     #[test]
