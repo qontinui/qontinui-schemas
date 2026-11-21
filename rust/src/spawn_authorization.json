@@ -31,11 +31,6 @@
       "purpose": "Dispatch a work unit to a device as a fresh session."
     },
     {
-      "agent_name": "next_step_dispatch",
-      "spawn_path": "standing_continuation",
-      "purpose": "Retired: coord no longer starts this path; the row stays until the contract drops the seed."
-    },
-    {
       "agent_name": "pr_fix_dispatch",
       "spawn_path": "standing_continuation",
       "purpose": "Spawn a fixer for a PR diagnosed as needing author rework."
