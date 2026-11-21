@@ -1,5 +1,26 @@
 # Changelog
 
+## [7.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.2.0...rust-v7.0.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* qontinui_types::verification::VerificationAgentContext and its TS/Python bindings are removed; they had no producer or consumer (coord finding 7c536351 item 1).
+* qontinui_types::verification no longer exports VerificationResult, DomainVerificationResult, IterationVerificationResults or TaskCompletionResult; qontinui_schemas.generated no longer exports their bindings, and @qontinui/shared-types no longer ships them under src/generated (no entry point ever re-exported them).
+
+### Features
+
+* declare dispatch_settable on each session work type ([ecac6bc](https://github.com/qontinui/qontinui-schemas/commit/ecac6bc2c9b28e087fc193f5562cc8bdd00e8eca))
+* delete the dead VerificationAgentContext DTO ([4c1d051](https://github.com/qontinui/qontinui-schemas/commit/4c1d05168f92e8ee2c3e7552c38b894219080518))
+* delete the orchestrator verifier's result DTOs ([92badbd](https://github.com/qontinui/qontinui-schemas/commit/92badbd052a1fae4ac0df1deb10210efa6d123df))
+* **journey:** EdgeOutcome::VerdictUnknown for an action whose own verdict was not stated ([f0302fa](https://github.com/qontinui/qontinui-schemas/commit/f0302fa0df2de2dae9f6366c38587dcebbee1c37))
+
+
+### Bug Fixes
+
+* name the escalate-review lane in merge_shepherd; tighten missing-field test ([ee717e3](https://github.com/qontinui/qontinui-schemas/commit/ee717e3baa2ed63ab732bc2fb91bad58e7d0bb4d))
+* **types:** satisfy clippy needless_bool on Rust 1.100 in JourneyFilter::keeps ([a334b16](https://github.com/qontinui/qontinui-schemas/commit/a334b16ffb2c5744abe0c9b3a7131e6d23036f12))
+
 ## [6.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.1.0...rust-v6.2.0) (2026-11-10)
 
 
