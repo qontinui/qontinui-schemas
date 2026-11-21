@@ -59,7 +59,8 @@ pub fn run(frame: &Frame, snapshot: &ElementSnapshot) -> AnalyzerResult {
         // `declared` distinguishes the two contrast regimes:
         //   - declared == true  → both fg_color AND bg_color came from the
         //     snapshot's computed style. Trustworthy → full WCAG AA gating
-        //     (Critical < 3.0, Warning < 4.5) and counts toward density.
+        //     against the text's scale (4.5:1 normal, 3:1 large; Critical
+        //     < 3.0, Warning below the minimum) and counts toward density.
         //   - declared == false → at least one color was missing, so we
         //     sampled the rendered pixels under the bbox via a two-mode
         //     histogram. For sparse-text elements both modes collapse to
