@@ -655,8 +655,7 @@ class CanonicalStep3(BaseModel):
         int | None, Field(description='Timeout in milliseconds.', ge=0)
     ] = None
     uiBridgeSnapshotTarget: Annotated[
-        str | None,
-        Field(description='Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.'),
+        str | None, Field(description='Snapshot target — `"control"` or `"sdk"`.')
     ] = None
     url: Annotated[
         str | None, Field(description='Navigation URL (for `navigate`).')
@@ -1113,8 +1112,7 @@ class UiBridgeStep(BaseModel):
         int | None, Field(description='Timeout in milliseconds.', ge=0)
     ] = None
     uiBridgeSnapshotTarget: Annotated[
-        str | None,
-        Field(description='Snapshot target — `"control"`, `"sdk"`, or `"proxy:PORT"`.'),
+        str | None, Field(description='Snapshot target — `"control"` or `"sdk"`.')
     ] = None
     url: Annotated[
         str | None, Field(description='Navigation URL (for `navigate`).')
