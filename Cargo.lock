@@ -1685,6 +1685,7 @@ dependencies = [
  "html-escape",
  "jsonschema",
  "regex",
+ "ryu-js",
  "schemars",
  "serde",
  "serde_jcs",
