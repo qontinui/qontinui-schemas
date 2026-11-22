@@ -29,8 +29,9 @@
 //! ([`crate::run_outcomes::is_valid_run_outcome_label`]), so every
 //! declaration this parser accepts is a row coord's result door can write.
 //! A measurement `name` is a slug — the metric-name grammar
-//! ([`crate::run_outcomes::is_valid_metric_name`], `[A-Za-z0-9_.:-]`) — since
-//! it is a dispatch key, part of a UUIDv5 input and a URL/MCP argument.
+//! ([`crate::run_outcomes::is_valid_metric_name`], `[A-Za-z0-9_.:-]`), and not
+//! made only of dots — since it is a dispatch key, part of a UUIDv5 input and
+//! a URL/MCP argument, where `.` or `..` would read as a path segment.
 //!
 //! [`parse_measurements`] is the ONLY entry point for repository text. The
 //! types derive `Deserialize` so a stored snapshot can be read back, but
@@ -147,7 +148,7 @@ pub enum MeasurementDeclError {
     },
     #[error(
         "{MEASUREMENTS_FILE_PATH} entry {index}: `name` must be 1..={RUN_OUTCOME_METRIC_NAME_MAX_BYTES} \
-         bytes of [A-Za-z0-9_.:-]"
+         bytes of [A-Za-z0-9_.:-], not only dots"
     )]
     InvalidName { index: usize },
     #[error("{MEASUREMENTS_FILE_PATH} entry {index} repeats the measurement name `{name}`")]
@@ -182,7 +183,7 @@ pub fn parse_measurements(text: &str) -> Result<MeasurementsFile, MeasurementDec
 
     let mut names = BTreeSet::new();
     for (index, m) in file.measurements.iter().enumerate() {
-        if !is_valid_metric_name(&m.name) {
+        if !is_valid_metric_name(&m.name) || m.name.bytes().all(|b| b == b'.') {
             return Err(MeasurementDeclError::InvalidName { index });
         }
         for (field, value) in [
@@ -364,6 +365,8 @@ task = "smoke"
     #[test]
     fn a_name_must_be_a_slug() {
         assert!(parse_measurements(&entry("unit-suite.v1:x_Y9", "")).is_ok());
+        // Dots are fine beside other characters; only an all-dot name is refused.
+        assert!(parse_measurements(&entry(".a", "")).is_ok());
         let at_limit = "n".repeat(RUN_OUTCOME_METRIC_NAME_MAX_BYTES);
         assert!(parse_measurements(&entry(&at_limit, "")).is_ok());
         let over = "n".repeat(RUN_OUTCOME_METRIC_NAME_MAX_BYTES + 1);
@@ -372,6 +375,9 @@ task = "smoke"
             "unit suite",
             "ünit",
             "a/b",
+            ".",
+            "..",
+            "...",
             " a",
             "a\\u0007",
             over.as_str(),
@@ -412,6 +418,14 @@ task = "smoke"
 
     #[test]
     fn size_and_count_caps() {
+        // Exactly the entry cap is accepted.
+        let at_cap: String = (0..MEASUREMENTS_MAX_ENTRIES)
+            .map(|i| entry(&format!("m{i}"), ""))
+            .collect();
+        assert_eq!(
+            parse_measurements(&at_cap).unwrap().measurements.len(),
+            MEASUREMENTS_MAX_ENTRIES
+        );
         let many: String = (0..=MEASUREMENTS_MAX_ENTRIES)
             .map(|i| entry(&format!("m{i}"), ""))
             .collect();
