@@ -4,22 +4,38 @@
 //! `tests/fixtures/ledger_envelope.v<N>.schema.json` is the schema
 //! `schemars` emits for [`LedgerEnvelope`] at `ENVELOPE_SCHEMA_VERSION = N`.
 //! This test regenerates it and fails on any STRUCTURAL difference — the
-//! comparison strips every `description` and `title` key, so a doc-comment
-//! edit or a `schemars` upgrade that only rewords cannot force a meaningless
-//! version bump, while a changed field, type, enum token or `required` entry
-//! cannot merge without one. Plan
+//! comparison strips the `description` and `title` schema KEYWORDS (never a
+//! property or definition of that name) and sorts `required`, so a
+//! doc-comment edit or a `schemars` upgrade that only rewords or reorders
+//! cannot force a meaningless version bump, while a changed field, type,
+//! pattern, enum token or `required` entry cannot merge without one. Each
+//! frozen file's structural digest is pinned in [`FROZEN_DIGESTS`], so a
+//! frozen file edited in place fails too. Plan
 //! `2026-11-22-phase1-envelope-frozen-and-measurement-dispatch-proven`
 //! Phase 1.
 //!
-//! To change the envelope: bump `ENVELOPE_SCHEMA_VERSION`, then run this test
-//! with `LEDGER_ENVELOPE_BLESS=1`, which writes the NEW version's file only
-//! when it does not exist yet. It never overwrites a file, and every earlier
-//! version's file must stay.
+//! The schema is also the validator non-Rust writers use, so
+//! [`the_schema_and_validate_agree_on_the_corpus`] runs one corpus through a
+//! JSON Schema validator (formats asserted) and through
+//! `qontinui_types::ledger::validate`, and fails if they disagree.
+//!
+//! To change the envelope: bump `ENVELOPE_SCHEMA_VERSION`, run this test with
+//! `LEDGER_ENVELOPE_BLESS=1` (it writes the NEW version's file only when it
+//! does not exist yet, never overwriting one), then add the new file's digest
+//! — printed by the failing pin test — to [`FROZEN_DIGESTS`]. Every earlier
+//! version's file and digest stay.
 
 use std::path::PathBuf;
 
-use qontinui_types::ledger::{LedgerEnvelope, ENVELOPE_SCHEMA_VERSION};
-use serde_json::{json, Value};
+use qontinui_types::canonical_hash::canonical_hash;
+use qontinui_types::ledger::{validate, LedgerEnvelope, ENVELOPE_SCHEMA_VERSION};
+use serde_json::{json, Map, Value};
+
+/// `canonical_hash(structural(file))` of every frozen version, oldest first.
+const FROZEN_DIGESTS: &[(u32, &str)] = &[(
+    1,
+    "sha256-2fbfae6936ec09cbddeb907bb7964b529b6d30331d2c045e03454743caf9f3f6",
+)];
 
 fn fixture(version: u32) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -31,20 +47,81 @@ fn emitted() -> Value {
     serde_json::to_value(schemars::schema_for!(LedgerEnvelope)).unwrap()
 }
 
-/// The schema with every `description` / `title` key removed, recursively.
-/// `serde_json::Value` equality is key-order independent, so this is the
-/// canonical structural form.
-fn structural(value: &Value) -> Value {
-    match value {
-        Value::Object(map) => Value::Object(
-            map.iter()
-                .filter(|(k, _)| k.as_str() != "description" && k.as_str() != "title")
-                .map(|(k, v)| (k.clone(), structural(v)))
-                .collect(),
-        ),
-        Value::Array(items) => Value::Array(items.iter().map(structural).collect()),
-        other => other.clone(),
+/// Keywords whose value is a map from NAMES to subschemas.
+const NAMED_SUBSCHEMAS: &[&str] = &[
+    "properties",
+    "patternProperties",
+    "$defs",
+    "definitions",
+    "dependentSchemas",
+];
+/// Keywords whose value is one subschema.
+const ONE_SUBSCHEMA: &[&str] = &[
+    "items",
+    "additionalItems",
+    "additionalProperties",
+    "unevaluatedItems",
+    "unevaluatedProperties",
+    "contains",
+    "propertyNames",
+    "not",
+    "if",
+    "then",
+    "else",
+];
+/// Keywords whose value is an array of subschemas.
+const SUBSCHEMA_ARRAYS: &[&str] = &["allOf", "anyOf", "oneOf", "prefixItems"];
+
+/// The canonical structural form of a SCHEMA: `description` / `title`
+/// removed only where they are keywords of a schema object, `required`
+/// sorted, and every other value (`const`, `enum`, `default`, property and
+/// definition names) kept verbatim. `serde_json::Value` equality is
+/// key-order independent.
+fn structural(schema: &Value) -> Value {
+    let Value::Object(map) = schema else {
+        return schema.clone(); // `true` / `false` schemas
+    };
+    let mut out = Map::new();
+    for (key, value) in map {
+        let k = key.as_str();
+        let kept = if k == "description" || k == "title" {
+            continue;
+        } else if NAMED_SUBSCHEMAS.contains(&k) {
+            match value {
+                Value::Object(named) => Value::Object(
+                    named
+                        .iter()
+                        .map(|(name, sub)| (name.clone(), structural(sub)))
+                        .collect(),
+                ),
+                other => other.clone(),
+            }
+        } else if ONE_SUBSCHEMA.contains(&k) {
+            structural(value)
+        } else if SUBSCHEMA_ARRAYS.contains(&k) {
+            match value {
+                Value::Array(items) => Value::Array(items.iter().map(structural).collect()),
+                other => other.clone(),
+            }
+        } else if k == "required" {
+            match value {
+                Value::Array(names) => {
+                    let mut names = names.clone();
+                    names.sort_by_key(|n| n.to_string());
+                    Value::Array(names)
+                }
+                other => other.clone(),
+            }
+        } else {
+            value.clone()
+        };
+        out.insert(key.clone(), kept);
     }
+    Value::Object(out)
+}
+
+fn structural_digest(schema: &Value) -> String {
+    canonical_hash(&structural(schema)).unwrap()
 }
 
 /// `Ok` when `emitted` is structurally the frozen `golden`; otherwise the
@@ -63,6 +140,19 @@ fn golden_verdict(emitted: &Value, golden: &Value, version: u32) -> Result<(), S
     ))
 }
 
+fn read_schema(version: u32) -> Value {
+    let path = fixture(version);
+    let bytes = std::fs::read(&path).unwrap_or_else(|e| {
+        panic!(
+            "{} is missing ({e}). Every version up to ENVELOPE_SCHEMA_VERSION = \
+             {ENVELOPE_SCHEMA_VERSION} needs its golden file: run this test once with \
+             LEDGER_ENVELOPE_BLESS=1 and commit the file",
+            path.display()
+        )
+    });
+    serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{} is not JSON: {e}", path.display()))
+}
+
 /// The frozen schema of the current version. With `LEDGER_ENVELOPE_BLESS`
 /// set it first writes the file — only when it does not exist yet.
 fn golden() -> Value {
@@ -71,18 +161,14 @@ fn golden() -> Value {
         let mut text = serde_json::to_string_pretty(&emitted()).unwrap();
         text.push('\n');
         // Write-then-rename so a parallel test never reads a half-written file.
-        let tmp = path.with_extension(format!("tmp.{}", std::process::id()));
+        // One temp file per thread: tests bless concurrently.
+        let thread = format!("{:?}", std::thread::current().id());
+        let thread: String = thread.chars().filter(char::is_ascii_digit).collect();
+        let tmp = path.with_extension(format!("tmp.{}.{thread}", std::process::id()));
         std::fs::write(&tmp, text).unwrap();
         std::fs::rename(&tmp, &path).unwrap();
     }
-    let bytes = std::fs::read(&path).unwrap_or_else(|e| {
-        panic!(
-            "{} is missing ({e}). ENVELOPE_SCHEMA_VERSION = {ENVELOPE_SCHEMA_VERSION} needs its \
-             golden file: run this test once with LEDGER_ENVELOPE_BLESS=1 and commit the file",
-            path.display()
-        )
-    });
-    serde_json::from_slice(&bytes).expect("golden schema is JSON")
+    read_schema(ENVELOPE_SCHEMA_VERSION)
 }
 
 #[test]
@@ -93,16 +179,30 @@ fn emitted_schema_matches_the_frozen_golden_file() {
 }
 
 #[test]
-fn every_earlier_version_file_is_kept() {
-    for version in 1..=ENVELOPE_SCHEMA_VERSION {
-        let path = fixture(version);
-        let parsed: Value = serde_json::from_slice(
-            &std::fs::read(&path)
-                .unwrap_or_else(|e| panic!("frozen {} must be kept: {e}", path.display())),
-        )
-        .unwrap_or_else(|e| panic!("{} is not JSON: {e}", path.display()));
-        assert!(parsed.is_object(), "{} is not a schema", path.display());
+fn every_frozen_file_is_kept_and_matches_its_pinned_digest() {
+    golden(); // bless first, if asked, so the current file exists
+    let pinned: Vec<u32> = FROZEN_DIGESTS.iter().map(|(v, _)| *v).collect();
+    let expected: Vec<u32> = (1..=ENVELOPE_SCHEMA_VERSION).collect();
+    let mut problems = Vec::new();
+    if pinned != expected {
+        problems.push(format!(
+            "FROZEN_DIGESTS pins versions {pinned:?}; it must pin exactly {expected:?}"
+        ));
     }
+    for version in 1..=ENVELOPE_SCHEMA_VERSION {
+        let actual = structural_digest(&read_schema(version));
+        match FROZEN_DIGESTS.iter().find(|(v, _)| *v == version) {
+            Some((_, pin)) if *pin == actual => {}
+            Some((_, pin)) => problems.push(format!(
+                "ledger_envelope.v{version}.schema.json was edited in place: structural digest \
+                 {actual}, pinned {pin}. A frozen version is never edited"
+            )),
+            None => problems.push(format!(
+                "v{version} has no pinned digest; add ({version}, \"{actual}\") to FROZEN_DIGESTS"
+            )),
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
 #[test]
@@ -110,13 +210,15 @@ fn a_structural_mutation_is_caught_and_a_reworded_description_is_not() {
     let golden = golden();
     golden_verdict(&golden, &golden, ENVELOPE_SCHEMA_VERSION).expect("identical");
 
-    // Reworded docs and titles only: not a version change.
+    // Reworded docs and titles, and a reordered `required`: not a change.
     let mut reworded = golden.clone();
     reworded["description"] = json!("reworded");
     reworded["title"] = json!("Renamed");
     reworded["properties"]["id"]["description"] = json!("reworded too");
+    reworded["required"].as_array_mut().unwrap().reverse();
     golden_verdict(&reworded, &golden, ENVELOPE_SCHEMA_VERSION)
-        .expect("description/title edits are not structural");
+        .expect("description/title edits and required order are not structural");
+    assert_eq!(structural_digest(&reworded), structural_digest(&golden));
 
     // Each of these is a change in meaning and must fail.
     type Mutation = Box<dyn Fn(&mut Value)>;
@@ -138,6 +240,12 @@ fn a_structural_mutation_is_caught_and_a_reworded_description_is_not() {
             "a changed type",
             Box::new(|s| {
                 s["properties"]["source_seq"]["type"] = json!("string");
+            }),
+        ),
+        (
+            "a relaxed pattern",
+            Box::new(|s| {
+                s["properties"]["id"]["pattern"] = json!("^.*$");
             }),
         ),
         (
@@ -165,7 +273,43 @@ fn a_structural_mutation_is_caught_and_a_reworded_description_is_not() {
             golden_verdict(&mutated, &golden, ENVELOPE_SCHEMA_VERSION).is_err(),
             "mutation `{name}` was not caught"
         );
+        assert_ne!(
+            structural_digest(&mutated),
+            structural_digest(&golden),
+            "mutation `{name}` kept the digest"
+        );
     }
+}
+
+#[test]
+fn structural_strips_doc_keywords_but_never_a_field_named_like_one() {
+    let schema = json!({
+        "title": "T",
+        "description": "D",
+        "type": "object",
+        "properties": {
+            "description": {"type": "string", "description": "the field's doc"},
+            "title": {"type": "integer"}
+        },
+        "required": ["title", "description"],
+        "$defs": {"title": {"const": {"description": "a value, not a keyword"}}}
+    });
+    let s = structural(&schema);
+    assert!(s.get("title").is_none() && s.get("description").is_none());
+    assert_eq!(s["properties"]["description"], json!({"type": "string"}));
+    assert_eq!(s["properties"]["title"], json!({"type": "integer"}));
+    assert_eq!(s["required"], json!(["description", "title"]));
+    assert_eq!(
+        s["$defs"]["title"]["const"],
+        json!({"description": "a value, not a keyword"})
+    );
+    // Dropping the `description` FIELD is structural.
+    let mut without = schema.clone();
+    without["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("description");
+    assert_ne!(structural(&without), s);
 }
 
 #[test]
@@ -210,5 +354,252 @@ fn the_frozen_schema_requires_every_envelope_field_and_refuses_unknown_ones() {
     assert!(
         part.contains("\"null\""),
         "PrincipalPart.value must admit null: {part}"
+    );
+}
+
+// ============================================================================
+// Schema / validate() agreement
+// ============================================================================
+
+const V7: &str = "019a8f2e-7c3b-7d4e-8a1b-2c3d4e5f6a7b";
+
+fn sample() -> Value {
+    let part = |value: Value, grade: &str| json!({"value": value, "attribution_grade": grade});
+    json!({
+        "id": V7,
+        "source": "coord.process_log",
+        "source_seq": 42,
+        "occurred_at": "2026-11-22T10:00:00Z",
+        "recorded_at": "2026-11-22T10:00:01.250+00:00",
+        "time_basis": "event",
+        "activity": "worktree.allocate",
+        "objects": [
+            {"object_type": "worktree", "object_id": "wt-1", "qualifier": "allocated"}
+        ],
+        "principal": {
+            "session": part(json!("s-1"), "observed"),
+            "agent": part(Value::Null, "declared"),
+            "device": part(json!("d-1"), "corroborated"),
+            "tenant": part(json!("t-1"), "gate_grade"),
+        },
+        "evidence_grade": "observed",
+        "source_class": "coord_observed",
+        "world": {"id": "prod", "kind": "prod"},
+        "correlation_id": "corr-1",
+        "causation_id": null,
+        "assignment": {
+            "unit": "session:s-1",
+            "arm": "treatment",
+            "probability": 0.5,
+            "covariates": {"device_class": "linux"},
+            "policy_version": "premise-notice@1",
+            "assignment_seed_id": "seed-2026-11-22"
+        },
+        "policy_version": null,
+        "schema_version": 1,
+        "prev_hash": null,
+        "payload": {"kind": "inline", "value": {"note": "hi"}}
+    })
+}
+
+/// `sample()` with one JSON pointer replaced (`None` removes the key).
+fn with(pointer: &str, value: Option<Value>) -> Value {
+    let mut v = sample();
+    match value {
+        Some(value) => match v.pointer_mut(pointer) {
+            Some(slot) => *slot = value,
+            None => {
+                // A new key (an unknown field).
+                let (parent, key) = pointer.rsplit_once('/').unwrap();
+                v.pointer_mut(parent)
+                    .and_then(Value::as_object_mut)
+                    .unwrap_or_else(|| panic!("{pointer}"))
+                    .insert(key.to_owned(), value);
+            }
+        },
+        None => {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            v.pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
+        }
+    }
+    v
+}
+
+fn corpus() -> Vec<(String, Value)> {
+    let mut c: Vec<(String, Value)> = vec![("sample".into(), sample())];
+    let mut set = |pointer: &str, value: Value| {
+        c.push((format!("{pointer} = {value}"), with(pointer, Some(value))));
+    };
+    // ids
+    for id in [
+        V7,
+        "019a8f2e-7c3b-4d4e-8a1b-2c3d4e5f6a7b",
+        "019a8f2e-7c3b-1d4e-8a1b-2c3d4e5f6a7b",
+        "019a8f2e7c3b7d4e8a1b2c3d4e5f6a7b",
+        "019a8f2e-7c3b-7d4e-ca1b-2c3d4e5f6a7b",
+        "019A8F2E-7C3B-7D4E-8A1B-2C3D4E5F6A7B",
+        "019a8f2e-7c3b-7d4e-8a1b-2c3d4e5f6a7B",
+        "not-a-uuid",
+        "",
+    ] {
+        set("/id", json!(id));
+    }
+    // timestamps
+    for t in [
+        "2026-11-22T10:00:00Z",
+        "2026-11-22T10:00:00.123456789Z",
+        "2026-11-22T10:00:00+05:30",
+        "2026-11-22T10:00:00-23:59",
+        "2024-02-29T23:59:59Z",
+        "2026-11-22 10:00:00",
+        "2026-11-22T10:00:00",
+        "yesterday",
+        "2026-11-22 10:00:00Z",
+        "2026-11-22t10:00:00z",
+        "2026-11-22T10:00:00z",
+        "2026-11-22T10:00:60Z",
+        "2026-02-30T10:00:00Z",
+        "2026-13-01T10:00:00Z",
+        "2026-11-22T24:00:00Z",
+        "2026-11-22T10:00:00.Z",
+        "2026-11-22T10:00:00+24:00",
+        "2026-11-22T10:00:00+0530",
+    ] {
+        set("/occurred_at", json!(t));
+        set("/recorded_at", json!(t));
+    }
+    // activity
+    for a in [
+        "worktree.allocate",
+        "train.occupancy_hourly",
+        "ci.run2",
+        "allocate",
+        "worktree.",
+        ".allocate",
+        "Worktree.allocate",
+        "worktree.allocate.extra",
+        "work-tree.allocate",
+        "1ci.run",
+        "ci. run",
+    ] {
+        set("/activity", json!(a));
+    }
+    // probability
+    for p in [0.0, -0.1, 1e-9, 0.5, 1.0, 1.000_001, 2.0] {
+        set("/assignment/probability", json!(p));
+    }
+    set("/assignment", Value::Null);
+    // schema version
+    set("/schema_version", json!(2));
+    set("/schema_version", json!(0));
+    // hashes
+    let good_hash = format!("sha256-{}", "a".repeat(64));
+    for h in [
+        good_hash.clone(),
+        "abc".into(),
+        format!("sha256-{}", "A".repeat(64)),
+        format!("sha256-{}", "a".repeat(63)),
+    ] {
+        set("/prev_hash", json!(h));
+        set(
+            "/payload",
+            json!({"kind": "erasable", "salted_hash": h, "store": "rack-pg.payloads"}),
+        );
+    }
+    set(
+        "/payload",
+        json!({"kind": "erasable", "salted_hash": good_hash, "store": " s"}),
+    );
+    // labels, at every label site
+    for site in [
+        "/source",
+        "/objects/0/object_type",
+        "/objects/0/object_id",
+        "/objects/0/qualifier",
+        "/principal/session/value",
+        "/world/id",
+        "/correlation_id",
+        "/causation_id",
+        "/policy_version",
+        "/assignment/unit",
+        "/assignment/arm",
+        "/assignment/policy_version",
+        "/assignment/assignment_seed_id",
+    ] {
+        for label in [
+            "ok",
+            "a b",
+            "a\u{FEFF}b",
+            "",
+            " x",
+            "x ",
+            "\u{FEFF}x",
+            "x\u{3000}",
+            "x\u{a0}",
+            "a\nb",
+            "a\u{85}b",
+            "a\u{7f}b",
+        ] {
+            set(site, json!(label));
+        }
+    }
+    // closed enums
+    set("/evidence_grade", json!("gate-grade"));
+    set("/source_class", json!("coordObserved"));
+    set("/time_basis", json!("wallclock"));
+    set("/world/kind", json!("staging"));
+    // unknown fields and a missing required key
+    set("/extra", json!(1));
+    set("/principal/agent/extra", json!(1));
+    set("/objects/0/extra", json!(1));
+    set("/payload/extra", json!(1));
+    c.push(("assignment removed".into(), with("/assignment", None)));
+    c.push(("prev_hash removed".into(), with("/prev_hash", None)));
+    c.push((
+        "principal.agent.value removed".into(),
+        with("/principal/agent/value", None),
+    ));
+    c
+}
+
+fn rust_accepts(v: &Value) -> bool {
+    serde_json::from_value::<LedgerEnvelope>(v.clone())
+        .map(|e| validate(&e).is_ok())
+        .unwrap_or(false)
+}
+
+#[test]
+fn the_schema_and_validate_agree_on_the_corpus() {
+    let schema = golden();
+    let validator = jsonschema::options()
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("the frozen schema compiles");
+    let corpus = corpus();
+    let mut accepted = 0;
+    let mut disagreements = Vec::new();
+    for (name, instance) in &corpus {
+        let by_schema = validator.is_valid(instance);
+        let by_rust = rust_accepts(instance);
+        if by_schema != by_rust {
+            disagreements.push(format!("{name}: schema={by_schema} validate={by_rust}"));
+        }
+        accepted += usize::from(by_rust);
+    }
+    assert!(
+        disagreements.is_empty(),
+        "the frozen schema and validate() disagree:\n{}",
+        disagreements.join("\n")
+    );
+    // Guard against a vacuous corpus: both outcomes must be exercised.
+    assert!(rust_accepts(&sample()));
+    assert!(
+        accepted > 20 && accepted < corpus.len() - 50,
+        "accepted {accepted}/{}",
+        corpus.len()
     );
 }
