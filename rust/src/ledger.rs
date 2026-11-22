@@ -32,7 +32,12 @@
 //! spelling of each pattern. The golden test validates a shared corpus with a
 //! JSON Schema validator and with [`validate`] and fails if they disagree.
 //! What only `format: date-time` carries (a day that exists in its month) is
-//! enforced by a validator that asserts formats.
+//! enforced only by a validator that ASSERTS formats — JSON Schema treats
+//! `format` as an annotation by default. A Python writer must therefore
+//! validate with format checking on (`jsonschema`'s `FormatChecker`, with
+//! `rfc3339-validator` installed so `date-time` is actually checked);
+//! without it `2026-02-30T10:00:00Z` passes the schema and fails here. The
+//! golden test pins exactly that gap with a formats-off validator.
 //!
 //! **Integers are emitted as JSON integers.** JSON Schema's `type: integer`
 //! admits an integer-valued float (`1.0`), and no keyword can refuse it, so
@@ -91,6 +96,13 @@ use crate::cloud_twin::WorldKind;
 /// requires a new `tests/fixtures/ledger_envelope.v<N>.schema.json`; the old
 /// file is kept.
 pub const ENVELOPE_SCHEMA_VERSION: u32 = 1;
+
+/// The largest integer every JSON implementation round-trips exactly
+/// (2^53 - 1, ECMAScript's `Number.MAX_SAFE_INTEGER`). Every integer in an
+/// envelope — `source_seq` and any integer inside `covariates` or an inline
+/// payload — lies within `±MAX_SAFE_INTEGER`, so the canonical form
+/// [`chain_hash`] hashes is the same RFC 8785 text in any language.
+pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 /// The activity namespaces D8 names for the substrate's own writers. The
 /// process log's coord-owned namespaces are valid too, so [`validate`] checks
@@ -245,7 +257,9 @@ pub struct Assignment {
     /// The logged probability of this arm for this unit, in `(0, 1]`.
     #[schemars(extend("exclusiveMinimum" = 0, "maximum" = 1))]
     pub probability: f64,
-    /// The covariates recorded at assignment time.
+    /// The covariates recorded at assignment time. Every integer inside is
+    /// within `±MAX_SAFE_INTEGER`.
+    #[schemars(with = "BTreeMap<String, SafeJson>")]
     pub covariates: BTreeMap<String, Value>,
     /// The version of the policy that made the assignment.
     #[schemars(extend("minLength" = 1, "pattern" = LABEL_PATTERN))]
@@ -262,6 +276,8 @@ pub struct Assignment {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Payload {
     Inline {
+        /// Any JSON; every integer inside is within `±MAX_SAFE_INTEGER`.
+        #[schemars(with = "SafeJson")]
         value: Value,
     },
     Erasable {
@@ -290,8 +306,8 @@ pub struct LedgerEnvelope {
     #[schemars(extend("minLength" = 1, "pattern" = LABEL_PATTERN))]
     pub source: String,
     /// The writer's own monotone sequence number (idempotent replay key with
-    /// `source`).
-    #[schemars(extend("maximum" = u64::MAX))]
+    /// `source`). At most [`MAX_SAFE_INTEGER`].
+    #[schemars(extend("maximum" = MAX_SAFE_INTEGER))]
     pub source_seq: u64,
     /// RFC 3339; what it measures is `time_basis`.
     #[schemars(extend("format" = "date-time", "pattern" = TIMESTAMP_PATTERN))]
@@ -370,6 +386,30 @@ impl<T: JsonSchema> JsonSchema for Nullable<T> {
     }
 }
 
+/// Schema-only stand-in for arbitrary JSON whose integers are all within
+/// `±MAX_SAFE_INTEGER` — the schema half of [`validate`]'s number walk. An
+/// integer here is any integer-VALUED number (`1e300` included), JSON
+/// Schema's meaning of `type: integer`.
+struct SafeJson;
+
+impl JsonSchema for SafeJson {
+    fn schema_name() -> Cow<'static, str> {
+        "SafeJson".into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        let max = MAX_SAFE_INTEGER;
+        let min = -(MAX_SAFE_INTEGER as i64);
+        schemars::json_schema!({
+            "description": "Any JSON value whose integers all lie within ±(2^53 - 1).",
+            "if": {"type": "integer"},
+            "then": {"minimum": min, "maximum": max},
+            "items": generator.subschema_for::<SafeJson>(),
+            "additionalProperties": generator.subschema_for::<SafeJson>(),
+        })
+    }
+}
+
 // ============================================================================
 // Validation
 // ============================================================================
@@ -391,6 +431,8 @@ pub enum EnvelopeRejection {
     BlankLabel(&'static str),
     #[error("{field} {value:?} is not `sha256-<64 lowercase hex>`")]
     Hash { field: &'static str, value: String },
+    #[error("{field} holds {value}, outside ±{MAX_SAFE_INTEGER} or not finite")]
+    UnsafeNumber { field: &'static str, value: String },
 }
 
 /// Check the rules the type system cannot: a UUIDv7 id, RFC 3339 times, the
@@ -410,6 +452,12 @@ pub fn validate(envelope: &LedgerEnvelope) -> Result<(), EnvelopeRejection> {
         return Err(EnvelopeRejection::IdNotUuidV7(envelope.id.clone()));
     }
     check_label("source", &envelope.source)?;
+    if envelope.source_seq > MAX_SAFE_INTEGER {
+        return Err(EnvelopeRejection::UnsafeNumber {
+            field: "source_seq",
+            value: envelope.source_seq.to_string(),
+        });
+    }
     check_timestamp("occurred_at", &envelope.occurred_at)?;
     check_timestamp("recorded_at", &envelope.recorded_at)?;
     if !is_valid_activity(&envelope.activity) {
@@ -448,6 +496,9 @@ pub fn validate(envelope: &LedgerEnvelope) -> Result<(), EnvelopeRejection> {
             "assignment.assignment_seed_id",
             &assignment.assignment_seed_id,
         )?;
+        for value in assignment.covariates.values() {
+            check_numbers("assignment.covariates", value)?;
+        }
         // `!(p > 0.0)` also refuses NaN.
         let p = assignment.probability;
         if !(p > 0.0 && p <= 1.0) {
@@ -458,7 +509,7 @@ pub fn validate(envelope: &LedgerEnvelope) -> Result<(), EnvelopeRejection> {
         check_hash("prev_hash", prev)?;
     }
     match &envelope.payload {
-        Payload::Inline { .. } => {}
+        Payload::Inline { value } => check_numbers("payload.value", value)?,
         Payload::Erasable { salted_hash, store } => {
             check_hash("payload.salted_hash", salted_hash)?;
             check_label("payload.store", store)?;
@@ -572,6 +623,34 @@ fn check_timestamp(field: &'static str, value: &str) -> Result<(), EnvelopeRejec
         .map_err(|_| reject())
 }
 
+/// Walk `value`: every number must be finite, and every integer-valued one
+/// within `±MAX_SAFE_INTEGER` (the `SafeJson` schema).
+fn check_numbers(field: &'static str, value: &Value) -> Result<(), EnvelopeRejection> {
+    match value {
+        Value::Number(n) => {
+            let safe = if let Some(u) = n.as_u64() {
+                u <= MAX_SAFE_INTEGER
+            } else if let Some(i) = n.as_i64() {
+                i.unsigned_abs() <= MAX_SAFE_INTEGER
+            } else {
+                let f = n.as_f64().unwrap_or(f64::NAN);
+                f.is_finite() && (f.fract() != 0.0 || f.abs() <= MAX_SAFE_INTEGER as f64)
+            };
+            if safe {
+                Ok(())
+            } else {
+                Err(EnvelopeRejection::UnsafeNumber {
+                    field,
+                    value: n.to_string(),
+                })
+            }
+        }
+        Value::Array(items) => items.iter().try_for_each(|v| check_numbers(field, v)),
+        Value::Object(map) => map.values().try_for_each(|v| check_numbers(field, v)),
+        Value::Null | Value::Bool(_) | Value::String(_) => Ok(()),
+    }
+}
+
 /// [`HASH_PATTERN`].
 fn check_hash(field: &'static str, value: &str) -> Result<(), EnvelopeRejection> {
     let ok = value.strip_prefix("sha256-").is_some_and(|hex| {
@@ -608,9 +687,17 @@ pub enum ChainHashError {
     Canonical(#[from] CanonicalHashError),
 }
 
-/// The hash a chain's NEXT event stores as its `prev_hash`: the crate's
-/// [`canonical_hash`] (RFC 8785 → SHA-256, `sha256-<hex>`) of
-/// `{"prev_hash": prev, "envelope": envelope}`.
+/// The hash a chain's NEXT event stores as its `prev_hash`: `"sha256-"` +
+/// lower-case hex SHA-256 of the RFC 8785 (JCS) canonical UTF-8 text of
+/// `{"envelope": <the envelope as serialized>, "prev_hash": prev}`, via the
+/// crate's [`canonical_hash`].
+///
+/// That text is genuine RFC 8785 — reproducible by any JCS implementation —
+/// because [`validate`] (run first) keeps every integer within
+/// `±MAX_SAFE_INTEGER` and every number finite; `serde_jcs` writes integers
+/// as their digits and other numbers by the ECMAScript algorithm. The
+/// known-answer vectors in the tests and the Python cross-check in
+/// `tests/ledger_envelope_golden.rs` pin it.
 ///
 /// The envelope must [`validate`]. `prev` is the previous event's chain hash
 /// (`None` for a chain's first event), and the envelope's own `prev_hash`
@@ -981,6 +1068,62 @@ mod tests {
                 chain_hash(None, &bad),
                 Err(ChainHashError::Invalid(EnvelopeRejection::Probability(_)))
             ));
+        }
+    }
+
+    /// Known answers, computed independently (Python `json.dumps` with
+    /// sorted keys and compact separators, which is RFC 8785 for this
+    /// all-ASCII, small-number input, then SHA-256). Any change to the
+    /// `Link` layout, a field name or the canonical output fails here.
+    #[test]
+    fn chain_hash_known_answer_vectors() {
+        const H1: &str = "sha256-e7187917ecb17d90fb1b5e772a99692dcf43835abc2a9775e8affe1d534bf9ff";
+        const H2: &str = "sha256-6f4f2406a66739330e9d7d2ce6ed62301c58bc9680eedbf809e056f522fd07e0";
+        let first = parse(sample()).unwrap();
+        assert_eq!(chain_hash(None, &first).unwrap(), H1);
+        let mut second = first;
+        second.source_seq = 43;
+        second.prev_hash = Some(H1.to_owned());
+        assert_eq!(chain_hash(Some(H1), &second).unwrap(), H2);
+    }
+
+    #[test]
+    fn integers_stay_within_max_safe_integer_everywhere() {
+        let mut v = sample();
+        v["source_seq"] = json!(MAX_SAFE_INTEGER);
+        validate(&parse(v).unwrap()).unwrap();
+        let mut v = sample();
+        v["source_seq"] = json!(MAX_SAFE_INTEGER + 1);
+        assert!(matches!(
+            validate(&parse(v).unwrap()),
+            Err(EnvelopeRejection::UnsafeNumber {
+                field: "source_seq",
+                ..
+            })
+        ));
+        let max = MAX_SAFE_INTEGER as i64;
+        for (pointer, ok, bad) in [
+            ("/assignment/covariates/n", json!(max), json!(max + 1)),
+            ("/assignment/covariates/n", json!(-max), json!(-max - 1)),
+            (
+                "/assignment/covariates/n",
+                json!(1.5e300 / 1e290),
+                json!(1e300),
+            ),
+            (
+                "/payload/value",
+                json!([1, {"a": max}]),
+                json!([1, {"a": u64::MAX}]),
+            ),
+            ("/payload/value", json!({"x": 0.1}), json!({"x": [-1e16]})),
+        ] {
+            for (value, good) in [(ok, true), (bad, false)] {
+                let mut v = sample();
+                let (parent, key) = pointer.rsplit_once('/').unwrap();
+                v.pointer_mut(parent).unwrap()[key] = value.clone();
+                let verdict = validate(&parse(v).unwrap());
+                assert_eq!(verdict.is_ok(), good, "{pointer} = {value}: {verdict:?}");
+            }
         }
     }
 

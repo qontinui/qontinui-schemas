@@ -28,13 +28,15 @@
 use std::path::PathBuf;
 
 use qontinui_types::canonical_hash::canonical_hash;
-use qontinui_types::ledger::{validate, LedgerEnvelope, ENVELOPE_SCHEMA_VERSION};
+use qontinui_types::ledger::{
+    chain_hash, validate, LedgerEnvelope, ENVELOPE_SCHEMA_VERSION, MAX_SAFE_INTEGER,
+};
 use serde_json::{json, Map, Value};
 
 /// `canonical_hash(structural(file))` of every frozen version, oldest first.
 const FROZEN_DIGESTS: &[(u32, &str)] = &[(
     1,
-    "sha256-8b3f21f91d093678509ab7fc4ce1753197d6f74cf3be525950e065ce72660cdf",
+    "sha256-8a0527d957342b54d342585f5b5558889a071ca170e29dc1cf1228441dec013c",
 )];
 
 fn fixture(version: u32) -> PathBuf {
@@ -117,7 +119,58 @@ fn structural(schema: &Value) -> Value {
         };
         out.insert(key.clone(), kept);
     }
+    normalize_generator_spellings(&mut out);
     Value::Object(out)
+}
+
+/// `format` tokens schemars adds for Rust's numeric types. They assert
+/// nothing a validator checks (`minimum` / `maximum` carry the bounds), so
+/// a generator that renames or drops them is not a change in meaning.
+const GENERATOR_FORMATS: &[&str] = &[
+    "int8", "int16", "int32", "int64", "int", "uint8", "uint16", "uint32", "uint64", "uint",
+    "float", "double",
+];
+
+/// Fold spellings that differ between schemars versions but mean the same
+/// thing: numeric `format` tokens are dropped, a `oneOf` of bare `const`s
+/// (what schemars emits for an enum with documented variants) becomes an
+/// `enum`, and every `enum` is sorted.
+fn normalize_generator_spellings(out: &mut Map<String, Value>) {
+    if out
+        .get("format")
+        .and_then(Value::as_str)
+        .is_some_and(|f| GENERATOR_FORMATS.contains(&f))
+    {
+        out.remove("format");
+    }
+    let consts = out
+        .get("oneOf")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            let mut consts = Vec::new();
+            let mut types = Vec::new();
+            for item in items {
+                let obj = item.as_object()?;
+                if !obj.keys().all(|k| k == "const" || k == "type") {
+                    return None;
+                }
+                consts.push(obj.get("const")?.clone());
+                types.push(obj.get("type").cloned());
+            }
+            Some((consts, types))
+        });
+    if let Some((consts, types)) = consts {
+        out.remove("oneOf");
+        out.insert("enum".into(), Value::Array(consts));
+        if let Some(Some(first)) = types.first() {
+            if types.iter().all(|t| t.as_ref() == Some(first)) {
+                out.entry("type").or_insert_with(|| first.clone());
+            }
+        }
+    }
+    if let Some(Value::Array(tokens)) = out.get_mut("enum") {
+        tokens.sort_by_key(|t| t.to_string());
+    }
 }
 
 fn structural_digest(schema: &Value) -> String {
@@ -134,7 +187,9 @@ fn golden_verdict(emitted: &Value, golden: &Value, version: u32) -> Result<(), S
         "the emitted LedgerEnvelope schema differs STRUCTURALLY from the frozen \
          ledger_envelope.v{version}.schema.json. A frozen version is never edited: bump \
          ENVELOPE_SCHEMA_VERSION to {next} and run this test with LEDGER_ENVELOPE_BLESS=1 to \
-         add ledger_envelope.v{next}.schema.json (keep v{version}).\nemitted:\n{}",
+         add ledger_envelope.v{next}.schema.json (keep v{version}). If only the GENERATOR \
+         changed (a schemars upgrade re-spelling the same meaning), do not bump: extend \
+         normalize_generator_spellings() in this file to fold the new spelling.\nemitted:\n{}",
         serde_json::to_string_pretty(emitted).unwrap(),
         next = version + 1,
     ))
@@ -521,6 +576,25 @@ fn corpus() -> Vec<(String, Value)> {
     set("/schema_version", json!(1.0));
     set("/schema_version", json!(-1));
     set("/schema_version", json!(4_294_967_297_u64));
+    // Every integer within ±(2^53 - 1), so the chain hash's canonical form is
+    // genuine RFC 8785 in every language.
+    let safe = MAX_SAFE_INTEGER as i64;
+    set("/source_seq", json!(MAX_SAFE_INTEGER));
+    set("/source_seq", json!(MAX_SAFE_INTEGER + 1));
+    for n in [
+        json!(safe),
+        json!(-safe),
+        json!(safe + 1),
+        json!(-safe - 1),
+        json!(1e300),
+        json!(1.5),
+        json!(-1e-300),
+        json!([1, [2, {"deep": safe + 1}]]),
+        json!({"a": {"b": -safe}}),
+    ] {
+        set("/assignment/covariates/n", n.clone());
+        set("/payload/value", n);
+    }
     // probability
     for p in [0.0, -0.1, 1e-9, 0.5, 1.0, 1.000_001, 2.0] {
         set("/assignment/probability", json!(p));
@@ -608,6 +682,14 @@ fn corpus() -> Vec<(String, Value)> {
 /// refuses), and each must appear in the corpus.
 const DECLARED_EXCEPTIONS: &[&str] = &["/source_seq = 1.0", "/schema_version = 1.0"];
 
+/// The corpus cases only `format: date-time` refuses (the day does not exist
+/// in its month): a validator with format checking OFF accepts them while
+/// `validate()` refuses. Declared, and asserted to be the ONLY such cases.
+const FORMAT_ONLY_CASES: &[&str] = &[
+    r#"/occurred_at = "2026-02-30T10:00:00Z""#,
+    r#"/recorded_at = "2026-02-30T10:00:00Z""#,
+];
+
 fn rust_accepts(v: &Value) -> bool {
     serde_json::from_value::<LedgerEnvelope>(v.clone())
         .map(|e| validate(&e).is_ok())
@@ -653,6 +735,27 @@ fn the_schema_and_validate_agree_on_the_corpus() {
         exceptions_seen, declared,
         "every declared exception is exercised"
     );
+
+    // A writer that leaves format checking OFF (JSON Schema's default) misses
+    // exactly what only `format: date-time` carries — and nothing else. The
+    // module docs require Python writers to turn it on.
+    let lax = jsonschema::options()
+        .should_validate_formats(false)
+        .build(&schema)
+        .expect("the frozen schema compiles");
+    let mut format_only = Vec::new();
+    for (name, instance) in &corpus {
+        if validator.is_valid(instance) != lax.is_valid(instance) {
+            format_only.push(name.as_str());
+        }
+    }
+    format_only.sort_unstable();
+    let mut expected = FORMAT_ONLY_CASES.to_vec();
+    expected.sort_unstable();
+    assert_eq!(
+        format_only, expected,
+        "with formats off, the schema must miss exactly the format-only cases"
+    );
     // Guard against a vacuous corpus: both outcomes must be exercised.
     assert!(rust_accepts(&sample()));
     assert!(
@@ -663,20 +766,76 @@ fn the_schema_and_validate_agree_on_the_corpus() {
 }
 
 // ============================================================================
-// The committed patterns under Python's `re`
+// Cross-language: Python's `re` and Python's canonical JSON
 // ============================================================================
 
-/// Python is a named non-Rust writer, and `re.search` differs from ECMA-262
-/// in one way that matters here: `$` also matches before a trailing newline.
-/// Run every committed pattern through `re.search` on cases including a
-/// newline suffix. Needs `python3`; CI's rust-ci job has it (its
-/// fleet-nouns step runs it), so under `CI` its absence fails rather than
-/// skips.
-#[test]
-fn the_committed_patterns_behave_the_same_under_python_re() {
+/// Run a Python snippet on `input` (JSON on stdin) and return its stdout, or
+/// `None` when no interpreter is runnable here. Tries `python3`, `python`,
+/// then `py -3`; a spawn that exits non-zero with empty stdout (the Windows
+/// Store `python3` alias, a broken shim) counts as not runnable.
+fn run_python(script: &str, input: &Value) -> Option<Vec<u8>> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
 
+    for (program, pre) in [
+        ("python3", &[][..]),
+        ("python", &[][..]),
+        ("py", &["-3"][..]),
+    ] {
+        let Ok(mut child) = Command::new(program)
+            .args(pre)
+            .args(["-I", "-c", script])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        else {
+            continue;
+        };
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(input.to_string().as_bytes());
+        }
+        let Ok(out) = child.wait_with_output() else {
+            continue;
+        };
+        if out.status.success() {
+            return Some(out.stdout);
+        }
+        if out.stdout.is_empty() {
+            continue; // not runnable
+        }
+        panic!(
+            "{program} ran the cross-check and failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    None
+}
+
+/// Report a skipped cross-check where it is SEEN: libtest captures
+/// `print!` / `eprint!`, but not a write to the raw stderr handle.
+fn report_skip(what: &str) {
+    use std::io::Write as _;
+    let _ = writeln!(
+        std::io::stderr(),
+        "SKIPPED (not a pass): {what} — no runnable python3 / python / py -3 here; \
+         GitHub Actions runs it"
+    );
+}
+
+/// Python is a named non-Rust writer, and two of its behaviours matter here:
+///
+/// - `re.search` lets `$` match before a trailing newline, so every committed
+///   pattern is run through it on cases including a newline suffix;
+/// - its canonical JSON (`json.dumps(sort_keys=True, separators=(",", ":"),
+///   ensure_ascii=False)`, RFC 8785 for this input) must reproduce
+///   [`chain_hash`] on the sample and its linked successor.
+///
+/// Under GitHub Actions (`GITHUB_ACTIONS` set; rust-ci's lanes all carry
+/// python3) a missing interpreter FAILS. Elsewhere it skips, and says so on
+/// the raw stderr handle so the skip is not silent.
+#[test]
+fn python_reproduces_the_patterns_and_the_chain_hash() {
     let schema = golden();
     let pattern = |pointer: &str| {
         schema
@@ -691,7 +850,7 @@ fn the_committed_patterns_behave_the_same_under_python_re() {
     let hash = pattern("/properties/prev_hash/pattern");
     let label = pattern("/properties/source/pattern");
     let h = "a".repeat(64);
-    let cases = json!([
+    let patterns = json!([
         [id, V7, true],
         [id, format!("{V7}\n"), false],
         [id, V7.to_uppercase(), false],
@@ -712,40 +871,46 @@ fn the_committed_patterns_behave_the_same_under_python_re() {
         [label, "\u{FEFF}x", false],
         [label, "a\u{85}b", false],
     ]);
+
+    let first: LedgerEnvelope = serde_json::from_value(sample()).unwrap();
+    let h1 = chain_hash(None, &first).unwrap();
+    let mut second = first.clone();
+    second.source_seq = 43;
+    second.prev_hash = Some(h1.clone());
+    let h2 = chain_hash(Some(&h1), &second).unwrap();
+    let links = json!([
+        [serde_json::to_value(&first).unwrap(), null, h1],
+        [serde_json::to_value(&second).unwrap(), h1, h2],
+    ]);
+
     let script = r#"
-import json, re, sys
+import hashlib, json, re, sys
+data = json.load(sys.stdin.buffer)
 bad = []
-for pattern, text, expected in json.load(sys.stdin):
+for pattern, text, expected in data["patterns"]:
     got = re.search(pattern, text) is not None
     if got != expected:
-        bad.append([pattern, text, expected, got])
+        bad.append(["pattern", pattern, text, expected, got])
+for envelope, prev, expected in data["links"]:
+    text = json.dumps({"envelope": envelope, "prev_hash": prev},
+                      sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    got = "sha256-" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if got != expected:
+        bad.append(["chain_hash", expected, got])
 print(json.dumps(bad))
 "#;
-    let child = Command::new("python3")
-        .args(["-I", "-c", script])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn();
-    let mut child = match child {
-        Ok(child) => child,
-        Err(e) if std::env::var_os("CI").is_none() => {
-            eprintln!("SKIPPED: python3 not runnable here ({e}); CI runs this test");
-            return;
+    let input = json!({"patterns": patterns, "links": links});
+    let Some(stdout) = run_python(script, &input) else {
+        if std::env::var_os("GITHUB_ACTIONS").is_some() {
+            panic!("python3 / python / py -3 is required under GitHub Actions");
         }
-        Err(e) => panic!("python3 is required under CI: {e}"),
+        report_skip("python_reproduces_the_patterns_and_the_chain_hash");
+        return;
     };
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(cases.to_string().as_bytes())
-        .unwrap();
-    let out = child.wait_with_output().unwrap();
-    assert!(
-        out.status.success(),
-        "python3 failed: {}",
-        String::from_utf8_lossy(&out.stderr)
+    let bad: Value = serde_json::from_slice(&stdout).expect("python printed JSON");
+    assert_eq!(
+        bad,
+        json!([]),
+        "Python disagrees with the committed contract"
     );
-    let bad: Value = serde_json::from_slice(&out.stdout).expect("python printed JSON");
-    assert_eq!(bad, json!([]), "patterns disagree under Python re.search");
 }
