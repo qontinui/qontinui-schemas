@@ -28,9 +28,7 @@
 use std::path::PathBuf;
 
 use qontinui_types::canonical_hash::canonical_hash;
-use qontinui_types::ledger::{
-    chain_hash, validate, LedgerEnvelope, ENVELOPE_SCHEMA_VERSION, MAX_SAFE_INTEGER,
-};
+use qontinui_types::ledger::{validate, LedgerEnvelope, ENVELOPE_SCHEMA_VERSION, MAX_SAFE_INTEGER};
 use serde_json::{json, Map, Value};
 
 /// `canonical_hash(structural(file))` of every frozen version, oldest first.
@@ -189,7 +187,10 @@ fn golden_verdict(emitted: &Value, golden: &Value, version: u32) -> Result<(), S
          ENVELOPE_SCHEMA_VERSION to {next} and run this test with LEDGER_ENVELOPE_BLESS=1 to \
          add ledger_envelope.v{next}.schema.json (keep v{version}). If only the GENERATOR \
          changed (a schemars upgrade re-spelling the same meaning), do not bump: extend \
-         normalize_generator_spellings() in this file to fold the new spelling.\nemitted:\n{}",
+         normalize_generator_spellings() in this file to fold the new spelling. That \
+         changes structural(v1), so FROZEN_DIGESTS must be re-pinned in the same commit, \
+         and that commit must show the raw v<N> file diff contains ONLY generator \
+         spellings (format tokens, oneOf-vs-enum, ordering), never a change in meaning.\nemitted:\n{}",
         serde_json::to_string_pretty(emitted).unwrap(),
         next = version + 1,
     ))
@@ -766,50 +767,66 @@ fn the_schema_and_validate_agree_on_the_corpus() {
 }
 
 // ============================================================================
-// Cross-language: Python's `re` and Python's canonical JSON
+// Cross-language: Python's `re`
 // ============================================================================
 
-/// Run a Python snippet on `input` (JSON on stdin) and return its stdout, or
-/// `None` when no interpreter is runnable here. Tries `python3`, `python`,
-/// then `py -3`; a spawn that exits non-zero with empty stdout (the Windows
-/// Store `python3` alias, a broken shim) counts as not runnable.
-fn run_python(script: &str, input: &Value) -> Option<Vec<u8>> {
+/// The interpreters tried, in order.
+const PYTHONS: &[(&str, &[&str])] = &[("python3", &[]), ("python", &[]), ("py", &["-3"])];
+
+/// The first interpreter that RUNS here: `-c "print(1)"` exits 0 and prints
+/// `1`. A Windows Store alias or a broken shim fails this probe and is
+/// skipped; nothing after a successful probe is ever treated as "not
+/// runnable".
+fn runnable_python() -> Option<(&'static str, &'static [&'static str])> {
+    use std::process::{Command, Stdio};
+    PYTHONS.iter().copied().find(|(program, pre)| {
+        Command::new(program)
+            .args(*pre)
+            .args(["-I", "-c", "print(1)"])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .is_ok_and(|o| o.status.success() && o.stdout.trim_ascii() == b"1")
+    })
+}
+
+/// Run `script` (JSON on stdin) under a probed interpreter. Any failure
+/// after the probe — a non-zero exit, unparsable output, an `error` object
+/// the script reported — is a test FAILURE.
+fn run_python(program: &str, pre: &[&str], script: &str, input: &Value) -> Value {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
-
-    for (program, pre) in [
-        ("python3", &[][..]),
-        ("python", &[][..]),
-        ("py", &["-3"][..]),
-    ] {
-        let Ok(mut child) = Command::new(program)
-            .args(pre)
-            .args(["-I", "-c", script])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        else {
-            continue;
-        };
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(input.to_string().as_bytes());
-        }
-        let Ok(out) = child.wait_with_output() else {
-            continue;
-        };
-        if out.status.success() {
-            return Some(out.stdout);
-        }
-        if out.stdout.is_empty() {
-            continue; // not runnable
-        }
+    let mut child = Command::new(program)
+        .args(pre)
+        .args(["-I", "-c", script])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("{program} passed its probe but did not spawn: {e}"));
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.to_string().as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{program} exited {:?} after a successful probe: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let result: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
         panic!(
-            "{program} ran the cross-check and failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+            "{program} printed no JSON ({e}): {}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    });
+    if let Some(error) = result.get("error") {
+        panic!("the Python cross-check raised: {error}");
     }
-    None
+    result
 }
 
 /// Report a skipped cross-check where it is SEEN: libtest captures
@@ -823,19 +840,18 @@ fn report_skip(what: &str) {
     );
 }
 
-/// Python is a named non-Rust writer, and two of its behaviours matter here:
-///
-/// - `re.search` lets `$` match before a trailing newline, so every committed
-///   pattern is run through it on cases including a newline suffix;
-/// - its canonical JSON (`json.dumps(sort_keys=True, separators=(",", ":"),
-///   ensure_ascii=False)`, RFC 8785 for this input) must reproduce
-///   [`chain_hash`] on the sample and its linked successor.
+/// Python is a named non-Rust writer, and `re.search` differs from ECMA-262
+/// in one way that matters here: `$` also matches before a trailing newline.
+/// Every committed pattern is run through it on cases including a newline
+/// suffix. (The chain hash is NOT cross-checked here — Python's standard
+/// library has no RFC 8785 implementation; its known answers come from the
+/// independent `rfc8785` package, hard-coded in `ledger`'s unit tests.)
 ///
 /// Under GitHub Actions (`GITHUB_ACTIONS` set; rust-ci's lanes all carry
 /// python3) a missing interpreter FAILS. Elsewhere it skips, and says so on
 /// the raw stderr handle so the skip is not silent.
 #[test]
-fn python_reproduces_the_patterns_and_the_chain_hash() {
+fn the_committed_patterns_behave_the_same_under_python_re() {
     let schema = golden();
     let pattern = |pointer: &str| {
         schema
@@ -872,45 +888,30 @@ fn python_reproduces_the_patterns_and_the_chain_hash() {
         [label, "a\u{85}b", false],
     ]);
 
-    let first: LedgerEnvelope = serde_json::from_value(sample()).unwrap();
-    let h1 = chain_hash(None, &first).unwrap();
-    let mut second = first.clone();
-    second.source_seq = 43;
-    second.prev_hash = Some(h1.clone());
-    let h2 = chain_hash(Some(&h1), &second).unwrap();
-    let links = json!([
-        [serde_json::to_value(&first).unwrap(), null, h1],
-        [serde_json::to_value(&second).unwrap(), h1, h2],
-    ]);
-
     let script = r#"
-import hashlib, json, re, sys
-data = json.load(sys.stdin.buffer)
-bad = []
-for pattern, text, expected in data["patterns"]:
-    got = re.search(pattern, text) is not None
-    if got != expected:
-        bad.append(["pattern", pattern, text, expected, got])
-for envelope, prev, expected in data["links"]:
-    text = json.dumps({"envelope": envelope, "prev_hash": prev},
-                      sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    got = "sha256-" + hashlib.sha256(text.encode("utf-8")).hexdigest()
-    if got != expected:
-        bad.append(["chain_hash", expected, got])
-print(json.dumps(bad))
+import json, re, sys
+try:
+    data = json.load(sys.stdin.buffer)
+    bad = []
+    for pattern, text, expected in data["patterns"]:
+        got = re.search(pattern, text) is not None
+        if got != expected:
+            bad.append([pattern, text, expected, got])
+    print(json.dumps({"bad": bad}))
+except Exception as e:
+    print(json.dumps({"error": repr(e)}))
 "#;
-    let input = json!({"patterns": patterns, "links": links});
-    let Some(stdout) = run_python(script, &input) else {
+    let Some((program, pre)) = runnable_python() else {
         if std::env::var_os("GITHUB_ACTIONS").is_some() {
             panic!("python3 / python / py -3 is required under GitHub Actions");
         }
-        report_skip("python_reproduces_the_patterns_and_the_chain_hash");
+        report_skip("the_committed_patterns_behave_the_same_under_python_re");
         return;
     };
-    let bad: Value = serde_json::from_slice(&stdout).expect("python printed JSON");
+    let result = run_python(program, pre, script, &json!({"patterns": patterns}));
     assert_eq!(
-        bad,
+        result["bad"],
         json!([]),
-        "Python disagrees with the committed contract"
+        "patterns disagree under Python re.search"
     );
 }

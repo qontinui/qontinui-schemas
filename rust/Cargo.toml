@@ -27,6 +27,8 @@ unicode-normalization = "0.1"
 sha2 = "0.10"
 hex = "0.4"
 serde_jcs = "0.1"
+# ledger::canonical_json writes numbers in ECMAScript form (RFC 8785 §3.2.2.3).
+ryu-js = "0.2"
 thiserror = "2"
 base64 = "0.22"
 # Optional: only `host_sizing::probe` reads the live host. Enable with the
