@@ -155,6 +155,13 @@ pub mod ir;
 /// the frontier of seen-but-never-activated affordances. See
 /// `2026-09-20-ui-bridge-represents-the-users-path-and-the-passage-of-time.md`.
 pub mod journey;
+/// The development-substrate ledger **envelope** v1 — the frozen,
+/// versioned event contract every substrate writer emits
+/// ([`ledger::LedgerEnvelope`], [`ledger::validate`],
+/// [`ledger::chain_hash`]), pinned by a golden JSON Schema. Unrelated to
+/// `ci-exec`'s executor step ledger. See
+/// `2026-11-22-phase1-envelope-frozen-and-measurement-dispatch-proven.md`.
+pub mod ledger;
 pub mod mcp_config;
 #[cfg(feature = "measurement-decl")]
 pub mod measurement_decl;
