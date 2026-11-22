@@ -1,0 +1,371 @@
+{
+  "$defs": {
+    "Assignment": {
+      "additionalProperties": false,
+      "description": "The D12 assignment block: present on every event a randomised policy\ndecided, because assignment cannot be back-filled.",
+      "properties": {
+        "arm": {
+          "description": "The arm the unit was assigned to.",
+          "type": "string"
+        },
+        "assignment_seed_id": {
+          "description": "The id of the seed the assignment was drawn from.",
+          "type": "string"
+        },
+        "covariates": {
+          "additionalProperties": true,
+          "description": "The covariates recorded at assignment time.",
+          "type": "object"
+        },
+        "policy_version": {
+          "description": "The version of the policy that made the assignment.",
+          "type": "string"
+        },
+        "probability": {
+          "description": "The logged probability of this arm for this unit, in `(0, 1]`.",
+          "format": "double",
+          "type": "number"
+        },
+        "unit": {
+          "description": "The randomisation unit (a session, a PR, a switchback window, …).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit",
+        "arm",
+        "probability",
+        "covariates",
+        "policy_version",
+        "assignment_seed_id"
+      ],
+      "type": "object"
+    },
+    "EvidenceGrade": {
+      "description": "How strongly a fact is established. ORDERED: `declared < observed <\ncorroborated < gate_grade` — the variant order below is the `Ord` order,\nand D9's thresholds compare with it. Never reorder the variants.",
+      "oneOf": [
+        {
+          "const": "declared",
+          "description": "Merely claimed by the writer; nothing checked it.",
+          "type": "string"
+        },
+        {
+          "const": "observed",
+          "description": "Seen by one observer.",
+          "type": "string"
+        },
+        {
+          "const": "corroborated",
+          "description": "Agreed by an independent second source.",
+          "type": "string"
+        },
+        {
+          "const": "gate_grade",
+          "description": "Established to the standard a coord gate attests to.",
+          "type": "string"
+        }
+      ]
+    },
+    "ObjectRef": {
+      "additionalProperties": false,
+      "description": "An OCEL 2.0 event-to-object reference with its qualifier.",
+      "properties": {
+        "object_id": {
+          "type": "string"
+        },
+        "object_type": {
+          "type": "string"
+        },
+        "qualifier": {
+          "description": "The OCEL qualifier: the role this object plays in the event.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_type",
+        "object_id",
+        "qualifier"
+      ],
+      "type": "object"
+    },
+    "Payload": {
+      "description": "The event's payload: inline JSON, or a reference to a payload stored\nbeside the chain so it can be erased without breaking a sealed record\n(D8 \"Erasure\").",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "inline",
+              "type": "string"
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "erasable",
+              "type": "string"
+            },
+            "salted_hash": {
+              "description": "`sha256-<64 hex>` of the salted payload.",
+              "type": "string"
+            },
+            "store": {
+              "description": "The side store holding the payload.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "salted_hash",
+            "store"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Principal": {
+      "additionalProperties": false,
+      "description": "The graded principal of an event (D8): session, agent, device, tenant.",
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/PrincipalPart"
+        },
+        "device": {
+          "$ref": "#/$defs/PrincipalPart"
+        },
+        "session": {
+          "$ref": "#/$defs/PrincipalPart"
+        },
+        "tenant": {
+          "$ref": "#/$defs/PrincipalPart"
+        }
+      },
+      "required": [
+        "session",
+        "agent",
+        "device",
+        "tenant"
+      ],
+      "type": "object"
+    },
+    "PrincipalPart": {
+      "additionalProperties": false,
+      "description": "One graded identity of the principal. `value` is `null` when the identity\nis unknown — spelled, never omitted — and `attribution_grade` says how\nwell a non-null value is established.",
+      "properties": {
+        "attribution_grade": {
+          "$ref": "#/$defs/EvidenceGrade"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "attribution_grade"
+      ],
+      "type": "object"
+    },
+    "SourceClass": {
+      "description": "Who observed a fact — the process log's `evidence_tier` vocabulary, kept\ntoken-for-token so the OCEL projection keeps its tier.",
+      "enum": [
+        "coord_observed",
+        "derived",
+        "agent_reported",
+        "operator"
+      ],
+      "type": "string"
+    },
+    "TimeBasis": {
+      "description": "What `occurred_at` measures — the process log's `time_basis` vocabulary.",
+      "oneOf": [
+        {
+          "const": "event",
+          "description": "The source's own event time.",
+          "type": "string"
+        },
+        {
+          "const": "insert",
+          "description": "The time the source row was inserted.",
+          "type": "string"
+        },
+        {
+          "const": "observed",
+          "description": "The time an observer first saw the state.",
+          "type": "string"
+        },
+        {
+          "const": "declared",
+          "description": "A time the writer declared and nothing checked.",
+          "type": "string"
+        }
+      ]
+    },
+    "WorldKind": {
+      "description": "What a world is.",
+      "oneOf": [
+        {
+          "const": "prod",
+          "description": "Production — the real cloud.",
+          "type": "string"
+        },
+        {
+          "const": "clone",
+          "description": "A world hosted by a clone release.",
+          "type": "string"
+        },
+        {
+          "const": "fork",
+          "description": "A fork of another world (its `parent`).",
+          "type": "string"
+        }
+      ]
+    },
+    "WorldRef": {
+      "additionalProperties": false,
+      "description": "The world an event happened in — production is a world. References a\n[`crate::cloud_twin::World`] by id and kind.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/WorldKind"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One ledger event, version [`ENVELOPE_SCHEMA_VERSION`]. Every field is\nrequired on the wire; nullable fields are spelled `null`.",
+  "properties": {
+    "activity": {
+      "description": "`<namespace>.<verb>`, both `[a-z][a-z0-9_]*`.",
+      "type": "string"
+    },
+    "assignment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "causation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "correlation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence_grade": {
+      "$ref": "#/$defs/EvidenceGrade"
+    },
+    "id": {
+      "description": "A UUIDv7.",
+      "type": "string"
+    },
+    "objects": {
+      "items": {
+        "$ref": "#/$defs/ObjectRef"
+      },
+      "type": "array"
+    },
+    "occurred_at": {
+      "description": "RFC 3339; what it measures is `time_basis`.",
+      "type": "string"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    },
+    "policy_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "prev_hash": {
+      "description": "The [`chain_hash`] of the previous event of this chain; `null` only\nfor a chain's first event.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "principal": {
+      "$ref": "#/$defs/Principal"
+    },
+    "recorded_at": {
+      "description": "RFC 3339; when the ledger recorded the event.",
+      "type": "string"
+    },
+    "schema_version": {
+      "description": "Always [`ENVELOPE_SCHEMA_VERSION`] for this crate's writers.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "source": {
+      "description": "The writer that produced the event.",
+      "type": "string"
+    },
+    "source_class": {
+      "$ref": "#/$defs/SourceClass"
+    },
+    "source_seq": {
+      "description": "The writer's own monotone sequence number (idempotent replay key with\n`source`).",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "time_basis": {
+      "$ref": "#/$defs/TimeBasis"
+    },
+    "world": {
+      "$ref": "#/$defs/WorldRef"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "source_seq",
+    "occurred_at",
+    "recorded_at",
+    "time_basis",
+    "activity",
+    "objects",
+    "principal",
+    "evidence_grade",
+    "source_class",
+    "world",
+    "correlation_id",
+    "causation_id",
+    "assignment",
+    "policy_version",
+    "schema_version",
+    "prev_hash",
+    "payload"
+  ],
+  "title": "LedgerEnvelope",
+  "type": "object"
+}
