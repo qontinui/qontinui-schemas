@@ -1206,6 +1206,9 @@ mod tests {
             "{\"s\":\"\\u0000\\b\\t\\n\\u000b\\f\\r\\u001f\u{7F}\u{2028}\\\"\\\\/\"}",
         ),
     ];
+    // chain_hash of the sample and of its linked successor (source_seq 43,
+    // prev_hash CHAIN_H1), generated with the same independent `rfc8785`
+    // package as JCS_VECTORS: sha256 of rfc8785.dumps({"envelope": ..., "prev_hash": ...}).
     const CHAIN_H1: &str =
         "sha256-e7187917ecb17d90fb1b5e772a99692dcf43835abc2a9775e8affe1d534bf9ff";
     const CHAIN_H2: &str =

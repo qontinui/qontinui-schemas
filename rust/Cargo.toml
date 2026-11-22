@@ -18,7 +18,10 @@ exclude = [
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: ledger::canonical_json formats the double serde_json parsed,
+# so parsing must be exact (RFC 8785 numbers). Declared here, not inherited
+# transitively from serde_jcs.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 schemars = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
