@@ -156,6 +156,7 @@ pub mod ir;
 /// `2026-09-20-ui-bridge-represents-the-users-path-and-the-passage-of-time.md`.
 pub mod journey;
 pub mod mcp_config;
+#[cfg(feature = "measurement-decl")]
 pub mod measurement_decl;
 pub mod memory;
 pub mod orchestration_config;

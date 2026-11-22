@@ -28,6 +28,15 @@
 //! Labels follow the `run_outcomes` rules
 //! ([`crate::run_outcomes::is_valid_run_outcome_label`]), so every
 //! declaration this parser accepts is a row coord's result door can write.
+//! A measurement `name` is a slug — the metric-name grammar
+//! ([`crate::run_outcomes::is_valid_metric_name`], `[A-Za-z0-9_.:-]`) — since
+//! it is a dispatch key, part of a UUIDv5 input and a URL/MCP argument.
+//!
+//! [`parse_measurements`] is the ONLY entry point for repository text. The
+//! types derive `Deserialize` so a stored snapshot can be read back, but
+//! deserializing them directly validates nothing beyond shape.
+//!
+//! Behind the `measurement-decl` feature, which is what pulls in `toml`.
 //!
 //! PURE: no I/O, no clock, no coord state.
 
@@ -35,7 +44,10 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::run_outcomes::{is_valid_run_outcome_label, RUN_OUTCOME_LABEL_MAX_BYTES};
+use crate::run_outcomes::{
+    is_valid_metric_name, is_valid_run_outcome_label, RUN_OUTCOME_LABEL_MAX_BYTES,
+    RUN_OUTCOME_METRIC_NAME_MAX_BYTES,
+};
 
 /// Where the declaration lives, relative to the measured repository's root.
 pub const MEASUREMENTS_FILE_PATH: &str = ".qontinui/measurements.toml";
@@ -50,6 +62,10 @@ pub const MEASUREMENTS_MAX_ENTRIES: usize = 64;
 pub const JOB_KEY: &str = "job";
 
 /// The whole file: `[[measurements]]` entries and nothing else.
+///
+/// `Deserialize` checks shape only (strict keys, string values). It does NOT
+/// apply the label, name, duplicate or size rules — repository text goes
+/// through [`parse_measurements`], never through a bare deserialize.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MeasurementsFile {
@@ -60,6 +76,9 @@ pub struct MeasurementsFile {
 
 /// One declared measurement. Serializes to the snapshot coord stores on the
 /// dispatch row (`coord.ci_dispatches.measurement`).
+///
+/// `Deserialize` checks shape only; it does NOT validate the labels or the
+/// name. Repository text goes through [`parse_measurements`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MeasurementDecl {
@@ -80,10 +99,9 @@ impl MeasurementsFile {
     }
 }
 
-/// Which field of an entry failed the label rule.
+/// Which label field of an entry failed the label rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MeasurementField {
-    Name,
     Source,
     Subject,
     Task,
@@ -92,7 +110,6 @@ pub enum MeasurementField {
 impl MeasurementField {
     pub fn as_str(self) -> &'static str {
         match self {
-            MeasurementField::Name => "name",
             MeasurementField::Source => "source",
             MeasurementField::Subject => "subject",
             MeasurementField::Task => "task",
@@ -113,7 +130,8 @@ pub enum MeasurementDeclError {
     )]
     JobKeyNotSupported { index: usize },
     /// Malformed TOML, a missing key, a non-string value, or an unknown key
-    /// (the parser is strict). The message is the TOML parser's.
+    /// (the parser is strict). The message is the TOML parser's full report,
+    /// including the line and column.
     #[error("{MEASUREMENTS_FILE_PATH} is malformed: {0}")]
     Malformed(String),
     #[error("{MEASUREMENTS_FILE_PATH} declares {count} measurements; the limit is {MEASUREMENTS_MAX_ENTRIES}")]
@@ -127,6 +145,11 @@ pub enum MeasurementDeclError {
         index: usize,
         field: MeasurementField,
     },
+    #[error(
+        "{MEASUREMENTS_FILE_PATH} entry {index}: `name` must be 1..={RUN_OUTCOME_METRIC_NAME_MAX_BYTES} \
+         bytes of [A-Za-z0-9_.:-]"
+    )]
+    InvalidName { index: usize },
     #[error("{MEASUREMENTS_FILE_PATH} entry {index} repeats the measurement name `{name}`")]
     DuplicateName { index: usize, name: String },
 }
@@ -137,21 +160,19 @@ pub fn parse_measurements(text: &str) -> Result<MeasurementsFile, MeasurementDec
         return Err(MeasurementDeclError::TooLarge { bytes: text.len() });
     }
 
-    // Name the v1 `job` refusal before the generic unknown-key one, so the
-    // author learns why the key is absent rather than only that it is.
-    let raw: toml::Table = toml::from_str(text)
-        .map_err(|e| MeasurementDeclError::Malformed(e.message().to_owned()))?;
-    if let Some(toml::Value::Array(entries)) = raw.get("measurements") {
-        if let Some(index) = entries
-            .iter()
-            .position(|e| e.as_table().is_some_and(|t| t.contains_key(JOB_KEY)))
-        {
-            return Err(MeasurementDeclError::JobKeyNotSupported { index });
+    // One parse on the accepting path, straight into the strict types, so a
+    // schema error (unknown or missing key) keeps the parser's line/column.
+    // Only on failure is the text re-read as a plain table, to name the v1
+    // `job` refusal rather than report it as just another unknown key.
+    let file: MeasurementsFile = match toml::from_str(text) {
+        Ok(file) => file,
+        Err(e) => {
+            if let Some(index) = job_key_index(text) {
+                return Err(MeasurementDeclError::JobKeyNotSupported { index });
+            }
+            return Err(MeasurementDeclError::Malformed(e.to_string()));
         }
-    }
-
-    let file: MeasurementsFile = toml::from_str(text)
-        .map_err(|e| MeasurementDeclError::Malformed(e.message().to_owned()))?;
+    };
 
     if file.measurements.len() > MEASUREMENTS_MAX_ENTRIES {
         return Err(MeasurementDeclError::TooManyEntries {
@@ -161,8 +182,10 @@ pub fn parse_measurements(text: &str) -> Result<MeasurementsFile, MeasurementDec
 
     let mut names = BTreeSet::new();
     for (index, m) in file.measurements.iter().enumerate() {
+        if !is_valid_metric_name(&m.name) {
+            return Err(MeasurementDeclError::InvalidName { index });
+        }
         for (field, value) in [
-            (MeasurementField::Name, &m.name),
             (MeasurementField::Source, &m.source),
             (MeasurementField::Subject, &m.subject),
             (MeasurementField::Task, &m.task),
@@ -180,6 +203,18 @@ pub fn parse_measurements(text: &str) -> Result<MeasurementsFile, MeasurementDec
     }
 
     Ok(file)
+}
+
+/// The index of the first `[[measurements]]` entry carrying a `job` key, when
+/// the text is well-formed TOML.
+fn job_key_index(text: &str) -> Option<usize> {
+    let raw: toml::Table = toml::from_str(text).ok()?;
+    match raw.get("measurements")? {
+        toml::Value::Array(entries) => entries
+            .iter()
+            .position(|e| e.as_table().is_some_and(|t| t.contains_key(JOB_KEY))),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -304,19 +339,63 @@ task = "smoke"
         );
     }
 
+    fn with_source(source: &str) -> String {
+        format!(
+            "[[measurements]]\nname = \"a\"\nsource = \"{source}\"\nsubject = \"x\"\ntask = \"t\"\n"
+        )
+    }
+
     #[test]
     fn blank_padded_or_control_labels_are_refused() {
-        for (name, field) in [
-            ("", MeasurementField::Name),
-            (" a", MeasurementField::Name),
-            ("a\\u0007", MeasurementField::Name),
+        for source in ["", " a", "a\\u0007"] {
+            assert_eq!(
+                parse_measurements(&with_source(source)),
+                Err(MeasurementDeclError::InvalidLabel {
+                    index: 0,
+                    field: MeasurementField::Source
+                }),
+                "{source:?}"
+            );
+        }
+        // A label may hold spaces inside; a name may not (below).
+        assert!(parse_measurements(&with_source("cargo test")).is_ok());
+    }
+
+    #[test]
+    fn a_name_must_be_a_slug() {
+        assert!(parse_measurements(&entry("unit-suite.v1:x_Y9", "")).is_ok());
+        let at_limit = "n".repeat(RUN_OUTCOME_METRIC_NAME_MAX_BYTES);
+        assert!(parse_measurements(&entry(&at_limit, "")).is_ok());
+        let over = "n".repeat(RUN_OUTCOME_METRIC_NAME_MAX_BYTES + 1);
+        for name in [
+            "",
+            "unit suite",
+            "ünit",
+            "a/b",
+            " a",
+            "a\\u0007",
+            over.as_str(),
         ] {
             assert_eq!(
                 parse_measurements(&entry(name, "")),
-                Err(MeasurementDeclError::InvalidLabel { index: 0, field }),
+                Err(MeasurementDeclError::InvalidName { index: 0 }),
                 "{name:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_malformed_report_keeps_the_line_and_column() {
+        let text = format!("{}{}", entry("a", ""), entry("b", "timeout = \"5m\""));
+        let Err(MeasurementDeclError::Malformed(m)) = parse_measurements(&text) else {
+            panic!("expected Malformed");
+        };
+        assert!(m.contains("timeout") && m.contains("line 12"), "{m}");
+        let Err(MeasurementDeclError::Malformed(m)) = parse_measurements("[[measurements]\n")
+        else {
+            panic!("expected Malformed");
+        };
+        assert!(m.contains("line 1"), "{m}");
     }
 
     #[test]
@@ -342,7 +421,13 @@ task = "smoke"
                 count: MEASUREMENTS_MAX_ENTRIES + 1
             })
         );
-        let huge = format!("# {}\n", "x".repeat(MEASUREMENTS_FILE_MAX_BYTES));
+        // Exactly the cap is accepted.
+        let body = entry("a", "");
+        let pad = MEASUREMENTS_FILE_MAX_BYTES - body.len() - 3;
+        let exact = format!("{body}# {}\n", "x".repeat(pad));
+        assert_eq!(exact.len(), MEASUREMENTS_FILE_MAX_BYTES);
+        assert_eq!(parse_measurements(&exact).unwrap().measurements.len(), 1);
+        let huge = format!("{exact}#");
         assert!(matches!(
             parse_measurements(&huge),
             Err(MeasurementDeclError::TooLarge { .. })

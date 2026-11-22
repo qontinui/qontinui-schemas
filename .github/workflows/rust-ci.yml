@@ -397,7 +397,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe -- -D warnings
+        run: cargo clippy --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe,qontinui-types/measurement-decl -- -D warnings
 
       # The library as its consumers (runner, coord) build it: WITHOUT the
       # `import` feature, so dead code behind the feature gate is caught.
@@ -405,7 +405,7 @@ jobs:
         run: cargo clippy -p qontinui-ci-exec --all-targets -- -D warnings
 
       - name: cargo build
-        run: cargo build --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe
+        run: cargo build --workspace --all-targets --features qontinui-ci-exec/import,qontinui-types/host-probe,qontinui-types/measurement-decl
 
       # The vacuity parser below is a COPY. Its source of record is
       # qontinui-claude-config/scripts/lib/cargo-vacuity.sh, which this runner
@@ -438,9 +438,11 @@ jobs:
           # non-default feature (library consumers do not pull in libyaml).
           # qontinui-types/host-probe: `host_sizing::probe` and its test sit
           # behind that non-default feature (it pulls in sysinfo).
+          # qontinui-types/measurement-decl: `measurement_decl` and its tests
+          # sit behind that non-default feature (it pulls in toml).
           # The output goes to $RUNNER_TEMP, which the runner empties per job
           # on either lane; a self-hosted registration keeps /tmp between jobs.
-          cargo test --workspace --features qontinui-ci-exec/import,qontinui-types/host-probe 2>&1 | tee "$RUNNER_TEMP/cargo-test.out"
+          cargo test --workspace --features qontinui-ci-exec/import,qontinui-types/host-probe,qontinui-types/measurement-decl 2>&1 | tee "$RUNNER_TEMP/cargo-test.out"
           SUBRC=${PIPESTATUS[0]}
           set -e
 

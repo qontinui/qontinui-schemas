@@ -29,8 +29,6 @@ hex = "0.4"
 serde_jcs = "0.1"
 thiserror = "2"
 base64 = "0.22"
-# `measurement_decl` parses `.qontinui/measurements.toml`.
-toml = "1"
 # Optional: only `host_sizing::probe` reads the live host. Enable with the
 # `host-probe` feature; the pure sizing arithmetic needs nothing.
 sysinfo = { version = "0.32", default-features = false, features = ["system"], optional = true }
@@ -38,6 +36,10 @@ sysinfo = { version = "0.32", default-features = false, features = ["system"], o
 # Enable with the `spec-yaml` feature; the spec types themselves need nothing,
 # so a consumer that only uses them adds nothing to its lockfile.
 serde_yaml_ng = { version = "0.10", optional = true }
+# Optional: only `measurement_decl` parses `.qontinui/measurements.toml`.
+# Enable with the `measurement-decl` feature (coord will, Phase 5); nothing else in the
+# crate reads TOML.
+toml = { version = "1", optional = true }
 
 [features]
 default = []
@@ -48,11 +50,14 @@ host-probe = ["dep:sysinfo"]
 # `spec_model::{parse, render}` — the spec artifact body as YAML frontmatter
 # plus prose. Consumers that read or write whole spec bodies enable this.
 spec-yaml = ["dep:serde_yaml_ng"]
+# `measurement_decl` — the `.qontinui/measurements.toml` grammar and its
+# strict parser. Coord, which reads the file, enables it (Phase 5).
+measurement-decl = ["dep:toml"]
 
 [dev-dependencies]
-# tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml
-# (it also uses `toml`, a normal dependency).
+# tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.
 regex = "1"
+toml = "1"
 # tests/image_slot_fixtures.rs — image-slot specs are authored as YAML. The
 # maintained fork of the deprecated serde_yaml, already locked here by ci-exec.
 serde_yaml_ng = "0.10"
