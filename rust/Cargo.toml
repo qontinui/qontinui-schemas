@@ -29,6 +29,8 @@ hex = "0.4"
 serde_jcs = "0.1"
 thiserror = "2"
 base64 = "0.22"
+# `measurement_decl` parses `.qontinui/measurements.toml`.
+toml = "1"
 # Optional: only `host_sizing::probe` reads the live host. Enable with the
 # `host-probe` feature; the pure sizing arithmetic needs nothing.
 sysinfo = { version = "0.32", default-features = false, features = ["system"], optional = true }
@@ -48,9 +50,9 @@ host-probe = ["dep:sysinfo"]
 spec-yaml = ["dep:serde_yaml_ng"]
 
 [dev-dependencies]
-# tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml.
+# tests/fleet_nouns_vocabulary.rs — validates the repo-root fleet-nouns.toml
+# (it also uses `toml`, a normal dependency).
 regex = "1"
-toml = "1"
 # tests/image_slot_fixtures.rs — image-slot specs are authored as YAML. The
 # maintained fork of the deprecated serde_yaml, already locked here by ci-exec.
 serde_yaml_ng = "0.10"
