@@ -34,7 +34,7 @@ use serde_json::{json, Map, Value};
 /// `canonical_hash(structural(file))` of every frozen version, oldest first.
 const FROZEN_DIGESTS: &[(u32, &str)] = &[(
     1,
-    "sha256-2fbfae6936ec09cbddeb907bb7964b529b6d30331d2c045e03454743caf9f3f6",
+    "sha256-8b3f21f91d093678509ab7fc4ce1753197d6f74cf3be525950e065ce72660cdf",
 )];
 
 fn fixture(version: u32) -> PathBuf {
@@ -249,7 +249,25 @@ fn a_structural_mutation_is_caught_and_a_reworded_description_is_not() {
             }),
         ),
         (
-            "an enum token added",
+            "a plain-enum token appended (SourceClass)",
+            Box::new(|s| {
+                let tokens = s["$defs"]["SourceClass"]["enum"]
+                    .as_array_mut()
+                    .expect("SourceClass is a plain `enum` array");
+                tokens.push(json!("vendor"));
+            }),
+        ),
+        (
+            "a documented-enum variant appended (EvidenceGrade)",
+            Box::new(|s| {
+                let variants = s["$defs"]["EvidenceGrade"]["oneOf"]
+                    .as_array_mut()
+                    .expect("EvidenceGrade is a `oneOf` of documented consts");
+                variants.push(json!({"const": "audited", "type": "string"}));
+            }),
+        ),
+        (
+            "an enum token renamed",
             Box::new(|s| {
                 let defs = s["$defs"].as_object_mut().unwrap();
                 let grade = defs.get_mut("EvidenceGrade").unwrap();
@@ -488,6 +506,21 @@ fn corpus() -> Vec<(String, Value)> {
     ] {
         set("/activity", json!(a));
     }
+    // A trailing newline, which Python's `$` would otherwise admit.
+    set("/activity", json!("ci.run\n"));
+    set("/id", json!(format!("{V7}\n")));
+    set("/occurred_at", json!("2026-11-22T10:00:00Z\n"));
+    set("/prev_hash", json!(format!("sha256-{}\n", "a".repeat(64))));
+    set("/source", json!("x\n"));
+    // Integers: negative, past u64::MAX, and the integer-valued float (a
+    // DECLARED exception, see `DECLARED_EXCEPTIONS`).
+    set("/source_seq", json!(-1));
+    set("/source_seq", json!(u64::MAX));
+    set("/source_seq", json!(18_446_744_073_709_551_616.0_f64));
+    set("/source_seq", json!(1.0));
+    set("/schema_version", json!(1.0));
+    set("/schema_version", json!(-1));
+    set("/schema_version", json!(4_294_967_297_u64));
     // probability
     for p in [0.0, -0.1, 1e-9, 0.5, 1.0, 1.000_001, 2.0] {
         set("/assignment/probability", json!(p));
@@ -543,6 +576,7 @@ fn corpus() -> Vec<(String, Value)> {
             "a\nb",
             "a\u{85}b",
             "a\u{7f}b",
+            "x\n",
         ] {
             set(site, json!(label));
         }
@@ -566,6 +600,14 @@ fn corpus() -> Vec<(String, Value)> {
     c
 }
 
+/// The corpus cases where the schema and `validate()` are DOCUMENTED to
+/// disagree (module docs of `qontinui_types::ledger`, "Integers are emitted
+/// as JSON integers"): JSON Schema's `type: integer` admits an
+/// integer-valued float and no keyword can refuse it, while Rust stays
+/// strict. Each must disagree exactly that way (schema admits, Rust
+/// refuses), and each must appear in the corpus.
+const DECLARED_EXCEPTIONS: &[&str] = &["/source_seq = 1.0", "/schema_version = 1.0"];
+
 fn rust_accepts(v: &Value) -> bool {
     serde_json::from_value::<LedgerEnvelope>(v.clone())
         .map(|e| validate(&e).is_ok())
@@ -582,10 +624,19 @@ fn the_schema_and_validate_agree_on_the_corpus() {
     let corpus = corpus();
     let mut accepted = 0;
     let mut disagreements = Vec::new();
+    let mut exceptions_seen = Vec::new();
     for (name, instance) in &corpus {
         let by_schema = validator.is_valid(instance);
         let by_rust = rust_accepts(instance);
-        if by_schema != by_rust {
+        if DECLARED_EXCEPTIONS.contains(&name.as_str()) {
+            // Must disagree exactly as declared: schema admits, Rust refuses.
+            assert!(
+                by_schema && !by_rust,
+                "declared exception `{name}` no longer behaves as documented: \
+                 schema={by_schema} validate={by_rust}"
+            );
+            exceptions_seen.push(name.as_str());
+        } else if by_schema != by_rust {
             disagreements.push(format!("{name}: schema={by_schema} validate={by_rust}"));
         }
         accepted += usize::from(by_rust);
@@ -595,6 +646,13 @@ fn the_schema_and_validate_agree_on_the_corpus() {
         "the frozen schema and validate() disagree:\n{}",
         disagreements.join("\n")
     );
+    exceptions_seen.sort_unstable();
+    let mut declared = DECLARED_EXCEPTIONS.to_vec();
+    declared.sort_unstable();
+    assert_eq!(
+        exceptions_seen, declared,
+        "every declared exception is exercised"
+    );
     // Guard against a vacuous corpus: both outcomes must be exercised.
     assert!(rust_accepts(&sample()));
     assert!(
@@ -602,4 +660,92 @@ fn the_schema_and_validate_agree_on_the_corpus() {
         "accepted {accepted}/{}",
         corpus.len()
     );
+}
+
+// ============================================================================
+// The committed patterns under Python's `re`
+// ============================================================================
+
+/// Python is a named non-Rust writer, and `re.search` differs from ECMA-262
+/// in one way that matters here: `$` also matches before a trailing newline.
+/// Run every committed pattern through `re.search` on cases including a
+/// newline suffix. Needs `python3`; CI's rust-ci job has it (its
+/// fleet-nouns step runs it), so under `CI` its absence fails rather than
+/// skips.
+#[test]
+fn the_committed_patterns_behave_the_same_under_python_re() {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+
+    let schema = golden();
+    let pattern = |pointer: &str| {
+        schema
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("no pattern at {pointer}"))
+            .to_owned()
+    };
+    let id = pattern("/properties/id/pattern");
+    let ts = pattern("/properties/occurred_at/pattern");
+    let activity = pattern("/properties/activity/pattern");
+    let hash = pattern("/properties/prev_hash/pattern");
+    let label = pattern("/properties/source/pattern");
+    let h = "a".repeat(64);
+    let cases = json!([
+        [id, V7, true],
+        [id, format!("{V7}\n"), false],
+        [id, V7.to_uppercase(), false],
+        [ts, "2026-11-22T10:00:00Z", true],
+        [ts, "2026-11-22T10:00:00.5+05:30", true],
+        [ts, "2026-11-22T10:00:00Z\n", false],
+        [ts, "2026-11-22t10:00:00z", false],
+        [activity, "ci.run", true],
+        [activity, "ci.run\n", false],
+        [activity, "ci.run.x", false],
+        [hash, format!("sha256-{h}"), true],
+        [hash, format!("sha256-{h}\n"), false],
+        [label, "x", true],
+        [label, "a b", true],
+        [label, "x\n", false],
+        [label, " x", false],
+        [label, "x\u{3000}", false],
+        [label, "\u{FEFF}x", false],
+        [label, "a\u{85}b", false],
+    ]);
+    let script = r#"
+import json, re, sys
+bad = []
+for pattern, text, expected in json.load(sys.stdin):
+    got = re.search(pattern, text) is not None
+    if got != expected:
+        bad.append([pattern, text, expected, got])
+print(json.dumps(bad))
+"#;
+    let child = Command::new("python3")
+        .args(["-I", "-c", script])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn();
+    let mut child = match child {
+        Ok(child) => child,
+        Err(e) if std::env::var_os("CI").is_none() => {
+            eprintln!("SKIPPED: python3 not runnable here ({e}); CI runs this test");
+            return;
+        }
+        Err(e) => panic!("python3 is required under CI: {e}"),
+    };
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(cases.to_string().as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "python3 failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let bad: Value = serde_json::from_slice(&out.stdout).expect("python printed JSON");
+    assert_eq!(bad, json!([]), "patterns disagree under Python re.search");
 }

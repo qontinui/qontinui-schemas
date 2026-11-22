@@ -7,13 +7,13 @@
         "arm": {
           "description": "The arm the unit was assigned to.",
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "assignment_seed_id": {
           "description": "The id of the seed the assignment was drawn from.",
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "covariates": {
@@ -24,7 +24,7 @@
         "policy_version": {
           "description": "The version of the policy that made the assignment.",
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "probability": {
@@ -37,7 +37,7 @@
         "unit": {
           "description": "The randomisation unit (a session, a PR, a switchback window, …).",
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         }
       },
@@ -82,18 +82,18 @@
       "properties": {
         "object_id": {
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "object_type": {
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "qualifier": {
           "description": "The OCEL qualifier: the role this object plays in the event.",
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         }
       },
@@ -131,13 +131,13 @@
             },
             "salted_hash": {
               "description": "`sha256-<64 hex>` of the salted payload.",
-              "pattern": "^sha256-[0-9a-f]{64}$",
+              "pattern": "^(?!.*\\n)sha256-[0-9a-f]{64}$",
               "type": "string"
             },
             "store": {
               "description": "The side store holding the payload.",
               "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+              "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
               "type": "string"
             }
           },
@@ -184,7 +184,7 @@
         },
         "value": {
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": [
             "string",
             "null"
@@ -258,7 +258,7 @@
       "properties": {
         "id": {
           "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+          "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
           "type": "string"
         },
         "kind": {
@@ -278,7 +278,7 @@
   "properties": {
     "activity": {
       "description": "`<namespace>.<verb>`, both `[a-z][a-z0-9_]*`.",
-      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "pattern": "^(?!.*\\n)[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
       "type": "string"
     },
     "assignment": {
@@ -293,7 +293,7 @@
     },
     "causation_id": {
       "minLength": 1,
-      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+      "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
       "type": [
         "string",
         "null"
@@ -301,7 +301,7 @@
     },
     "correlation_id": {
       "minLength": 1,
-      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+      "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
       "type": [
         "string",
         "null"
@@ -313,7 +313,7 @@
     "id": {
       "description": "A lower-case hyphenated UUIDv7.",
       "format": "uuid",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "pattern": "^(?!.*\\n)[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
       "type": "string"
     },
     "objects": {
@@ -325,7 +325,7 @@
     "occurred_at": {
       "description": "RFC 3339; what it measures is `time_basis`.",
       "format": "date-time",
-      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+      "pattern": "^(?!.*\\n)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
       "type": "string"
     },
     "payload": {
@@ -333,7 +333,7 @@
     },
     "policy_version": {
       "minLength": 1,
-      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+      "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
       "type": [
         "string",
         "null"
@@ -341,7 +341,7 @@
     },
     "prev_hash": {
       "description": "The [`chain_hash`] of the previous event of this chain; `null` only\nfor a chain's first event.",
-      "pattern": "^sha256-[0-9a-f]{64}$",
+      "pattern": "^(?!.*\\n)sha256-[0-9a-f]{64}$",
       "type": [
         "string",
         "null"
@@ -353,20 +353,21 @@
     "recorded_at": {
       "description": "RFC 3339; when the ledger recorded the event.",
       "format": "date-time",
-      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+      "pattern": "^(?!.*\\n)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
       "type": "string"
     },
     "schema_version": {
       "const": 1,
       "description": "Always [`ENVELOPE_SCHEMA_VERSION`] for this crate's writers.",
       "format": "uint32",
+      "maximum": 4294967295,
       "minimum": 0,
       "type": "integer"
     },
     "source": {
       "description": "The writer that produced the event.",
       "minLength": 1,
-      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
+      "pattern": "^(?!.*\\n)[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF])?$",
       "type": "string"
     },
     "source_class": {
@@ -375,6 +376,7 @@
     "source_seq": {
       "description": "The writer's own monotone sequence number (idempotent replay key with\n`source`).",
       "format": "uint64",
+      "maximum": 18446744073709551615,
       "minimum": 0,
       "type": "integer"
     },

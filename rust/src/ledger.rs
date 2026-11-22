@@ -34,6 +34,13 @@
 //! What only `format: date-time` carries (a day that exists in its month) is
 //! enforced by a validator that asserts formats.
 //!
+//! **Integers are emitted as JSON integers.** JSON Schema's `type: integer`
+//! admits an integer-valued float (`1.0`), and no keyword can refuse it, so
+//! the schema accepts `"source_seq": 1.0` and `"schema_version": 1.0` while
+//! Rust (serde_json into `u64` / `u32`) refuses them. Rust stays strict on
+//! purpose; a writer MUST emit `1`, never `1.0`. This is the one declared,
+//! tested disagreement between the schema and [`validate`].
+//!
 //! # Every field is required — absence is spelled `null`, never omitted
 //!
 //! Every field of the envelope must be **present** on the wire. A field that
@@ -103,25 +110,30 @@ pub const SUBSTRATE_ACTIVITY_NAMESPACES: &[&str] = &[
 // Patterns — the schema spelling of validate()'s rules
 // ============================================================================
 
+// Every pattern starts `^(?!.*\n)`: Python's `re.search` lets `$` match
+// before a trailing newline, so without the lookahead a Python writer would
+// accept `"ci.run\n"` that Rust refuses. The lookahead is valid ECMA-262,
+// Python `re` and fancy-regex syntax.
+
 /// A lower-case, hyphenated UUIDv7 with the RFC 4122 variant. One id, one
 /// spelling: upper-case hex is refused.
 pub const UUID_V7_PATTERN: &str =
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+    r"^(?!.*\n)[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 
 /// RFC 3339 with an upper-case `T`, optional fraction, and `Z` or `±hh:mm`.
 /// No leap second (`:60`). Whether the day exists in its month is the
 /// `format: date-time` half.
-pub const TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$";
+pub const TIMESTAMP_PATTERN: &str = r"^(?!.*\n)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$";
 
 /// `<namespace>.<verb>`, each `[a-z][a-z0-9_]*`.
-pub const ACTIVITY_PATTERN: &str = r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$";
+pub const ACTIVITY_PATTERN: &str = r"^(?!.*\n)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$";
 
 /// A [`canonical_hash`]-shaped digest.
-pub const HASH_PATTERN: &str = r"^sha256-[0-9a-f]{64}$";
+pub const HASH_PATTERN: &str = r"^(?!.*\n)sha256-[0-9a-f]{64}$";
 
 /// A label: non-empty, no control character (Unicode `Cc`), and no
 /// whitespace (Unicode `White_Space`, plus U+FEFF) at either end.
-pub const LABEL_PATTERN: &str = r"^[^\u0000-\u001F\u007F-\u009F \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]([^\u0000-\u001F\u007F-\u009F]*[^\u0000-\u001F\u007F-\u009F \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])?$";
+pub const LABEL_PATTERN: &str = r"^(?!.*\n)[^\u0000-\u001F\u007F-\u009F \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]([^\u0000-\u001F\u007F-\u009F]*[^\u0000-\u001F\u007F-\u009F \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])?$";
 
 // ============================================================================
 // Vocabulary
@@ -279,6 +291,7 @@ pub struct LedgerEnvelope {
     pub source: String,
     /// The writer's own monotone sequence number (idempotent replay key with
     /// `source`).
+    #[schemars(extend("maximum" = u64::MAX))]
     pub source_seq: u64,
     /// RFC 3339; what it measures is `time_basis`.
     #[schemars(extend("format" = "date-time", "pattern" = TIMESTAMP_PATTERN))]
@@ -308,7 +321,7 @@ pub struct LedgerEnvelope {
     #[schemars(with = "Nullable<String>", extend("minLength" = 1, "pattern" = LABEL_PATTERN))]
     pub policy_version: Option<String>,
     /// Always [`ENVELOPE_SCHEMA_VERSION`] for this crate's writers.
-    #[schemars(extend("const" = ENVELOPE_SCHEMA_VERSION))]
+    #[schemars(extend("const" = ENVELOPE_SCHEMA_VERSION, "maximum" = u32::MAX))]
     pub schema_version: u32,
     /// The [`chain_hash`] of the previous event of this chain; `null` only
     /// for a chain's first event.
