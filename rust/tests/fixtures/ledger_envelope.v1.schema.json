@@ -17,8 +17,10 @@
           "type": "string"
         },
         "covariates": {
-          "additionalProperties": true,
-          "description": "The covariates recorded at assignment time.",
+          "additionalProperties": {
+            "$ref": "#/$defs/SafeJson"
+          },
+          "description": "The covariates recorded at assignment time. Every integer inside is\nwithin `±MAX_SAFE_INTEGER`.",
           "type": "object"
         },
         "policy_version": {
@@ -114,7 +116,10 @@
               "const": "inline",
               "type": "string"
             },
-            "value": true
+            "value": {
+              "$ref": "#/$defs/SafeJson",
+              "description": "Any JSON; every integer inside is within `±MAX_SAFE_INTEGER`."
+            }
           },
           "required": [
             "kind",
@@ -196,6 +201,22 @@
         "attribution_grade"
       ],
       "type": "object"
+    },
+    "SafeJson": {
+      "additionalProperties": {
+        "$ref": "#/$defs/SafeJson"
+      },
+      "description": "Any JSON value whose integers all lie within ±(2^53 - 1).",
+      "if": {
+        "type": "integer"
+      },
+      "items": {
+        "$ref": "#/$defs/SafeJson"
+      },
+      "then": {
+        "maximum": 9007199254740991,
+        "minimum": -9007199254740991
+      }
     },
     "SourceClass": {
       "description": "Who observed a fact — the process log's `evidence_tier` vocabulary, kept\ntoken-for-token so the OCEL projection keeps its tier.",
@@ -374,9 +395,9 @@
       "$ref": "#/$defs/SourceClass"
     },
     "source_seq": {
-      "description": "The writer's own monotone sequence number (idempotent replay key with\n`source`).",
+      "description": "The writer's own monotone sequence number (idempotent replay key with\n`source`). At most [`MAX_SAFE_INTEGER`].",
       "format": "uint64",
-      "maximum": 18446744073709551615,
+      "maximum": 9007199254740991,
       "minimum": 0,
       "type": "integer"
     },
