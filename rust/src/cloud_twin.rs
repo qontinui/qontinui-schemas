@@ -125,6 +125,12 @@ pub struct OperationRef {
 // ============================================================================
 
 /// What a world is.
+///
+/// **The frozen ledger envelope depends on this enum:**
+/// [`crate::ledger::WorldRef`] embeds it, so its tokens are part of
+/// `ledger_envelope.v1.schema.json`. Adding, removing or renaming a variant
+/// changes that frozen schema and fails `tests/ledger_envelope_golden.rs`
+/// until the envelope's version is bumped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WorldKind {

@@ -61,3 +61,6 @@ toml = "1"
 # tests/image_slot_fixtures.rs — image-slot specs are authored as YAML. The
 # maintained fork of the deprecated serde_yaml, already locked here by ci-exec.
 serde_yaml_ng = "0.10"
+# tests/ledger_envelope_golden.rs — checks the frozen envelope schema and
+# ledger::validate agree. No default features: no HTTP/file $ref resolution.
+jsonschema = { version = "0.45", default-features = false }
