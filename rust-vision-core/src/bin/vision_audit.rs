@@ -1720,7 +1720,7 @@ mod tests {
     fn the_verdict_line_names_the_fold_and_the_exit() {
         let snap = snap_with_overlap();
         let bl = HashMap::new();
-        let pass = assert_all(&snap, None, &[Assertion::NoClipping { region: None }], &bl);
+        let pass = assert_all(&snap, None, &[aligned_a_b()], &bl);
         assert!(assert_summary(&pass)
             .lines()
             .next()
