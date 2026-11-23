@@ -172,7 +172,8 @@ HASH:
     no JSON), not a per-file error entry: rename the file or pass a UTF-8 path.
 
 OUTPUT: machine JSON -> stdout, human summary -> stderr.
-EXIT:   0 ok / gate passed, 2 gate failed, 1 usage|io|parse error
+EXIT:   0 ok / gate passed, 2 gate failed, 3 no verdict (assert: empty
+        assertion list), 1 usage|io|parse error
         (hash: 1 also when every file failed).
 
 NOTE: OCR/VLM run runner-side only; this bin uses the snapshot-text path and
