@@ -237,9 +237,24 @@ pub struct Element {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub line_height_px: Option<f32>,
     /// Parent id, when known. Lets `no_clipping` walk up to the clip
-    /// ancestor without re-running the layout engine.
+    /// ancestor without re-running the layout engine: it follows this chain,
+    /// skipping every ancestor whose [`Self::clips_children`] is
+    /// `Some(false)`, and compares the child against the first ancestor that
+    /// may clip (`Some(true)` or unmeasured `None`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
+    /// Whether this element clips its descendants' painting to its own box.
+    ///
+    /// - `Some(true)`: it clips — computed `overflow` (either axis) is
+    ///   `hidden`, `clip`, `scroll` or `auto`, or `contain` includes `paint`.
+    /// - `Some(false)`: measured as NOT clipping (`overflow: visible` on both
+    ///   axes, no paint containment). A descendant overhanging it is not cut
+    ///   off by it, so `no_clipping` walks past it to the next ancestor.
+    /// - `None`: unmeasured. `no_clipping` treats it as possibly clipping and
+    ///   compares against it, which is how every snapshot from a producer
+    ///   that does not send this field is read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clips_children: Option<bool>,
     /// Children ids, when known.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children_ids: Vec<String>,

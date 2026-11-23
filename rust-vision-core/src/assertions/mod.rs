@@ -49,7 +49,7 @@
 //! See [`evaluate`] for the entrypoint and individual variant docs for
 //! what each one checks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -108,12 +108,19 @@ pub enum Assertion {
     /// Horizontal: `scroll_width_px > bbox.w` means the laid-out text is
     /// wider than the box showing it, i.e. it is ellipsised or clipped.
     /// Vertical: `scroll_height_px > bbox.h` means it is taller than the box.
-    /// Without `scroll_height_px` the vertical arm falls back to an ESTIMATE:
-    /// `bbox.h` shorter than ~1.5x `font_size_px` fails.
+    /// Without `scroll_height_px` the vertical arm falls back to an ESTIMATE
+    /// that the box holds at least one line: `bbox.h` shorter than the
+    /// element's measured `line_height_px` fails, and without that, `bbox.h`
+    /// shorter than ~1.5x `font_size_px` fails. Both are estimates — neither
+    /// measures the content, so neither sees a label that wrapped onto a
+    /// second line — but the measured line height is the better one: a
+    /// `leading-none` label exactly as tall as its font passes it, where the
+    /// 1.5x guess would call it clipped.
     ///
     /// A failure on either arm fails the assertion, even when the other arm
     /// measured nothing. Otherwise an arm that measured nothing — no
-    /// `scroll_width_px`, or neither `scroll_height_px` nor `font_size_px` —
+    /// `scroll_width_px`, or none of `scroll_height_px`, `line_height_px` and
+    /// `font_size_px` —
     /// makes it `unknown{input_missing}` rather than a pass, because a silent
     /// pass on an un-measured axis is what let truncated labels through
     /// before. An element that carries no text is `unknown{input_missing}`
@@ -166,15 +173,27 @@ pub enum Assertion {
         #[serde(default)]
         tolerance_px: Option<u32>,
     },
-    /// No descendant element extends past its parent's clip rect.
+    /// No element extends past its nearest CLIPPING ancestor's box.
     /// `region` scopes the check to the children whose box intersects it.
     ///
+    /// The ancestor compared against is found by walking the child's
+    /// `parent_id` chain: an ancestor the producer measured as NOT clipping
+    /// (`clips_children: Some(false)`, i.e. `overflow: visible`) is skipped,
+    /// because content may legitimately overhang it; the first ancestor that
+    /// is not skipped — `Some(true)`, or `None` (unmeasured, so it may clip) —
+    /// is the one compared, provided it is registered and has a bbox. If that
+    /// first non-skipped ancestor is unregistered or bbox-less, or the chain
+    /// ends or cycles before reaching one, nothing is compared for that
+    /// child. A snapshot whose producer measures no `clips_children` is read
+    /// exactly as before: every direct parent is compared.
+    ///
     /// A pass needs at least one child that was actually compared: in scope,
-    /// with a bbox, and with a `parent_id` that resolves to an element with a
-    /// bbox. A check that compared none is `unknown{input_missing}`, never a
-    /// vacuous pass: a snapshot in which no element carries a `parent_id`,
-    /// every parent unresolved or unpositioned, every parented child
-    /// unpositioned, or a `region` that holds no parented child.
+    /// with a bbox, and with a `parent_id` chain reaching such an ancestor
+    /// with a bbox. A check that compared none is `unknown{input_missing}`,
+    /// never a vacuous pass: a snapshot in which no element carries a
+    /// `parent_id`, every chain ends unresolved, unpositioned or with no
+    /// clipping ancestor, every parented child unpositioned, or a `region`
+    /// that holds no parented child.
     NoClipping {
         #[serde(default)]
         region: Option<Region>,
@@ -731,10 +750,14 @@ pub struct AssertionResult {
     /// is the one place in this evaluator where `None` is a KNOWN GAP in this
     /// field's coverage rather than a claim of exactness. When the snapshot
     /// carries no `scroll_height_px`, the vertical arm thresholds `bbox.h`
-    /// against a hard-coded `font_size_px * 1.5` line-height guess, and its
-    /// own detail says "text likely clipped" or "estimated". It states
-    /// `None` because `1.5` is an unmeasured constant: deriving a number from
-    /// it would manufacture exactly the precision this field exists to avoid.
+    /// against one line: the measured `line_height_px` when the snapshot
+    /// carries it, else a hard-coded `font_size_px * 1.5` line-height guess,
+    /// and its own detail says "text likely clipped" or "estimated", naming
+    /// which was used. It states `None` in both cases: `1.5` is an unmeasured
+    /// constant, and even a measured line height stands in for the content
+    /// height it does not measure (a wrapped second line is invisible to it),
+    /// so deriving a number from either would manufacture exactly the
+    /// precision this field exists to avoid.
     /// The measured arms (`scroll_width_px` and `scroll_height_px` against
     /// the box) are genuinely exact, so a producer that sends
     /// `scroll_height_px` closes the gap for its elements.
@@ -1516,7 +1539,8 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     // `truncate` / `text-overflow: ellipsis` label whose name is cut to a
     // fragment), VERTICAL is `scroll_height_px` against it. Only the vertical
     // arm has a fallback, an estimate from the font size, kept for producers
-    // that do not send `scroll_height_px` yet.
+    // that do not send `scroll_height_px` yet: the measured line height when
+    // there is one, else the font size.
     // No text is nothing to fit, and nothing was checked: unknown, never a
     // vacuous pass (plan 2026-11-09 Phase 0 — a verdict is never read off an
     // absence). The conformance fixture pins this for every port.
@@ -1568,12 +1592,15 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         }
     }
 
-    // --- Vertical: measured; else estimated from the font size; else not at all. ---
-    let vertical = match (el.scroll_height_px, el.font_size_px) {
-        // The measurement decides alone. The estimate is not consulted even
-        // when it disagrees: a `leading-none` label is exactly as tall as its
+    // --- Vertical: measured; else estimated from the line height, then the
+    // font size; else not at all. ---
+    // A line height that is not a finite positive length measures nothing.
+    let line_height = el.line_height_px.filter(|lh| lh.is_finite() && *lh > 0.0);
+    let vertical = match (el.scroll_height_px, line_height, el.font_size_px) {
+        // The measurement decides alone. The estimates are not consulted even
+        // when they disagree: a `leading-none` label is exactly as tall as its
         // font, which the 1.5x guess would call clipped.
-        (Some(sh), _) => {
+        (Some(sh), _, _) => {
             if sh > box_h {
                 return AssertionResult::fail(
                     assertion,
@@ -1586,20 +1613,36 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             }
             VerticalFit::Measured
         }
-        (None, Some(size)) => {
+        // The box must hold at least one line, at the element's own measured
+        // line height.
+        (None, Some(lh), _) => {
+            let needed = lh.ceil() as u32;
+            if box_h < needed {
+                return AssertionResult::fail(
+                    assertion,
+                    format!(
+                        "element height {box_h} px is less than its measured line height \
+                         {lh}px ({needed} px expected for one line) — text likely clipped"
+                    ),
+                );
+            }
+            VerticalFit::EstimatedFromLineHeight
+        }
+        (None, None, Some(size)) => {
             // Reasonable upper bound: text line height is ~font_size * 1.5.
             let needed = (size * 1.5).ceil() as u32;
             if box_h < needed {
                 return AssertionResult::fail(
                     assertion,
                     format!(
-                        "element height {box_h} px is less than ~1.5×{size}px font ({needed} px expected) — text likely clipped"
+                        "element height {box_h} px is less than ~1.5×{size}px font ({needed} px \
+                         expected; estimated, no `line_height_px` measured) — text likely clipped"
                     ),
                 );
             }
-            VerticalFit::Estimated
+            VerticalFit::EstimatedFromFontSize
         }
-        (None, None) => VerticalFit::Unmeasured,
+        (None, None, None) => VerticalFit::Unmeasured,
     };
 
     // Neither arm failed. Pass only when both of them looked: an arm that
@@ -1608,10 +1651,17 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
     let horizontal_measured = el.scroll_width_px.is_some();
     match (horizontal_measured, vertical) {
         (true, VerticalFit::Measured) => AssertionResult::pass(assertion),
-        (true, VerticalFit::Estimated) => AssertionResult::pass_with(
+        (true, VerticalFit::EstimatedFromLineHeight) => AssertionResult::pass_with(
+            assertion,
+            "horizontal fit measured; vertical fit ESTIMATED as one line at the measured \
+             `line_height_px`, because the snapshot carries no `scroll_height_px` for this \
+             element",
+        ),
+        (true, VerticalFit::EstimatedFromFontSize) => AssertionResult::pass_with(
             assertion,
             "horizontal fit measured; vertical fit ESTIMATED from the font size (~1.5x), \
-             because the snapshot carries no `scroll_height_px` for this element",
+             because the snapshot carries neither `scroll_height_px` nor `line_height_px` \
+             for this element",
         ),
         (_, _) => {
             let mut unmeasured = Vec::with_capacity(2);
@@ -1619,7 +1669,10 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
                 unmeasured.push("horizontal fit (no `scroll_width_px`)");
             }
             if vertical == VerticalFit::Unmeasured {
-                unmeasured.push("vertical fit (neither `scroll_height_px` nor `font_size_px`)");
+                unmeasured.push(
+                    "vertical fit (none of `scroll_height_px`, `line_height_px` and \
+                     `font_size_px`)",
+                );
             }
             AssertionResult::unknown(
                 assertion,
@@ -1639,9 +1692,12 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
 enum VerticalFit {
     /// `scroll_height_px` against the box.
     Measured,
+    /// One line at the measured `line_height_px` against the box: an
+    /// estimate, since the content height itself was not measured.
+    EstimatedFromLineHeight,
     /// The `font_size_px * 1.5` fallback.
-    Estimated,
-    /// Neither input was on the snapshot.
+    EstimatedFromFontSize,
+    /// None of the inputs was on the snapshot.
     Unmeasured,
 }
 
@@ -2066,50 +2122,63 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
              `parent_id` for no_clipping to answer",
         );
     }
-    // Build a parent → bbox map for O(1) lookup. Only positioned elements
-    // are clip candidates / clip ancestors.
-    let mut bbox_by_id: HashMap<&str, Region> = HashMap::with_capacity(snap.elements.len());
+    // Index the elements by id for the ancestor walk. The first element with
+    // an id wins, as in [`ElementSnapshot::get`].
+    let mut by_id: HashMap<&str, &crate::element_snapshot::Element> =
+        HashMap::with_capacity(snap.elements.len());
     for el in &snap.elements {
-        if let Some(bbox) = el.region() {
-            bbox_by_id.insert(el.id.as_str(), bbox);
-        }
+        by_id.entry(el.id.as_str()).or_insert(el);
     }
-    let mut offender: Option<(String, String)> = None;
-    // Pairs actually compared. A `parent_id` naming an unregistered or
-    // bbox-less parent, a bbox-less child, or a region holding no child
-    // compares nothing — and nothing compared is unknown, not a pass.
+    // (child, compared ancestor, whether that ancestor is the direct parent)
+    let mut offender: Option<(String, String, bool)> = None;
+    // Pairs actually compared. A chain whose first non-skipped ancestor is
+    // unregistered or bbox-less, a chain with no clipping ancestor at all, a
+    // bbox-less child, or a region holding no child compares nothing — and
+    // nothing compared is unknown, not a pass.
     let mut compared = 0usize;
     for el in &snap.elements {
         // A bbox-less child has no geometry to clip — skip it.
         let Some(el_bbox) = el.region() else { continue };
-        if let Some(parent_id) = &el.parent_id {
-            // Parent must also be positioned to be a clip ancestor.
-            if let Some(parent_bbox) = bbox_by_id.get(parent_id.as_str()) {
-                if let Some(r) = scope {
-                    if !regions_overlap(r, el_bbox) {
-                        continue;
-                    }
-                }
-                compared += 1;
-                if !region_contains(*parent_bbox, el_bbox) {
-                    offender = Some((el.id.clone(), parent_id.clone()));
-                    break;
-                }
+        let Some(parent_id) = &el.parent_id else {
+            continue;
+        };
+        let Some((ancestor_id, ancestor_bbox)) = nearest_clipping_ancestor(parent_id, &by_id)
+        else {
+            continue;
+        };
+        if let Some(r) = scope {
+            if !regions_overlap(r, el_bbox) {
+                continue;
             }
         }
+        compared += 1;
+        if !region_contains(ancestor_bbox, el_bbox) {
+            offender = Some((
+                el.id.clone(),
+                ancestor_id.to_string(),
+                ancestor_id == parent_id.as_str(),
+            ));
+            break;
+        }
     }
-    if let Some((child, parent)) = offender {
-        AssertionResult::fail(
-            assertion,
-            format!("element '{child}' extends past its parent '{parent}'"),
-        )
+    if let Some((child, ancestor, is_parent)) = offender {
+        let detail = if is_parent {
+            format!("element '{child}' extends past its parent '{ancestor}'")
+        } else {
+            format!(
+                "element '{child}' extends past its clipping ancestor '{ancestor}' (the \
+                 ancestors between them do not clip: `clips_children: false`)"
+            )
+        };
+        AssertionResult::fail(assertion, detail)
     } else if compared == 0 {
         AssertionResult::unknown(
             assertion,
             UnknownCode::InputMissing,
             format!(
-                "no child/parent pair was compared: no element{} has a bbox and a `parent_id` \
-                 naming a registered element with a bbox, so nothing was checked",
+                "no child/ancestor pair was compared: no element{} has a bbox and a `parent_id` \
+                 chain reaching a registered, possibly clipping ancestor (one not marked \
+                 `clips_children: false`) with a bbox, so nothing was checked",
                 if scope.is_some() {
                     " in the region"
                 } else {
@@ -2119,6 +2188,37 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         )
     } else {
         AssertionResult::pass(assertion)
+    }
+}
+
+/// The ancestor [`Assertion::NoClipping`] compares a child against, starting
+/// the walk at the child's `parent_id`: ancestors measured as NOT clipping
+/// (`clips_children: Some(false)`) are skipped, and the first one that is not
+/// (`Some(true)`, or `None` = unmeasured, which may clip) is the answer —
+/// when it is registered and has a bbox. When that first non-skipped ancestor
+/// is unregistered or bbox-less, or the chain ends (or cycles) before one is
+/// found, nothing is compared for this child: `None`.
+///
+/// Every step visits a distinct registered id (a visited set), so the walk is
+/// bounded by the element count and a `parent_id` cycle terminates.
+fn nearest_clipping_ancestor<'a>(
+    parent_id: &'a str,
+    by_id: &HashMap<&'a str, &'a crate::element_snapshot::Element>,
+) -> Option<(&'a str, Region)> {
+    let mut visited: HashSet<&str> = HashSet::new();
+    let mut current = parent_id;
+    loop {
+        if !visited.insert(current) {
+            // A `parent_id` cycle: no clipping ancestor was found.
+            return None;
+        }
+        let ancestor = by_id.get(current)?;
+        if ancestor.clips_children == Some(false) {
+            // Measured as not clipping (overflow: visible): look further up.
+            current = ancestor.parent_id.as_deref()?;
+            continue;
+        }
+        return ancestor.region().map(|r| (ancestor.id.as_str(), r));
     }
 }
 
@@ -3854,6 +3954,48 @@ mod tests {
         };
         let res = evaluate(&Assertion::NoClipping { region: None }, &ctx);
         assert!(!res.passed);
+    }
+
+    #[test]
+    fn no_clipping_names_the_clipping_ancestor_it_compared() {
+        let mut card = el("card", 0, 0, 100, 100);
+        card.clips_children = Some(true);
+        let mut row = el("row", 10, 10, 20, 20);
+        row.parent_id = Some("card".into());
+        row.clips_children = Some(false);
+        let mut badge = el("badge", 90, 10, 50, 10); // past card, via row
+        badge.parent_id = Some("row".into());
+        let snap = snap_of(vec![card, row, badge]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(&Assertion::NoClipping { region: None }, &ctx);
+        assert_eq!(res.outcome, AssertionOutcome::Failed, "{:?}", res.detail);
+        let detail = res.detail.unwrap_or_default();
+        assert!(
+            detail.contains("clipping ancestor 'card'"),
+            "the detail must name the ancestor actually compared: {detail}"
+        );
+    }
+
+    #[test]
+    fn no_clipping_ancestor_walk_terminates_on_a_parent_id_cycle() {
+        // Two overflow-visible elements naming each other as parent: the
+        // walk must stop, and with no clipping ancestor nothing is compared.
+        let mut a = el("a", 0, 0, 10, 10);
+        a.parent_id = Some("b".into());
+        a.clips_children = Some(false);
+        let mut b = el("b", 0, 0, 10, 10);
+        b.parent_id = Some("a".into());
+        b.clips_children = Some(false);
+        let snap = snap_of(vec![a, b]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(&Assertion::NoClipping { region: None }, &ctx);
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
     }
 
     #[test]

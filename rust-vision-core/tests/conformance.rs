@@ -33,9 +33,10 @@
 //! other key is accepted at those three levels, so a change to the shape is a
 //! `version` bump the port is told about, never a silent drift.
 //!
-//! **Numbers, for a port.** `font_size_px` and `font_weight` are `f32` here,
-//! and so is every comparison on them (the large-text thresholds) and the
-//! vertical estimate `ceil(font_size_px * 1.5)`. A port whose numbers are
+//! **Numbers, for a port.** `font_size_px`, `font_weight` and `line_height_px`
+//! are `f32` here, and so is every comparison on them (the large-text
+//! thresholds) and the vertical estimates `ceil(line_height_px)` and
+//! `ceil(font_size_px * 1.5)`. A port whose numbers are
 //! doubles must round to `f32` on both sides of each comparison and after the
 //! multiplication (in JavaScript, `Math.fround`), or it disagrees within about
 //! 1e-6 of a boundary: `10.666667 * 1.5` ceils to 16 in `f32` and to 17 in
@@ -51,10 +52,17 @@
 //!   `scroll_width_px` / `scroll_height_px` are the DOM's integer
 //!   `scrollWidth` / `scrollHeight`, compared with those strictly, with no
 //!   slack: content exactly as large as the ceiled box fits, and one pixel
-//!   larger does not, so a 119.4 px box holds 120 px. The vertical estimate
-//!   compares `ceil(h)` with `ceil(font_size_px * 1.5)`. The `*-ceiled-box-*`
+//!   larger does not, so a 119.4 px box holds 120 px. Without
+//!   `scroll_height_px` the vertical estimate compares `ceil(h)` with
+//!   `ceil(line_height_px)` when `line_height_px` is a finite positive number,
+//!   else with `ceil(font_size_px * 1.5)`. The `*-ceiled-box-*`
 //!   cases pin both sides of the boundary, and the `*-fractional-*` ones that
 //!   the ceiling is taken of the unrounded size.
+//! - `no_clipping` compares each child with its nearest CLIPPING ancestor: it
+//!   walks the `parent_id` chain, skipping every ancestor whose
+//!   `clips_children` is `false`, and compares with the first one that is
+//!   `true` or absent — if that one is registered and has a bbox, else with
+//!   nothing. A chain with no such ancestor compares nothing.
 //! - The geometry kinds (`no_overlap`, `element_above`, `no_clipping`) snap
 //!   each EDGE to the nearest pixel: `left = round(x)`, `top = round(y)`,
 //!   `right = round(x + w)`, `bottom = round(y + h)`, with `x + w` and `y + h`
