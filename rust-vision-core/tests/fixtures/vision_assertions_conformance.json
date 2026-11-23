@@ -938,6 +938,17 @@
       ]},
       "assertion": {"type": "no_clipping"},
       "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-repeated-parent-id-resolves-first-wins-and-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "p"},
+        {"id": "p", "bbox": {"x": 0, "y": 0, "w": 10, "h": 10}},
+        {"id": "c", "bbox": {"x": 0, "y": 0, "w": 50, "h": 50}, "parent_id": "p"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
     }
   ]
 }
