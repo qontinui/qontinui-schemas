@@ -201,6 +201,7 @@ from .per_type.finding_update import FindingUpdate
 from .per_type.finding_user_input import FindingUserInput
 from .per_type.findings_summary import FindingsSummary
 from .per_type.flow_event import FlowEvent
+from .per_type.folded_outcome import FoldedOutcome
 from .per_type.frontier_entry import FrontierEntry
 from .per_type.full_runner_step import FullRunnerStep
 from .per_type.functional_spec import FunctionalSpec
@@ -341,6 +342,7 @@ from .per_type.operation_input import OperationInput
 from .per_type.orchestration_loop_config import OrchestrationLoopConfig
 from .per_type.orchestration_loop_status import OrchestrationLoopStatus
 from .per_type.outcome import Outcome
+from .per_type.outcome_counts import OutcomeCounts
 from .per_type.output_line import OutputLine
 from .per_type.output_stream import OutputStream
 from .per_type.override_collection import OverrideCollection
@@ -457,6 +459,7 @@ from .per_type.source_citation import SourceCitation
 from .per_type.source_citation_kind import SourceCitationKind
 from .per_type.spec_acceptance_criterion import SpecAcceptanceCriterion
 from .per_type.spec_api_event import SpecApiEvent
+from .per_type.spec_assertion_verdict import SpecAssertionVerdict
 from .per_type.spec_check_confidence import SpecCheckConfidence
 from .per_type.spec_check_policy import SpecCheckPolicy
 from .per_type.spec_check_result import SpecCheckResult
@@ -829,6 +832,7 @@ __all__ = [
     "FindingUserInput",
     "FindingsSummary",
     "FlowEvent",
+    "FoldedOutcome",
     "FrontierEntry",
     "FullRunnerStep",
     "FunctionalSpec",
@@ -969,6 +973,7 @@ __all__ = [
     "OrchestrationLoopConfig",
     "OrchestrationLoopStatus",
     "Outcome",
+    "OutcomeCounts",
     "OutputLine",
     "OutputStream",
     "OverrideCollection",
@@ -1085,6 +1090,7 @@ __all__ = [
     "SourceCitationKind",
     "SpecAcceptanceCriterion",
     "SpecApiEvent",
+    "SpecAssertionVerdict",
     "SpecCheckConfidence",
     "SpecCheckPolicy",
     "SpecCheckResult",
