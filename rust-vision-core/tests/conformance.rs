@@ -62,7 +62,9 @@
 //!   walks the `parent_id` chain, skipping every ancestor whose
 //!   `clips_children` is `false`, and compares with the first one that is
 //!   `true` or absent — if that one is registered and has a bbox, else with
-//!   nothing. A chain with no such ancestor compares nothing.
+//!   nothing. A chain with no such ancestor, one stopped by an id naming no
+//!   element, and one that cycles back to the child compare nothing. Ids
+//!   resolve first-wins.
 //! - The geometry kinds (`no_overlap`, `element_above`, `no_clipping`) snap
 //!   each EDGE to the nearest pixel: `left = round(x)`, `top = round(y)`,
 //!   `right = round(x + w)`, `bottom = round(y + h)`, with `x + w` and `y + h`

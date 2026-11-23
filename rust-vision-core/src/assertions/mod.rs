@@ -119,8 +119,8 @@ pub enum Assertion {
     ///
     /// A failure on either arm fails the assertion, even when the other arm
     /// measured nothing. Otherwise an arm that measured nothing — no
-    /// `scroll_width_px`, or none of `scroll_height_px`, `line_height_px` and
-    /// `font_size_px` —
+    /// `scroll_width_px`, or no `scroll_height_px`, no finite positive
+    /// `line_height_px` and no `font_size_px` —
     /// makes it `unknown{input_missing}` rather than a pass, because a silent
     /// pass on an un-measured axis is what let truncated labels through
     /// before. An element that carries no text is `unknown{input_missing}`
@@ -184,8 +184,12 @@ pub enum Assertion {
     /// is the one compared, provided it is registered and has a bbox. If that
     /// first non-skipped ancestor is unregistered or bbox-less, or the chain
     /// ends or cycles before reaching one, nothing is compared for that
-    /// child. A snapshot whose producer measures no `clips_children` is read
-    /// exactly as before: every direct parent is compared.
+    /// child, and a chain that comes back to the child itself (a `parent_id`
+    /// cycle) compares nothing rather than the child with itself. When a
+    /// snapshot's producer measures no `clips_children`, every child is
+    /// compared with its direct parent, as before this field existed; ids are
+    /// resolved first-wins, as [`ElementSnapshot::get`] resolves them, so a
+    /// snapshot repeating an id resolves it to the first such element.
     ///
     /// A pass needs at least one child that was actually compared: in scope,
     /// with a bbox, and with a `parent_id` chain reaching such an ancestor
@@ -1660,7 +1664,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
         (true, VerticalFit::EstimatedFromFontSize) => AssertionResult::pass_with(
             assertion,
             "horizontal fit measured; vertical fit ESTIMATED from the font size (~1.5x), \
-             because the snapshot carries neither `scroll_height_px` nor `line_height_px` \
+             because the snapshot carries no `scroll_height_px` and no positive `line_height_px` \
              for this element",
         ),
         (_, _) => {
@@ -1670,7 +1674,7 @@ fn eval_text_fits(element: String, ctx: &EvalContext<'_>) -> AssertionResult {
             }
             if vertical == VerticalFit::Unmeasured {
                 unmeasured.push(
-                    "vertical fit (none of `scroll_height_px`, `line_height_px` and \
+                    "vertical fit (no `scroll_height_px`, no positive `line_height_px` and no \
                      `font_size_px`)",
                 );
             }
@@ -2142,7 +2146,8 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
         let Some(parent_id) = &el.parent_id else {
             continue;
         };
-        let Some((ancestor_id, ancestor_bbox)) = nearest_clipping_ancestor(parent_id, &by_id)
+        let Some((ancestor_id, ancestor_bbox)) =
+            nearest_clipping_ancestor(el.id.as_str(), parent_id, &by_id)
         else {
             continue;
         };
@@ -2199,17 +2204,22 @@ fn eval_no_clipping(scope: Option<Region>, ctx: &EvalContext<'_>) -> AssertionRe
 /// is unregistered or bbox-less, or the chain ends (or cycles) before one is
 /// found, nothing is compared for this child: `None`.
 ///
-/// Every step visits a distinct registered id (a visited set), so the walk is
-/// bounded by the element count and a `parent_id` cycle terminates.
+/// The visited set is seeded with the child's own id, so a cycle that leads
+/// back to the child yields `None` rather than the child as its own clipping
+/// ancestor (a self-comparison would always pass). Every step visits a
+/// distinct id, so the walk is bounded by the element count and any
+/// `parent_id` cycle terminates.
 fn nearest_clipping_ancestor<'a>(
+    child_id: &'a str,
     parent_id: &'a str,
     by_id: &HashMap<&'a str, &'a crate::element_snapshot::Element>,
 ) -> Option<(&'a str, Region)> {
-    let mut visited: HashSet<&str> = HashSet::new();
+    let mut visited: HashSet<&str> = HashSet::from([child_id]);
     let mut current = parent_id;
     loop {
         if !visited.insert(current) {
-            // A `parent_id` cycle: no clipping ancestor was found.
+            // A `parent_id` cycle (possibly back to the child): no clipping
+            // ancestor was found.
             return None;
         }
         let ancestor = by_id.get(current)?;
@@ -3977,6 +3987,28 @@ mod tests {
             detail.contains("clipping ancestor 'card'"),
             "the detail must name the ancestor actually compared: {detail}"
         );
+    }
+
+    #[test]
+    fn no_clipping_cycle_back_to_the_child_compares_nothing() {
+        // a's chain: b (no bbox, overflow-visible, skipped) -> a itself. The
+        // child must never become its own clipping ancestor: a self-compare
+        // always passes.
+        let mut a = el("a", 0, 0, 10, 10);
+        a.parent_id = Some("b".into());
+        let b = Element {
+            id: "b".into(),
+            parent_id: Some("a".into()),
+            clips_children: Some(false),
+            ..Default::default()
+        };
+        let snap = snap_of(vec![a, b]);
+        let ctx = EvalContext {
+            snapshot: Some(&snap),
+            ..Default::default()
+        };
+        let res = evaluate(&Assertion::NoClipping { region: None }, &ctx);
+        assert_eq!(res.outcome, AssertionOutcome::Unknown, "{:?}", res.detail);
     }
 
     #[test]
