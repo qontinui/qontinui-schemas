@@ -87,7 +87,8 @@ pub enum UnknownCode {
     /// would have occurred is unknown.
     NoEventBeforeTimeout,
     /// Nothing to judge: zero results or assertions were folded, so the
-    /// verdict is unknown — never passed.
+    /// verdict is unknown — never passed. The UI Bridge SDK's roll-up of a
+    /// `POST /vision/assert` batch answers it for an empty assertion list.
     NoResults,
     /// No usable expectation to judge against (assertion criteria that do not
     /// parse, an empty `activateStates`).
@@ -106,6 +107,10 @@ pub enum UnknownCode {
     /// The hit-test looked and cannot tell whether a pointer reaches the
     /// target (a null hit, a shadow host on the target's composed path, a
     /// cross-origin frame, a target computing `pointer-events: none`).
+    /// `element_above` answers it when no paint-order evidence was measured
+    /// (no `occluded_by` attribution and no resolvable `z_index` order),
+    /// which the UI Bridge SDK's in-tab evaluator reaches when no hit-test
+    /// sample shows both elements.
     HitTestUnmeasurable,
 }
 
