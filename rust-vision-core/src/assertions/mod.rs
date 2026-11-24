@@ -461,11 +461,13 @@ pub enum Assertion {
     /// An invalid `size_tolerance_pct` (non-finite or negative) skips the
     /// `size` check as undecided; the rest still run.
     ///
-    /// Answered `Unknown` before any comparison when the baseline is
-    /// unregistered, there is no in-situ capture for `component`, or either
-    /// side's `schemaVersion` is absent or not
-    /// [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`] (all `input_missing`), or
-    /// when both source shas are known and differ (`stale_input`).
+    /// Answered `Unknown` before any comparison, and only for these inputs:
+    /// - no component baselines were supplied, or `baseline` is not
+    ///   registered among them (`input_missing`);
+    /// - there is no in-situ capture for `component` (`input_missing`);
+    /// - either side's `schemaVersion` is absent or is not
+    ///   [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`] (`input_missing`);
+    /// - both source shas are known and differ (`stale_input`).
     ///
     /// Otherwise every check that has its inputs runs, and a definite failure
     /// outranks an undecided check: any finding is `Failed`, with each check

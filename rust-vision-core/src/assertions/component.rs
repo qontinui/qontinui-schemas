@@ -680,7 +680,7 @@ fn baseline_clip(
 /// baseline clip ancestor with no rect is consulted). Only the topmost clipped
 /// (or noted, or undecided) node of a subtree is reported, and each kind
 /// keeps its own list: a scroll note or an undecided node never hides a
-/// descendant that is definitely clipped or itself undecided.
+/// descendant that is definitely clipped.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -705,7 +705,10 @@ fn clip_check(
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
     let mut undecided_paths: Vec<String> = Vec::new();
-    let mut baseline_undecided: Vec<String> = Vec::new();
+    // (path, reason) of each baseline-undecided entry: a descendant repeating
+    // the same reason is folded into its ancestor's entry; a different reason
+    // is recorded on its own.
+    let mut baseline_undecided: Vec<(String, String)> = Vec::new();
     let mut scroll_noted: Vec<String> = Vec::new();
     let mut no_bbox: Vec<String> = Vec::new();
     let overflow = |anc: &ClipAncestor| {
@@ -763,14 +766,17 @@ fn clip_check(
                 // Descendants are still judged: one definitely clipped below
                 // this node is a finding. Only a repeat undecided entry for
                 // the same subtree is suppressed.
-                if !below_any(&node.path, &baseline_undecided) {
+                let repeat = baseline_undecided
+                    .iter()
+                    .any(|(p, r)| *r == why && is_descendant(&node.path, p));
+                if !repeat {
                     undecided.push(format!(
                         "clipped not decided: <{}> at path '{}' extends past clip ancestor \
                          '{}' in situ, but {why}",
                         node.tag, node.path, anc.descriptor,
                     ));
                 }
-                baseline_undecided.push(node.path.clone());
+                baseline_undecided.push((node.path.clone(), why));
                 continue;
             }
             BaselineClip::NotClipped => {}
@@ -1977,6 +1983,64 @@ mod tests {
             overflow_y: Some(y.to_string()),
             rect: None,
         }
+    }
+
+    #[test]
+    fn a_rectless_baseline_clip_ancestor_makes_an_in_situ_clip_undecided() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.frame".to_string(),
+            overflow_x: Some("hidden".to_string()),
+            overflow_y: Some("hidden".to_string()),
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        }];
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = vec![rectless("hidden", "hidden")];
+        let r = run(base, situ);
+        assert_input_missing(&r, "a baseline clip ancestor has no rect");
+        assert!(!kinds(&r).contains(&ComponentFindingKind::Clipped));
+        // The child "1" repeats the root's reason: folded into one entry.
+        let entries = report(&r)
+            .unknown_checks
+            .iter()
+            .filter(|n| n.contains("a baseline clip ancestor has no rect"))
+            .count();
+        assert_eq!(entries, 1);
+    }
+
+    #[test]
+    fn a_descendant_with_a_different_baseline_reason_keeps_its_entry() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.frame".to_string(),
+            overflow_x: Some("hidden".to_string()),
+            overflow_y: Some("hidden".to_string()),
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        }];
+        // Root: no bbox in the baseline. "1": extends past an unreported
+        // baseline ancestor that the (bbox-less) root cannot be judged by.
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes[0].bbox = None;
+        base.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.unknown".to_string(),
+            overflow_x: None,
+            overflow_y: None,
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        }];
+        let r = run(base, situ);
+        let rep = report(&r);
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
+        assert!(rep
+            .unknown_checks
+            .iter()
+            .any(|n| n.contains("at path ''") && n.contains("has no bbox in the baseline")));
+        assert!(
+            rep.unknown_checks
+                .iter()
+                .any(|n| n.contains("at path '1'") && n.contains("'div.unknown'")),
+            "{:?}",
+            rep.unknown_checks
+        );
     }
 
     #[test]

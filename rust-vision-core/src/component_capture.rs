@@ -157,7 +157,10 @@ pub struct ComponentCaptureNode {
 }
 
 /// An ancestor OUTSIDE the root whose `overflowX` or `overflowY` is not
-/// `visible`, i.e. one that can clip the component.
+/// `visible`. Only an axis that is `hidden` or `clip` cuts the component off;
+/// an unreported (absent or unrecognized) axis might, so the assertion treats
+/// extending past it as undecided. An `auto`, `scroll` or `overlay` axis
+/// scrolls rather than clips: extending past it is only noted.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClipAncestor {
