@@ -18,9 +18,9 @@ exclude = [
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-# float_roundtrip: ledger::canonical_json formats the double serde_json parsed,
+# float_roundtrip: canonical_hash::canonical_json formats the double serde_json parsed,
 # so parsing must be exact (RFC 8785 numbers). Declared here, not inherited
-# transitively from serde_jcs.
+# transitively.
 serde_json = { version = "1", features = ["float_roundtrip"] }
 schemars = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -29,8 +29,7 @@ html-escape = "0.2"
 unicode-normalization = "0.1"
 sha2 = "0.10"
 hex = "0.4"
-serde_jcs = "0.1"
-# ledger::canonical_json writes numbers in ECMAScript form (RFC 8785 §3.2.2.3).
+# canonical_hash::canonical_json writes numbers in ECMAScript form (RFC 8785 §3.2.2.3).
 ryu-js = "0.2"
 thiserror = "2"
 base64 = "0.22"

@@ -111,7 +111,7 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::canonical_hash::canonical_hash;
+use crate::canonical_hash::{canonical_hash, CanonicalHashError};
 
 // ============================================================================
 // Value rules shared by the schema and `validate`
@@ -151,7 +151,7 @@ pub const DPR_MAX: f64 = 8.0;
 /// The largest integer RFC 8785 (I-JSON) carries exactly, 2^53 − 1. Larger
 /// integers are rounded by every canonicalizer that reads numbers as IEEE 754
 /// doubles, so a hash over them would differ between languages.
-pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+pub use crate::canonical_hash::MAX_SAFE_INTEGER;
 /// The upper bound of a threshold with no natural ceiling: the largest finite
 /// `f64`. Bounding it keeps infinity out of the schema's range as well as
 /// `validate`'s, so a validator generated from the schema refuses it too.
@@ -601,15 +601,7 @@ impl ImageSlotSpec {
             provenance: None,
             ..self.clone()
         };
-        let mut audit = NumberAudit::default();
-        authored
-            .serialize(&mut audit)
-            .map_err(|e| ImageSlotHashError::Canonicalize(e.to_string()))?;
-        if let Some(problem) = audit.found {
-            return Err(problem);
-        }
-        let prefixed = canonical_hash(&authored)
-            .map_err(|e| ImageSlotHashError::Canonicalize(e.to_string()))?;
+        let prefixed = canonical_hash(&authored).map_err(ImageSlotHashError::from)?;
         prefixed
             .strip_prefix("sha256-")
             .map(str::to_owned)
@@ -659,297 +651,15 @@ impl fmt::Display for ImageSlotHashError {
 
 impl std::error::Error for ImageSlotHashError {}
 
-type AuditError = serde::de::value::Error;
-
-/// Walks a value through its `Serialize` impl and records the first number
-/// RFC 8785 cannot carry exactly, with its path. It reads every number serde
-/// emits, so a numeric field added later is audited without being listed here.
-#[derive(Default)]
-struct NumberAudit {
-    path: Vec<String>,
-    found: Option<ImageSlotHashError>,
-}
-
-impl NumberAudit {
-    fn here(&self) -> String {
-        let mut out = String::new();
-        for part in &self.path {
-            if !out.is_empty() && !part.starts_with('[') {
-                out.push('.');
+impl From<CanonicalHashError> for ImageSlotHashError {
+    fn from(e: CanonicalHashError) -> Self {
+        match e {
+            CanonicalHashError::NonFiniteNumber { path } => Self::NonFiniteNumber { path },
+            CanonicalHashError::UnsafeInteger { path, value } => {
+                Self::UnsafeInteger { path, value }
             }
-            out.push_str(part);
+            CanonicalHashError::Serialize(reason) => Self::Canonicalize(reason),
         }
-        out
-    }
-
-    fn float(&mut self, value: f64) -> Result<(), AuditError> {
-        if !value.is_finite() && self.found.is_none() {
-            self.found = Some(ImageSlotHashError::NonFiniteNumber { path: self.here() });
-        }
-        Ok(())
-    }
-
-    fn signed(&mut self, value: i128) -> Result<(), AuditError> {
-        if value.unsigned_abs() > u128::from(MAX_SAFE_INTEGER) && self.found.is_none() {
-            self.found = Some(ImageSlotHashError::UnsafeInteger {
-                path: self.here(),
-                value: value.to_string(),
-            });
-        }
-        Ok(())
-    }
-
-    fn unsigned(&mut self, value: u128) -> Result<(), AuditError> {
-        if value > u128::from(MAX_SAFE_INTEGER) && self.found.is_none() {
-            self.found = Some(ImageSlotHashError::UnsafeInteger {
-                path: self.here(),
-                value: value.to_string(),
-            });
-        }
-        Ok(())
-    }
-
-    fn nested<T: ?Sized + Serialize>(&mut self, part: String, value: &T) -> Result<(), AuditError> {
-        self.path.push(part);
-        let result = value.serialize(&mut *self);
-        self.path.pop();
-        result
-    }
-}
-
-impl<'a> serde::Serializer for &'a mut NumberAudit {
-    type Ok = ();
-    type Error = AuditError;
-    type SerializeSeq = AuditSeq<'a>;
-    type SerializeTuple = AuditSeq<'a>;
-    type SerializeTupleStruct = AuditSeq<'a>;
-    type SerializeTupleVariant = AuditSeq<'a>;
-    type SerializeMap = AuditSeq<'a>;
-    type SerializeStruct = Self;
-    type SerializeStructVariant = Self;
-
-    fn serialize_bool(self, _: bool) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_i8(self, v: i8) -> Result<(), AuditError> {
-        self.signed(v.into())
-    }
-    fn serialize_i16(self, v: i16) -> Result<(), AuditError> {
-        self.signed(v.into())
-    }
-    fn serialize_i32(self, v: i32) -> Result<(), AuditError> {
-        self.signed(v.into())
-    }
-    fn serialize_i64(self, v: i64) -> Result<(), AuditError> {
-        self.signed(v.into())
-    }
-    fn serialize_i128(self, v: i128) -> Result<(), AuditError> {
-        self.signed(v)
-    }
-    fn serialize_u8(self, v: u8) -> Result<(), AuditError> {
-        self.unsigned(v.into())
-    }
-    fn serialize_u16(self, v: u16) -> Result<(), AuditError> {
-        self.unsigned(v.into())
-    }
-    fn serialize_u32(self, v: u32) -> Result<(), AuditError> {
-        self.unsigned(v.into())
-    }
-    fn serialize_u64(self, v: u64) -> Result<(), AuditError> {
-        self.unsigned(v.into())
-    }
-    fn serialize_u128(self, v: u128) -> Result<(), AuditError> {
-        self.unsigned(v)
-    }
-    fn serialize_f32(self, v: f32) -> Result<(), AuditError> {
-        self.float(v.into())
-    }
-    fn serialize_f64(self, v: f64) -> Result<(), AuditError> {
-        self.float(v)
-    }
-    fn serialize_char(self, _: char) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_str(self, _: &str) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_bytes(self, _: &[u8]) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_none(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<(), AuditError> {
-        value.serialize(self)
-    }
-    fn serialize_unit(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_unit_struct(self, _: &'static str) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_unit_variant(
-        self,
-        _: &'static str,
-        _: u32,
-        _: &'static str,
-    ) -> Result<(), AuditError> {
-        Ok(())
-    }
-    fn serialize_newtype_struct<T: ?Sized + Serialize>(
-        self,
-        _: &'static str,
-        value: &T,
-    ) -> Result<(), AuditError> {
-        value.serialize(self)
-    }
-    fn serialize_newtype_variant<T: ?Sized + Serialize>(
-        self,
-        _: &'static str,
-        _: u32,
-        variant: &'static str,
-        value: &T,
-    ) -> Result<(), AuditError> {
-        self.nested(variant.to_owned(), value)
-    }
-    fn serialize_seq(self, _: Option<usize>) -> Result<AuditSeq<'a>, AuditError> {
-        Ok(AuditSeq {
-            audit: self,
-            index: 0,
-        })
-    }
-    fn serialize_tuple(self, _: usize) -> Result<AuditSeq<'a>, AuditError> {
-        self.serialize_seq(None)
-    }
-    fn serialize_tuple_struct(self, _: &'static str, _: usize) -> Result<AuditSeq<'a>, AuditError> {
-        self.serialize_seq(None)
-    }
-    fn serialize_tuple_variant(
-        self,
-        _: &'static str,
-        _: u32,
-        _: &'static str,
-        _: usize,
-    ) -> Result<AuditSeq<'a>, AuditError> {
-        self.serialize_seq(None)
-    }
-    fn serialize_map(self, _: Option<usize>) -> Result<AuditSeq<'a>, AuditError> {
-        self.serialize_seq(None)
-    }
-    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self, AuditError> {
-        Ok(self)
-    }
-    fn serialize_struct_variant(
-        self,
-        _: &'static str,
-        _: u32,
-        _: &'static str,
-        _: usize,
-    ) -> Result<Self, AuditError> {
-        Ok(self)
-    }
-}
-
-impl serde::ser::SerializeStruct for &mut NumberAudit {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_field<T: ?Sized + Serialize>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), AuditError> {
-        self.nested(key.to_owned(), value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-impl serde::ser::SerializeStructVariant for &mut NumberAudit {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_field<T: ?Sized + Serialize>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), AuditError> {
-        self.nested(key.to_owned(), value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-/// A sequence, tuple or map under audit: elements are addressed `[i]`, map
-/// entries `[i]` in emission order (a key is audited like a value).
-struct AuditSeq<'a> {
-    audit: &'a mut NumberAudit,
-    index: usize,
-}
-
-impl AuditSeq<'_> {
-    fn element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        let part = format!("[{}]", self.index);
-        self.index += 1;
-        self.audit.nested(part, value)
-    }
-}
-
-impl serde::ser::SerializeSeq for AuditSeq<'_> {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        self.element(value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-impl serde::ser::SerializeTuple for AuditSeq<'_> {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        self.element(value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-impl serde::ser::SerializeTupleStruct for AuditSeq<'_> {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        self.element(value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-impl serde::ser::SerializeTupleVariant for AuditSeq<'_> {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        self.element(value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
-    }
-}
-
-impl serde::ser::SerializeMap for AuditSeq<'_> {
-    type Ok = ();
-    type Error = AuditError;
-    fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), AuditError> {
-        self.element(key)
-    }
-    fn serialize_value<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
-        self.element(value)
-    }
-    fn end(self) -> Result<(), AuditError> {
-        Ok(())
     }
 }
 
