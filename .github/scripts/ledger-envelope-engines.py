@@ -28,10 +28,10 @@ CORPUS_SIZE entries or CORPUS_DISTINCT distinct names, a case whose name is not
 a string or whose flags are not booleans, a corpus exercising one outcome only,
 a malformed ENGINE_DIFFERENCES entry, a missing schema file, a `date-time`
 checker that is not loaded, an ajv or ajv-formats whose version is not the
-lockfile's, or an engine that printed nothing. Once the corpus loads, every problem is counted on a summary line, so
-a failing run never prints only lines that read as agreement; a corpus, case
-shape or schema that stops the run before the engines prints `corpus: not
-checked`.
+lockfile's, or an engine that printed nothing. Once the corpus loads, every
+problem is counted on a summary line, so a failing run never prints only lines
+that read as agreement; a corpus, case shape or schema that stops the run
+before the engines prints `corpus: not checked`.
 
 Plan 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.
 """
@@ -117,7 +117,8 @@ def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]
         )
     # A name is a case's identity in every comparison below. The corpus may
     # repeat a case (`/source = "x\n"` is both a trailing-newline case and a
-    # label case), but one name must never stand for two different instances.
+    # label case), but one name must never stand for two different cases: the
+    # same instance and the same flags.
     first: dict[str, Case] = {}
     for c in cases:
         seen = first.setdefault(c["name"], c)
