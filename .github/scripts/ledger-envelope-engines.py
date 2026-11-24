@@ -23,7 +23,9 @@ declared exceptions (which must be schema-admits / Rust-refuses) and the
 engine's own ENGINE_DIFFERENCES (each must disagree exactly as declared); and
 the formats-off verdict must differ from formats-on on exactly the corpus's
 format-only cases. Exit 1 on any disagreement, and on everything that would
-make agreement UNKNOWN: a missing, unparsable, short or one-sided corpus, a
+make agreement UNKNOWN: a missing or unparsable corpus, one of other than
+CORPUS_SIZE cases or exercising one outcome only, a malformed
+ENGINE_DIFFERENCES entry, a
 missing schema file, a `date-time` checker that is not loaded, or an engine
 that printed nothing.
 
@@ -142,29 +144,38 @@ def ajv_arm(schema, cases):
 
 
 def compare(engine, cases, verdicts):
-    """The problems one engine's verdicts raise, plus its summary line."""
+    """The problems one engine's verdicts raise, plus its summary line.
+
+    Every problem counts as exactly one disagreement, so a failing run never
+    prints a summary that reads as agreement, and one bad entry is one problem.
+    """
     problems = []
     declared = ENGINE_DIFFERENCES[engine]
-    names = {c["name"] for c in cases}
-    for name in sorted(set(declared) - names):
-        problems.append(f"{engine}: ENGINE_DIFFERENCES names `{name}`, which is not in the corpus — stale entry")
-    disagreements = 0
-    exceptions = 0
-    for c in cases:
-        name, rust = c["name"], c["rust"]
-        on, _ = verdicts[name]
-        if name in declared and c["declared_exception"]:
+    by_name = {c["name"]: c for c in cases}
+    usable = set()
+    for name, entry in sorted(declared.items()):
+        if not (isinstance(entry, dict) and isinstance(entry.get("engine"), bool) and entry.get("reason")):
+            problems.append(f"{engine}: ENGINE_DIFFERENCES entry `{name}` needs a bool `engine` and a `reason`")
+        elif name not in by_name:
+            problems.append(f"{engine}: ENGINE_DIFFERENCES names `{name}`, which is not in the corpus — stale entry")
+        elif by_name[name]["declared_exception"]:
             problems.append(
                 f"{engine}: ENGINE_DIFFERENCES names `{name}`, a declared exception — it is checked as one, "
                 "so the entry is never exercised; remove it"
             )
-            disagreements += 1
-        if name in declared and declared[name]["engine"] and not rust:
+        elif entry["engine"] and not by_name[name]["rust"]:
             problems.append(
                 f"{engine}: ENGINE_DIFFERENCES entry `{name}` declares {engine} ADMITS a case validate() refuses — "
                 "never declarable: a writer could drive that data through"
             )
-            disagreements += 1
+        else:
+            usable.add(name)
+    # Only well-formed, in-corpus, declarable entries are compared as declared
+    # differences; a refused entry's case is compared like any other.
+    exceptions = 0
+    for name, c in by_name.items():
+        rust = c["rust"]
+        on, _ = verdicts[name]
         if c["declared_exception"]:
             exceptions += 1
             if not (on and not rust):
@@ -172,28 +183,24 @@ def compare(engine, cases, verdicts):
                     f"{engine}: declared exception `{name}` no longer disagrees as documented "
                     f"(schema admits, validate refuses): {engine}={on} validate={rust}"
                 )
-                disagreements += 1
-        elif name in declared:
+        elif name in usable:
             if on != declared[name]["engine"] or on == rust:
                 problems.append(
                     f"{engine}: ENGINE_DIFFERENCES entry `{name}` is stale — declared {engine}="
                     f"{declared[name]['engine']} vs validate={rust}, measured {engine}={on}"
                 )
-                disagreements += 1
         elif on != rust:
             problems.append(f"{engine}: `{name}`: {engine}={on} validate={rust}")
-            disagreements += 1
-    format_only = sorted(c["name"] for c in cases if c["format_only"])
+    format_only = sorted({c["name"] for c in cases if c["format_only"]})
     missed = sorted(n for n, (on, off) in verdicts.items() if on != off)
     if missed != format_only:
         problems.append(
             f"{engine}: with formats off the schema must miss exactly the format-only cases {format_only}; "
             f"it missed {missed}"
         )
-        disagreements += 1
     summary = (
-        f"{engine}: {len(cases)} cases, {exceptions + len(declared)} declared, "
-        f"{disagreements} disagreement(s); formats off misses {len(missed)} case(s)"
+        f"{engine}: {len(cases)} cases, {exceptions + len(usable)} declared, "
+        f"{len(problems)} disagreement(s); formats off misses {len(missed)} case(s)"
     )
     return problems, summary
 

@@ -18,21 +18,35 @@
 // compile or the input is malformed; the orchestrator reads that as UNKNOWN.
 "use strict";
 
-// Resolve ajv ONLY from NODE_PATH (the pinned `npm ci` tree): a bare require()
-// would search every node_modules above this file first, and on a box with an
-// ancestor node_modules would check an unpinned ajv.
+// Load ajv from NODE_PATH (the pinned `npm ci` tree) and REFUSE any other
+// copy. A bare require() searches every node_modules above this file first;
+// a require anchored at NODE_PATH still falls back to every node_modules above
+// NODE_PATH. So resolve, then check the resolved file sits under NODE_PATH:
+// on a box with an ancestor node_modules, an empty or mistyped NODE_PATH
+// would otherwise check an unpinned ajv.
+const fs = require("fs");
 const path = require("path");
-if (!process.env.NODE_PATH) {
-  process.stderr.write("ledger-envelope-engines.cjs: NODE_PATH is unset; point it at the pinned node_modules\n");
-  process.exit(1);
+function loadPinned() {
+  const np = process.env.NODE_PATH || "";
+  if (!np || np.includes(path.delimiter) || !fs.existsSync(np)) {
+    throw new Error(`NODE_PATH must name ONE existing directory, the pinned node_modules (got ${JSON.stringify(np)})`);
+  }
+  const root = fs.realpathSync(np) + path.sep;
+  const pinned = require("module").createRequire(path.join(root, "noop.js"));
+  const load = (m) => {
+    const file = fs.realpathSync(pinned.resolve(m));
+    if (!file.startsWith(root)) {
+      throw new Error(`${m} resolved to ${file}, outside the pinned NODE_PATH ${root}`);
+    }
+    return pinned(file);
+  };
+  return { Ajv2020: load("ajv/dist/2020"), addFormats: load("ajv-formats") };
 }
-const pinned = require("module").createRequire(path.join(path.resolve(process.env.NODE_PATH), "noop.js"));
-const Ajv2020 = pinned("ajv/dist/2020");
-const addFormats = pinned("ajv-formats");
 
 const ANNOTATION_ONLY = { uint32: true, uint64: true, double: true };
 
 function main() {
+  const { Ajv2020, addFormats } = loadPinned();
   const input = JSON.parse(require("fs").readFileSync(0, "utf8"));
   if (!input || typeof input.schema !== "object" || !Array.isArray(input.cases)) {
     throw new Error("expected {schema, cases[]} on stdin");
@@ -44,7 +58,8 @@ function main() {
 
   // Formats off: a writer who sets `validateFormats: false` (JSON Schema's
   // annotation-only default). A writer who merely omits ajv-formats gets no
-  // verdict at all: ajv refuses to compile on the unknown `date-time`. This
+  // verdict at all: ajv refuses to compile on the unknown `uuid` (and
+  // `date-time`). This
   // arm must miss exactly the corpus's format-only cases.
   const off = new Ajv2020({
     formats: ANNOTATION_ONLY,
