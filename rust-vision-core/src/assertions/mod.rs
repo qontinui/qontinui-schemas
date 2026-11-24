@@ -459,19 +459,21 @@ pub enum Assertion {
     /// geometry is root-relative.
     ///
     /// Answered `Unknown` before any comparison when the baseline is
-    /// unregistered, there is no in-situ capture for `component`, either
+    /// unregistered, there is no in-situ capture for `component`, or either
     /// side's `schemaVersion` is absent or not
-    /// [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`], or either side lacks root
-    /// geometry (all `input_missing`), or when both source shas are known and
-    /// differ (`stale_input`).
+    /// [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`] (all `input_missing`), or
+    /// when both source shas are known and differ (`stale_input`).
     ///
     /// Otherwise every check that has its inputs runs, and a definite failure
     /// outranks an undecided check: any finding is `Failed`, with each check
     /// that could not run listed in the report's `unknown_checks`. Only when
-    /// nothing failed AND a check could not run — no node tree or no root
-    /// node (path `""`) on a side, `compare_props` with props missing on a
-    /// side, or a node extending past a clip ancestor whose overflow is
-    /// unreported — is the answer `Unknown{input_missing}`. See
+    /// nothing failed AND a check could not run is the answer
+    /// `Unknown{input_missing}`. Checks that cannot run: `size` and `clipped`
+    /// when either side lacks root geometry; the per-node checks when either
+    /// side has no node tree or no root node (path `""`); `props_delta` when
+    /// `compare_props` is set and either side has no props; and `clipped` at
+    /// a node that extends past a clip ancestor whose overflow is unreported,
+    /// past a clip ancestor with no rect, or that has no bbox. See
     /// `assertions/component.rs`.
     // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
     // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
