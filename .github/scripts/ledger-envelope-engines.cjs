@@ -43,10 +43,10 @@ function loadPinned() {
       throw new Error(`${m} resolved to ${file}, outside the pinned NODE_PATH ${root}`);
     }
     const want = (locked[`node_modules/${pkg}`] || {}).version;
-    const got = JSON.parse(fs.readFileSync(pinned.resolve(`${pkg}/package.json`), "utf8")).version;
     if (!want) {
       throw new Error(`${LOCK} has no "node_modules/${pkg}" entry to check ${pkg} against`);
     }
+    const got = JSON.parse(fs.readFileSync(pinned.resolve(`${pkg}/package.json`), "utf8")).version;
     if (got !== want) {
       throw new Error(`${pkg} under NODE_PATH is ${got}, but ${LOCK} pins ${want}`);
     }
