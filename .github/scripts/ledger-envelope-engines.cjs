@@ -19,28 +19,37 @@
 "use strict";
 
 // Load ajv from NODE_PATH (the pinned `npm ci` tree) and REFUSE any other
-// copy. A bare require() searches every node_modules above this file first;
-// a require anchored at NODE_PATH still falls back to every node_modules above
-// NODE_PATH. So resolve, then check the resolved file sits under NODE_PATH:
-// on a box with an ancestor node_modules, an empty or mistyped NODE_PATH
-// would otherwise check an unpinned ajv.
+// copy. A bare require() searches every node_modules above this file first,
+// and a require anchored at NODE_PATH still falls back to every node_modules
+// above NODE_PATH. So: resolve, check the resolved file sits under NODE_PATH,
+// and check each package's version is the one the committed package-lock.json
+// pins. "Under NODE_PATH" alone would pass a NODE_PATH naming the parent of
+// some other node_modules.
 const fs = require("fs");
 const path = require("path");
+const LOCK = path.join(__dirname, "ledger-envelope-engines", "package-lock.json");
+
 function loadPinned() {
   const np = process.env.NODE_PATH || "";
-  if (!np || np.includes(path.delimiter) || !fs.existsSync(np)) {
+  if (!np || np.includes(path.delimiter) || !fs.existsSync(np) || !fs.statSync(np).isDirectory()) {
     throw new Error(`NODE_PATH must name ONE existing directory, the pinned node_modules (got ${JSON.stringify(np)})`);
   }
   const root = fs.realpathSync(np) + path.sep;
+  const locked = JSON.parse(fs.readFileSync(LOCK, "utf8")).packages || {};
   const pinned = require("module").createRequire(path.join(root, "noop.js"));
-  const load = (m) => {
+  const load = (m, pkg) => {
     const file = fs.realpathSync(pinned.resolve(m));
     if (!file.startsWith(root)) {
       throw new Error(`${m} resolved to ${file}, outside the pinned NODE_PATH ${root}`);
     }
+    const want = (locked[`node_modules/${pkg}`] || {}).version;
+    const got = JSON.parse(fs.readFileSync(pinned.resolve(`${pkg}/package.json`), "utf8")).version;
+    if (!want || got !== want) {
+      throw new Error(`${pkg} under NODE_PATH is ${got}, but ${LOCK} pins ${want}`);
+    }
     return pinned(file);
   };
-  return { Ajv2020: load("ajv/dist/2020"), addFormats: load("ajv-formats") };
+  return { Ajv2020: load("ajv/dist/2020", "ajv"), addFormats: load("ajv-formats", "ajv-formats") };
 }
 
 const ANNOTATION_ONLY = { uint32: true, uint64: true, double: true };
@@ -58,9 +67,8 @@ function main() {
 
   // Formats off: a writer who sets `validateFormats: false` (JSON Schema's
   // annotation-only default). A writer who merely omits ajv-formats gets no
-  // verdict at all: ajv refuses to compile on the unknown `uuid` (and
-  // `date-time`). This
-  // arm must miss exactly the corpus's format-only cases.
+  // verdict at all: ajv refuses to compile on the unknown `uuid`. This arm
+  // must miss exactly the corpus's format-only cases.
   const off = new Ajv2020({
     formats: ANNOTATION_ONLY,
     strictTypes: false,
