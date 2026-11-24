@@ -112,8 +112,13 @@ fn write_canonical(out: &mut String, value: &Value) {
         Value::Null => out.push_str("null"),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         Value::Number(n) => {
-            // serde_json holds no non-finite number.
-            let f = n.as_f64().unwrap_or(0.0);
+            // Without serde_json's `arbitrary_precision` feature (not enabled in
+            // this workspace) every number is an i64, u64 or finite f64, so this
+            // is always `Some`. Fail loudly rather than hash an unreadable
+            // number as 0.
+            let f = n
+                .as_f64()
+                .expect("serde_json number is always readable as f64");
             if f == 0.0 {
                 out.push('0'); // also -0
             } else {
@@ -474,9 +479,11 @@ impl serde::ser::SerializeMap for AuditSeq<'_> {
     type Ok = ();
     type Error = AuditError;
     fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), AuditError> {
-        // The key and the value of one entry share the entry's index.
-        let part = format!("[{}]", self.index);
-        self.audit.nested(part, key)
+        // A map key is written as a JSON string whatever its Rust type (a
+        // `u64` key above 2^53 - 1 is the exact text "9007199254740993", not a
+        // number), so it has nothing to audit. The entry's value takes `[i]`.
+        let _ = key;
+        Ok(())
     }
     fn serialize_value<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), AuditError> {
         self.element(value)
@@ -701,6 +708,29 @@ mod tests {
                 path: "T[1]".into()
             })
         );
+        // A clean variant before a failing value: the variant segment must
+        // have been popped, so the path names the second element only.
+        assert_eq!(
+            canonical_hash(&vec![E::T(1, 1.0), E::T(1, f64::NAN)]),
+            Err(CanonicalHashError::NonFiniteNumber {
+                path: "[1].T[1]".into()
+            })
+        );
+        assert_eq!(
+            canonical_hash(&vec![
+                E::S {
+                    inner: Inner { n: 1.0 }
+                },
+                E::T(1, f64::NAN)
+            ]),
+            Err(CanonicalHashError::NonFiniteNumber {
+                path: "[1].T[1]".into()
+            })
+        );
+        // A numeric map key is a string in JSON and is never refused.
+        let mut big_keys = BTreeMap::new();
+        big_keys.insert(9_007_199_254_740_993_u64, 1_u8);
+        assert!(canonical_hash(&big_keys).is_ok());
         // A real Value map (the external-JSON path) reports the entry index.
         let v: Value = serde_json::from_str(r#"{"a": 1, "b": 9007199254740993}"#).unwrap();
         assert_eq!(
