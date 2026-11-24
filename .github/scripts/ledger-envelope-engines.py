@@ -24,10 +24,10 @@ engine's own ENGINE_DIFFERENCES (each must disagree exactly as declared); and
 the formats-off verdict must differ from formats-on on exactly the corpus's
 format-only cases. Exit 1 on any disagreement, and on everything that would
 make agreement UNKNOWN: a missing or unparsable corpus, one of other than
-CORPUS_SIZE cases or exercising one outcome only, a malformed
-ENGINE_DIFFERENCES entry, a
-missing schema file, a `date-time` checker that is not loaded, or an engine
-that printed nothing.
+CORPUS_SIZE cases or exercising one outcome only, a malformed ENGINE_DIFFERENCES
+entry, a missing schema file, a `date-time` checker that is not loaded, an ajv
+that is not the lockfile's, or an engine that printed nothing. Every problem
+is counted on a summary line, so a failing run never reads as agreement.
 
 Plan 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.
 """
@@ -146,15 +146,18 @@ def ajv_arm(schema, cases):
 def compare(engine, cases, verdicts):
     """The problems one engine's verdicts raise, plus its summary line.
 
-    Every problem counts as exactly one disagreement, so a failing run never
-    prints a summary that reads as agreement, and one bad entry is one problem.
+    Every problem counts as one disagreement, so this engine's summary line
+    never reads as agreement beside a failure of its own. Each bad entry
+    raises exactly one entry problem; its case is then compared like any
+    other, so a case that also disagrees adds its own.
     """
     problems = []
     declared = ENGINE_DIFFERENCES[engine]
     by_name = {c["name"]: c for c in cases}
     usable = set()
     for name, entry in sorted(declared.items()):
-        if not (isinstance(entry, dict) and isinstance(entry.get("engine"), bool) and entry.get("reason")):
+        if not (isinstance(entry, dict) and isinstance(entry.get("engine"), bool)
+                and isinstance(entry.get("reason"), str) and entry["reason"].strip()):
             problems.append(f"{engine}: ENGINE_DIFFERENCES entry `{name}` needs a bool `engine` and a `reason`")
         elif name not in by_name:
             problems.append(f"{engine}: ENGINE_DIFFERENCES names `{name}`, which is not in the corpus — stale entry")
@@ -199,7 +202,7 @@ def compare(engine, cases, verdicts):
             f"it missed {missed}"
         )
     summary = (
-        f"{engine}: {len(cases)} cases, {exceptions + len(usable)} declared, "
+        f"{engine}: {len(by_name)} distinct cases, {exceptions + len(usable)} declared, "
         f"{len(problems)} disagreement(s); formats off misses {len(missed)} case(s)"
     )
     return problems, summary
@@ -213,7 +216,9 @@ def main():
         for p in problems:
             error(p)
         return 1
-    summaries = []
+    # The corpus's own problems get a summary line too: a failing run whose
+    # engines agreed must not print only lines that read as agreement.
+    summaries = [f"corpus: {len(cases)} entries, {len({c['name'] for c in cases})} distinct, {len(problems)} problem(s)"]
     for engine, arm in (("python-jsonschema", python_arm), ("ajv", ajv_arm)):
         try:
             verdicts = arm(schema, cases)
