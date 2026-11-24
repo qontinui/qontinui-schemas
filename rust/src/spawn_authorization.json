@@ -117,5 +117,32 @@
       "call_site": "qontinui-runner src-tauri/src/mcp/sessions.rs role_slash_command arm, authorized as req.role on POST /sessions/spawn",
       "purpose": "The `/sessions/spawn` role that dispatches `/implement-plan`; the role is the registry key the spawn is authorized under. Declared so the agent-registry retire doors (coord's POST /coord/agent-registry/retire and the web seeder's --retire-orphans) refuse a definition-less row of this name instead of disabling it, since a disabled row of this name vetoes every spawn authorized under it. NEVER seeded: an enabled row of this name would govern the spawn outright and stop a class-level disable from reaching it."
     }
+  ],
+  "harness_builtin_roles": [
+    {
+      "name": "general-purpose",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Claude Code's built-in general-purpose subagent (Agent tool `subagent_type: general-purpose`), the default type for a delegated multi-step task. Declared so the agent-registry catalog lists it and an admin can switch it off before any row exists; NEVER seeded, so no row is written until someone makes a decision."
+    },
+    {
+      "name": "explore",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Claude Code's built-in read-only search subagent (Agent tool `subagent_type: Explore`, keyed lowercase). Declared so the agent-registry catalog lists it and an admin can switch it off before any row exists; NEVER seeded, so no row is written until someone makes a decision."
+    },
+    {
+      "name": "plan",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Claude Code's built-in software-architect planning subagent (Agent tool `subagent_type: Plan`, keyed lowercase). Declared so the agent-registry catalog lists it and an admin can switch it off before any row exists; NEVER seeded, so no row is written until someone makes a decision."
+    },
+    {
+      "name": "statusline-setup",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Claude Code's built-in subagent that configures the status line setting (Agent tool `subagent_type: statusline-setup`). Declared so the agent-registry catalog lists it and an admin can switch it off before any row exists; NEVER seeded, so no row is written until someone makes a decision."
+    },
+    {
+      "name": "claude-code-guide",
+      "spawn_path": "in_session_subagent",
+      "purpose": "Claude Code's built-in subagent that answers questions about Claude Code, the Agent SDK and the Claude API (Agent tool `subagent_type: claude-code-guide`). Declared so the agent-registry catalog lists it and an admin can switch it off before any row exists; NEVER seeded, so no row is written until someone makes a decision."
+    }
   ]
 }
