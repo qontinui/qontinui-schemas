@@ -477,16 +477,25 @@ pub enum Assertion {
     /// outranks an undecided check: any finding is `Failed`, with each check
     /// that could not run listed in the report's `unknown_checks`. Only when
     /// nothing failed AND a check could not run is the answer
-    /// `Unknown{input_missing}`. Checks that cannot run: `size` and `clipped`
-    /// when either side lacks root geometry; `size` on an axis whose fill
-    /// ratio cannot be computed while its absolute size differs; the per-node checks when either
-    /// side has no node tree or no root node (path `""`); `props_delta` when
-    /// `compare_props` is set and either side has no props; and `clipped`
-    /// (decided per axis, on both sides) at a node that, on an axis, extends
-    /// past a clip ancestor whose overflow is unreported,
-    /// past a clip ancestor with no rect, or that has no bbox; and any check a
-    /// capture lists in its own `unknownChecks`. See
-    /// `assertions/component.rs`.
+    /// `Unknown{input_missing}`. Checks that cannot run:
+    /// - `size` and `clipped` when either side lacks root geometry;
+    /// - `size` when the tolerance is invalid, or on an axis whose fill ratio
+    ///   cannot be computed while its absolute size differs;
+    /// - the per-node checks when either side has no node tree or no root
+    ///   node (path `""`);
+    /// - `props_delta` when `compare_props` is set and either side has no
+    ///   props;
+    /// - `clipped`, decided per axis on both sides, at a node that on that
+    ///   axis, in situ, extends past an ancestor whose overflow is unreported,
+    ///   or where any ancestor that may clip on that axis has no rect, or that
+    ///   has no bbox (a non-finite one counts) while such an ancestor exists;
+    /// - `clipped` at a node clipped in situ on an axis while, in isolation,
+    ///   it extends past an ancestor whose overflow on that axis is
+    ///   unreported, any ancestor that may clip on that axis has no rect, or
+    ///   it has no bbox while such an ancestor exists;
+    /// - any check a capture lists in its own `unknownChecks`.
+    ///
+    /// See `assertions/component.rs`.
     // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
     // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
     // `result_large_err` bound. The wire is unchanged.

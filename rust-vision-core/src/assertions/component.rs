@@ -42,8 +42,10 @@ pub enum ComponentFindingKind {
     /// Stretched or constrained beyond tolerance (absolute size AND fill
     /// ratio of the parent content box both differ on one axis).
     Size,
-    /// A node extends past a clip ancestor in situ that did not clip it in
-    /// isolation.
+    /// On some axis (x or y), a node extends past a clip ancestor in situ
+    /// that cuts it off there, while in isolation nothing clipped it on that
+    /// same axis (or the path is absent in isolation). The finding names that
+    /// axis and its ancestor.
     Clipped,
     /// A component name or tag differs at the same tree path, or a node is
     /// present on one side only.
@@ -820,12 +822,17 @@ fn clip_check(
 
         if let Some((axis, anc, clip_rect)) = new_clip {
             let ax = axis.name();
+            let isolation = if b_page.is_none() {
+                "the path is absent in isolation, so nothing clipped it there".to_string()
+            } else {
+                format!("no clip ancestor clipped it on {ax} in isolation")
+            };
             findings.push(ComponentFinding {
                 kind: ComponentFindingKind::Clipped,
                 path: node.path.clone(),
                 message: format!(
-                    "<{}> at path '{}' extends past clip ancestor '{}' {} on {ax} in situ; no \
-                     clip ancestor clipped it on {ax} in isolation",
+                    "<{}> at path '{}' extends past clip ancestor '{}' {} on {ax} in situ; \
+                     {isolation}",
                     node.tag,
                     node.path,
                     anc.descriptor,
@@ -1186,7 +1193,11 @@ fn portal_check(
 }
 
 fn compare_viewports(base: &ComponentCapture, in_situ: &ComponentCapture) -> ViewportComparison {
-    let vp_eq = base.viewport.zip(in_situ.viewport).map(|(b, s)| b == s);
+    // A non-finite (null on the wire) viewport is unknown, not a mismatch.
+    let finite_vp = |v: Option<CaptureViewport>| v.filter(CaptureViewport::is_finite);
+    let vp_eq = finite_vp(base.viewport)
+        .zip(finite_vp(in_situ.viewport))
+        .map(|(b, s)| b == s);
     let dpr_eq = base.dpr.zip(in_situ.dpr).map(|(b, s)| b == s);
     let matches = match (vp_eq, dpr_eq) {
         (Some(false), _) | (_, Some(false)) => Some(false),
@@ -2142,6 +2153,79 @@ mod tests {
         assert_eq!(f.in_situ["clipAncestor"], json!("div.y-frame"));
         assert_eq!(f.in_situ["clipRect"]["height"], json!(30.0));
         assert!(f.message.contains("div.y-frame") && f.message.contains("on y"));
+    }
+
+    /// `capture`, round-tripped through its wire form with node `path`'s
+    /// bbox `x` set to an explicit null.
+    fn with_null_bbox_x(c: &ComponentCapture, path: &str) -> ComponentCapture {
+        let mut wire = serde_json::to_value(c).unwrap();
+        for n in wire["nodes"].as_array_mut().unwrap() {
+            if n["path"] == json!(path) {
+                n["bbox"]["x"] = Value::Null;
+            }
+        }
+        serde_json::from_value(wire).expect("a null coordinate parses")
+    }
+
+    #[test]
+    fn a_null_coordinate_reads_as_an_unmeasured_bbox() {
+        let nulls: CaptureRect =
+            serde_json::from_value(json!({"x": null, "y": 0, "width": 10, "height": null}))
+                .expect("null coordinates parse");
+        assert!(nulls.x.is_nan() && nulls.height.is_nan() && !nulls.is_finite());
+        let vp: CaptureViewport =
+            serde_json::from_value(json!({"width": null, "height": 800})).unwrap();
+        assert!(!vp.is_finite());
+        let t: CaptureTarget = serde_json::from_value(json!({"kind": null, "id": "x"})).unwrap();
+        assert_eq!(t.kind, CaptureTargetKind::Component);
+
+        // Under a hidden ancestor, node "1" with a null x is a node with no
+        // bbox: undecided.
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![anc(
+            "div.frame",
+            Some("hidden"),
+            Some("hidden"),
+            Some(rect(100.0, 300.0, 400.0, 600.0)),
+        )];
+        let situ = with_null_bbox_x(&situ, "1");
+        assert!(!situ.nodes[2].bbox.unwrap().is_finite());
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "1 in-situ node(s) have no bbox ('1')");
+
+        // Under scroll containers only, it does not matter: Passed.
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![anc(
+            "div.scroller",
+            Some("auto"),
+            Some("scroll"),
+            Some(rect(100.0, 300.0, 400.0, 600.0)),
+        )];
+        let situ = with_null_bbox_x(&situ, "1");
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn a_clip_at_a_path_absent_in_isolation_says_so() {
+        let mut situ = x_clipped_situ();
+        situ.nodes
+            .push(node("2", "span", None, rect(0.0, 0.0, 400.0, 10.0)));
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = x_clipped_situ().clip_ancestors;
+        let r = run(base, situ);
+        let rep = report(&r);
+        let f = rep
+            .findings
+            .iter()
+            .find(|f| f.kind == ComponentFindingKind::Clipped)
+            .expect("the new node is clipped");
+        assert_eq!(f.path, "2");
+        assert!(
+            f.message.contains("the path is absent in isolation"),
+            "{}",
+            f.message
+        );
     }
 
     #[test]
