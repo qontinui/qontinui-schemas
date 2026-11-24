@@ -575,145 +575,137 @@ fn size_check(
     });
 }
 
-/// The axes (x, y) on which some clip ancestor of `c` clips `node_page`.
-fn clipped_axes(c: &ComponentCapture, node_page: &CaptureRect) -> (bool, bool) {
-    c.clip_ancestors.iter().fold((false, false), |(x, y), anc| {
-        let Some(rect) = anc.rect.filter(CaptureRect::is_finite) else {
-            return (x, y);
-        };
-        let past_x = anc.clips_x()
-            && (node_page.x < rect.x - CLIP_EPSILON_PX
-                || node_page.right() > rect.right() + CLIP_EPSILON_PX);
-        let past_y = anc.clips_y()
-            && (node_page.y < rect.y - CLIP_EPSILON_PX
-                || node_page.bottom() > rect.bottom() + CLIP_EPSILON_PX);
-        (x || past_x, y || past_y)
-    })
+/// One layout axis of the `clipped` check. Each axis is decided on its own,
+/// on both sides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Axis {
+    X,
+    Y,
 }
 
-/// The first clip ancestor in `c` that `node_page` extends past, if any.
-fn clipping_ancestor(
-    c: &ComponentCapture,
-    node_page: &CaptureRect,
-) -> Option<(usize, CaptureRect)> {
-    c.clip_ancestors.iter().enumerate().find_map(|(i, anc)| {
-        let rect = anc.rect.filter(CaptureRect::is_finite)?;
-        let past_x = anc.clips_x()
-            && (node_page.x < rect.x - CLIP_EPSILON_PX
-                || node_page.right() > rect.right() + CLIP_EPSILON_PX);
-        let past_y = anc.clips_y()
-            && (node_page.y < rect.y - CLIP_EPSILON_PX
-                || node_page.bottom() > rect.bottom() + CLIP_EPSILON_PX);
-        (past_x || past_y).then_some((i, rect))
-    })
+impl Axis {
+    const BOTH: [Axis; 2] = [Axis::X, Axis::Y];
+
+    fn name(self) -> &'static str {
+        match self {
+            Axis::X => "x",
+            Axis::Y => "y",
+        }
+    }
+
+    fn overflow(self, anc: &ClipAncestor) -> OverflowAxis {
+        match self {
+            Axis::X => anc.axis_x(),
+            Axis::Y => anc.axis_y(),
+        }
+    }
+
+    /// `node` extends past `rect` on this axis (beyond sub-pixel slack).
+    fn extends_past(self, node: &CaptureRect, rect: &CaptureRect) -> bool {
+        match self {
+            Axis::X => {
+                node.x < rect.x - CLIP_EPSILON_PX || node.right() > rect.right() + CLIP_EPSILON_PX
+            }
+            Axis::Y => {
+                node.y < rect.y - CLIP_EPSILON_PX || node.bottom() > rect.bottom() + CLIP_EPSILON_PX
+            }
+        }
+    }
 }
 
-/// The first clip ancestor in `c` that `node_page` extends past along an
-/// axis whose overflow is `kind` (one that scrolls, or one that is
-/// unreported), if any, with the axis or axes it extends past on.
-fn overflow_past<'c>(
-    c: &'c ComponentCapture,
-    node_page: &CaptureRect,
-    kind: OverflowAxis,
-) -> Option<(&'c ClipAncestor, &'static str)> {
-    let soft = |axis: OverflowAxis| axis == kind;
-    c.clip_ancestors.iter().find_map(|anc| {
-        let rect = anc.rect.filter(CaptureRect::is_finite)?;
-        let past_x = soft(anc.axis_x())
-            && (node_page.x < rect.x - CLIP_EPSILON_PX
-                || node_page.right() > rect.right() + CLIP_EPSILON_PX);
-        let past_y = soft(anc.axis_y())
-            && (node_page.y < rect.y - CLIP_EPSILON_PX
-                || node_page.bottom() > rect.bottom() + CLIP_EPSILON_PX);
-        let axis = match (past_x, past_y) {
-            (true, true) => "x and y",
-            (true, false) => "x",
-            (false, true) => "y",
-            (false, false) => return None,
-        };
-        Some((anc, axis))
-    })
+/// Whether `anc` might clip on `axis`: that axis clips (`hidden`, `clip`) or
+/// is unreported. A scrolling (`auto`, `scroll`, `overlay`) or `visible` axis
+/// never clips.
+fn may_clip_on(anc: &ClipAncestor, axis: Axis) -> bool {
+    matches!(
+        axis.overflow(anc),
+        OverflowAxis::Clips | OverflowAxis::Unreported
+    )
 }
 
-/// Whether an ancestor might clip on some axis: one axis clips (`hidden`,
-/// `clip`) or is unreported. A scroll container (`auto`, `scroll`, `overlay`)
-/// or a `visible` axis never clips.
-fn may_clip(anc: &ClipAncestor) -> bool {
-    let might = |axis| matches!(axis, OverflowAxis::Clips | OverflowAxis::Unreported);
-    might(anc.axis_x()) || might(anc.axis_y())
+/// Why one axis of one side could not be decided.
+enum Undecided<'c> {
+    /// The node extends past this ancestor, whose overflow on the axis is
+    /// unreported or unrecognized.
+    Unreported(&'c ClipAncestor),
+    /// This ancestor (index, ancestor) may clip on the axis but has no rect.
+    NoRect(usize, &'c ClipAncestor),
+    /// The node has no bbox while some ancestor may clip on the axis.
+    NoBbox,
 }
 
-/// How the baseline (isolated) render treated the node at a path the in-situ
-/// render clips.
-enum BaselineClip {
-    /// Clipped in isolation too: not a finding.
-    Clipped,
-    /// Known not clipped in isolation (or absent there): a finding.
+/// How one side's render treats a node on one axis.
+enum AxisClip<'c> {
+    /// Cut off by this ancestor, at its rect.
+    Clipped(&'c ClipAncestor, CaptureRect),
+    Undecided(Undecided<'c>),
     NotClipped,
-    /// Cannot be told, with the reason.
-    Undecided(String),
 }
 
-/// `situ_axes` are the axes (x, y) the in-situ render clips the node on. A
-/// baseline clip covers the in-situ one only on the same axis: clipped on x
-/// in isolation does not excuse a new clip on y.
-fn baseline_clip(
-    base: &ComponentCapture,
-    node: Option<&&ComponentCaptureNode>,
-    b_root: CaptureRect,
-    situ_axes: (bool, bool),
-) -> BaselineClip {
+/// Decide whether capture `c` clips the node at page rect `node` (`None`:
+/// the node has no bbox) on `axis`. Clipping wins over undecided: a known
+/// `hidden`/`clip` ancestor the node extends past decides it.
+fn axis_clip(c: &ComponentCapture, node: Option<CaptureRect>, axis: Axis) -> AxisClip<'_> {
     let Some(node) = node else {
-        // Absent in isolation: `child_identity` reports that; the clip is new.
-        return BaselineClip::NotClipped;
+        return if c.clip_ancestors.iter().any(|a| may_clip_on(a, axis)) {
+            AxisClip::Undecided(Undecided::NoBbox)
+        } else {
+            AxisClip::NotClipped
+        };
     };
-    let Some(rel) = node.bbox.filter(CaptureRect::is_finite) else {
-        return BaselineClip::Undecided("the node has no bbox in the baseline capture".into());
-    };
-    let page = rel.offset_by(&b_root);
-    let (bx, by) = clipped_axes(base, &page);
-    let (sx, sy) = situ_axes;
-    // An in-situ clip axis the baseline did not also clip is a new clip.
-    let uncovered = (sx && !bx) || (sy && !by);
-    if !uncovered {
-        return BaselineClip::Clipped;
+    let finite = |a: &ClipAncestor| a.rect.filter(CaptureRect::is_finite);
+    for anc in &c.clip_ancestors {
+        if axis.overflow(anc) == OverflowAxis::Clips {
+            if let Some(rect) = finite(anc).filter(|r| axis.extends_past(&node, r)) {
+                return AxisClip::Clipped(anc, rect);
+            }
+        }
     }
-    if let Some((anc, axis)) = overflow_past(base, &page, OverflowAxis::Unreported) {
-        return BaselineClip::Undecided(format!(
-            "in isolation it extends outside clip ancestor '{}' on {axis}, whose overflow is \
-             unreported or unrecognized",
-            anc.descriptor
-        ));
+    for anc in &c.clip_ancestors {
+        if axis.overflow(anc) == OverflowAxis::Unreported
+            && finite(anc).is_some_and(|r| axis.extends_past(&node, &r))
+        {
+            return AxisClip::Undecided(Undecided::Unreported(anc));
+        }
     }
-    if base
-        .clip_ancestors
-        .iter()
-        .any(|a| may_clip(a) && a.rect.filter(CaptureRect::is_finite).is_none())
-    {
-        return BaselineClip::Undecided(
-            "a baseline clip ancestor has no rect, so whether it clipped the node in \
-             isolation is unknown"
-                .into(),
-        );
+    for (i, anc) in c.clip_ancestors.iter().enumerate() {
+        if may_clip_on(anc, axis) && finite(anc).is_none() {
+            return AxisClip::Undecided(Undecided::NoRect(i, anc));
+        }
     }
-    BaselineClip::NotClipped
+    AxisClip::NotClipped
 }
 
-/// `clipped`: a node extends past a clip ancestor in situ, while in isolation
-/// no clip ancestor clipped the node at that path. Only overflow `hidden` and
-/// `clip` count as clipping: a node that extends outside a scroll container
-/// (`auto`, `scroll`, `overlay`) is scrolled to, not cut off, so it is noted
-/// and never a `clipped` finding.
+fn overflow_label(anc: &ClipAncestor) -> String {
+    format!(
+        "(overflowX {}, overflowY {})",
+        anc.overflow_x.as_deref().unwrap_or("absent"),
+        anc.overflow_y.as_deref().unwrap_or("absent"),
+    )
+}
+
+/// `clipped`: decided per node and PER AXIS, on both sides.
 ///
-/// What cannot be decided is pushed to `undecided`, which makes the answer
-/// unknown when nothing else failed: a node extending past an ancestor whose
-/// overflow is unreported (absent or unrecognized), an in-situ clip ancestor
-/// with no rect, an in-situ node with no bbox, and an in-situ clip whose
-/// baseline counterpart cannot be judged ([`baseline_clip`], which is where a
-/// baseline clip ancestor with no rect is consulted). Only the topmost clipped
-/// (or noted, or undecided) node of a subtree is reported, and each kind
-/// keeps its own list: a scroll note or an undecided node never hides a
-/// descendant that is definitely clipped.
+/// For each in-situ node and each axis, the in-situ render either clips it
+/// (some ancestor whose overflow on that axis is `hidden` or `clip` has a rect
+/// the node extends past on that axis), cannot be decided (it extends past an
+/// ancestor whose overflow on that axis is unreported or unrecognized, a
+/// may-clip ancestor has no rect, or the node has no bbox while some ancestor
+/// may clip), or does not clip it. Only for an axis clipped in situ is the
+/// baseline decided the same way, at the same path. Then, per axis:
+///
+/// - clipped in situ, not clipped in isolation (or the path is absent there):
+///   a NEW clip, so a `clipped` finding naming that axis's ancestor;
+/// - clipped in situ, undecided in isolation: undecided;
+/// - clipped on both sides: covered, nothing;
+/// - undecided in situ: undecided;
+/// - not clipped in situ: nothing; extending outside a scroll container
+///   (`auto`, `scroll`, `overlay`) on it is only noted.
+///
+/// A node is a finding when either axis is. Only the topmost finding of a
+/// subtree is reported. Undecided and covered nodes never stop their
+/// descendants being judged; an undecided entry is folded into an ancestor's
+/// only when it repeats the same reason, and so is a scroll note.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -723,121 +715,161 @@ fn clip_check(
     notes: &mut Vec<String>,
     undecided: &mut Vec<String>,
 ) {
-    for (i, anc) in in_situ.clip_ancestors.iter().enumerate() {
-        if may_clip(anc) && anc.rect.filter(CaptureRect::is_finite).is_none() {
-            undecided.push(format!(
-                "clipped not decided: in-situ clip ancestor {i} ('{}') has no rect, so \
-                 whether it clips the component there is unknown",
-                anc.descriptor
-            ));
-        }
-    }
     if in_situ.clip_ancestors.is_empty() {
         return;
     }
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
-    let mut undecided_paths: Vec<String> = Vec::new();
-    // (path, reason) of each baseline-undecided entry: a descendant repeating
-    // the same reason is folded into its ancestor's entry; a different reason
-    // is recorded on its own.
-    let mut baseline_undecided: Vec<(String, String)> = Vec::new();
+    // (path, reason) of each undecided entry already recorded.
+    let mut recorded: Vec<(String, String)> = Vec::new();
     let mut scroll_noted: Vec<String> = Vec::new();
     let mut no_bbox: Vec<String> = Vec::new();
-    let overflow = |anc: &ClipAncestor| {
-        format!(
-            "(overflowX {}, overflowY {})",
-            anc.overflow_x.as_deref().unwrap_or("absent"),
-            anc.overflow_y.as_deref().unwrap_or("absent"),
-        )
-    };
+    let might_clip = Axis::BOTH
+        .iter()
+        .any(|&ax| in_situ.clip_ancestors.iter().any(|a| may_clip_on(a, ax)));
+
     for node in &in_situ.nodes {
         if below_any(&node.path, &reported) {
             continue;
         }
-        let Some(rel) = node.bbox.filter(CaptureRect::is_finite) else {
-            no_bbox.push(format!("'{}'", node.path));
-            continue;
-        };
-        let page = rel.offset_by(&s_root);
-        let Some((i, clip_rect)) = clipping_ancestor(in_situ, &page) else {
-            if !below_any(&node.path, &undecided_paths) {
-                if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Unreported) {
-                    undecided.push(format!(
-                    "clipped not decided: <{}> at path '{}' extends outside clip ancestor '{}' \
-                     on {axis} in situ {}, and that overflow value is unreported or \
-                     unrecognized, so whether it is clipped is unknown",
-                    node.tag,
-                    node.path,
-                    anc.descriptor,
-                    overflow(anc),
-                ));
-                    undecided_paths.push(node.path.clone());
-                    continue;
-                }
-            }
-            if below_any(&node.path, &scroll_noted) {
-                continue;
-            }
-            if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Scrolls) {
-                notes.push(format!(
-                    "clipped: <{}> at path '{}' extends outside '{}' on {axis} in situ {}; \
-                     that axis scrolls rather than clipping, so it is not a clipped finding",
-                    node.tag,
-                    node.path,
-                    anc.descriptor,
-                    overflow(anc),
-                ));
-                scroll_noted.push(node.path.clone());
+        let Some(page) = node
+            .bbox
+            .filter(CaptureRect::is_finite)
+            .map(|r| r.offset_by(&s_root))
+        else {
+            if might_clip {
+                no_bbox.push(format!("'{}'", node.path));
             }
             continue;
         };
-        let anc = &in_situ.clip_ancestors[i];
-        let situ_axes = clipped_axes(in_situ, &page);
-        match baseline_clip(base, b_nodes.get(node.path.as_str()), b_root, situ_axes) {
-            BaselineClip::Clipped => continue,
-            BaselineClip::Undecided(why) => {
-                // Descendants are still judged: one definitely clipped below
-                // this node is a finding. Only a repeat undecided entry for
-                // the same subtree is suppressed.
-                let repeat = baseline_undecided
-                    .iter()
-                    .any(|(p, r)| *r == why && is_descendant(&node.path, p));
-                if !repeat {
-                    undecided.push(format!(
-                        "clipped not decided: <{}> at path '{}' extends past clip ancestor \
-                         '{}' in situ, but {why}",
-                        node.tag, node.path, anc.descriptor,
+        // The baseline's page rect at this path: `None` (path absent there)
+        // and `Some(None)` (present without a bbox) are different answers.
+        let b_page = b_nodes.get(node.path.as_str()).map(|bn| {
+            bn.bbox
+                .filter(CaptureRect::is_finite)
+                .map(|r| r.offset_by(&b_root))
+        });
+
+        let mut new_clip: Option<(Axis, &ClipAncestor, CaptureRect)> = None;
+        let mut reasons: Vec<String> = Vec::new();
+        let mut unclipped: Vec<Axis> = Vec::new();
+        for axis in Axis::BOTH {
+            let ax = axis.name();
+            match axis_clip(in_situ, Some(page), axis) {
+                AxisClip::NotClipped => unclipped.push(axis),
+                AxisClip::Undecided(why) => reasons.push(match why {
+                    Undecided::Unreported(anc) => format!(
+                        "extends outside clip ancestor '{}' on {ax} in situ {}, and that overflow \
+                         value is unreported or unrecognized, so whether it is clipped is unknown",
+                        anc.descriptor,
+                        overflow_label(anc)
+                    ),
+                    Undecided::NoRect(i, anc) => format!(
+                        "in-situ clip ancestor {i} ('{}') has no rect, so whether it clips the \
+                         node on {ax} is unknown",
+                        anc.descriptor
+                    ),
+                    Undecided::NoBbox => unreachable!("the in-situ node has a bbox here"),
+                }),
+                AxisClip::Clipped(s_anc, s_rect) => {
+                    let baseline = match b_page {
+                        None => AxisClip::NotClipped,
+                        Some(b) => axis_clip(base, b, axis),
+                    };
+                    let but = match baseline {
+                        AxisClip::Clipped(..) => continue,
+                        AxisClip::NotClipped => {
+                            if new_clip.is_none() {
+                                new_clip = Some((axis, s_anc, s_rect));
+                            }
+                            continue;
+                        }
+                        AxisClip::Undecided(Undecided::NoBbox) => {
+                            "the node has no bbox in the baseline capture".to_string()
+                        }
+                        AxisClip::Undecided(Undecided::Unreported(anc)) => format!(
+                            "in isolation it extends outside clip ancestor '{}' on {ax}, whose \
+                             overflow is unreported or unrecognized",
+                            anc.descriptor
+                        ),
+                        AxisClip::Undecided(Undecided::NoRect(..)) => format!(
+                            "a baseline clip ancestor has no rect, so whether it clipped the \
+                             node on {ax} in isolation is unknown"
+                        ),
+                    };
+                    reasons.push(format!(
+                        "extends past clip ancestor '{}' on {ax} in situ, but {but}",
+                        s_anc.descriptor
                     ));
                 }
-                baseline_undecided.push((node.path.clone(), why));
-                continue;
             }
-            BaselineClip::NotClipped => {}
         }
-        findings.push(ComponentFinding {
-            kind: ComponentFindingKind::Clipped,
-            path: node.path.clone(),
-            message: format!(
-                "<{}> at path '{}' extends past clip ancestor '{}' (overflowX {}, overflowY {}) \
-                 in situ; no clip ancestor clipped it in isolation",
+
+        for reason in reasons {
+            let repeat = recorded
+                .iter()
+                .any(|(p, r)| *r == reason && (*p == node.path || is_descendant(&node.path, p)));
+            if !repeat {
+                undecided.push(format!(
+                    "clipped not decided: <{}> at path '{}': {reason}",
+                    node.tag, node.path
+                ));
+                recorded.push((node.path.clone(), reason));
+            }
+        }
+
+        if let Some((axis, anc, clip_rect)) = new_clip {
+            let ax = axis.name();
+            findings.push(ComponentFinding {
+                kind: ComponentFindingKind::Clipped,
+                path: node.path.clone(),
+                message: format!(
+                    "<{}> at path '{}' extends past clip ancestor '{}' {} on {ax} in situ; no \
+                     clip ancestor clipped it on {ax} in isolation",
+                    node.tag,
+                    node.path,
+                    anc.descriptor,
+                    overflow_label(anc),
+                ),
+                baseline: Value::Null,
+                in_situ: json!({
+                    "axis": ax,
+                    "nodeRect": rect_json(&page),
+                    "clipAncestor": anc.descriptor,
+                    "clipRect": rect_json(&clip_rect),
+                }),
+            });
+            reported.push(node.path.clone());
+            continue;
+        }
+
+        if below_any(&node.path, &scroll_noted) {
+            continue;
+        }
+        let scrolled = in_situ.clip_ancestors.iter().find_map(|anc| {
+            let rect = anc.rect.filter(CaptureRect::is_finite)?;
+            let axes: Vec<&str> = unclipped
+                .iter()
+                .filter(|&&a| {
+                    a.overflow(anc) == OverflowAxis::Scrolls && a.extends_past(&page, &rect)
+                })
+                .map(|a| a.name())
+                .collect();
+            (!axes.is_empty()).then(|| (anc, axes.join(" and ")))
+        });
+        if let Some((anc, axes)) = scrolled {
+            notes.push(format!(
+                "clipped: <{}> at path '{}' extends outside '{}' on {axes} in situ {}; that \
+                 axis scrolls rather than clipping, so it is not a clipped finding",
                 node.tag,
                 node.path,
                 anc.descriptor,
-                anc.overflow_x.as_deref().unwrap_or("?"),
-                anc.overflow_y.as_deref().unwrap_or("?"),
-            ),
-            baseline: Value::Null,
-            in_situ: json!({
-                "nodeRect": rect_json(&page),
-                "clipAncestor": anc.descriptor,
-                "clipRect": rect_json(&clip_rect),
-            }),
-        });
-        reported.push(node.path.clone());
+                overflow_label(anc),
+            ));
+            scroll_noted.push(node.path.clone());
+        }
     }
-    // A node with no bbox matters only when something in situ might clip it.
-    if !no_bbox.is_empty() && in_situ.clip_ancestors.iter().any(may_clip) {
+    if !no_bbox.is_empty() {
         undecided.push(format!(
             "clipped not decided: {} in-situ node(s) have no bbox ({}), so whether they are \
              clipped is unknown",
@@ -2004,27 +2036,126 @@ mod tests {
         );
         assert!(!kinds(&r).contains(&ComponentFindingKind::Clipped));
 
-        // A baseline root with no bbox cannot be judged either, but the
-        // undecided root does not hide its child "1", which is clipped in
-        // situ and definitely not in isolation: Failed, with the root noted.
+        // (a) A baseline root with no bbox but no baseline clip ancestor:
+        // nothing could have clipped it in isolation, so the in-situ clip is
+        // new. Failed at the root.
         let mut base = capture(page(), parent_of(page()));
         base.nodes[0].bbox = None;
         let r = run(base, situ);
         assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
-        let rep = report(&r);
-        let clipped: Vec<&str> = rep
+        assert_eq!(clipped_paths(&r), vec![""]);
+    }
+
+    fn clipped_paths(r: &AssertionResult) -> Vec<String> {
+        report(r)
             .findings
             .iter()
             .filter(|f| f.kind == ComponentFindingKind::Clipped)
-            .map(|f| f.path.as_str())
-            .collect();
-        assert_eq!(clipped, vec!["1"]);
-        assert!(
-            rep.unknown_checks.iter().any(|n| n.contains("at path ''")
-                && n.contains("the node has no bbox in the baseline capture")),
-            "{:?}",
-            rep.unknown_checks
-        );
+            .map(|f| f.path.clone())
+            .collect()
+    }
+
+    fn anc(desc: &str, x: Option<&str>, y: Option<&str>, r: Option<CaptureRect>) -> ClipAncestor {
+        ClipAncestor {
+            descriptor: desc.to_string(),
+            overflow_x: x.map(str::to_string),
+            overflow_y: y.map(str::to_string),
+            rect: r,
+        }
+    }
+
+    /// In situ: a 300-wide `hidden`-x frame clips the 400-wide root on x.
+    fn x_clipped_situ() -> ComponentCapture {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![anc(
+            "div.x-frame",
+            Some("hidden"),
+            Some("visible"),
+            Some(rect(100.0, 300.0, 300.0, 600.0)),
+        )];
+        situ
+    }
+
+    #[test]
+    fn b_a_baseline_unreported_y_axis_does_not_excuse_a_new_x_clip() {
+        // The baseline node extends past an ancestor on y only, and that
+        // ancestor's y overflow is unreported; its x axis is visible. The
+        // in-situ clip is on x, where the baseline is decided: not clipped.
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = vec![anc(
+            "div.short",
+            Some("visible"),
+            None,
+            Some(rect(100.0, 300.0, 400.0, 30.0)),
+        )];
+        let r = run(base, x_clipped_situ());
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(clipped_paths(&r), vec![""]);
+    }
+
+    #[test]
+    fn c_a_rectless_baseline_ancestor_on_y_does_not_excuse_a_new_x_clip() {
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = vec![anc("div.y-only", Some("visible"), Some("hidden"), None)];
+        let r = run(base, x_clipped_situ());
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(clipped_paths(&r), vec![""]);
+    }
+
+    #[test]
+    fn d_a_covered_x_clip_does_not_hide_an_undecided_y_axis() {
+        // A clips on x on both sides (covered); B, in situ only, has an
+        // unreported y overflow that the root extends past.
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = x_clipped_situ().clip_ancestors;
+        let mut situ = x_clipped_situ();
+        situ.clip_ancestors.push(anc(
+            "div.b",
+            Some("visible"),
+            None,
+            Some(rect(100.0, 300.0, 400.0, 30.0)),
+        ));
+        let r = run(base, situ);
+        assert_input_missing(&r, "extends outside clip ancestor 'div.b' on y");
+        assert!(clipped_paths(&r).is_empty());
+    }
+
+    #[test]
+    fn e_the_finding_names_the_ancestor_of_the_new_axis() {
+        // A clips x on both sides (covered); B clips y in situ only (new).
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = x_clipped_situ().clip_ancestors;
+        let mut situ = x_clipped_situ();
+        situ.clip_ancestors.push(anc(
+            "div.y-frame",
+            Some("visible"),
+            Some("hidden"),
+            Some(rect(100.0, 300.0, 400.0, 30.0)),
+        ));
+        let r = run(base, situ);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        let rep = report(&r);
+        let f = &rep.findings[0];
+        assert_eq!(f.kind, ComponentFindingKind::Clipped);
+        assert_eq!(f.path, "");
+        assert_eq!(f.in_situ["axis"], json!("y"));
+        assert_eq!(f.in_situ["clipAncestor"], json!("div.y-frame"));
+        assert_eq!(f.in_situ["clipRect"]["height"], json!(30.0));
+        assert!(f.message.contains("div.y-frame") && f.message.contains("on y"));
+    }
+
+    #[test]
+    fn null_target_id_and_portal_mount_target_parse_as_empty() {
+        let c: ComponentCapture = serde_json::from_value(json!({
+            "schemaVersion": 1,
+            "target": { "kind": "component", "id": null },
+            "nodes": [
+                { "path": "", "tag": "div", "portal": { "mountTarget": null } }
+            ],
+        }))
+        .expect("null id and mountTarget parse");
+        assert_eq!(c.target.unwrap().id, "");
+        assert_eq!(c.nodes[0].portal.as_ref().unwrap().mount_target, "");
     }
 
     fn rectless(x: &str, y: &str) -> ClipAncestor {
