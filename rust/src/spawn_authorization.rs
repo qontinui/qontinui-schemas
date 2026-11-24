@@ -160,8 +160,9 @@ pub struct RunnerKey {
 /// had first been spawned and observed.
 ///
 /// `name` is the registry key, LOWERCASED (`Explore` -> `explore`): coord's
-/// name grammar is `[a-z0-9_-]`, and every lookup lowercases the name it is
-/// given (the plan's D6), so a mixed-case declaration could never match.
+/// name grammar is `[a-z0-9_-]`, and the plan's D6 has every lookup (coord,
+/// hook, runner) lowercase the name it is given, so a mixed-case declaration
+/// could never match.
 ///
 /// **Never seeded**, like a [`RunnerKey`]: a row is written only when an
 /// admin flips the switch (the plan's D3), so declaring a built-in changes
@@ -525,7 +526,13 @@ impl SpawnAuthorizationContract {
             // One registry name is one row. A built-in sharing a name with a
             // kind, a class or a runner key would make an admin's switch on
             // the built-in silently govern that other spawn too.
-            if self.kind_seeds.iter().any(|k| k.agent_name == r.name) {
+            // Case-insensitive: kind names are not grammar-checked here, and
+            // a D6 lookup folds `Plan` onto `plan`.
+            if self
+                .kind_seeds
+                .iter()
+                .any(|k| k.agent_name.eq_ignore_ascii_case(&r.name))
+            {
                 return Err(format!(
                     "harness built-in role `{}` collides with a kind_seeds \
                      agent_name — one registry name is one row, so a switch on \
@@ -1157,6 +1164,11 @@ mod tests {
     fn validate_rejects_a_harness_builtin_role_named_after_a_kind_seed() {
         let e = builtin_err(|c| {
             c.harness_builtin_roles[0].name = c.kind_seeds[0].agent_name.clone();
+        });
+        assert!(e.contains("collides with a kind_seeds agent_name"), "{e}");
+        // A mixed-case kind folds onto the built-in under a lowercasing lookup.
+        let e = builtin_err(|c| {
+            c.kind_seeds[0].agent_name = c.harness_builtin_roles[0].name.to_ascii_uppercase();
         });
         assert!(e.contains("collides with a kind_seeds agent_name"), "{e}");
     }
