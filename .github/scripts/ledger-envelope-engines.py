@@ -94,8 +94,8 @@ def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]
             "dropped or added (a deliberate corpus change must move CORPUS_SIZE in the same change)"
         )
     keys = {"name", "instance", "rust", "declared_exception", "format_only"}
-    if any(not isinstance(c, dict) or not keys <= c.keys() for c in cases):
-        problems.append(f"a corpus case lacks one of {sorted(keys)}")
+    if any(not isinstance(c, dict) or not keys <= c.keys() or not isinstance(c["name"], str) for c in cases):
+        problems.append(f"a corpus case is not an object carrying {sorted(keys)} with a string `name`")
         return None, problems
     # A name is a case's identity in every comparison below. The corpus may
     # repeat a case (`/source = "x\n"` is both a trailing-newline case and a
@@ -124,8 +124,10 @@ def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]
 
 def python_arm(schema: Schema, cases: list[Case]) -> Verdicts:
     """{name: (formats_on, formats_off)} under python-jsonschema."""
-    import jsonschema
-    from jsonschema.validators import validator_for
+    # Untyped for mypy unless types-jsonschema is installed, which this script
+    # does not depend on: mypy --strict is clean with or without the stubs.
+    import jsonschema  # type: ignore[import-untyped,unused-ignore]
+    from jsonschema.validators import validator_for  # type: ignore[import-untyped,unused-ignore]
 
     cls = validator_for(schema)
     if cls is not jsonschema.Draft202012Validator:
