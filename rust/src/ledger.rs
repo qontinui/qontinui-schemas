@@ -43,14 +43,14 @@
 //! `ajv/dist/2020` — the schema declares draft 2020-12), `ajv-formats`
 //! applied in its default mode (`addFormats(ajv)`), the three non-standard
 //! formats schemars emits registered as annotation-only —
-//! `formats: { uint32: true, uint64: true, double: true }` (`uint32` and
-//! `uint64` are defined by no ajv plugin; `ajv-formats` accepts `double`
-//! unchecked) — and
+//! `formats: { uint32: true, uint64: true, double: true }` (`ajv-formats`
+//! defines no `uint32` or `uint64`; it accepts `double` unchecked) — and
 //! `strictTypes: false`, because `SafeJson` is deliberately type-less.
-//! Everything else stays default. Without the three formats ajv's default
-//! constructor refuses to compile the schema at all (`unknown format
-//! "uint32"`), and without `ajv-formats` it refuses the same way on `date-time`.
-//! Only an explicit `validateFormats: false` skips `date-time`, the counterpart
+//! Everything else stays default. ajv refuses to compile the schema at all
+//! when any format is unknown to it: with neither the three formats nor
+//! `ajv-formats` it names `double` first, with `ajv-formats` alone `uint32`,
+//! and with the three formats alone `uuid`. Only an
+//! explicit `validateFormats: false` skips the format checks, the counterpart
 //! of Python without `rfc3339-validator`.
 //!
 //! Both recipes are proven, not assumed: rust-ci's `ledger-envelope-engines`
