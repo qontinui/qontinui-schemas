@@ -38,10 +38,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 JS = Path(__file__).with_name("ledger-envelope-engines.cjs")
 
-# The corpus size this check was last measured at. A smaller corpus means the
-# writer dropped cases (or wrote a stub), which is UNKNOWN, not agreement. A
-# corpus addition must raise this in the same change.
-CORPUS_FLOOR = 301
+# The corpus size this check was last measured at, matched EXACTLY: a smaller
+# corpus means the writer dropped cases (or wrote a stub), which is UNKNOWN,
+# not agreement; a larger one means cases were added without moving this, so
+# a later drop of as many would go unseen. Any corpus change moves this in the
+# same change.
+CORPUS_SIZE = 301
 
 # Measured per-engine disagreements a writer following the module docs cannot
 # be harmed by: case name -> {"engine": the engine's formats-on verdict,
@@ -49,7 +51,9 @@ CORPUS_FLOOR = 301
 # declared — a stale entry fails like a new disagreement. Measured empty for
 # both engines on 2026-11-24 (ajv 8.20.0 + ajv-formats 3.0.1, jsonschema
 # 4.26.0 + rfc3339-validator 0.1.4). An engine ADMITTING a case validate()
-# refuses is never declarable: that is a hole writers can drive data through.
+# refuses is never declarable: that is a hole writers can drive data through,
+# and compare() refuses such an entry. A declared exception (DECLARED_EXCEPTIONS
+# in the Rust test) is never an entry here either.
 ENGINE_DIFFERENCES = {"python-jsonschema": {}, "ajv": {}}
 
 
@@ -69,10 +73,10 @@ def load_corpus(path):
         return None, None, [f"the corpus {path} has no cases — UNKNOWN, not agreement"]
     if doc.get("count") != len(cases):
         problems.append(f"the corpus says count={doc.get('count')} but carries {len(cases)} cases — truncated or hand-edited")
-    if len(cases) < CORPUS_FLOOR:
+    if len(cases) != CORPUS_SIZE:
         problems.append(
-            f"the corpus has {len(cases)} cases, below the floor of {CORPUS_FLOOR} — cases were dropped "
-            "(a deliberate corpus change must move CORPUS_FLOOR in the same change)"
+            f"the corpus has {len(cases)} cases, not the {CORPUS_SIZE} this check was measured at — cases were "
+            "dropped or added (a deliberate corpus change must move CORPUS_SIZE in the same change)"
         )
     keys = {"name", "instance", "rust", "declared_exception", "format_only"}
     if any(not isinstance(c, dict) or not keys <= c.keys() for c in cases):
@@ -149,6 +153,18 @@ def compare(engine, cases, verdicts):
     for c in cases:
         name, rust = c["name"], c["rust"]
         on, _ = verdicts[name]
+        if name in declared and c["declared_exception"]:
+            problems.append(
+                f"{engine}: ENGINE_DIFFERENCES names `{name}`, a declared exception — it is checked as one, "
+                "so the entry is never exercised; remove it"
+            )
+            disagreements += 1
+        if name in declared and declared[name]["engine"] and not rust:
+            problems.append(
+                f"{engine}: ENGINE_DIFFERENCES entry `{name}` declares {engine} ADMITS a case validate() refuses — "
+                "never declarable: a writer could drive that data through"
+            )
+            disagreements += 1
         if c["declared_exception"]:
             exceptions += 1
             if not (on and not rust):

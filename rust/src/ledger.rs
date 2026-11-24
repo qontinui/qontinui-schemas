@@ -41,14 +41,17 @@
 //!
 //! A JS writer validates with ajv, configured exactly so: `Ajv2020` (from
 //! `ajv/dist/2020` — the schema declares draft 2020-12), `ajv-formats`
-//! applied in its default mode (`addFormats(ajv)`), the three formats
-//! schemars emits that no ajv plugin defines registered as annotation-only —
-//! `formats: { uint32: true, uint64: true, double: true }` — and
+//! applied in its default mode (`addFormats(ajv)`), the three non-standard
+//! formats schemars emits registered as annotation-only —
+//! `formats: { uint32: true, uint64: true, double: true }` (`uint32` and
+//! `uint64` are defined by no ajv plugin; `ajv-formats` accepts `double`
+//! unchecked) — and
 //! `strictTypes: false`, because `SafeJson` is deliberately type-less.
 //! Everything else stays default. Without the three formats ajv's default
 //! constructor refuses to compile the schema at all (`unknown format
-//! "uint32"`); without `ajv-formats` it skips `date-time` exactly as Python
-//! does without `rfc3339-validator`.
+//! "uint32"`), and without `ajv-formats` it refuses the same way on `date-time`.
+//! Only an explicit `validateFormats: false` skips `date-time`, the counterpart
+//! of Python without `rfc3339-validator`.
 //!
 //! Both recipes are proven, not assumed: rust-ci's `ledger-envelope-engines`
 //! job runs the golden test's corpus through python-jsonschema (the recipe
