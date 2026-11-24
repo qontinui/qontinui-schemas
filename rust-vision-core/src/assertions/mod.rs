@@ -481,8 +481,9 @@ pub enum Assertion {
     /// when either side lacks root geometry; `size` on an axis whose fill
     /// ratio cannot be computed while its absolute size differs; the per-node checks when either
     /// side has no node tree or no root node (path `""`); `props_delta` when
-    /// `compare_props` is set and either side has no props; and `clipped` at
-    /// a node that extends past a clip ancestor whose overflow is unreported,
+    /// `compare_props` is set and either side has no props; and `clipped`
+    /// (decided per axis, on both sides) at a node that, on an axis, extends
+    /// past a clip ancestor whose overflow is unreported,
     /// past a clip ancestor with no rect, or that has no bbox; and any check a
     /// capture lists in its own `unknownChecks`. See
     /// `assertions/component.rs`.

@@ -107,6 +107,7 @@ pub enum CaptureTargetKind {
 #[serde(rename_all = "camelCase")]
 pub struct CaptureTarget {
     pub kind: CaptureTargetKind,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub id: String,
 }
 
@@ -139,6 +140,7 @@ pub struct CaptureRoot {
 pub struct CapturePortal {
     /// A CSS-ish descriptor of the DOM parent it mounted into, e.g.
     /// `body>div#portal-root`.
+    #[serde(default, deserialize_with = "null_as_default")]
     pub mount_target: String,
     /// The tree path of its React parent, when that parent is inside the
     /// captured tree.
