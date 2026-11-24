@@ -458,13 +458,21 @@ pub enum Assertion {
     /// note. A viewport mismatch is reported and never fails alone: node
     /// geometry is root-relative.
     ///
-    /// `Unknown{input_missing}` when the baseline is unregistered, there is
-    /// no in-situ capture for `component`, either side's `schemaVersion` is
-    /// not [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`], either side lacks
-    /// root geometry, either side has no nodes or no root node (path `""`),
-    /// or `compare_props` is set and either side has no props;
-    /// `Unknown{stale_input}` when both source shas are known and differ.
-    /// See `assertions/component.rs`.
+    /// Answered `Unknown` before any comparison when the baseline is
+    /// unregistered, there is no in-situ capture for `component`, either
+    /// side's `schemaVersion` is absent or not
+    /// [`crate::COMPONENT_CAPTURE_SCHEMA_VERSION`], or either side lacks root
+    /// geometry (all `input_missing`), or when both source shas are known and
+    /// differ (`stale_input`).
+    ///
+    /// Otherwise every check that has its inputs runs, and a definite failure
+    /// outranks an undecided check: any finding is `Failed`, with each check
+    /// that could not run listed in the report's `unknown_checks`. Only when
+    /// nothing failed AND a check could not run — no node tree or no root
+    /// node (path `""`) on a side, `compare_props` with props missing on a
+    /// side, or a node extending past a clip ancestor whose overflow is
+    /// unreported — is the answer `Unknown{input_missing}`. See
+    /// `assertions/component.rs`.
     // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
     // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
     // `result_large_err` bound. The wire is unchanged.

@@ -29,10 +29,6 @@ use serde::{Deserialize, Serialize};
 /// The capture schema version this crate reads.
 pub const COMPONENT_CAPTURE_SCHEMA_VERSION: u32 = 1;
 
-fn default_schema_version() -> u32 {
-    COMPONENT_CAPTURE_SCHEMA_VERSION
-}
-
 /// A rectangle in CSS px. Page coordinates or root-relative, depending on the
 /// field that holds it (see the module doc).
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
@@ -184,7 +180,8 @@ pub enum OverflowAxis {
     Scrolls,
     /// `visible`: overflowing content is painted.
     Visible,
-    /// Absent or an unrecognized value: whether it clips is unknown.
+    /// Absent or an unrecognized value: whether it clips is unknown, so a
+    /// node extending past it leaves the `clipped` check undecided.
     Unreported,
 }
 
@@ -210,10 +207,12 @@ impl ClipAncestor {
         OverflowAxis::of(self.overflow_y.as_deref())
     }
 
-    /// Whether this ancestor clips along the horizontal axis: only
+    /// Whether this ancestor is KNOWN to clip along the horizontal axis: only
     /// `overflowX` `hidden` or `clip` does. A scroll container (`auto`,
-    /// `scroll`) does not cut its content off, and an absent value is not
-    /// evidence of clipping.
+    /// `scroll`, `overlay`) does not cut its content off. An absent or
+    /// unrecognized value is neither clipping nor not clipping
+    /// ([`OverflowAxis::Unreported`]): `false` here, and the assertion treats
+    /// a node extending past such an axis as an undecided check.
     pub fn clips_x(&self) -> bool {
         self.axis_x() == OverflowAxis::Clips
     }
@@ -229,8 +228,11 @@ impl ClipAncestor {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentCapture {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
+    /// The capture's wire schema version. `None` when the key is absent: an
+    /// unversioned capture is not assumed to be version 1, and the assertion
+    /// answers it `unknown{input_missing}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<CaptureTarget>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
