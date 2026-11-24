@@ -610,6 +610,10 @@ pub enum VisibilityReason {
     /// Every hit-test sample landed on another element. The element may
     /// still be fully painted, under a transparent overlay.
     Occluded,
+    /// Every hit-test sample lies outside the region an ancestor's overflow
+    /// lets it paint into (a nav item scrolled out of its sidebar): like
+    /// [`Self::OffScreen`], not in the frame.
+    Clipped,
     /// A reason this crate does not know, carried verbatim.
     Other(String),
 }
@@ -628,6 +632,7 @@ impl From<String> for VisibilityReason {
             "no-layout" => Self::NoLayout,
             "off-screen" => Self::OffScreen,
             "occluded" => Self::Occluded,
+            "clipped" => Self::Clipped,
             _ => Self::Other(s),
         }
     }
@@ -640,6 +645,7 @@ impl From<VisibilityReason> for String {
             VisibilityReason::NoLayout => "no-layout".into(),
             VisibilityReason::OffScreen => "off-screen".into(),
             VisibilityReason::Occluded => "occluded".into(),
+            VisibilityReason::Clipped => "clipped".into(),
             VisibilityReason::Other(s) => s,
         }
     }
@@ -1216,7 +1222,11 @@ mod visibility_reason_tests {
             ("no-layout", VisibilityReason::NoLayout),
             ("off-screen", VisibilityReason::OffScreen),
             ("occluded", VisibilityReason::Occluded),
-            ("clipped", VisibilityReason::Other("clipped".into())),
+            ("clipped", VisibilityReason::Clipped),
+            (
+                "future-reason",
+                VisibilityReason::Other("future-reason".into()),
+            ),
         ] {
             let el: Element = serde_json::from_value(serde_json::json!({
                 "id": "x", "visible": false, "visibility_reason": wire, "occluded_pct": 100.0
@@ -1228,6 +1238,8 @@ mod visibility_reason_tests {
                 wire
             );
         }
+        // Clipped paints (just not in the frame); it is not a paints-nothing reason.
+        assert!(!VisibilityReason::Clipped.paints_nothing());
         // Absent in, absent out: older snapshots are unchanged.
         let el: Element = serde_json::from_str(r#"{"id":"x"}"#).unwrap();
         assert!(el.visibility_reason.is_none() && el.occluded_pct.is_none());

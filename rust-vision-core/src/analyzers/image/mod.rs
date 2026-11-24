@@ -728,6 +728,8 @@ pub fn unrendered(_snapshot: &ElementSnapshot, el: &Element) -> Option<String> {
 ///   A transparent overlay (a stretched-link card, an inset-0 scrim) produces
 ///   exactly this while the image is fully painted beneath it.
 /// - `visibility_reason: off-screen` — outside the viewport at capture.
+/// - `visibility_reason: clipped` — cut off by an ancestor's overflow at
+///   every sample, so the frame does not show it.
 /// - any other reason this crate does not know, or `visible: false` with no
 ///   reason at all (an older producer).
 /// - a box wholly inside the box of the element the producer names in
@@ -754,6 +756,13 @@ pub fn unreadable(snapshot: &ElementSnapshot, el: &Element) -> Option<String> {
         (Some(VisibilityReason::OffScreen), _) => {
             return Some(format!(
                 "element '{}' was outside the viewport at capture, so the frame does not show it",
+                el.id
+            ))
+        }
+        (Some(VisibilityReason::Clipped), _) => {
+            return Some(format!(
+                "element '{}' was cut off by an ancestor's overflow at every hit-test sample, \
+                 so the frame does not show it",
                 el.id
             ))
         }
@@ -2140,5 +2149,22 @@ mod tests {
         assert!(why.contains("zero-area box"), "{why}");
         // The same 0.4 px at x = 0.3 straddles a pixel edge and covers one.
         assert_eq!(unrendered(&snap, &boxed(0.3, 0.4, 20.0)), None);
+    }
+
+    #[test]
+    fn a_clipped_element_reads_like_off_screen_not_like_an_unknown_reason() {
+        let snap = ElementSnapshot::default();
+        let mut el = boxed(10.0, 100.0, 40.0);
+        el.visible = Some(false);
+        el.visibility_reason = Some(VisibilityReason::from("clipped".to_string()));
+        assert_eq!(el.visibility_reason, Some(VisibilityReason::Clipped));
+        // Not a paints-nothing reason: it is a gap, not an unrendered element.
+        assert_eq!(unrendered(&snap, &el), None);
+        let why = unreadable(&snap, &el).expect("clipped is a gap");
+        assert_eq!(
+            why,
+            "element 'hairline' was cut off by an ancestor's overflow at every hit-test \
+             sample, so the frame does not show it"
+        );
     }
 }

@@ -960,7 +960,7 @@ fn an_image_reported_occluded_is_unknown_never_silently_dropped() {
         interactable: true,
         ..Default::default()
     };
-    let cases: [(&str, Element); 5] = [
+    let cases: [(&str, Element); 6] = [
         (
             "occluded",
             with_visibility(img_el("hero", 10, 10, &base), Some(false), Some("occluded")),
@@ -978,8 +978,16 @@ fn an_image_reported_occluded_is_unknown_never_silently_dropped() {
             with_visibility(img_el("hero", 10, 10, &base), Some(false), None),
         ),
         (
-            "unknown reason",
+            "clipped",
             with_visibility(img_el("hero", 10, 10, &base), Some(false), Some("clipped")),
+        ),
+        (
+            "unknown reason",
+            with_visibility(
+                img_el("hero", 10, 10, &base),
+                Some(false),
+                Some("future-reason"),
+            ),
         ),
         ("inside its occluder", {
             let mut e = img_el("hero", 10, 10, &base);

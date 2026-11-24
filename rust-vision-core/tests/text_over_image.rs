@@ -1352,7 +1352,8 @@ fn text_reported_not_visible_over_the_image_blocks_a_pass() {
     for reason in [
         Some(VisibilityReason::Occluded),
         Some(VisibilityReason::OffScreen),
-        Some(VisibilityReason::Other("clipped".into())),
+        Some(VisibilityReason::Clipped),
+        Some(VisibilityReason::Other("future-reason".into())),
         None,
     ] {
         let mut scrim = case("scrim");
