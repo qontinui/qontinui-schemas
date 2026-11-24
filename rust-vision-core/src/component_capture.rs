@@ -24,7 +24,31 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// A defaulted field that also reads an explicit JSON `null` as its default,
+/// so a producer that serializes an empty value as `null` still parses.
+fn null_as_default<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
+
+/// `styles`: `null` reads as no styles, and a `null` VALUE is a style that
+/// was not captured, so it is left out (absent, not an empty string).
+fn null_tolerant_styles<'de, D>(d: D) -> Result<BTreeMap<String, String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw: Option<BTreeMap<String, Option<String>>> = Option::deserialize(d)?;
+    Ok(raw
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(k, v)| v.map(|v| (k, v)))
+        .collect())
+}
 
 /// The capture schema version this crate reads.
 pub const COMPONENT_CAPTURE_SCHEMA_VERSION: u32 = 1;
@@ -129,10 +153,10 @@ pub struct CapturePortal {
 pub struct ComponentCaptureNode {
     /// Child-index path from the root over element children, `/`-joined;
     /// `""` for the root. Two captures' nodes are paired by this path.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub path: String,
     /// Lowercase tag name.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub tag: String,
     /// Explicit `role` attribute, else a best-effort implicit role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -149,8 +173,12 @@ pub struct ComponentCaptureNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<CaptureRect>,
     /// Whitelisted computed styles, camelCase CSS property names to string
-    /// values. Every key is optional.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    /// values. Every key is optional; a `null` value on the wire is dropped.
+    #[serde(
+        default,
+        deserialize_with = "null_tolerant_styles",
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
     pub styles: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub portal: Option<CapturePortal>,
@@ -164,7 +192,7 @@ pub struct ComponentCaptureNode {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClipAncestor {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub descriptor: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overflow_x: Option<String>,
@@ -255,10 +283,18 @@ pub struct ComponentCapture {
     pub dpr: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<CaptureRoot>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub nodes: Vec<ComponentCaptureNode>,
     /// Nearest-first.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub clip_ancestors: Vec<ClipAncestor>,
     /// The component's `state()` when it is a registered component.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -267,7 +303,11 @@ pub struct ComponentCapture {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub props: Option<serde_json::Value>,
     /// Capture-side notes about checks the SDK could not perform.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub unknown_checks: Vec<String>,
 }
 

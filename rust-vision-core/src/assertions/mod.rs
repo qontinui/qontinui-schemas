@@ -451,7 +451,11 @@ pub enum Assertion {
     ///
     /// `size` fires only when, on one axis, BOTH the absolute root size and
     /// the root-to-parent-content-box fill ratio differ by more than
-    /// `size_tolerance_pct` (default 5). `style_props` (default `display`,
+    /// `size_tolerance_pct` (default 5). When the absolute size differs but
+    /// the fill ratio cannot be computed (no usable `parentContentBox` on a
+    /// side, or a zero-sized one), `size` is undecided, never failed on
+    /// absolute size alone: the fill ratio is what keeps a fluid component
+    /// from reading as stretched. `style_props` (default `display`,
     /// `fontSize`, `color`, `overflow`) are compared per tree path;
     /// `props_delta` only with `compare_props`. An unreadable (null)
     /// component name skips the name comparison with an `unknown_checks`
@@ -474,7 +478,8 @@ pub enum Assertion {
     /// that could not run listed in the report's `unknown_checks`. Only when
     /// nothing failed AND a check could not run is the answer
     /// `Unknown{input_missing}`. Checks that cannot run: `size` and `clipped`
-    /// when either side lacks root geometry; the per-node checks when either
+    /// when either side lacks root geometry; `size` on an axis whose fill
+    /// ratio cannot be computed while its absolute size differs; the per-node checks when either
     /// side has no node tree or no root node (path `""`); `props_delta` when
     /// `compare_props` is set and either side has no props; and `clipped` at
     /// a node that extends past a clip ancestor whose overflow is unreported,
