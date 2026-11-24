@@ -50,6 +50,16 @@ where
         .collect())
 }
 
+/// A coordinate that reads an explicit JSON `null` as `NaN`: the SDK's
+/// `JSON.stringify` writes a `NaN` measurement as `null`, and a non-finite
+/// rect is what every geometry check already treats as unmeasured.
+fn null_as_nan<'de, D>(d: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Option::<f64>::deserialize(d)?.unwrap_or(f64::NAN))
+}
+
 /// The capture schema version this crate reads.
 pub const COMPONENT_CAPTURE_SCHEMA_VERSION: u32 = 1;
 
@@ -57,9 +67,13 @@ pub const COMPONENT_CAPTURE_SCHEMA_VERSION: u32 = 1;
 /// field that holds it (see the module doc).
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct CaptureRect {
+    #[serde(deserialize_with = "null_as_nan")]
     pub x: f64,
+    #[serde(deserialize_with = "null_as_nan")]
     pub y: f64,
+    #[serde(deserialize_with = "null_as_nan")]
     pub width: f64,
+    #[serde(deserialize_with = "null_as_nan")]
     pub height: f64,
 }
 
@@ -93,11 +107,13 @@ impl CaptureRect {
 }
 
 /// What the capture was taken of.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CaptureTargetKind {
     /// A registered `useUIComponent` component; its root is the nearest
-    /// common DOM ancestor of its mounted `elementIds`.
+    /// common DOM ancestor of its mounted `elementIds`. The default, which an
+    /// explicit `null` kind reads as.
+    #[default]
     Component,
     /// A registered element; its root is that element.
     Element,
@@ -106,6 +122,7 @@ pub enum CaptureTargetKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureTarget {
+    #[serde(default, deserialize_with = "null_as_default")]
     pub kind: CaptureTargetKind,
     #[serde(default, deserialize_with = "null_as_default")]
     pub id: String,
@@ -114,8 +131,17 @@ pub struct CaptureTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureViewport {
+    #[serde(deserialize_with = "null_as_nan")]
     pub width: f64,
+    #[serde(deserialize_with = "null_as_nan")]
     pub height: f64,
+}
+
+impl CaptureViewport {
+    /// Both dimensions are finite numbers.
+    pub fn is_finite(&self) -> bool {
+        self.width.is_finite() && self.height.is_finite()
+    }
 }
 
 /// The captured root's geometry, in page coordinates.
