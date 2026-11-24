@@ -26,11 +26,15 @@ format-only cases. Exit 1 on any disagreement, and on everything that would
 make agreement UNKNOWN: a missing or unparsable corpus, one of other than
 CORPUS_SIZE cases or exercising one outcome only, a malformed ENGINE_DIFFERENCES
 entry, a missing schema file, a `date-time` checker that is not loaded, an ajv
-that is not the lockfile's, or an engine that printed nothing. Every problem
-is counted on a summary line, so a failing run never reads as agreement.
+or ajv-formats whose version is not the lockfile's, or an engine that printed
+nothing. Once the corpus loads, every problem is counted on a summary line, so
+a failing run never prints only lines that read as agreement; a corpus that
+cannot be loaded prints `corpus: unreadable`.
 
 Plan 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.
 """
+
+from __future__ import annotations
 
 import json
 import subprocess
@@ -59,11 +63,11 @@ CORPUS_SIZE = 301
 ENGINE_DIFFERENCES = {"python-jsonschema": {}, "ajv": {}}
 
 
-def error(msg):
+def error(msg: str) -> None:
     print(f"::error::{msg}")
 
 
-def load_corpus(path):
+def load_corpus(path: str) -> tuple[list[dict] | None, dict | None, list[str]]:
     """The corpus and the schema it was written for, or a list of refusals."""
     try:
         doc = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -109,7 +113,7 @@ def load_corpus(path):
     return cases, schema, problems
 
 
-def python_arm(schema, cases):
+def python_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
     """{name: (formats_on, formats_off)} under python-jsonschema."""
     import jsonschema
     from jsonschema.validators import validator_for
@@ -129,21 +133,28 @@ def python_arm(schema, cases):
     return {c["name"]: (on.is_valid(c["instance"]), off.is_valid(c["instance"])) for c in cases}
 
 
-def ajv_arm(schema, cases):
+def ajv_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
     """{name: (formats_on, formats_off)} under ajv, via the .cjs arm."""
     payload = json.dumps({"schema": schema, "cases": [{"name": c["name"], "instance": c["instance"]} for c in cases]})
-    proc = subprocess.run(["node", str(JS)], input=payload, capture_output=True, text=True, encoding="utf-8")
+    # Bytes in and out, decoded once after the call: a decode failure is then
+    # a RuntimeError the caller reports as "did not run", never a lost stream.
+    proc = subprocess.run(["node", str(JS)], input=payload.encode("utf-8"), capture_output=True)
+    stderr = proc.stderr.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
-        raise RuntimeError(f"node exited {proc.returncode}: {proc.stderr.strip()}")
-    if not proc.stdout.strip():
+        raise RuntimeError(f"node exited {proc.returncode}: {stderr}")
+    try:
+        stdout = proc.stdout.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise RuntimeError(f"the ajv arm printed output that is not UTF-8 ({e})") from e
+    if not stdout.strip():
         raise RuntimeError("the ajv arm printed nothing")
-    rows = json.loads(proc.stdout)
+    rows = json.loads(stdout)
     if [r[0] for r in rows] != [c["name"] for c in cases]:
         raise RuntimeError(f"the ajv arm evaluated a different case list ({len(rows)} rows vs {len(cases)} cases)")
     return {name: (on, off) for name, on, off in rows}
 
 
-def compare(engine, cases, verdicts):
+def compare(engine: str, cases: list[dict], verdicts: dict[str, tuple[bool, bool]]) -> tuple[list[str], str]:
     """The problems one engine's verdicts raise, plus its summary line.
 
     Every problem counts as one disagreement, so this engine's summary line
@@ -208,11 +219,12 @@ def compare(engine, cases, verdicts):
     return problems, summary
 
 
-def main():
+def main() -> int:
     if len(sys.argv) != 2:
         sys.exit("usage: ledger-envelope-engines.py <corpus.json>")
     cases, schema, problems = load_corpus(sys.argv[1])
     if cases is None:
+        print("corpus: unreadable")
         for p in problems:
             error(p)
         return 1
