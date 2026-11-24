@@ -353,11 +353,11 @@ fn diff(
         size_check(
             base,
             in_situ,
-            b_root,
-            s_root,
+            (b_root, s_root),
             tol,
             &mut findings,
             &mut notes,
+            undecided,
         );
     }
     if opts.per_node {
@@ -464,17 +464,22 @@ fn ratio(num: f64, den: Option<f64>) -> Option<f64> {
 /// root-to-parent-content-box fill ratio differ beyond tolerance. A component
 /// that fills its parent on both sides (a fluid component shrink-wrapped in a
 /// centered story and filling a page column) or keeps its absolute size on
-/// both sides is not stretched. Without a parent content box on either side
-/// the fill ratio is unknown, so the absolute size alone decides and a note
-/// says so.
+/// both sides is not stretched.
+///
+/// Without a usable parent content box on a side (absent, or zero-sized) the
+/// fill ratio cannot be computed. An axis whose absolute size is within
+/// tolerance is still decided (not stretched; a note says the fill ratio was
+/// not compared). An axis whose absolute size differs is UNDECIDED: absolute
+/// size alone would read every fluid component as stretched, so it is pushed
+/// to `undecided` as `size: fill ratio not compared`, never failed.
 fn size_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
-    b: CaptureRect,
-    s: CaptureRect,
+    (b, s): (CaptureRect, CaptureRect),
     tol_pct: f64,
     findings: &mut Vec<ComponentFinding>,
     notes: &mut Vec<String>,
+    undecided: &mut Vec<String>,
 ) {
     let bp = base.parent_content_box();
     let sp = in_situ.parent_content_box();
@@ -496,44 +501,48 @@ fn size_check(
     ];
     let mut reasons = Vec::new();
     let mut fill_unknown = Vec::new();
+    let mut size_undecided = Vec::new();
     for (axis, b_abs, s_abs, b_par, s_par) in axes {
         let abs_pct = rel_diff(b_abs, s_abs) * 100.0;
-        let b_fill = ratio(b_abs, b_par);
-        let s_fill = ratio(s_abs, s_par);
-        let fill_pct = match (b_fill, s_fill) {
-            (Some(bf), Some(sf)) => Some(rel_diff(bf, sf) * 100.0),
-            _ => {
-                fill_unknown.push(axis);
-                None
-            }
-        };
         let abs_differs = exceeds_tolerance(abs_pct, tol_pct);
-        let fill_differs = fill_pct.is_none_or(|p| exceeds_tolerance(p, tol_pct));
-        if abs_differs && fill_differs {
-            let verb = if s_abs > b_abs {
-                "stretched"
-            } else {
-                "constrained"
-            };
-            let fill = match (b_fill, s_fill) {
-                (Some(bf), Some(sf)) => {
-                    format!(", fill ratio {bf:.2} -> {sf:.2} of the parent content box")
+        match (ratio(b_abs, b_par), ratio(s_abs, s_par)) {
+            (Some(bf), Some(sf)) => {
+                if abs_differs && exceeds_tolerance(rel_diff(bf, sf) * 100.0, tol_pct) {
+                    let verb = if s_abs > b_abs {
+                        "stretched"
+                    } else {
+                        "constrained"
+                    };
+                    reasons.push(format!(
+                        "{verb} on {axis}: {b_abs}px -> {s_abs}px, fill ratio {bf:.2} -> \
+                         {sf:.2} of the parent content box"
+                    ));
                 }
-                _ => ", fill ratio unknown (absolute size only)".to_string(),
-            };
-            reasons.push(format!("{verb} on {axis}: {b_abs}px -> {s_abs}px{fill}"));
+            }
+            _ if abs_differs => {
+                size_undecided.push(format!("{axis} {b_abs}px -> {s_abs}px ({abs_pct:.1}%)"))
+            }
+            _ => fill_unknown.push(axis),
         }
     }
+    let side = match (bp.is_some(), sp.is_some()) {
+        (false, false) => "either side",
+        (false, true) => "the baseline side",
+        (true, false) => "the in-situ side",
+        _ => "one side (zero-sized)",
+    };
+    if !size_undecided.is_empty() {
+        undecided.push(format!(
+            "size: fill ratio not compared: no usable parentContentBox on {side}, and the \
+             absolute size differs beyond tolerance ({}), so whether the component is \
+             stretched is unknown",
+            size_undecided.join("; ")
+        ));
+    }
     if !fill_unknown.is_empty() {
-        let side = match (bp.is_some(), sp.is_some()) {
-            (false, false) => "either side",
-            (false, true) => "the baseline side",
-            (true, false) => "the in-situ side",
-            _ => "one side (zero-sized)",
-        };
         notes.push(format!(
             "size: no usable parentContentBox on {side} for {}; the fill ratio was not \
-             compared and absolute size alone decided",
+             compared, and the absolute size is within tolerance there",
             fill_unknown.join(", ")
         ));
     }
@@ -564,6 +573,22 @@ fn size_check(
         baseline: side_json(&b, bp),
         in_situ: side_json(&s, sp),
     });
+}
+
+/// The axes (x, y) on which some clip ancestor of `c` clips `node_page`.
+fn clipped_axes(c: &ComponentCapture, node_page: &CaptureRect) -> (bool, bool) {
+    c.clip_ancestors.iter().fold((false, false), |(x, y), anc| {
+        let Some(rect) = anc.rect.filter(CaptureRect::is_finite) else {
+            return (x, y);
+        };
+        let past_x = anc.clips_x()
+            && (node_page.x < rect.x - CLIP_EPSILON_PX
+                || node_page.right() > rect.right() + CLIP_EPSILON_PX);
+        let past_y = anc.clips_y()
+            && (node_page.y < rect.y - CLIP_EPSILON_PX
+                || node_page.bottom() > rect.bottom() + CLIP_EPSILON_PX);
+        (x || past_x, y || past_y)
+    })
 }
 
 /// The first clip ancestor in `c` that `node_page` extends past, if any.
@@ -629,10 +654,14 @@ enum BaselineClip {
     Undecided(String),
 }
 
+/// `situ_axes` are the axes (x, y) the in-situ render clips the node on. A
+/// baseline clip covers the in-situ one only on the same axis: clipped on x
+/// in isolation does not excuse a new clip on y.
 fn baseline_clip(
     base: &ComponentCapture,
     node: Option<&&ComponentCaptureNode>,
     b_root: CaptureRect,
+    situ_axes: (bool, bool),
 ) -> BaselineClip {
     let Some(node) = node else {
         // Absent in isolation: `child_identity` reports that; the clip is new.
@@ -642,7 +671,11 @@ fn baseline_clip(
         return BaselineClip::Undecided("the node has no bbox in the baseline capture".into());
     };
     let page = rel.offset_by(&b_root);
-    if clipping_ancestor(base, &page).is_some() {
+    let (bx, by) = clipped_axes(base, &page);
+    let (sx, sy) = situ_axes;
+    // An in-situ clip axis the baseline did not also clip is a new clip.
+    let uncovered = (sx && !bx) || (sy && !by);
+    if !uncovered {
         return BaselineClip::Clipped;
     }
     if let Some((anc, axis)) = overflow_past(base, &page, OverflowAxis::Unreported) {
@@ -760,7 +793,8 @@ fn clip_check(
             continue;
         };
         let anc = &in_situ.clip_ancestors[i];
-        match baseline_clip(base, b_nodes.get(node.path.as_str()), b_root) {
+        let situ_axes = clipped_axes(in_situ, &page);
+        match baseline_clip(base, b_nodes.get(node.path.as_str()), b_root, situ_axes) {
             BaselineClip::Clipped => continue,
             BaselineClip::Undecided(why) => {
                 // Descendants are still judged: one definitely clipped below
@@ -802,7 +836,8 @@ fn clip_check(
         });
         reported.push(node.path.clone());
     }
-    if !no_bbox.is_empty() {
+    // A node with no bbox matters only when something in situ might clip it.
+    if !no_bbox.is_empty() && in_situ.clip_ancestors.iter().any(may_clip) {
         undecided.push(format!(
             "clipped not decided: {} in-situ node(s) have no bbox ({}), so whether they are \
              clipped is unknown",
@@ -1357,26 +1392,42 @@ mod tests {
     }
 
     #[test]
-    fn missing_parent_box_compares_absolute_size_only_and_notes_it() {
+    fn missing_parent_box_leaves_a_size_difference_undecided() {
         let b = rect(0.0, 0.0, 200.0, 40.0);
         let s = rect(0.0, 0.0, 1000.0, 40.0);
         let r = run(
             capture(b, None),
             capture(s, Some(rect(0.0, 0.0, 1000.0, 40.0))),
         );
-        assert_eq!(r.outcome, AssertionOutcome::Failed);
+        assert_input_missing(&r, "size: fill ratio not compared");
         let rep = report(&r);
-        assert!(rep
-            .findings
-            .iter()
-            .any(|f| f.kind == ComponentFindingKind::Size));
+        assert!(!kinds(&r).contains(&ComponentFindingKind::Size));
         assert!(
             rep.unknown_checks
                 .iter()
-                .any(|n| n.starts_with("size:") && n.contains("baseline side")),
+                .any(|n| n.starts_with("size: fill ratio not compared")
+                    && n.contains("baseline side")
+                    && n.contains("width")),
             "{:?}",
             rep.unknown_checks
         );
+
+        // Another finding outranks the undecided size: Failed, size noted.
+        let mut base = capture(b, None);
+        let mut situ = capture(s, Some(rect(0.0, 0.0, 1000.0, 40.0)));
+        base.nodes[3].styles.insert("color".into(), "red".into());
+        situ.nodes[3].styles.insert("color".into(), "blue".into());
+        let r = run(base, situ);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::StyleDelta]);
+        assert!(report(&r)
+            .unknown_checks
+            .iter()
+            .any(|n| n.starts_with("size: fill ratio not compared")));
+
+        // Absolute size within tolerance: decided without a fill ratio.
+        let r = run(capture(b, None), capture(b, None));
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
     }
 
     // ---- clipped ------------------------------------------------------
@@ -2173,11 +2224,82 @@ mod tests {
             .any(|n| n.starts_with("size:")));
 
         // 0 -> N: collapsed in isolation, rendered in situ, no fill ratio
-        // on the baseline side, so absolute size decides: a size finding.
+        // on the baseline side (zero-sized parent): size is undecided.
         let s = rect(0.0, 0.0, 300.0, 40.0);
         let r = run(capture(z, Some(z)), capture(s, Some(s)));
-        assert_eq!(r.outcome, AssertionOutcome::Failed);
-        assert!(kinds(&r).contains(&ComponentFindingKind::Size));
+        assert_input_missing(&r, "size: fill ratio not compared");
+        assert!(!kinds(&r).contains(&ComponentFindingKind::Size));
+    }
+
+    #[test]
+    fn a_baseline_clip_on_x_does_not_cover_an_in_situ_clip_on_y() {
+        let mut base = capture(page(), parent_of(page()));
+        // Isolation: a 300-wide frame clips the 400-wide root on x only.
+        base.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.x-frame".to_string(),
+            overflow_x: Some("hidden".to_string()),
+            overflow_y: Some("visible".to_string()),
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        }];
+        // In situ: a 30-tall frame clips the 40-tall root on y only.
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.y-frame".to_string(),
+            overflow_x: Some("visible".to_string()),
+            overflow_y: Some("hidden".to_string()),
+            rect: Some(rect(100.0, 300.0, 400.0, 30.0)),
+        }];
+        let r = run(base.clone(), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::Clipped]);
+        assert_eq!(report(&r).findings[0].path, "");
+
+        // The same axis on both sides is covered: no finding.
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = base.clip_ancestors.clone();
+        let r = run(base, situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn a_node_without_a_bbox_under_only_scroll_containers_passes() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.scroller".to_string(),
+            overflow_x: Some("auto".to_string()),
+            overflow_y: Some("scroll".to_string()),
+            rect: Some(rect(100.0, 300.0, 400.0, 600.0)),
+        }];
+        situ.nodes[2].bbox = None;
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn null_list_and_style_value_fields_parse_as_absent() {
+        let c: ComponentCapture = serde_json::from_value(json!({
+            "schemaVersion": 1,
+            "nodes": [
+                { "path": null, "tag": null, "styles": { "color": null, "display": "block" } },
+                { "path": "0", "tag": "span", "styles": null }
+            ],
+            "clipAncestors": null,
+            "unknownChecks": null,
+        }))
+        .expect("nulls in defaulted fields parse");
+        assert!(c.clip_ancestors.is_empty());
+        assert!(c.unknown_checks.is_empty());
+        assert_eq!(c.nodes[0].path, "");
+        assert_eq!(c.nodes[0].tag, "");
+        assert_eq!(c.nodes[0].styles.len(), 1);
+        assert_eq!(c.nodes[0].styles["display"], "block");
+        assert!(c.nodes[1].styles.is_empty());
+
+        let a: ClipAncestor = serde_json::from_value(json!({"descriptor": null})).unwrap();
+        assert_eq!(a.descriptor, "");
+        let n: ComponentCapture =
+            serde_json::from_value(json!({"schemaVersion": 1, "nodes": null})).unwrap();
+        assert!(n.nodes.is_empty());
     }
 
     #[test]
