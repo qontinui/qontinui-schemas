@@ -180,6 +180,12 @@
 #    are Actions, not commands. It also runs the test binary it recovers from
 #    the Actions `cargo test` step's log rather than invoking cargo again.
 #    (Same plan, Phase 3.)
+#
+# 13. rust-ci's "Pool label set and lane declaration agree everywhere" step is
+#    NOT mirrored. It needs python3 3.11+ (tomllib) on PATH, which this lane
+#    cannot provision (gap 7), and it checks workflow text and the lane
+#    declaration (.qontinui/ci-pool-variables.toml), not the code this lane
+#    builds. (Plan 2026-11-11-coord-owns-ci-lane-variables, Phase 2c.)
 # ===========================================================================
 
 version = 1
