@@ -1,0 +1,10 @@
+{
+  "name": "ledger-envelope-engines",
+  "private": true,
+  "description": "Pinned ajv arm of .github/scripts/ledger-envelope-engines.py. Installed with `npm ci --ignore-scripts` into $RUNNER_TEMP, never here.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}
