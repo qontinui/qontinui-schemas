@@ -38,7 +38,7 @@
 //! - A class row that is deliberately NOT seeded records `seeded: false` **and
 //!   a `reason`** ([`ClassSeed`]). An omission expressed as an absent literal
 //!   is invisible; expressed as data, a test can assert on it.
-//! - **Every key is declared.** All four types are `deny_unknown_fields`, so
+//! - **Every key is declared.** All five types are `deny_unknown_fields`, so
 //!   a key this module does not know fails the PARSE rather than being
 //!   silently dropped. A hopeful `"disposition"` on a row type that has none
 //!   would otherwise read as set and behave as absent — the 2026-08-03 shape,
@@ -47,6 +47,11 @@
 //! - A name the RUNNER authorizes a spawn under by name goes in
 //!   `runner_keys` ([`RunnerKey`]), NEVER in `kind_seeds`: kind seeds are rows
 //!   coord seeds, and runner keys must never be seeded.
+//! - A Claude Code built-in Agent-tool `subagent_type` goes in
+//!   `harness_builtin_roles` ([`HarnessBuiltinRole`]), lowercased and never
+//!   seeded. Its name must collide with no kind seed, class seed or runner
+//!   key: one registry name is one row, and a built-in sharing a kind's or a
+//!   runner key's name would make a switch on one silently govern the other.
 //! - Adding a spawn path or disposition is a vocabulary change: the DB columns
 //!   are deliberately `CHECK`-free (`agent_registry.rs`'s
 //!   "Vocabulary lives in Rust, not the DB", citing coord's
@@ -144,6 +149,49 @@ pub struct RunnerKey {
     pub purpose: String,
 }
 
+/// A Claude Code built-in Agent-tool `subagent_type` — declared, never
+/// seeded.
+///
+/// Plan `2026-11-24-tenant-admins-switch-agent-spawns-off-per-agent-type`,
+/// Phase 2. The harness ships these types itself, so no
+/// `.claude/agents/<name>.md` in any repo declares them and no seeder writes
+/// a row for them. Without a declaration they would be invisible to the
+/// agent-registry catalog, and an admin could not switch one off until it
+/// had first been spawned and observed.
+///
+/// `name` is the registry key, LOWERCASED (`Explore` -> `explore`): coord's
+/// name grammar is `[a-z0-9_-]`, and every lookup lowercases the name it is
+/// given (the plan's D6), so a mixed-case declaration could never match.
+///
+/// **Never seeded**, like a [`RunnerKey`]: a row is written only when an
+/// admin flips the switch (the plan's D3), so declaring a built-in changes
+/// no authorization decision on its own. `fork` is deliberately absent —
+/// the guard hook treats it specially and it is not an agent type —
+/// and [`validate`] refuses it.
+///
+/// Optional in the JSON (`#[serde(default)]` on the field) so a contract
+/// file that predates this list still parses.
+///
+/// [`validate`]: SpawnAuthorizationContract::validate
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HarnessBuiltinRole {
+    /// The registry key: lowercase, in the character-and-length half of
+    /// coord's `validate_agent_name` grammar (see `is_registry_agent_name`).
+    pub name: String,
+    /// Always [`HARNESS_BUILTIN_SPAWN_PATH`]: an Agent-tool subagent runs
+    /// inside the session that spawned it.
+    pub spawn_path: String,
+    pub purpose: String,
+}
+
+/// The only `spawn_path` a [`HarnessBuiltinRole`] may declare.
+pub const HARNESS_BUILTIN_SPAWN_PATH: &str = "in_session_subagent";
+
+/// The Agent-tool `subagent_type` that is not an agent type at all (it
+/// clones the calling session), so it must never be declared as one.
+const FORK_SUBAGENT_TYPE: &str = "fork";
+
 /// The longest `agent_name` coord's `validate_agent_name` admits.
 const MAX_AGENT_NAME_LEN: usize = 64;
 
@@ -218,6 +266,15 @@ pub struct SpawnAuthorizationContract {
     ///
     /// [`seeded_keys`]: SpawnAuthorizationContract::seeded_keys
     pub runner_keys: Vec<RunnerKey>,
+    /// The harness's built-in Agent-tool subagent types. Declared, NEVER
+    /// seeded — see [`HarnessBuiltinRole`]. Not part of [`seeded_keys`].
+    ///
+    /// `#[serde(default)]` so a contract file without the key still parses
+    /// (as an empty list) for a consumer pinned to an older file.
+    ///
+    /// [`seeded_keys`]: SpawnAuthorizationContract::seeded_keys
+    #[serde(default)]
+    pub harness_builtin_roles: Vec<HarnessBuiltinRole>,
 }
 
 impl SpawnAuthorizationContract {
@@ -253,6 +310,19 @@ impl SpawnAuthorizationContract {
     /// so this accessor is where that vocabulary is enforceable at all.
     pub fn is_disposition(&self, value: &str) -> bool {
         self.dispositions.iter().any(|d| d == value)
+    }
+
+    /// The declared harness built-in role named `name`, compared
+    /// case-insensitively (the plan's D6: `Explore` and `explore` are one
+    /// key). `None` for any name the harness does not ship.
+    pub fn harness_builtin_role(&self, name: &str) -> Option<&HarnessBuiltinRole> {
+        let key = name.to_ascii_lowercase();
+        self.harness_builtin_roles.iter().find(|r| r.name == key)
+    }
+
+    /// Is `name` (case-insensitively) a declared harness built-in role?
+    pub fn is_harness_builtin_role(&self, name: &str) -> bool {
+        self.harness_builtin_role(name).is_some()
     }
 
     /// Every `(agent_name, spawn_path)` key a seeder writes — the KIND rows
@@ -413,7 +483,83 @@ impl SpawnAuthorizationContract {
                 return Err(format!("duplicate seeded key ({name}, {path})"));
             }
         }
-        self.validate_runner_keys()
+        self.validate_runner_keys()?;
+        self.validate_harness_builtin_roles()
+    }
+
+    /// The [`HarnessBuiltinRole`] arm of [`validate`](Self::validate).
+    fn validate_harness_builtin_roles(&self) -> Result<(), String> {
+        let mut seen = std::collections::HashSet::new();
+        for r in &self.harness_builtin_roles {
+            if r.name.trim().is_empty() {
+                return Err("a harness built-in role has a blank name".into());
+            }
+            if r.purpose.trim().is_empty() {
+                return Err(format!(
+                    "harness built-in role `{}` has a blank purpose",
+                    r.name
+                ));
+            }
+            if !is_registry_agent_name(&r.name) {
+                return Err(format!(
+                    "harness built-in role `{}` is outside the registry agent_name \
+                     grammar (1..={MAX_AGENT_NAME_LEN} chars of [a-z0-9_-]; declare \
+                     the name lowercased) — no row could ever carry it",
+                    r.name
+                ));
+            }
+            if r.spawn_path != HARNESS_BUILTIN_SPAWN_PATH {
+                return Err(format!(
+                    "harness built-in role `{}` declares spawn_path `{}`; an \
+                     Agent-tool subagent is always `{HARNESS_BUILTIN_SPAWN_PATH}`",
+                    r.name, r.spawn_path
+                ));
+            }
+            if r.name == FORK_SUBAGENT_TYPE {
+                return Err(format!(
+                    "`{FORK_SUBAGENT_TYPE}` is not an agent type (it clones the \
+                     calling session) and must not be declared as a harness \
+                     built-in role"
+                ));
+            }
+            // One registry name is one row. A built-in sharing a name with a
+            // kind, a class or a runner key would make an admin's switch on
+            // the built-in silently govern that other spawn too.
+            if self.kind_seeds.iter().any(|k| k.agent_name == r.name) {
+                return Err(format!(
+                    "harness built-in role `{}` collides with a kind_seeds \
+                     agent_name — one registry name is one row, so a switch on \
+                     the built-in would govern that coord spawn kind too",
+                    r.name
+                ));
+            }
+            // Class rows key as (spawn_path, spawn_path), and every class
+            // seed's path is a declared spawn_path (checked in `validate`).
+            if self.is_spawn_path(&r.name) {
+                return Err(format!(
+                    "harness built-in role `{}` collides with a spawn_path / class \
+                     seed — class rows key as (spawn_path, spawn_path), so the \
+                     built-in would be that class row",
+                    r.name
+                ));
+            }
+            if self.runner_keys.iter().any(|k| k.agent_name == r.name) {
+                return Err(format!(
+                    "harness built-in role `{}` collides with a runner_keys \
+                     agent_name — one registry name is one row, so a switch on \
+                     the built-in would veto every spawn the runner authorizes \
+                     under that key",
+                    r.name
+                ));
+            }
+            if !seen.insert(r.name.as_str()) {
+                return Err(format!(
+                    "harness built-in role `{}` is declared twice",
+                    r.name
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// The [`RunnerKey`] arm of [`validate`](Self::validate).
@@ -936,6 +1082,124 @@ mod tests {
             let e = runner_key_err(|c| c.runner_keys[0].agent_name = path.clone());
             assert!(e.contains("named after a spawn_path"), "{path}: {e}");
         }
+    }
+
+    /// The harness's built-in Agent-tool types are declared, lowercased,
+    /// in-session, `fork`-free — and NOT seeded.
+    #[test]
+    fn the_harness_builtin_roles_are_declared_and_unseeded() {
+        let c = contract();
+        let names: Vec<&str> = c
+            .harness_builtin_roles
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "general-purpose",
+                "explore",
+                "plan",
+                "statusline-setup",
+                "claude-code-guide",
+            ]
+        );
+        assert!(!names.contains(&"fork"), "`fork` is not an agent type");
+        for r in &c.harness_builtin_roles {
+            assert_eq!(r.spawn_path, HARNESS_BUILTIN_SPAWN_PATH, "{}", r.name);
+            assert_eq!(r.name, r.name.to_ascii_lowercase(), "{}", r.name);
+        }
+        let seeded: Vec<String> = c.seeded_keys().into_iter().map(|(n, _)| n).collect();
+        for n in &names {
+            assert!(
+                !seeded.iter().any(|s| s == n),
+                "harness built-in `{n}` must never be seeded"
+            );
+        }
+    }
+
+    #[test]
+    fn harness_builtin_lookup_is_case_insensitive() {
+        let c = contract();
+        // The harness spells these `Explore` and `Plan`; the key is lowercase.
+        assert_eq!(
+            c.harness_builtin_role("Explore").map(|r| r.name.as_str()),
+            Some("explore")
+        );
+        assert!(c.is_harness_builtin_role("Plan"));
+        assert!(c.is_harness_builtin_role("general-purpose"));
+        assert!(!c.is_harness_builtin_role("fork"));
+        assert!(!c.is_harness_builtin_role("code-reviewer"));
+    }
+
+    #[test]
+    fn a_contract_without_harness_builtin_roles_still_parses() {
+        // `#[serde(default)]`: a consumer pinned to an older contract file
+        // (one with no such key) must keep parsing it.
+        let mut v: serde_json::Value = serde_json::from_str(CONTRACT_JSON).unwrap();
+        assert!(
+            v.as_object_mut()
+                .unwrap()
+                .remove("harness_builtin_roles")
+                .is_some(),
+            "the fixture must actually drop the key"
+        );
+        let c: SpawnAuthorizationContract = serde_json::from_value(v).unwrap();
+        assert!(c.harness_builtin_roles.is_empty());
+        assert!(c.validate().is_ok());
+    }
+
+    fn builtin_err(mutate: impl FnOnce(&mut SpawnAuthorizationContract)) -> String {
+        runner_key_err(mutate)
+    }
+
+    #[test]
+    fn validate_rejects_a_harness_builtin_role_named_after_a_kind_seed() {
+        let e = builtin_err(|c| {
+            c.harness_builtin_roles[0].name = c.kind_seeds[0].agent_name.clone();
+        });
+        assert!(e.contains("collides with a kind_seeds agent_name"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_harness_builtin_role_named_after_a_class_seed() {
+        for path in valid().spawn_paths {
+            let e = builtin_err(|c| c.harness_builtin_roles[0].name = path.clone());
+            assert!(
+                e.contains("collides with a spawn_path / class seed"),
+                "{path}: {e}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_rejects_a_harness_builtin_role_named_after_a_runner_key() {
+        let e = builtin_err(|c| {
+            c.harness_builtin_roles[0].name = c.runner_keys[0].agent_name.clone();
+        });
+        assert!(e.contains("collides with a runner_keys agent_name"), "{e}");
+    }
+
+    #[test]
+    fn validate_rejects_a_malformed_harness_builtin_role() {
+        let e = builtin_err(|c| c.harness_builtin_roles[0].name = " ".into());
+        assert!(e.contains("blank name"), "{e}");
+        let e = builtin_err(|c| c.harness_builtin_roles[0].purpose = String::new());
+        assert!(e.contains("blank purpose"), "{e}");
+        // The harness's own spelling must be lowercased before it is declared.
+        let e = builtin_err(|c| c.harness_builtin_roles[0].name = "Explore".into());
+        assert!(e.contains("registry agent_name grammar"), "{e}");
+        let e = builtin_err(|c| {
+            c.harness_builtin_roles[0].spawn_path = "parallel_fanout".into();
+        });
+        assert!(e.contains("always `in_session_subagent`"), "{e}");
+        let e = builtin_err(|c| c.harness_builtin_roles[0].name = "fork".into());
+        assert!(e.contains("not an agent type"), "{e}");
+        let e = builtin_err(|c| {
+            let dup = c.harness_builtin_roles[0].clone();
+            c.harness_builtin_roles.push(dup);
+        });
+        assert!(e.contains("declared twice"), "{e}");
     }
 
     #[test]
