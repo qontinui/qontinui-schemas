@@ -24,10 +24,11 @@ engine's own ENGINE_DIFFERENCES (each must disagree exactly as declared); and
 the formats-off verdict must differ from formats-on on exactly the corpus's
 format-only cases. Exit 1 on any disagreement, and on everything that would
 make agreement UNKNOWN: a missing or unparsable corpus, one of other than
-CORPUS_SIZE cases or exercising one outcome only, a malformed ENGINE_DIFFERENCES
-entry, a missing schema file, a `date-time` checker that is not loaded, an ajv
-or ajv-formats whose version is not the lockfile's, or an engine that printed
-nothing. Once the corpus loads, every problem is counted on a summary line, so
+CORPUS_SIZE entries or CORPUS_DISTINCT distinct names, a case whose name is not
+a string or whose flags are not booleans, a corpus exercising one outcome only,
+a malformed ENGINE_DIFFERENCES entry, a missing schema file, a `date-time`
+checker that is not loaded, an ajv or ajv-formats whose version is not the
+lockfile's, or an engine that printed nothing. Once the corpus loads, every problem is counted on a summary line, so
 a failing run never prints only lines that read as agreement; a corpus, case
 shape or schema that stops the run before the engines prints `corpus: not
 checked`.
@@ -120,7 +121,7 @@ def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]
     first: dict[str, Case] = {}
     for c in cases:
         seen = first.setdefault(c["name"], c)
-        if seen["instance"] != c["instance"] or seen["rust"] != c["rust"]:
+        if seen["instance"] != c["instance"] or any(seen[f] != c[f] for f in flags):
             problems.append(f"the corpus name `{c['name']}` stands for two different cases")
     verdicts = {c["rust"] for c in cases}
     if verdicts != {True, False}:
