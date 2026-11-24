@@ -63,6 +63,11 @@ on:
       # its only validator: a data-only edit must still run it on main.
       - "fleet-nouns.toml"
       - ".github/scripts/fleet-nouns-portability.*"
+      # The ledger envelope's cross-engine checker and its pinned dependencies
+      # (the ledger-envelope-engines job). `*` does not cross `/`, so the
+      # lockfile directory needs its own entry.
+      - ".github/scripts/ledger-envelope-engines.*"
+      - ".github/scripts/ledger-envelope-engines/**"
       # Not a workspace member either: rust/tests/glossary_source.rs is the
       # glossary source's only validator (invariants, fleet nouns, the version
       # guard, and drift of BOTH generated tables — rust/src/glossary/generated.rs
@@ -697,6 +702,96 @@ jobs:
             echo "::error::the provisioning env e2e did not report exactly one passing test. A renamed test runs nothing; that is UNKNOWN, not a pass."
             exit 1
           fi
+
+  ledger-envelope-engines:
+    # ── The ledger envelope schema under ajv and python-jsonschema ──────────
+    #
+    # rust/src/ledger.rs tells non-Rust writers to validate against the
+    # COMMITTED schema (rust/tests/fixtures/ledger_envelope.v<N>.schema.json)
+    # while Rust writers call `validate`. ledger_envelope_golden.rs proves the
+    # two agree under the Rust `jsonschema` crate only; this job proves it
+    # under the two validators those writers actually run. The Rust test writes
+    # the corpus with its Rust verdicts, and the checker runs every case
+    # through python-jsonschema (FormatChecker, rfc3339-validator loaded) and
+    # ajv (the JS writer's recipe in ledger.rs's module docs), formats on and
+    # off, and fails on any disagreement. Plan
+    # 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.
+    #
+    # ITS OWN JOB, PINNED HOSTED, for provisioning-env-e2e-linux's reason:
+    # `rust-ci` may run on the self-hosted pool, and setup-python /
+    # setup-node change PATH, LD_LIBRARY_PATH and PKG_CONFIG_PATH, which a
+    # persistent shared host must not inherit. This repo is public, so the
+    # hosted minutes are free. Skipped on merge-candidate refs for the same
+    # reason as that job: the PR's own run is where this proof is made.
+    #
+    # NOT mirrored in .qontinui/ci.toml (gap 13 there).
+    if: ${{ !startsWith(github.ref, 'refs/heads/merge-candidate') }}
+    runs-on: ubuntu-latest
+    # Build and test of one crate's test target (hosted, cached) plus the
+    # steps' own bounds (setup-python 3, setup-node 3, the engines 5).
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml pins this; keep every `toolchain:` line in step.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Write the ledger envelope agreement corpus
+        # The corpus goes to $RUNNER_TEMP, emptied per job, so a test that
+        # stopped writing it cannot leave an older corpus for the check. A
+        # renamed test filters to zero and libtest exits 0 on `0 passed`, so
+        # the one pass AND the file have to show.
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/ledger-envelope-corpus.json"
+          LEDGER_ENVELOPE_CORPUS_OUT="$RUNNER_TEMP/ledger-envelope-corpus.json" \
+            cargo test --locked -p qontinui-types --test ledger_envelope_golden \
+            agreement_corpus_for_the_cross_engine_check 2>&1 | tee "$RUNNER_TEMP/ledger-corpus.out"
+          if ! grep -q 'test result: ok\. 1 passed' "$RUNNER_TEMP/ledger-corpus.out"; then
+            echo "::error::the corpus writer did not report exactly one passing test. A renamed test runs nothing; that is UNKNOWN, not a pass."
+            exit 1
+          fi
+          if [ ! -s "$RUNNER_TEMP/ledger-envelope-corpus.json" ]; then
+            echo "::error::the corpus writer passed but wrote no corpus to $RUNNER_TEMP/ledger-envelope-corpus.json; the engines would check nothing."
+            exit 1
+          fi
+
+      # These come AFTER every cargo step, because both setup actions change
+      # what later steps resolve (setup-python also exports LD_LIBRARY_PATH and
+      # PKG_CONFIG_PATH on Linux).
+      - uses: actions/setup-python@v5
+        timeout-minutes: 3
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v5
+        timeout-minutes: 3
+        with:
+          node-version: "22"
+
+      - name: Ledger envelope schema agrees with validate under ajv and python-jsonschema
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          # NO CARGO HERE (see the setup actions above). Dependencies are the
+          # committed lockfiles, installed outside the checkout: integrity
+          # hashes and --require-hashes refuse a re-published artifact, and
+          # --ignore-scripts runs no install hook.
+          LOCKS=.github/scripts/ledger-envelope-engines
+          mkdir -p "$RUNNER_TEMP/ledger-js"
+          cp "$LOCKS/package.json" "$LOCKS/package-lock.json" "$RUNNER_TEMP/ledger-js/"
+          (cd "$RUNNER_TEMP/ledger-js" && npm ci --ignore-scripts --no-audit --no-fund)
+          python -m venv "$RUNNER_TEMP/ledger-py"
+          "$RUNNER_TEMP/ledger-py/bin/python" -m pip install --quiet --require-hashes -r "$LOCKS/requirements.txt"
+          NODE_PATH="$RUNNER_TEMP/ledger-js/node_modules" \
+            "$RUNNER_TEMP/ledger-py/bin/python" .github/scripts/ledger-envelope-engines.py \
+            "$RUNNER_TEMP/ledger-envelope-corpus.json"
 
   ci-exec-windows:
     # The CI executor (ci-exec) runs on Windows CI nodes too — the runner's

@@ -17,7 +17,13 @@
 //! The schema is also the validator non-Rust writers use, so
 //! [`the_schema_and_validate_agree_on_the_corpus`] runs one corpus through a
 //! JSON Schema validator (formats asserted) and through
-//! `qontinui_types::ledger::validate`, and fails if they disagree.
+//! `qontinui_types::ledger::validate`, and fails if they disagree. That is
+//! the Rust `jsonschema` crate; the two validators non-Rust writers actually
+//! run — ajv (JS) and python-jsonschema — are checked against the same
+//! corpus by `.github/scripts/ledger-envelope-engines.py`, which reads the
+//! corpus [`agreement_corpus_for_the_cross_engine_check`] writes (rust-ci's
+//! `ledger-envelope-engines` job). Plan
+//! `2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema`.
 //!
 //! To change the envelope: bump `ENVELOPE_SCHEMA_VERSION`, run this test with
 //! `LEDGER_ENVELOPE_BLESS=1` (it writes the NEW version's file only when it
@@ -656,6 +662,23 @@ fn corpus() -> Vec<(String, Value)> {
             set(site, json!(label));
         }
     }
+    // ECMA-262 line terminators and astral code points: ECMA `.` excludes
+    // `\r`, U+2028 and U+2029 (Python's and Rust's exclude only `\n`), and
+    // ajv compiles every pattern with the `u` flag, under which an astral
+    // code point is one character rather than two surrogates. The
+    // cross-engine check runs these through ajv and python-jsonschema.
+    for text in [
+        "a\rb",
+        "a\u{2028}b",
+        "x\u{2028}",
+        "\u{2029}x",
+        "a\u{1F600}b",
+        "\u{1F600}",
+    ] {
+        set("/source", json!(text));
+        set("/activity", json!(text));
+    }
+    set("/source", json!("x\r\n"));
     // closed enums
     set("/evidence_grade", json!("gate-grade"));
     set("/source_class", json!("coordObserved"));
@@ -764,6 +787,51 @@ fn the_schema_and_validate_agree_on_the_corpus() {
         "accepted {accepted}/{}",
         corpus.len()
     );
+}
+
+/// The corpus, its Rust verdicts and both declared lists, written for
+/// `.github/scripts/ledger-envelope-engines.py`, which runs every case
+/// through ajv and python-jsonschema against the COMMITTED schema file and
+/// fails on any disagreement with `validate` (the job
+/// `ledger-envelope-engines` in rust-ci.yml). `serde_json` writes integers
+/// past 2^53 as their exact digits, so each engine parses them exactly as
+/// its own writers would.
+///
+/// With `LEDGER_ENVELOPE_CORPUS_OUT` unset (every ordinary `cargo test`) it
+/// only checks the corpus is non-empty: the engines are not here, and the
+/// job that sets the variable is where the check is made. A write failure
+/// panics.
+#[test]
+fn agreement_corpus_for_the_cross_engine_check() {
+    let corpus = corpus();
+    assert!(!corpus.is_empty(), "the agreement corpus is empty");
+    let Some(out) = std::env::var_os("LEDGER_ENVELOPE_CORPUS_OUT") else {
+        return;
+    };
+    let cases: Vec<Value> = corpus
+        .iter()
+        .map(|(name, instance)| {
+            json!({
+                "name": name,
+                "instance": instance,
+                "rust": rust_accepts(instance),
+                "declared_exception": DECLARED_EXCEPTIONS.contains(&name.as_str()),
+                "format_only": FORMAT_ONLY_CASES.contains(&name.as_str()),
+            })
+        })
+        .collect();
+    let document = json!({
+        "schema_version": ENVELOPE_SCHEMA_VERSION,
+        "count": cases.len(),
+        "cases": cases,
+    });
+    let bytes = serde_json::to_vec_pretty(&document).expect("the corpus serializes");
+    std::fs::write(&out, bytes).unwrap_or_else(|e| {
+        panic!(
+            "could not write the corpus to {}: {e}",
+            PathBuf::from(&out).display()
+        )
+    });
 }
 
 // ============================================================================

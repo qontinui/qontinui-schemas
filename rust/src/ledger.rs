@@ -23,7 +23,7 @@
 //!
 //! # One rule set, two spellings
 //!
-//! Non-Rust writers (shell, Python) validate against the committed schema;
+//! Non-Rust writers (shell, Python, JS) validate against the committed schema;
 //! Rust writers call [`validate`]. The schema therefore carries every rule of
 //! [`validate`] that JSON Schema can express — the UUIDv7 id pattern, the
 //! timestamp pattern plus `format: date-time`, the activity grammar, the
@@ -38,6 +38,26 @@
 //! `rfc3339-validator` installed so `date-time` is actually checked);
 //! without it `2026-02-30T10:00:00Z` passes the schema and fails here. The
 //! golden test pins exactly that gap with a formats-off validator.
+//!
+//! A JS writer validates with ajv, configured exactly so: `Ajv2020` (from
+//! `ajv/dist/2020` — the schema declares draft 2020-12), `ajv-formats`
+//! applied in its default mode (`addFormats(ajv)`), the three formats
+//! schemars emits that no ajv plugin defines registered as annotation-only —
+//! `formats: { uint32: true, uint64: true, double: true }` — and
+//! `strictTypes: false`, because `SafeJson` is deliberately type-less.
+//! Everything else stays default. Without the three formats ajv's default
+//! constructor refuses to compile the schema at all (`unknown format
+//! "uint32"`); without `ajv-formats` it skips `date-time` exactly as Python
+//! does without `rfc3339-validator`.
+//!
+//! Both recipes are proven, not assumed: rust-ci's `ledger-envelope-engines`
+//! job runs the golden test's corpus through python-jsonschema (the recipe
+//! above) and ajv (this one) against the committed schema file, formats on
+//! and off, and fails on any disagreement with [`validate`]
+//! (`.github/scripts/ledger-envelope-engines.py`). Measured: neither engine
+//! disagrees with [`validate`] beyond the declared exception below — integers
+//! past 2^53 rounded by `JSON.parse` and ECMA-262's wider set of line
+//! terminators included.
 //!
 //! **Integers are emitted as JSON integers.** JSON Schema's `type: integer`
 //! admits an integer-valued float (`1.0`), and no keyword can refuse it, so

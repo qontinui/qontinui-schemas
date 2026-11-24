@@ -180,6 +180,16 @@
 #    are Actions, not commands. It also runs the test binary it recovers from
 #    the Actions `cargo test` step's log rather than invoking cargo again.
 #    (Same plan, Phase 3.)
+#
+# 13. rust-ci.yml's `ledger-envelope-engines` job is NOT mirrored. It passes
+#    the ledger envelope corpus to the next command through
+#    LEDGER_ENVELOPE_CORPUS_OUT, which is not in ENV_ALLOWLIST, and its checker
+#    needs a Python 3 interpreter with `venv` (refused here for gap 12's reason,
+#    `no_python_refusal`) plus node, both installed by the setup-python and
+#    setup-node actions, which are Actions, not commands. The Rust-engine half —
+#    `the_schema_and_validate_agree_on_the_corpus` in
+#    rust/tests/ledger_envelope_golden.rs — does run here, inside `rust-test`.
+#    (Plan 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.)
 # ===========================================================================
 
 version = 1
