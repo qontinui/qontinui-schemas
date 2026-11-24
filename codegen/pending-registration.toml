@@ -41,22 +41,25 @@
 # The cli_session types (first landed by schemas#212 at 86710c89, dropped by
 # dc6c2d01 while runner#1990 sat conflicted), restored for its route-around
 # revival runner#2920.
+# Renewed 2026-11-24 (first declared 2026-11-13, would warn from 2026-11-25):
+# runner#2920 is OPEN (CONFLICTING) but was updated 2026-11-24, so the wait is
+# live. Were it CLOSED, these rows would be dropped, not renewed.
 [[pending]]
 type = "CapabilityState"
 runner_pr = "qontinui/qontinui-runner#2920"
-added = 2026-11-13
+added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
 
 [[pending]]
 type = "CliProfile"
 runner_pr = "qontinui/qontinui-runner#2920"
-added = 2026-11-13
+added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
 
 [[pending]]
 type = "SessionFailure"
 runner_pr = "qontinui/qontinui-runner#2920"
-added = 2026-11-13
+added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
 
 # The saved-tab-list layout types (schemas#300), awaiting runner#2750.
