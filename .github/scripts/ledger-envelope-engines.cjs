@@ -18,8 +18,17 @@
 // compile or the input is malformed; the orchestrator reads that as UNKNOWN.
 "use strict";
 
-const Ajv2020 = require("ajv/dist/2020");
-const addFormats = require("ajv-formats");
+// Resolve ajv ONLY from NODE_PATH (the pinned `npm ci` tree): a bare require()
+// would search every node_modules above this file first, and on a box with an
+// ancestor node_modules would check an unpinned ajv.
+const path = require("path");
+if (!process.env.NODE_PATH) {
+  process.stderr.write("ledger-envelope-engines.cjs: NODE_PATH is unset; point it at the pinned node_modules\n");
+  process.exit(1);
+}
+const pinned = require("module").createRequire(path.join(path.resolve(process.env.NODE_PATH), "noop.js"));
+const Ajv2020 = pinned("ajv/dist/2020");
+const addFormats = pinned("ajv-formats");
 
 const ANNOTATION_ONLY = { uint32: true, uint64: true, double: true };
 
@@ -33,8 +42,10 @@ function main() {
   addFormats(on);
   const validateOn = on.compile(input.schema);
 
-  // Formats off: JSON Schema's default, what a writer gets without
-  // ajv-formats. It must miss exactly the corpus's format-only cases.
+  // Formats off: a writer who sets `validateFormats: false` (JSON Schema's
+  // annotation-only default). A writer who merely omits ajv-formats gets no
+  // verdict at all: ajv refuses to compile on the unknown `date-time`. This
+  // arm must miss exactly the corpus's format-only cases.
   const off = new Ajv2020({
     formats: ANNOTATION_ONLY,
     strictTypes: false,
