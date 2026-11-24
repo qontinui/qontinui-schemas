@@ -50,6 +50,14 @@ fn assertion() -> Assertion {
 }
 
 fn result_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> AssertionResult {
+    result_with(&assertion(), baseline, in_situ)
+}
+
+fn result_with(
+    a: &Assertion,
+    baseline: Option<ComponentCapture>,
+    in_situ: ComponentCapture,
+) -> AssertionResult {
     let baselines: HashMap<String, ComponentBaseline> = baseline
         .into_iter()
         .map(|capture| {
@@ -74,7 +82,7 @@ fn result_of(baseline: Option<ComponentCapture>, in_situ: ComponentCapture) -> A
     // breaks this file, not first the runner.
     let _runner_entry: fn(&Assertion, &EvalContext<'_>) -> AssertionResult =
         qontinui_vision_core::evaluate_assertion;
-    assertions::evaluate(&assertion(), &ctx)
+    assertions::evaluate(a, &ctx)
 }
 
 /// A 400x40 root at page (100, 300) with one child node at root-relative
@@ -197,15 +205,26 @@ fn a_child_inside_the_clip_rect_is_not_clipped() {
     assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
 }
 
-/// The size tolerance is exclusive: a difference of exactly 5% (absolute and
-/// fill ratio alike) passes, and anything beyond it fails.
+/// The size tolerance is exclusive: a difference of exactly the tolerance
+/// passes, and anything beyond it fails. The values are exactly representable
+/// in binary floating point, so both the absolute and the fill-ratio
+/// difference compute to exactly 50.0 at the boundary and a `>` read as `>=`
+/// is caught.
 #[test]
-fn exactly_the_default_size_tolerance_passes_and_just_beyond_fails() {
-    // 200 -> 210 in an unchanged 1000-wide parent: +5.0% absolute, +5.0% fill.
-    let r = result_of(Some(capture(200.0, 1000.0)), capture(210.0, 1000.0));
+fn exactly_the_size_tolerance_passes_and_just_beyond_fails() {
+    let a: Assertion = serde_json::from_value(json!({
+        "type": "matches_isolated_render",
+        "component": COMPONENT,
+        "baseline": BASELINE,
+        "size_tolerance_pct": 50.0,
+    }))
+    .expect("the assertion's wire form parses");
+    // 128 -> 192 in an unchanged 256-wide parent: absolute +50.0%, fill
+    // ratio 0.5 -> 0.75, also +50.0%.
+    let r = result_with(&a, Some(capture(128.0, 256.0)), capture(192.0, 256.0));
     assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
 
-    // 200 -> 211: +5.5%.
-    let r = result_of(Some(capture(200.0, 1000.0)), capture(211.0, 1000.0));
+    // 128 -> 193: both differences are +50.78125%.
+    let r = result_with(&a, Some(capture(128.0, 256.0)), capture(193.0, 256.0));
     assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
 }

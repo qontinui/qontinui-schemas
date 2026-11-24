@@ -127,8 +127,8 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
 
     let Some(entry) = ctx.component_baselines.and_then(|m| m.get(&*baseline)) else {
         let detail = if ctx.component_baselines.is_none() {
-            "the caller supplied no component inputs (no component baselines were passed to \
-             the evaluator), so the in-situ render was not compared"
+            "no component baselines were supplied to the evaluator, so the in-situ render \
+             was not compared"
                 .to_string()
         } else {
             format!(
@@ -148,7 +148,23 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             ),
         );
     };
-    let (b_ver, s_ver) = (entry.capture.schema_version, in_situ.schema_version);
+    for (side, c) in [("baseline", &entry.capture), ("in-situ", in_situ)] {
+        if c.schema_version.is_none() {
+            return AssertionResult::unknown(
+                a,
+                UnknownCode::InputMissing,
+                format!(
+                    "the {side} capture carries no schemaVersion, so it cannot be read as \
+                     schemaVersion {COMPONENT_CAPTURE_SCHEMA_VERSION} and the renders were \
+                     not compared"
+                ),
+            );
+        }
+    }
+    let (b_ver, s_ver) = (
+        entry.capture.schema_version.unwrap_or_default(),
+        in_situ.schema_version.unwrap_or_default(),
+    );
     if b_ver != COMPONENT_CAPTURE_SCHEMA_VERSION || s_ver != COMPONENT_CAPTURE_SCHEMA_VERSION {
         return AssertionResult::unknown(
             a,
@@ -188,9 +204,14 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             format!("{what}, so the renders were not compared"),
         );
     };
+    // From here every check that has its inputs runs, and a definite failure
+    // outranks a check that could not run. `undecided` collects the checks
+    // that could not run: with no finding, any of them makes the answer
+    // unknown; with a finding, they are notes on the failure.
+    let mut undecided: Vec<String> = Vec::new();
     // A capture with no node tree (or no root node) would pass with every
     // per-node check skipped, or fail with every node "missing": neither is
-    // an answer.
+    // an answer, so only the root-geometry checks run.
     let has_root_node = |c: &ComponentCapture| c.nodes.iter().any(|n| n.path.is_empty());
     let missing_tree = |c: &ComponentCapture| {
         if c.nodes.is_empty() {
@@ -201,15 +222,17 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             None
         }
     };
+    let mut tree_ok = true;
     for (side, c) in [("baseline", &entry.capture), ("in-situ", in_situ)] {
         if let Some(why) = missing_tree(c) {
-            return AssertionResult::unknown(
-                a,
-                UnknownCode::InputMissing,
-                format!("the {side} capture {why}, so the renders were not compared"),
-            );
+            tree_ok = false;
+            undecided.push(format!(
+                "per-node checks skipped: the {side} capture {why}, so clipped, \
+                 child_identity, style_delta and portal_mismatch were not compared"
+            ));
         }
     }
+    let mut props_ok = compare_props;
     if compare_props {
         let missing = match (entry.capture.props.is_none(), in_situ.props.is_none()) {
             (true, true) => Some("neither capture has props"),
@@ -218,11 +241,10 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
             (false, false) => None,
         };
         if let Some(what) = missing {
-            return AssertionResult::unknown(
-                a,
-                UnknownCode::InputMissing,
-                format!("compare_props was requested but {what}, so the renders were not compared"),
-            );
+            props_ok = false;
+            undecided.push(format!(
+                "props not compared: compare_props was requested but {what}"
+            ));
         }
     }
     // A repeated style prop must not yield a repeated finding.
@@ -235,12 +257,24 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     let opts = DiffOptions {
         size_tolerance_pct,
         style_props: &props,
-        compare_props,
+        compare_props: props_ok,
+        per_node: tree_ok,
     };
-    let (findings, unknown_checks) = diff(entry, in_situ, b_root, s_root, &opts);
+    let (findings, notes) = diff(entry, in_situ, b_root, s_root, &opts, &mut undecided);
     let viewport = compare_viewports(&entry.capture, in_situ);
-    let summary = summarize(&component, &baseline, &findings);
     let failed = !findings.is_empty();
+    let unknown = !failed && !undecided.is_empty();
+    let summary = if unknown {
+        format!(
+            "component '{component}' could not be fully compared with baseline '{baseline}' \
+             and no compared check failed: {}",
+            undecided.join("; ")
+        )
+    } else {
+        summarize(&component, &baseline, &findings)
+    };
+    let mut unknown_checks = undecided;
+    unknown_checks.extend(notes);
     let report = ComponentDiffReport {
         summary,
         component: component.into(),
@@ -250,7 +284,9 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         viewport,
     };
     let detail = serde_json::to_string(&report).expect("a ComponentDiffReport always serializes");
-    if failed {
+    if unknown {
+        AssertionResult::unknown(a, UnknownCode::InputMissing, detail)
+    } else if failed {
         AssertionResult::fail(a, detail)
     } else {
         AssertionResult::pass_with(a, detail)
@@ -290,7 +326,10 @@ fn kind_name(k: ComponentFindingKind) -> &'static str {
 struct DiffOptions<'a> {
     size_tolerance_pct: f64,
     style_props: &'a [String],
+    /// Compare props: requested AND both sides carry them.
     compare_props: bool,
+    /// Run the per-node checks: both sides have a node tree with a root node.
+    per_node: bool,
 }
 
 fn diff(
@@ -299,6 +338,7 @@ fn diff(
     b_root: CaptureRect,
     s_root: CaptureRect,
     opts: &DiffOptions<'_>,
+    undecided: &mut Vec<String>,
 ) -> (Vec<ComponentFinding>, Vec<String>) {
     let base = &entry.capture;
     let mut findings = Vec::new();
@@ -313,22 +353,32 @@ fn diff(
         &mut findings,
         &mut notes,
     );
-    clip_check(base, in_situ, b_root, s_root, &mut findings, &mut notes);
-    let b_nodes = by_path(base);
-    let s_nodes = by_path(in_situ);
-    let retagged = identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
-    style_check(
-        in_situ,
-        &b_nodes,
-        &retagged,
-        opts.style_props,
-        &mut findings,
-        &mut notes,
-    );
+    if opts.per_node {
+        clip_check(
+            base,
+            in_situ,
+            b_root,
+            s_root,
+            &mut findings,
+            &mut notes,
+            undecided,
+        );
+        let b_nodes = by_path(base);
+        let s_nodes = by_path(in_situ);
+        let retagged = identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
+        style_check(
+            in_situ,
+            &b_nodes,
+            &retagged,
+            opts.style_props,
+            &mut findings,
+            &mut notes,
+        );
+        portal_check(in_situ, &b_nodes, &retagged, &mut findings);
+    }
     if opts.compare_props {
         props_check(base, in_situ, &mut findings);
     }
-    portal_check(in_situ, &b_nodes, &retagged, &mut findings);
 
     for n in &base.unknown_checks {
         notes.push(format!("baseline capture: {n}"));
@@ -516,14 +566,14 @@ fn clipping_ancestor(
 }
 
 /// The first clip ancestor in `c` that `node_page` extends past along an
-/// axis that does not clip it — one that scrolls (`auto`, `scroll`) or whose
-/// overflow is unreported — if any.
-fn non_clipping_overflow<'c>(
+/// axis whose overflow is `kind` (one that scrolls, or one that is
+/// unreported), if any, with the axis or axes it extends past on.
+fn overflow_past<'c>(
     c: &'c ComponentCapture,
     node_page: &CaptureRect,
+    kind: OverflowAxis,
 ) -> Option<(&'c ClipAncestor, &'static str)> {
-    let soft =
-        |axis: OverflowAxis| matches!(axis, OverflowAxis::Scrolls | OverflowAxis::Unreported);
+    let soft = |axis: OverflowAxis| axis == kind;
     c.clip_ancestors.iter().find_map(|anc| {
         let rect = anc.rect.filter(CaptureRect::is_finite)?;
         let past_x = soft(anc.axis_x())
@@ -545,9 +595,11 @@ fn non_clipping_overflow<'c>(
 /// `clipped`: a node extends past a clip ancestor in situ, while in isolation
 /// no clip ancestor clipped the node at that path. Only overflow `hidden` and
 /// `clip` count as clipping: a node that extends outside a scroll container
-/// (`auto`, `scroll`) — or one whose overflow is unreported — is scrolled to,
-/// not cut off, so it is noted and never a `clipped` finding. Only the
-/// topmost clipped (or noted) node of a subtree is reported.
+/// (`auto`, `scroll`, `overlay`) is scrolled to, not cut off, so it is noted
+/// and never a `clipped` finding. A node that extends past an ancestor whose
+/// overflow is unreported (absent or unrecognized) cannot be decided: that is
+/// pushed to `undecided`, which makes the answer unknown when nothing else
+/// failed. Only the topmost clipped (or noted) node of a subtree is reported.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -555,6 +607,7 @@ fn clip_check(
     s_root: CaptureRect,
     findings: &mut Vec<ComponentFinding>,
     notes: &mut Vec<String>,
+    undecided: &mut Vec<String>,
 ) {
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
@@ -568,20 +621,37 @@ fn clip_check(
         };
         let page = rel.offset_by(&s_root);
         let Some((i, clip_rect)) = clipping_ancestor(in_situ, &page) else {
-            if !below_any(&node.path, &noted) {
-                if let Some((anc, axis)) = non_clipping_overflow(in_situ, &page) {
-                    notes.push(format!(
-                        "clipped: <{}> at path '{}' extends outside '{}' on {axis} in situ \
-                         (overflowX {}, overflowY {}); that axis scrolls or is unreported \
-                         rather than clipping, so it is not a clipped finding",
-                        node.tag,
-                        node.path,
-                        anc.descriptor,
-                        anc.overflow_x.as_deref().unwrap_or("?"),
-                        anc.overflow_y.as_deref().unwrap_or("?"),
-                    ));
-                    noted.push(node.path.clone());
-                }
+            if below_any(&node.path, &noted) {
+                continue;
+            }
+            let overflow = |anc: &ClipAncestor| {
+                format!(
+                    "(overflowX {}, overflowY {})",
+                    anc.overflow_x.as_deref().unwrap_or("absent"),
+                    anc.overflow_y.as_deref().unwrap_or("absent"),
+                )
+            };
+            if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Unreported) {
+                undecided.push(format!(
+                    "clipped not decided: <{}> at path '{}' extends outside clip ancestor '{}' \
+                     on {axis} in situ {}, and that overflow value is unreported or \
+                     unrecognized, so whether it is clipped is unknown",
+                    node.tag,
+                    node.path,
+                    anc.descriptor,
+                    overflow(anc),
+                ));
+                noted.push(node.path.clone());
+            } else if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Scrolls) {
+                notes.push(format!(
+                    "clipped: <{}> at path '{}' extends outside '{}' on {axis} in situ {}; \
+                     that axis scrolls rather than clipping, so it is not a clipped finding",
+                    node.tag,
+                    node.path,
+                    anc.descriptor,
+                    overflow(anc),
+                ));
+                noted.push(node.path.clone());
             }
             continue;
         };
@@ -971,7 +1041,7 @@ mod tests {
     fn capture(root: CaptureRect, parent: Option<CaptureRect>) -> ComponentCapture {
         let w = root.width;
         ComponentCapture {
-            schema_version: 1,
+            schema_version: Some(1),
             target: Some(CaptureTarget {
                 kind: CaptureTargetKind::Component,
                 id: "date-range-picker".to_string(),
@@ -1836,7 +1906,7 @@ mod tests {
     #[test]
     fn the_contract_example_round_trips() {
         let c: ComponentCapture = serde_json::from_str(CONTRACT_EXAMPLE).unwrap();
-        assert_eq!(c.schema_version, 1);
+        assert_eq!(c.schema_version, Some(1));
         assert_eq!(
             c.target.as_ref().unwrap().kind,
             CaptureTargetKind::Component
@@ -1913,7 +1983,7 @@ mod tests {
     #[test]
     fn an_unsupported_schema_version_on_either_side_is_input_missing() {
         let mut base = capture(page(), parent_of(page()));
-        base.schema_version = 2;
+        base.schema_version = Some(2);
         let r = run(base, capture(page(), parent_of(page())));
         assert_input_missing(
             &r,
@@ -1921,7 +1991,7 @@ mod tests {
         );
 
         let mut situ = capture(page(), parent_of(page()));
-        situ.schema_version = 7;
+        situ.schema_version = Some(7);
         let r = run(capture(page(), parent_of(page())), situ);
         assert_input_missing(
             &r,
@@ -1934,16 +2004,45 @@ mod tests {
     }
 
     #[test]
+    fn an_absent_schema_version_is_input_missing() {
+        let mut wire: Value = serde_json::from_str(CONTRACT_EXAMPLE).unwrap();
+        wire.as_object_mut().unwrap().remove("schemaVersion");
+        let unversioned: ComponentCapture = serde_json::from_value(wire).unwrap();
+        assert_eq!(unversioned.schema_version, None);
+        // An unversioned capture serializes without the key, not as 1.
+        assert!(serde_json::to_value(&unversioned)
+            .unwrap()
+            .get("schemaVersion")
+            .is_none());
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.schema_version = None;
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "the in-situ capture carries no schemaVersion");
+
+        let mut base = capture(page(), parent_of(page()));
+        base.schema_version = None;
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_input_missing(&r, "the baseline capture carries no schemaVersion");
+    }
+
+    #[test]
     fn a_side_with_no_nodes_is_input_missing() {
         let mut base = capture(page(), parent_of(page()));
         base.nodes.clear();
         let r = run(base, capture(page(), parent_of(page())));
-        assert_input_missing(&r, "the baseline capture has no nodes");
+        assert_input_missing(
+            &r,
+            "per-node checks skipped: the baseline capture has no nodes",
+        );
 
         let mut situ = capture(page(), parent_of(page()));
         situ.nodes.clear();
         let r = run(capture(page(), parent_of(page())), situ);
-        assert_input_missing(&r, "the in-situ capture has no nodes");
+        assert_input_missing(
+            &r,
+            "per-node checks skipped: the in-situ capture has no nodes",
+        );
     }
 
     #[test]
@@ -1959,6 +2058,76 @@ mod tests {
         assert_input_missing(&r, "the in-situ capture has no root node");
     }
 
+    /// Isolation: 200 wide in a 400-wide parent; in situ: 1000 of 1000.
+    fn stretched() -> (ComponentCapture, ComponentCapture) {
+        (
+            capture(
+                rect(0.0, 0.0, 200.0, 40.0),
+                Some(rect(0.0, 0.0, 400.0, 40.0)),
+            ),
+            capture(
+                rect(0.0, 0.0, 1000.0, 40.0),
+                Some(rect(0.0, 0.0, 1000.0, 40.0)),
+            ),
+        )
+    }
+
+    #[test]
+    fn a_size_delta_with_no_node_tree_fails_with_a_note() {
+        for clear_base in [true, false] {
+            let (mut base, mut situ) = stretched();
+            if clear_base {
+                base.nodes.clear();
+            } else {
+                situ.nodes.clear();
+            }
+            let r = run(base, situ);
+            assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+            let rep = report(&r);
+            assert_eq!(kinds(&r), vec![ComponentFindingKind::Size]);
+            assert!(
+                rep.unknown_checks
+                    .iter()
+                    .any(|n| n.starts_with("per-node checks skipped:")),
+                "{:?}",
+                rep.unknown_checks
+            );
+        }
+    }
+
+    #[test]
+    fn a_size_delta_with_props_missing_fails_with_a_note() {
+        let (base, mut situ) = stretched();
+        situ.props = Some(json!({"mode": "range"}));
+        let r = run_with(&props_assertion(), base, situ);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        let rep = report(&r);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::Size]);
+        assert!(
+            rep.unknown_checks
+                .iter()
+                .any(|n| n.starts_with("props not compared:")
+                    && n.contains("the baseline capture has no props")),
+            "{:?}",
+            rep.unknown_checks
+        );
+    }
+
+    #[test]
+    fn an_unknown_after_comparison_still_carries_the_report() {
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes.clear();
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_eq!(r.outcome, AssertionOutcome::Unknown);
+        let rep = report(&r);
+        assert!(rep.findings.is_empty());
+        assert!(
+            rep.summary.contains("could not be fully compared"),
+            "{}",
+            rep.summary
+        );
+    }
+
     #[test]
     fn compare_props_with_props_missing_on_either_side_is_input_missing() {
         let with_props = || {
@@ -1970,7 +2139,7 @@ mod tests {
         let a = props_assertion();
         assert_input_missing(
             &run_with(&a, bare(), with_props()),
-            "the baseline capture has no props",
+            "props not compared: compare_props was requested but the baseline capture has no props",
         );
         assert_input_missing(
             &run_with(&a, with_props(), bare()),
@@ -2008,21 +2177,38 @@ mod tests {
         }
     }
 
-    #[test]
-    fn an_unreported_overflow_axis_is_noted_not_clipped() {
-        let mut situ = capture(page(), parent_of(page()));
-        situ.clip_ancestors = vec![ClipAncestor {
+    fn unreported_clip(overflow: Option<&str>) -> ClipAncestor {
+        ClipAncestor {
             descriptor: "div.unknown".to_string(),
-            overflow_x: None,
-            overflow_y: None,
+            overflow_x: overflow.map(str::to_string),
+            overflow_y: overflow.map(str::to_string),
             rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
-        }];
+        }
+    }
+
+    #[test]
+    fn an_unreported_overflow_axis_is_unknown_when_nothing_else_fails() {
+        for overflow in [None, Some("bogus")] {
+            let mut situ = capture(page(), parent_of(page()));
+            situ.clip_ancestors = vec![unreported_clip(overflow)];
+            let r = run(capture(page(), parent_of(page())), situ);
+            assert_input_missing(&r, "clipped not decided");
+            assert!(r.detail.unwrap().contains("div.unknown"), "{overflow:?}");
+        }
+    }
+
+    #[test]
+    fn an_unreported_overflow_axis_is_a_note_when_something_else_fails() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![unreported_clip(None)];
+        situ.nodes[3].component_name = Some("NativeDateInput".to_string());
         let r = run(capture(page(), parent_of(page())), situ);
-        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::ChildIdentity]);
         assert!(report(&r)
             .unknown_checks
             .iter()
-            .any(|n| n.starts_with("clipped:") && n.contains("div.unknown")));
+            .any(|n| n.starts_with("clipped not decided") && n.contains("div.unknown")));
     }
 
     #[test]
@@ -2105,7 +2291,10 @@ mod tests {
             ..Default::default()
         };
         let none = evaluate(&assertion(), &ctx(None)).detail.unwrap();
-        assert!(none.contains("supplied no component inputs"), "{none}");
+        assert!(
+            none.contains("no component baselines were supplied"),
+            "{none}"
+        );
         assert!(!none.contains("vision/component-baseline"), "{none}");
 
         let empty = HashMap::new();
