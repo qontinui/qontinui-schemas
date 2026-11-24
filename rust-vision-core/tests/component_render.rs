@@ -208,8 +208,9 @@ fn a_child_inside_the_clip_rect_is_not_clipped() {
 /// The size tolerance is exclusive: a difference of exactly the tolerance
 /// passes, and anything beyond it fails. The values are exactly representable
 /// in binary floating point, so both the absolute and the fill-ratio
-/// difference compute to exactly 50.0 at the boundary and a `>` read as `>=`
-/// is caught.
+/// difference compute to exactly 50.0 at the boundary. (The comparison
+/// carries a relative epsilon for decimal tolerances; see the unit test
+/// `a_decimal_boundary_difference_is_within_tolerance`.)
 #[test]
 fn exactly_the_size_tolerance_passes_and_just_beyond_fails() {
     let a: Assertion = serde_json::from_value(json!({

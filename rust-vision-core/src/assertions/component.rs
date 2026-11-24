@@ -192,23 +192,26 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         }
     }
 
-    let (Some(b_root), Some(s_root)) = (entry.capture.root_bbox(), in_situ.root_bbox()) else {
-        let what = match (entry.capture.root_bbox(), in_situ.root_bbox()) {
-            (None, None) => "neither capture has root geometry",
-            (None, Some(_)) => "the baseline capture has no root geometry",
-            _ => "the in-situ capture has no root geometry",
-        };
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!("{what}, so the renders were not compared"),
-        );
-    };
     // From here every check that has its inputs runs, and a definite failure
     // outranks a check that could not run. `undecided` collects the checks
     // that could not run: with no finding, any of them makes the answer
     // unknown; with a finding, they are notes on the failure.
     let mut undecided: Vec<String> = Vec::new();
+    // Root geometry is what `size` measures and what turns root-relative node
+    // rects into page coordinates for `clipped`; without it on a side, those
+    // two checks cannot run, and the rest still do.
+    let roots = match (entry.capture.root_bbox(), in_situ.root_bbox()) {
+        (Some(b), Some(s)) => Some((b, s)),
+        (b, s) => {
+            let what = match (b, s) {
+                (None, None) => "neither capture has root geometry",
+                (None, Some(_)) => "the baseline capture has no root geometry",
+                _ => "the in-situ capture has no root geometry",
+            };
+            undecided.push(format!("size/clipped not compared: {what}"));
+            None
+        }
+    };
     // A capture with no node tree (or no root node) would pass with every
     // per-node check skipped, or fail with every node "missing": neither is
     // an answer, so only the root-geometry checks run.
@@ -260,7 +263,7 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         compare_props: props_ok,
         per_node: tree_ok,
     };
-    let (findings, notes) = diff(entry, in_situ, b_root, s_root, &opts, &mut undecided);
+    let (findings, notes) = diff(entry, in_situ, roots, &opts, &mut undecided);
     let viewport = compare_viewports(&entry.capture, in_situ);
     let failed = !findings.is_empty();
     let unknown = !failed && !undecided.is_empty();
@@ -332,11 +335,13 @@ struct DiffOptions<'a> {
     per_node: bool,
 }
 
+/// Both captures' root bboxes (baseline, in situ), when both are usable.
+type Roots = Option<(CaptureRect, CaptureRect)>;
+
 fn diff(
     entry: &ComponentBaseline,
     in_situ: &ComponentCapture,
-    b_root: CaptureRect,
-    s_root: CaptureRect,
+    roots: Roots,
     opts: &DiffOptions<'_>,
     undecided: &mut Vec<String>,
 ) -> (Vec<ComponentFinding>, Vec<String>) {
@@ -344,25 +349,29 @@ fn diff(
     let mut findings = Vec::new();
     let mut notes = Vec::new();
 
-    size_check(
-        base,
-        in_situ,
-        b_root,
-        s_root,
-        opts.size_tolerance_pct,
-        &mut findings,
-        &mut notes,
-    );
-    if opts.per_node {
-        clip_check(
+    if let Some((b_root, s_root)) = roots {
+        size_check(
             base,
             in_situ,
             b_root,
             s_root,
+            opts.size_tolerance_pct,
             &mut findings,
             &mut notes,
-            undecided,
         );
+    }
+    if opts.per_node {
+        if let Some((b_root, s_root)) = roots {
+            clip_check(
+                base,
+                in_situ,
+                b_root,
+                s_root,
+                &mut findings,
+                &mut notes,
+                undecided,
+            );
+        }
         let b_nodes = by_path(base);
         let s_nodes = by_path(in_situ);
         let retagged = identity_check(base, in_situ, &b_nodes, &s_nodes, &mut findings, &mut notes);
@@ -438,6 +447,13 @@ fn rel_diff(reference: f64, other: f64) -> f64 {
     }
 }
 
+/// `pct` is beyond `tol_pct`, with a relative epsilon so a difference that
+/// is exactly the tolerance in decimal (100 -> 107 at 7%, which computes as
+/// 7.000000000000001) is not read as beyond it. The tolerance is exclusive.
+fn exceeds_tolerance(pct: f64, tol_pct: f64) -> bool {
+    pct > tol_pct + tol_pct.max(1.0) * 1e-9
+}
+
 fn ratio(num: f64, den: Option<f64>) -> Option<f64> {
     den.filter(|d| *d > 0.0).map(|d| num / d)
 }
@@ -489,8 +505,8 @@ fn size_check(
                 None
             }
         };
-        let abs_differs = abs_pct > tol_pct;
-        let fill_differs = fill_pct.is_none_or(|p| p > tol_pct);
+        let abs_differs = exceeds_tolerance(abs_pct, tol_pct);
+        let fill_differs = fill_pct.is_none_or(|p| exceeds_tolerance(p, tol_pct));
         if abs_differs && fill_differs {
             let verb = if s_abs > b_abs {
                 "stretched"
@@ -592,14 +608,73 @@ fn overflow_past<'c>(
     })
 }
 
+/// Whether an ancestor might clip on some axis (it is not `visible` on both).
+fn may_clip(anc: &ClipAncestor) -> bool {
+    !(anc.axis_x() == OverflowAxis::Visible && anc.axis_y() == OverflowAxis::Visible)
+}
+
+/// How the baseline (isolated) render treated the node at a path the in-situ
+/// render clips.
+enum BaselineClip {
+    /// Clipped in isolation too: not a finding.
+    Clipped,
+    /// Known not clipped in isolation (or absent there): a finding.
+    NotClipped,
+    /// Cannot be told, with the reason.
+    Undecided(String),
+}
+
+fn baseline_clip(
+    base: &ComponentCapture,
+    node: Option<&&ComponentCaptureNode>,
+    b_root: CaptureRect,
+) -> BaselineClip {
+    let Some(node) = node else {
+        // Absent in isolation: `child_identity` reports that; the clip is new.
+        return BaselineClip::NotClipped;
+    };
+    let Some(rel) = node.bbox.filter(CaptureRect::is_finite) else {
+        return BaselineClip::Undecided("the node has no bbox in the baseline capture".into());
+    };
+    let page = rel.offset_by(&b_root);
+    if clipping_ancestor(base, &page).is_some() {
+        return BaselineClip::Clipped;
+    }
+    if let Some((anc, axis)) = overflow_past(base, &page, OverflowAxis::Unreported) {
+        return BaselineClip::Undecided(format!(
+            "in isolation it extends outside clip ancestor '{}' on {axis}, whose overflow is \
+             unreported or unrecognized",
+            anc.descriptor
+        ));
+    }
+    if base
+        .clip_ancestors
+        .iter()
+        .any(|a| may_clip(a) && a.rect.filter(CaptureRect::is_finite).is_none())
+    {
+        return BaselineClip::Undecided(
+            "a baseline clip ancestor has no rect, so whether it clipped the node in \
+             isolation is unknown"
+                .into(),
+        );
+    }
+    BaselineClip::NotClipped
+}
+
 /// `clipped`: a node extends past a clip ancestor in situ, while in isolation
 /// no clip ancestor clipped the node at that path. Only overflow `hidden` and
 /// `clip` count as clipping: a node that extends outside a scroll container
 /// (`auto`, `scroll`, `overlay`) is scrolled to, not cut off, so it is noted
-/// and never a `clipped` finding. A node that extends past an ancestor whose
-/// overflow is unreported (absent or unrecognized) cannot be decided: that is
-/// pushed to `undecided`, which makes the answer unknown when nothing else
-/// failed. Only the topmost clipped (or noted) node of a subtree is reported.
+/// and never a `clipped` finding.
+///
+/// What cannot be decided is pushed to `undecided`, which makes the answer
+/// unknown when nothing else failed: a node extending past an ancestor whose
+/// overflow is unreported (absent or unrecognized), a clip ancestor with no
+/// rect on either side, an in-situ node with no bbox, and an in-situ clip
+/// whose baseline counterpart cannot be judged ([`baseline_clip`]). Only the
+/// topmost clipped (or noted, or undecided) node of a subtree is reported;
+/// the three kinds keep separate lists, so a scroll note never hides an
+/// undecided descendant.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -609,30 +684,45 @@ fn clip_check(
     notes: &mut Vec<String>,
     undecided: &mut Vec<String>,
 ) {
+    for (side, c) in [("baseline", base), ("in-situ", in_situ)] {
+        for (i, anc) in c.clip_ancestors.iter().enumerate() {
+            if may_clip(anc) && anc.rect.filter(CaptureRect::is_finite).is_none() {
+                undecided.push(format!(
+                    "clipped not decided: {side} clip ancestor {i} ('{}') has no rect, so \
+                     whether it clips the component there is unknown",
+                    anc.descriptor
+                ));
+            }
+        }
+    }
+    if in_situ.clip_ancestors.is_empty() {
+        return;
+    }
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
-    let mut noted: Vec<String> = Vec::new();
+    let mut undecided_paths: Vec<String> = Vec::new();
+    let mut scroll_noted: Vec<String> = Vec::new();
+    let mut no_bbox: Vec<String> = Vec::new();
+    let overflow = |anc: &ClipAncestor| {
+        format!(
+            "(overflowX {}, overflowY {})",
+            anc.overflow_x.as_deref().unwrap_or("absent"),
+            anc.overflow_y.as_deref().unwrap_or("absent"),
+        )
+    };
     for node in &in_situ.nodes {
         if below_any(&node.path, &reported) {
             continue;
         }
         let Some(rel) = node.bbox.filter(CaptureRect::is_finite) else {
+            no_bbox.push(format!("'{}'", node.path));
             continue;
         };
         let page = rel.offset_by(&s_root);
         let Some((i, clip_rect)) = clipping_ancestor(in_situ, &page) else {
-            if below_any(&node.path, &noted) {
-                continue;
-            }
-            let overflow = |anc: &ClipAncestor| {
-                format!(
-                    "(overflowX {}, overflowY {})",
-                    anc.overflow_x.as_deref().unwrap_or("absent"),
-                    anc.overflow_y.as_deref().unwrap_or("absent"),
-                )
-            };
-            if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Unreported) {
-                undecided.push(format!(
+            if !below_any(&node.path, &undecided_paths) {
+                if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Unreported) {
+                    undecided.push(format!(
                     "clipped not decided: <{}> at path '{}' extends outside clip ancestor '{}' \
                      on {axis} in situ {}, and that overflow value is unreported or \
                      unrecognized, so whether it is clipped is unknown",
@@ -641,8 +731,14 @@ fn clip_check(
                     anc.descriptor,
                     overflow(anc),
                 ));
-                noted.push(node.path.clone());
-            } else if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Scrolls) {
+                    undecided_paths.push(node.path.clone());
+                    continue;
+                }
+            }
+            if below_any(&node.path, &scroll_noted) {
+                continue;
+            }
+            if let Some((anc, axis)) = overflow_past(in_situ, &page, OverflowAxis::Scrolls) {
                 notes.push(format!(
                     "clipped: <{}> at path '{}' extends outside '{}' on {axis} in situ {}; \
                      that axis scrolls rather than clipping, so it is not a clipped finding",
@@ -651,19 +747,24 @@ fn clip_check(
                     anc.descriptor,
                     overflow(anc),
                 ));
-                noted.push(node.path.clone());
+                scroll_noted.push(node.path.clone());
             }
             continue;
         };
-        let baseline_clipped = b_nodes
-            .get(node.path.as_str())
-            .and_then(|bn| bn.bbox.filter(CaptureRect::is_finite))
-            .and_then(|r| clipping_ancestor(base, &r.offset_by(&b_root)))
-            .is_some();
-        if baseline_clipped {
-            continue;
-        }
         let anc = &in_situ.clip_ancestors[i];
+        match baseline_clip(base, b_nodes.get(node.path.as_str()), b_root) {
+            BaselineClip::Clipped => continue,
+            BaselineClip::Undecided(why) => {
+                undecided.push(format!(
+                    "clipped not decided: <{}> at path '{}' extends past clip ancestor '{}' \
+                     in situ, but {why}",
+                    node.tag, node.path, anc.descriptor,
+                ));
+                reported.push(node.path.clone());
+                continue;
+            }
+            BaselineClip::NotClipped => {}
+        }
         findings.push(ComponentFinding {
             kind: ComponentFindingKind::Clipped,
             path: node.path.clone(),
@@ -684,6 +785,14 @@ fn clip_check(
             }),
         });
         reported.push(node.path.clone());
+    }
+    if !no_bbox.is_empty() {
+        undecided.push(format!(
+            "clipped not decided: {} in-situ node(s) have no bbox ({}), so whether they are \
+             clipped is unknown",
+            no_bbox.len(),
+            no_bbox.join(", ")
+        ));
     }
 }
 
@@ -916,8 +1025,9 @@ fn props_check(
     in_situ: &ComponentCapture,
     findings: &mut Vec<ComponentFinding>,
 ) {
-    // `evaluate` answers `unknown{input_missing}` before diffing when either
-    // side lacks props, so both are present here.
+    // `diff` calls this only when both sides carry props (`evaluate` records
+    // `props not compared` as an undecided check otherwise), so this
+    // early return is defensive.
     let (Some(bp), Some(sp)) = (&base.props, &in_situ.props) else {
         return;
     };
@@ -1701,30 +1811,156 @@ mod tests {
         let mut situ = capture(page(), parent_of(page()));
         situ.root = None;
         let r = run(capture(page(), parent_of(page())), situ);
-        assert_eq!(r.outcome, AssertionOutcome::Unknown);
-        assert_eq!(r.code, Some(UnknownCode::InputMissing));
-        assert!(r
-            .detail
-            .unwrap()
-            .starts_with("the in-situ capture has no root geometry,"),);
+        assert_input_missing(
+            &r,
+            "size/clipped not compared: the in-situ capture has no root",
+        );
 
         let mut base = capture(page(), parent_of(page()));
         base.root = None;
         let r = run(base.clone(), capture(page(), parent_of(page())));
-        assert_eq!(r.code, Some(UnknownCode::InputMissing));
-        assert!(r
-            .detail
-            .unwrap()
-            .starts_with("the baseline capture has no root geometry,"),);
+        assert_input_missing(
+            &r,
+            "size/clipped not compared: the baseline capture has no root",
+        );
 
         let mut situ = capture(page(), parent_of(page()));
         situ.root = None;
         let r = run(base, situ);
-        assert_eq!(r.code, Some(UnknownCode::InputMissing));
-        assert!(r
-            .detail
-            .unwrap()
-            .starts_with("neither capture has root geometry,"));
+        assert_input_missing(
+            &r,
+            "size/clipped not compared: neither capture has root geometry",
+        );
+    }
+
+    #[test]
+    fn missing_root_geometry_still_runs_the_other_checks() {
+        let mut base = capture(page(), parent_of(page()));
+        base.props = Some(json!({"mode": "range"}));
+        let mut situ = capture(page(), parent_of(page()));
+        situ.root = None;
+        situ.props = Some(json!({"mode": "single"}));
+        let r = run_with(&props_assertion(), base, situ);
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        assert_eq!(kinds(&r), vec![ComponentFindingKind::PropsDelta]);
+        assert!(
+            report(&r)
+                .unknown_checks
+                .iter()
+                .any(|n| n.starts_with("size/clipped not compared: the in-situ capture")),
+            "{:?}",
+            report(&r).unknown_checks
+        );
+    }
+
+    #[test]
+    fn a_decimal_boundary_difference_is_within_tolerance() {
+        let a: Assertion = serde_json::from_value(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "size_tolerance_pct": 7.0,
+        }))
+        .unwrap();
+        // 100 -> 107 in an unchanged 100 parent: rel_diff * 100 computes as
+        // 7.000000000000001 on the absolute side, and the fill ratio side too.
+        assert!(rel_diff(100.0, 107.0) * 100.0 > 7.0);
+        let p = Some(rect(0.0, 0.0, 100.0, 40.0));
+        let r = run_with(
+            &a,
+            capture(rect(0.0, 0.0, 100.0, 40.0), p),
+            capture(rect(0.0, 0.0, 107.0, 40.0), p),
+        );
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        let r = run_with(
+            &a,
+            capture(rect(0.0, 0.0, 100.0, 40.0), p),
+            capture(rect(0.0, 0.0, 108.0, 40.0), p),
+        );
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn a_scroll_note_on_a_parent_does_not_hide_an_undecided_child() {
+        let mut situ = capture(page(), parent_of(page()));
+        // "1/0" is positioned below the root (page y 350..370).
+        situ.nodes[3].bbox = Some(rect(0.0, 50.0, 120.0, 20.0));
+        situ.clip_ancestors = vec![
+            // The 400-wide root extends past this 300-wide scroller: a note.
+            ClipAncestor {
+                descriptor: "div.scroller".to_string(),
+                overflow_x: Some("auto".to_string()),
+                overflow_y: Some("auto".to_string()),
+                rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+            },
+            // The root fits this unreported ancestor; "1/0" extends below it.
+            ClipAncestor {
+                descriptor: "div.unknown".to_string(),
+                overflow_x: None,
+                overflow_y: None,
+                rect: Some(rect(100.0, 300.0, 400.0, 45.0)),
+            },
+        ];
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes[3].bbox = Some(rect(0.0, 50.0, 120.0, 20.0));
+        let r = run(base, situ);
+        assert_input_missing(&r, "clipped not decided: <input> at path '1/0'");
+        assert!(report(&r)
+            .unknown_checks
+            .iter()
+            .any(|n| n.starts_with("clipped: <div> at path ''")));
+    }
+
+    #[test]
+    fn an_unreported_baseline_ancestor_makes_an_in_situ_clip_undecided() {
+        let frame = |overflow: Option<&str>| ClipAncestor {
+            descriptor: "div.frame".to_string(),
+            overflow_x: overflow.map(str::to_string),
+            overflow_y: overflow.map(str::to_string),
+            rect: Some(rect(100.0, 300.0, 300.0, 600.0)),
+        };
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![frame(Some("hidden"))];
+        // In isolation the root extends past an ancestor of unknown overflow:
+        // it may have been clipped there too, so the in-situ clip is not new.
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = vec![frame(Some("bogus"))];
+        let r = run(base, situ.clone());
+        assert_input_missing(
+            &r,
+            "but in isolation it extends outside clip ancestor 'div.frame'",
+        );
+        assert!(!kinds(&r).contains(&ComponentFindingKind::Clipped));
+
+        // A baseline node with no bbox cannot be judged either.
+        let mut base = capture(page(), parent_of(page()));
+        base.nodes[0].bbox = None;
+        let r = run(base, situ);
+        assert_input_missing(&r, "the node has no bbox in the baseline capture");
+    }
+
+    #[test]
+    fn a_clip_ancestor_without_a_rect_or_a_node_without_a_bbox_is_undecided() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.frame".to_string(),
+            overflow_x: Some("hidden".to_string()),
+            overflow_y: Some("hidden".to_string()),
+            rect: None,
+        }];
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "in-situ clip ancestor 0 ('div.frame') has no rect");
+
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![ClipAncestor {
+            descriptor: "div.frame".to_string(),
+            overflow_x: Some("hidden".to_string()),
+            overflow_y: Some("hidden".to_string()),
+            rect: Some(rect(100.0, 300.0, 400.0, 600.0)),
+        }];
+        situ.nodes[2].bbox = None;
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "1 in-situ node(s) have no bbox ('1')");
     }
 
     #[test]
