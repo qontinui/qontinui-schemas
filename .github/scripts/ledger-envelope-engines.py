@@ -49,12 +49,14 @@ Verdicts = dict[str, tuple[bool, bool]]
 ROOT = Path(__file__).resolve().parents[2]
 JS = Path(__file__).with_name("ledger-envelope-engines.cjs")
 
-# The corpus size this check was last measured at, matched EXACTLY: a smaller
-# corpus means the writer dropped cases (or wrote a stub), which is UNKNOWN,
-# not agreement; a larger one means cases were added without moving this, so
-# a later drop of as many would go unseen. Any corpus change moves this in the
-# same change.
+# The corpus size this check was last measured at, matched EXACTLY, as both
+# entries and distinct case names (the corpus repeats one case under one name):
+# fewer means the writer dropped cases or wrote a stub, more means cases were
+# added without moving these (so a later drop of as many would go unseen), and
+# the right entry count over fewer names means a case was swapped for a repeat
+# of another and goes unchecked. Any corpus change moves both in the same change.
 CORPUS_SIZE = 301
+CORPUS_DISTINCT = 300
 
 # Measured per-engine disagreements a writer following the module docs cannot
 # be harmed by: case name -> {"engine": the engine's formats-on verdict,
@@ -94,9 +96,24 @@ def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]
             "dropped or added (a deliberate corpus change must move CORPUS_SIZE in the same change)"
         )
     keys = {"name", "instance", "rust", "declared_exception", "format_only"}
-    if any(not isinstance(c, dict) or not keys <= c.keys() or not isinstance(c["name"], str) for c in cases):
-        problems.append(f"a corpus case is not an object carrying {sorted(keys)} with a string `name`")
+    flags = ("rust", "declared_exception", "format_only")
+    if any(
+        not isinstance(c, dict)
+        or not keys <= c.keys()
+        or not isinstance(c["name"], str)
+        or not all(isinstance(c[f], bool) for f in flags)
+        for c in cases
+    ):
+        problems.append(
+            f"a corpus case is not an object carrying {sorted(keys)} with a string `name` and boolean {list(flags)}"
+        )
         return None, problems
+    distinct = len({c["name"] for c in cases})
+    if distinct != CORPUS_DISTINCT:
+        problems.append(
+            f"the corpus has {distinct} distinct cases, not the {CORPUS_DISTINCT} this check was measured at — a case "
+            "was dropped, added or replaced by a repeat (a deliberate corpus change must move CORPUS_DISTINCT too)"
+        )
     # A name is a case's identity in every comparison below. The corpus may
     # repeat a case (`/source = "x\n"` is both a trailing-newline case and a
     # label case), but one name must never stand for two different instances.
