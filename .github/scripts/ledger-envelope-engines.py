@@ -28,18 +28,23 @@ CORPUS_SIZE cases or exercising one outcome only, a malformed ENGINE_DIFFERENCES
 entry, a missing schema file, a `date-time` checker that is not loaded, an ajv
 or ajv-formats whose version is not the lockfile's, or an engine that printed
 nothing. Once the corpus loads, every problem is counted on a summary line, so
-a failing run never prints only lines that read as agreement; a corpus that
-cannot be loaded prints `corpus: unreadable`.
+a failing run never prints only lines that read as agreement; a corpus, case
+shape or schema that stops the run before the engines prints `corpus: not
+checked`.
 
 Plan 2026-11-24-ledger-envelope-schema-agreement-under-ajv-and-python-jsonschema.
 """
-
-from __future__ import annotations
 
 import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+# One corpus case, the committed schema, and one engine's verdicts by case name.
+Case = dict[str, Any]
+Schema = dict[str, Any]
+Verdicts = dict[str, tuple[bool, bool]]
 
 ROOT = Path(__file__).resolve().parents[2]
 JS = Path(__file__).with_name("ledger-envelope-engines.cjs")
@@ -60,23 +65,27 @@ CORPUS_SIZE = 301
 # refuses is never declarable: that is a hole writers can drive data through,
 # and compare() refuses such an entry. A declared exception (DECLARED_EXCEPTIONS
 # in the Rust test) is never an entry here either.
-ENGINE_DIFFERENCES = {"python-jsonschema": {}, "ajv": {}}
+ENGINE_DIFFERENCES: dict[str, dict[str, dict[str, Any]]] = {"python-jsonschema": {}, "ajv": {}}
 
 
 def error(msg: str) -> None:
     print(f"::error::{msg}")
 
 
-def load_corpus(path: str) -> tuple[list[dict] | None, dict | None, list[str]]:
-    """The corpus and the schema it was written for, or a list of refusals."""
+def load_corpus(path: str) -> tuple[tuple[list[Case], Schema] | None, list[str]]:
+    """(the corpus, the schema it was written for) or None, plus the refusals.
+
+    None means nothing can be checked; the refusals then say why. Otherwise the
+    refusals are corpus problems the run still reports beside the engines.
+    """
     try:
         doc = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
-        return None, None, [f"the corpus {path} is missing or unparsable ({e}) — UNKNOWN, not agreement"]
+        return None, [f"the corpus {path} is missing or unparsable ({e}) — UNKNOWN, not agreement"]
     problems = []
     cases = doc.get("cases") if isinstance(doc, dict) else None
     if not isinstance(cases, list) or not cases:
-        return None, None, [f"the corpus {path} has no cases — UNKNOWN, not agreement"]
+        return None, [f"the corpus {path} has no cases — UNKNOWN, not agreement"]
     if doc.get("count") != len(cases):
         problems.append(f"the corpus says count={doc.get('count')} but carries {len(cases)} cases — truncated or hand-edited")
     if len(cases) != CORPUS_SIZE:
@@ -87,11 +96,11 @@ def load_corpus(path: str) -> tuple[list[dict] | None, dict | None, list[str]]:
     keys = {"name", "instance", "rust", "declared_exception", "format_only"}
     if any(not isinstance(c, dict) or not keys <= c.keys() for c in cases):
         problems.append(f"a corpus case lacks one of {sorted(keys)}")
-        return None, None, problems
+        return None, problems
     # A name is a case's identity in every comparison below. The corpus may
     # repeat a case (`/source = "x\n"` is both a trailing-newline case and a
     # label case), but one name must never stand for two different instances.
-    first = {}
+    first: dict[str, Case] = {}
     for c in cases:
         seen = first.setdefault(c["name"], c)
         if seen["instance"] != c["instance"] or seen["rust"] != c["rust"]:
@@ -109,11 +118,11 @@ def load_corpus(path: str) -> tuple[list[dict] | None, dict | None, list[str]]:
         schema = json.loads(schema_file.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         problems.append(f"the committed schema {schema_file} is missing or unparsable ({e})")
-        return None, None, problems
-    return cases, schema, problems
+        return None, problems
+    return (cases, schema), problems
 
 
-def python_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
+def python_arm(schema: Schema, cases: list[Case]) -> Verdicts:
     """{name: (formats_on, formats_off)} under python-jsonschema."""
     import jsonschema
     from jsonschema.validators import validator_for
@@ -133,7 +142,7 @@ def python_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
     return {c["name"]: (on.is_valid(c["instance"]), off.is_valid(c["instance"])) for c in cases}
 
 
-def ajv_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
+def ajv_arm(schema: Schema, cases: list[Case]) -> Verdicts:
     """{name: (formats_on, formats_off)} under ajv, via the .cjs arm."""
     payload = json.dumps({"schema": schema, "cases": [{"name": c["name"], "instance": c["instance"]} for c in cases]})
     # Bytes in and out, decoded once after the call: a decode failure is then
@@ -154,7 +163,7 @@ def ajv_arm(schema: dict, cases: list[dict]) -> dict[str, tuple[bool, bool]]:
     return {name: (on, off) for name, on, off in rows}
 
 
-def compare(engine: str, cases: list[dict], verdicts: dict[str, tuple[bool, bool]]) -> tuple[list[str], str]:
+def compare(engine: str, cases: list[Case], verdicts: Verdicts) -> tuple[list[str], str]:
     """The problems one engine's verdicts raise, plus its summary line.
 
     Every problem counts as one disagreement, so this engine's summary line
@@ -222,12 +231,15 @@ def compare(engine: str, cases: list[dict], verdicts: dict[str, tuple[bool, bool
 def main() -> int:
     if len(sys.argv) != 2:
         sys.exit("usage: ledger-envelope-engines.py <corpus.json>")
-    cases, schema, problems = load_corpus(sys.argv[1])
-    if cases is None:
-        print("corpus: unreadable")
+    loaded, problems = load_corpus(sys.argv[1])
+    if loaded is None:
+        # Nothing was checked: the corpus, a case's shape or the committed
+        # schema stopped the run before either engine saw a case.
+        print("corpus: not checked")
         for p in problems:
             error(p)
         return 1
+    cases, schema = loaded
     # The corpus's own problems get a summary line too: a failing run whose
     # engines agreed must not print only lines that read as agreement.
     summaries = [f"corpus: {len(cases)} entries, {len({c['name'] for c in cases})} distinct, {len(problems)} problem(s)"]
