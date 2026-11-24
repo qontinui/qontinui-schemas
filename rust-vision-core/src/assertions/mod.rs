@@ -458,6 +458,9 @@ pub enum Assertion {
     /// note. A viewport mismatch is reported and never fails alone: node
     /// geometry is root-relative.
     ///
+    /// An invalid `size_tolerance_pct` (non-finite or negative) skips the
+    /// `size` check as undecided; the rest still run.
+    ///
     /// Answered `Unknown` before any comparison when the baseline is
     /// unregistered, there is no in-situ capture for `component`, or either
     /// side's `schemaVersion` is absent or not
@@ -473,7 +476,8 @@ pub enum Assertion {
     /// side has no node tree or no root node (path `""`); `props_delta` when
     /// `compare_props` is set and either side has no props; and `clipped` at
     /// a node that extends past a clip ancestor whose overflow is unreported,
-    /// past a clip ancestor with no rect, or that has no bbox. See
+    /// past a clip ancestor with no rect, or that has no bbox; and any check a
+    /// capture lists in its own `unknownChecks`. See
     /// `assertions/component.rs`.
     // Boxed `str`/slice fields, not `String`/`Vec`: they keep `Assertion`
     // (and so `AssertionResult`, the `Err` of many helpers) under clippy's
@@ -487,9 +491,14 @@ pub enum Assertion {
             deserialize_with = "null_as_default_size_tolerance_pct"
         )]
         size_tolerance_pct: f64,
-        #[serde(default = "default_style_props")]
+        /// An explicit JSON `null` takes the default, as an omitted key does.
+        #[serde(
+            default = "default_style_props",
+            deserialize_with = "null_as_default_style_props"
+        )]
         style_props: Box<[String]>,
-        #[serde(default)]
+        /// An explicit JSON `null` is `false`, as an omitted key is.
+        #[serde(default, deserialize_with = "null_as_false")]
         compare_props: bool,
     },
 }
@@ -513,6 +522,23 @@ fn default_style_props() -> Box<[String]> {
         .iter()
         .map(|s| s.to_string())
         .collect()
+}
+
+/// `style_props`: `null` reads as the default (see
+/// [`null_as_default_size_tolerance_pct`]).
+fn null_as_default_style_props<'de, D>(d: D) -> Result<Box<[String]>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<Box<[String]>>::deserialize(d)?.unwrap_or_else(default_style_props))
+}
+
+/// `compare_props`: `null` reads as `false`, the default.
+fn null_as_false<'de, D>(d: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<bool>::deserialize(d)?.unwrap_or(false))
 }
 
 fn default_wcag_aa() -> WcagLevel {

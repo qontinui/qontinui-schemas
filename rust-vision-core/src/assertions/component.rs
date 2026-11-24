@@ -114,17 +114,6 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         unreachable!("not a component assertion: {a:?}")
     };
 
-    if !size_tolerance_pct.is_finite() || size_tolerance_pct < 0.0 {
-        return AssertionResult::unknown(
-            a,
-            UnknownCode::InputMissing,
-            format!(
-                "size_tolerance_pct {size_tolerance_pct} is not a finite non-negative \
-                 percentage, so the captures were not compared"
-            ),
-        );
-    }
-
     let Some(entry) = ctx.component_baselines.and_then(|m| m.get(&*baseline)) else {
         let detail = if ctx.component_baselines.is_none() {
             "no component baselines were supplied to the evaluator, so the in-situ render \
@@ -197,6 +186,15 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     // that could not run: with no finding, any of them makes the answer
     // unknown; with a finding, they are notes on the failure.
     let mut undecided: Vec<String> = Vec::new();
+    let tolerance = if size_tolerance_pct.is_finite() && size_tolerance_pct >= 0.0 {
+        Some(size_tolerance_pct)
+    } else {
+        undecided.push(format!(
+            "size not compared: invalid tolerance (size_tolerance_pct {size_tolerance_pct} \
+             is not a finite non-negative percentage)"
+        ));
+        None
+    };
     // Root geometry is what `size` measures and what turns root-relative node
     // rects into page coordinates for `clipped`; without it on a side, those
     // two checks cannot run, and the rest still do.
@@ -214,7 +212,8 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
     };
     // A capture with no node tree (or no root node) would pass with every
     // per-node check skipped, or fail with every node "missing": neither is
-    // an answer, so only the root-geometry checks run.
+    // an answer, so the per-node checks are skipped as undecided while `size`
+    // and `props_delta` still run.
     let has_root_node = |c: &ComponentCapture| c.nodes.iter().any(|n| n.path.is_empty());
     let missing_tree = |c: &ComponentCapture| {
         if c.nodes.is_empty() {
@@ -258,7 +257,7 @@ pub(super) fn evaluate(a: Assertion, ctx: &EvalContext<'_>) -> AssertionResult {
         }
     }
     let opts = DiffOptions {
-        size_tolerance_pct,
+        size_tolerance_pct: tolerance,
         style_props: &props,
         compare_props: props_ok,
         per_node: tree_ok,
@@ -327,7 +326,8 @@ fn kind_name(k: ComponentFindingKind) -> &'static str {
 }
 
 struct DiffOptions<'a> {
-    size_tolerance_pct: f64,
+    /// `None` when the requested tolerance was invalid: `size` is skipped.
+    size_tolerance_pct: Option<f64>,
     style_props: &'a [String],
     /// Compare props: requested AND both sides carry them.
     compare_props: bool,
@@ -349,13 +349,13 @@ fn diff(
     let mut findings = Vec::new();
     let mut notes = Vec::new();
 
-    if let Some((b_root, s_root)) = roots {
+    if let (Some((b_root, s_root)), Some(tol)) = (roots, opts.size_tolerance_pct) {
         size_check(
             base,
             in_situ,
             b_root,
             s_root,
-            opts.size_tolerance_pct,
+            tol,
             &mut findings,
             &mut notes,
         );
@@ -389,11 +389,13 @@ fn diff(
         props_check(base, in_situ, &mut findings);
     }
 
+    // Checks the SDK itself could not perform are checks this comparison
+    // could not run either: undecided, not mere notes.
     for n in &base.unknown_checks {
-        notes.push(format!("baseline capture: {n}"));
+        undecided.push(format!("baseline capture: {n}"));
     }
     for n in &in_situ.unknown_checks {
-        notes.push(format!("in-situ capture: {n}"));
+        undecided.push(format!("in-situ capture: {n}"));
     }
     (findings, notes)
 }
@@ -608,9 +610,12 @@ fn overflow_past<'c>(
     })
 }
 
-/// Whether an ancestor might clip on some axis (it is not `visible` on both).
+/// Whether an ancestor might clip on some axis: one axis clips (`hidden`,
+/// `clip`) or is unreported. A scroll container (`auto`, `scroll`, `overlay`)
+/// or a `visible` axis never clips.
 fn may_clip(anc: &ClipAncestor) -> bool {
-    !(anc.axis_x() == OverflowAxis::Visible && anc.axis_y() == OverflowAxis::Visible)
+    let might = |axis| matches!(axis, OverflowAxis::Clips | OverflowAxis::Unreported);
+    might(anc.axis_x()) || might(anc.axis_y())
 }
 
 /// How the baseline (isolated) render treated the node at a path the in-situ
@@ -669,12 +674,13 @@ fn baseline_clip(
 ///
 /// What cannot be decided is pushed to `undecided`, which makes the answer
 /// unknown when nothing else failed: a node extending past an ancestor whose
-/// overflow is unreported (absent or unrecognized), a clip ancestor with no
-/// rect on either side, an in-situ node with no bbox, and an in-situ clip
-/// whose baseline counterpart cannot be judged ([`baseline_clip`]). Only the
-/// topmost clipped (or noted, or undecided) node of a subtree is reported;
-/// the three kinds keep separate lists, so a scroll note never hides an
-/// undecided descendant.
+/// overflow is unreported (absent or unrecognized), an in-situ clip ancestor
+/// with no rect, an in-situ node with no bbox, and an in-situ clip whose
+/// baseline counterpart cannot be judged ([`baseline_clip`], which is where a
+/// baseline clip ancestor with no rect is consulted). Only the topmost clipped
+/// (or noted, or undecided) node of a subtree is reported, and each kind
+/// keeps its own list: a scroll note or an undecided node never hides a
+/// descendant that is definitely clipped or itself undecided.
 fn clip_check(
     base: &ComponentCapture,
     in_situ: &ComponentCapture,
@@ -684,15 +690,13 @@ fn clip_check(
     notes: &mut Vec<String>,
     undecided: &mut Vec<String>,
 ) {
-    for (side, c) in [("baseline", base), ("in-situ", in_situ)] {
-        for (i, anc) in c.clip_ancestors.iter().enumerate() {
-            if may_clip(anc) && anc.rect.filter(CaptureRect::is_finite).is_none() {
-                undecided.push(format!(
-                    "clipped not decided: {side} clip ancestor {i} ('{}') has no rect, so \
-                     whether it clips the component there is unknown",
-                    anc.descriptor
-                ));
-            }
+    for (i, anc) in in_situ.clip_ancestors.iter().enumerate() {
+        if may_clip(anc) && anc.rect.filter(CaptureRect::is_finite).is_none() {
+            undecided.push(format!(
+                "clipped not decided: in-situ clip ancestor {i} ('{}') has no rect, so \
+                 whether it clips the component there is unknown",
+                anc.descriptor
+            ));
         }
     }
     if in_situ.clip_ancestors.is_empty() {
@@ -701,6 +705,7 @@ fn clip_check(
     let b_nodes = by_path(base);
     let mut reported: Vec<String> = Vec::new();
     let mut undecided_paths: Vec<String> = Vec::new();
+    let mut baseline_undecided: Vec<String> = Vec::new();
     let mut scroll_noted: Vec<String> = Vec::new();
     let mut no_bbox: Vec<String> = Vec::new();
     let overflow = |anc: &ClipAncestor| {
@@ -755,12 +760,17 @@ fn clip_check(
         match baseline_clip(base, b_nodes.get(node.path.as_str()), b_root) {
             BaselineClip::Clipped => continue,
             BaselineClip::Undecided(why) => {
-                undecided.push(format!(
-                    "clipped not decided: <{}> at path '{}' extends past clip ancestor '{}' \
-                     in situ, but {why}",
-                    node.tag, node.path, anc.descriptor,
-                ));
-                reported.push(node.path.clone());
+                // Descendants are still judged: one definitely clipped below
+                // this node is a finding. Only a repeat undecided entry for
+                // the same subtree is suppressed.
+                if !below_any(&node.path, &baseline_undecided) {
+                    undecided.push(format!(
+                        "clipped not decided: <{}> at path '{}' extends past clip ancestor \
+                         '{}' in situ, but {why}",
+                        node.tag, node.path, anc.descriptor,
+                    ));
+                }
+                baseline_undecided.push(node.path.clone());
                 continue;
             }
             BaselineClip::NotClipped => {}
@@ -1557,9 +1567,14 @@ mod tests {
         for n in &mut situ.nodes {
             n.component_name = None;
         }
+        // Unreadable names alone skip only the name comparison, with a note.
+        let r = run(capture(page(), parent_of(page())), situ.clone());
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        // When the capture itself lists the check it could not perform, that
+        // check is undecided and the answer is unknown.
         situ.unknown_checks = vec!["componentName: unreadable (minified or redacted)".into()];
         let r = run(capture(page(), parent_of(page())), situ);
-        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+        assert_eq!(r.outcome, AssertionOutcome::Unknown, "{:?}", r.detail);
         let rep = report(&r);
         assert!(rep.findings.is_empty());
         assert!(
@@ -1932,11 +1947,82 @@ mod tests {
         );
         assert!(!kinds(&r).contains(&ComponentFindingKind::Clipped));
 
-        // A baseline node with no bbox cannot be judged either.
+        // A baseline root with no bbox cannot be judged either, but the
+        // undecided root does not hide its child "1", which is clipped in
+        // situ and definitely not in isolation: Failed, with the root noted.
         let mut base = capture(page(), parent_of(page()));
         base.nodes[0].bbox = None;
         let r = run(base, situ);
-        assert_input_missing(&r, "the node has no bbox in the baseline capture");
+        assert_eq!(r.outcome, AssertionOutcome::Failed, "{:?}", r.detail);
+        let rep = report(&r);
+        let clipped: Vec<&str> = rep
+            .findings
+            .iter()
+            .filter(|f| f.kind == ComponentFindingKind::Clipped)
+            .map(|f| f.path.as_str())
+            .collect();
+        assert_eq!(clipped, vec!["1"]);
+        assert!(
+            rep.unknown_checks.iter().any(|n| n.contains("at path ''")
+                && n.contains("the node has no bbox in the baseline capture")),
+            "{:?}",
+            rep.unknown_checks
+        );
+    }
+
+    fn rectless(x: &str, y: &str) -> ClipAncestor {
+        ClipAncestor {
+            descriptor: "div.rectless".to_string(),
+            overflow_x: Some(x.to_string()),
+            overflow_y: Some(y.to_string()),
+            rect: None,
+        }
+    }
+
+    #[test]
+    fn a_rectless_scroll_container_cannot_clip_and_passes() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.clip_ancestors = vec![rectless("auto", "scroll")];
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn a_rectless_baseline_ancestor_matters_only_when_judging_an_in_situ_clip() {
+        let mut base = capture(page(), parent_of(page()));
+        base.clip_ancestors = vec![rectless("hidden", "hidden")];
+        let r = run(base, capture(page(), parent_of(page())));
+        assert_eq!(r.outcome, AssertionOutcome::Passed, "{:?}", r.detail);
+    }
+
+    #[test]
+    fn a_captures_own_unknown_checks_make_an_otherwise_passing_result_unknown() {
+        let mut situ = capture(page(), parent_of(page()));
+        situ.unknown_checks = vec!["styles unreadable".into()];
+        let r = run(capture(page(), parent_of(page())), situ);
+        assert_input_missing(&r, "in-situ capture: styles unreadable");
+    }
+
+    #[test]
+    fn null_style_props_and_compare_props_take_their_defaults() {
+        let a: Assertion = serde_json::from_value(json!({
+            "type": "matches_isolated_render",
+            "component": "date-range-picker",
+            "baseline": NAME,
+            "style_props": null,
+            "compare_props": null,
+        }))
+        .expect("explicit nulls parse");
+        let Assertion::MatchesIsolatedRender {
+            style_props,
+            compare_props,
+            ..
+        } = a
+        else {
+            panic!()
+        };
+        assert_eq!(style_props, default_props());
+        assert!(!compare_props);
     }
 
     #[test]
@@ -1988,9 +2074,16 @@ mod tests {
                 capture(page(), parent_of(page())),
                 capture(page(), parent_of(page())),
             );
-            assert_eq!(r.outcome, AssertionOutcome::Unknown, "{tol}");
-            assert_eq!(r.code, Some(UnknownCode::InputMissing), "{tol}");
-            assert!(r.detail.unwrap().contains("size_tolerance_pct"));
+            assert_input_missing(&r, "size not compared: invalid tolerance");
+
+            // The other checks still run: a style delta fails.
+            let mut base = capture(page(), parent_of(page()));
+            let mut situ = capture(page(), parent_of(page()));
+            base.nodes[3].styles.insert("color".into(), "red".into());
+            situ.nodes[3].styles.insert("color".into(), "blue".into());
+            let r = run_with(&a, base, situ);
+            assert_eq!(r.outcome, AssertionOutcome::Failed, "{tol}: {:?}", r.detail);
+            assert_eq!(kinds(&r), vec![ComponentFindingKind::StyleDelta]);
         }
     }
 

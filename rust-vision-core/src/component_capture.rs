@@ -98,7 +98,9 @@ pub struct CaptureViewport {
 #[serde(rename_all = "camelCase")]
 pub struct CaptureRoot {
     /// The root element's border box. `None` (or non-finite) is a capture
-    /// with no geometry, which the assertion answers `unknown{input_missing}`.
+    /// with no root geometry: the assertion cannot run its `size` and
+    /// `clipped` checks, records them as undecided, and still runs the rest
+    /// (unknown only when nothing else fails).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbox: Option<CaptureRect>,
     /// The root's parent element's content box; `None` when the root has no
