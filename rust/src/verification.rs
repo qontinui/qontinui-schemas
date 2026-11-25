@@ -21,8 +21,6 @@
 //! - UUIDs are `String`s (wire-format), not `uuid::Uuid`.
 //! - `SuccessCriterion.criterion_type` serializes as `"type"` on the wire (the
 //!   field is renamed via `#[serde(rename = "type")]`).
-//! - `WorkerCoordinationMessage` uses the `{ "type": ..., "data": ... }`
-//!   externally-tagged envelope.
 //! - `WorkerSignal` uses `{ "signal": ..., "data": ... }` as its discriminator
 //!   pair — `signal` rather than `type` to avoid collision with other tagged
 //!   unions and to match the pre-extraction wire.
@@ -372,62 +370,6 @@ pub struct WorkerInstance {
     pub error_message: Option<String>,
 }
 
-/// Coordination message between workers.
-///
-/// Externally tagged as `{ "type": ..., "data": { ... } }` to match the
-/// pre-extraction wire.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", content = "data")]
-pub enum WorkerCoordinationMessage {
-    /// Worker completed work on a set of files.
-    #[serde(rename = "files_modified")]
-    FilesModified {
-        /// ID of the worker that modified the files.
-        worker_id: String,
-        /// Paths of the modified files.
-        files: Vec<String>,
-    },
-
-    /// Worker found an issue that may affect other workers.
-    #[serde(rename = "shared_finding")]
-    SharedFinding {
-        /// ID of the worker that made the finding.
-        worker_id: String,
-        /// The finding payload.
-        finding: Finding,
-    },
-
-    /// Worker is blocked waiting for another worker.
-    #[serde(rename = "blocked")]
-    Blocked {
-        /// ID of the blocked worker.
-        worker_id: String,
-        /// ID of the worker being waited on.
-        waiting_for: String,
-        /// Human-readable reason for the block.
-        reason: String,
-    },
-
-    /// Worker is ready for verification.
-    #[serde(rename = "ready_for_verification")]
-    ReadyForVerification {
-        /// ID of the worker that is ready.
-        worker_id: String,
-        /// Optional domain scope for the verification.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        domain: Option<String>,
-    },
-
-    /// Coordination signal to synchronize multiple workers.
-    #[serde(rename = "sync_point")]
-    SyncPoint {
-        /// IDs of the workers that should synchronize.
-        worker_ids: Vec<String>,
-        /// Human-readable reason for the sync point.
-        reason: String,
-    },
-}
-
 // ============================================================================
 // Worker signals & findings
 // ============================================================================
@@ -513,24 +455,6 @@ pub enum Confidence {
     Medium,
     /// Low confidence — speculative or weakly supported.
     Low,
-}
-
-// ============================================================================
-// Iteration control
-// ============================================================================
-
-/// Request to extend iterations after the max has been reached.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
-pub struct ExtendIterationsRequest {
-    /// Additional iterations to add.
-    #[serde(alias = "additional_iterations")]
-    pub additional_iterations: u32,
-
-    /// Optional guidance for the worker.
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "guidance")]
-    pub guidance: Option<String>,
 }
 
 // ============================================================================
