@@ -64,8 +64,9 @@ export interface OrchestrationLoopConfig {
    */
   supervisorPort: number;
   /**
-   * Target runner ID (for supervisor restart calls). If `None`, uses
-   * `"primary"`.
+   * Target runner ID, used ONLY by the dev-supervisor rebuild path. If
+   * `None`, it is resolved from the supervisor `/runners` list by
+   * `target_runner_port`; a plain restart never uses this id.
    */
   targetRunnerId?: string | null;
   /**
