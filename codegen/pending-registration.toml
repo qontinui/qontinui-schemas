@@ -61,31 +61,3 @@ type = "SessionFailure"
 runner_pr = "qontinui/qontinui-runner#2920"
 added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
-
-# The saved-tab-list layout types (schemas#300), awaiting runner#2750.
-# Renewed 2026-11-24 (first declared 2026-11-08, expired 2026-11-22): runner#2750
-# is still OPEN and MERGEABLE, its head a491608a registers all four types, and its
-# last commit is 2026-11-23, so the wait is live, not forgotten.
-[[pending]]
-type = "TerminalLayout"
-runner_pr = "qontinui/qontinui-runner#2750"
-added = 2026-11-24
-schemas_pr = "qontinui/qontinui-schemas#300"
-
-[[pending]]
-type = "TerminalLayoutPage"
-runner_pr = "qontinui/qontinui-runner#2750"
-added = 2026-11-24
-schemas_pr = "qontinui/qontinui-schemas#300"
-
-[[pending]]
-type = "TerminalLayoutRunner"
-runner_pr = "qontinui/qontinui-runner#2750"
-added = 2026-11-24
-schemas_pr = "qontinui/qontinui-schemas#300"
-
-[[pending]]
-type = "TerminalLayoutSession"
-runner_pr = "qontinui/qontinui-runner#2750"
-added = 2026-11-24
-schemas_pr = "qontinui/qontinui-schemas#300"
