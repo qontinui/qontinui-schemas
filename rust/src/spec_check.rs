@@ -25,7 +25,7 @@
 //!   cannot silently slip unrecognized fields past the schema.
 //! - Unit enums (`MatchOutcome`, `Confidence`, `MissReason`, `PolicyStatus`)
 //!   serialize as `snake_case` strings.
-//! - Internally-tagged enums (`AssertionOutcome`, `ConjunctRule`) carry
+//! - Internally-tagged enums (`SpecAssertionVerdict`, `ConjunctRule`) carry
 //!   their discriminator inline; field names use `snake_case` to match
 //!   the design context's policy DSL.
 //!
@@ -327,17 +327,22 @@ pub struct AssertionResult {
     /// Free-form category — `"layout"`, `"a11y"`, etc.
     pub category: String,
 
-    /// Pass / fail discriminator + payload.
-    pub outcome: AssertionOutcome,
+    /// Pass / fail / unknown discriminator + payload.
+    pub outcome: SpecAssertionVerdict,
 }
 
-/// Internally-tagged on `status` — `{ "status": "pass", "matched": {...} }`
-/// or `{ "status": "fail", "miss": {...} }`. Distinct from the
+/// Internally-tagged on `status` — `{ "status": "pass", "matched": {...} }`,
+/// `{ "status": "fail", "miss": {...} }` or
+/// `{ "status": "unknown", "code": "no_expectation" }`. Distinct from the
 /// worker-output `{ "type": ..., "data": ... }` envelope used elsewhere
 /// in the codebase.
+///
+/// Named `SpecAssertionVerdict` (it was `AssertionOutcome`) so the generated
+/// bindings' `AssertionOutcome` is the shared three-state
+/// [`crate::outcome::AssertionOutcome`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "status", rename_all = "snake_case")]
-pub enum AssertionOutcome {
+pub enum SpecAssertionVerdict {
     /// Assertion passed against the named matched element.
     Pass {
         /// The element that satisfied the assertion.
@@ -347,6 +352,15 @@ pub enum AssertionOutcome {
     Fail {
         /// Diagnostic detail.
         miss: AssertionMiss,
+    },
+    /// The assertion could NOT be evaluated — e.g. its criteria do not
+    /// parse, so there is no expectation to judge against. Not a failure:
+    /// nothing is known about whether the page satisfies it. Aggregates that
+    /// read this treat it as neither a pass nor a failure (a policy conjunct
+    /// it could decide is `Indeterminate`).
+    Unknown {
+        /// WHY it could not be evaluated.
+        code: crate::outcome::UnknownCode,
     },
 }
 
