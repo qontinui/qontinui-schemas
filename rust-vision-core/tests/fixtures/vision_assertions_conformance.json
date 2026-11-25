@@ -318,6 +318,20 @@
       "expected": {"outcome": "unknown", "code": "input_missing"}
     },
     {
+      "id": "text-fits-vertical-estimate-uses-the-measured-line-height-passes",
+      "kind": "text_fits_container",
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 16}, "text": "Save changes", "font_size_px": 16, "line_height_px": 16, "scroll_width_px": 120}]},
+      "assertion": {"type": "text_fits_container", "element": "label"},
+      "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "text-fits-vertical-estimate-box-shorter-than-the-measured-line-height-fails",
+      "kind": "text_fits_container",
+      "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 18}, "text": "Save changes", "line_height_px": 20, "scroll_width_px": 120}]},
+      "assertion": {"type": "text_fits_container", "element": "label"},
+      "expected": {"outcome": "failed", "code": null}
+    },
+    {
       "id": "text-fits-element-without-text-is-unknown",
       "kind": "text_fits_container",
       "snapshot": {"elements": [{"id": "label", "bbox": {"x": 0, "y": 0, "w": 200, "h": 20}, "scroll_width_px": 120, "scroll_height_px": 20}]},
@@ -836,6 +850,102 @@
       "snapshot": {"elements": [
         {"id": "card"},
         {"id": "badge", "bbox": {"x": 380, "y": 90, "w": 60, "h": 24}, "parent_id": "card"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-child-past-an-overflow-visible-parent-inside-its-grandparent-passes",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "card", "bbox": {"x": 100, "y": 100, "w": 300, "h": 200}},
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "parent_id": "card", "clips_children": false},
+        {"id": "badge", "bbox": {"x": 200, "y": 110, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "no-clipping-child-past-a-clipping-grandparent-through-an-overflow-visible-parent-fails",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "card", "bbox": {"x": 100, "y": 100, "w": 300, "h": 200}, "clips_children": true},
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "parent_id": "card", "clips_children": false},
+        {"id": "badge", "bbox": {"x": 380, "y": 90, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "failed", "code": null}
+    },
+    {
+      "id": "no-clipping-child-past-a-clipping-parent-fails",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "card", "bbox": {"x": 100, "y": 100, "w": 300, "h": 200}, "clips_children": true},
+        {"id": "badge", "bbox": {"x": 380, "y": 90, "w": 60, "h": 24}, "parent_id": "card"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "failed", "code": null}
+    },
+    {
+      "id": "no-clipping-only-ancestor-overflow-visible-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "clips_children": false},
+        {"id": "badge", "bbox": {"x": 200, "y": 110, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-child-past-an-overflow-visible-parent-inside-a-clipping-grandparent-passes",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "card", "bbox": {"x": 100, "y": 100, "w": 300, "h": 200}, "clips_children": true},
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "parent_id": "card", "clips_children": false},
+        {"id": "badge", "bbox": {"x": 200, "y": 110, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "passed", "code": null}
+    },
+    {
+      "id": "no-clipping-first-non-skipped-ancestor-without-a-bbox-compares-nothing-and-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "card", "bbox": {"x": 100, "y": 100, "w": 300, "h": 200}},
+        {"id": "wrapper", "parent_id": "card"},
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "parent_id": "wrapper", "clips_children": false},
+        {"id": "badge", "bbox": {"x": 380, "y": 90, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-unregistered-id-mid-chain-stops-the-walk-and-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "row", "bbox": {"x": 120, "y": 120, "w": 100, "h": 40}, "parent_id": "missing", "clips_children": false},
+        {"id": "badge", "bbox": {"x": 380, "y": 90, "w": 60, "h": 24}, "parent_id": "row"}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-cycle-back-to-the-child-compares-nothing-and-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "a", "bbox": {"x": 0, "y": 0, "w": 10, "h": 10}, "parent_id": "b"},
+        {"id": "b", "parent_id": "a", "clips_children": false}
+      ]},
+      "assertion": {"type": "no_clipping"},
+      "expected": {"outcome": "unknown", "code": "input_missing"}
+    },
+    {
+      "id": "no-clipping-repeated-parent-id-resolves-first-wins-and-is-unknown",
+      "kind": "no_clipping",
+      "snapshot": {"elements": [
+        {"id": "p"},
+        {"id": "p", "bbox": {"x": 0, "y": 0, "w": 10, "h": 10}},
+        {"id": "c", "bbox": {"x": 0, "y": 0, "w": 50, "h": 50}, "parent_id": "p"}
       ]},
       "assertion": {"type": "no_clipping"},
       "expected": {"outcome": "unknown", "code": "input_missing"}
