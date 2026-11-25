@@ -814,7 +814,7 @@ fn blockiness_within(
 /// one scale factor); a snapshot. Then, per image with text over it, the two
 /// frames must be registered over it ([`tc::registered`]); its text is
 /// unmeasured otherwise. Text over an unrendered image is skipped and
-/// disclosed; text reported not visible ITSELF (occluded, off-screen) is
+/// disclosed; text reported not visible ITSELF (occluded, off-screen, clipped) is
 /// unmeasured, so it never lets a pass through, and so is a rendered image
 /// with no box (what lies over it is unknown) and painted text with no box
 /// (whether it lies over an image is unknown); text over an OCCLUDED image
@@ -888,12 +888,12 @@ fn text_over_image(
         }
     }
     // Text over the image that may paint but cannot be attributed to the
-    // frame (occluded, off-screen, an unknown reason): unmeasured, so it
+    // frame (occluded, off-screen, clipped, an unknown reason): unmeasured, so it
     // blocks a pass as any other unmeasured text does. Text that paints
     // nothing never reaches this count (`paints_text` drops it first).
     if page.skipped_texts > 0 {
         unmeasured.push(format!(
-            "{} text element(s) over an image are reported not visible (occluded, off-screen, or \
+            "{} text element(s) over an image are reported not visible (occluded, off-screen, clipped, or \
              for a reason this crate does not read), so whether the frame shows their glyphs is \
              unknown",
             page.skipped_texts
