@@ -59,7 +59,7 @@
 //! is UNRENDERED ([`unrendered`]): its pixel values are unknown and it is
 //! left out of the page-wide checks. An element that may paint but cannot be
 //! attributed — reported `occluded` (a transparent overlay reads the same) or
-//! `off-screen`, `visible: false` with no reason, or wholly inside its
+//! `off-screen` or `clipped`, `visible: false` with no reason, or wholly inside its
 //! recorded occluder — is UNREADABLE ([`unreadable`]): a gap, so the analyzer
 //! degrades and page-wide checks answer unknown.
 
