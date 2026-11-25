@@ -544,11 +544,11 @@ class SpecCheckResult(BaseModel):
         ),
     ] = None
     specContentHash: Annotated[
-        str,
+        str | None,
         Field(
-            description='Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.'
+            description='Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.\nAbsent when the canonical hasher refused the document (a number RFC\n8785 cannot carry exactly); never a placeholder digest.'
         ),
-    ]
+    ] = None
     specVersion: Annotated[
         str, Field(description='IR document `version` field (currently `"1.0"`).')
     ]

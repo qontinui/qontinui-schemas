@@ -147,7 +147,8 @@ def _jcs(value: object) -> str:
     integers, booleans and null — and it REFUSES floats rather than emit a
     number formatting it has not implemented (JCS requires ECMAScript
     Number-to-String, which ``repr(float)`` does not match in general). The
-    Rust half uses ``serde_jcs``, the crate ``canonical_hash.rs`` hashes with.
+    Rust half is ``canonical_json`` in ``canonical_hash.rs``, which
+    sorts by UTF-16 code units like this one.
 
     - object keys sorted by UTF-16 code units (RFC 8785 §3.2.3);
     - no insignificant whitespace;

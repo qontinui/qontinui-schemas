@@ -70,8 +70,10 @@ export interface SpecCheckResult {
   snapshotSha256?: string | null;
   /**
    * Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.
+   * Absent when the canonical hasher refused the document (a number RFC
+   * 8785 cannot carry exactly); never a placeholder digest.
    */
-  specContentHash: string;
+  specContentHash?: string | null;
   /**
    * IR document `version` field (currently `"1.0"`).
    */

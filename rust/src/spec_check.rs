@@ -178,7 +178,12 @@ pub struct SpecCheckResult {
     pub snapshot_sha256: Option<String>,
 
     /// Hash of the spec IR document at evaluation time. `"sha256-<hex>"`.
-    pub spec_content_hash: String,
+    /// Absent when the canonical hasher refused the document (a number RFC
+    /// 8785 cannot carry exactly); never a placeholder digest. Two absent
+    /// hashes are not equal: a consumer comparing landed against pending IRs
+    /// must treat `None` as unknown, not as a match.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spec_content_hash: Option<String>,
 
     /// IR document `version` field (currently `"1.0"`).
     pub spec_version: String,

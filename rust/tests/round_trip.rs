@@ -9796,6 +9796,7 @@ const BOUNDED_READ_META_FIXTURES: [(&str, &str); 8] = [
 
 #[test]
 fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
+    use qontinui_types::canonical_hash::canonical_json;
     use qontinui_types::page::BoundedReadMeta;
     for (name, raw) in BOUNDED_READ_META_FIXTURES {
         let expected = raw.trim_end_matches('\n');
@@ -9803,7 +9804,7 @@ fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
         // comparison below would be against a spelling neither side emits.
         let as_value: Value = serde_json::from_str(raw).unwrap();
         assert_eq!(
-            serde_jcs::to_string(&as_value).unwrap(),
+            canonical_json(&as_value),
             expected,
             "{name}: fixture is not in JCS canonical form"
         );
@@ -9824,7 +9825,7 @@ fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
             "{name}: unexpected extra keys"
         );
         assert_eq!(
-            serde_jcs::to_string(&meta).unwrap(),
+            canonical_json(&serde_json::to_value(&meta).unwrap()),
             expected,
             "{name}: JCS bytes diverged after the round trip"
         );
@@ -9845,10 +9846,11 @@ fn bounded_read_meta_fixtures_roundtrip_to_identical_jcs_bytes() {
 /// exactly the `unavailable` and `ranked_not_pageable` fixtures.
 #[test]
 fn bounded_read_meta_fixtures_are_what_the_page_constructors_emit() {
+    use qontinui_types::canonical_hash::canonical_json;
     use qontinui_types::page::Page;
     let meta = Page::<()>::unavailable(20).meta();
     assert_eq!(
-        serde_jcs::to_string(&meta).unwrap(),
+        canonical_json(&serde_json::to_value(&meta).unwrap()),
         include_str!("../../tests/fixtures/bounded_read_meta_unavailable.json")
             .trim_end_matches('\n')
     );
@@ -9859,7 +9861,7 @@ fn bounded_read_meta_fixtures_are_what_the_page_constructors_emit() {
         "GET /api/v1/memory/records",
     );
     assert_eq!(
-        serde_jcs::to_string(&ranked.meta()).unwrap(),
+        canonical_json(&serde_json::to_value(ranked.meta()).unwrap()),
         include_str!("../../tests/fixtures/bounded_read_meta_ranked_not_pageable.json")
             .trim_end_matches('\n')
     );
