@@ -1,5 +1,41 @@
 # Changelog
 
+## [7.0.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.2.0...rust-v7.0.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vision-core:** element_above without paint-order evidence is unknown{hit_test_unmeasurable}
+* qontinui_types::verification::VerificationAgentContext and its TS/Python bindings are removed; they had no producer or consumer (coord finding 7c536351 item 1).
+* qontinui_types::verification no longer exports VerificationResult, DomainVerificationResult, IterationVerificationResults or TaskCompletionResult; qontinui_schemas.generated no longer exports their bindings, and @qontinui/shared-types no longer ships them under src/generated (no entry point ever re-exported them).
+
+### Features
+
+* declare dispatch_settable on each session work type ([ecac6bc](https://github.com/qontinui/qontinui-schemas/commit/ecac6bc2c9b28e087fc193f5562cc8bdd00e8eca))
+* delete the dead VerificationAgentContext DTO ([4c1d051](https://github.com/qontinui/qontinui-schemas/commit/4c1d05168f92e8ee2c3e7552c38b894219080518))
+* delete the orchestrator verifier's result DTOs ([92badbd](https://github.com/qontinui/qontinui-schemas/commit/92badbd052a1fae4ac0df1deb10210efa6d123df))
+* **journey:** EdgeOutcome::VerdictUnknown for an action whose own verdict was not stated ([f0302fa](https://github.com/qontinui/qontinui-schemas/commit/f0302fa0df2de2dae9f6366c38587dcebbee1c37))
+* **spawn-contract:** declare the harness built-in Agent-tool roles ([e153623](https://github.com/qontinui/qontinui-schemas/commit/e1536233af4b10e18c97ff3e6c41cec627615821))
+* **types:** freeze the ledger envelope v1 with a golden schema ([6f3c547](https://github.com/qontinui/qontinui-schemas/commit/6f3c5475a63d6f8737d383fce194a9e051f216c7))
+* **types:** measurement declaration grammar for .qontinui/measurements.toml ([9178ace](https://github.com/qontinui/qontinui-schemas/commit/9178ace9dfc546f898dc5d9449191c65520ca739))
+* **vision-core:** hit_test_unmeasurable, and element_above answers it ([39a64bc](https://github.com/qontinui/qontinui-schemas/commit/39a64bcba20dfde940b6aea201e9c54e1cf6fa79))
+
+
+### Bug Fixes
+
+* merge_train glossary lists what actually holds a green PR (glossary v3) ([c9014c6](https://github.com/qontinui/qontinui-schemas/commit/c9014c63f00ef40a879ad1ca1b932d7756a69f94))
+* merge_train glossary names an unknown main as a hold too ([3b6e951](https://github.com/qontinui/qontinui-schemas/commit/3b6e9518df987cc574c2e0cf6b62dbdfde2b5b8c))
+* name the escalate-review lane in merge_shepherd; tighten missing-field test ([ee717e3](https://github.com/qontinui/qontinui-schemas/commit/ee717e3baa2ed63ab732bc2fb91bad58e7d0bb4d))
+* **spawn-contract:** fold case in the built-in/kind collision check ([8088f9f](https://github.com/qontinui/qontinui-schemas/commit/8088f9f4b8b6943d9cce450dbebc81c86f5a6b07))
+* **types:** bound envelope integers and make its patterns newline-proof ([ebeeb4b](https://github.com/qontinui/qontinui-schemas/commit/ebeeb4ba462d24ba27a8d7ec1139d607a00d306c))
+* **types:** enforce the ledger engine checker's declared rules and correct the ajv recipe docs ([3558adb](https://github.com/qontinui/qontinui-schemas/commit/3558adb14a208dec00854cbfab66d6277befdde2))
+* **types:** gate measurement_decl behind a feature and tighten its parser ([d1826d8](https://github.com/qontinui/qontinui-schemas/commit/d1826d8fb46ff479abd4b93e41302e3b1a90f30f))
+* **types:** hash the ledger chain over a genuine RFC 8785 canonicalizer ([d6c14fe](https://github.com/qontinui/qontinui-schemas/commit/d6c14fe018ed1d22256e860ce740386b22146ef1))
+* **types:** make the envelope chain hash reproducible across languages ([89a7672](https://github.com/qontinui/qontinui-schemas/commit/89a7672c514f33bc146cd3562927888749bd9e16))
+* **types:** make the frozen ledger envelope schema carry validate()'s rules ([50f3729](https://github.com/qontinui/qontinui-schemas/commit/50f37298130e00337e73129dba567d9c38cca557))
+* **types:** pin the ledger checker's ajv to NODE_PATH by resolved path and count each refusal once ([28b36ca](https://github.com/qontinui/qontinui-schemas/commit/28b36ca504dbf44bc93b90853c7ec5bd48241334))
+* **types:** satisfy clippy needless_bool on Rust 1.100 in JourneyFilter::keeps ([a334b16](https://github.com/qontinui/qontinui-schemas/commit/a334b16ffb2c5744abe0c9b3a7131e6d23036f12))
+
 ## [6.2.0](https://github.com/qontinui/qontinui-schemas/compare/rust-v6.1.0...rust-v6.2.0) (2026-11-10)
 
 
