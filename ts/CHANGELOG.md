@@ -1,5 +1,28 @@
 # Changelog
 
+## [4.0.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v3.1.0...ts-v4.0.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vision-core:** element_above without paint-order evidence is unknown{hit_test_unmeasurable}
+* qontinui_types::verification::VerificationAgentContext and its TS/Python bindings are removed; they had no producer or consumer (coord finding 7c536351 item 1).
+* qontinui_types::verification no longer exports VerificationResult, DomainVerificationResult, IterationVerificationResults or TaskCompletionResult; qontinui_schemas.generated no longer exports their bindings, and @qontinui/shared-types no longer ships them under src/generated (no entry point ever re-exported them).
+
+### Features
+
+* delete the dead VerificationAgentContext DTO ([4c1d051](https://github.com/qontinui/qontinui-schemas/commit/4c1d05168f92e8ee2c3e7552c38b894219080518))
+* delete the orchestrator verifier's result DTOs ([92badbd](https://github.com/qontinui/qontinui-schemas/commit/92badbd052a1fae4ac0df1deb10210efa6d123df))
+* **journey:** EdgeOutcome::VerdictUnknown for an action whose own verdict was not stated ([f0302fa](https://github.com/qontinui/qontinui-schemas/commit/f0302fa0df2de2dae9f6366c38587dcebbee1c37))
+* **types:** restore the cli_session bindings for runner[#2920](https://github.com/qontinui/qontinui-schemas/issues/2920) ([b64fdb1](https://github.com/qontinui/qontinui-schemas/commit/b64fdb1837e498152a191e8dff2f391afb1497a0))
+* **vision-core:** hit_test_unmeasurable, and element_above answers it ([39a64bc](https://github.com/qontinui/qontinui-schemas/commit/39a64bcba20dfde940b6aea201e9c54e1cf6fa79))
+
+
+### Bug Fixes
+
+* merge_train glossary lists what actually holds a green PR (glossary v3) ([c9014c6](https://github.com/qontinui/qontinui-schemas/commit/c9014c63f00ef40a879ad1ca1b932d7756a69f94))
+* merge_train glossary names an unknown main as a hold too ([3b6e951](https://github.com/qontinui/qontinui-schemas/commit/3b6e9518df987cc574c2e0cf6b62dbdfde2b5b8c))
+
 ## [3.1.0](https://github.com/qontinui/qontinui-schemas/compare/ts-v3.0.0...ts-v3.1.0) (2026-11-09)
 
 
