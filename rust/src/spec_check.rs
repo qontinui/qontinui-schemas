@@ -716,6 +716,37 @@ mod tests {
     use super::*;
 
     // ========================================================================
+    // SpecAssertionVerdict wire shape
+    // ========================================================================
+
+    #[test]
+    fn spec_assertion_verdict_unknown_round_trips_its_documented_wire_form() {
+        let verdict = SpecAssertionVerdict::Unknown {
+            code: crate::outcome::UnknownCode::NoExpectation,
+        };
+        let json = serde_json::to_value(&verdict).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({ "status": "unknown", "code": "no_expectation" })
+        );
+        let back: SpecAssertionVerdict = serde_json::from_value(json).expect("deserialize");
+        assert!(matches!(
+            back,
+            SpecAssertionVerdict::Unknown {
+                code: crate::outcome::UnknownCode::NoExpectation
+            }
+        ));
+    }
+
+    #[test]
+    fn spec_assertion_verdict_unknown_without_a_code_is_refused() {
+        let refused = serde_json::from_value::<SpecAssertionVerdict>(
+            serde_json::json!({ "status": "unknown" }),
+        );
+        assert!(refused.is_err(), "an unknown verdict must name its code");
+    }
+
+    // ========================================================================
     // Threshold & Classification tests
     // ========================================================================
 
