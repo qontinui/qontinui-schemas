@@ -893,8 +893,9 @@ pub struct AssertReport {
     /// Assertions that were EVALUATED and VIOLATED. Before the tri-state
     /// landed this counted `unknown` too, which made a suite whose operands
     /// were simply absent from the snapshot read as a page full of layout
-    /// bugs. The gate is unchanged — `all_passed` is still
-    /// `failed + unknown == 0` — only the attribution is now honest.
+    /// bugs. The gate is `all_passed`, which is `verdict.outcome == passed`,
+    /// not `failed + unknown == 0`: an empty assertion list has
+    /// `failed + unknown == 0` and still does not pass (it exits 3).
     failed: usize,
     /// Assertions that could NOT be evaluated: a missing operand, a
     /// measurement field the producer does not populate, an unregistered
