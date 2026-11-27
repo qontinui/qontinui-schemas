@@ -62,21 +62,21 @@ runner_pr = "qontinui/qontinui-runner#2920"
 added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
 
-# The shared three-state outcome (plan 2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass Phase 1b/1c; schemas#355 supersedes #308 and #291), awaiting runner#2811.
+# The shared three-state outcome (plan 2026-11-06-no-verification-instrument-reads-an-absence-as-a-pass Phase 1b/1c; schemas#355 supersedes #308 and #291), awaiting runner#3308 (which supersedes runner#2811 and #2712).
 [[pending]]
 type = "FoldedOutcome"
-runner_pr = "qontinui/qontinui-runner#2811"
+runner_pr = "qontinui/qontinui-runner#3308"
 added = 2026-11-26
 schemas_pr = "qontinui/qontinui-schemas#355"
 
 [[pending]]
 type = "OutcomeCounts"
-runner_pr = "qontinui/qontinui-runner#2811"
+runner_pr = "qontinui/qontinui-runner#3308"
 added = 2026-11-26
 schemas_pr = "qontinui/qontinui-schemas#355"
 
 [[pending]]
 type = "SpecAssertionVerdict"
-runner_pr = "qontinui/qontinui-runner#2811"
+runner_pr = "qontinui/qontinui-runner#3308"
 added = 2026-11-26
 schemas_pr = "qontinui/qontinui-schemas#355"
