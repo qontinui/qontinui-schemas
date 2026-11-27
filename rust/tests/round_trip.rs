@@ -80,7 +80,7 @@ fn schedule_expression_condition_roundtrips() {
 }
 
 // ============================================================================
-// Scheduler — ScheduledTaskType (all seven variants, internally tagged with
+// Scheduler — ScheduledTaskType (all eight variants, internally tagged with
 // `task_type`)
 // ============================================================================
 
@@ -310,6 +310,138 @@ fn scheduled_task_type_remote_agent_keeps_explicit_effort_values() {
         _ => panic!("wrong variant"),
     }
     assert_eq!(serde_json::to_string(&t).unwrap(), unlisted);
+}
+
+#[test]
+fn scheduled_task_type_command_tail_roundtrips() {
+    let t = ScheduledTaskType::Command {
+        program: "bash".to_string(),
+        args: vec![
+            "scripts/sweep.sh".to_string(),
+            "--mode".to_string(),
+            "two words".to_string(),
+        ],
+        working_directory: Some("/repo".to_string()),
+        timeout_seconds: Some(900),
+        output: CommandOutput::Tail { bytes: 4096 },
+        detach: false,
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    assert_eq!(
+        json,
+        concat!(
+            r#"{"task_type":"Command","program":"bash","#,
+            r#""args":["scripts/sweep.sh","--mode","two words"],"#,
+            r#""working_directory":"/repo","timeout_seconds":900,"#,
+            r#""output":{"type":"Tail","bytes":4096},"detach":false}"#,
+        )
+    );
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    match back {
+        ScheduledTaskType::Command {
+            program,
+            args,
+            output,
+            detach,
+            ..
+        } => {
+            assert_eq!(program, "bash");
+            // One argv entry per element: "two words" is never split.
+            assert_eq!(args.len(), 3);
+            assert_eq!(args[2], "two words");
+            assert_eq!(output, CommandOutput::Tail { bytes: 4096 });
+            assert!(!detach);
+        }
+        _ => panic!("wrong variant"),
+    }
+}
+
+#[test]
+fn scheduled_task_type_command_discard_detached_roundtrips() {
+    let t = ScheduledTaskType::Command {
+        program: "/usr/local/bin/terraform".to_string(),
+        args: vec!["plan".to_string()],
+        working_directory: None,
+        timeout_seconds: None,
+        output: CommandOutput::Discard,
+        detach: true,
+    };
+    let json = serde_json::to_string(&t).unwrap();
+    assert_eq!(
+        json,
+        concat!(
+            r#"{"task_type":"Command","program":"/usr/local/bin/terraform","#,
+            r#""args":["plan"],"output":{"type":"Discard"},"detach":true}"#,
+        )
+    );
+    let back: ScheduledTaskType = serde_json::from_str(&json).unwrap();
+    assert_eq!(json, serde_json::to_string(&back).unwrap());
+    match back {
+        ScheduledTaskType::Command { output, detach, .. } => {
+            assert_eq!(output, CommandOutput::Discard);
+            assert!(detach);
+        }
+        _ => panic!("wrong variant"),
+    }
+}
+
+#[test]
+fn scheduled_task_type_command_defaults_when_omitted() {
+    // Only the required `program`: every other field takes its default.
+    let min = r#"{"task_type":"Command","program":"true"}"#;
+    let t: ScheduledTaskType = serde_json::from_str(min).unwrap();
+    match &t {
+        ScheduledTaskType::Command {
+            program,
+            args,
+            working_directory,
+            timeout_seconds,
+            output,
+            detach,
+        } => {
+            assert_eq!(program, "true");
+            assert!(args.is_empty());
+            assert!(working_directory.is_none());
+            // None means COMMAND_DEFAULT_TIMEOUT_SECONDS at execution.
+            assert!(timeout_seconds.is_none());
+            assert_eq!(COMMAND_DEFAULT_TIMEOUT_SECONDS, 3600);
+            assert_eq!(
+                *output,
+                CommandOutput::Tail {
+                    bytes: CommandOutput::DEFAULT_TAIL_BYTES
+                }
+            );
+            assert_eq!(CommandOutput::DEFAULT_TAIL_BYTES, 2048);
+            assert_eq!(CommandOutput::MAX_TAIL_BYTES, 4096);
+            assert!(!detach);
+        }
+        _ => panic!("wrong variant"),
+    }
+    // None / empty fields stay off the wire; the defaulted `output` and
+    // `detach` are written explicitly, so a stored row never depends on a
+    // default that might later change.
+    assert_eq!(
+        serde_json::to_string(&t).unwrap(),
+        r#"{"task_type":"Command","program":"true","output":{"type":"Tail","bytes":2048},"detach":false}"#
+    );
+    assert_eq!(
+        CommandOutput::default(),
+        CommandOutput::Tail { bytes: 2048 }
+    );
+
+    // `program` is required.
+    assert!(serde_json::from_str::<ScheduledTaskType>(r#"{"task_type":"Command"}"#).is_err());
+    // `args` is an argv array, never a shell string.
+    assert!(serde_json::from_str::<ScheduledTaskType>(
+        r#"{"task_type":"Command","program":"bash","args":"-c true"}"#
+    )
+    .is_err());
+    // A Tail output must say how many bytes to keep.
+    assert!(serde_json::from_str::<ScheduledTaskType>(
+        r#"{"task_type":"Command","program":"true","output":{"type":"Tail"}}"#
+    )
+    .is_err());
 }
 
 // ============================================================================

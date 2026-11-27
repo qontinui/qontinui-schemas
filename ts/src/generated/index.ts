@@ -74,6 +74,7 @@ export type { CheckType } from './CheckType';
 export type { CliProfile } from './CliProfile';
 export type { CodeExecutionStep } from './CodeExecutionStep';
 export type { CommandMode } from './CommandMode';
+export type { CommandOutput } from './CommandOutput';
 export type { CommandStep } from './CommandStep';
 export type { CommandStepPhase } from './CommandStepPhase';
 export type { CompletenessVerdict } from './CompletenessVerdict';

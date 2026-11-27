@@ -6,6 +6,7 @@
  */
 
 import type { CatchUpPolicy } from "./CatchUpPolicy";
+import type { CommandOutput } from "./CommandOutput";
 import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
 import type { ConditionStatus } from "./ConditionStatus";
 import type { IdleCondition } from "./IdleCondition";
