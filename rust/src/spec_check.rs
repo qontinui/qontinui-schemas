@@ -355,9 +355,11 @@ pub enum SpecAssertionVerdict {
     },
     /// The assertion could NOT be evaluated — e.g. its criteria do not
     /// parse, so there is no expectation to judge against. Not a failure:
-    /// nothing is known about whether the page satisfies it. Aggregates that
-    /// read this treat it as neither a pass nor a failure (a policy conjunct
-    /// it could decide is `Indeterminate`).
+    /// nothing is known about whether the page satisfies it. The count-based
+    /// policy conjuncts (all-pass, max-failures, failure-rate) count it apart
+    /// from decided failures (a conjunct it could decide is `Indeterminate`)
+    /// and severity counts leave it out; the pass-only rates and match
+    /// outcomes count it as not passed.
     Unknown {
         /// WHY it could not be evaluated.
         code: crate::outcome::UnknownCode,
