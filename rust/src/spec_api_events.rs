@@ -123,6 +123,13 @@ pub enum SpecApiEvent {
         page_id: String,
         failing_assertion_id: String,
         failing_state_id: String,
+        /// Which verdict put `failing_assertion_id` there: `"fail"` (the
+        /// page was judged and did not satisfy it) or `"unknown"` (it could
+        /// not be evaluated — a red from unknowns alone names one). `""` when
+        /// no assertion is named. Absent from an older emitter, so it
+        /// deserializes as `""`: read that as UNKNOWN, never as `"fail"`.
+        #[serde(default)]
+        failing_assertion_verdict: String,
         snapshot_id: String,
         at_ms: u64,
     },

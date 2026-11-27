@@ -157,7 +157,9 @@ impl std::fmt::Display for ClassificationStatus {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct SpecCheckResult {
-    /// v1 = 1. Missing on the wire (pre-versioned persisted rows) → 0.
+    /// v1 = 1; v2 = 2 adds the `unknown` assertion verdict
+    /// ([`SpecAssertionVerdict::Unknown`]). Missing on the wire
+    /// (pre-versioned persisted rows) → 0.
     #[serde(default = "default_result_schema_version")]
     pub result_schema_version: u32,
 
