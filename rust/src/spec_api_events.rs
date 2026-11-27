@@ -125,9 +125,11 @@ pub enum SpecApiEvent {
         failing_state_id: String,
         /// Which verdict put `failing_assertion_id` there: `"fail"` (the
         /// page was judged and did not satisfy it) or `"unknown"` (it could
-        /// not be evaluated — a red from unknowns alone names one). `""` when
-        /// no assertion is named. Absent from an older emitter, so it
-        /// deserializes as `""`: read that as UNKNOWN, never as `"fail"`.
+        /// not be evaluated — a red from unknowns alone names one). `""` has
+        /// two causes, told apart by `failing_assertion_id`: with an empty
+        /// id, no assertion is named; with a non-empty id, the event came
+        /// from an older emitter that predates this field (it deserializes
+        /// as `""`), so the verdict is UNKNOWN, never `"fail"`.
         #[serde(default)]
         failing_assertion_verdict: String,
         snapshot_id: String,
