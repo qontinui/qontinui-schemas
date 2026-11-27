@@ -49,7 +49,9 @@ export interface SpecCheckResult {
    */
   pageId: string;
   /**
-   * v1 = 1. Missing on the wire (pre-versioned persisted rows) → 0.
+   * v1 = 1; v2 = 2 adds the `unknown` assertion verdict
+   * ([`SpecAssertionVerdict::Unknown`]). Missing on the wire
+   * (pre-versioned persisted rows) → 0.
    */
   resultSchemaVersion: number;
   /**
