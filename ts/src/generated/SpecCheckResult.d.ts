@@ -6,7 +6,6 @@
  */
 
 import type { AssertionMiss } from "./AssertionMiss";
-import type { AssertionOutcome } from "./AssertionOutcome";
 import type { AssertionResult } from "./AssertionResult";
 import type { AssertionSeverityCounts } from "./AssertionSeverityCounts";
 import type { BridgeFingerprint } from "./BridgeFingerprint";
@@ -16,9 +15,11 @@ import type { MatchOutcome } from "./MatchOutcome";
 import type { MatchedElement } from "./MatchedElement";
 import type { MissReason } from "./MissReason";
 import type { RecommendedState } from "./RecommendedState";
+import type { SpecAssertionVerdict } from "./SpecAssertionVerdict";
 import type { SpecCheckConfidence } from "./SpecCheckConfidence";
 import type { SpecCheckSummary } from "./SpecCheckSummary";
 import type { StateMatchResult } from "./StateMatchResult";
+import type { UnknownCode } from "./UnknownCode";
 
 /**
  * Result of evaluating one or more page specs against a bridge snapshot.
@@ -48,7 +49,9 @@ export interface SpecCheckResult {
    */
   pageId: string;
   /**
-   * v1 = 1. Missing on the wire (pre-versioned persisted rows) → 0.
+   * v1 = 1; v2 = 2 adds the `unknown` assertion verdict
+   * ([`SpecAssertionVerdict::Unknown`]). Missing on the wire
+   * (pre-versioned persisted rows) → 0.
    */
   resultSchemaVersion: number;
   /**

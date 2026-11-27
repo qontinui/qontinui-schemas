@@ -25,7 +25,7 @@
 //!   cannot silently slip unrecognized fields past the schema.
 //! - Unit enums (`MatchOutcome`, `Confidence`, `MissReason`, `PolicyStatus`)
 //!   serialize as `snake_case` strings.
-//! - Internally-tagged enums (`AssertionOutcome`, `ConjunctRule`) carry
+//! - Internally-tagged enums (`SpecAssertionVerdict`, `ConjunctRule`) carry
 //!   their discriminator inline; field names use `snake_case` to match
 //!   the design context's policy DSL.
 //!
@@ -157,7 +157,9 @@ impl std::fmt::Display for ClassificationStatus {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct SpecCheckResult {
-    /// v1 = 1. Missing on the wire (pre-versioned persisted rows) → 0.
+    /// v1 = 1; v2 = 2 adds the `unknown` assertion verdict
+    /// ([`SpecAssertionVerdict::Unknown`]). Missing on the wire
+    /// (pre-versioned persisted rows) → 0.
     #[serde(default = "default_result_schema_version")]
     pub result_schema_version: u32,
 
@@ -327,17 +329,22 @@ pub struct AssertionResult {
     /// Free-form category — `"layout"`, `"a11y"`, etc.
     pub category: String,
 
-    /// Pass / fail discriminator + payload.
-    pub outcome: AssertionOutcome,
+    /// Pass / fail / unknown discriminator + payload.
+    pub outcome: SpecAssertionVerdict,
 }
 
-/// Internally-tagged on `status` — `{ "status": "pass", "matched": {...} }`
-/// or `{ "status": "fail", "miss": {...} }`. Distinct from the
+/// Internally-tagged on `status` — `{ "status": "pass", "matched": {...} }`,
+/// `{ "status": "fail", "miss": {...} }` or
+/// `{ "status": "unknown", "code": "no_expectation" }`. Distinct from the
 /// worker-output `{ "type": ..., "data": ... }` envelope used elsewhere
 /// in the codebase.
+///
+/// Named `SpecAssertionVerdict` (it was `AssertionOutcome`) so the generated
+/// bindings' `AssertionOutcome` is the shared three-state
+/// [`crate::outcome::AssertionOutcome`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "status", rename_all = "snake_case")]
-pub enum AssertionOutcome {
+pub enum SpecAssertionVerdict {
     /// Assertion passed against the named matched element.
     Pass {
         /// The element that satisfied the assertion.
@@ -347,6 +354,17 @@ pub enum AssertionOutcome {
     Fail {
         /// Diagnostic detail.
         miss: AssertionMiss,
+    },
+    /// The assertion could NOT be evaluated — e.g. its criteria do not
+    /// parse, so there is no expectation to judge against. Not a failure:
+    /// nothing is known about whether the page satisfies it. The count-based
+    /// policy conjuncts (all-pass, max-failures, failure-rate) count it apart
+    /// from decided failures (a conjunct it could decide is `Indeterminate`)
+    /// and severity counts leave it out; the pass-only rates and match
+    /// outcomes count it as not passed.
+    Unknown {
+        /// WHY it could not be evaluated.
+        code: crate::outcome::UnknownCode,
     },
 }
 
@@ -700,6 +718,37 @@ pub enum PolicyStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    // SpecAssertionVerdict wire shape
+    // ========================================================================
+
+    #[test]
+    fn spec_assertion_verdict_unknown_round_trips_its_documented_wire_form() {
+        let verdict = SpecAssertionVerdict::Unknown {
+            code: crate::outcome::UnknownCode::NoExpectation,
+        };
+        let json = serde_json::to_value(&verdict).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({ "status": "unknown", "code": "no_expectation" })
+        );
+        let back: SpecAssertionVerdict = serde_json::from_value(json).expect("deserialize");
+        assert!(matches!(
+            back,
+            SpecAssertionVerdict::Unknown {
+                code: crate::outcome::UnknownCode::NoExpectation
+            }
+        ));
+    }
+
+    #[test]
+    fn spec_assertion_verdict_unknown_without_a_code_is_refused() {
+        let refused = serde_json::from_value::<SpecAssertionVerdict>(
+            serde_json::json!({ "status": "unknown" }),
+        );
+        assert!(refused.is_err(), "an unknown verdict must name its code");
+    }
 
     // ========================================================================
     // Threshold & Classification tests

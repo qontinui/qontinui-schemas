@@ -81,6 +81,19 @@ export type SpecApiEvent =
       app_id: string;
       at_ms: number;
       failing_assertion_id: string;
+      /**
+       * Which verdict put `failing_assertion_id` there: `"fail"` (the
+       * page was judged and did not satisfy it) or `"unknown"` (it could
+       * not be evaluated — a red from unknowns alone names one). `""` has
+       * two causes, told apart by `failing_assertion_id`: with an empty
+       * id, no assertion is named; with a non-empty id, the event came
+       * from an older emitter that predates this field, so the verdict is
+       * UNKNOWN, never `"fail"`. serde and pydantic readers default the
+       * absent field to `""`; a raw-JSON reader, such as TypeScript over
+       * SSE, sees it absent (despite its generated type) and must read
+       * absent as `""`.
+       */
+      failing_assertion_verdict: string;
       failing_state_id: string;
       page_id: string;
       proposal_id: string;

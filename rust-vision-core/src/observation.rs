@@ -89,8 +89,8 @@ use crate::analyzers::Analyzer;
 // ---------------------------------------------------------------------------
 
 /// WHY a producer could not answer. A closed vocabulary: an agent branches on
-/// the code, and the human-readable [`UnknownInfo::detail`] is never the only
-/// carrier of the reason.
+/// the code, and a human-readable detail (`UnknownInfo::detail` in
+/// vision-core) is never the only carrier of the reason.
 ///
 /// Adding a member is a wire change for every consumer (runner, ui-bridge,
 /// ui-bridge-mcp); the diagnostic-code registry name of each is
