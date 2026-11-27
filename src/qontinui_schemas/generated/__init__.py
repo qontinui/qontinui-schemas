@@ -76,6 +76,7 @@ from .per_type.check_type import CheckType
 from .per_type.cli_profile import CliProfile
 from .per_type.code_execution_step import CodeExecutionStep
 from .per_type.command_mode import CommandMode
+from .per_type.command_output import CommandOutput
 from .per_type.command_step import CommandStep
 from .per_type.command_step_phase import CommandStepPhase
 from .per_type.completeness_verdict import CompletenessVerdict
@@ -704,6 +705,7 @@ __all__ = [
     "CliProfile",
     "CodeExecutionStep",
     "CommandMode",
+    "CommandOutput",
     "CommandStep",
     "CommandStepPhase",
     "CompletenessVerdict",

@@ -25,7 +25,8 @@ export interface TaskExecutionRecord {
    */
   endedAt?: string | null;
   /**
-   * Error message if the execution failed.
+   * Error message of a failed run, or a note on a successful one (a
+   * detached `Command`'s launch note).
    */
   errorMessage?: string | null;
   /**

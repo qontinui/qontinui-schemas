@@ -61,3 +61,12 @@ type = "SessionFailure"
 runner_pr = "qontinui/qontinui-runner#2920"
 added = 2026-11-24
 schemas_pr = "qontinui/qontinui-schemas#327"
+
+# ScheduledTaskType::Command's output policy (plan
+# 2026-09-13-move-fleet-scheduling-into-qontinui Phase 1); registered by the
+# runner half, qontinui-runner#3304.
+[[pending]]
+type = "CommandOutput"
+runner_pr = "qontinui/qontinui-runner#3304"
+added = 2026-11-27
+schemas_pr = "qontinui/qontinui-schemas#356"

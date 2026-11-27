@@ -5,6 +5,7 @@
  * `qontinui-runner/src-tauri/scripts/generate_types.sh`.
  */
 
+import type { CommandOutput } from "./CommandOutput";
 import type { McpConnectionRef } from "./McpConnectionRef";
 
 /**
@@ -160,6 +161,50 @@ export type ScheduledTaskType =
       /**
        * Working directory for the command. `None` = the runner's project
        * root.
+       */
+      working_directory?: string | null;
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Arguments passed to `program`, one element per argv entry, with no
+       * shell splitting or expansion. Empty = no arguments.
+       */
+      args?: string[];
+      /**
+       * Launch the child detached from the runner, so it outlives the
+       * runner's process-lifetime grouping, and record the run as
+       * launched rather than waiting for its exit (so `output` and
+       * `timeout_seconds` do not apply). Defaults to `false`.
+       *
+       * **Linux systemd caveat:** a runner run as a systemd unit with the
+       * default `KillMode=control-group` kills a detached child on a
+       * service stop or restart. `setsid` leaves the runner's session and
+       * process group, not the unit's cgroup, so there the child does NOT
+       * outlive the runner's service.
+       */
+      detach: boolean;
+      /**
+       * What happens to the child's output. Defaults to
+       * `Tail { bytes: 2048 }` when absent.
+       */
+      output?: CommandOutput & {};
+      /**
+       * The program to exec: a bare name resolved on the runner's `PATH`,
+       * or an absolute path. Must be non-empty.
+       */
+      program: string;
+      task_type: "Command";
+      /**
+       * Wall-clock timeout in seconds. `None` = 3600 s (one hour; see
+       * [`COMMAND_DEFAULT_TIMEOUT_SECONDS`]). On timeout the runner kills
+       * the child's whole process tree, not only the direct child.
+       */
+      timeout_seconds?: number | null;
+      /**
+       * Working directory for the child. `None` = the runner's project
+       * root. Stored as a string (not `PathBuf`) to keep this crate
+       * JSON-Schema-friendly.
        */
       working_directory?: string | null;
       [k: string]: unknown;

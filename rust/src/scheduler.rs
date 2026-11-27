@@ -357,6 +357,112 @@ pub enum ScheduledTaskType {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeout_seconds: Option<u64>,
     },
+    /// Exec a program directly (no Claude session, no shell). The recorded
+    /// outcome is the program's exit status: success iff exit code 0; a
+    /// timeout, a spawn failure and a policy denial are failures.
+    ///
+    /// **Argv, never a shell string.** `program` is exec'd with `args` as its
+    /// argument vector exactly as given: no `sh -c`, `cmd /C` or PowerShell
+    /// sits in between, so there is no quoting, globbing, variable expansion,
+    /// redirection or piping, and no guessing which shell a string was meant
+    /// for. Wrap the call in an explicit interpreter yourself (e.g.
+    /// `program: "bash", args: ["-c", "..."]`) when you want shell syntax.
+    /// Contrast [`ScheduledTaskType::Script`], which runs a shell command
+    /// line.
+    ///
+    /// **Windows resolves a bare `program` name to an `.exe` only.** Rust's
+    /// process spawn does not try `.cmd` / `.bat` the way a shell does, so a
+    /// bare `npm` or `yarn` is not found there. Use `program: "cmd"` with
+    /// `args: ["/C", ...]` for a batch script, or an absolute path to the
+    /// `.exe`.
+    ///
+    /// **A `Tail` output is stored in plain Postgres.** The kept stderr tail
+    /// lands in the execution record, so a failing child that prints a secret
+    /// to stderr persists it there; use [`CommandOutput::Discard`] for such a
+    /// job.
+    ///
+    /// **No `env` field, by design.** A task row is stored in plain Postgres,
+    /// so a secret placed there would be a durable copy of a credential. The
+    /// child inherits the runner's environment and nothing else.
+    Command {
+        /// The program to exec: a bare name resolved on the runner's `PATH`,
+        /// or an absolute path. Must be non-empty.
+        program: String,
+        /// Arguments passed to `program`, one element per argv entry, with no
+        /// shell splitting or expansion. Empty = no arguments.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<String>,
+        /// Working directory for the child. `None` = the runner's project
+        /// root. Stored as a string (not `PathBuf`) to keep this crate
+        /// JSON-Schema-friendly.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        working_directory: Option<String>,
+        /// Wall-clock timeout in seconds. `None` = 3600 s (one hour; see
+        /// [`COMMAND_DEFAULT_TIMEOUT_SECONDS`]). On timeout the runner kills
+        /// the child's whole process tree, not only the direct child.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
+        /// What happens to the child's output. Defaults to
+        /// `Tail { bytes: 2048 }` when absent.
+        #[serde(default)]
+        output: CommandOutput,
+        /// Launch the child detached from the runner, so it outlives the
+        /// runner's process-lifetime grouping, and record the run as
+        /// launched rather than waiting for its exit (so `output` and
+        /// `timeout_seconds` do not apply). Defaults to `false`.
+        ///
+        /// **Linux systemd caveat:** a runner run as a systemd unit with the
+        /// default `KillMode=control-group` kills a detached child on a
+        /// service stop or restart. `setsid` leaves the runner's session and
+        /// process group, not the unit's cgroup, so there the child does NOT
+        /// outlive the runner's service.
+        #[serde(default)]
+        detach: bool,
+    },
+}
+
+/// Default wall-clock timeout, in seconds, of a [`ScheduledTaskType::Command`]
+/// whose `timeout_seconds` is `None`: one hour.
+pub const COMMAND_DEFAULT_TIMEOUT_SECONDS: u64 = 3600;
+
+/// What the runner does with the output of a [`ScheduledTaskType::Command`]
+/// child.
+///
+/// Internally tagged by `type`: `{"type":"Discard"}` or
+/// `{"type":"Tail","bytes":2048}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type")]
+pub enum CommandOutput {
+    /// Stdout and stderr go to the null device. The runner never logs,
+    /// stores or forwards a single byte of either.
+    Discard,
+    /// Keep the last `bytes` bytes of stderr and store them in the execution
+    /// record's `error_message`; stdout is discarded. The accepted range of
+    /// `bytes` is `1..=4096` ([`CommandOutput::MAX_TAIL_BYTES`]): the runner's
+    /// create and update routes refuse `0` and anything above 4096 with a
+    /// `400`.
+    Tail {
+        /// How many trailing bytes of stderr to keep: `1..=4096`.
+        #[schemars(range(min = 1, max = 4096))]
+        bytes: u32,
+    },
+}
+
+impl CommandOutput {
+    /// The largest accepted [`CommandOutput::Tail`] `bytes` (the smallest is 1).
+    pub const MAX_TAIL_BYTES: u32 = 4096;
+    /// The `bytes` of the default [`CommandOutput::Tail`].
+    pub const DEFAULT_TAIL_BYTES: u32 = 2048;
+}
+
+impl Default for CommandOutput {
+    /// `Tail { bytes: 2048 }`: enough to diagnose a failure without keeping
+    /// a log file.
+    fn default() -> Self {
+        CommandOutput::Tail {
+            bytes: Self::DEFAULT_TAIL_BYTES,
+        }
+    }
 }
 
 /// Lightweight reference to an MCP connection for [`ScheduledTaskType::RemoteAgent`].
@@ -481,7 +587,8 @@ pub struct TaskExecutionRecord {
     /// Whether the task succeeded, read from the session checkpoint.
     #[serde(default, alias = "success")]
     pub success: bool,
-    /// Error message if the execution failed.
+    /// Error message of a failed run, or a note on a successful one (a
+    /// detached `Command`'s launch note).
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -983,8 +1090,8 @@ pub enum RecurringAgentError {
     /// A custom agent (no `catalog_ref`) without a `task_spec`.
     #[error("a custom agent (no catalog_ref) must carry a task_spec")]
     CustomWithoutTask,
-    /// A custom agent whose task is not a `RemoteAgent` (D9: `Script` tasks
-    /// come only from the catalog).
+    /// A custom agent whose task is not a `RemoteAgent` (D9: `Script` and
+    /// `Command` tasks come only from the catalog).
     #[error("a custom agent may only run a RemoteAgent task, got {task_type}")]
     CustomTaskNotRemoteAgent {
         /// The task type that was supplied.
@@ -1583,8 +1690,8 @@ fn is_param_slug(s: &str) -> bool {
 /// catalog agent, the template rendered from `params`; a working directory may
 /// still be the `{workspace_root}` token, which the runner resolves). A
 /// custom agent (no `catalog_ref`) must carry a `RemoteAgent` task and no
-/// `requireProbe` condition (D9): `Script` and probe commands come only from
-/// the catalog, and the runner applies them only when they equal its own
+/// `requireProbe` condition (D9): `Script`, `Command` and probe commands come
+/// only from the catalog, and the runner applies them only when they equal its own
 /// bundled pin.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
@@ -1699,6 +1806,7 @@ fn task_type_name(task: &ScheduledTaskType) -> &'static str {
         ScheduledTaskType::BackgroundCapture { .. } => "BackgroundCapture",
         ScheduledTaskType::RemoteAgent { .. } => "RemoteAgent",
         ScheduledTaskType::Script { .. } => "Script",
+        ScheduledTaskType::Command { .. } => "Command",
     }
 }
 
@@ -2498,6 +2606,24 @@ mod tests {
             script.validate(),
             Err(RecurringAgentError::CustomTaskNotRemoteAgent {
                 task_type: "Script"
+            })
+        );
+
+        let command = RecurringAgentSpec {
+            task_spec: Some(ScheduledTaskType::Command {
+                program: "rm".to_string(),
+                args: vec!["-rf".to_string(), "/".to_string()],
+                working_directory: None,
+                timeout_seconds: None,
+                output: CommandOutput::default(),
+                detach: false,
+            }),
+            ..custom_spec()
+        };
+        assert_eq!(
+            command.validate(),
+            Err(RecurringAgentError::CustomTaskNotRemoteAgent {
+                task_type: "Command"
             })
         );
 

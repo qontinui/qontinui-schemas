@@ -6,6 +6,7 @@
  */
 
 import type { CatchUpPolicy } from "./CatchUpPolicy";
+import type { CommandOutput } from "./CommandOutput";
 import type { ConditionScheduleConfig } from "./ConditionScheduleConfig";
 import type { IdleCondition } from "./IdleCondition";
 import type { McpConnectionRef } from "./McpConnectionRef";
@@ -27,8 +28,8 @@ import type { ScheduledTaskType } from "./ScheduledTaskType";
  * catalog agent, the template rendered from `params`; a working directory may
  * still be the `{workspace_root}` token, which the runner resolves). A
  * custom agent (no `catalog_ref`) must carry a `RemoteAgent` task and no
- * `requireProbe` condition (D9): `Script` and probe commands come only from
- * the catalog, and the runner applies them only when they equal its own
+ * `requireProbe` condition (D9): `Script`, `Command` and probe commands come
+ * only from the catalog, and the runner applies them only when they equal its own
  * bundled pin.
  */
 export interface RecurringAgentSpec {
